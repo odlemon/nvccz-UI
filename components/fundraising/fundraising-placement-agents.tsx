@@ -46,7 +46,7 @@ function StatusChip({ label, className }: { label: string; className: string }) 
   return (
     <span
       className={cn(
-        "inline-flex whitespace-nowrap rounded-[4px] px-2 py-0.5 text-[10px] font-semibold",
+        "inline-flex whitespace-nowrap rounded-[4px] px-2 py-0.5 text-[11px] font-semibold",
         className,
       )}
     >
@@ -65,9 +65,9 @@ function KpiCard({ kpi }: { kpi: PlacementAgentKpi }) {
       >
         <Icon className="h-[18px] w-[18px]" strokeWidth={2} />
       </span>
-      <p className="mt-3 text-[12px] font-medium text-[#64748b]">{kpi.label}</p>
-      <p className="mt-1.5 text-[22px] font-bold tabular-nums text-[#0f172a]">{kpi.value}</p>
-      <p className="mt-1 text-[11px] text-[#94a3b8]">{kpi.sublabel}</p>
+      <p className="mt-3 text-[12px] font-medium text-[#111111]">{kpi.label}</p>
+      <p className="mt-1.5 text-[22px] font-bold tabular-nums text-[#000000]">{kpi.value}</p>
+      <p className="mt-1 text-[11px] text-[#141414]">{kpi.sublabel}</p>
     </div>
   )
 }
@@ -104,52 +104,52 @@ function DetailPanel({
   return (
     <aside className={cn(CARD, "flex flex-col overflow-hidden")}>
       <div className="border-b border-[#f1f5f9] px-4 py-4">
-        <h2 className="text-[13px] font-semibold text-[#0f172a]">{agent.name}</h2>
-        <p className="mt-0.5 text-[11px] text-[#64748b]">{agent.geography}</p>
+        <h2 className="text-[13px] font-semibold text-[#000000]">{agent.name}</h2>
+        <p className="mt-0.5 text-[11px] text-[#111111]">{agent.geography}</p>
         <div className="mt-3 flex flex-wrap gap-1.5">
           <StatusChip
             label={agent.commissionStatus ?? "—"}
-            className={agent.commissionStatus ? commissionStatusClass(agent.commissionStatus as any) : "bg-[#f1f5f9] text-[#64748b]"}
+            className={agent.commissionStatus ? commissionStatusClass(agent.commissionStatus as any) : "bg-[#f1f5f9] text-[#111111]"}
           />
           <StatusChip
             label={`${agent.feePct}% fee`}
-            className="bg-[#f1f5f9] text-[#64748b]"
+            className="bg-[#f1f5f9] text-[#111111]"
           />
         </div>
         <dl className="mt-3 space-y-1.5 text-[11px]">
           <div className="flex justify-between gap-2">
-            <dt className="text-[#94a3b8]">Retainer</dt>
-            <dd className="font-medium text-[#0f172a]">{agent.retainer}</dd>
+            <dt className="text-[#141414]">Retainer</dt>
+            <dd className="font-medium text-[#000000]">{agent.retainer}</dd>
           </div>
           <div className="flex justify-between gap-2">
-            <dt className="text-[#94a3b8]">Period</dt>
-            <dd className="text-[#64748b]">{agent.period}</dd>
+            <dt className="text-[#141414]">Period</dt>
+            <dd className="text-[#111111]">{agent.period}</dd>
           </div>
           <div className="flex justify-between gap-2">
-            <dt className="text-[#94a3b8]">Owner</dt>
-            <dd className="text-[#64748b]">{agent.owner}</dd>
+            <dt className="text-[#141414]">Owner</dt>
+            <dd className="text-[#111111]">{agent.owner}</dd>
           </div>
           <div className="flex justify-between gap-2">
-            <dt className="text-[#94a3b8]">Appointed</dt>
-            <dd className="text-[#64748b]">{agent.appointedAt}</dd>
+            <dt className="text-[#141414]">Appointed</dt>
+            <dd className="text-[#111111]">{agent.appointedAt}</dd>
           </div>
           <div className="flex justify-between gap-2">
-            <dt className="text-[#94a3b8]">Accrued commission</dt>
-            <dd className="font-medium text-[#0f172a]">{agent.accruedCommissionLabel}</dd>
+            <dt className="text-[#141414]">Accrued commission</dt>
+            <dd className="font-medium text-[#000000]">{agent.accruedCommissionLabel}</dd>
           </div>
           <div className="flex justify-between gap-2">
-            <dt className="text-[#94a3b8]">Paid commission</dt>
-            <dd className="text-[#64748b]">{agent.paidCommissionLabel}</dd>
+            <dt className="text-[#141414]">Paid commission</dt>
+            <dd className="text-[#111111]">{agent.paidCommissionLabel}</dd>
           </div>
         </dl>
       </div>
 
       {agent.exclusions.length > 0 ? (
         <div className="border-b border-[#f1f5f9] px-4 py-3">
-          <p className="text-[11px] font-semibold text-[#0f172a]">Exclusions</p>
+          <p className="text-[11px] font-semibold text-[#000000]">Exclusions</p>
           <ul className="mt-2 space-y-1">
             {agent.exclusions.map((ex: string) => (
-              <li key={ex} className="flex items-start gap-1.5 text-[11px] text-[#64748b]">
+              <li key={ex} className="flex items-start gap-1.5 text-[11px] text-[#111111]">
                 <Ban className="mt-0.5 h-3 w-3 shrink-0 text-[#dc2626]" />
                 {ex}
               </li>
@@ -160,13 +160,13 @@ function DetailPanel({
 
       <div className="px-4 py-3">
         <div className="flex items-center justify-between">
-          <h3 className="text-[12px] font-semibold text-[#0f172a]">Assigned Opportunities</h3>
-          <span className="text-[11px] tabular-nums text-[#64748b]">
+          <h3 className="text-[12px] font-semibold text-[#000000]">Assigned Opportunities</h3>
+          <span className="text-[11px] tabular-nums text-[#111111]">
             {detailLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : `${eligible}/${assignedOpportunities.length} eligible`}
           </span>
         </div>
         {assignedOpportunities.length === 0 ? (
-          <p className="mt-2 text-[11px] text-[#94a3b8]">
+          <p className="mt-2 text-[11px] text-[#141414]">
             {detailLoading ? "Loading assigned opportunities…" : "No opportunities assigned yet."}
           </p>
         ) : (
@@ -174,9 +174,9 @@ function DetailPanel({
             {assignedOpportunities.slice(0, 4).map((o) => (
               <li key={o.id} className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
-                  <p className="truncate text-[11px] font-medium text-[#0f172a]">{o.investor}</p>
-                  <p className="truncate text-[10px] text-[#64748b]">{o.campaign} · {o.opportunity}</p>
-                  <p className="text-[10px] text-[#94a3b8]">{o.amount}</p>
+                  <p className="truncate text-[11px] font-medium text-[#000000]">{o.investor}</p>
+                  <p className="truncate text-[11px] text-[#111111]">{o.campaign} · {o.opportunity}</p>
+                  <p className="text-[11px] text-[#141414]">{o.amount}</p>
                 </div>
                 <StatusChip
                   label={o.status}
@@ -201,13 +201,13 @@ function DetailPanel({
 
       <div className="border-t border-[#f1f5f9] px-4 py-3">
         <div className="flex items-center justify-between">
-          <h3 className="text-[12px] font-semibold text-[#0f172a]">Commissions</h3>
-          <span className="text-[11px] tabular-nums text-[#64748b]">
+          <h3 className="text-[12px] font-semibold text-[#000000]">Commissions</h3>
+          <span className="text-[11px] tabular-nums text-[#111111]">
             {commissionsLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : `${commissions.length}`}
           </span>
         </div>
         {commissions.length === 0 ? (
-          <p className="mt-2 text-[11px] text-[#94a3b8]">
+          <p className="mt-2 text-[11px] text-[#141414]">
             {commissionsLoading ? "Loading commissions…" : "No commission entries recorded yet."}
           </p>
         ) : (
@@ -215,12 +215,12 @@ function DetailPanel({
             {commissions.slice(0, 4).map((c) => (
               <li key={c.id} className="flex items-center justify-between gap-2">
                 <div className="min-w-0">
-                  <p className="truncate text-[11px] font-medium text-[#0f172a]">{c.investor}</p>
-                  <p className="text-[10px] text-[#94a3b8]">{c.amount} · {c.date}</p>
+                  <p className="truncate text-[11px] font-medium text-[#000000]">{c.investor}</p>
+                  <p className="text-[11px] text-[#141414]">{c.amount} · {c.date}</p>
                 </div>
                 <StatusChip
                   label={c.status}
-                  className={c.status ? commissionStatusClass(c.status as any) : "bg-[#f1f5f9] text-[#64748b]"}
+                  className={c.status ? commissionStatusClass(c.status as any) : "bg-[#f1f5f9] text-[#111111]"}
                 />
               </li>
             ))}
@@ -229,7 +229,7 @@ function DetailPanel({
       </div>
 
       <div className="mt-auto border-t border-[#f1f5f9] px-4 py-3">
-        <p className="mb-2 text-[11px] font-semibold text-[#0f172a]">Assign Opportunity</p>
+        <p className="mb-2 text-[11px] font-semibold text-[#000000]">Assign Opportunity</p>
         <div className="flex gap-2">
           <select
             className={cn(frSelectClass, "h-8 rounded-full text-[11px]")}
@@ -627,11 +627,11 @@ export function FundraisingPlacementAgents() {
     <div className="h-full overflow-y-auto bg-[#f8fafc] p-4 md:p-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="flex items-center gap-2 text-xl font-bold text-[#0f172a] md:text-[22px]">
+          <h1 className="flex items-center gap-2 text-xl font-bold text-[#000000] md:text-[22px]">
             Placement Agents
-            {loading ? <Loader2 className="h-4 w-4 animate-spin text-[#94a3b8]" /> : null}
+            {loading ? <Loader2 className="h-4 w-4 animate-spin text-[#141414]" /> : null}
           </h1>
-          <p className="mt-1 text-[12px] text-[#64748b]">
+          <p className="mt-1 text-[12px] text-[#111111]">
             Agent appointments, geography coverage and commission-eligible opportunities
           </p>
         </div>
@@ -669,13 +669,13 @@ export function FundraisingPlacementAgents() {
         <div className={cn(CARD, "overflow-hidden")}>
           <div className="flex flex-col gap-3 border-b border-[#f1f5f9] px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-2">
-              <h2 className="text-[13px] font-semibold text-[#0f172a]">Appointments</h2>
-              <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-[4px] bg-[#f1f5f9] px-1.5 text-[11px] font-semibold text-[#64748b]">
+              <h2 className="text-[13px] font-semibold text-[#000000]">Appointments</h2>
+              <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-[4px] bg-[#f1f5f9] px-1.5 text-[11px] font-semibold text-[#111111]">
                 {merged.length}
               </span>
             </div>
             <div className="relative w-full sm:w-[220px]">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#94a3b8]" />
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#141414]" />
               <Input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
@@ -698,7 +698,7 @@ export function FundraisingPlacementAgents() {
                     "Commission",
                     "Owner",
                   ].map((h) => (
-                    <th key={h} className="px-3 py-2 text-[11px] font-semibold text-[#94a3b8]">
+                    <th key={h} className="px-3 py-2 text-[11px] font-semibold text-[#141414]">
                       {h}
                     </th>
                   ))}
@@ -709,7 +709,7 @@ export function FundraisingPlacementAgents() {
                   <FrTableSkeleton columns={8} rows={6} />
                 ) : filtered.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="px-3 py-10 text-center text-[13px] text-[#94a3b8]">
+                    <td colSpan={8} className="px-3 py-10 text-center text-[13px] text-[#141414]">
                       {merged.length === 0 ? "No placement agents appointed yet." : "No agents match your search."}
                     </td>
                   </tr>
@@ -723,23 +723,23 @@ export function FundraisingPlacementAgents() {
                         selectedId === a.id ? "bg-[#f5f3ff]" : "hover:bg-[#f8fafc]",
                       )}
                     >
-                      <td className="px-3 py-2.5 text-[12px] font-medium text-[#0f172a]">{a.name}</td>
-                      <td className="px-3 py-2.5 text-[11px] text-[#64748b]">{a.geography}</td>
-                      <td className="px-3 py-2.5 text-[11px] tabular-nums text-[#0f172a]">
+                      <td className="px-3 py-2.5 text-[12px] font-medium text-[#000000]">{a.name}</td>
+                      <td className="px-3 py-2.5 text-[11px] text-[#111111]">{a.geography}</td>
+                      <td className="px-3 py-2.5 text-[11px] tabular-nums text-[#000000]">
                         {a.feePct}%
                       </td>
-                      <td className="px-3 py-2.5 text-[11px] text-[#64748b]">{a.retainer}</td>
-                      <td className="px-3 py-2.5 text-[11px] text-[#94a3b8]">{a.period}</td>
-                      <td className="px-3 py-2.5 text-[11px] tabular-nums text-[#0f172a]">
+                      <td className="px-3 py-2.5 text-[11px] text-[#111111]">{a.retainer}</td>
+                      <td className="px-3 py-2.5 text-[11px] text-[#141414]">{a.period}</td>
+                      <td className="px-3 py-2.5 text-[11px] tabular-nums text-[#000000]">
                         {a.introducedCount}
                       </td>
                       <td className="px-3 py-2.5">
                         <StatusChip
                           label={a.commissionStatus ?? "—"}
-                          className={a.commissionStatus ? commissionStatusClass(a.commissionStatus as any) : "bg-[#f1f5f9] text-[#64748b]"}
+                          className={a.commissionStatus ? commissionStatusClass(a.commissionStatus as any) : "bg-[#f1f5f9] text-[#111111]"}
                         />
                       </td>
-                      <td className="px-3 py-2.5 text-[11px] text-[#64748b]">{a.owner}</td>
+                      <td className="px-3 py-2.5 text-[11px] text-[#111111]">{a.owner}</td>
                     </tr>
                   ))
                 )}

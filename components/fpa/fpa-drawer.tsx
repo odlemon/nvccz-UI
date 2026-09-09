@@ -27,11 +27,11 @@ export function FpaDrawer({ open, onClose, title, children, footer, className, b
       <div className="flex items-start justify-between gap-2 px-4 py-3 border-b border-[#e2e8f0] shrink-0">
         <div className="min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <h2 className="text-sm font-semibold text-[#0f172a]">{title}</h2>
+            <h2 className="text-sm font-semibold text-[#000000]">{title}</h2>
             {badge}
           </div>
         </div>
-        <button type="button" onClick={onClose} className="text-[#94a3b8] hover:text-[#64748b] p-1" aria-label="Close">
+        <button type="button" onClick={onClose} className="text-[#141414] hover:text-[#111111] p-1" aria-label="Close">
           <X className="w-4 h-4" />
         </button>
       </div>

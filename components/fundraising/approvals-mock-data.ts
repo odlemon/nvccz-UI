@@ -9,9 +9,9 @@ export function priorityClass(priority: string | null | undefined) {
     case "MEDIUM":
       return "bg-[#ffedd5] text-[#c2410c]"
     case "LOW":
-      return "bg-[#f1f5f9] text-[#64748b]"
+      return "bg-[#f1f5f9] text-[#111111]"
     default:
-      return "bg-[#f1f5f9] text-[#94a3b8]"
+      return "bg-[#f1f5f9] text-[#141414]"
   }
 }
 
@@ -32,5 +32,5 @@ export function typeClass(type: string) {
   if (t.includes("COMMITMENT") || t.includes("FEE")) return "bg-[#ede9fe] text-[#6d28d9]"
   if (t.includes("OPPORTUNITY") || t.includes("STAGE")) return "bg-[#e0f2fe] text-[#0369a1]"
   if (t.includes("AGREEMENT") || t.includes("SIDE_LETTER")) return "bg-[#dbeafe] text-[#1d4ed8]"
-  return "bg-[#f1f5f9] text-[#64748b]"
+  return "bg-[#f1f5f9] text-[#111111]"
 }

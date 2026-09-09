@@ -945,15 +945,33 @@ function pathMatches(base: string, path: string) {
   return path === b || path.startsWith(`${b}/`)
 }
 
+const moduleOwnsPath = (module: ModuleConfig, path: string): boolean =>
+  pathMatches(module.path, path) ||
+  module.subModules.some(sub => pathMatches(sub.path, path)) ||
+  (module.groups ? module.groups.some(g => {
+    if (g.path && pathMatches(g.path, path)) return true
+    return g.items ? g.items.some(sub => pathMatches(sub.path, path)) : false
+  }) : false)
+
+/**
+ * Resolve the module that owns a path.
+ *
+ * Superseded modules are preferred LAST. Several paths are claimed by both an old module
+ * and the client-design port that replaced it — `/performance` is owned by both
+ * `performance-management` (superseded, declared first) and, in practice, by
+ * `performance-v22`, whose own `path` is the redirecting `/performance-v22`. A plain
+ * `.find()` returns whichever appears earlier in MODULE_CONFIG, which for `/performance`
+ * was the dead module, so `ClientDesignModuleShell` overwrote its own
+ * `defaultModuleId="performance-v22"` with `performance-management` on mount and every
+ * permission check keyed by module id evaluated the wrong id.
+ *
+ * Ordering by supersededness rather than reordering MODULE_CONFIG fixes the whole class
+ * of collision without changing the array, which other code reads positionally.
+ */
 export const getModuleByPath = (path: string): ModuleConfig | undefined => {
-  return MODULE_CONFIG.find(module =>
-    pathMatches(module.path, path) ||
-    module.subModules.some(sub => pathMatches(sub.path, path)) ||
-    (module.groups ? module.groups.some(g => {
-      if (g.path && pathMatches(g.path, path)) return true
-      return g.items ? g.items.some(sub => pathMatches(sub.path, path)) : false
-    }) : false)
-  )
+  const matches = MODULE_CONFIG.filter(module => moduleOwnsPath(module, path))
+  if (matches.length <= 1) return matches[0]
+  return matches.find(m => !SUPERSEDED_MODULE_IDS.has(m.id)) ?? matches[0]
 }
 
 /** Modules shown in the App Switcher (excludes superseded old UIs). */

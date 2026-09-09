@@ -2618,6 +2618,106 @@ export function getRolePermissions(roleCode: RoleCode): RolePermissions | null {
 }
 
 /**
+ * Client-design ports that replaced an older module inherit that module's grants.
+ *
+ * `performance-v22` serves `/performance`, superseding `performance-management`. Every role
+ * in ROLE_PERMISSIONS_MAP is granted `performance-management` (26 of them) and none is
+ * granted `performance-v22`, so removing the blanket "return true" bypass without this alias
+ * would lock every user out of the module. Aliasing reuses the access levels that were
+ * already deliberated per role rather than inventing 26 new grants.
+ */
+const MODULE_ID_ALIASES: Record<string, string> = {
+  "performance-v22": "performance-management",
+};
+
+/**
+ * Sub-module handling for aliased modules.
+ *
+ * The legacy `performance-management` subModules allowlists are deliberately NOT reused for
+ * V22 page ids, for three measured reasons:
+ *
+ *  1. 12 of 36 roles declare an allowlist, in three competing naming conventions for the
+ *     same page (`kpi-management` / `kpiManagement`; `department-scorecard` /
+ *     `department-scorecards` / `departmentScorecard`), and several ids match no entry in
+ *     modules.ts at all.
+ *  2. Those allowlists cover only 5-6 of the legacy module's ~25 pages. Only **CFO** grants
+ *     `performance-reviews`; 11 of the 12 omit it. Mapping V22's Reviews page onto that id
+ *     therefore denies Reviews to HR_MGR — the role whose entire function is review
+ *     governance. Verified, not assumed.
+ *  3. They were authored against a different page inventory and cannot express an opinion
+ *     about pages that did not exist at the time.
+ *
+ * So an aliased module resolves on module-level access, with administrative surfaces gated
+ * behind `full`. Note the baseline this replaces: before this change a hard-coded bypass
+ * granted every role full access to every page, so relative to actual behaviour this is
+ * strictly a tightening, not a widening.
+ */
+const ADMIN_SUBMODULE_IDS = new Set<string>(["pm22-access"]);
+
+const resolveModuleId = (moduleId: string): string => MODULE_ID_ALIASES[moduleId] ?? moduleId;
+
+/**
+ * Sub-module ids are spelled three different ways across ROLE_PERMISSIONS_MAP and
+ * middleware.ts routePermissions, for the same page:
+ *
+ *   kpi-management / kpiManagement        task-management / tasks-management / taskManagement
+ *   goals-management / goalsManagement    department-scorecard / department-scorecards / departmentScorecard
+ *   performance-dashboard / dashboard     departments / departments-management
+ *
+ * That was harmless while `/performance-legacy` sat inside STAFF_PUBLIC_PASS_THROUGH and the
+ * permission loop never ran for it. Removing `/performance` from that list on 8 Sep 2026 also
+ * un-exempted `/performance-legacy` (startsWith), and the mismatches immediately locked real
+ * roles out of the legacy module: `/performance-legacy/departments` denied to EVERY role
+ * tested, and the landing page denied to HR_MGR, CEO and OPS_MGR.
+ *
+ * `subModuleMatches` compares ids by normalised form (lowercased, separators stripped) and by
+ * an explicit synonym group. This is a spelling fix, not a widening: it never grants a page a
+ * role's allowlist does not already name in some spelling, and roles with no allowlist are
+ * unaffected because they inherit module access before this is consulted.
+ */
+const SUBMODULE_SYNONYMS: string[][] = [
+  ["performancedashboard", "dashboard"],
+  ["departments", "departmentsmanagement"],
+  ["taskmanagement", "tasksmanagement"],
+  ["departmentscorecard", "departmentscorecards"],
+  ["userscorecard", "userscorecards"],
+]
+
+const normaliseSubModuleId = (id: string): string => id.toLowerCase().replace(/[^a-z0-9]/g, "")
+
+/**
+ * A module's landing page inherits module access.
+ *
+ * Several allowlists grant every feature page but omit the dashboard — OPS_MGR holds
+ * kpi-management, goals-management, task-management, department-scorecard and user-scorecard
+ * on `performance-management`, yet no dashboard entry, so it could reach every sub-page of
+ * the legacy module while being bounced off the module's own front door. That is incoherent
+ * rather than restrictive, and it only became visible once the route stopped being exempt
+ * from the permission loop. A role that already holds module access can see the landing page.
+ */
+const LANDING_SUBMODULE_IDS = new Set(["performancedashboard", "dashboard"])
+
+function subModuleMatches(required: string, held: string): boolean {
+  const a = normaliseSubModuleId(required)
+  const b = normaliseSubModuleId(held)
+  if (a === b) return true
+  return SUBMODULE_SYNONYMS.some((group) => group.includes(a) && group.includes(b))
+}
+
+/** Look up a sub-module grant tolerantly across the naming variants above. */
+function findSubModuleAccess(
+  subModules: Record<string, 'full' | 'read' | 'write' | 'none'>,
+  subModuleId: string,
+): 'full' | 'read' | 'write' | 'none' | undefined {
+  const direct = subModules[subModuleId]
+  if (direct) return direct
+  for (const key of Object.keys(subModules)) {
+    if (subModuleMatches(subModuleId, key)) return subModules[key]
+  }
+  return undefined
+}
+
+/**
  * Check if a role has access to a specific module
  */
 export function hasModuleAccess(
@@ -2642,13 +2742,15 @@ export function hasModuleAccess(
   if (moduleId === "investee-portal-v8") return true;
   // Accounting V2 redesign mocks — open during mock phase
   if (moduleId === "accounting-v2") return true;
-  // Performance Management V22.1 client design — open during comparison/mock phase
-  if (moduleId === "performance-v22") return true;
+  // NOTE: the `performance-v22` bypass that sat here was removed on 8 Sep 2026. It made the
+  // whole Performance module readable and writable by every role regardless of grants.
+  // Access now resolves through MODULE_ID_ALIASES against the real per-role grants.
 
   const permissions = getRolePermissions(roleCode);
   if (!permissions) return false;
 
-  const modulePermission = permissions.modules.find(m => m.moduleId === moduleId);
+  const resolved = resolveModuleId(moduleId);
+  const modulePermission = permissions.modules.find(m => m.moduleId === resolved);
   return modulePermission ? modulePermission.access !== 'none' : false;
 }
 
@@ -2683,21 +2785,35 @@ export function hasSubModuleAccess(
   if (moduleId === "fundraising-kyc") return true;
   if (moduleId === "investee-portal-v8") return true;
   if (moduleId === "accounting-v2") return true;
-  if (moduleId === "performance-v22") return true;
+  // `performance-v22` bypass removed 8 Sep 2026 — see hasModuleAccess above.
 
   const permissions = getRolePermissions(roleCode);
   if (!permissions) return false;
 
-  const modulePermission = permissions.modules.find(m => m.moduleId === moduleId);
+  const resolved = resolveModuleId(moduleId);
+  const modulePermission = permissions.modules.find(m => m.moduleId === resolved);
   if (!modulePermission || modulePermission.access === 'none') return false;
+
+  // Aliased module (e.g. performance-v22 → performance-management): the superseded module's
+  // sub-module allowlist does not describe this module's pages — see the note above.
+  // Resolve on module access, gating administrative surfaces behind 'full'.
+  if (resolved !== moduleId) {
+    if (ADMIN_SUBMODULE_IDS.has(subModuleId)) return modulePermission.access === 'full';
+    return true; // access !== 'none' already checked
+  }
 
   // If no specific sub-module permissions, inherit from module
   if (!modulePermission.subModules) {
     return true; // Already checked access !== 'none' above
   }
 
-  const subModuleAccess = modulePermission.subModules[subModuleId];
-  return subModuleAccess ? subModuleAccess !== 'none' : false;
+  const subModuleAccess = findSubModuleAccess(modulePermission.subModules, subModuleId);
+  if (subModuleAccess) return subModuleAccess !== 'none';
+
+  // Landing page of a module the role already has access to.
+  if (LANDING_SUBMODULE_IDS.has(normaliseSubModuleId(subModuleId))) return true;
+
+  return false;
 }
 
 /**

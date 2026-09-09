@@ -79,8 +79,8 @@ export function FpaExportDownloadModal({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md rounded-2xl border border-[#e2e8f0] p-0 gap-0 overflow-hidden">
         <DialogHeader className="px-5 pt-5 pb-3 border-b border-[#f1f5f9]">
-          <DialogTitle className="text-base text-[#0f172a]">{title}</DialogTitle>
-          <DialogDescription className="text-sm text-[#64748b]">
+          <DialogTitle className="text-base text-[#000000]">{title}</DialogTitle>
+          <DialogDescription className="text-sm text-[#111111]">
             {description}
           </DialogDescription>
         </DialogHeader>
@@ -89,7 +89,7 @@ export function FpaExportDownloadModal({
           {status === "loading" && (
             <>
               <Loader2 className="w-8 h-8 animate-spin text-[#2563eb]" />
-              <p className="text-sm text-[#475569]">Downloading…</p>
+              <p className="text-sm text-[#111111]">Downloading…</p>
             </>
           )}
           {status === "done" && (
@@ -97,12 +97,12 @@ export function FpaExportDownloadModal({
               <div className="h-10 w-10 rounded-full bg-[#ecfdf5] flex items-center justify-center">
                 <Download className="w-5 h-5 text-[#059669]" />
               </div>
-              <p className="text-sm font-medium text-[#0f172a]">Download started</p>
+              <p className="text-sm font-medium text-[#000000]">Download started</p>
               {savedAs ? (
-                <p className="text-xs text-[#64748b] truncate max-w-full">{savedAs}</p>
+                <p className="text-xs text-[#111111] truncate max-w-full">{savedAs}</p>
               ) : null}
               {formatNote ? (
-                <p className="text-[11px] text-[#64748b] leading-relaxed max-w-sm">{formatNote}</p>
+                <p className="text-[11px] text-[#111111] leading-relaxed max-w-sm">{formatNote}</p>
               ) : null}
             </>
           )}
@@ -111,8 +111,8 @@ export function FpaExportDownloadModal({
               <div className="h-10 w-10 rounded-full bg-[#fef2f2] flex items-center justify-center">
                 <X className="w-5 h-5 text-[#dc2626]" />
               </div>
-              <p className="text-sm font-medium text-[#0f172a]">Couldn’t download</p>
-              <p className="text-xs text-[#64748b]">{error}</p>
+              <p className="text-sm font-medium text-[#000000]">Couldn’t download</p>
+              <p className="text-xs text-[#111111]">{error}</p>
             </>
           )}
         </div>
@@ -130,7 +130,7 @@ export function FpaExportDownloadModal({
           <button
             type="button"
             onClick={() => onOpenChange(false)}
-            className="h-9 flex-1 rounded-full border border-[#e2e8f0] text-sm font-medium text-[#475569]"
+            className="h-9 flex-1 rounded-full border border-[#e2e8f0] text-sm font-medium text-[#111111]"
           >
             {status === "done" ? "Close" : "Cancel"}
           </button>

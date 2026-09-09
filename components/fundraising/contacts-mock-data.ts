@@ -253,6 +253,6 @@ export function influenceChipClass(influence: ContactInfluence): string {
     case "Gatekeeper":
       return "bg-[#ffedd5] text-[#c2410c]"
     default:
-      return "bg-[#f1f5f9] text-[#64748b]"
+      return "bg-[#f1f5f9] text-[#111111]"
   }
 }

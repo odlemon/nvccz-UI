@@ -69,14 +69,14 @@ function HeaderFilter({
         aria-haspopup="listbox"
       >
         <span className="flex flex-col justify-center min-w-0 py-1">
-          <span className="text-[9px] font-medium uppercase tracking-wide text-[#94a3b8] leading-none">
+          <span className="text-[11px] font-medium uppercase tracking-wide text-[#141414] leading-none">
             {label}
           </span>
-          <span className="text-[12px] font-semibold text-[#0f172a] leading-tight mt-0.5 truncate">
+          <span className="text-[12px] font-semibold text-[#000000] leading-tight mt-0.5 truncate">
             {value}
           </span>
         </span>
-        <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[#94a3b8]">{trailing}</span>
+        <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[#141414]">{trailing}</span>
       </button>
       {open ? (
         <div
@@ -95,7 +95,7 @@ function HeaderFilter({
               }}
               className={cn(
                 "w-full flex items-center justify-between gap-2 px-3 py-2 text-left text-[12px] hover:bg-[#f8fafc]",
-                opt === value ? "text-[#2563eb] font-semibold" : "text-[#334155]",
+                opt === value ? "text-[#2563eb] font-semibold" : "text-[#111111]",
               )}
             >
               {opt}
@@ -178,20 +178,20 @@ export function FpaPageHeader({
       )}
     >
       <div className="flex items-center gap-2 shrink-0">
-        <h1 className="text-base font-semibold text-[#0f172a]">{title}</h1>
-        <Star className="w-4 h-4 text-[#cbd5e1]" strokeWidth={1.75} />
+        <h1 className="text-base font-semibold text-[#000000]">{title}</h1>
+        <Star className="w-4 h-4 text-[#141414]" strokeWidth={1.75} />
       </div>
 
       {showSearch ? (
         <div className="flex-1 min-w-[160px] max-w-md relative order-last sm:order-none w-full sm:w-auto">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#94a3b8]" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#141414]" />
           <input
-            className="w-full h-10 rounded-md border border-[#e2e8f0] bg-white pl-9 pr-14 text-sm text-[#0f172a] placeholder:text-[#94a3b8] focus:outline-none focus:ring-2 focus:ring-[#2563eb]/30"
+            className="w-full h-10 rounded-md border border-[#e2e8f0] bg-white pl-9 pr-14 text-sm text-[#000000] placeholder:text-[#141414] focus:outline-none focus:ring-2 focus:ring-[#2563eb]/30"
             placeholder={searchPlaceholder}
             value={searchValue}
             onChange={(event) => onSearchChange?.(event.target.value)}
           />
-          <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[10px] text-[#94a3b8] border border-[#e2e8f0] rounded-[4px] bg-[#f8fafc] px-1.5 py-0.5 hidden sm:inline">
+          <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[11px] text-[#141414] border border-[#e2e8f0] rounded-[4px] bg-[#f8fafc] px-1.5 py-0.5 hidden sm:inline">
             ⌘ K
           </span>
         </div>
@@ -232,11 +232,11 @@ export function FpaPageHeader({
               key={f.label + f.value}
               className="h-10 min-w-[108px] inline-flex flex-col justify-center rounded-full border border-[#e2e8f0] bg-white px-2.5 text-left"
             >
-              <span className="text-[9px] font-medium uppercase tracking-wide text-[#94a3b8] leading-none">
+              <span className="text-[11px] font-medium uppercase tracking-wide text-[#141414] leading-none">
                 {f.label}
               </span>
-              <span className="text-[12px] font-semibold text-[#0f172a] leading-tight mt-0.5 inline-flex items-center gap-1.5">
-                {f.icon === "calendar" ? <Calendar className="w-3.5 h-3.5 text-[#94a3b8]" /> : null}
+              <span className="text-[12px] font-semibold text-[#000000] leading-tight mt-0.5 inline-flex items-center gap-1.5">
+                {f.icon === "calendar" ? <Calendar className="w-3.5 h-3.5 text-[#141414]" /> : null}
                 {f.value}
               </span>
             </div>

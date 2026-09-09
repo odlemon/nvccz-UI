@@ -416,10 +416,10 @@ export function FpaDriversLibrary() {
         title="Assumptions"
         actions={
           <div className="flex flex-wrap items-center gap-2">
-            <label className="flex items-center gap-1.5 text-[11px] text-[#667085]">
+            <label className="flex items-center gap-1.5 text-[11px] text-[#111111]">
               Model
               <select
-                className="h-9 rounded-full border border-[#d0d5dd] bg-white px-3 text-xs font-semibold text-[#101828]"
+                className="h-9 rounded-full border border-[#d0d5dd] bg-white px-3 text-xs font-semibold text-[#000000]"
                 value={selectedModelId || ""}
                 onChange={(e) => {
                   const id = e.target.value || null
@@ -475,10 +475,10 @@ export function FpaDriversLibrary() {
       />
 
       <div className="px-4 sm:px-5 pb-6 space-y-4 w-full">
-        <p className="text-[12px] text-[#667085]">
-          Driver library for the selected <span className="font-semibold text-[#344054]">model / version / scenario</span>
+        <p className="text-[12px] text-[#111111]">
+          Driver library for the selected <span className="font-semibold text-[#111111]">model / version / scenario</span>
           {" · "}
-          Currently scoped to <span className="font-semibold text-[#344054]">{scenarioLabel}</span>
+          Currently scoped to <span className="font-semibold text-[#111111]">{scenarioLabel}</span>
           {" · "}
           Create Best / Downside on{" "}
           <Link href="/forecasting/scenarios" className="text-[#2563eb] font-semibold hover:underline">
@@ -498,7 +498,7 @@ export function FpaDriversLibrary() {
                   "h-8 px-3 rounded-full text-xs font-semibold border transition-all",
                   activeCategory === cat
                     ? "border-[#2563eb] bg-[#eff8ff] text-[#175cd3]"
-                    : "border-[#d0d5dd] bg-white text-[#344054] hover:bg-[#f9fafb]",
+                    : "border-[#d0d5dd] bg-white text-[#111111] hover:bg-[#f9fafb]",
                 )}
               >
                 {cat === "ALL" ? "All Drivers" : cat}
@@ -507,23 +507,23 @@ export function FpaDriversLibrary() {
           </div>
 
           <div className="relative shrink-0">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[#98a2b3]" />
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[#141414]" />
             <input
               type="text"
               placeholder="Search drivers..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="h-8 w-48 rounded-full border border-[#d0d5dd] pl-8 pr-3 text-xs text-[#101828] placeholder:text-[#98a2b3] focus:outline-none focus:ring-1 focus:ring-[#2563eb]"
+              className="h-8 w-48 rounded-full border border-[#d0d5dd] pl-8 pr-3 text-xs text-[#000000] placeholder:text-[#141414] focus:outline-none focus:ring-1 focus:ring-[#2563eb]"
             />
           </div>
         </div>
 
         {!selectedModelId ? (
-          <div className="rounded-xl border border-dashed border-[#eaecf0] bg-white p-8 text-center text-sm text-[#94a3b8]">
+          <div className="rounded-xl border border-dashed border-[#eaecf0] bg-white p-8 text-center text-sm text-[#141414]">
             Select a model to load live assumptions from the API.
           </div>
         ) : loading ? (
-          <div className="rounded-xl border border-[#eaecf0] bg-white p-10 flex items-center justify-center gap-2 text-sm text-[#667085]">
+          <div className="rounded-xl border border-[#eaecf0] bg-white p-10 flex items-center justify-center gap-2 text-sm text-[#111111]">
             <Loader2 className="w-4 h-4 animate-spin" />
             Loading assumptions…
           </div>
@@ -541,7 +541,7 @@ export function FpaDriversLibrary() {
             </Button>
           </div>
         ) : filteredDrivers.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-[#eaecf0] bg-white p-8 text-center text-sm text-[#94a3b8] space-y-2">
+          <div className="rounded-xl border border-dashed border-[#eaecf0] bg-white p-8 text-center text-sm text-[#141414] space-y-2">
             <p>No drivers for this model / version / scenario.</p>
             <p className="text-[12px]">
               Create one here, or seed scenarios from Base on the Scenarios page first.
@@ -551,12 +551,12 @@ export function FpaDriversLibrary() {
           <div className="rounded-xl border border-[#eaecf0] bg-white shadow-sm overflow-hidden">
             <table className="w-full text-[13px] border-collapse min-w-[700px]">
               <thead>
-                <tr className="border-b border-[#eaecf0] bg-[#f9fafb] text-left text-xs text-[#475467]">
+                <tr className="border-b border-[#eaecf0] bg-[#f9fafb] text-left text-xs text-[#111111]">
                   <th className="px-5 py-3 font-semibold w-1/4">
                     <button
                       type="button"
                       onClick={() => toggleSort("name")}
-                      className="inline-flex items-center gap-1 hover:text-[#101828]"
+                      className="inline-flex items-center gap-1 hover:text-[#000000]"
                     >
                       Driver Name <ArrowUpDown className="w-3 h-3" />
                     </button>
@@ -566,7 +566,7 @@ export function FpaDriversLibrary() {
                     <button
                       type="button"
                       onClick={() => toggleSort("category")}
-                      className="inline-flex items-center gap-1 hover:text-[#101828]"
+                      className="inline-flex items-center gap-1 hover:text-[#000000]"
                     >
                       Category <ArrowUpDown className="w-3 h-3" />
                     </button>
@@ -576,7 +576,7 @@ export function FpaDriversLibrary() {
                     <button
                       type="button"
                       onClick={() => toggleSort("value")}
-                      className="inline-flex items-center gap-1 ml-auto hover:text-[#101828]"
+                      className="inline-flex items-center gap-1 ml-auto hover:text-[#000000]"
                     >
                       Plan Value <ArrowUpDown className="w-3 h-3" />
                     </button>
@@ -592,23 +592,23 @@ export function FpaDriversLibrary() {
                     className="cursor-pointer hover:bg-[#f9fafb]/50 transition-colors"
                     onClick={() => openDriver(d)}
                   >
-                    <td className="px-5 py-3 font-semibold text-[#101828]">
+                    <td className="px-5 py-3 font-semibold text-[#000000]">
                       <div>{d.name}</div>
-                      <div className="text-[10px] text-[#667085] font-normal mt-0.5">
+                      <div className="text-[11px] text-[#111111] font-normal mt-0.5">
                         {d.periodDate ? `As of ${String(d.periodDate).slice(0, 10)}` : "No period"}
                         {d.priorActual != null || d.priorValue != null
                           ? ` · Prior ${asNumber(d.priorActual ?? d.priorValue)}`
                           : ""}
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-[#475569] font-mono text-xs">{d.code}</td>
-                    <td className="px-4 py-3 text-[#344054] font-medium">
+                    <td className="px-4 py-3 text-[#111111] font-mono text-xs">{d.code}</td>
+                    <td className="px-4 py-3 text-[#111111] font-medium">
                       {normalizeCategory(d.category)}
                     </td>
-                    <td className="px-4 py-3 text-[#667085] text-center text-xs font-semibold">
+                    <td className="px-4 py-3 text-[#111111] text-center text-xs font-semibold">
                       {d.spreadingLabel}
                     </td>
-                    <td className="px-4 py-3 text-right tabular-nums font-semibold text-[#101828]">
+                    <td className="px-4 py-3 text-right tabular-nums font-semibold text-[#000000]">
                       {d.unit === "%" || String(d.unit || "").includes("%")
                         ? `${asNumber(d.value)}%`
                         : formatMoney(d.value)}
@@ -616,7 +616,7 @@ export function FpaDriversLibrary() {
                     <td className="px-4 py-3 text-center">
                       <span
                         className={cn(
-                          "inline-flex items-center justify-center h-5 px-2 rounded-full text-[10px] font-bold",
+                          "inline-flex items-center justify-center h-5 px-2 rounded-full text-[11px] font-bold",
                           d.confidenceLabel === "High" && "bg-[#edfcf2] text-[#087443]",
                           d.confidenceLabel === "Medium" && "bg-[#fffbeb] text-[#b45309]",
                           d.confidenceLabel === "Low" && "bg-[#fef3f2] text-[#b42318]",
@@ -641,18 +641,18 @@ export function FpaDriversLibrary() {
       <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle className="text-[16px] font-semibold text-[#101828]">
+            <DialogTitle className="text-[16px] font-semibold text-[#000000]">
               Create assumption driver
             </DialogTitle>
           </DialogHeader>
           <div className="py-4 space-y-4 text-[13px]">
-            <p className="text-[11px] text-[#667085]">
+            <p className="text-[11px] text-[#111111]">
               Saved to model <span className="font-semibold">{selectedModel?.name || "—"}</span>
               {" · "}
               scenario <span className="font-semibold">{scenarioLabel}</span>
             </p>
             <div className="space-y-1.5">
-              <label className="font-semibold text-[#344054]">Code Name (Uppercase Mono)</label>
+              <label className="font-semibold text-[#111111]">Code Name (Uppercase Mono)</label>
               <input
                 className="w-full h-9 rounded-lg border border-[#d0d5dd] px-3 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[#2563eb]/20"
                 value={newCode}
@@ -661,7 +661,7 @@ export function FpaDriversLibrary() {
               />
             </div>
             <div className="space-y-1.5">
-              <label className="font-semibold text-[#344054]">Driver Display Name</label>
+              <label className="font-semibold text-[#111111]">Driver Display Name</label>
               <input
                 className="w-full h-9 rounded-lg border border-[#d0d5dd] px-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#2563eb]/20"
                 value={newName}
@@ -671,7 +671,7 @@ export function FpaDriversLibrary() {
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <label className="font-semibold text-[#344054]">Category</label>
+                <label className="font-semibold text-[#111111]">Category</label>
                 <select
                   className="w-full h-9 rounded-lg border border-[#d0d5dd] px-2 text-sm bg-white cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#2563eb]/20"
                   value={newCategory}
@@ -685,7 +685,7 @@ export function FpaDriversLibrary() {
                 </select>
               </div>
               <div className="space-y-1.5">
-                <label className="font-semibold text-[#344054]">Unit</label>
+                <label className="font-semibold text-[#111111]">Unit</label>
                 <select
                   className="w-full h-9 rounded-lg border border-[#d0d5dd] px-2 text-sm bg-white cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#2563eb]/20"
                   value={newUnit}
@@ -698,7 +698,7 @@ export function FpaDriversLibrary() {
               </div>
             </div>
             <div className="space-y-1.5">
-              <label className="font-semibold text-[#344054]">Default Value</label>
+              <label className="font-semibold text-[#111111]">Default Value</label>
               <input
                 type="number"
                 step="0.01"
@@ -709,7 +709,7 @@ export function FpaDriversLibrary() {
               />
             </div>
             <div className="space-y-1.5">
-              <label className="font-semibold text-[#344054]">Effective Period (optional)</label>
+              <label className="font-semibold text-[#111111]">Effective Period (optional)</label>
               <input
                 type="date"
                 className="w-full h-9 rounded-lg border border-[#d0d5dd] px-3 text-sm focus:outline-none focus:ring-2 focus:ring-[#2563eb]/20"
@@ -746,7 +746,7 @@ export function FpaDriversLibrary() {
         title="Assumption Details & Phasing"
         badge={
           selected ? (
-            <span className="text-[10px] bg-[#f2f4f7] text-[#667085] px-2 py-0.5 rounded-full font-bold uppercase">
+            <span className="text-[11px] bg-[#f2f4f7] text-[#111111] px-2 py-0.5 rounded-full font-bold uppercase">
               {normalizeCategory(selected.category)}
             </span>
           ) : undefined
@@ -766,7 +766,7 @@ export function FpaDriversLibrary() {
             ) : null}
             <button
               type="button"
-              className="h-9 flex-1 rounded-full border border-[#d0d5dd] text-xs font-semibold text-[#475569] hover:bg-[#f9fafb]"
+              className="h-9 flex-1 rounded-full border border-[#d0d5dd] text-xs font-semibold text-[#111111] hover:bg-[#f9fafb]"
               onClick={() => setDrawerOpen(false)}
             >
               Cancel
@@ -785,18 +785,18 @@ export function FpaDriversLibrary() {
         {selected ? (
           <div className="space-y-5 text-[13px]">
             <div>
-              <span className="text-[11px] uppercase tracking-wider font-semibold text-[#667085]">
+              <span className="text-[11px] uppercase tracking-wider font-semibold text-[#111111]">
                 Driver Name
               </span>
-              <p className="text-[14px] font-bold text-[#101828] mt-0.5">{selected.name}</p>
-              <p className="text-[10px] text-[#475569] mt-0.5 font-mono bg-[#f9fafb] inline-block px-1.5 py-0.5 rounded border border-[#eaecf0]">
+              <p className="text-[14px] font-bold text-[#000000] mt-0.5">{selected.name}</p>
+              <p className="text-[11px] text-[#111111] mt-0.5 font-mono bg-[#f9fafb] inline-block px-1.5 py-0.5 rounded border border-[#eaecf0]">
                 {selected.code}
               </p>
             </div>
 
             <div className="grid grid-cols-2 gap-3.5">
               <div className="space-y-1">
-                <span className="text-[11px] uppercase tracking-wider font-semibold text-[#667085]">
+                <span className="text-[11px] uppercase tracking-wider font-semibold text-[#111111]">
                   Value
                 </span>
                 <input
@@ -809,7 +809,7 @@ export function FpaDriversLibrary() {
                 />
               </div>
               <div className="space-y-1">
-                <span className="text-[11px] uppercase tracking-wider font-semibold text-[#667085]">
+                <span className="text-[11px] uppercase tracking-wider font-semibold text-[#111111]">
                   Period
                 </span>
                 <input
@@ -824,7 +824,7 @@ export function FpaDriversLibrary() {
 
             <div className="grid grid-cols-2 gap-3.5">
               <div className="space-y-1">
-                <span className="text-[11px] uppercase tracking-wider font-semibold text-[#667085]">
+                <span className="text-[11px] uppercase tracking-wider font-semibold text-[#111111]">
                   Confidence
                 </span>
                 <select
@@ -840,7 +840,7 @@ export function FpaDriversLibrary() {
                 </select>
               </div>
               <div className="space-y-1">
-                <span className="text-[11px] uppercase tracking-wider font-semibold text-[#667085]">
+                <span className="text-[11px] uppercase tracking-wider font-semibold text-[#111111]">
                   Spreading Method
                 </span>
                 <select
@@ -855,20 +855,20 @@ export function FpaDriversLibrary() {
                   <option value="Prior year pattern">Prior year pattern</option>
                   <option value="Manual">Manual</option>
                 </select>
-                <p className="text-[10px] text-[#98a2b3]">Saved on driver · plan cell Spread tools still apply phasing</p>
+                <p className="text-[11px] text-[#141414]">Saved on driver · plan cell Spread tools still apply phasing</p>
               </div>
             </div>
 
             <div className="space-y-2 border-t border-[#eaecf0] pt-4">
               <div className="flex items-center justify-between">
-                <span className="text-[11px] uppercase tracking-wider font-semibold text-[#667085]">
+                <span className="text-[11px] uppercase tracking-wider font-semibold text-[#111111]">
                   Phasing profile
                 </span>
-                <span className="text-[10px] text-[#2563eb] font-semibold">
+                <span className="text-[11px] text-[#2563eb] font-semibold">
                   {editSpreading}
                 </span>
               </div>
-              <div className="rounded-xl border border-[#eaecf0] bg-[#f9fafb] p-3 text-[11px] leading-relaxed text-[#667085]">
+              <div className="rounded-xl border border-[#eaecf0] bg-[#f9fafb] p-3 text-[11px] leading-relaxed text-[#111111]">
                 Monthly phasing values are shown in the planning worksheet. This panel does not
                 invent a seasonal profile when the API returns only a spreading method.
               </div>

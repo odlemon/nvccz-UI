@@ -108,7 +108,7 @@ export function BuilderInspector({
 
   if (!selected) {
     return (
-      <aside className="h-full rounded-xl border border-[#e2e8f0] bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04)] p-5 text-[13px] text-[#94a3b8]">
+      <aside className="h-full rounded-xl border border-[#e2e8f0] bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04)] p-5 text-[13px] text-[#141414]">
         Select a line item to edit properties and formulas.
       </aside>
     )
@@ -140,7 +140,7 @@ export function BuilderInspector({
               "h-10 px-2.5 text-[12px] font-medium border-b-2 -mb-px whitespace-nowrap transition-colors",
               tab === t.id
                 ? "border-[#2563eb] text-[#2563eb]"
-                : "border-transparent text-[#64748b] hover:text-[#334155]",
+                : "border-transparent text-[#111111] hover:text-[#111111]",
             )}
           >
             {t.label}
@@ -226,36 +226,36 @@ export function BuilderInspector({
                 </Field>
 
                 <div>
-                  <p className="mb-1.5 text-[11px] font-medium text-[#64748b]">Dimensionality</p>
+                  <p className="mb-1.5 text-[11px] font-medium text-[#111111]">Dimensionality</p>
                   <div className="flex flex-wrap gap-1.5">
                     {dims.length ? (
                       dims.map((t) => (
                         <span
                           key={t}
-                          className="inline-flex items-center rounded-full bg-[#f1f5f9] px-2.5 py-1 text-[11px] font-medium text-[#475569]"
+                          className="inline-flex items-center rounded-full bg-[#f1f5f9] px-2.5 py-1 text-[11px] font-medium text-[#111111]"
                         >
                           {t}
                         </span>
                       ))
                     ) : (
-                      <span className="text-[11px] text-[#94a3b8]">No dimensions assigned.</span>
+                      <span className="text-[11px] text-[#141414]">No dimensions assigned.</span>
                     )}
                   </div>
                 </div>
 
                 <div>
-                  <p className="text-[11px] font-medium text-[#64748b] mb-1.5">Data Type</p>
-                  <div className="inline-flex items-center gap-1.5 text-[13px] font-medium text-[#0f172a]">
+                  <p className="text-[11px] font-medium text-[#111111] mb-1.5">Data Type</p>
+                  <div className="inline-flex items-center gap-1.5 text-[13px] font-medium text-[#000000]">
                     {kind === "CALCULATED" ? (
                       <>
                         <span className="text-[#2563eb] text-[12px] font-bold italic leading-none">
-                          ƒ<sub className="text-[9px]">x</sub>
+                          ƒ<sub className="text-[11px]">x</sub>
                         </span>
                         Calculated
                       </>
                     ) : (
                       <>
-                        <span className="text-[#64748b] text-[12px] font-semibold">123</span>
+                        <span className="text-[#111111] text-[12px] font-semibold">123</span>
                         Input
                       </>
                     )}
@@ -269,7 +269,7 @@ export function BuilderInspector({
         {showFormulaBlock && (
           <div>
             {tab === "formula" ? (
-              <p className="text-[11px] font-medium text-[#64748b] mb-1.5">Formula</p>
+              <p className="text-[11px] font-medium text-[#111111] mb-1.5">Formula</p>
             ) : null}
             <FormulaEditorBox
               expression={expression}
@@ -298,9 +298,9 @@ export function BuilderInspector({
 
         {showRefsBlock && (
           <div>
-            <p className="text-[12px] font-semibold text-[#0f172a] mb-2">References</p>
+            <p className="text-[12px] font-semibold text-[#000000] mb-2">References</p>
             {refs.length === 0 ? (
-              <p className="text-[12px] text-[#94a3b8]">
+              <p className="text-[12px] text-[#141414]">
                 {kind === "INPUT" ? "Input rows have no formula references." : "No references yet."}
               </p>
             ) : (
@@ -316,10 +316,10 @@ export function BuilderInspector({
                         <Table2 className="w-3 h-3" />
                       </span>
                       <span className="min-w-0">
-                        <span className="block text-[12px] font-medium text-[#0f172a] group-hover:text-[#2563eb]">
+                        <span className="block text-[12px] font-medium text-[#000000] group-hover:text-[#2563eb]">
                           {r.name}
                         </span>
-                        <span className="block text-[11px] text-[#94a3b8] truncate">{r.path}</span>
+                        <span className="block text-[11px] text-[#141414] truncate">{r.path}</span>
                       </span>
                     </button>
                   </li>
@@ -329,20 +329,20 @@ export function BuilderInspector({
 
             <button
               type="button"
-              className="mt-3 flex w-full items-center gap-1 text-[12px] font-medium text-[#0f172a]"
+              className="mt-3 flex w-full items-center gap-1 text-[12px] font-medium text-[#000000]"
               onClick={() => setUsedInOpen((v) => !v)}
             >
               {usedInOpen ? (
-                <ChevronDown className="w-3.5 h-3.5 text-[#64748b]" />
+                <ChevronDown className="w-3.5 h-3.5 text-[#111111]" />
               ) : (
-                <ChevronRight className="w-3.5 h-3.5 text-[#64748b]" />
+                <ChevronRight className="w-3.5 h-3.5 text-[#111111]" />
               )}
               Used In ({usedIn.length})
             </button>
             {usedInOpen && (
               <ul className="mt-2 ml-1 space-y-2 border-l border-[#e2e8f0] pl-3">
                 {usedIn.length === 0 ? (
-                  <li className="text-[12px] text-[#94a3b8]">Not referenced elsewhere.</li>
+                  <li className="text-[12px] text-[#141414]">Not referenced elsewhere.</li>
                 ) : (
                   usedIn.map((u) => (
                     <li key={u.name}>
@@ -351,10 +351,10 @@ export function BuilderInspector({
                         className="w-full text-left group"
                         onClick={() => onSelectReference?.(u.name)}
                       >
-                        <span className="block text-[12px] font-medium text-[#0f172a] group-hover:text-[#2563eb]">
+                        <span className="block text-[12px] font-medium text-[#000000] group-hover:text-[#2563eb]">
                           {u.name}
                         </span>
-                        <span className="block text-[11px] text-[#94a3b8]">{u.path}</span>
+                        <span className="block text-[11px] text-[#141414]">{u.path}</span>
                       </button>
                     </li>
                   ))
@@ -365,9 +365,9 @@ export function BuilderInspector({
         )}
       </div>
 
-      <div className="border-t border-[#e2e8f0] px-4 py-3 text-[11px] text-[#94a3b8] space-y-1 shrink-0">
+      <div className="border-t border-[#e2e8f0] px-4 py-3 text-[11px] text-[#141414] space-y-1 shrink-0">
         <p>
-          <span className="text-[#64748b]">Created:</span>{" "}
+          <span className="text-[#111111]">Created:</span>{" "}
           {selected.createdAt
             ? new Date(selected.createdAt).toLocaleDateString("en-US", {
                 month: "short",
@@ -378,7 +378,7 @@ export function BuilderInspector({
           {selected.createdByName ? ` by ${selected.createdByName}` : ""}
         </p>
         <p>
-          <span className="text-[#64748b]">Last Modified:</span>{" "}
+          <span className="text-[#111111]">Last Modified:</span>{" "}
           {selected.updatedAt
             ? new Date(selected.updatedAt).toLocaleDateString("en-US", {
                 month: "short",
@@ -408,11 +408,11 @@ export function BuilderInspector({
 }
 
 const inputClass =
-  "mt-1 w-full h-8 rounded-[6px] border border-[#e2e8f0] bg-white px-2.5 text-[12px] text-[#0f172a] outline-none focus:border-[#2563eb] disabled:bg-[#f8fafc] disabled:text-[#64748b]"
+  "mt-1 w-full h-8 rounded-[6px] border border-[#e2e8f0] bg-white px-2.5 text-[12px] text-[#000000] outline-none focus:border-[#2563eb] disabled:bg-[#f8fafc] disabled:text-[#111111]"
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <label className="block text-[11px] font-medium text-[#64748b]">
+    <label className="block text-[11px] font-medium text-[#111111]">
       {label}
       {children}
     </label>
@@ -512,7 +512,7 @@ function FormulaEditorBox({
           </span>
         )}
         {formulaValid === false && (
-          <span className="absolute top-2 right-2 text-[#dc2626] text-[10px] font-medium max-w-[40%] text-right">
+          <span className="absolute top-2 right-2 text-[#dc2626] text-[11px] font-medium max-w-[40%] text-right">
             !
           </span>
         )}
@@ -541,12 +541,12 @@ function FormulaEditorBox({
           </span>
         )}
         {formulaValid === null && (
-          <span className="text-[11px] text-[#94a3b8]">Not validated</span>
+          <span className="text-[11px] text-[#141414]">Not validated</span>
         )}
 
         <button
           type="button"
-          className="ml-auto p-1.5 rounded-[6px] text-[#94a3b8] hover:bg-[#f8fafc] hover:text-[#64748b]"
+          className="ml-auto p-1.5 rounded-[6px] text-[#141414] hover:bg-[#f8fafc] hover:text-[#111111]"
           aria-label="Expand formula editor"
           onClick={onExpand}
         >
@@ -582,10 +582,10 @@ function FormulaExpandModal({
     <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/30 p-4">
       <div className="w-full max-w-xl rounded-xl border border-[#e2e8f0] bg-white shadow-xl overflow-hidden">
         <div className="flex items-center justify-between px-4 py-3 border-b border-[#e2e8f0]">
-          <h4 className="text-[13px] font-semibold text-[#0f172a]">Formula Editor</h4>
+          <h4 className="text-[13px] font-semibold text-[#000000]">Formula Editor</h4>
           <button
             type="button"
-            className="p-1.5 rounded-md text-[#64748b] hover:bg-[#f8fafc]"
+            className="p-1.5 rounded-md text-[#111111] hover:bg-[#f8fafc]"
             onClick={onClose}
             aria-label="Close"
           >
@@ -607,7 +607,7 @@ function FormulaExpandModal({
           <div className="mt-3 flex justify-end gap-2">
             <button
               type="button"
-              className="h-8 rounded-full border border-[#e2e8f0] px-3 text-[12px] font-medium text-[#475569]"
+              className="h-8 rounded-full border border-[#e2e8f0] px-3 text-[12px] font-medium text-[#111111]"
               onClick={onClose}
             >
               Close
@@ -640,7 +640,7 @@ function HighlightedFormula({ text }: { text: string }) {
             {part}
           </span>
         ) : (
-          <span key={i} className="text-[#0f172a]">
+          <span key={i} className="text-[#000000]">
             {part}
           </span>
         ),

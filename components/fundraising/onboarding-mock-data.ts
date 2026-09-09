@@ -254,7 +254,7 @@ export function kycStatusClass(status: KycOnboardingStatus): string {
     case "EXPIRED":
       return "bg-[#fee2e2] text-[#dc2626]"
     default:
-      return "bg-[#f1f5f9] text-[#64748b]"
+      return "bg-[#f1f5f9] text-[#111111]"
   }
 }
 
@@ -274,6 +274,6 @@ export function mandateStatusClass(status: MandateOnboardingStatus): string {
     case "LOST_BEFORE_ACTIVATION":
       return "bg-[#fee2e2] text-[#dc2626]"
     default:
-      return "bg-[#f1f5f9] text-[#64748b]"
+      return "bg-[#f1f5f9] text-[#111111]"
   }
 }

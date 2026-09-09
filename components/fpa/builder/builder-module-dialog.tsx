@@ -79,20 +79,20 @@ export function BuilderModuleNameDialog({
           if (e.key === "Enter" && !busy) void submit()
         }}
       >
-        <h3 id="module-name-dialog-title" className="text-sm font-semibold text-[#0f172a]">
+        <h3 id="module-name-dialog-title" className="text-sm font-semibold text-[#000000]">
           {title}
         </h3>
         {parentName && mode === "create" ? (
-          <p className="text-[12px] text-[#64748b]">
-            Creates a child module inside <span className="font-medium text-[#0f172a]">{parentName}</span>.
+          <p className="text-[12px] text-[#111111]">
+            Creates a child module inside <span className="font-medium text-[#000000]">{parentName}</span>.
             Add line items after selecting it in the tree.
           </p>
         ) : null}
-        <label className="block text-xs text-[#64748b]">
+        <label className="block text-xs text-[#111111]">
           Module name
           <input
             ref={inputRef}
-            className="mt-1 w-full h-9 rounded-full border border-[#e2e8f0] px-3 text-sm text-[#0f172a]"
+            className="mt-1 w-full h-9 rounded-full border border-[#e2e8f0] px-3 text-sm text-[#000000]"
             value={name}
             disabled={busy}
             onChange={(e) => setName(e.target.value)}
@@ -104,7 +104,7 @@ export function BuilderModuleNameDialog({
           <button
             type="button"
             disabled={busy}
-            className="h-9 rounded-full border border-[#e2e8f0] px-3 text-xs text-[#475569] disabled:opacity-50"
+            className="h-9 rounded-full border border-[#e2e8f0] px-3 text-xs text-[#111111] disabled:opacity-50"
             onClick={onClose}
           >
             Cancel
@@ -159,13 +159,13 @@ export function BuilderConfirmDialog({
         aria-modal="true"
         onClick={(e) => e.stopPropagation()}
       >
-        <h3 className="text-sm font-semibold text-[#0f172a]">{title}</h3>
-        <p className="text-[13px] text-[#475569] leading-relaxed">{message}</p>
+        <h3 className="text-sm font-semibold text-[#000000]">{title}</h3>
+        <p className="text-[13px] text-[#111111] leading-relaxed">{message}</p>
         <div className="flex justify-end gap-2 pt-1">
           <button
             type="button"
             disabled={busy}
-            className="h-9 rounded-full border border-[#e2e8f0] px-3 text-xs text-[#475569] disabled:opacity-50"
+            className="h-9 rounded-full border border-[#e2e8f0] px-3 text-xs text-[#111111] disabled:opacity-50"
             onClick={onClose}
           >
             Cancel
@@ -236,8 +236,8 @@ export function BuilderAttachDimensionsDialog({
         aria-modal="true"
         onClick={(e) => e.stopPropagation()}
       >
-        <h3 className="text-sm font-semibold text-[#0f172a]">Attach dimensions</h3>
-        <p className="text-[12px] text-[#64748b]">
+        <h3 className="text-sm font-semibold text-[#000000]">Attach dimensions</h3>
+        <p className="text-[12px] text-[#111111]">
           Choose which dimensions belong on this model. Saving replaces the full attach set.
         </p>
         <ul className="max-h-64 overflow-y-auto space-y-1 border border-[#e2e8f0] rounded-lg p-2">
@@ -254,21 +254,21 @@ export function BuilderAttachDimensionsDialog({
                     onChange={() => toggle(d.key || d.name)}
                     className="rounded border-[#cbd5e1]"
                   />
-                  <span className="font-medium text-[#0f172a]">{d.name}</span>
-                  <span className="text-[#94a3b8] ml-auto">{d.key}</span>
+                  <span className="font-medium text-[#000000]">{d.name}</span>
+                  <span className="text-[#141414] ml-auto">{d.key}</span>
                 </label>
               </li>
             )
           })}
           {!catalog.length ? (
-            <li className="px-2 py-6 text-center text-[12px] text-[#94a3b8]">No dimensions in catalog</li>
+            <li className="px-2 py-6 text-center text-[12px] text-[#141414]">No dimensions in catalog</li>
           ) : null}
         </ul>
         <div className="flex justify-end gap-2 pt-1">
           <button
             type="button"
             disabled={busy}
-            className="h-9 rounded-full border border-[#e2e8f0] px-3 text-xs text-[#475569] disabled:opacity-50"
+            className="h-9 rounded-full border border-[#e2e8f0] px-3 text-xs text-[#111111] disabled:opacity-50"
             onClick={onClose}
           >
             Cancel

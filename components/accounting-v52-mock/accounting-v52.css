@@ -1462,14 +1462,19 @@
 
 /* ========================= MATANHO ACCOUNTING v23 ========================= */
 .accounting-v52-root{--v23-blue:#0a6cff;--v23-cyan:#00a9e8;--v23-violet:#6f4cff;--v23-ink:#10223b;--v23-muted:#66788f;--v23-line:#d7e2ee;--v23-panel:#ffffff;--v23-soft:#f5f9fd;--v23-green:#00a878;--v23-amber:#ef9700;--v23-red:#df3654}
-/* Sidebar: preserve default collapse, allow explicit v23 expansion without fighting legacy observers. */
-.accounting-v52-root #app.v23-expanded{--sidebar:282px!important}
-.accounting-v52-root #app.v23-expanded .brand{justify-content:flex-start!important;padding:12px 17px!important}
-.accounting-v52-root #app.v23-expanded .brand img{display:block!important;width:165px!important}
-.accounting-v52-root #app.v23-expanded .brand-mark{display:none!important}
-.accounting-v52-root #app.v23-expanded .tenant-meta, .accounting-v52-root #app.v23-expanded .nav-label, .accounting-v52-root #app.v23-expanded .nav-item span:not(.nav-icon), .accounting-v52-root #app.v23-expanded .health div, .accounting-v52-root #app.v23-expanded .toggle-label{display:block!important;opacity:1!important;visibility:visible!important}
-.accounting-v52-root #app.v23-expanded .nav-item{justify-content:flex-start!important;padding-left:14px!important;padding-right:12px!important}
-.accounting-v52-root #app.v23-expanded .sidebar-foot{width:auto!important}
+/* Sidebar: preserve default collapse, allow explicit v23 expansion without fighting legacy observers.
+   `v23-expanded` is applied to #app permanently by the runtime, so every rule below used to be
+   permanently on: the sidebar was pinned to 282px and its labels/logo were force-shown in BOTH
+   toggle states, which is why the collapse button changed its chevron but never narrowed the rail.
+   The live toggle flips `v25-expanded` (see the v31 block further down: 68px rail / 216px expanded),
+   so these are now scoped to that class — v23's expanded presentation applies only when the sidebar
+   is actually expanded, and the width comes from the v31 model rather than being pinned here. */
+.accounting-v52-root #app.v23-expanded.v25-expanded .brand{justify-content:flex-start!important;padding:12px 17px!important}
+.accounting-v52-root #app.v23-expanded.v25-expanded .brand img{display:block!important;width:165px!important}
+.accounting-v52-root #app.v23-expanded.v25-expanded .brand-mark{display:none!important}
+.accounting-v52-root #app.v23-expanded.v25-expanded .tenant-meta, .accounting-v52-root #app.v23-expanded.v25-expanded .nav-label, .accounting-v52-root #app.v23-expanded.v25-expanded .nav-item span:not(.nav-icon), .accounting-v52-root #app.v23-expanded.v25-expanded .health div, .accounting-v52-root #app.v23-expanded.v25-expanded .toggle-label{display:block!important;opacity:1!important;visibility:visible!important}
+.accounting-v52-root #app.v23-expanded.v25-expanded .nav-item{justify-content:flex-start!important;padding-left:14px!important;padding-right:12px!important}
+.accounting-v52-root #app.v23-expanded.v25-expanded .sidebar-foot{width:auto!important}
 .accounting-v52-root .sidebar-foot{margin-top:auto!important}
 .accounting-v52-root #menuBtnV8, .accounting-v52-root #menuBtn{margin-top:8px!important}
 
@@ -1533,7 +1538,7 @@
 
 /* Responsive breakpoints. */
 @media(max-width:1280px){.accounting-v52-root .v23-kpis{grid-template-columns:repeat(3,minmax(140px,1fr))}.accounting-v52-root .v23-filter-panel{grid-template-columns:repeat(3,minmax(0,1fr))!important}.accounting-v52-root .v23-config-kpis{grid-template-columns:repeat(3,minmax(0,1fr))}.accounting-v52-root .v23-grid.two{grid-template-columns:1fr}.accounting-v52-root .v23-rate-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
-@media(max-width:900px){.accounting-v52-root #app.v23-expanded{--sidebar:240px!important}.accounting-v52-root .v23-kpis{grid-template-columns:repeat(2,minmax(130px,1fr))}.accounting-v52-root .v23-grid.equal, .accounting-v52-root .v23-grid.three, .accounting-v52-root .v23-control-layout{grid-template-columns:1fr}.accounting-v52-root .v23-form-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.accounting-v52-root .v23-facts{grid-template-columns:repeat(2,minmax(0,1fr))}.accounting-v52-root .v23-filter-panel{grid-template-columns:repeat(2,minmax(0,1fr))!important}.accounting-v52-root .v23-stepper{grid-template-columns:repeat(2,minmax(0,1fr))}.accounting-v52-root .v23-config-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:900px){.accounting-v52-root #app.v23-expanded.v25-expanded{--sidebar:240px!important}.accounting-v52-root .v23-kpis{grid-template-columns:repeat(2,minmax(130px,1fr))}.accounting-v52-root .v23-grid.equal, .accounting-v52-root .v23-grid.three, .accounting-v52-root .v23-control-layout{grid-template-columns:1fr}.accounting-v52-root .v23-form-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.accounting-v52-root .v23-facts{grid-template-columns:repeat(2,minmax(0,1fr))}.accounting-v52-root .v23-filter-panel{grid-template-columns:repeat(2,minmax(0,1fr))!important}.accounting-v52-root .v23-stepper{grid-template-columns:repeat(2,minmax(0,1fr))}.accounting-v52-root .v23-config-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:620px){.accounting-v52-root .v23-head{display:block}.accounting-v52-root .v23-actions{justify-content:flex-start;margin-top:10px}.accounting-v52-root .v23-kpis{grid-template-columns:1fr 1fr}.accounting-v52-root .v23-filter-panel, .accounting-v52-root .v23-form-grid{grid-template-columns:1fr!important}.accounting-v52-root .v23-rate-grid, .accounting-v52-root .v23-config-kpis{grid-template-columns:1fr 1fr}.accounting-v52-root .v23-chart-focus{padding:7px}.accounting-v52-root .v23-chart-focus-inner{width:calc(100vw - 14px);height:calc(100vh - 14px);border-radius:13px}.accounting-v52-root .v17-investment-drawer .v17-facts{grid-template-columns:repeat(2,minmax(0,1fr))!important}.accounting-v52-root .v23-control-matrix{grid-template-columns:1fr 1fr}}
 
 
@@ -3447,10 +3452,15 @@
 .accounting-v52-root .content{
   padding:16px 18px 74px!important;
 }
-.accounting-v52-root #app:not(.collapsed),
-.accounting-v52-root #app.v23-expanded{
-  --sidebar:282px!important;
-}
+/* Removed: a stale v23-generation override that pinned the sidebar to 282px.
+   Both of its selectors matched permanently — `v23-expanded` is always on #app, and #app
+   never receives `.collapsed` (the live v25 toggle flips `v25-expanded`, not `collapsed`) —
+   and at #id + !important it beat the newer v31 sidebar model further up this file
+   (`--v31-sidebar-collapsed:68px` / `--v31-sidebar-expanded:216px`). The result was a sidebar
+   stuck at 282px in BOTH states: wider than every other module (performance 242px, portfolio
+   ~210–220px) and with a collapse button that changed the chevron and the label but not the
+   width. Deleting it lets the v31 rules govern, so the rail collapses to 68px and expands to
+   216px as that layer intends. */
 
 /* Topbar app grid icon */
 .accounting-v52-root .apps-launcher-btn svg circle{fill:currentColor!important;stroke:none!important}
@@ -3584,4 +3594,38 @@
 .accounting-v52-root[data-theme="dark"] .page{max-width:none!important}
 @media(max-width:760px){
   .accounting-v52-root[data-theme="dark"] .content{background:var(--bg)!important}
+}
+
+
+/* ===================== Sidebar rail (collapsed) — final word =====================
+   The module has extensive collapsed-sidebar styling, but all of it keys on `.collapsed`,
+   which never survives: `afterRenderV5()` and `sidebar23()` both strip that class from #app
+   on every render. The only class the live toggle actually owns is `v25-expanded`
+   (see the v25 toggle handler in matanho-accounting-runtime.js), so the rail state is
+   expressed here as its inverse. Without this the "collapsed" sidebar kept the full logo,
+   group headings, labels and counts inside a 68px rail, so everything clipped.
+   Widths themselves come from the v31 model (68px rail / 216px expanded).
+   Scoped to >760px on purpose: below that the sidebar is a fixed off-canvas mobile
+   drawer, and hiding its labels there would leave an icon-only panel at drawer width. */
+@media(min-width:761px){
+  .accounting-v52-root #app:not(.v25-expanded) .brand{justify-content:center!important;padding:12px 6px!important}
+  .accounting-v52-root #app:not(.v25-expanded) .brand img{display:none!important}
+  .accounting-v52-root #app:not(.v25-expanded) .brand-mark{display:flex!important}
+  .accounting-v52-root #app:not(.v25-expanded) .tenant{justify-content:center!important}
+  .accounting-v52-root #app:not(.v25-expanded) .tenant-meta,
+  .accounting-v52-root #app:not(.v25-expanded) .tenant-copy,
+  .accounting-v52-root #app:not(.v25-expanded) .nav-group,
+  .accounting-v52-root #app:not(.v25-expanded) .nav-group-label,
+  .accounting-v52-root #app:not(.v25-expanded) .nav-label,
+  .accounting-v52-root #app:not(.v25-expanded) .nav-count,
+  .accounting-v52-root #app:not(.v25-expanded) .health div,
+  .accounting-v52-root #app:not(.v25-expanded) .sidebar-health-copy,
+  .accounting-v52-root #app:not(.v25-expanded) .toggle-label,
+  .accounting-v52-root #app:not(.v25-expanded) .v25-sidebar-label{display:none!important}
+  .accounting-v52-root #app:not(.v25-expanded) .nav-item{justify-content:center!important;padding:0!important;width:44px!important;height:42px!important;min-height:42px!important;margin:2px auto!important;gap:0!important}
+  .accounting-v52-root #app:not(.v25-expanded) .nav-icon{margin:0!important}
+  .accounting-v52-root #app:not(.v25-expanded) .health{justify-content:center!important;padding:12px 7px!important}
+  .accounting-v52-root #app:not(.v25-expanded) .sidebar,
+  .accounting-v52-root #app:not(.v25-expanded) .nav-scroll{overflow-x:hidden!important}
+  .accounting-v52-root #app:not(.v25-expanded) .v25-sidebar-toggle{justify-content:center!important}
 }

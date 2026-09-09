@@ -115,7 +115,7 @@ function Avatar({ src, alt, className }: { src?: string | null; alt: string; cla
     return (
       <span
         className={cn(
-          "rounded-full bg-[#e2e8f0] text-[#475569] inline-flex items-center justify-center font-semibold",
+          "rounded-full bg-[#e2e8f0] text-[#111111] inline-flex items-center justify-center font-semibold",
           className,
         )}
         aria-label={alt}
@@ -205,10 +205,10 @@ function FilterSelect({
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="h-8 inline-flex items-center gap-1.5 rounded-full border border-[#e2e8f0] bg-white px-2.5 text-[11px] font-medium text-[#475569] hover:bg-[#f8fafc]"
+        className="h-8 inline-flex items-center gap-1.5 rounded-full border border-[#e2e8f0] bg-white px-2.5 text-[11px] font-medium text-[#111111] hover:bg-[#f8fafc]"
       >
         {value}
-        <ChevronDown className={cn("w-3.5 h-3.5 text-[#94a3b8] transition-transform", open && "rotate-180")} />
+        <ChevronDown className={cn("w-3.5 h-3.5 text-[#141414] transition-transform", open && "rotate-180")} />
       </button>
       {open ? (
         <div className="absolute right-0 top-[calc(100%+4px)] z-30 min-w-[160px] rounded-md border border-[#e2e8f0] bg-white py-1 shadow-lg">
@@ -223,7 +223,7 @@ function FilterSelect({
               }}
               className={cn(
                 "w-full flex items-center justify-between gap-2 rounded-full px-3 py-2 text-left text-[12px] hover:bg-[#f8fafc]",
-                opt === value ? "text-[#2563eb] font-semibold" : "text-[#334155]",
+                opt === value ? "text-[#2563eb] font-semibold" : "text-[#111111]",
               )}
             >
               {opt}
@@ -257,7 +257,7 @@ function CardMenu({
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="text-[#64748b] hover:text-[#64748b] p-1 rounded-full hover:bg-[#f8fafc]"
+        className="text-[#111111] hover:text-[#111111] p-1 rounded-full hover:bg-[#f8fafc]"
         aria-label="More"
       >
         <MoreVertical className="w-4 h-4" />
@@ -272,7 +272,7 @@ function CardMenu({
                 it.onClick()
                 setOpen(false)
               }}
-              className="w-full flex items-center gap-2 rounded-full px-3 py-2 text-left text-[12px] text-[#334155] hover:bg-[#f8fafc]"
+              className="w-full flex items-center gap-2 rounded-full px-3 py-2 text-left text-[12px] text-[#111111] hover:bg-[#f8fafc]"
             >
               {it.icon}
               {it.label}
@@ -289,11 +289,11 @@ function PriorityBadge({ level }: { level: string }) {
   return (
     <span
       className={cn(
-        "inline-flex items-center h-5 px-2 rounded-[6px] text-[10px] font-semibold",
+        "inline-flex items-center h-5 px-2 rounded-[6px] text-[11px] font-semibold",
         normalized === "high" && "bg-[#fecaca] text-[#991b1b]",
         normalized === "medium" && "bg-[#fed7aa] text-[#9a3412]",
         normalized === "low" && "bg-[#bbf7d0] text-[#166534]",
-        !["high", "medium", "low"].includes(normalized) && "bg-[#e5e7eb] text-[#4b5563]",
+        !["high", "medium", "low"].includes(normalized) && "bg-[#e5e7eb] text-[#111111]",
       )}
     >
       {level}
@@ -306,10 +306,10 @@ function StatusBadge({ status }: { status: string }) {
   return (
     <span
       className={cn(
-        "inline-flex items-center h-5 px-2 rounded-[6px] text-[10px] font-semibold",
+        "inline-flex items-center h-5 px-2 rounded-[6px] text-[11px] font-semibold",
         /progress|review|submitted/.test(normalized) && "bg-[#bfdbfe] text-[#1d4ed8]",
         /approved|complete|done/.test(normalized) && "bg-[#bbf7d0] text-[#166534]",
-        !/progress|review|submitted|approved|complete|done/.test(normalized) && "bg-[#e5e7eb] text-[#4b5563]",
+        !/progress|review|submitted|approved|complete|done/.test(normalized) && "bg-[#e5e7eb] text-[#111111]",
       )}
     >
       {status}
@@ -333,25 +333,25 @@ function ScenarioTable({
   return (
     <div className="rounded-md border border-[#e2e8f0] overflow-x-auto -mx-0.5">
       {metrics.length === 0 || headers.length === 0 ? (
-        <p className="py-8 text-center text-[12px] text-[#64748b]">No scenario comparison data.</p>
+        <p className="py-8 text-center text-[12px] text-[#111111]">No scenario comparison data.</p>
       ) : (
       <table className="w-full text-[11px] border-collapse min-w-0">
         <thead>
           <tr className="bg-[#f8fafc]">
-            <th className="py-2.5 px-2 text-left font-semibold text-[#1e293b] border-b border-[#e2e8f0] sticky left-0 bg-[#f8fafc] z-[1] whitespace-nowrap">
+            <th className="py-2.5 px-2 text-left font-semibold text-[#000000] border-b border-[#e2e8f0] sticky left-0 bg-[#f8fafc] z-[1] whitespace-nowrap">
               Scenario
             </th>
             {headers.map((h) => (
               <th
                 key={h.id}
                 className={cn(
-                  "py-2.5 px-1.5 text-center font-semibold text-[#1e293b] border-b border-l border-[#e2e8f0] whitespace-nowrap",
+                  "py-2.5 px-1.5 text-center font-semibold text-[#000000] border-b border-l border-[#e2e8f0] whitespace-nowrap",
                   activeScenarioId === h.id && "bg-[#eff6ff] text-[#1d4ed8]",
                 )}
               >
                 {h.name}
                 {h.scenarioType ? (
-                  <span className="block text-[9px] font-normal text-[#94a3b8]">{h.scenarioType}</span>
+                  <span className="block text-[11px] font-normal text-[#141414]">{h.scenarioType}</span>
                 ) : null}
               </th>
             ))}
@@ -363,7 +363,7 @@ function ScenarioTable({
               <tr key={r.key}>
                 <td
                   className={cn(
-                    "py-3 px-2 font-semibold text-[#1e293b] sticky left-0 bg-white z-[1] whitespace-nowrap",
+                    "py-3 px-2 font-semibold text-[#000000] sticky left-0 bg-white z-[1] whitespace-nowrap",
                     i < metrics.length - 1 && "border-b border-[#e2e8f0]",
                   )}
                 >
@@ -382,13 +382,13 @@ function ScenarioTable({
                       activeScenarioId === header.id && "bg-[#eff6ff]/70",
                     )}
                   >
-                    <p className="font-bold text-[#1e293b] tabular-nums leading-tight whitespace-nowrap">
+                    <p className="font-bold text-[#000000] tabular-nums leading-tight whitespace-nowrap">
                       {value == null ? EMPTY : formatMetricValue(r.key, value)}
                     </p>
                     <p
                       className={cn(
-                        "text-[10px] font-semibold mt-1 leading-none whitespace-nowrap",
-                        variance == null ? "text-[#64748b]" : variance >= 0 ? "text-[#15803d]" : "text-[#b91c1c]",
+                        "text-[11px] font-semibold mt-1 leading-none whitespace-nowrap",
+                        variance == null ? "text-[#111111]" : variance >= 0 ? "text-[#15803d]" : "text-[#b91c1c]",
                       )}
                     >
                       {variance == null ? EMPTY : `${variance >= 0 ? "▲" : "▼"} ${Math.abs(variance).toFixed(1)}%`}
@@ -456,7 +456,7 @@ function DeptTable({
         <tbody>
           {rows.length === 0 ? (
             <tr>
-              <td colSpan={compact ? 5 : 6} className="py-8 text-center text-[#64748b]">
+              <td colSpan={compact ? 5 : 6} className="py-8 text-center text-[#111111]">
                 No over-budget departments.
               </td>
             </tr>
@@ -514,7 +514,7 @@ function DeptTable({
                   i < rows.length - 1 && "border-b border-[#e2e8f0]",
                 )}
               >
-                <span className="inline-flex items-center h-6 px-2.5 rounded-[6px] text-[10px] font-semibold bg-[#fecaca] text-[#991b1b] whitespace-nowrap">
+                <span className="inline-flex items-center h-6 px-2.5 rounded-[6px] text-[11px] font-semibold bg-[#fecaca] text-[#991b1b] whitespace-nowrap">
                   Over Budget
                 </span>
               </td>
@@ -833,7 +833,7 @@ export function FpaHomeBoard() {
 
       <div className="w-full max-w-full px-3 sm:px-4 py-3 space-y-3 overflow-x-hidden">
         {(loadingModels || loadingDashboard) && dashboard ? (
-          <div className={cn(CARD, "px-4 py-3 text-[12px] text-[#475569]")} role="status">
+          <div className={cn(CARD, "px-4 py-3 text-[12px] text-[#111111]")} role="status">
             Refreshing dashboard…
           </div>
         ) : null}
@@ -858,7 +858,7 @@ export function FpaHomeBoard() {
           {kpis.map((kpi) => (
             <div key={kpi.id} className={cn(CARD, "px-4 pt-3.5 pb-3.5 min-w-0 overflow-hidden")}>
               <div className="flex items-start justify-between gap-2">
-                <p className="text-[13px] font-semibold text-[#0f172a] leading-snug pr-1">
+                <p className="text-[13px] font-semibold text-[#000000] leading-snug pr-1">
                   {kpi.label}
                 </p>
                 <CardMenu
@@ -889,7 +889,7 @@ export function FpaHomeBoard() {
               </div>
               <div className="mt-3 flex items-end justify-between gap-3 min-w-0">
                 <div className="min-w-0 flex-1">
-                  <p className="text-[22px] sm:text-[24px] font-bold text-[#0f172a] tabular-nums leading-tight tracking-tight whitespace-nowrap">
+                  <p className="text-[22px] sm:text-[24px] font-bold text-[#000000] tabular-nums leading-tight tracking-tight whitespace-nowrap">
                     {kpi.value}
                   </p>
                   <p className="mt-1.5 text-[11px] sm:text-[12px] leading-snug">
@@ -897,7 +897,7 @@ export function FpaHomeBoard() {
                       className={cn(
                         "font-semibold",
                         kpi.pct === EMPTY
-                          ? "text-[#64748b]"
+                          ? "text-[#111111]"
                           : kpi.up
                             ? "text-[#15803d]"
                             : "text-[#b91c1c]",
@@ -905,7 +905,7 @@ export function FpaHomeBoard() {
                     >
                       {kpi.pct === EMPTY ? EMPTY : `${kpi.up ? "▲" : "▼"} ${kpi.pct}`}
                     </span>
-                    <span className="text-[#64748b] font-normal"> {kpi.vs}</span>
+                    <span className="text-[#111111] font-normal"> {kpi.vs}</span>
                   </p>
                 </div>
                 <KpiSparkline values={kpi.spark} dashed={kpi.dashed} />
@@ -919,7 +919,7 @@ export function FpaHomeBoard() {
           <section className={cn(CARD, "lg:col-span-5 flex flex-col min-h-[280px] sm:min-h-[320px] min-w-0")}>
             <div className="flex flex-wrap items-center justify-between gap-2 px-4 sm:px-5 pt-4 pb-2">
               <div className="flex items-center gap-1.5 min-w-0">
-                <h2 className="text-[14px] font-semibold text-[#0f172a] truncate">
+                <h2 className="text-[14px] font-semibold text-[#000000] truncate">
                   Revenue vs Expense Trend
                 </h2>
                 <button
@@ -930,7 +930,7 @@ export function FpaHomeBoard() {
                     description: "Solid blue = Revenue · Dashed teal = Total Expenses",
                   })}
                 >
-                  <Info className="w-3.5 h-3.5 text-[#64748b]" />
+                  <Info className="w-3.5 h-3.5 text-[#111111]" />
                 </button>
               </div>
               <div className="flex items-center gap-1.5 shrink-0">
@@ -960,8 +960,8 @@ export function FpaHomeBoard() {
             </div>
 
             <div className="flex flex-wrap items-center gap-x-5 gap-y-1 px-5 pb-1">
-              <p className="text-[11px] text-[#64748b]">$ in millions</p>
-              <div className="flex items-center gap-4 text-[12px] text-[#334155]">
+              <p className="text-[11px] text-[#111111]">$ in millions</p>
+              <div className="flex items-center gap-4 text-[12px] text-[#111111]">
                 <span className="inline-flex items-center gap-1.5">
                   <svg width="22" height="8" aria-hidden>
                     <line x1="0" y1="4" x2="16" y2="4" stroke={BLUE_BRIGHT} strokeWidth="3" />
@@ -989,7 +989,7 @@ export function FpaHomeBoard() {
 
             <div className="flex-1 min-h-[200px] sm:min-h-[240px] px-1 sm:px-2 pb-3 min-w-0 overflow-hidden">
               {trendData.length === 0 ? (
-                <div className="h-full flex items-center justify-center text-[12px] text-[#64748b]">
+                <div className="h-full flex items-center justify-center text-[12px] text-[#111111]">
                   No revenue or expense trend data.
                 </div>
               ) : (
@@ -1071,7 +1071,7 @@ export function FpaHomeBoard() {
 
           <section className={cn(CARD, "lg:col-span-4 flex flex-col min-w-0")}>
             <div className="flex items-center gap-1.5 px-4 pt-3.5 pb-3">
-              <h2 className="text-[14px] font-semibold text-[#1e293b]">Scenario Comparison</h2>
+              <h2 className="text-[14px] font-semibold text-[#000000]">Scenario Comparison</h2>
               <button
                 type="button"
                 className="rounded-full p-1 hover:bg-[#f8fafc]"
@@ -1084,7 +1084,7 @@ export function FpaHomeBoard() {
                   })
                 }
               >
-                <Info className="w-3.5 h-3.5 text-[#64748b]" />
+                <Info className="w-3.5 h-3.5 text-[#111111]" />
               </button>
             </div>
             <div className="px-3 sm:px-4 pb-3 flex-1 flex flex-col min-w-0 overflow-x-auto">
@@ -1095,7 +1095,7 @@ export function FpaHomeBoard() {
                 activeScenarioId={selectedScenarioId}
               />
               <div className="mt-2.5 flex flex-wrap items-center justify-between gap-2">
-                <p className="text-[10px] text-[#94a3b8]">
+                <p className="text-[11px] text-[#141414]">
                   Showing {scenarioName} · {versionNote} · {dashboardPeriod}
                 </p>
                 <button
@@ -1124,7 +1124,7 @@ export function FpaHomeBoard() {
                   })
                 }
               >
-                <Info className="w-3.5 h-3.5 text-[#4b5563]" />
+                <Info className="w-3.5 h-3.5 text-[#111111]" />
               </button>
             </div>
 
@@ -1152,13 +1152,13 @@ export function FpaHomeBoard() {
                   <p className="text-[26px] font-bold text-[#1f2937] leading-none">
                     {workflowComplete == null ? EMPTY : `${workflowComplete}%`}
                   </p>
-                  <p className="text-[11px] text-[#4b5563] mt-1">Complete</p>
+                  <p className="text-[11px] text-[#111111] mt-1">Complete</p>
                 </div>
               </div>
 
               <ul className="w-full space-y-3 min-w-0 flex-1">
                 {workflow.length === 0 ? (
-                  <li className="text-center text-[12px] text-[#64748b]">No workflow status data.</li>
+                  <li className="text-center text-[12px] text-[#111111]">No workflow status data.</li>
                 ) : null}
                 {workflow.map((d) => (
                   <li key={d.name}>
@@ -1174,12 +1174,12 @@ export function FpaHomeBoard() {
                         className="h-2.5 w-2.5 rounded-full shrink-0"
                         style={{ backgroundColor: d.color }}
                       />
-                      <span className="text-[12px] text-[#4b5563] truncate">{d.name}</span>
+                      <span className="text-[12px] text-[#111111] truncate">{d.name}</span>
                       <span className="text-right whitespace-nowrap">
                         <span className="text-[12px] font-bold text-[#1f2937] tabular-nums">
                           {d.pct}
                         </span>{" "}
-                        <span className="text-[11px] text-[#4b5563] tabular-nums">{d.count}</span>
+                        <span className="text-[11px] text-[#111111] tabular-nums">{d.count}</span>
                       </span>
                     </button>
                   </li>
@@ -1188,8 +1188,8 @@ export function FpaHomeBoard() {
             </div>
 
             <div className="mt-3 border-t border-[#d1d5db] px-4 py-3 flex items-center gap-2">
-              <Inbox className="w-4 h-4 text-[#4b5563] shrink-0" />
-              <p className="text-[12px] text-[#4b5563]">
+              <Inbox className="w-4 h-4 text-[#111111] shrink-0" />
+              <p className="text-[12px] text-[#111111]">
                 {workflow.length ? `${workflowTotal} workflow items tracked` : "No workflow items available."}
               </p>
             </div>
@@ -1232,7 +1232,7 @@ export function FpaHomeBoard() {
             </div>
             <div className="px-4 pb-3 overflow-x-auto">
               {deptRows.length === 0 ? (
-                <p className="text-[12px] text-[#64748b] py-8 text-center">
+                <p className="text-[12px] text-[#111111] py-8 text-center">
                   No over-budget departments{dashboardPeriod === EMPTY ? "." : ` for ${dashboardPeriod}.`}
                 </p>
               ) : (
@@ -1261,7 +1261,7 @@ export function FpaHomeBoard() {
                     })
                   }
                 >
-                  <Info className="w-3.5 h-3.5 text-[#4b5563]" />
+                  <Info className="w-3.5 h-3.5 text-[#111111]" />
                 </button>
               </div>
               <FilterSelect
@@ -1284,7 +1284,7 @@ export function FpaHomeBoard() {
                     className={cn(
                       "font-semibold",
                       cash.delta === EMPTY
-                        ? "text-[#64748b]"
+                        ? "text-[#111111]"
                         : cash.up
                           ? "text-[#047857]"
                           : "text-[#b91c1c]",
@@ -1292,15 +1292,15 @@ export function FpaHomeBoard() {
                   >
                     {cash.delta === EMPTY ? EMPTY : `${cash.up ? "▲" : "▼"} ${cash.delta}`}
                   </span>
-                  <span className="text-[#4b5563]"> vs prior period</span>
+                  <span className="text-[#111111]"> vs prior period</span>
                 </p>
               </div>
 
-              <p className="text-[11px] text-[#4b5563] mt-4 mb-1">Cash Balance ($ in millions)</p>
+              <p className="text-[11px] text-[#111111] mt-4 mb-1">Cash Balance ($ in millions)</p>
 
               <div className="flex-1 min-h-[160px] sm:min-h-[180px] min-w-0 overflow-hidden">
                 {cash.bars.length === 0 ? (
-                  <div className="h-full flex items-center justify-center text-[12px] text-[#64748b]">
+                  <div className="h-full flex items-center justify-center text-[12px] text-[#111111]">
                     No cash runway history.
                   </div>
                 ) : (
@@ -1364,7 +1364,7 @@ export function FpaHomeBoard() {
                     })
                   }
                 >
-                  <Info className="w-3.5 h-3.5 text-[#4b5563]" />
+                  <Info className="w-3.5 h-3.5 text-[#111111]" />
                 </button>
               </div>
               <button
@@ -1379,7 +1379,7 @@ export function FpaHomeBoard() {
             <div className="mx-4 mb-4 flex-1 rounded-md border border-[#d1d5db] overflow-hidden">
               <ul>
                 {activities.length === 0 ? (
-                  <li className="py-8 text-center text-[12px] text-[#64748b]">No recent activity.</li>
+                  <li className="py-8 text-center text-[12px] text-[#111111]">No recent activity.</li>
                 ) : null}
                 {activities.slice(0, 5).map((a, i) => (
                   <li key={a.id}>
@@ -1407,7 +1407,7 @@ export function FpaHomeBoard() {
                         <p className="text-[12px] font-semibold text-[#1f2937] leading-snug">
                           {a.title}
                         </p>
-                        <p className="text-[11px] text-[#4b5563] mt-1 leading-none">
+                        <p className="text-[11px] text-[#111111] mt-1 leading-none">
                           {a.who} • {a.when}
                         </p>
                       </div>
@@ -1433,14 +1433,14 @@ export function FpaHomeBoard() {
                   })
                 }
               >
-                <Info className="w-3.5 h-3.5 text-[#4b5563]" />
+                <Info className="w-3.5 h-3.5 text-[#111111]" />
               </button>
             </div>
           </div>
 
           <div className="px-5 pb-4 overflow-x-auto">
             {visibleTasks.length === 0 ? (
-              <p className="text-[12px] text-[#4b5563] py-8 text-center">
+              <p className="text-[12px] text-[#111111] py-8 text-center">
                 No open tasks.
               </p>
             ) : (
@@ -1471,18 +1471,18 @@ export function FpaHomeBoard() {
                     >
                       <td className="py-3 pr-3">
                         <span className="inline-flex items-center gap-2.5 font-medium text-[#1f2937]">
-                          <FileText className="w-4 h-4 text-[#4b5563] shrink-0" />
+                          <FileText className="w-4 h-4 text-[#111111] shrink-0" />
                           {t.task}
                         </span>
                       </td>
-                      <td className="py-3 px-3 text-[#4b5563]">{t.module}</td>
+                      <td className="py-3 px-3 text-[#111111]">{t.module}</td>
                       <td className="py-3 px-3">
                         <span className="inline-flex items-center gap-2">
                           <Avatar src={t.photo} alt={t.owner} className="h-7 w-7" />
                           <span className="text-[#374151]">{t.owner}</span>
                         </span>
                       </td>
-                      <td className="py-3 px-3 text-[#4b5563] tabular-nums whitespace-nowrap">
+                      <td className="py-3 px-3 text-[#111111] tabular-nums whitespace-nowrap">
                         {t.due}
                       </td>
                       <td className="py-3 px-3">
@@ -1513,7 +1513,7 @@ export function FpaHomeBoard() {
       <Dialog open={modal !== null} onOpenChange={(o) => !o && setModal(null)}>
         <DialogContent className="w-[calc(100%-1.5rem)] sm:max-w-3xl max-h-[85vh] flex flex-col p-0 gap-0 overflow-hidden rounded-xl">
           <DialogHeader className="px-5 pt-5 pb-3 border-b border-[#e2e8f0] shrink-0">
-            <DialogTitle className="text-[15px] text-[#0f172a]">
+            <DialogTitle className="text-[15px] text-[#000000]">
               {modal === "departments" && "All Departments Over Budget"}
               {modal === "activity" && "All Recent Activity"}
               {modal === "tasks" && "All Open Tasks"}
@@ -1521,7 +1521,7 @@ export function FpaHomeBoard() {
               {modal === "workflow" && "Budget Workflow Details"}
               {modal === "cashflow" && "Cash Flow Detail"}
             </DialogTitle>
-            <DialogDescription className="text-[12px] text-[#64748b]">
+            <DialogDescription className="text-[12px] text-[#111111]">
               {modal === "departments" && `${modalDeptRows.length} departments · ${dashboardPeriod}`}
               {modal === "activity" && `${activities.length} events across the planning cycle`}
               {modal === "tasks" && `${modalTasks.length} open tasks`}
@@ -1543,7 +1543,7 @@ export function FpaHomeBoard() {
               <div className="rounded-md border border-[#d1d5db] overflow-hidden">
                 <ul>
                   {activities.length === 0 ? (
-                    <li className="py-8 text-center text-[12px] text-[#64748b]">No recent activity.</li>
+                    <li className="py-8 text-center text-[12px] text-[#111111]">No recent activity.</li>
                   ) : null}
                   {activities.map((a, i) => (
                     <li key={a.id}>
@@ -1569,8 +1569,8 @@ export function FpaHomeBoard() {
                         </span>
                         <div className="min-w-0">
                           <p className="text-[13px] font-semibold text-[#1f2937]">{a.title}</p>
-                          <p className="text-[12px] text-[#4b5563] mt-0.5">{a.detail}</p>
-                          <p className="text-[11px] text-[#4b5563] mt-1">
+                          <p className="text-[12px] text-[#111111] mt-0.5">{a.detail}</p>
+                          <p className="text-[11px] text-[#111111] mt-1">
                             {a.who} • {a.when}
                           </p>
                         </div>
@@ -1600,18 +1600,18 @@ export function FpaHomeBoard() {
                         <tr key={t.task} className="border-t border-[#f1f5f9] hover:bg-[#f9fafb]">
                           <td className="py-2.5 px-3">
                             <span className="inline-flex items-center gap-2 font-medium text-[#1f2937]">
-                              <FileText className="w-4 h-4 text-[#4b5563] shrink-0" />
+                              <FileText className="w-4 h-4 text-[#111111] shrink-0" />
                               {t.task}
                             </span>
                           </td>
-                          <td className="py-2.5 px-3 text-[#4b5563]">{t.module}</td>
+                          <td className="py-2.5 px-3 text-[#111111]">{t.module}</td>
                           <td className="py-2.5 px-3">
                             <span className="inline-flex items-center gap-2">
                               <Avatar src={t.photo} alt={t.owner} className="h-7 w-7" />
                               <span className="text-[#374151]">{t.owner}</span>
                             </span>
                           </td>
-                          <td className="py-2.5 px-3 text-[#4b5563]">{t.due}</td>
+                          <td className="py-2.5 px-3 text-[#111111]">{t.due}</td>
                           <td className="py-2.5 px-3">
                             <PriorityBadge level={t.priority} />
                           </td>
@@ -1633,7 +1633,7 @@ export function FpaHomeBoard() {
                   scenarios={comparedScenarios}
                   activeScenarioId={selectedScenarioId}
                 />
-                <p className="text-[11px] text-[#94a3b8]">
+                <p className="text-[11px] text-[#141414]">
                   Active: {scenarioName} · {versionNote} · {dashboardPeriod}. Click Export in the card menu to
                   download.
                 </p>
@@ -1652,7 +1652,7 @@ export function FpaHomeBoard() {
               <div className="space-y-4">
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   {workflow.length === 0 ? (
-                    <p className="sm:col-span-3 py-8 text-center text-[12px] text-[#64748b]">
+                    <p className="sm:col-span-3 py-8 text-center text-[12px] text-[#111111]">
                       No workflow status data.
                     </p>
                   ) : null}
@@ -1665,9 +1665,9 @@ export function FpaHomeBoard() {
                         className="inline-block h-3 w-3 rounded-full mb-2"
                         style={{ backgroundColor: d.color }}
                       />
-                      <p className="text-[12px] text-[#64748b]">{d.name}</p>
-                      <p className="text-[18px] font-bold text-[#0f172a] mt-1">{d.pct}</p>
-                      <p className="text-[11px] text-[#64748b]">{d.count}</p>
+                      <p className="text-[12px] text-[#111111]">{d.name}</p>
+                      <p className="text-[18px] font-bold text-[#000000] mt-1">{d.pct}</p>
+                      <p className="text-[11px] text-[#111111]">{d.count}</p>
                     </div>
                   ))}
                 </div>
@@ -1693,7 +1693,7 @@ export function FpaHomeBoard() {
                         className={cn(
                           "font-semibold",
                           cash.delta === EMPTY
-                            ? "text-[#64748b]"
+                            ? "text-[#111111]"
                             : cash.up
                               ? "text-[#047857]"
                               : "text-[#b91c1c]",
@@ -1701,7 +1701,7 @@ export function FpaHomeBoard() {
                       >
                         {cash.delta === EMPTY ? EMPTY : `${cash.up ? "▲" : "▼"} ${cash.delta}`}
                       </span>
-                      <span className="text-[#4b5563]">
+                      <span className="text-[#111111]">
                         {" "}
                         vs prior period · {scenarioName}
                       </span>
@@ -1754,7 +1754,7 @@ export function FpaHomeBoard() {
                     <tbody>
                       {cash.bars.map((b) => (
                         <tr key={b.m} className="border-t border-[#f1f5f9]">
-                          <td className="py-2 px-3 text-[#334155]">{b.m}</td>
+                          <td className="py-2 px-3 text-[#111111]">{b.m}</td>
                           <td className="py-2 px-3 text-right tabular-nums font-semibold">
                             ${b.bal.toFixed(1)}M
                           </td>

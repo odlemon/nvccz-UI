@@ -108,14 +108,14 @@ export function ImportSourceFileDialog({ open, modelId, onClose, onImported }: P
         className="w-full max-w-md rounded-xl border border-[#e2e8f0] bg-white shadow-xl"
       >
         <div className="flex items-center justify-between border-b border-[#e2e8f0] px-4 py-3">
-          <h2 id="import-source-title" className="text-sm font-semibold text-[#0f172a]">
+          <h2 id="import-source-title" className="text-sm font-semibold text-[#000000]">
             Import CSV / Excel
           </h2>
           <button
             type="button"
             disabled={busy}
             onClick={onClose}
-            className="h-8 w-8 inline-flex items-center justify-center rounded-full text-[#64748b] hover:bg-[#f8fafc]"
+            className="h-8 w-8 inline-flex items-center justify-center rounded-full text-[#111111] hover:bg-[#f8fafc]"
             aria-label="Close"
           >
             <X className="w-4 h-4" />
@@ -123,15 +123,15 @@ export function ImportSourceFileDialog({ open, modelId, onClose, onImported }: P
         </div>
 
         <div className="px-4 py-4 space-y-3">
-          <p className="text-[12px] text-[#64748b]">
+          <p className="text-[12px] text-[#111111]">
             Upload a CSV or Excel file to create source fields and mapping suggestions for this
             model.
           </p>
 
-          <label className="block text-[11px] font-medium text-[#64748b]">
+          <label className="block text-[11px] font-medium text-[#111111]">
             Source system
             <select
-              className="mt-1 w-full h-9 rounded-full border border-[#e2e8f0] px-3 text-sm text-[#0f172a]"
+              className="mt-1 w-full h-9 rounded-full border border-[#e2e8f0] px-3 text-sm text-[#000000]"
               value={sourceSystem}
               disabled={busy}
               onChange={(e) =>
@@ -146,20 +146,20 @@ export function ImportSourceFileDialog({ open, modelId, onClose, onImported }: P
             </select>
           </label>
 
-          <label className="block text-[11px] font-medium text-[#64748b]">
+          <label className="block text-[11px] font-medium text-[#111111]">
             File
             <input
               ref={inputRef}
               type="file"
               accept={accept}
               disabled={busy}
-              className="mt-1 block w-full text-[12px] text-[#334155] file:mr-3 file:h-8 file:rounded-full file:border-0 file:bg-[#eff6ff] file:px-3 file:text-[11px] file:font-medium file:text-[#1d4ed8]"
+              className="mt-1 block w-full text-[12px] text-[#111111] file:mr-3 file:h-8 file:rounded-full file:border-0 file:bg-[#eff6ff] file:px-3 file:text-[11px] file:font-medium file:text-[#1d4ed8]"
               onChange={(e) => setFile(e.target.files?.[0] || null)}
             />
           </label>
 
           {file ? (
-            <p className="text-[11px] text-[#0f172a]">
+            <p className="text-[11px] text-[#000000]">
               Selected: <span className="font-medium">{file.name}</span>
             </p>
           ) : null}
@@ -172,7 +172,7 @@ export function ImportSourceFileDialog({ open, modelId, onClose, onImported }: P
             type="button"
             disabled={busy}
             onClick={onClose}
-            className="h-9 rounded-full border border-[#e2e8f0] px-4 text-xs font-medium text-[#334155] hover:bg-[#f8fafc]"
+            className="h-9 rounded-full border border-[#e2e8f0] px-4 text-xs font-medium text-[#111111] hover:bg-[#f8fafc]"
           >
             Cancel
           </button>

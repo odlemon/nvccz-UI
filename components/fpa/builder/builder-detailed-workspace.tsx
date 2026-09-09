@@ -69,12 +69,12 @@ function FormulaHighlight({
   accent?: "blue" | "purple"
 }) {
   if (!formula || formula === "Input" || formula === "—") {
-    return <span className="text-[#94a3b8]">—</span>
+    return <span className="text-[#141414]">—</span>
   }
-  const refClass = accent === "purple" ? "text-[#7c3aed] font-medium" : "text-[#475569]"
+  const refClass = accent === "purple" ? "text-[#7c3aed] font-medium" : "text-[#111111]"
   const parts = formula.split(/(\[[^\]]+\])/g)
   return (
-    <span className="font-mono text-[12px] text-[#334155]">
+    <span className="font-mono text-[12px] text-[#111111]">
       {parts.map((p, i) =>
         p.startsWith("[") ? (
           <span key={i} className={refClass}>
@@ -476,16 +476,16 @@ export function BuilderDetailedWorkspace({
         <button
           type="button"
           onClick={onBack}
-          className="h-8 inline-flex items-center gap-1.5 rounded-full border border-[#e2e8f0] bg-white px-2.5 text-[12px] font-medium text-[#475569] hover:bg-[#f8fafc]"
+          className="h-8 inline-flex items-center gap-1.5 rounded-full border border-[#e2e8f0] bg-white px-2.5 text-[12px] font-medium text-[#111111] hover:bg-[#f8fafc]"
         >
           <ArrowLeft className="w-3.5 h-3.5" />
           Structure
         </button>
 
-        <label className="relative inline-flex items-center gap-1.5 text-[12px] text-[#64748b]">
+        <label className="relative inline-flex items-center gap-1.5 text-[12px] text-[#111111]">
           <span className="sr-only">Module</span>
           <select
-            className="h-8 appearance-none rounded-full border border-[#e2e8f0] bg-white pl-3 pr-8 text-[13px] font-semibold text-[#0f172a] focus:outline-none focus:ring-2 focus:ring-[#2563eb]/20"
+            className="h-8 appearance-none rounded-full border border-[#e2e8f0] bg-white pl-3 pr-8 text-[13px] font-semibold text-[#000000] focus:outline-none focus:ring-2 focus:ring-[#2563eb]/20"
             value={leaf?.leafId || ""}
             onChange={(e) => {
               const opt = leafOptions.find((o) => o.leafId === e.target.value)
@@ -505,7 +505,7 @@ export function BuilderDetailedWorkspace({
               </option>
             ))}
           </select>
-          <ChevronDown className="pointer-events-none absolute right-2 w-3.5 h-3.5 text-[#94a3b8]" />
+          <ChevronDown className="pointer-events-none absolute right-2 w-3.5 h-3.5 text-[#141414]" />
         </label>
 
         <div
@@ -515,7 +515,7 @@ export function BuilderDetailedWorkspace({
               ? "bg-[#ecfdf5] text-[#166534]"
               : validation.valid === false
                 ? "bg-[#fef2f2] text-[#b91c1c]"
-                : "bg-[#f1f5f9] text-[#64748b]",
+                : "bg-[#f1f5f9] text-[#111111]",
           )}
         >
           {validation.valid === true ? (
@@ -548,7 +548,7 @@ export function BuilderDetailedWorkspace({
           <button
             type="button"
             onClick={onOpenModelSettings}
-            className="h-8 rounded-full border border-[#e2e8f0] bg-white px-3 text-[12px] font-medium text-[#334155] hover:bg-[#f8fafc]"
+            className="h-8 rounded-full border border-[#e2e8f0] bg-white px-3 text-[12px] font-medium text-[#111111] hover:bg-[#f8fafc]"
             title="Edit calendar and base currency"
           >
             Calendar
@@ -569,11 +569,11 @@ export function BuilderDetailedWorkspace({
         {/* Line Item Builder */}
         <section className="rounded-lg border border-[#e2e8f0] bg-white overflow-hidden">
           <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-[#e2e8f0] px-4 py-3">
-            <h2 className="shrink-0 text-[15px] font-semibold text-[#0f172a] tracking-tight">
+            <h2 className="shrink-0 text-[15px] font-semibold text-[#000000] tracking-tight">
               Line Item Builder
             </h2>
 
-            <label className="inline-flex items-center gap-1.5 text-[12px] text-[#64748b]">
+            <label className="inline-flex items-center gap-1.5 text-[12px] text-[#111111]">
               View
               <select
                 value={grain}
@@ -584,7 +584,7 @@ export function BuilderDetailedWorkspace({
                     next === "Quarterly" ? "quarterly" : next === "Annual" ? "annual" : "monthly"
                   onGridGrainChange?.(apiGrain)
                 }}
-                className="h-8 rounded-full border border-[#e2e8f0] bg-white pl-2.5 pr-7 text-[12px] font-medium text-[#0f172a] focus:outline-none focus:ring-2 focus:ring-[#2563eb]/20"
+                className="h-8 rounded-full border border-[#e2e8f0] bg-white pl-2.5 pr-7 text-[12px] font-medium text-[#000000] focus:outline-none focus:ring-2 focus:ring-[#2563eb]/20"
               >
                 <option value="Monthly">Monthly</option>
                 <option value="Quarterly">Quarterly</option>
@@ -609,7 +609,7 @@ export function BuilderDetailedWorkspace({
           <div className="overflow-x-auto">
             <table className="w-full min-w-[1280px] text-left border-collapse">
               <thead>
-                <tr className="bg-[#f8fafc] text-[11px] text-[#64748b] border-b border-[#e2e8f0]">
+                <tr className="bg-[#f8fafc] text-[11px] text-[#111111] border-b border-[#e2e8f0]">
                   <th
                     className={cn(
                       "sticky left-0 z-10 bg-[#f8fafc] px-3 py-2.5 font-medium min-w-[200px]",
@@ -633,7 +633,7 @@ export function BuilderDetailedWorkspace({
                       {m}
                     </th>
                   ))}
-                  <th className="px-3 py-2.5 font-semibold text-right whitespace-nowrap text-[#0f172a]">
+                  <th className="px-3 py-2.5 font-semibold text-right whitespace-nowrap text-[#000000]">
                     Total
                   </th>
                 </tr>
@@ -661,7 +661,7 @@ export function BuilderDetailedWorkspace({
                         )}
                       >
                         <div className="flex items-center gap-1.5 min-w-0">
-                          <ChevronRight className="w-3.5 h-3.5 text-[#cbd5e1] shrink-0" />
+                          <ChevronRight className="w-3.5 h-3.5 text-[#141414] shrink-0" />
                           {isCalc ? (
                             <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded bg-[#f3e8ff] text-[11px] font-bold text-[#7c3aed]">
                               Σ
@@ -671,16 +671,16 @@ export function BuilderDetailedWorkspace({
                               <BarChart3 className="w-3 h-3" />
                             </span>
                           )}
-                          <span className="truncate font-medium text-[#0f172a]">{row.name}</span>
+                          <span className="truncate font-medium text-[#000000]">{row.name}</span>
                         </div>
                       </td>
                       <td className={cn("px-3 py-2", cellBorder)}>
                         {isCalc ? (
-                          <span className="inline-flex rounded-full bg-[#f3e8ff] px-2 py-0.5 text-[10px] font-medium text-[#6d28d9]">
+                          <span className="inline-flex rounded-full bg-[#f3e8ff] px-2 py-0.5 text-[11px] font-medium text-[#6d28d9]">
                             Calculated
                           </span>
                         ) : (
-                          <span className="inline-flex rounded-full bg-[#eff6ff] px-2 py-0.5 text-[10px] font-medium text-[#2563eb]">
+                          <span className="inline-flex rounded-full bg-[#eff6ff] px-2 py-0.5 text-[11px] font-medium text-[#2563eb]">
                             Driver
                           </span>
                         )}
@@ -727,7 +727,7 @@ export function BuilderDetailedWorkspace({
                             className={cn(
                               "px-1.5 py-1 text-right tabular-nums whitespace-nowrap",
                               cellBorder,
-                              !isEditing && (v < 0 ? "text-[#dc2626]" : "text-[#0f172a]"),
+                              !isEditing && (v < 0 ? "text-[#dc2626]" : "text-[#000000]"),
                               editable && "hover:bg-white/90",
                             )}
                             onDoubleClick={(e) => {
@@ -772,7 +772,7 @@ export function BuilderDetailedWorkspace({
                       <td
                         className={cn(
                           "px-3 py-2 text-right tabular-nums font-semibold whitespace-nowrap",
-                          row.fy < 0 ? "text-[#dc2626]" : "text-[#0f172a]",
+                          row.fy < 0 ? "text-[#dc2626]" : "text-[#000000]",
                         )}
                         title="Total (read-only)"
                       >
@@ -785,7 +785,7 @@ export function BuilderDetailedWorkspace({
                   <tr>
                     <td
                       colSpan={4 + monthHeaders.length}
-                      className="px-6 py-10 text-center text-[12px] text-[#64748b]"
+                      className="px-6 py-10 text-center text-[12px] text-[#111111]"
                     >
                       No line items are configured for this module. Add a line item or import model data.
                     </td>
@@ -977,7 +977,7 @@ function PanelShell({
           headerClassName,
         )}
       >
-        <h3 className="text-[12px] font-semibold text-[#0f172a]">{title}</h3>
+        <h3 className="text-[12px] font-semibold text-[#000000]">{title}</h3>
         {action}
       </div>
       <div className="flex-1 min-h-0 p-3 overflow-auto">{children}</div>
@@ -1073,7 +1073,7 @@ function FormulaTracePanel({
           </button>
         }
       >
-        <p className="text-[11px] text-[#94a3b8]">Closed — reopen to inspect precedents and chain.</p>
+        <p className="text-[11px] text-[#141414]">Closed — reopen to inspect precedents and chain.</p>
       </PanelShell>
     )
   }
@@ -1081,13 +1081,13 @@ function FormulaTracePanel({
   return (
     <section className="rounded-xl border border-[#e2e8f0] bg-white shadow-sm flex flex-col min-h-[320px] overflow-hidden">
       <div className="flex items-center justify-between border-b border-[#e2e8f0] px-3 py-2 shrink-0">
-        <h3 className="text-[12px] font-semibold text-[#0f172a]">
+        <h3 className="text-[12px] font-semibold text-[#000000]">
           Formula Trace: <span className="text-[#2563eb]">{name}</span>
         </h3>
         <button
           type="button"
           onClick={onClose}
-          className="h-7 w-7 inline-flex items-center justify-center rounded text-[#94a3b8] hover:bg-[#f1f5f9]"
+          className="h-7 w-7 inline-flex items-center justify-center rounded text-[#141414] hover:bg-[#f1f5f9]"
           aria-label="Close formula trace"
         >
           <X className="w-3.5 h-3.5" />
@@ -1095,12 +1095,12 @@ function FormulaTracePanel({
       </div>
 
       <div className="px-3 pt-2 pb-2 shrink-0">
-        <p className="text-[10px] font-medium text-[#64748b] mb-1">Formula</p>
+        <p className="text-[11px] font-medium text-[#111111] mb-1">Formula</p>
         <div className="rounded-md border border-[#e2e8f0] bg-[#f8fafc] px-2 py-1.5">
           {isCalc && formula ? (
             <FormulaHighlight formula={formula} accent="purple" />
           ) : (
-            <span className="text-[11px] text-[#94a3b8]">—</span>
+            <span className="text-[11px] text-[#141414]">—</span>
           )}
         </div>
       </div>
@@ -1113,10 +1113,10 @@ function FormulaTracePanel({
               type="button"
               onClick={() => onTab(t.id)}
               className={cn(
-                "pb-2 text-[10px] font-medium border-b-2 whitespace-nowrap",
+                "pb-2 text-[11px] font-medium border-b-2 whitespace-nowrap",
                 tab === t.id
                   ? "border-[#2563eb] text-[#2563eb]"
-                  : "border-transparent text-[#64748b] hover:text-[#0f172a]",
+                  : "border-transparent text-[#111111] hover:text-[#000000]",
               )}
             >
               {t.label}
@@ -1128,18 +1128,18 @@ function FormulaTracePanel({
       <div className="flex-1 min-h-0 p-3 overflow-auto">
         {tab === "summary" && (
           <div className="grid grid-cols-2 gap-2 min-w-0">
-            <dl className="space-y-1.5 text-[10px] min-w-0">
+            <dl className="space-y-1.5 text-[11px] min-w-0">
               <MetaRow label="Line Item Type" value={isCalc ? "Calculated" : "Driver"} />
               <MetaRow label="Data Type" value="USD" />
               <MetaRow label="Aggregation" value="Monthly" />
               <MetaRow label="Format" value="#,##0" mono />
               <MetaRow label="Last Calculated" value={fmtWhen(cellMeta?.lastCalculatedAt)} />
               <div>
-                <dt className="text-[#94a3b8]">Status</dt>
+                <dt className="text-[#141414]">Status</dt>
                 <dd className="mt-0.5">
                   <span
                     className={cn(
-                      "inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[9px] font-medium",
+                      "inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[11px] font-medium",
                       statusOk
                         ? "bg-[#dcfce7] text-[#166534]"
                         : "bg-[#fef2f2] text-[#b91c1c]",
@@ -1151,8 +1151,8 @@ function FormulaTracePanel({
                 </dd>
               </div>
               <div>
-                <dt className="text-[#94a3b8]">Formula Updated</dt>
-                <dd className="font-medium text-[#0f172a] mt-0.5 leading-tight text-[9px]">
+                <dt className="text-[#141414]">Formula Updated</dt>
+                <dd className="font-medium text-[#000000] mt-0.5 leading-tight text-[11px]">
                   {cellMeta?.formulaUpdatedAt
                     ? `${fmtWhen(cellMeta.formulaUpdatedAt)}${
                         cellMeta.formulaUpdatedByName
@@ -1164,7 +1164,7 @@ function FormulaTracePanel({
               </div>
             </dl>
             <div className="min-w-0">
-              <p className="text-[10px] font-semibold text-[#0f172a] mb-1">Calculation Chain</p>
+              <p className="text-[11px] font-semibold text-[#000000] mb-1">Calculation Chain</p>
               <CalcChainFlow
                 onNavigate={onNavigate}
                 focusName={name}
@@ -1196,7 +1196,7 @@ function FormulaTracePanel({
 
         {tab === "chain" && (
           <div>
-            <p className="text-[10px] font-semibold text-[#0f172a] mb-2">Calculation Chain</p>
+            <p className="text-[11px] font-semibold text-[#000000] mb-2">Calculation Chain</p>
             <CalcChainFlow
               onNavigate={onNavigate}
               focusName={name}
@@ -1221,8 +1221,8 @@ function MetaRow({
 }) {
   return (
     <div>
-      <dt className="text-[#94a3b8]">{label}</dt>
-      <dd className={cn("font-medium text-[#0f172a] mt-0.5", mono && "font-mono text-[11px]")}>
+      <dt className="text-[#141414]">{label}</dt>
+      <dd className={cn("font-medium text-[#000000] mt-0.5", mono && "font-mono text-[11px]")}>
         {value}
       </dd>
     </div>
@@ -1243,7 +1243,7 @@ function RefList({
   tone: "driver" | "calc"
 }) {
   if (!names.length) {
-    return <p className="text-[12px] text-[#94a3b8] py-6 text-center">{empty}</p>
+    return <p className="text-[12px] text-[#141414] py-6 text-center">{empty}</p>
   }
   return (
     <ul className="space-y-2 max-w-lg">
@@ -1270,12 +1270,12 @@ function RefList({
                     <BarChart3 className="w-3.5 h-3.5" />
                   </span>
                 )}
-                <span className="text-[13px] font-medium text-[#0f172a] truncate">{n}</span>
+                <span className="text-[13px] font-medium text-[#000000] truncate">{n}</span>
               </span>
               <span
                 className={cn(
                   "text-[12px] tabular-nums font-medium shrink-0",
-                  fy != null && fy < 0 ? "text-[#dc2626]" : "text-[#64748b]",
+                  fy != null && fy < 0 ? "text-[#dc2626]" : "text-[#111111]",
                 )}
               >
                 {fy != null ? formatCell(fy, "currency") : "—"}
@@ -1362,7 +1362,7 @@ function CalcChainFlow({
   const live = liveTrace
   if (!live || live.nodes.length === 0) {
     return (
-      <div className="rounded-lg border border-[#e2e8f0] bg-[#fafbfc] px-3 py-4 text-[10px] text-[#64748b] leading-snug">
+      <div className="rounded-lg border border-[#e2e8f0] bg-[#fafbfc] px-3 py-4 text-[11px] text-[#111111] leading-snug">
         Calculation chain unavailable. Run Test Calculation, or select a calculated line item with
         live cell trace data.
       </div>
@@ -1371,8 +1371,8 @@ function CalcChainFlow({
   if (live.nodes.length === 1 && live.edges.length === 0) {
     const only = live.nodes[0]
     return (
-      <div className="rounded-lg border border-[#e2e8f0] bg-[#fafbfc] px-3 py-3 text-[10px] text-[#64748b] leading-snug space-y-1">
-        <p className="font-medium text-[#0f172a]">{only.label}</p>
+      <div className="rounded-lg border border-[#e2e8f0] bg-[#fafbfc] px-3 py-3 text-[11px] text-[#111111] leading-snug space-y-1">
+        <p className="font-medium text-[#000000]">{only.label}</p>
         <p>
           Single-node trace
           {only.value != null ? ` · ${only.value}` : ""} — typical for INPUT drivers. Pick a
@@ -1521,7 +1521,7 @@ function CalcChainFlow({
         })}
       </svg>
 
-      <div className="flex flex-wrap items-center justify-center gap-2 px-1 py-1.5 border-t border-[#e2e8f0] text-[9px] text-[#64748b]">
+      <div className="flex flex-wrap items-center justify-center gap-2 px-1 py-1.5 border-t border-[#e2e8f0] text-[11px] text-[#111111]">
         <span className="inline-flex items-center gap-1">
           <span className="h-1.5 w-1.5 rounded-full bg-[#2563eb]" /> Drivers
         </span>
@@ -1582,17 +1582,17 @@ function DataMappingPanel({
   return (
     <section className="rounded-xl border border-[#e2e8f0] bg-white shadow-sm flex flex-col min-h-[320px] overflow-hidden">
       <div className="flex items-center justify-between border-b border-[#e2e8f0] px-3 py-2.5 shrink-0 gap-2">
-        <h3 className="text-[12px] font-semibold text-[#0f172a] inline-flex items-center gap-1.5 min-w-0">
-          <Database className="w-3.5 h-3.5 text-[#64748b] shrink-0" />
+        <h3 className="text-[12px] font-semibold text-[#000000] inline-flex items-center gap-1.5 min-w-0">
+          <Database className="w-3.5 h-3.5 text-[#111111] shrink-0" />
           Data Mapping
         </h3>
         <div className="flex items-center gap-1.5 shrink-0">
           {inferred ? (
-            <span className="inline-flex items-center rounded-full bg-[#eff6ff] px-2 py-0.5 text-[10px] font-semibold text-[#1d4ed8]">
+            <span className="inline-flex items-center rounded-full bg-[#eff6ff] px-2 py-0.5 text-[11px] font-semibold text-[#1d4ed8]">
               {allCount} suggested
             </span>
           ) : (
-            <span className="inline-flex items-center rounded-full bg-[#dcfce7] px-2 py-0.5 text-[10px] font-semibold text-[#166534]">
+            <span className="inline-flex items-center rounded-full bg-[#dcfce7] px-2 py-0.5 text-[11px] font-semibold text-[#166534]">
               {mappedPct}% Mapped
             </span>
           )}
@@ -1600,7 +1600,7 @@ function DataMappingPanel({
             <button
               type="button"
               onClick={onAddMapping}
-              className="h-7 inline-flex items-center gap-1 rounded-full bg-[#2563eb] px-2.5 text-[10px] font-medium text-white shadow-sm hover:bg-[#1d4ed8]"
+              className="h-7 inline-flex items-center gap-1 rounded-full bg-[#2563eb] px-2.5 text-[11px] font-medium text-white shadow-sm hover:bg-[#1d4ed8]"
             >
               <Plus className="w-3 h-3" />
               Add
@@ -1611,7 +1611,7 @@ function DataMappingPanel({
 
       <div className="flex-1 min-h-0 p-3 flex flex-col gap-2.5">
         {inferred ? (
-          <p className="text-[10px] text-[#64748b] leading-snug -mt-0.5">
+          <p className="text-[11px] text-[#111111] leading-snug -mt-0.5">
             No connector seed on this model yet — add mappings below, or seed the catalog from
             backend. Suggested rows are derived from line items until real mappings exist.
           </p>
@@ -1622,7 +1622,7 @@ function DataMappingPanel({
               <button
                 type="button"
                 onClick={onRefresh}
-                className="h-7 rounded-full border border-[#e2e8f0] px-2.5 text-[10px] font-medium text-[#475569] hover:bg-[#f8fafc]"
+                className="h-7 rounded-full border border-[#e2e8f0] px-2.5 text-[11px] font-medium text-[#111111] hover:bg-[#f8fafc]"
               >
                 Refresh from connectors
               </button>
@@ -1631,7 +1631,7 @@ function DataMappingPanel({
               <button
                 type="button"
                 onClick={onSeedCatalog}
-                className="h-7 rounded-full border border-[#bfdbfe] bg-[#eff6ff] px-2.5 text-[10px] font-medium text-[#1d4ed8] hover:bg-[#dbeafe]"
+                className="h-7 rounded-full border border-[#bfdbfe] bg-[#eff6ff] px-2.5 text-[11px] font-medium text-[#1d4ed8] hover:bg-[#dbeafe]"
               >
                 Seed catalog
               </button>
@@ -1640,7 +1640,7 @@ function DataMappingPanel({
               <button
                 type="button"
                 onClick={onImportFile}
-                className="h-7 rounded-full border border-[#bbf7d0] bg-[#f0fdf4] px-2.5 text-[10px] font-medium text-[#15803d] hover:bg-[#dcfce7]"
+                className="h-7 rounded-full border border-[#bbf7d0] bg-[#f0fdf4] px-2.5 text-[11px] font-medium text-[#15803d] hover:bg-[#dcfce7]"
               >
                 Import CSV / Excel
               </button>
@@ -1653,7 +1653,7 @@ function DataMappingPanel({
               value={system}
               onChange={(e) => onSystem(e.target.value)}
               aria-label="Source System"
-              className="h-8 appearance-none rounded-full border border-[#e2e8f0] bg-white pl-2.5 pr-7 text-[11px] text-[#0f172a] min-w-[118px]"
+              className="h-8 appearance-none rounded-full border border-[#e2e8f0] bg-white pl-2.5 pr-7 text-[11px] text-[#000000] min-w-[118px]"
             >
               {systemOptions.map((s) => (
                 <option key={s} value={s}>
@@ -1661,23 +1661,23 @@ function DataMappingPanel({
                 </option>
               ))}
             </select>
-            <ChevronDown className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 text-[#94a3b8]" />
+            <ChevronDown className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 text-[#141414]" />
           </div>
           <div className="relative flex-1 min-w-0">
-            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[#94a3b8]" />
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[#141414]" />
             <input
               value={query}
               onChange={(e) => onQuery(e.target.value)}
               placeholder="Search mappings..."
-              className="h-8 w-full rounded-md border border-[#e2e8f0] bg-white pl-8 pr-2 text-[11px] text-[#0f172a] placeholder:text-[#94a3b8]"
+              className="h-8 w-full rounded-md border border-[#e2e8f0] bg-white pl-8 pr-2 text-[11px] text-[#000000] placeholder:text-[#141414]"
             />
           </div>
         </div>
 
         <div className="flex-1 min-h-0 overflow-auto -mx-1 px-1">
-          <table className="w-full text-[10px]">
+          <table className="w-full text-[11px]">
             <thead className="sticky top-0 bg-white">
-              <tr className="text-[#94a3b8] text-left border-b border-[#e2e8f0]">
+              <tr className="text-[#141414] text-left border-b border-[#e2e8f0]">
                 <th className="pb-1.5 pr-2 font-medium">Source Field</th>
                 <th className="pb-1.5 pr-2 font-medium">Source System</th>
                 <th className="pb-1.5 w-5 font-medium text-center" aria-hidden />
@@ -1688,7 +1688,7 @@ function DataMappingPanel({
             <tbody>
               {rows.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="py-6 text-center text-[11px] text-[#94a3b8]">
+                  <td colSpan={5} className="py-6 text-center text-[11px] text-[#141414]">
                     {allCount === 0
                       ? "Add line items to suggest source mappings, or seed connectors on the backend."
                       : "No mappings match your filters."}
@@ -1715,14 +1715,14 @@ function DataMappingPanel({
                         selected ? "bg-[#eff6ff]" : "hover:bg-[#f8fafc]",
                       )}
                     >
-                      <td className="py-2 pr-2 font-medium text-[#0f172a] whitespace-nowrap">
+                      <td className="py-2 pr-2 font-medium text-[#000000] whitespace-nowrap">
                         {r.source}
                       </td>
-                      <td className="py-2 pr-2 text-[#64748b] whitespace-nowrap">{r.system}</td>
-                      <td className="py-2 text-center text-[#94a3b8]">
+                      <td className="py-2 pr-2 text-[#111111] whitespace-nowrap">{r.system}</td>
+                      <td className="py-2 text-center text-[#141414]">
                         <ArrowRight className="w-3 h-3 mx-auto" />
                       </td>
-                      <td className="py-2 pr-2 text-[#334155] whitespace-nowrap">{r.target}</td>
+                      <td className="py-2 pr-2 text-[#111111] whitespace-nowrap">{r.target}</td>
                       <td className="py-2 text-center">
                         {r.ok ? (
                           suggested ? (
@@ -1749,7 +1749,7 @@ function DataMappingPanel({
         </div>
 
         <div className="flex items-center justify-between gap-2 pt-1 shrink-0 border-t border-[#f1f5f9]">
-          <label className="inline-flex items-center gap-1.5 text-[10px] text-[#64748b] cursor-pointer select-none">
+          <label className="inline-flex items-center gap-1.5 text-[11px] text-[#111111] cursor-pointer select-none">
             <input
               type="checkbox"
               checked={unmappedOnly}
@@ -1761,14 +1761,14 @@ function DataMappingPanel({
           <button
             type="button"
             onClick={onViewAll}
-            className="inline-flex items-center gap-1 text-[10px] font-medium text-[#2563eb] hover:underline"
+            className="inline-flex items-center gap-1 text-[11px] font-medium text-[#2563eb] hover:underline"
           >
             View all mappings
             <ArrowRight className="w-3 h-3" />
           </button>
         </div>
 
-        <p className="text-[9px] text-[#94a3b8] -mt-1">
+        <p className="text-[11px] text-[#141414] -mt-1">
           Showing {rows.length} of {allCount}
           {inferred ? " · suggested" : ""}
           {unmappedOnly ? " · unmapped" : ""}
@@ -1793,7 +1793,7 @@ function AuditLogPanel({
   return (
     <section className="rounded-xl border border-[#e2e8f0] bg-white shadow-sm flex flex-col min-h-[320px] max-h-[420px] overflow-hidden">
       <div className="flex items-center justify-between border-b border-[#e2e8f0] px-3 py-2.5 shrink-0">
-        <h3 className="text-[12px] font-semibold text-[#0f172a]">Model Audit Log</h3>
+        <h3 className="text-[12px] font-semibold text-[#000000]">Model Audit Log</h3>
         <button
           type="button"
           onClick={onViewAll}
@@ -1804,9 +1804,9 @@ function AuditLogPanel({
       </div>
 
       <div className="flex-1 min-h-0 overflow-auto fpa-thin-scroll">
-        <table className="w-full text-[10px] table-fixed">
+        <table className="w-full text-[11px] table-fixed">
           <thead className="sticky top-0 z-[1] bg-white shadow-[0_1px_0_#e2e8f0]">
-            <tr className="text-[#94a3b8] text-left">
+            <tr className="text-[#141414] text-left">
               <th className="px-3 py-2 font-medium w-[22%]">Time</th>
               <th className="px-2 py-2 font-medium w-[22%]">User</th>
               <th className="px-2 py-2 font-medium w-[22%]">Action</th>
@@ -1816,7 +1816,7 @@ function AuditLogPanel({
           <tbody>
             {rows.length === 0 ? (
               <tr>
-                <td colSpan={4} className="px-3 py-8 text-center text-[11px] text-[#94a3b8]">
+                <td colSpan={4} className="px-3 py-8 text-center text-[11px] text-[#141414]">
                   No audit entries yet.
                 </td>
               </tr>
@@ -1843,28 +1843,28 @@ function AuditLogPanel({
                       selected ? "bg-[#eff6ff]" : "hover:bg-[#f8fafc]",
                     )}
                   >
-                    <td className="px-3 py-2.5 text-[#64748b] align-top whitespace-nowrap">
+                    <td className="px-3 py-2.5 text-[#111111] align-top whitespace-nowrap">
                       {e.time}
                     </td>
                     <td className="px-2 py-2.5 align-top">
                       <div className="flex items-center gap-1.5 min-w-0">
                         <div
-                          className="h-6 w-6 rounded-full flex items-center justify-center text-[9px] font-semibold shrink-0"
+                          className="h-6 w-6 rounded-full flex items-center justify-center text-[11px] font-semibold shrink-0"
                           style={{ backgroundColor: avatar.bg, color: avatar.text }}
                         >
                           {initials}
                         </div>
-                        <span className="text-[#0f172a] font-medium truncate" title={e.user}>
+                        <span className="text-[#000000] font-medium truncate" title={e.user}>
                           {e.user}
                         </span>
                       </div>
                     </td>
-                    <td className="px-2 py-2.5 text-[#0f172a] font-medium align-top">
+                    <td className="px-2 py-2.5 text-[#000000] font-medium align-top">
                       <span className="line-clamp-2 break-words" title={e.action}>
                         {e.action}
                       </span>
                     </td>
-                    <td className="px-3 py-2.5 text-[#64748b] align-top">
+                    <td className="px-3 py-2.5 text-[#111111] align-top">
                       <span className="line-clamp-2 break-words" title={e.details}>
                         {e.details || "—"}
                       </span>
@@ -1917,7 +1917,7 @@ function ExceptionsCard({
       )}
     >
       <div className="border-b border-[#e2e8f0] px-3 py-2.5 shrink-0">
-        <h3 className="text-[12px] font-semibold text-[#0f172a] inline-flex items-center gap-1.5 mb-2">
+        <h3 className="text-[12px] font-semibold text-[#000000] inline-flex items-center gap-1.5 mb-2">
           <AlertTriangle className="w-3.5 h-3.5 text-[#d97706]" />
           Exceptions
         </h3>
@@ -1933,13 +1933,13 @@ function ExceptionsCard({
                   onTab(active ? null : t.id)
                 }}
                 className={cn(
-                  "inline-flex items-center gap-1 h-7 px-2 rounded-full text-[10px] font-medium transition-colors",
+                  "inline-flex items-center gap-1 h-7 px-2 rounded-full text-[11px] font-medium transition-colors",
                   active
                     ? cn(t.activeBg, t.activeText)
-                    : "text-[#64748b] hover:bg-[#f8fafc]",
+                    : "text-[#111111] hover:bg-[#f8fafc]",
                 )}
               >
-                <Icon className={cn("w-3 h-3", active ? t.iconColor : "text-[#94a3b8]")} />
+                <Icon className={cn("w-3 h-3", active ? t.iconColor : "text-[#141414]")} />
                 {t.label} ({t.count})
               </button>
             )
@@ -1948,9 +1948,9 @@ function ExceptionsCard({
       </div>
 
       <div className="flex-1 min-h-0 overflow-auto px-3 py-2">
-        <table className="w-full text-[10px]">
+        <table className="w-full text-[11px]">
           <thead className="sticky top-0 bg-white">
-            <tr className="text-[#94a3b8] text-left border-b border-[#e2e8f0]">
+            <tr className="text-[#141414] text-left border-b border-[#e2e8f0]">
               <th className="pb-2 w-6 font-medium" />
               <th className="pb-2 pr-2 font-medium whitespace-nowrap">Line Item / Mapping</th>
               <th className="pb-2 pr-2 font-medium">Issue</th>
@@ -1960,7 +1960,7 @@ function ExceptionsCard({
           <tbody>
             {rows.length === 0 ? (
               <tr>
-                <td colSpan={4} className="py-6 text-center text-[11px] text-[#94a3b8]">
+                <td colSpan={4} className="py-6 text-center text-[11px] text-[#141414]">
                   No exceptions in this category.
                 </td>
               </tr>
@@ -1993,14 +1993,14 @@ function ExceptionsCard({
                         <Info className="w-3.5 h-3.5 text-[#2563eb]" />
                       )}
                     </td>
-                    <td className="py-2 pr-2 font-medium text-[#0f172a] whitespace-nowrap align-middle">
+                    <td className="py-2 pr-2 font-medium text-[#000000] whitespace-nowrap align-middle">
                       {r.lineItem}
                     </td>
-                    <td className="py-2 pr-2 text-[#64748b] align-middle">{r.issue}</td>
+                    <td className="py-2 pr-2 text-[#111111] align-middle">{r.issue}</td>
                     <td className="py-2 text-right align-middle">
                       <span
                         className={cn(
-                          "inline-flex rounded-full px-2 py-0.5 text-[9px] font-semibold",
+                          "inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold",
                           r.impact === "High"
                             ? "bg-[#fef2f2] text-[#dc2626]"
                             : r.impact === "Medium"
@@ -2023,7 +2023,7 @@ function ExceptionsCard({
         <button
           type="button"
           onClick={onViewAll}
-          className="inline-flex items-center gap-1 text-[10px] font-medium text-[#2563eb] hover:underline"
+          className="inline-flex items-center gap-1 text-[11px] font-medium text-[#2563eb] hover:underline"
         >
           View all exceptions
           <ArrowRight className="w-3 h-3" />
@@ -2062,7 +2062,7 @@ function ValidationSummaryCard({
   return (
     <section className="rounded-xl border border-[#e2e8f0] bg-white shadow-sm flex flex-col min-h-[320px] overflow-hidden">
       <div className="border-b border-[#e2e8f0] px-3 py-2.5 shrink-0">
-        <h3 className="text-[12px] font-semibold text-[#0f172a]">Validation Summary</h3>
+        <h3 className="text-[12px] font-semibold text-[#000000]">Validation Summary</h3>
       </div>
 
       <div className="flex-1 min-h-0 px-4 py-4 flex items-center gap-5">
@@ -2071,8 +2071,8 @@ function ValidationSummaryCard({
           style={{ background: gradient, borderRadius: "9999px" }}
         >
           <div className="absolute inset-[12px] rounded-full bg-white flex flex-col items-center justify-center">
-            <span className="text-[20px] font-bold text-[#0f172a] leading-none">{total}</span>
-            <span className="text-[9px] text-[#94a3b8] mt-1 text-center leading-tight">
+            <span className="text-[20px] font-bold text-[#000000] leading-none">{total}</span>
+            <span className="text-[11px] text-[#141414] mt-1 text-center leading-tight">
               Total Checks
             </span>
           </div>
@@ -2088,11 +2088,11 @@ function ValidationSummaryCard({
                 className="h-3 w-3 rounded-sm shrink-0"
                 style={{ backgroundColor: item.color }}
               />
-              <span className="text-[#64748b]">{item.label}</span>
-              <span className="font-bold text-[#0f172a] tabular-nums text-right min-w-[12px]">
+              <span className="text-[#111111]">{item.label}</span>
+              <span className="font-bold text-[#000000] tabular-nums text-right min-w-[12px]">
                 {item.count}
               </span>
-              <span className="text-[#94a3b8] tabular-nums text-right w-8">{item.pct}%</span>
+              <span className="text-[#141414] tabular-nums text-right w-8">{item.pct}%</span>
             </div>
           ))}
         </div>
@@ -2196,9 +2196,9 @@ function ImpactAnalysisPanel({
   return (
     <section className="rounded-xl border border-[#e2e8f0] bg-white shadow-sm flex flex-col min-h-[320px] overflow-hidden">
       <div className="border-b border-[#e2e8f0] px-3 py-2.5 shrink-0 space-y-2">
-        <h3 className="text-[12px] font-semibold text-[#0f172a]">
+        <h3 className="text-[12px] font-semibold text-[#000000]">
           Impact Analysis{" "}
-          <span className="font-normal text-[#64748b]">
+          <span className="font-normal text-[#111111]">
             (if {driverName} {shockLabel})
           </span>
         </h3>
@@ -2208,7 +2208,7 @@ function ImpactAnalysisPanel({
               value={driverId}
               onChange={(e) => setDriverId(e.target.value)}
               aria-label="Sensitivity driver"
-              className="h-7 max-w-[140px] rounded-full border border-[#e2e8f0] bg-white px-2 text-[10px] text-[#0f172a]"
+              className="h-7 max-w-[140px] rounded-full border border-[#e2e8f0] bg-white px-2 text-[11px] text-[#000000]"
             >
               {drivers.length === 0 ? (
                 <option value="">No drivers</option>
@@ -2220,7 +2220,7 @@ function ImpactAnalysisPanel({
                 ))
               )}
             </select>
-            <label className="inline-flex items-center gap-1 text-[10px] text-[#64748b]">
+            <label className="inline-flex items-center gap-1 text-[11px] text-[#111111]">
               Shock
               <input
                 type="number"
@@ -2229,7 +2229,7 @@ function ImpactAnalysisPanel({
                 step={1}
                 value={shockPct}
                 onChange={(e) => onShockPct(Number(e.target.value) || 0)}
-                className="h-7 w-14 rounded-full border border-[#e2e8f0] px-2 text-[10px] text-[#0f172a] tabular-nums"
+                className="h-7 w-14 rounded-full border border-[#e2e8f0] px-2 text-[11px] text-[#000000] tabular-nums"
               />
               %
             </label>
@@ -2237,7 +2237,7 @@ function ImpactAnalysisPanel({
               type="button"
               disabled={!driverId}
               onClick={() => driverId && onRun?.(driverId, shockPct)}
-              className="h-7 rounded-full bg-[#2563eb] px-3 text-[10px] font-medium text-white shadow-sm hover:bg-[#1d4ed8] disabled:opacity-50"
+              className="h-7 rounded-full bg-[#2563eb] px-3 text-[11px] font-medium text-white shadow-sm hover:bg-[#1d4ed8] disabled:opacity-50"
             >
               Run
             </button>
@@ -2249,7 +2249,7 @@ function ImpactAnalysisPanel({
         <div className="flex flex-col gap-2.5 shrink-0 w-[118px]">
           {leftCards.length === 0 ? (
             <div className="rounded-lg border border-[#e2e8f0] bg-[#f8fafc] px-3 py-3 flex-1 flex items-center">
-              <p className="text-[10px] text-[#64748b] leading-snug">
+              <p className="text-[11px] text-[#111111] leading-snug">
                 {sensitivity?.emptyMessage || "No impact metrics for this driver."}
               </p>
             </div>
@@ -2259,7 +2259,7 @@ function ImpactAnalysisPanel({
                 key={imp.lineItemId}
                 className="rounded-lg border border-[#e2e8f0] bg-white px-3 py-3 flex-1 flex flex-col justify-center"
               >
-                <p className="text-[10px] text-[#64748b] mb-1.5 truncate" title={imp.name}>
+                <p className="text-[11px] text-[#111111] mb-1.5 truncate" title={imp.name}>
                   {imp.name} Impact
                 </p>
                 <p className={cn("text-[15px] font-bold leading-none tabular-nums", deltaColor(imp.deltaTotal))}>
@@ -2275,12 +2275,12 @@ function ImpactAnalysisPanel({
 
         <div className="flex-1 min-w-0 flex flex-col min-h-[200px]">
           {!hasChartData ? (
-            <p className="text-[11px] text-[#64748b] m-auto text-center px-4">
+            <p className="text-[11px] text-[#111111] m-auto text-center px-4">
               {sensitivity?.emptyMessage || "Run sensitivity analysis to view impact data."}
             </p>
           ) : (
             <>
-              <div className="flex items-center justify-center gap-4 mb-1 text-[9px] text-[#64748b] shrink-0">
+              <div className="flex items-center justify-center gap-4 mb-1 text-[11px] text-[#111111] shrink-0">
                 <span className="inline-flex items-center gap-1.5">
                   <svg width="20" height="8" aria-hidden>
                     <line x1="0" y1="4" x2="14" y2="4" stroke="#2563eb" strokeWidth="1.5" strokeDasharray="3 2" />
@@ -2426,10 +2426,10 @@ function AnalyticsDetailModal({
     <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
       <DialogContent className="sm:max-w-2xl max-h-[85vh] flex flex-col p-0 gap-0 overflow-hidden">
         <DialogHeader className="px-5 pt-5 pb-3 border-b border-[#e2e8f0] shrink-0">
-          <DialogTitle className="text-[15px] text-[#0f172a]">
+          <DialogTitle className="text-[15px] text-[#000000]">
             {kind ? titles[kind] : ""}
           </DialogTitle>
-          <DialogDescription className="text-[12px] text-[#64748b]">
+          <DialogDescription className="text-[12px] text-[#111111]">
             {kind ? descriptions[kind] : ""}
           </DialogDescription>
         </DialogHeader>
@@ -2438,7 +2438,7 @@ function AnalyticsDetailModal({
           {kind === "mappings" && (
             <table className="w-full text-[11px]">
               <thead>
-                <tr className="text-[#94a3b8] text-left border-b border-[#e2e8f0]">
+                <tr className="text-[#141414] text-left border-b border-[#e2e8f0]">
                   <th className="pb-2 pr-3 font-medium">Source Field</th>
                   <th className="pb-2 pr-3 font-medium">Source System</th>
                   <th className="pb-2 w-5" aria-hidden />
@@ -2449,7 +2449,7 @@ function AnalyticsDetailModal({
               <tbody>
                 {mappingRows.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="py-8 text-center text-[#94a3b8]">
+                    <td colSpan={5} className="py-8 text-center text-[#141414]">
                       No source fields in the mapping catalog yet.
                     </td>
                   </tr>
@@ -2468,12 +2468,12 @@ function AnalyticsDetailModal({
                     }}
                     className="border-b border-[#f1f5f9] hover:bg-[#f8fafc] cursor-pointer"
                   >
-                    <td className="py-2.5 pr-3 font-medium text-[#0f172a]">{r.source}</td>
-                    <td className="py-2.5 pr-3 text-[#64748b]">{r.system}</td>
-                    <td className="py-2.5 text-[#94a3b8]">
+                    <td className="py-2.5 pr-3 font-medium text-[#000000]">{r.source}</td>
+                    <td className="py-2.5 pr-3 text-[#111111]">{r.system}</td>
+                    <td className="py-2.5 text-[#141414]">
                       <ArrowRight className="w-3.5 h-3.5" />
                     </td>
-                    <td className="py-2.5 pr-3 text-[#334155]">{r.target}</td>
+                    <td className="py-2.5 pr-3 text-[#111111]">{r.target}</td>
                     <td className="py-2.5 text-center">
                       {r.ok ? (
                         <CheckCircle2 className="w-4 h-4 text-[#16a34a] mx-auto" />
@@ -2492,7 +2492,7 @@ function AnalyticsDetailModal({
             <div className="max-h-[55vh] overflow-auto fpa-thin-scroll">
               <table className="w-full text-[11px] table-fixed">
                 <thead className="sticky top-0 bg-white z-[1] shadow-[0_1px_0_#e2e8f0]">
-                  <tr className="text-[#94a3b8] text-left">
+                  <tr className="text-[#141414] text-left">
                     <th className="pb-2 pr-3 font-medium w-[20%]">Time</th>
                     <th className="pb-2 pr-3 font-medium w-[20%]">User</th>
                     <th className="pb-2 pr-3 font-medium w-[22%]">Action</th>
@@ -2517,28 +2517,28 @@ function AnalyticsDetailModal({
                         }}
                         className="border-b border-[#f1f5f9] hover:bg-[#f8fafc] cursor-pointer"
                       >
-                        <td className="py-2.5 pr-3 text-[#64748b] whitespace-nowrap align-top">
+                        <td className="py-2.5 pr-3 text-[#111111] whitespace-nowrap align-top">
                           {e.time}
                         </td>
                         <td className="py-2.5 pr-3 align-top">
                           <div className="flex items-center gap-2 min-w-0">
                             <div
-                              className="h-6 w-6 rounded-full flex items-center justify-center text-[9px] font-semibold shrink-0"
+                              className="h-6 w-6 rounded-full flex items-center justify-center text-[11px] font-semibold shrink-0"
                               style={{ backgroundColor: avatar.bg, color: avatar.text }}
                             >
                               {initials}
                             </div>
-                            <span className="font-medium text-[#0f172a] truncate" title={e.user}>
+                            <span className="font-medium text-[#000000] truncate" title={e.user}>
                               {e.user}
                             </span>
                           </div>
                         </td>
-                        <td className="py-2.5 pr-3 font-medium text-[#0f172a] align-top">
+                        <td className="py-2.5 pr-3 font-medium text-[#000000] align-top">
                           <span className="break-words" title={e.action}>
                             {e.action}
                           </span>
                         </td>
-                        <td className="py-2.5 text-[#64748b] align-top">
+                        <td className="py-2.5 text-[#111111] align-top">
                           <span className="break-words whitespace-pre-wrap" title={e.details}>
                             {e.details || "—"}
                           </span>
@@ -2554,7 +2554,7 @@ function AnalyticsDetailModal({
           {kind === "exceptions" && (
             <table className="w-full text-[11px]">
               <thead>
-                <tr className="text-[#94a3b8] text-left border-b border-[#e2e8f0]">
+                <tr className="text-[#141414] text-left border-b border-[#e2e8f0]">
                   <th className="pb-2 w-6" />
                   <th className="pb-2 pr-3 font-medium">Line Item / Mapping</th>
                   <th className="pb-2 pr-3 font-medium">Issue</th>
@@ -2585,12 +2585,12 @@ function AnalyticsDetailModal({
                         <Info className="w-3.5 h-3.5 text-[#2563eb]" />
                       )}
                     </td>
-                    <td className="py-2.5 pr-3 font-medium text-[#0f172a]">{r.lineItem}</td>
-                    <td className="py-2.5 pr-3 text-[#64748b]">{r.issue}</td>
+                    <td className="py-2.5 pr-3 font-medium text-[#000000]">{r.lineItem}</td>
+                    <td className="py-2.5 pr-3 text-[#111111]">{r.issue}</td>
                     <td className="py-2.5 text-right">
                       <span
                         className={cn(
-                          "inline-flex rounded-full px-2 py-0.5 text-[9px] font-semibold",
+                          "inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold",
                           r.impact === "High"
                             ? "bg-[#fef2f2] text-[#dc2626]"
                             : r.impact === "Medium"
@@ -2610,7 +2610,7 @@ function AnalyticsDetailModal({
           {kind === "validation" && (
             <table className="w-full text-[11px]">
               <thead>
-                <tr className="text-[#94a3b8] text-left border-b border-[#e2e8f0]">
+                <tr className="text-[#141414] text-left border-b border-[#e2e8f0]">
                   <th className="pb-2 pr-3 font-medium">Check</th>
                   <th className="pb-2 pr-3 font-medium">Module</th>
                   <th className="pb-2 font-medium text-right">Status</th>
@@ -2631,12 +2631,12 @@ function AnalyticsDetailModal({
                     }}
                     className="border-b border-[#f1f5f9] hover:bg-[#f8fafc] cursor-pointer"
                   >
-                    <td className="py-2.5 pr-3 font-medium text-[#0f172a]">{c.check}</td>
-                    <td className="py-2.5 pr-3 text-[#64748b]">{c.module}</td>
+                    <td className="py-2.5 pr-3 font-medium text-[#000000]">{c.check}</td>
+                    <td className="py-2.5 pr-3 text-[#111111]">{c.module}</td>
                     <td className="py-2.5 text-right">
                       <span
                         className={cn(
-                          "inline-flex rounded-full px-2 py-0.5 text-[9px] font-semibold capitalize",
+                          "inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold capitalize",
                           validationStatusStyle(c.status),
                         )}
                       >

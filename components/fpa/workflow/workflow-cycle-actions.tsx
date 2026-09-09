@@ -64,8 +64,8 @@ export function WorkflowCycleActions({
     <section className="rounded-xl border border-[#e2e8f0] bg-white p-4 space-y-3 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h2 className="text-sm font-semibold text-[#0f172a]">Cycle actions</h2>
-          <p className="text-[11px] text-[#64748b]">
+          <h2 className="text-sm font-semibold text-[#000000]">Cycle actions</h2>
+          <p className="text-[11px] text-[#111111]">
             FP&A accept, CFO approve, return, and lock for this planning cycle.
           </p>
         </div>
@@ -73,8 +73,8 @@ export function WorkflowCycleActions({
 
       {readOnlyMessage ? (
         <div className="flex items-start gap-2 rounded-lg border border-[#e2e8f0] bg-[#f8fafc] px-3 py-2.5">
-          <Lock className="w-3.5 h-3.5 text-[#64748b] mt-0.5 shrink-0" />
-          <p className="text-[11px] text-[#475569] leading-relaxed">{readOnlyMessage}</p>
+          <Lock className="w-3.5 h-3.5 text-[#111111] mt-0.5 shrink-0" />
+          <p className="text-[11px] text-[#111111] leading-relaxed">{readOnlyMessage}</p>
         </div>
       ) : null}
 
@@ -89,7 +89,7 @@ export function WorkflowCycleActions({
               ? "Comment required to return; optional for accept/approve/lock"
               : "Optional comment"
           }
-          className="w-full rounded-lg border border-[#e2e8f0] px-3 py-2 text-xs disabled:bg-[#f8fafc] disabled:text-[#94a3b8]"
+          className="w-full rounded-lg border border-[#e2e8f0] px-3 py-2 text-xs disabled:bg-[#f8fafc] disabled:text-[#141414]"
         />
       ) : null}
 

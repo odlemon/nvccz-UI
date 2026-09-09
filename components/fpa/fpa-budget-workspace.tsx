@@ -42,7 +42,7 @@ export function FpaBudgetWorkspace({ cycleId }: { cycleId: string }) {
 
   if (!cycle) {
     return (
-      <div className="flex min-h-[40vh] items-center justify-center gap-2 text-[#64748b]">
+      <div className="flex min-h-[40vh] items-center justify-center gap-2 text-[#111111]">
         <Loader2 className="h-5 w-5 animate-spin" />
         Loading budget workspace…
       </div>

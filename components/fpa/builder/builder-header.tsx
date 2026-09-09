@@ -114,9 +114,9 @@ export function BuilderHeader({
         <div className="flex flex-wrap items-end gap-x-4 gap-y-3 min-w-0 flex-1">
           {/* Model — label above */}
           <div className="flex flex-col gap-1">
-            <span className="text-[11px] font-medium text-[#64748b]">Model</span>
+            <span className="text-[11px] font-medium text-[#111111]">Model</span>
             <Select value={modelId || undefined} onValueChange={onModelChange}>
-              <SelectTrigger className="h-10 w-[240px] rounded-md border border-[#e2e8f0] bg-white px-3 text-[13px] font-medium text-[#0f172a] shadow-none focus:ring-2 focus:ring-[#2563eb]/20">
+              <SelectTrigger className="h-10 w-[240px] rounded-md border border-[#e2e8f0] bg-white px-3 text-[13px] font-medium text-[#000000] shadow-none focus:ring-2 focus:ring-[#2563eb]/20">
                 <SelectValue placeholder={modelLabel} />
               </SelectTrigger>
               <SelectContent>
@@ -137,9 +137,9 @@ export function BuilderHeader({
 
           {/* Workspace — label above */}
           <div className="flex flex-col gap-1">
-            <span className="text-[11px] font-medium text-[#64748b]">Workspace</span>
+            <span className="text-[11px] font-medium text-[#111111]">Workspace</span>
             <Select value={versionId || undefined} onValueChange={onVersionChange}>
-              <SelectTrigger className="h-10 w-[160px] rounded-md border border-[#e2e8f0] bg-white px-3 text-[13px] text-[#0f172a] shadow-none focus:ring-2 focus:ring-[#2563eb]/20">
+              <SelectTrigger className="h-10 w-[160px] rounded-md border border-[#e2e8f0] bg-white px-3 text-[13px] text-[#000000] shadow-none focus:ring-2 focus:ring-[#2563eb]/20">
                 <SelectValue placeholder={workspaceLabel} />
               </SelectTrigger>
               <SelectContent>
@@ -214,15 +214,15 @@ export function BuilderHeader({
             <div className="leading-tight">
               {publishedAt ? (
                 <>
-                  <p className="text-[12px] text-[#64748b] whitespace-nowrap">
+                  <p className="text-[12px] text-[#111111] whitespace-nowrap">
                     Last Published: {publishedAt}
                   </p>
                   {publishedBy ? (
-                    <p className="text-[12px] text-[#0f172a] whitespace-nowrap">by {publishedBy}</p>
+                    <p className="text-[12px] text-[#000000] whitespace-nowrap">by {publishedBy}</p>
                   ) : null}
                 </>
               ) : (
-                <p className="text-[12px] text-[#94a3b8]">Never published</p>
+                <p className="text-[12px] text-[#141414]">Never published</p>
               )}
             </div>
           </div>
@@ -248,7 +248,7 @@ export function BuilderHeader({
             type="button"
             disabled={!modelId || busyKey === "test"}
             onClick={onTestCalc}
-            className="h-10 inline-flex items-center gap-2 rounded-md border border-[#e2e8f0] bg-white px-3.5 text-[13px] font-medium text-[#334155] hover:bg-[#f8fafc] disabled:opacity-50"
+            className="h-10 inline-flex items-center gap-2 rounded-md border border-[#e2e8f0] bg-white px-3.5 text-[13px] font-medium text-[#111111] hover:bg-[#f8fafc] disabled:opacity-50"
             title="Run test calculation and refresh preview"
           >
             {busyKey === "test" ? (
@@ -305,7 +305,7 @@ export function BuilderHeader({
           <button
             type="button"
             onClick={onChangeHistory}
-            className="h-10 w-10 inline-flex items-center justify-center rounded-full border border-[#e2e8f0] bg-white text-[#64748b] hover:bg-[#f8fafc]"
+            className="h-10 w-10 inline-flex items-center justify-center rounded-full border border-[#e2e8f0] bg-white text-[#111111] hover:bg-[#f8fafc]"
             aria-label="More actions"
           >
             <MoreHorizontal className="w-4 h-4" />
@@ -314,7 +314,7 @@ export function BuilderHeader({
             <button
               type="button"
               onClick={onOpenModelSettings}
-              className="h-10 rounded-full border border-[#e2e8f0] bg-white px-3.5 text-[13px] font-medium text-[#334155] hover:bg-[#f8fafc]"
+              className="h-10 rounded-full border border-[#e2e8f0] bg-white px-3.5 text-[13px] font-medium text-[#111111] hover:bg-[#f8fafc]"
               title="Edit calendar and base currency"
             >
               Calendar
@@ -328,7 +328,7 @@ export function BuilderHeader({
 
 function NotCheckedPill() {
   return (
-    <span className="inline-flex items-center gap-1 rounded-full border border-[#e2e8f0] bg-white px-2.5 py-1 text-[11px] text-[#64748b]">
+    <span className="inline-flex items-center gap-1 rounded-full border border-[#e2e8f0] bg-white px-2.5 py-1 text-[11px] text-[#111111]">
       Not checked
     </span>
   )

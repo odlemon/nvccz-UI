@@ -80,7 +80,7 @@ function statusPill(status: WfDeptRow["status"]) {
   if (status === "hiring") return "bg-[#eff8ff] text-[#175cd3] border-[#b2ddff]"
   if (status === "over") return "bg-[#fef3f2] text-[#b42318] border-[#fecdca]"
   if (status === "under") return "bg-[#fffaeb] text-[#b54708] border-[#fedf89]"
-  return status === "on-track" ? "bg-[#ecfdf3] text-[#027a48] border-[#abefc6]" : "bg-[#f2f4f7] text-[#667085] border-[#e4e7ec]"
+  return status === "on-track" ? "bg-[#ecfdf3] text-[#027a48] border-[#abefc6]" : "bg-[#f2f4f7] text-[#111111] border-[#e4e7ec]"
 }
 
 function statusLabel(status: WfDeptRow["status"]) {
@@ -120,10 +120,10 @@ function FilterSelect({
         className="h-10 min-w-[118px] inline-flex items-center rounded-full border border-[#d0d5dd] bg-white pl-2.5 pr-7 text-left hover:bg-[#f9fafb]"
       >
         <span className="flex flex-col justify-center min-w-0 py-1">
-          <span className="text-[9px] font-medium uppercase tracking-wide text-[#98a2b3] leading-none">{label}</span>
-          <span className="text-[12px] font-semibold text-[#101828] leading-tight mt-0.5 truncate">{value}</span>
+          <span className="text-[11px] font-medium uppercase tracking-wide text-[#141414] leading-none">{label}</span>
+          <span className="text-[12px] font-semibold text-[#000000] leading-tight mt-0.5 truncate">{value}</span>
         </span>
-        <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 size-4 text-[#98a2b3]" />
+        <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 size-4 text-[#141414]" />
       </button>
       {open ? (
         <div className={`absolute left-0 top-[calc(100%+4px)] z-40 min-w-[180px] ${R} border border-[#e4e7ec] bg-white py-1 shadow-lg`}>
@@ -137,7 +137,7 @@ function FilterSelect({
               }}
               className={cn(
                 "w-full flex items-center justify-between gap-2 px-3 py-2 text-left text-[12px] hover:bg-[#f9fafb]",
-                opt === value ? "text-[#1570ef] font-semibold" : "text-[#344054]",
+                opt === value ? "text-[#1570ef] font-semibold" : "text-[#111111]",
               )}
             >
               {opt}
@@ -159,8 +159,8 @@ function WfKpiCard({ kpi, onClick }: { kpi: WfKpi; onClick?: () => void }) {
       className={`${R} border border-[#e4e7ec] bg-white px-4 py-3 shadow-[0_1px_2px_rgba(16,24,40,0.03)] flex items-center justify-between gap-3 min-h-[92px] w-full text-left hover:border-[#b2ddff] transition-colors`}
     >
       <div className="min-w-0 flex flex-col justify-center">
-        <p className="text-[13px] font-semibold text-[#344054] leading-tight">{kpi.label}</p>
-        <p className="mt-1.5 text-[26px] font-semibold text-[#101828] tabular-nums leading-none tracking-tight">{kpi.value}</p>
+        <p className="text-[13px] font-semibold text-[#111111] leading-tight">{kpi.label}</p>
+        <p className="mt-1.5 text-[26px] font-semibold text-[#000000] tabular-nums leading-none tracking-tight">{kpi.value}</p>
         {kpi.delta ? (
           <p className={cn("mt-1.5 text-[12px] font-medium", kpi.up !== false ? "text-[#12b76a]" : "text-[#f04438]")}>
             {kpi.delta}
@@ -343,7 +343,7 @@ export function WorkforceAnalysisView({
   }
 
   const hasData = adjustedKpis.length > 0 || displayedDeptRows.length > 0 || displayedHirePlan.length > 0 || chartableAttrition.length > 0
-  if (loading && !hasData) return <div className="min-h-full bg-[#f1f5f9] flex items-center justify-center gap-2 text-sm text-[#64748b]"><Loader2 className="size-5 animate-spin" /> Loading workforce analysis…</div>
+  if (loading && !hasData) return <div className="min-h-full bg-[#f1f5f9] flex items-center justify-center gap-2 text-sm text-[#111111]"><Loader2 className="size-5 animate-spin" /> Loading workforce analysis…</div>
   if (error && !hasData) return <div className="min-h-full bg-[#f1f5f9] flex items-center justify-center p-8 text-sm text-[#b42318]">{error}</div>
 
   return (
@@ -351,7 +351,7 @@ export function WorkforceAnalysisView({
       <div className="bg-white border-b border-[#e4e7ec]">
         <div className="px-4 sm:px-5 pt-4 pb-3">
           <div className="flex items-center justify-between gap-3">
-            <h1 className="text-[18px] font-semibold text-[#101828]">Workforce</h1>
+            <h1 className="text-[18px] font-semibold text-[#000000]">Workforce</h1>
             <Button variant="outline" className="rounded-full h-9 px-4 text-xs" onClick={() => onRefresh?.()}>
               <RefreshCw className="size-3.5" />
               Refresh
@@ -374,14 +374,14 @@ export function WorkforceAnalysisView({
               Reset Filters
             </button>
           </div>
-          <p className="mt-2 text-[11px] text-[#667085]">
+          <p className="mt-2 text-[11px] text-[#111111]">
             Applied scope: {appliedScope?.entityId ? selectedEntityName : "All entities"} · {appliedScope?.periodFrom || "First period"} → {appliedScope?.periodTo || "Latest period"}
           </p>
         </div>
 
         <div className="px-4 sm:px-5 pb-4">
           {adjustedKpis.length === 0 ? (
-            <p className="py-8 text-sm text-[#64748b]">No workforce KPIs are available.</p>
+            <p className="py-8 text-sm text-[#111111]">No workforce KPIs are available.</p>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3">
               {adjustedKpis.map((k) => (
@@ -395,16 +395,16 @@ export function WorkforceAnalysisView({
       <div className="flex-1 flex min-h-0">
         <div className="flex-1 p-4 sm:p-5 space-y-4 overflow-auto">
           {preview ? <div className="rounded-lg border border-[#c4b5fd] bg-[#f5f3ff] px-4 py-3 text-xs font-semibold text-[#6d28d9]">Preview · not persisted — cards, charts, and tables below use the preview dataset.</div> : null}
-          {loading && hasData ? <p className="text-xs text-[#667085]"><Loader2 className="mr-1 inline size-3 animate-spin" />Refreshing current scope…</p> : null}
+          {loading && hasData ? <p className="text-xs text-[#111111]"><Loader2 className="mr-1 inline size-3 animate-spin" />Refreshing current scope…</p> : null}
           {error && hasData ? <p className="text-sm text-[#b42318]">{error}</p> : null}
           {view === "Hire Plan View" ? (
             <section className={`${R} border border-[#e4e7ec] bg-white p-4`}>
               <div className="flex items-center gap-2 mb-3">
                 <Users className="size-4 text-[#7c3aed]" />
-                <h2 className="text-sm font-semibold text-[#101828]">Hire Plan vs Actual</h2>
+                <h2 className="text-sm font-semibold text-[#000000]">Hire Plan vs Actual</h2>
               </div>
               {displayedHirePlan.length === 0 ? (
-                <p className="py-12 text-center text-sm text-[#64748b]">No hire plan data is available.</p>
+                <p className="py-12 text-center text-sm text-[#111111]">No hire plan data is available.</p>
               ) : <div className="h-[280px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <ComposedChart data={displayedHirePlan} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
@@ -422,13 +422,13 @@ export function WorkforceAnalysisView({
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
               <section className={`${R} border border-[#e4e7ec] bg-white p-4`}>
                 <div className="flex items-center justify-between mb-3">
-                  <h2 className="text-sm font-semibold text-[#101828]">Headcount vs Budget</h2>
-                  <button type="button" onClick={() => setInfoOpen(true)} className="text-[#98a2b3] hover:text-[#667085]">
+                  <h2 className="text-sm font-semibold text-[#000000]">Headcount vs Budget</h2>
+                  <button type="button" onClick={() => setInfoOpen(true)} className="text-[#141414] hover:text-[#111111]">
                     <Info className="size-4" />
                   </button>
                 </div>
                 {hcChartData.length === 0 ? (
-                  <p className="py-12 text-center text-sm text-[#64748b]">No department headcount data is available.</p>
+                  <p className="py-12 text-center text-sm text-[#111111]">No department headcount data is available.</p>
                 ) : <div className="h-[240px]">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={hcChartData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
@@ -457,11 +457,11 @@ export function WorkforceAnalysisView({
 
               <section className={`${R} border border-[#e4e7ec] bg-white p-4`}>
                 <div className="flex items-center justify-between mb-3">
-                  <h2 className="text-sm font-semibold text-[#101828]">Attrition Trend</h2>
-                  <span className="text-xs text-[#667085]">Rolling 6 months</span>
+                  <h2 className="text-sm font-semibold text-[#000000]">Attrition Trend</h2>
+                  <span className="text-xs text-[#111111]">Rolling 6 months</span>
                 </div>
                 {chartableAttrition.length === 0 ? (
-                  <p className="py-12 text-center text-sm text-[#64748b]">No attrition trend data is available.</p>
+                  <p className="py-12 text-center text-sm text-[#111111]">No attrition trend data is available.</p>
                 ) : <div className="h-[240px]">
                   <ResponsiveContainer width="100%" height="100%">
                     <ComposedChart data={chartableAttrition} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
@@ -479,9 +479,9 @@ export function WorkforceAnalysisView({
 
           <section className={`${R} border border-[#e4e7ec] bg-white overflow-hidden`}>
             <div className="px-4 pt-4 pb-2 flex items-center justify-between">
-              <h2 className="text-sm font-semibold text-[#101828]">Department Headcount Plan</h2>
+              <h2 className="text-sm font-semibold text-[#000000]">Department Headcount Plan</h2>
               <div className="relative" ref={menuRef}>
-                <button type="button" onClick={() => setMenuOpen((o) => !o)} className="size-8 inline-flex items-center justify-center rounded-full hover:bg-[#f2f4f7] text-[#667085]">
+                <button type="button" onClick={() => setMenuOpen((o) => !o)} className="size-8 inline-flex items-center justify-center rounded-full hover:bg-[#f2f4f7] text-[#111111]">
                   <MoreHorizontal className="size-4" />
                 </button>
                 {menuOpen ? (
@@ -499,7 +499,7 @@ export function WorkforceAnalysisView({
             <div className="overflow-x-auto">
               <table className="w-full text-sm min-w-[880px]">
                 <thead>
-                  <tr className="border-y border-[#e4e7ec] text-left text-xs text-[#667085] bg-[#f9fafb]">
+                  <tr className="border-y border-[#e4e7ec] text-left text-xs text-[#111111] bg-[#f9fafb]">
                     <th className="px-4 py-3 font-medium">Department</th>
                     <th className="px-4 py-3 font-medium">Entity</th>
                     <th className="px-4 py-3 font-medium text-right">Headcount</th>
@@ -515,7 +515,7 @@ export function WorkforceAnalysisView({
                 </thead>
                 <tbody>
                   {filteredRows.length === 0 ? (
-                    <tr><td colSpan={11} className="px-4 py-10 text-center text-sm text-[#64748b]">No department workforce data is available.</td></tr>
+                    <tr><td colSpan={11} className="px-4 py-10 text-center text-sm text-[#111111]">No department workforce data is available.</td></tr>
                   ) : null}
                   {filteredRows.map((row) => {
                     const varHc = row.hc == null || row.budgetHc == null ? null : row.hc - row.budgetHc
@@ -526,14 +526,14 @@ export function WorkforceAnalysisView({
                             {row.dept}
                           </button>
                         </td>
-                        <td className="px-4 py-3 text-[#667085]">{row.entity ?? "—"}</td>
+                        <td className="px-4 py-3 text-[#111111]">{row.entity ?? "—"}</td>
                         <td className="px-4 py-3 text-right tabular-nums font-medium">{row.hc}</td>
-                        <td className="px-4 py-3 text-right tabular-nums text-[#667085]">{row.budgetHc}</td>
-                        <td className={cn("px-4 py-3 text-right tabular-nums font-medium", varHc != null && varHc > 0 ? "text-[#f04438]" : varHc != null && varHc < 0 ? "text-[#f59e0b]" : "text-[#667085]")}>
+                        <td className="px-4 py-3 text-right tabular-nums text-[#111111]">{row.budgetHc}</td>
+                        <td className={cn("px-4 py-3 text-right tabular-nums font-medium", varHc != null && varHc > 0 ? "text-[#f04438]" : varHc != null && varHc < 0 ? "text-[#f59e0b]" : "text-[#111111]")}>
                           {varHc == null ? "—" : `${varHc > 0 ? "+" : ""}${varHc}`}
                         </td>
                         <td className="px-4 py-3 text-right tabular-nums">{fmtM(row.salary)}</td>
-                        <td className="px-4 py-3 text-right tabular-nums text-[#667085]">{row.avgSalary == null ? "—" : `$${row.avgSalary.toFixed(0)}K`}</td>
+                        <td className="px-4 py-3 text-right tabular-nums text-[#111111]">{row.avgSalary == null ? "—" : `$${row.avgSalary.toFixed(0)}K`}</td>
                         <td className="px-4 py-3 text-right tabular-nums text-[#12b76a]">{row.hires == null ? "—" : `+${row.hires}`}</td>
                         <td className="px-4 py-3 text-right tabular-nums text-[#f04438]">{row.attrition == null ? "—" : `${row.attrition.toFixed(1)}%`}</td>
                         <td className="px-4 py-3 text-right tabular-nums font-medium">{row.openRoles ?? "—"}</td>
@@ -553,10 +553,10 @@ export function WorkforceAnalysisView({
           <section className={`${R} border border-[#e4e7ec] bg-white p-4`}>
             <div className="flex items-center gap-2 mb-4">
               <SlidersHorizontal className="size-4 text-[#7c3aed]" />
-              <h2 className="text-sm font-semibold text-[#101828]">What-if: Salary Inflation</h2>
-              <span className="text-xs text-[#667085] ml-auto tabular-nums">{salaryInflation.toFixed(1)}%</span>
+              <h2 className="text-sm font-semibold text-[#000000]">What-if: Salary Inflation</h2>
+              <span className="text-xs text-[#111111] ml-auto tabular-nums">{salaryInflation.toFixed(1)}%</span>
             </div>
-            {drivers.length === 0 ? <p className="text-sm text-[#667085]">No workforce driver was returned, so this control is unavailable.</p> : <>
+            {drivers.length === 0 ? <p className="text-sm text-[#111111]">No workforce driver was returned, so this control is unavailable.</p> : <>
               <div className="flex flex-wrap items-end gap-2">
                 <FilterSelect label="Driver" value={drivers.find((driver) => driver.code === driverCode) ? `${drivers.find((driver) => driver.code === driverCode)?.name} · ${driverCode}` : "Select driver"} options={["Select driver", ...driverOptions]} onChange={(value) => {
                   const selected = drivers.find((driver) => `${driver.name} · ${driver.code}` === value)
@@ -571,7 +571,7 @@ export function WorkforceAnalysisView({
                 </Button>
                 {preview ? <Button variant="outline" className="rounded-full h-10 px-4" onClick={onResetPreview}>Reset to official</Button> : null}
               </div>
-              {!driverCode ? <p className="mt-3 text-[11px] text-[#667085]">Choose a returned driver; no driver code has been guessed.</p> : null}
+              {!driverCode ? <p className="mt-3 text-[11px] text-[#111111]">Choose a returned driver; no driver code has been guessed.</p> : null}
             </>}
             {previewError ? <p className="mt-3 text-sm text-[#b42318]">{previewError}</p> : null}
           </section>
@@ -581,24 +581,24 @@ export function WorkforceAnalysisView({
           <aside className="w-full sm:w-[360px] shrink-0 border-l border-[#e4e7ec] bg-white flex flex-col">
             <div className="px-4 py-3 border-b border-[#e4e7ec] flex items-start justify-between gap-2">
               <div>
-                <p className="text-xs text-[#667085]">{selectedDetail.entity ?? "—"} · {selectedDetail.period}</p>
-                <h3 className="text-base font-semibold text-[#101828] mt-0.5">{selectedDetail.dept}</h3>
+                <p className="text-xs text-[#111111]">{selectedDetail.entity ?? "—"} · {selectedDetail.period}</p>
+                <h3 className="text-base font-semibold text-[#000000] mt-0.5">{selectedDetail.dept}</h3>
               </div>
               <button type="button" onClick={() => setDetailOpen(false)} className="size-8 rounded-full hover:bg-[#f2f4f7] inline-flex items-center justify-center">
-                <X className="size-4 text-[#667085]" />
+                <X className="size-4 text-[#111111]" />
               </button>
             </div>
             <div className="p-4 space-y-4 overflow-auto flex-1">
               <div className="grid grid-cols-2 gap-2">
                 <div className={`${R} border border-[#e4e7ec] p-2 text-center`}>
-                  <p className="text-[10px] text-[#667085]">Headcount</p>
+                  <p className="text-[11px] text-[#111111]">Headcount</p>
                   <p className="text-lg font-semibold tabular-nums">{selectedDetail.headcount ?? "—"}</p>
-                  <p className="text-[10px] text-[#98a2b3]">Budget {selectedDetail.budgetHc ?? "—"}</p>
+                  <p className="text-[11px] text-[#141414]">Budget {selectedDetail.budgetHc ?? "—"}</p>
                 </div>
                 <div className={`${R} border border-[#e4e7ec] p-2 text-center`}>
-                  <p className="text-[10px] text-[#667085]">Payroll</p>
+                  <p className="text-[11px] text-[#111111]">Payroll</p>
                   <p className="text-lg font-semibold tabular-nums">{selectedDetail.salary}</p>
-                  <p className="text-[10px] text-[#98a2b3]">Avg {selectedDetail.avgSalary}</p>
+                  <p className="text-[11px] text-[#141414]">Avg {selectedDetail.avgSalary}</p>
                 </div>
               </div>
               <div className="grid grid-cols-3 gap-2 text-center">
@@ -608,12 +608,12 @@ export function WorkforceAnalysisView({
                   { label: "Open Roles", value: selectedDetail.openRoles == null ? "—" : String(selectedDetail.openRoles) },
                 ].map((cell) => (
                   <div key={cell.label} className={`${R} border border-[#e4e7ec] p-2`}>
-                    <p className="text-[10px] text-[#667085]">{cell.label}</p>
+                    <p className="text-[11px] text-[#111111]">{cell.label}</p>
                     <p className="text-sm font-semibold tabular-nums mt-0.5">{cell.value}</p>
                   </div>
                 ))}
               </div>
-              <p className="text-sm text-[#667085]">Role-level details and commentary are not included in this domain response.</p>
+              <p className="text-sm text-[#111111]">Role-level details and commentary are not included in this domain response.</p>
             </div>
           </aside>
         ) : null}
@@ -622,8 +622,8 @@ export function WorkforceAnalysisView({
       {infoOpen ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4" onClick={() => setInfoOpen(false)}>
           <div className={`${R} bg-white max-w-md w-full p-5 shadow-xl`} onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-base font-semibold text-[#101828]">Workforce Planning</h3>
-            <p className="text-sm text-[#475569] mt-2 leading-relaxed">
+            <h3 className="text-base font-semibold text-[#000000]">Workforce Planning</h3>
+            <p className="text-sm text-[#111111] mt-2 leading-relaxed">
               Monitor headcount, payroll, hires, and attrition by department. Sensitivity uses a returned workforce driver and replaces the active dataset only as a non-persisted preview.
             </p>
             <Button variant="outline" className="rounded-full mt-4" onClick={() => setInfoOpen(false)}>Close</Button>

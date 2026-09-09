@@ -112,7 +112,7 @@ function fmtPct(n: number): string {
 }
 
 function varTone(n: number): string {
-  if (n === 0) return "text-[#101828]"
+  if (n === 0) return "text-[#000000]"
   return n > 0 ? "text-[#12b76a]" : "text-[#f04438]"
 }
 
@@ -148,14 +148,14 @@ function FilterSelect({
         className="h-10 min-w-[118px] inline-flex items-center rounded-full border border-[#d0d5dd] bg-white pl-2.5 pr-7 text-left hover:bg-[#f9fafb]"
       >
         <span className="flex flex-col justify-center min-w-0 py-1">
-          <span className="text-[9px] font-medium uppercase tracking-wide text-[#98a2b3] leading-none">
+          <span className="text-[11px] font-medium uppercase tracking-wide text-[#141414] leading-none">
             {label}
           </span>
-          <span className="text-[12px] font-semibold text-[#101828] leading-tight mt-0.5 truncate">
+          <span className="text-[12px] font-semibold text-[#000000] leading-tight mt-0.5 truncate">
             {options.find((option) => option.value === value)?.label || "—"}
           </span>
         </span>
-        <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 size-4 text-[#98a2b3]" />
+        <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 size-4 text-[#141414]" />
       </button>
       {open ? (
         <div
@@ -171,7 +171,7 @@ function FilterSelect({
               }}
               className={cn(
                 "w-full flex items-center justify-between gap-2 rounded-full px-3 py-2 text-left text-[12px] hover:bg-[#f9fafb]",
-                opt.value === value ? "text-[#1570ef] font-semibold" : "text-[#344054]",
+                opt.value === value ? "text-[#1570ef] font-semibold" : "text-[#111111]",
               )}
             >
               {opt.label}
@@ -196,12 +196,12 @@ function VarKpiCard({ kpi, onClick }: { kpi: VarKpi; onClick?: () => void }) {
       className="rounded-lg border border-[#e4e7ec] bg-white px-4 py-3 shadow-[0_1px_2px_rgba(16,24,40,0.03)] flex items-center justify-between gap-3 min-h-[92px] w-full text-left hover:border-[#b2ddff] transition-colors"
     >
       <div className="min-w-0 flex flex-col justify-center">
-        <p className="text-[13px] font-semibold text-[#344054] leading-tight">{kpi.label}</p>
-        <p className="mt-1.5 text-[26px] font-semibold text-[#101828] tabular-nums leading-none tracking-tight">
+        <p className="text-[13px] font-semibold text-[#111111] leading-tight">{kpi.label}</p>
+        <p className="mt-1.5 text-[26px] font-semibold text-[#000000] tabular-nums leading-none tracking-tight">
           {kpi.value}
         </p>
         {isBaseline || !kpi.delta ? (
-          <p className="mt-1.5 text-[12px] text-[#98a2b3]">—</p>
+          <p className="mt-1.5 text-[12px] text-[#141414]">—</p>
         ) : (
           <p className="mt-1.5 text-[12px] font-medium text-[#12b76a] leading-tight">{kpi.delta}</p>
         )}
@@ -238,7 +238,7 @@ function CommentaryDot({ tone }: { tone: "green" | "yellow" | "red" }) {
 function varianceTone(value: string): string {
   if (value.includes("(")) return "text-[#f04438]"
   if (value.startsWith("$") && !value.includes("(")) return "text-[#12b76a]"
-  return "text-[#101828]"
+  return "text-[#000000]"
 }
 
 function StatusBadge({ status }: { status: VarCommentaryReq["status"] }) {
@@ -249,7 +249,7 @@ function StatusBadge({ status }: { status: VarCommentaryReq["status"] }) {
         ? "bg-[#ecfdf3] text-[#079455] border-[#abefc6]"
         : status === "In Progress"
           ? "bg-[#eff8ff] text-[#1570ef] border-[#b2ddff]"
-          : "bg-[#f2f4f7] text-[#667085] border-[#e4e7ec]"
+          : "bg-[#f2f4f7] text-[#111111] border-[#e4e7ec]"
   return (
     <span className={cn("inline-flex rounded-full border px-2 py-0.5 text-[11px] font-medium", styles)}>
       {status}
@@ -284,15 +284,15 @@ function VarianceDetailPanel({
     <aside className="w-full xl:w-[300px] shrink-0 border-t xl:border-t-0 xl:border-l border-[#e4e7ec] bg-white flex flex-col min-h-[420px] xl:min-h-0">
       <div className="flex items-start justify-between gap-2 px-4 py-3 border-b border-[#e4e7ec] shrink-0">
         <div className="min-w-0">
-          <h2 className="text-[14px] font-semibold text-[#101828]">Variance Detail</h2>
-          <p className="text-[11px] text-[#667085] mt-0.5 truncate">
+          <h2 className="text-[14px] font-semibold text-[#000000]">Variance Detail</h2>
+          <p className="text-[11px] text-[#111111] mt-0.5 truncate">
             {detail.dept} · {detail.area} · {detail.period}
           </p>
         </div>
         <button
           type="button"
           onClick={onClose}
-          className="rounded-full text-[#98a2b3] hover:text-[#667085] hover:bg-[#f9fafb] p-1"
+          className="rounded-full text-[#141414] hover:text-[#111111] hover:bg-[#f9fafb] p-1"
           aria-label="Close"
         >
           <X className="size-4" />
@@ -308,7 +308,7 @@ function VarianceDetailPanel({
         >
           {detail.headline}
         </p>
-        <p className="text-[12px] text-[#667085] mt-1">{detail.pctLabel}</p>
+        <p className="text-[12px] text-[#111111] mt-1">{detail.pctLabel}</p>
       </div>
 
       <div className="flex border-b border-[#e4e7ec] px-4">
@@ -319,7 +319,7 @@ function VarianceDetailPanel({
             onClick={() => setTab(t)}
             className={cn(
               "relative rounded-full py-2.5 px-2 mr-2 text-[12px] font-medium capitalize",
-              tab === t ? "text-[#1570ef]" : "text-[#667085] hover:text-[#344054]",
+              tab === t ? "text-[#1570ef]" : "text-[#111111] hover:text-[#111111]",
             )}
           >
             {t}
@@ -334,20 +334,20 @@ function VarianceDetailPanel({
         {tab === "details" ? (
           <>
             <div>
-              <p className="text-[11px] font-semibold text-[#344054] mb-1">Explanation</p>
-              <p className="text-[#475467] leading-relaxed">{detail.explanation}</p>
+              <p className="text-[11px] font-semibold text-[#111111] mb-1">Explanation</p>
+              <p className="text-[#111111] leading-relaxed">{detail.explanation}</p>
             </div>
             <div>
-              <p className="text-[11px] font-semibold text-[#344054] mb-1">Corrective Action</p>
-              <p className="text-[#475467] leading-relaxed">{detail.correctiveAction}</p>
+              <p className="text-[11px] font-semibold text-[#111111] mb-1">Corrective Action</p>
+              <p className="text-[#111111] leading-relaxed">{detail.correctiveAction}</p>
             </div>
             <div>
-              <p className="text-[11px] font-semibold text-[#344054] mb-2">Supporting Details</p>
+              <p className="text-[11px] font-semibold text-[#111111] mb-2">Supporting Details</p>
               <dl className="space-y-1.5">
                 {detail.supporting.map((row) => (
                   <div key={row.label} className="flex justify-between gap-3">
-                    <dt className="text-[#667085]">{row.label}</dt>
-                    <dd className="font-medium text-[#101828] tabular-nums text-right">{row.value}</dd>
+                    <dt className="text-[#111111]">{row.label}</dt>
+                    <dd className="font-medium text-[#000000] tabular-nums text-right">{row.value}</dd>
                   </div>
                 ))}
               </dl>
@@ -363,8 +363,8 @@ function VarianceDetailPanel({
                   {planningInitials(detail.owner)}
                 </span>
                 <div>
-                  <p className="font-medium text-[#101828]">{detail.owner}</p>
-                  <p className="text-[11px] text-[#667085]">Due {detail.due}</p>
+                  <p className="font-medium text-[#000000]">{detail.owner}</p>
+                  <p className="text-[11px] text-[#111111]">Due {detail.due}</p>
                 </div>
                 <StatusBadge status={detail.status} />
               </div>
@@ -396,7 +396,7 @@ function VarianceDetailPanel({
             )}
           </>
         ) : (
-          <p className="text-[#98a2b3] text-center py-8">No prior commentary history for this variance.</p>
+          <p className="text-[#141414] text-center py-8">No prior commentary history for this variance.</p>
         )}
       </div>
     </aside>
@@ -552,7 +552,7 @@ export function VarianceAnalysisView({
     <div className="min-h-full bg-[#f1f5f9] flex flex-col">
       <div className="bg-white border-b border-[#e4e7ec]">
         <div className="px-4 sm:px-5 pt-4 pb-3">
-          <h1 className="text-[18px] font-semibold text-[#101828]">Variance Analysis</h1>
+          <h1 className="text-[18px] font-semibold text-[#000000]">Variance Analysis</h1>
           <div className="mt-3 flex flex-wrap items-end gap-2">
             <FilterSelect
               label="Department"
@@ -610,7 +610,7 @@ export function VarianceAnalysisView({
               ))}
             </div>
           ) : (
-            <p className="py-5 text-center text-[12px] text-[#98a2b3]">
+            <p className="py-5 text-center text-[12px] text-[#141414]">
               {summaryError
                 ? "Variance KPI summary could not be loaded."
                 : "No variance KPI summary is available for this model and version. KPIs are not period-filtered."}
@@ -637,7 +637,7 @@ export function VarianceAnalysisView({
             </div>
             ))}
           {loading && !kpis.length && !deptRows.length && !commentaryReqs.length && !trend.length && !breakdown.length ? (
-            <div className="flex items-center gap-2 py-16 text-[#667085]">
+            <div className="flex items-center gap-2 py-16 text-[#111111]">
               <Loader2 className="size-5 animate-spin" /> Loading variance…
             </div>
           ) : (
@@ -647,13 +647,13 @@ export function VarianceAnalysisView({
                   <section className={`${R} border border-[#e4e7ec] bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04)] overflow-hidden`}>
                     <div className="px-4 py-3 border-b border-[#e4e7ec] flex items-center justify-between gap-2">
                       <div className="inline-flex items-center gap-1.5 min-w-0">
-                        <h2 className="text-[13px] font-semibold text-[#101828]">
+                        <h2 className="text-[13px] font-semibold text-[#000000]">
                           Actual vs Budget vs Forecast
                         </h2>
                         <button
                           type="button"
                           onClick={() => setInfoOpen("table")}
-                          className="inline-flex h-5 w-5 items-center justify-center rounded-full text-[#98a2b3] hover:text-[#667085] hover:bg-[#f9fafb]"
+                          className="inline-flex h-5 w-5 items-center justify-center rounded-full text-[#141414] hover:text-[#111111] hover:bg-[#f9fafb]"
                           aria-label="About this table"
                         >
                           <Info className="size-3.5" />
@@ -663,7 +663,7 @@ export function VarianceAnalysisView({
                         <button
                           type="button"
                           onClick={() => setTableMenuOpen((o) => !o)}
-                          className="inline-flex h-8 w-8 items-center justify-center rounded-full text-[#667085] hover:bg-[#f9fafb]"
+                          className="inline-flex h-8 w-8 items-center justify-center rounded-full text-[#111111] hover:bg-[#f9fafb]"
                           aria-label="Table options"
                         >
                           <MoreHorizontal className="size-4" />
@@ -672,7 +672,7 @@ export function VarianceAnalysisView({
                           <div className={`absolute right-0 top-full z-20 mt-1 w-44 ${R} border border-[#e4e7ec] bg-white py-1 shadow-lg`}>
                             <button
                               type="button"
-                              className="w-full rounded-full px-3 py-2 text-left text-[12px] hover:bg-[#f9fafb] text-[#344054]"
+                              className="w-full rounded-full px-3 py-2 text-left text-[12px] hover:bg-[#f9fafb] text-[#111111]"
                               onClick={() => {
                                 toast.success("Table exported to CSV")
                                 setTableMenuOpen(false)
@@ -682,7 +682,7 @@ export function VarianceAnalysisView({
                             </button>
                             <button
                               type="button"
-                              className="w-full rounded-full px-3 py-2 text-left text-[12px] hover:bg-[#f9fafb] text-[#344054]"
+                              className="w-full rounded-full px-3 py-2 text-left text-[12px] hover:bg-[#f9fafb] text-[#111111]"
                               onClick={() => {
                                 onRefresh?.()
                                 setTableMenuOpen(false)
@@ -698,27 +698,27 @@ export function VarianceAnalysisView({
                       <table className="w-full border-collapse text-[12px] min-w-[860px]">
                         <thead>
                           <tr className="border-b border-[#e4e7ec]">
-                            <th className="text-left px-4 py-2 font-semibold text-[#344054]">Department</th>
-                            <th className="px-3 py-2 text-right font-semibold text-[#344054]">Actual</th>
-                            <th className="px-3 py-2 text-right font-semibold text-[#344054]">Budget</th>
-                            <th className="px-3 py-2 text-right font-semibold text-[#344054]">Forecast</th>
-                            <th className="px-3 py-2 text-right font-semibold text-[#344054] whitespace-nowrap">
+                            <th className="text-left px-4 py-2 font-semibold text-[#111111]">Department</th>
+                            <th className="px-3 py-2 text-right font-semibold text-[#111111]">Actual</th>
+                            <th className="px-3 py-2 text-right font-semibold text-[#111111]">Budget</th>
+                            <th className="px-3 py-2 text-right font-semibold text-[#111111]">Forecast</th>
+                            <th className="px-3 py-2 text-right font-semibold text-[#111111] whitespace-nowrap">
                               Var to Budget
                             </th>
-                            <th className="px-3 py-2 text-right font-semibold text-[#344054]">Var %</th>
-                            <th className="px-3 py-2 text-right font-semibold text-[#344054] whitespace-nowrap">
+                            <th className="px-3 py-2 text-right font-semibold text-[#111111]">Var %</th>
+                            <th className="px-3 py-2 text-right font-semibold text-[#111111] whitespace-nowrap">
                               Var to Forecast
                             </th>
-                            <th className="px-4 py-2 text-right font-semibold text-[#344054]">Commentary</th>
+                            <th className="px-4 py-2 text-right font-semibold text-[#111111]">Commentary</th>
                           </tr>
                           <tr className="border-b border-[#e4e7ec]">
                             <th className="px-4 py-1" />
-                            <th className="px-3 py-1 text-right text-[10px] font-normal text-[#98a2b3]">Summary</th>
-                            <th className="px-3 py-1 text-right text-[10px] font-normal text-[#98a2b3]">Summary</th>
-                            <th className="px-3 py-1 text-right text-[10px] font-normal text-[#98a2b3]">Summary</th>
-                            <th className="px-3 py-1 text-right text-[10px] font-normal text-[#98a2b3]">$</th>
-                            <th className="px-3 py-1 text-right text-[10px] font-normal text-[#98a2b3]">%</th>
-                            <th className="px-3 py-1 text-right text-[10px] font-normal text-[#98a2b3]">$</th>
+                            <th className="px-3 py-1 text-right text-[11px] font-normal text-[#141414]">Summary</th>
+                            <th className="px-3 py-1 text-right text-[11px] font-normal text-[#141414]">Summary</th>
+                            <th className="px-3 py-1 text-right text-[11px] font-normal text-[#141414]">Summary</th>
+                            <th className="px-3 py-1 text-right text-[11px] font-normal text-[#141414]">$</th>
+                            <th className="px-3 py-1 text-right text-[11px] font-normal text-[#141414]">%</th>
+                            <th className="px-3 py-1 text-right text-[11px] font-normal text-[#141414]">$</th>
                             <th className="px-4 py-1" />
                           </tr>
                         </thead>
@@ -735,7 +735,7 @@ export function VarianceAnalysisView({
                                   className={cn(
                                     "px-4 py-2.5",
                                     summary
-                                      ? "font-semibold text-[#101828]"
+                                      ? "font-semibold text-[#000000]"
                                       : "font-medium text-[#1570ef]",
                                   )}
                                 >
@@ -743,7 +743,7 @@ export function VarianceAnalysisView({
                                 </td>
                                 <td
                                   className={cn(
-                                    "px-3 py-2.5 text-right tabular-nums text-[#101828]",
+                                    "px-3 py-2.5 text-right tabular-nums text-[#000000]",
                                     summary && "font-semibold",
                                   )}
                                 >
@@ -751,7 +751,7 @@ export function VarianceAnalysisView({
                                 </td>
                                 <td
                                   className={cn(
-                                    "px-3 py-2.5 text-right tabular-nums text-[#101828]",
+                                    "px-3 py-2.5 text-right tabular-nums text-[#000000]",
                                     summary && "font-semibold",
                                   )}
                                 >
@@ -759,7 +759,7 @@ export function VarianceAnalysisView({
                                 </td>
                                 <td
                                   className={cn(
-                                    "px-3 py-2.5 text-right tabular-nums text-[#101828]",
+                                    "px-3 py-2.5 text-right tabular-nums text-[#000000]",
                                     summary && "font-semibold",
                                   )}
                                 >
@@ -795,10 +795,10 @@ export function VarianceAnalysisView({
                                 <td className="px-4 py-2.5">
                                   <div className="flex items-center justify-end gap-1.5">
                                     {row.commentary ? <CommentaryDot tone={row.commentary} /> : (
-                                      <span className="text-[11px] text-[#98a2b3]">Unavailable</span>
+                                      <span className="text-[11px] text-[#141414]">Unavailable</span>
                                     )}
                                     {row.commentary && row.commentaryDone != null && row.commentaryTotal != null ? (
-                                      <span className="text-[11px] text-[#667085] tabular-nums">
+                                      <span className="text-[11px] text-[#111111] tabular-nums">
                                         {row.commentaryDone}/{row.commentaryTotal}
                                       </span>
                                     ) : null}
@@ -808,7 +808,7 @@ export function VarianceAnalysisView({
                             )
                           }) : (
                             <tr>
-                              <td colSpan={8} className="px-4 py-8 text-center text-[12px] text-[#98a2b3]">
+                              <td colSpan={8} className="px-4 py-8 text-center text-[12px] text-[#141414]">
                                 {summaryError
                                   ? "Department summary could not be loaded."
                                   : "No department variance data is available for the current selection."}
@@ -822,11 +822,11 @@ export function VarianceAnalysisView({
 
                   <section className={`${R} h-[320px] border border-[#e4e7ec] bg-white shadow-[0_1px_2px_rgba(16,24,40,0.04)] overflow-hidden flex flex-col`}>
                     <div className="px-4 py-3 border-b border-[#e4e7ec] flex items-center gap-1.5 shrink-0">
-                      <h2 className="text-[13px] font-semibold text-[#101828]">Commentary Requests</h2>
+                      <h2 className="text-[13px] font-semibold text-[#000000]">Commentary Requests</h2>
                       <button
                         type="button"
                         onClick={() => setInfoOpen("commentary")}
-                        className="inline-flex h-5 w-5 items-center justify-center rounded-full text-[#98a2b3] hover:text-[#667085] hover:bg-[#f9fafb]"
+                        className="inline-flex h-5 w-5 items-center justify-center rounded-full text-[#141414] hover:text-[#111111] hover:bg-[#f9fafb]"
                         aria-label="About commentary requests"
                       >
                         <Info className="size-3.5" />
@@ -836,12 +836,12 @@ export function VarianceAnalysisView({
                       <table className="w-full border-collapse text-[12px] min-w-[700px]">
                         <thead>
                           <tr className="border-b border-[#e4e7ec]">
-                            <th className="text-left px-4 py-2 font-semibold text-[#344054]">Department</th>
-                            <th className="text-left px-3 py-2 font-semibold text-[#344054]">Variance Area</th>
-                            <th className="text-left px-3 py-2 font-semibold text-[#344054]">Owner</th>
-                            <th className="px-3 py-2 text-right font-semibold text-[#344054]">Variance $</th>
-                            <th className="px-3 py-2 text-right font-semibold text-[#344054]">Due Date</th>
-                            <th className="px-4 py-2 text-right font-semibold text-[#344054]">Status</th>
+                            <th className="text-left px-4 py-2 font-semibold text-[#111111]">Department</th>
+                            <th className="text-left px-3 py-2 font-semibold text-[#111111]">Variance Area</th>
+                            <th className="text-left px-3 py-2 font-semibold text-[#111111]">Owner</th>
+                            <th className="px-3 py-2 text-right font-semibold text-[#111111]">Variance $</th>
+                            <th className="px-3 py-2 text-right font-semibold text-[#111111]">Due Date</th>
+                            <th className="px-4 py-2 text-right font-semibold text-[#111111]">Status</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -852,19 +852,19 @@ export function VarianceAnalysisView({
                               onClick={() => onSelectCommentary?.(req, periodLabel)}
                               className="border-b border-[#f2f4f7] cursor-pointer hover:bg-[#fcfcfd] last:border-b-0"
                             >
-                              <td className="px-4 py-2.5 font-medium text-[#101828]">{req.dept}</td>
-                              <td className="px-3 py-2.5 text-[#475467]">{req.area}</td>
+                              <td className="px-4 py-2.5 font-medium text-[#000000]">{req.dept}</td>
+                              <td className="px-3 py-2.5 text-[#111111]">{req.area}</td>
                               <td className="px-3 py-2.5">
                                 <div className="inline-flex items-center gap-2">
                                   <span
                                     className={cn(
-                                      "inline-flex h-7 w-7 items-center justify-center rounded-full text-[10px] font-semibold text-white shrink-0",
+                                      "inline-flex h-7 w-7 items-center justify-center rounded-full text-[11px] font-semibold text-white shrink-0",
                                       planningAvatarTone(req.owner),
                                     )}
                                   >
                                     {planningInitials(req.owner)}
                                   </span>
-                                  <span className="font-medium text-[#344054]">{req.owner}</span>
+                                  <span className="font-medium text-[#111111]">{req.owner}</span>
                                 </div>
                               </td>
                               <td
@@ -875,7 +875,7 @@ export function VarianceAnalysisView({
                               >
                                 {req.variance}
                               </td>
-                              <td className="px-3 py-2.5 text-right text-[#667085]">{req.due}</td>
+                              <td className="px-3 py-2.5 text-right text-[#111111]">{req.due}</td>
                               <td className="px-4 py-2.5 text-right">
                                 <StatusBadge status={req.status} />
                               </td>
@@ -883,7 +883,7 @@ export function VarianceAnalysisView({
                             ))
                           ) : (
                             <tr>
-                              <td colSpan={6} className="px-4 py-8 text-center text-[12px] text-[#98a2b3]">
+                              <td colSpan={6} className="px-4 py-8 text-center text-[12px] text-[#141414]">
                                 {resultsError
                                   ? "Commentary requests could not be loaded."
                                   : "No commentary requests match the current filters."}
@@ -907,8 +907,8 @@ export function VarianceAnalysisView({
 
                 <div className="lg:col-span-5 flex flex-col gap-4 min-w-0 min-h-full">
                   <section className={`${R} h-[320px] border border-[#e4e7ec] bg-white p-4 shadow-[0_1px_2px_rgba(16,24,40,0.04)] flex flex-col min-h-0`}>
-                    <h2 className="text-[13px] font-semibold text-[#101828] shrink-0">Variance Trend (Total Company)</h2>
-                    <p className="text-[11px] text-[#667085] mb-3 shrink-0">{periodLabel} · {versionLabel}</p>
+                    <h2 className="text-[13px] font-semibold text-[#000000] shrink-0">Variance Trend (Total Company)</h2>
+                    <p className="text-[11px] text-[#111111] mb-3 shrink-0">{periodLabel} · {versionLabel}</p>
                     <div className="flex-1 min-h-0 overflow-y-auto">
                       {filteredTrend.length ? (
                         <div className="h-[210px] min-w-0">
@@ -946,12 +946,12 @@ export function VarianceAnalysisView({
                         </ResponsiveContainer>
                         </div>
                       ) : (
-                        <div className="h-full flex items-center justify-center text-[12px] text-[#98a2b3]">
+                        <div className="h-full flex items-center justify-center text-[12px] text-[#141414]">
                           {summaryError ? "Variance trend could not be loaded." : "No variance trend is available for the selected period."}
                         </div>
                       )}
                     </div>
-                    <div className="mt-2 flex flex-wrap gap-3 text-[10px] text-[#667085] shrink-0">
+                    <div className="mt-2 flex flex-wrap gap-3 text-[11px] text-[#111111] shrink-0">
                       <span className="inline-flex items-center gap-1.5">
                         <span className="size-2.5 rounded-full bg-[#1570ef]" /> Variance ($M)
                       </span>
@@ -959,8 +959,8 @@ export function VarianceAnalysisView({
                   </section>
 
                   <section className={`${R} h-[320px] border border-[#e4e7ec] bg-white p-4 shadow-[0_1px_2px_rgba(16,24,40,0.04)] flex flex-col min-h-0`}>
-                    <h2 className="text-[13px] font-semibold text-[#101828] shrink-0">Variance Breakdown by Department</h2>
-                    <p className="text-[11px] text-[#667085] mb-3 shrink-0">Var to Budget ($M) · click a bar</p>
+                    <h2 className="text-[13px] font-semibold text-[#000000] shrink-0">Variance Breakdown by Department</h2>
+                    <p className="text-[11px] text-[#111111] mb-3 shrink-0">Var to Budget ($M) · click a bar</p>
                     <div className="flex-1 min-h-0 overflow-y-auto">
                       {filteredBreakdown.length ? <div style={{ height: Math.max(210, filteredBreakdown.length * 34) }} className="min-w-0"><ResponsiveContainer width="100%" height="100%">
                         <ComposedChart
@@ -997,7 +997,7 @@ export function VarianceAnalysisView({
                           </Bar>
                         </ComposedChart>
                       </ResponsiveContainer></div> : (
-                        <div className="h-full flex items-center justify-center text-[12px] text-[#98a2b3]">
+                        <div className="h-full flex items-center justify-center text-[12px] text-[#141414]">
                           {summaryError
                             ? "Department variance breakdown could not be loaded."
                             : "No department variance breakdown matches the current filters."}

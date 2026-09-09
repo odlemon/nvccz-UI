@@ -45,3 +45,6 @@ next-env.d.ts
 design-refs/credentials-and-database-access.md
 scripts/_*.py
 !scripts/_ssh_creds.py
+.patch-performance-runtime.lock
+.perf-dumps/
+.acc-dumps/

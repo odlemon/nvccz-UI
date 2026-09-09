@@ -312,7 +312,7 @@ export function FpaReports() {
       <div className="px-4 sm:px-5 pb-6 space-y-4 w-full">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
-            <p className="text-sm text-[#64748b] max-w-3xl">
+            <p className="text-sm text-[#111111] max-w-3xl">
               Generate board-ready financial packs from the selected model and version.
             </p>
             {!selectedModelId ? (
@@ -320,19 +320,19 @@ export function FpaReports() {
                 Select a model to load, generate, and download reports.
               </p>
             ) : (
-              <p className="mt-1 text-xs text-[#98a2b3]">
+              <p className="mt-1 text-xs text-[#141414]">
                 Model: {modelName || selectedModelId}
               </p>
             )}
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <label className="text-[11px] font-semibold text-[#667085] uppercase tracking-wide">
+            <label className="text-[11px] font-semibold text-[#111111] uppercase tracking-wide">
               Period
             </label>
             <select
               value={period}
               onChange={(e) => setPeriod(e.target.value)}
-              className="h-9 rounded-full border border-[#d0d5dd] bg-white px-4 text-xs font-medium text-[#344054] focus:outline-none focus:ring-2 focus:ring-[#2563eb]/20"
+              className="h-9 rounded-full border border-[#d0d5dd] bg-white px-4 text-xs font-medium text-[#111111] focus:outline-none focus:ring-2 focus:ring-[#2563eb]/20"
             >
               {PERIOD_OPTIONS.map((p) => (
                 <option key={p} value={p}>
@@ -403,9 +403,9 @@ export function FpaReports() {
                     <Icon className="w-5 h-5 text-[#2563eb]" />
                   </div>
                   <div>
-                    <h2 className="text-[13.5px] font-bold text-[#101828]">{r.name}</h2>
-                    <p className="text-xs text-[#667085] mt-1 leading-relaxed">{r.desc}</p>
-                    <p className="text-[10px] text-[#98a2b3] mt-2 font-medium">
+                    <h2 className="text-[13.5px] font-bold text-[#000000]">{r.name}</h2>
+                    <p className="text-xs text-[#111111] mt-1 leading-relaxed">{r.desc}</p>
+                    <p className="text-[11px] text-[#141414] mt-2 font-medium">
                       {capability?.enabled && !loadingCapabilities
                         ? "Available · Server-generated export"
                         : "Server-generated export"}
@@ -415,11 +415,11 @@ export function FpaReports() {
 
                 <div className="border-t border-[#f2f4f7] pt-4 mt-auto space-y-3">
                   <div className="flex items-center justify-between">
-                    <span className="text-[10px] text-[#667085] uppercase tracking-wider font-semibold">
+                    <span className="text-[11px] text-[#111111] uppercase tracking-wider font-semibold">
                       Status
                     </span>
                     {isGenerating ? (
-                      <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-[#2563eb] bg-[#eff8ff] px-2 py-0.5 rounded-full">
+                      <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#2563eb] bg-[#eff8ff] px-2 py-0.5 rounded-full">
                         <Loader2 className="w-2.5 h-2.5 animate-spin" />
                         Generating
                       </span>
@@ -478,7 +478,7 @@ export function FpaReports() {
                   {capabilityReason ? (
                     <p
                       role={capabilitiesError || capability?.enabled === false ? "alert" : undefined}
-                      className="text-[11px] leading-relaxed text-[#667085]"
+                      className="text-[11px] leading-relaxed text-[#111111]"
                     >
                       {capabilityReason}
                     </p>
@@ -490,7 +490,7 @@ export function FpaReports() {
         </div>
 
         {loadingJobs && selectedModelId ? (
-          <div className="flex items-center gap-2 text-xs text-[#667085]">
+          <div className="flex items-center gap-2 text-xs text-[#111111]">
             <Loader2 className="h-3.5 w-3.5 animate-spin" />
             Loading recent export jobs…
           </div>
@@ -519,15 +519,15 @@ export function FpaReports() {
           <section className="rounded-xl border border-[#eaecf0] bg-white shadow-sm overflow-hidden">
             <div className="px-4 py-3 border-b border-[#eaecf0] flex items-center justify-between gap-2 bg-white">
               <div className="flex items-center gap-2">
-                <History className="w-4 h-4 text-[#475467]" />
-                <h2 className="text-[14px] font-semibold text-[#101828]">Recent Export Jobs</h2>
+                <History className="w-4 h-4 text-[#111111]" />
+                <h2 className="text-[14px] font-semibold text-[#000000]">Recent Export Jobs</h2>
               </div>
-              <span className="text-[11px] text-[#667085]">{jobs.length} jobs</span>
+              <span className="text-[11px] text-[#111111]">{jobs.length} jobs</span>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-xs text-left border-collapse min-w-[720px]">
                 <thead>
-                  <tr className="border-b border-[#eaecf0] bg-[#f9fafb] text-[#667085] text-[10px] uppercase font-bold">
+                  <tr className="border-b border-[#eaecf0] bg-[#f9fafb] text-[#111111] text-[11px] uppercase font-bold">
                     <th className="px-5 py-3 font-semibold">Report</th>
                     <th className="px-4 py-3 font-semibold">Period</th>
                     <th className="px-4 py-3 font-semibold">Status</th>
@@ -539,21 +539,21 @@ export function FpaReports() {
                 <tbody className="divide-y divide-[#eaecf0] text-[12px]">
                   {jobs.map((j) => (
                     <tr key={j.id} className="hover:bg-[#f9fafb]/50">
-                      <td className="px-5 py-3 font-semibold text-[#101828]">
+                      <td className="px-5 py-3 font-semibold text-[#000000]">
                         {reportName(j.exportType)}
                       </td>
-                      <td className="px-4 py-3 text-[#667085]">{j.period || "—"}</td>
+                      <td className="px-4 py-3 text-[#111111]">{j.period || "—"}</td>
                       <td className="px-4 py-3">
                         <FpaStatusBadge tone={statusTone(j.status)}>{normalizeStatus(j.status)}</FpaStatusBadge>
                       </td>
-                      <td className="px-4 py-3 text-[#667085]">{j.createdAt ? formatTime(j.createdAt) : "—"}</td>
-                      <td className="px-4 py-3 text-[#667085]">{j.completedAt ? formatTime(j.completedAt) : "—"}</td>
+                      <td className="px-4 py-3 text-[#111111]">{j.createdAt ? formatTime(j.createdAt) : "—"}</td>
+                      <td className="px-4 py-3 text-[#111111]">{j.completedAt ? formatTime(j.completedAt) : "—"}</td>
                       <td className="px-4 py-3">
                         <div className="flex items-center justify-center gap-1.5">
                           <button
                             type="button"
                             onClick={() => setPreviewReport(j)}
-                            className="h-8 rounded-full border border-[#d0d5dd] bg-white px-3 font-semibold text-[#344054] hover:bg-[#f9fafb] inline-flex items-center gap-1"
+                            className="h-8 rounded-full border border-[#d0d5dd] bg-white px-3 font-semibold text-[#111111] hover:bg-[#f9fafb] inline-flex items-center gap-1"
                           >
                             <Eye className="w-3 h-3" />
                             Preview
@@ -581,31 +581,31 @@ export function FpaReports() {
       <Dialog open={!!previewReport} onOpenChange={(open) => !open && setPreviewReport(null)}>
         <DialogContent className="sm:max-w-2xl max-h-[85vh] flex flex-col">
           <DialogHeader>
-            <DialogTitle className="text-[16px] font-semibold text-[#101828]">
+            <DialogTitle className="text-[16px] font-semibold text-[#000000]">
               {previewReport ? reportName(previewReport.exportType) : "Export details"}
             </DialogTitle>
           </DialogHeader>
           <div className="flex-1 overflow-auto rounded-lg border border-[#eaecf0] bg-[#f9fafb] p-4">
-            <p className="text-xs leading-relaxed text-[#667085]">
+            <p className="text-xs leading-relaxed text-[#111111]">
               File-content preview is unavailable for server-generated exports. Download the completed
               file to review its contents.
             </p>
             {previewReport ? (
               <dl className="mt-4 grid grid-cols-[120px_1fr] gap-x-4 gap-y-2 text-xs">
-                <dt className="font-semibold text-[#475467]">Job ID</dt>
-                <dd className="break-all text-[#101828]">{previewReport.id}</dd>
-                <dt className="font-semibold text-[#475467]">Model</dt>
-                <dd className="break-all text-[#101828]">{modelName || previewReport.modelId}</dd>
-                <dt className="font-semibold text-[#475467]">Version</dt>
-                <dd className="break-all text-[#101828]">{previewReport.versionId || "—"}</dd>
-                <dt className="font-semibold text-[#475467]">Period</dt>
-                <dd className="text-[#101828]">{previewReport.period || "—"}</dd>
-                <dt className="font-semibold text-[#475467]">Status</dt>
+                <dt className="font-semibold text-[#111111]">Job ID</dt>
+                <dd className="break-all text-[#000000]">{previewReport.id}</dd>
+                <dt className="font-semibold text-[#111111]">Model</dt>
+                <dd className="break-all text-[#000000]">{modelName || previewReport.modelId}</dd>
+                <dt className="font-semibold text-[#111111]">Version</dt>
+                <dd className="break-all text-[#000000]">{previewReport.versionId || "—"}</dd>
+                <dt className="font-semibold text-[#111111]">Period</dt>
+                <dd className="text-[#000000]">{previewReport.period || "—"}</dd>
+                <dt className="font-semibold text-[#111111]">Status</dt>
                 <dd><FpaStatusBadge tone={statusTone(previewReport.status)}>{normalizeStatus(previewReport.status)}</FpaStatusBadge></dd>
-                <dt className="font-semibold text-[#475467]">Created</dt>
-                <dd className="text-[#101828]">{previewReport.createdAt ? formatTime(previewReport.createdAt) : "—"}</dd>
-                <dt className="font-semibold text-[#475467]">Completed</dt>
-                <dd className="text-[#101828]">{previewReport.completedAt ? formatTime(previewReport.completedAt) : "—"}</dd>
+                <dt className="font-semibold text-[#111111]">Created</dt>
+                <dd className="text-[#000000]">{previewReport.createdAt ? formatTime(previewReport.createdAt) : "—"}</dd>
+                <dt className="font-semibold text-[#111111]">Completed</dt>
+                <dd className="text-[#000000]">{previewReport.completedAt ? formatTime(previewReport.completedAt) : "—"}</dd>
               </dl>
             ) : null}
           </div>

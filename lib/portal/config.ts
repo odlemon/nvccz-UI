@@ -74,7 +74,14 @@ export const STAFF_PUBLIC_PASS_THROUGH = [
   // required login. Narrow this if legacy must stay authenticated.
   '/accounting',
   '/procurement-v23',
-  '/performance',
+  // '/performance' deliberately REMOVED (8 Sep 2026). This list is checked at
+  // middleware.ts:350 and returns NextResponse.next() *before* the token check and
+  // before the routePermissions loop, so while it was here every /performance* URL was
+  // reachable with no session and the module's 25 routePermissions entries were dead
+  // code. Removed ahead of wiring real employee performance data into the module.
+  // Note startsWith matching meant this entry also exposed /performance-legacy.
+  // The sibling client-design ports above are still public — same issue, not yet in
+  // scope. See design-refs/performance-role-matrix.md §1.
   '/fundraising-kyc',
   '/broker-instruction',
 ] as const

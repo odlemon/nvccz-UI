@@ -1,6 +1,10 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
-import { ROLE_PERMISSIONS_MAP, type RoleCode } from '@/lib/config/role-permissions'
+import {
+  type RoleCode,
+  hasModuleAccess as sharedHasModuleAccess,
+  hasSubModuleAccess as sharedHasSubModuleAccess,
+} from '@/lib/config/role-permissions'
 import {
   PORTAL_ID,
   LP_PORTAL_EXTERNAL_URL,
@@ -17,37 +21,29 @@ import {
   shouldRedirectEventsToPortal,
 } from '@/lib/portal/config'
 
-// Helper function to check if role has access to a module
+// These used to be standalone re-implementations of the two helpers in
+// `lib/config/role-permissions.ts`, reading ROLE_PERMISSIONS_MAP directly. They drifted:
+// the shared versions know about module-id aliases (performance-v22 → performance-management)
+// and the client-design bypasses, these did not. That never showed up because every
+// client-design port sits in STAFF_PUBLIC_PASS_THROUGH, so this permission loop never ran
+// for any of them. Removing `/performance` from that list on 8 Sep 2026 made it the first
+// one to actually reach here — and it 403'd every role, including HR_MGR, because
+// `performance-v22` is not a key in ROLE_PERMISSIONS_MAP.
+//
+// Now delegating, so there is one implementation. The OPS_MGR short-circuit below is
+// preserved verbatim rather than removed: it is pre-existing behaviour affecting every other
+// module, and changing it is out of scope here. It is almost certainly a copy-paste error
+// (the comment says "Admin role" but OPS_MGR is Operations Manager) — flagged, not fixed.
 function hasModuleAccess(roleCode: RoleCode | null, moduleId: string): boolean {
   if (!roleCode) return false
-
-  // Admin role has access to everything
   if (roleCode === 'OPS_MGR') return true
-
-  const permissions = ROLE_PERMISSIONS_MAP[roleCode]
-  if (!permissions) return false
-
-  const modulePermission = permissions.modules.find(m => m.moduleId === moduleId)
-  return modulePermission ? modulePermission.access !== 'none' : false
+  return sharedHasModuleAccess(roleCode, moduleId)
 }
 
-// Helper function to check sub-module access
 function hasSubModuleAccess(roleCode: RoleCode | null, moduleId: string, subModuleId: string): boolean {
   if (!roleCode) return false
-
-  // Admin role has access to everything
   if (roleCode === 'OPS_MGR') return true
-
-  const permissions = ROLE_PERMISSIONS_MAP[roleCode]
-  if (!permissions) return false
-
-  const modulePermission = permissions.modules.find(m => m.moduleId === moduleId)
-  if (!modulePermission || modulePermission.access === 'none') return false
-
-  if (!modulePermission.subModules) return true // If no submodules defined, allow access to module
-
-  const subModuleAccess = modulePermission.subModules[subModuleId]
-  return subModuleAccess ? subModuleAccess !== 'none' : false
+  return sharedHasSubModuleAccess(roleCode, moduleId, subModuleId)
 }
 
 // Map routes to modules and sub-modules
@@ -127,9 +123,6 @@ const routePermissions: Record<string, { module: string; subModule?: string }> =
   '/performance/timesheets': { module: 'performance-v22', subModule: 'pm22-tasks' },
   '/performance/settings': { module: 'performance-v22', subModule: 'pm22-access' },
   '/performance/performance-reports': { module: 'performance-v22', subModule: 'pm22-reports' },
-  '/performance/ad-hoc-reports': { module: 'performance-v22', subModule: 'pm22-reports' },
-  '/performance/scheduled-reports': { module: 'performance-v22', subModule: 'pm22-reports' },
-  '/performance/report-history': { module: 'performance-v22', subModule: 'pm22-reports' },
   '/performance/themes': { module: 'performance-v22', subModule: 'pm22-strategy' },
   '/performance/risks': { module: 'performance-v22', subModule: 'pm22-strategy' },
   '/performance/contracts': { module: 'performance-v22', subModule: 'pm22-dashboard' },

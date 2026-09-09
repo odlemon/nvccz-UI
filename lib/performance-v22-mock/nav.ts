@@ -20,9 +20,6 @@ export const PM22_PAGE_TO_PATH: Record<string, string> = {
   'kpiManagement': '/performance/kpi-management',
   'bscPillars': '/performance/bsc-pillars',
   'performanceReports': '/performance/performance-reports',
-  'adHocReports': '/performance/ad-hoc-reports',
-  'scheduledReports': '/performance/scheduled-reports',
-  'reportHistory': '/performance/report-history',
   'settings': '/performance/settings',
   'timesheets': '/performance/timesheets',
 }
@@ -63,9 +60,6 @@ export const PM22_NAV_PAGES = [
   { id: 'pm22-kpiManagement', page: 'kpiManagement', path: '/performance/kpi-management', name: 'KPI Management' },
   { id: 'pm22-bscPillars', page: 'bscPillars', path: '/performance/bsc-pillars', name: 'BSC Pillars' },
   { id: 'pm22-performanceReports', page: 'performanceReports', path: '/performance/performance-reports', name: 'Performance Reports' },
-  { id: 'pm22-adHocReports', page: 'adHocReports', path: '/performance/ad-hoc-reports', name: 'Ad-hoc Reports' },
-  { id: 'pm22-scheduledReports', page: 'scheduledReports', path: '/performance/scheduled-reports', name: 'Scheduled Reports' },
-  { id: 'pm22-reportHistory', page: 'reportHistory', path: '/performance/report-history', name: 'Report History' },
   { id: 'pm22-settings', page: 'settings', path: '/performance/settings', name: 'Settings' },
   { id: 'pm22-timesheets', page: 'timesheets', path: '/performance/timesheets', name: 'Timesheets' },
 ] as const

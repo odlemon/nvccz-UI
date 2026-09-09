@@ -11,9 +11,9 @@ import { useAppDispatch } from "@/lib/store"
 import { bootstrapFpaSelection, fetchFpaModels } from "@/lib/store/slices/fpaSlice"
 
 const FIELD =
-  "mt-1 w-full h-9 rounded-full border border-[#e2e8f0] px-3 text-sm text-[#0f172a] bg-white"
+  "mt-1 w-full h-9 rounded-full border border-[#e2e8f0] px-3 text-sm text-[#000000] bg-white"
 const FIELD_AREA =
-  "mt-1 w-full rounded-xl border border-[#e2e8f0] px-3 py-2 text-sm text-[#0f172a] bg-white min-h-[72px] resize-none"
+  "mt-1 w-full rounded-xl border border-[#e2e8f0] px-3 py-2 text-sm text-[#000000] bg-white min-h-[72px] resize-none"
 
 type Props = {
   open: boolean
@@ -127,14 +127,14 @@ export function BuilderCreateModelModal({ open, onClose }: Props) {
         className="w-full max-w-lg rounded-xl border border-[#e2e8f0] bg-white shadow-xl"
       >
         <div className="flex items-center justify-between border-b border-[#e2e8f0] px-4 py-3">
-          <h2 id="builder-create-title" className="text-sm font-semibold text-[#0f172a]">
+          <h2 id="builder-create-title" className="text-sm font-semibold text-[#000000]">
             New model
           </h2>
           <button
             type="button"
             disabled={busy}
             onClick={handleClose}
-            className="h-8 w-8 inline-flex items-center justify-center rounded-md text-[#64748b] hover:bg-[#f8fafc]"
+            className="h-8 w-8 inline-flex items-center justify-center rounded-md text-[#111111] hover:bg-[#f8fafc]"
             aria-label="Close"
           >
             <X className="w-4 h-4" />
@@ -142,12 +142,12 @@ export function BuilderCreateModelModal({ open, onClose }: Props) {
         </div>
 
         <div className="px-4 py-4 space-y-3 max-h-[70vh] overflow-y-auto">
-          <p className="text-[12px] text-[#64748b]">
+          <p className="text-[12px] text-[#111111]">
             Create the model shell here. Add modules, formulas, and publish on the Builder detail
             page.
           </p>
 
-          <label className="block text-[11px] font-medium text-[#64748b]">
+          <label className="block text-[11px] font-medium text-[#111111]">
             Name <span className="text-[#b91c1c]">*</span>
             <input
               className={FIELD}
@@ -158,7 +158,7 @@ export function BuilderCreateModelModal({ open, onClose }: Props) {
             />
           </label>
 
-          <label className="block text-[11px] font-medium text-[#64748b]">
+          <label className="block text-[11px] font-medium text-[#111111]">
             Description
             <textarea
               className={FIELD_AREA}
@@ -170,7 +170,7 @@ export function BuilderCreateModelModal({ open, onClose }: Props) {
           </label>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <label className="block text-[11px] font-medium text-[#64748b]">
+            <label className="block text-[11px] font-medium text-[#111111]">
               Model type <span className="text-[#b91c1c]">*</span>
               <select
                 className={FIELD}
@@ -183,7 +183,7 @@ export function BuilderCreateModelModal({ open, onClose }: Props) {
               </select>
             </label>
 
-            <label className="block text-[11px] font-medium text-[#64748b]">
+            <label className="block text-[11px] font-medium text-[#111111]">
               Base currency <span className="text-[#b91c1c]">*</span>
               <div className="mt-1">
                 <CurrencySelect value={baseCurrency} onChange={setBaseCurrency} />
@@ -192,7 +192,7 @@ export function BuilderCreateModelModal({ open, onClose }: Props) {
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <label className="block text-[11px] font-medium text-[#64748b]">
+            <label className="block text-[11px] font-medium text-[#111111]">
               Planning start <span className="text-[#b91c1c]">*</span>
               <input
                 type="date"
@@ -201,7 +201,7 @@ export function BuilderCreateModelModal({ open, onClose }: Props) {
                 onChange={(e) => setStartPeriod(e.target.value)}
               />
             </label>
-            <label className="block text-[11px] font-medium text-[#64748b]">
+            <label className="block text-[11px] font-medium text-[#111111]">
               Planning end <span className="text-[#b91c1c]">*</span>
               <input
                 type="date"
@@ -212,7 +212,7 @@ export function BuilderCreateModelModal({ open, onClose }: Props) {
             </label>
           </div>
 
-          <label className="block text-[11px] font-medium text-[#64748b]">
+          <label className="block text-[11px] font-medium text-[#111111]">
             Time granularity <span className="text-[#b91c1c]">*</span>
             <select
               className={FIELD}
@@ -233,7 +233,7 @@ export function BuilderCreateModelModal({ open, onClose }: Props) {
             type="button"
             disabled={busy}
             onClick={handleClose}
-            className="h-9 rounded-full border border-[#e2e8f0] px-4 text-[13px] font-medium text-[#334155] hover:bg-[#f8fafc] disabled:opacity-50"
+            className="h-9 rounded-full border border-[#e2e8f0] px-4 text-[13px] font-medium text-[#111111] hover:bg-[#f8fafc] disabled:opacity-50"
           >
             Cancel
           </button>

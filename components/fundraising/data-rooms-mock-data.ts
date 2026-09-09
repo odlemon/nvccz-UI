@@ -233,7 +233,7 @@ export function roomStatusClass(status: DataRoomStatus): string {
     case "Active":
       return "bg-[#dcfce7] text-[#15803d]"
     case "Draft":
-      return "bg-[#f1f5f9] text-[#64748b]"
+      return "bg-[#f1f5f9] text-[#111111]"
     case "Expired":
       return "bg-[#ffedd5] text-[#c2410c]"
     case "Revoked":

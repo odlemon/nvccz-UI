@@ -1610,10 +1610,10 @@ export function FpaModelBuilder({ modelId }: { modelId?: string }) {
           actions={allModelsLink}
         />
         <div className="p-8 max-w-lg mx-auto text-center space-y-2">
-          <p className="text-sm font-semibold text-[#0f172a]">
+          <p className="text-sm font-semibold text-[#000000]">
             You don&apos;t have access to Model Builder
           </p>
-          <p className="text-xs text-[#64748b]">
+          <p className="text-xs text-[#111111]">
             Model Builder is for FP&A admins. Use Model Planning to enter assumptions.
           </p>
         </div>
@@ -1625,8 +1625,8 @@ export function FpaModelBuilder({ modelId }: { modelId?: string }) {
     <div className="fpa-thin-scroll flex flex-col h-[calc(100vh-5rem)] min-h-0 overflow-hidden bg-white">
       <div className="shrink-0 flex items-center gap-3 px-5 py-3 border-b border-[#e2e8f0] bg-white">
         <div className="flex items-center gap-2 shrink-0">
-          <h1 className="text-base font-semibold text-[#0f172a]">Model Builder</h1>
-          <Star className="w-4 h-4 text-[#cbd5e1]" />
+          <h1 className="text-base font-semibold text-[#000000]">Model Builder</h1>
+          <Star className="w-4 h-4 text-[#141414]" />
         </div>
         <div className="flex-1" />
         {allModelsLink}
@@ -1635,8 +1635,8 @@ export function FpaModelBuilder({ modelId }: { modelId?: string }) {
       {!id ? (
         <div className="flex-1 flex items-center justify-center p-10">
           <div className="text-center max-w-md">
-            <p className="text-sm font-medium text-[#0f172a]">No model selected</p>
-            <p className="text-xs text-[#64748b] mt-1">
+            <p className="text-sm font-medium text-[#000000]">No model selected</p>
+            <p className="text-xs text-[#111111] mt-1">
               Open a model from the list, or create a new one.
             </p>
             <Link
@@ -1648,14 +1648,14 @@ export function FpaModelBuilder({ modelId }: { modelId?: string }) {
           </div>
         </div>
       ) : loading || (!loadError && loadedModelId !== id) ? (
-        <div className="flex-1 flex items-center justify-center gap-2 text-[#64748b]">
+        <div className="flex-1 flex items-center justify-center gap-2 text-[#111111]">
           <Loader2 className="w-5 h-5 animate-spin" /> Loading model…
         </div>
       ) : loadError ? (
         <div className="flex-1 flex items-center justify-center p-10">
           <div className="max-w-md text-center">
-            <p className="text-sm font-semibold text-[#0f172a]">Model could not be loaded</p>
-            <p className="mt-1 text-xs text-[#64748b]">{loadError}</p>
+            <p className="text-sm font-semibold text-[#000000]">Model could not be loaded</p>
+            <p className="mt-1 text-xs text-[#111111]">{loadError}</p>
             <button
               type="button"
               onClick={() => void load()}

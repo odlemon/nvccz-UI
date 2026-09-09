@@ -201,7 +201,7 @@ export function meetingStatusClass(s: MeetingStatus): string {
     case "Completed":
       return "bg-[#dcfce7] text-[#15803d]"
     case "Cancelled":
-      return "bg-[#f1f5f9] text-[#64748b]"
+      return "bg-[#f1f5f9] text-[#111111]"
   }
 }
 
@@ -217,9 +217,9 @@ export function frTaskStatusClass(status: FrTaskStatus): string {
     case "WAITING_ON_INTERNAL_TEAM":
       return "bg-[#ffedd5] text-[#c2410c]"
     case "CANCELLED":
-      return "bg-[#f1f5f9] text-[#64748b]"
+      return "bg-[#f1f5f9] text-[#111111]"
     default:
-      return "bg-[#f1f5f9] text-[#64748b]"
+      return "bg-[#f1f5f9] text-[#111111]"
   }
 }
 

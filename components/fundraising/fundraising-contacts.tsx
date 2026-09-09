@@ -64,43 +64,43 @@ function Detail({
             {contact.initials}
           </span>
           <div>
-            <h2 className="text-[14px] font-semibold text-[#0f172a]">{contact.name}</h2>
-            <p className="mt-0.5 text-[11px] text-[#64748b]">{contact.role}</p>
+            <h2 className="text-[14px] font-semibold text-[#000000]">{contact.name}</h2>
+            <p className="mt-0.5 text-[11px] text-[#111111]">{contact.role}</p>
           </div>
         </div>
-        <button type="button" onClick={onClose} className="rounded-full p-1 text-[#94a3b8] hover:bg-[#f1f5f9]">
+        <button type="button" onClick={onClose} className="rounded-full p-1 text-[#141414] hover:bg-[#f1f5f9]">
           <X className="h-4 w-4" />
         </button>
       </div>
       <div className="space-y-3 p-4 text-[12px]">
         <div>
-          <p className="text-[10px] text-[#94a3b8]">Organisation</p>
-          <p className="mt-0.5 font-medium text-[#0f172a]">{contact.organisationName}</p>
+          <p className="text-[11px] text-[#141414]">Organisation</p>
+          <p className="mt-0.5 font-medium text-[#000000]">{contact.organisationName}</p>
           <button
             type="button"
             onClick={onOpenInvestor}
-            className="mt-1 inline-flex items-center gap-1 rounded-full text-[10px] font-medium text-[#2563eb] hover:underline"
+            className="mt-1 inline-flex items-center gap-1 rounded-full text-[11px] font-medium text-[#2563eb] hover:underline"
           >
             Open Investor 360 <ExternalLink className="h-3 w-3" />
           </button>
         </div>
         <div className="grid grid-cols-1 gap-2">
           <div>
-            <p className="text-[10px] text-[#94a3b8]">Email</p>
-            <p className="mt-0.5 text-[#0f172a]">{contact.email}</p>
+            <p className="text-[11px] text-[#141414]">Email</p>
+            <p className="mt-0.5 text-[#000000]">{contact.email}</p>
           </div>
           <div>
-            <p className="text-[10px] text-[#94a3b8]">Phone</p>
-            <p className="mt-0.5 text-[#0f172a]">{contact.phone}</p>
+            <p className="text-[11px] text-[#141414]">Phone</p>
+            <p className="mt-0.5 text-[#000000]">{contact.phone}</p>
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
-          <span className={cn("rounded-[4px] px-2 py-0.5 text-[10px] font-semibold", influenceChipClass(contact.influence as ContactInfluence))}>
+          <span className={cn("rounded-[4px] px-2 py-0.5 text-[11px] font-semibold", influenceChipClass(contact.influence as ContactInfluence))}>
             {contact.influence}
           </span>
           <span
             className={cn(
-              "rounded-[4px] px-2 py-0.5 text-[10px] font-semibold",
+              "rounded-[4px] px-2 py-0.5 text-[11px] font-semibold",
               contact.consent ? "bg-[#dcfce7] text-[#15803d]" : "bg-[#fee2e2] text-[#dc2626]",
             )}
           >
@@ -108,19 +108,19 @@ function Detail({
           </span>
         </div>
         <div className="border-t border-[#f1f5f9] pt-3">
-          <p className="text-[10px] text-[#94a3b8]">Next action</p>
-          <p className="mt-0.5 font-medium text-[#0f172a]">{contact.nextAction}</p>
-          <p className="mt-2 text-[10px] text-[#94a3b8]">Last interaction · {contact.lastInteraction}</p>
-          <p className="mt-1 text-[10px] text-[#94a3b8]">Owner · {contact.owner}</p>
+          <p className="text-[11px] text-[#141414]">Next action</p>
+          <p className="mt-0.5 font-medium text-[#000000]">{contact.nextAction}</p>
+          <p className="mt-2 text-[11px] text-[#141414]">Last interaction · {contact.lastInteraction}</p>
+          <p className="mt-1 text-[11px] text-[#141414]">Owner · {contact.owner}</p>
         </div>
         <div className="border-t border-[#f1f5f9] pt-3">
-          <p className="text-[11px] font-semibold text-[#0f172a]">Campaigns</p>
+          <p className="text-[11px] font-semibold text-[#000000]">Campaigns</p>
           <div className="mt-2 flex flex-wrap gap-1.5">
             {contact.campaigns.length === 0 ? (
-              <span className="text-[11px] text-[#94a3b8]">None on file</span>
+              <span className="text-[11px] text-[#141414]">None on file</span>
             ) : (
               contact.campaigns.map((c: string) => (
-                <span key={c} className="rounded-[4px] bg-[#f1f5f9] px-2 py-0.5 text-[10px] text-[#475569]">
+                <span key={c} className="rounded-[4px] bg-[#f1f5f9] px-2 py-0.5 text-[11px] text-[#111111]">
                   {c}
                 </span>
               ))
@@ -327,8 +327,8 @@ export function FundraisingContacts() {
     <div className="h-full overflow-y-auto bg-[#f8fafc] p-4 md:p-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-xl font-bold tracking-tight text-[#0f172a] md:text-[22px]">Contacts</h1>
-          <p className="mt-1 text-[12px] text-[#64748b]">
+          <h1 className="text-xl font-bold tracking-tight text-[#000000] md:text-[22px]">Contacts</h1>
+          <p className="mt-1 text-[12px] text-[#111111]">
             Reusable people across campaigns — no duplicate contact records
           </p>
         </div>
@@ -377,15 +377,15 @@ export function FundraisingContacts() {
         <div className={cn(CARD, "min-w-0 overflow-hidden")}>
           <div className="flex flex-col gap-2 border-b border-[#f1f5f9] px-3 py-3 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex items-center gap-2">
-              <Contact className="h-4 w-4 text-[#64748b]" />
-              <h2 className="text-[13px] font-semibold text-[#0f172a]">People</h2>
-              <span className="rounded-[4px] bg-[#f1f5f9] px-1.5 text-[11px] font-semibold text-[#64748b]">
+              <Contact className="h-4 w-4 text-[#111111]" />
+              <h2 className="text-[13px] font-semibold text-[#000000]">People</h2>
+              <span className="rounded-[4px] bg-[#f1f5f9] px-1.5 text-[11px] font-semibold text-[#111111]">
                 {filtered.length}
               </span>
             </div>
             <div className="flex flex-col gap-2 sm:flex-row">
               <div className="relative sm:w-[200px]">
-                <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#94a3b8]" />
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#141414]" />
                 <Input
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
@@ -424,7 +424,7 @@ export function FundraisingContacts() {
                 <tr className="border-b border-[#f1f5f9] bg-[#fafafa]">
                   {["Contact", "Organisation", "Influence", "Consent", "Owner", "Next action", "Last touch"].map(
                     (h) => (
-                      <th key={h} className="px-3 py-2 text-[11px] font-semibold text-[#94a3b8]">{h}</th>
+                      <th key={h} className="px-3 py-2 text-[11px] font-semibold text-[#141414]">{h}</th>
                     ),
                   )}
                 </tr>
@@ -434,7 +434,7 @@ export function FundraisingContacts() {
                   <FrTableSkeleton columns={7} rows={7} />
                 ) : filtered.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="px-3 py-10 text-center text-[13px] text-[#94a3b8]">
+                    <td colSpan={7} className="px-3 py-10 text-center text-[13px] text-[#141414]">
                       No contacts match your filters.
                     </td>
                   </tr>
@@ -451,22 +451,22 @@ export function FundraisingContacts() {
                       <td className="px-3 py-2.5">
                         <div className="flex items-center gap-2">
                           <span
-                            className="flex h-7 w-7 items-center justify-center rounded-full text-[9px] font-bold text-white"
+                            className="flex h-7 w-7 items-center justify-center rounded-full text-[11px] font-bold text-white"
                             style={{ backgroundColor: c.avatarBg }}
                           >
                             {c.initials}
                           </span>
                           <div>
-                            <p className="text-[12px] font-medium text-[#0f172a]">{c.name}</p>
-                            <p className="text-[10px] text-[#94a3b8]">{c.role}</p>
+                            <p className="text-[12px] font-medium text-[#000000]">{c.name}</p>
+                            <p className="text-[11px] text-[#141414]">{c.role}</p>
                           </div>
                         </div>
                       </td>
-                      <td className="whitespace-nowrap px-3 py-2.5 text-[11px] text-[#64748b]">
+                      <td className="whitespace-nowrap px-3 py-2.5 text-[11px] text-[#111111]">
                         {c.organisationName}
                       </td>
                       <td className="px-3 py-2.5">
-                        <span className={cn("rounded-[4px] px-1.5 py-0.5 text-[10px] font-semibold", influenceChipClass(c.influence as ContactInfluence))}>
+                        <span className={cn("rounded-[4px] px-1.5 py-0.5 text-[11px] font-semibold", influenceChipClass(c.influence as ContactInfluence))}>
                           {c.influence}
                         </span>
                       </td>
@@ -475,9 +475,9 @@ export function FundraisingContacts() {
                           {c.consent ? "Yes" : "No"}
                         </span>
                       </td>
-                      <td className="whitespace-nowrap px-3 py-2.5 text-[11px] text-[#64748b]">{c.owner}</td>
-                      <td className="max-w-[160px] truncate px-3 py-2.5 text-[11px] text-[#64748b]">{c.nextAction}</td>
-                      <td className="whitespace-nowrap px-3 py-2.5 text-[11px] text-[#94a3b8]">{c.lastInteraction}</td>
+                      <td className="whitespace-nowrap px-3 py-2.5 text-[11px] text-[#111111]">{c.owner}</td>
+                      <td className="max-w-[160px] truncate px-3 py-2.5 text-[11px] text-[#111111]">{c.nextAction}</td>
+                      <td className="whitespace-nowrap px-3 py-2.5 text-[11px] text-[#141414]">{c.lastInteraction}</td>
                     </tr>
                   ))
                 )}
@@ -548,7 +548,7 @@ export function FundraisingContacts() {
               ))}
             </select>
           </FrField>
-          <label className="flex items-center gap-2 text-[12px] text-[#334155]">
+          <label className="flex items-center gap-2 text-[12px] text-[#111111]">
             <input
               type="checkbox"
               checked={form.communicationConsent}
@@ -607,7 +607,7 @@ export function FundraisingContacts() {
               {DECISION_INFLUENCE_OPTIONS.map((option) => <option key={option.code} value={option.code}>{option.label}</option>)}
             </select>
           </FrField>
-          <label className="flex items-center gap-2 text-[12px] text-[#334155] sm:col-span-2">
+          <label className="flex items-center gap-2 text-[12px] text-[#111111] sm:col-span-2">
             <input
               type="checkbox"
               checked={editForm.communicationConsent}

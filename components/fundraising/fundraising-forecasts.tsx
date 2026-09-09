@@ -155,10 +155,10 @@ function KpiCard({ kpi }: { kpi: KpiCardModel }) {
         >
           <Icon className="h-4 w-4" />
         </div>
-        <span className="text-[10px] text-[#94a3b8]">{kpi.meta}</span>
+        <span className="text-[11px] text-[#141414]">{kpi.meta}</span>
       </div>
-      <p className="mt-2 text-[11px] text-[#64748b]">{kpi.label}</p>
-      <p className="mt-0.5 text-[15px] font-bold tabular-nums text-[#0f172a]">{kpi.value}</p>
+      <p className="mt-2 text-[11px] text-[#111111]">{kpi.label}</p>
+      <p className="mt-0.5 text-[15px] font-bold tabular-nums text-[#000000]">{kpi.value}</p>
       <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[#f1f5f9]">
         <div
           className="h-full rounded-full"
@@ -209,8 +209,8 @@ function AnalyticsTable({
   return (
     <section className={cn(CARD, "overflow-hidden")}>
       <div className="border-b border-[#f1f5f9] px-4 py-3">
-        <h2 className="text-sm font-semibold text-[#0f172a]">{title}</h2>
-        <p className="text-[11px] text-[#94a3b8]">{subtitle}</p>
+        <h2 className="text-sm font-semibold text-[#000000]">{title}</h2>
+        <p className="text-[11px] text-[#141414]">{subtitle}</p>
       </div>
       {loading ? (
         <div className="overflow-x-auto">
@@ -221,7 +221,7 @@ function AnalyticsTable({
           </table>
         </div>
       ) : rows.length === 0 ? (
-        <p className="px-4 py-10 text-center text-[12px] text-[#94a3b8]">
+        <p className="px-4 py-10 text-center text-[12px] text-[#141414]">
           No analytics data yet for this campaign.
         </p>
       ) : (
@@ -230,7 +230,7 @@ function AnalyticsTable({
             <thead>
               <tr className="border-b border-[#f1f5f9] bg-[#fafafa]">
                 {columns.map((h) => (
-                  <th key={h} className="px-3 py-2 text-[11px] font-semibold text-[#94a3b8]">
+                  <th key={h} className="px-3 py-2 text-[11px] font-semibold text-[#141414]">
                     {h}
                   </th>
                 ))}
@@ -240,7 +240,7 @@ function AnalyticsTable({
               {rows.map((row, i) => (
                 <tr key={i} className="border-b border-[#f1f5f9] last:border-0">
                   {columns.map((col) => (
-                    <td key={col} className="px-3 py-2.5 text-[12px] text-[#0f172a]">
+                    <td key={col} className="px-3 py-2.5 text-[12px] text-[#000000]">
                       {formatCell(row[col])}
                     </td>
                   ))}
@@ -520,8 +520,8 @@ export function FundraisingForecasts() {
     <div className="h-full overflow-y-auto bg-[#f8fafc] p-4 md:p-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-xl font-bold text-[#0f172a] md:text-[22px]">Forecasts & Analytics</h1>
-          <p className="mt-1 text-[12px] text-[#64748b]">
+          <h1 className="text-xl font-bold text-[#000000] md:text-[22px]">Forecasts & Analytics</h1>
+          <p className="mt-1 text-[12px] text-[#111111]">
             Weighted pipeline, coverage ratio and expected fee revenue by scenario
           </p>
         </div>
@@ -570,7 +570,7 @@ export function FundraisingForecasts() {
               "rounded-full px-3 py-1.5 text-[11px] font-semibold transition-colors",
               scenario === opt.id
                 ? "bg-gradient-to-r from-blue-600 to-cyan-600 text-white"
-                : "border border-[#e2e8f0] bg-white text-[#64748b] hover:bg-[#f8fafc]",
+                : "border border-[#e2e8f0] bg-white text-[#111111] hover:bg-[#f8fafc]",
             )}
           >
             {opt.label}
@@ -579,7 +579,7 @@ export function FundraisingForecasts() {
             ) : null}
           </button>
         ))}
-        <span className="ml-1 text-[11px] text-[#94a3b8]">{activeMeta.description}</span>
+        <span className="ml-1 text-[11px] text-[#141414]">{activeMeta.description}</span>
       </div>
 
       <div className="mt-5 grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
@@ -592,17 +592,17 @@ export function FundraisingForecasts() {
         <section className={cn(CARD, "xl:col-span-8 p-4")}>
           <div className="mb-3 flex items-center justify-between">
             <div>
-              <h2 className="text-sm font-semibold text-[#0f172a]">Monthly close curve</h2>
-              <p className="text-[11px] text-[#94a3b8]">{activeMeta.label} scenario</p>
+              <h2 className="text-sm font-semibold text-[#000000]">Monthly close curve</h2>
+              <p className="text-[11px] text-[#141414]">{activeMeta.label} scenario</p>
             </div>
           </div>
           {curveLoading ? (
-            <div className="flex h-[240px] w-full items-center justify-center gap-2 rounded-[6px] border border-[#e2e8f0] bg-[#fafbfc] text-[12px] text-[#94a3b8]">
+            <div className="flex h-[240px] w-full items-center justify-center gap-2 rounded-[6px] border border-[#e2e8f0] bg-[#fafbfc] text-[12px] text-[#141414]">
               <Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading close curve…
             </div>
           ) : curve.length === 0 ? (
             <div className="flex h-[240px] w-full items-center justify-center rounded-[6px] border border-dashed border-[#e2e8f0] bg-[#fafbfc] px-6 text-center">
-              <p className="text-[12px] leading-relaxed text-[#94a3b8]">
+              <p className="text-[12px] leading-relaxed text-[#141414]">
                 {active
                   ? "No monthly close curve recorded for this scenario yet."
                   : "Create a scenario to see its monthly close curve."}
@@ -646,7 +646,7 @@ export function FundraisingForecasts() {
         <section className={cn(CARD, "xl:col-span-4 p-4")}>
           <div className="mb-3 flex items-center gap-2">
             <BarChart3 className="h-4 w-4 text-[#7c3aed]" />
-            <h2 className="text-sm font-semibold text-[#0f172a]">Scenario snapshot</h2>
+            <h2 className="text-sm font-semibold text-[#000000]">Scenario snapshot</h2>
           </div>
           <dl className="space-y-3">
             {[
@@ -657,8 +657,8 @@ export function FundraisingForecasts() {
               { label: "Pipeline decay", value: active ? `${active.assumptions.pipelineDecay ?? "—"}%` : "—" },
             ].map((row) => (
               <div key={row.label} className="flex items-center justify-between text-[12px]">
-                <dt className="text-[#64748b]">{row.label}</dt>
-                <dd className="font-medium tabular-nums text-[#0f172a]">{row.value}</dd>
+                <dt className="text-[#111111]">{row.label}</dt>
+                <dd className="font-medium tabular-nums text-[#000000]">{row.value}</dd>
               </div>
             ))}
           </dl>
@@ -750,7 +750,7 @@ export function FundraisingForecasts() {
           />
 
           <div className="border-t border-[#f1f5f9] pt-4">
-            <p className="mb-2 text-[11px] font-medium text-[#64748b]">
+            <p className="mb-2 text-[11px] font-medium text-[#111111]">
               Projected outcomes (drive the KPI cards above)
             </p>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">

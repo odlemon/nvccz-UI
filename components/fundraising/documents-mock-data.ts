@@ -148,7 +148,7 @@ export function docStatusClass(s: DocStatus) {
     case "In Review":
       return "bg-[#ffedd5] text-[#c2410c]"
     case "Superseded":
-      return "bg-[#f1f5f9] text-[#64748b]"
+      return "bg-[#f1f5f9] text-[#111111]"
     default:
       return "bg-[#e0f2fe] text-[#0369a1]"
   }

@@ -210,7 +210,7 @@ export function sentimentClass(s: CommSentiment): string {
     case "Negative":
       return "bg-[#fee2e2] text-[#dc2626]"
     default:
-      return "bg-[#f1f5f9] text-[#64748b]"
+      return "bg-[#f1f5f9] text-[#111111]"
   }
 }
 
@@ -219,5 +219,5 @@ export function commTypeClass(t: CommType): string {
   if (t === "DDQ") return "bg-[#ede9fe] text-[#6d28d9]"
   if (t === "Meeting" || t === "Presentation") return "bg-[#dbeafe] text-[#1d4ed8]"
   if (t === "Call") return "bg-[#e0f2fe] text-[#0369a1]"
-  return "bg-[#f1f5f9] text-[#475569]"
+  return "bg-[#f1f5f9] text-[#111111]"
 }

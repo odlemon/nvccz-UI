@@ -83,11 +83,11 @@ function formatMetric(n: number | null | undefined, opts?: { pct?: boolean; coun
 function getMetricIcon(code: string) {
   const c = code.toUpperCase()
   if (c.includes("REVENUE")) return <BarChart3 className="w-4 h-4 text-[#9e77ed] shrink-0" />
-  if (c.includes("COGS")) return <Tag className="w-4 h-4 text-[#667085] shrink-0" />
+  if (c.includes("COGS")) return <Tag className="w-4 h-4 text-[#111111] shrink-0" />
   if (c.includes("GROSS_PROFIT")) return <FileText className="w-4 h-4 text-[#1570ef] shrink-0" />
   if (c.includes("GROSS_MARGIN")) return <Percent className="w-4 h-4 text-[#f79009] shrink-0" />
   if (c.includes("OPEX")) return <Wallet className="w-4 h-4 text-[#7f56d9] shrink-0" />
-  if (c.includes("EBITDA_MARGIN")) return <Percent className="w-4 h-4 text-[#667085] shrink-0" />
+  if (c.includes("EBITDA_MARGIN")) return <Percent className="w-4 h-4 text-[#111111] shrink-0" />
   if (c.includes("EBITDA")) return <TrendingUp className="w-4 h-4 text-[#f04438] shrink-0" />
   if (c.includes("CAPEX")) return <Building className="w-4 h-4 text-[#1570ef] shrink-0" />
   if (c.includes("HEADCOUNT")) return <Users className="w-4 h-4 text-[#1570ef] shrink-0" />
@@ -615,8 +615,8 @@ export function PlanningScenarioCompareView({
         {/* Header toolbar matches design */}
         <div className="px-5 py-3.5 border-b border-[#eaecf0] flex flex-wrap items-center justify-between gap-3 bg-white">
           <div>
-            <h2 className="text-[16px] font-semibold text-[#101828]">Scenario Comparison</h2>
-            <p className="text-[12px] text-[#667085] mt-0.5">
+            <h2 className="text-[16px] font-semibold text-[#000000]">Scenario Comparison</h2>
+            <p className="text-[12px] text-[#111111] mt-0.5">
               All values in {currency}
               {selectedIds.length >= 3 ? ` · ${selectedIds.length} scenarios` : ""}
             </p>
@@ -630,8 +630,8 @@ export function PlanningScenarioCompareView({
                 className={cn(
                   "px-3 py-1 text-[12px] font-medium rounded-full transition-colors",
                   metricUnit === "%"
-                    ? "bg-white text-[#101828] shadow-sm"
-                    : "text-[#667085] hover:text-[#101828]",
+                    ? "bg-white text-[#000000] shadow-sm"
+                    : "text-[#111111] hover:text-[#000000]",
                 )}
               >
                 %
@@ -642,8 +642,8 @@ export function PlanningScenarioCompareView({
                 className={cn(
                   "px-3 py-1 text-[12px] font-medium rounded-full transition-colors",
                   metricUnit === "$"
-                    ? "bg-white text-[#101828] shadow-sm"
-                    : "text-[#667085] hover:text-[#101828]",
+                    ? "bg-white text-[#000000] shadow-sm"
+                    : "text-[#111111] hover:text-[#000000]",
                 )}
               >
                 $
@@ -653,9 +653,9 @@ export function PlanningScenarioCompareView({
               <DropdownMenuTrigger asChild>
                 <button
                   type="button"
-                  className="inline-flex items-center gap-1.5 h-9 rounded-full border border-[#d0d5dd] bg-white px-3 text-[12px] font-medium text-[#344054] hover:bg-[#f9fafb]"
+                  className="inline-flex items-center gap-1.5 h-9 rounded-full border border-[#d0d5dd] bg-white px-3 text-[12px] font-medium text-[#111111] hover:bg-[#f9fafb]"
                 >
-                  <Columns className="w-3.5 h-3.5 text-[#475467]" />
+                  <Columns className="w-3.5 h-3.5 text-[#111111]" />
                   Columns
                 </button>
               </DropdownMenuTrigger>
@@ -702,16 +702,16 @@ export function PlanningScenarioCompareView({
         </div>
 
         {!versionId ? (
-          <p className="p-6 text-[13px] text-[#94a3b8]">Select a model version to compare scenarios.</p>
+          <p className="p-6 text-[13px] text-[#141414]">Select a model version to compare scenarios.</p>
         ) : selectedIds.length < 2 ? (
-          <p className="p-6 text-[13px] text-[#94a3b8]">
+          <p className="p-6 text-[13px] text-[#141414]">
             Select at least two scenarios to compare.
           </p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full border-collapse text-[13px] min-w-[800px]">
               <thead>
-                <tr className="border-b border-[#eaecf0] bg-[#f9fafb] text-[#475467]">
+                <tr className="border-b border-[#eaecf0] bg-[#f9fafb] text-[#111111]">
                   <th
                     rowSpan={2}
                     className="text-left px-5 py-1.5 font-semibold sticky left-0 bg-[#f9fafb] min-w-[200px]"
@@ -726,9 +726,9 @@ export function PlanningScenarioCompareView({
                     >
                       <div>{s.name}</div>
                       {s.name.includes("Budget") ? (
-                        <div className="text-[11px] font-normal text-[#667085] mt-0.5">(Plan)</div>
+                        <div className="text-[11px] font-normal text-[#111111] mt-0.5">(Plan)</div>
                       ) : s.name.includes("Forecast") ? (
-                        <div className="text-[11px] font-normal text-[#667085] mt-0.5">
+                        <div className="text-[11px] font-normal text-[#111111] mt-0.5">
                           (Current)
                         </div>
                       ) : null}
@@ -743,7 +743,7 @@ export function PlanningScenarioCompareView({
                     </th>
                   ) : null}
                 </tr>
-                <tr className="border-b border-[#eaecf0] bg-[#f9fafb] text-[#475467]">
+                <tr className="border-b border-[#eaecf0] bg-[#f9fafb] text-[#111111]">
                   {showVarianceAbs ? <th className="px-4 py-1 text-right font-semibold w-24">$</th> : null}
                   {showVariancePct ? <th className="px-4 py-1 text-right font-semibold w-20">%</th> : null}
                 </tr>
@@ -757,7 +757,7 @@ export function PlanningScenarioCompareView({
                         (row.varianceAbs < 0 && !row.higherIsFavourable)
                   return (
                     <tr key={row.code} className="hover:bg-[#f9fafb]/55 transition-colors">
-                      <td className="px-5 py-1.5 font-medium text-[#101828] sticky left-0 bg-white flex items-center gap-2.5">
+                      <td className="px-5 py-1.5 font-medium text-[#000000] sticky left-0 bg-white flex items-center gap-2.5">
                         {getMetricIcon(row.code)}
                         <span>{row.label}</span>
                       </td>
@@ -795,7 +795,7 @@ export function PlanningScenarioCompareView({
                               "px-4 py-1.5 text-right tabular-nums",
                               isCurrentColumn
                                 ? "text-[#1570ef] font-semibold text-[13.5px]"
-                                : "text-[#344054]",
+                                : "text-[#111111]",
                             )}
                           >
                             {displayVal}
@@ -808,7 +808,7 @@ export function PlanningScenarioCompareView({
                           "px-4 py-1.5 text-right tabular-nums font-semibold",
                           favourable === true && "text-[#12b76a]",
                           favourable === false && "text-[#f04438]",
-                          favourable == null && "text-[#667085]",
+                          favourable == null && "text-[#111111]",
                         )}
                       >
                         {row.varianceAbs == null
@@ -826,7 +826,7 @@ export function PlanningScenarioCompareView({
                           "px-4 py-1.5 text-right tabular-nums font-semibold",
                           favourable === true && "text-[#12b76a]",
                           favourable === false && "text-[#f04438]",
-                          favourable == null && "text-[#667085]",
+                          favourable == null && "text-[#111111]",
                         )}
                       >
                         {row.variancePct != null
@@ -847,10 +847,10 @@ export function PlanningScenarioCompareView({
         {/* Waterfall Bridge Section */}
         <section className="xl:col-span-5 rounded-xl border border-[#eaecf0] bg-white p-4 shadow-sm flex flex-col justify-between">
           <div className="mb-4">
-            <h3 className="text-[14px] font-semibold text-[#101828]">
+            <h3 className="text-[14px] font-semibold text-[#000000]">
               Variance to Plan (Waterfall)
             </h3>
-            <p className="text-[11px] text-[#667085] mt-0.5">All values in USD</p>
+            <p className="text-[11px] text-[#111111] mt-0.5">All values in USD</p>
           </div>
 
           <div className="flex-1 min-h-[190px] flex items-center justify-center">
@@ -859,11 +859,11 @@ export function PlanningScenarioCompareView({
 
           <div className="mt-3 pt-3 border-t border-[#f2f4f7] flex items-center justify-between">
             <div className="flex items-center gap-1.5">
-              <span className="text-[11px] text-[#667085]">Bridge by</span>
+              <span className="text-[11px] text-[#111111]">Bridge by</span>
               <select
                 value={waterfallMetric}
                 onChange={(e) => setWaterfallMetric(e.target.value as any)}
-                className="h-7 rounded-full border border-[#d0d5dd] px-2 text-[11px] font-semibold text-[#344054] bg-white cursor-pointer"
+                className="h-7 rounded-full border border-[#d0d5dd] px-2 text-[11px] font-semibold text-[#111111] bg-white cursor-pointer"
               >
                 <option value="revenue">Revenue</option>
                 <option value="ebitda">EBITDA</option>
@@ -874,7 +874,7 @@ export function PlanningScenarioCompareView({
               type="button"
               onClick={() => setBridgeOpen(true)}
               disabled={selectedIds.length < 2}
-              className="h-7 rounded-full border border-[#d0d5dd] px-2.5 text-[11px] font-medium text-[#344054] hover:bg-[#f9fafb] disabled:opacity-50"
+              className="h-7 rounded-full border border-[#d0d5dd] px-2.5 text-[11px] font-medium text-[#111111] hover:bg-[#f9fafb] disabled:opacity-50"
             >
               Edit Bridge
             </button>
@@ -884,26 +884,26 @@ export function PlanningScenarioCompareView({
         {/* Scenario Assumptions Section */}
         <section className="xl:col-span-7 rounded-xl border border-[#eaecf0] bg-white p-4 shadow-sm flex flex-col justify-between">
           <div className="flex items-center justify-between mb-4">
-            <h3 className="text-[14px] font-semibold text-[#101828]">Scenario Assumptions</h3>
+            <h3 className="text-[14px] font-semibold text-[#000000]">Scenario Assumptions</h3>
             <button
               type="button"
               onClick={() => openEditDialogForDriver(editDriverName || firstEditableDriver)}
               disabled={!firstEditableDriver}
-              className="h-7 inline-flex items-center rounded-full border border-[#d0d5dd] px-2.5 text-[11px] font-medium text-[#344054] hover:bg-[#f9fafb] disabled:opacity-50"
+              className="h-7 inline-flex items-center rounded-full border border-[#d0d5dd] px-2.5 text-[11px] font-medium text-[#111111] hover:bg-[#f9fafb] disabled:opacity-50"
             >
               Edit Assumptions
             </button>
           </div>
 
           {!assumptionMatrix.length ? (
-            <p className="flex-1 flex items-center justify-center text-[12px] text-[#94a3b8] text-center px-4">
+            <p className="flex-1 flex items-center justify-center text-[12px] text-[#141414] text-center px-4">
               No drivers returned for the selected scenarios.
             </p>
           ) : (
             <div className="flex-1 overflow-x-auto">
               <table className="w-full text-[11px] border-collapse min-w-[500px]">
                 <thead>
-                  <tr className="text-left text-[#667085] border-b border-[#eaecf0] bg-white">
+                  <tr className="text-left text-[#111111] border-b border-[#eaecf0] bg-white">
                     <th className="py-2 pr-3 font-semibold w-1/4">Driver</th>
                     {selectedScenarios.map((s) => (
                       <th
@@ -947,10 +947,10 @@ export function PlanningScenarioCompareView({
                         }
                       >
                         {/* Driver label column */}
-                        <td className="py-2 pr-3 font-medium text-[#344054] text-[12px]">
+                        <td className="py-2 pr-3 font-medium text-[#111111] text-[12px]">
                           <div>{row.name}</div>
                           {row.unit ? (
-                            <div className="text-[10px] text-[#667085] font-normal mt-0.5">
+                            <div className="text-[11px] text-[#111111] font-normal mt-0.5">
                               {row.unit}
                             </div>
                           ) : null}
@@ -973,7 +973,7 @@ export function PlanningScenarioCompareView({
                           return (
                             <td key={s.id} className="py-2 px-0 relative w-16">
                               {/* Numerical value representation */}
-                              <div className="text-[11px] font-semibold text-[#101828] text-center mb-1.5 tabular-nums">
+                              <div className="text-[11px] font-semibold text-[#000000] text-center mb-1.5 tabular-nums">
                                 {valStr}
                               </div>
                               {/* Horizontal track range */}
@@ -1004,19 +1004,19 @@ export function PlanningScenarioCompareView({
 
       {/* Interactive assumptions dialog */}
       <section className="rounded-xl border border-[#eaecf0] bg-white p-4 shadow-sm">
-        <h3 className="text-[14px] font-semibold text-[#101828] mb-2">Sensitivity Matrix</h3>
+        <h3 className="text-[14px] font-semibold text-[#000000] mb-2">Sensitivity Matrix</h3>
         <SensitivityBoard rows={apiSensitivity} />
       </section>
 
       <Dialog open={bridgeOpen} onOpenChange={setBridgeOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle className="text-[16px] font-semibold text-[#101828]">
+            <DialogTitle className="text-[16px] font-semibold text-[#000000]">
               Configure waterfall bridge
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-3">
-            <label className="block text-[12px] font-medium text-[#344054]">
+            <label className="block text-[12px] font-medium text-[#111111]">
               Source scenario
               <select
                 value={bridgeSourceId}
@@ -1032,7 +1032,7 @@ export function PlanningScenarioCompareView({
                 {selectedScenarios.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
               </select>
             </label>
-            <label className="block text-[12px] font-medium text-[#344054]">
+            <label className="block text-[12px] font-medium text-[#111111]">
               Target scenario
               <select
                 value={bridgeTargetId}
@@ -1044,7 +1044,7 @@ export function PlanningScenarioCompareView({
                   .map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
               </select>
             </label>
-            <label className="block text-[12px] font-medium text-[#344054]">
+            <label className="block text-[12px] font-medium text-[#111111]">
               Metric
               <select
                 value={bridgeMetric}
@@ -1061,7 +1061,7 @@ export function PlanningScenarioCompareView({
             <button
               type="button"
               onClick={() => setBridgeOpen(false)}
-              className="h-9 rounded-full border border-[#d0d5dd] px-4 text-[13px] font-semibold text-[#344054]"
+              className="h-9 rounded-full border border-[#d0d5dd] px-4 text-[13px] font-semibold text-[#111111]"
             >
               Cancel
             </button>
@@ -1091,7 +1091,7 @@ export function PlanningScenarioCompareView({
       <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
         <DialogContent className="sm:max-w-md max-h-[85vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="text-[16px] font-semibold text-[#101828]">
+            <DialogTitle className="text-[16px] font-semibold text-[#000000]">
               Edit Assumptions: {editDriverName}
             </DialogTitle>
           </DialogHeader>
@@ -1100,7 +1100,7 @@ export function PlanningScenarioCompareView({
               const sName = s.name
               return (
                 <div key={s.id} className="flex items-center justify-between gap-4">
-                  <span className="text-[13px] font-medium text-[#344054] inline-flex items-center gap-2">
+                  <span className="text-[13px] font-medium text-[#111111] inline-flex items-center gap-2">
                     <span
                       className="w-2.5 h-2.5 rounded-full"
                       style={{ backgroundColor: getScenarioColor(sName) }}
@@ -1117,7 +1117,7 @@ export function PlanningScenarioCompareView({
                       }))
                     }
                     placeholder="e.g. 5.0% or 1.09"
-                    className="h-9 w-28 rounded-lg border border-[#d0d5dd] px-3 text-[13px] text-[#101828] text-right focus:outline-none focus:ring-2 focus:ring-[#2563eb]/20"
+                    className="h-9 w-28 rounded-lg border border-[#d0d5dd] px-3 text-[13px] text-[#000000] text-right focus:outline-none focus:ring-2 focus:ring-[#2563eb]/20"
                   />
                 </div>
               )
@@ -1127,7 +1127,7 @@ export function PlanningScenarioCompareView({
             <button
               type="button"
               onClick={() => setIsEditOpen(false)}
-              className="h-9 rounded-full border border-[#d0d5dd] px-4 text-[13px] font-semibold text-[#344054] hover:bg-[#f9fafb]"
+              className="h-9 rounded-full border border-[#d0d5dd] px-4 text-[13px] font-semibold text-[#111111] hover:bg-[#f9fafb]"
             >
               Cancel
             </button>
@@ -1182,7 +1182,7 @@ function WaterfallChart({
 
   if (!fromApi?.length) {
     return (
-      <p className="text-[12px] text-[#94a3b8] text-center px-4">
+      <p className="text-[12px] text-[#141414] text-center px-4">
         Waterfall data will appear when the compare API returns a bridge for this selection.
       </p>
     )
@@ -1245,14 +1245,14 @@ function WaterfallChart({
               x={margin.left - 6}
               y={y + 3.5}
               textAnchor="end"
-              className="fill-[#667085] text-[9px] font-medium tabular-nums"
+              className="fill-[#667085] text-[11px] font-medium tabular-nums"
             >
               {tick}
             </text>
           </g>
         )
       })}
-      <text x={5} y={12} className="fill-[#667085] text-[9px] font-semibold">
+      <text x={5} y={12} className="fill-[#667085] text-[11px] font-semibold">
         USD M
       </text>
       {computedBars.map((bar) => (
@@ -1263,7 +1263,7 @@ function WaterfallChart({
             y={bar.type === "decrease" ? bar.y + bar.height + 11 : bar.y - 5}
             textAnchor="middle"
             className={cn(
-              "text-[9px] tabular-nums",
+              "text-[11px] tabular-nums",
               bar.type === "total"
                 ? "fill-[#101828] font-bold"
                 : bar.type === "increase"
@@ -1277,7 +1277,7 @@ function WaterfallChart({
             x={bar.x + barWidth / 2}
             y={h - 6}
             textAnchor="middle"
-            className="fill-[#667085] text-[8.5px] font-medium"
+            className="fill-[#667085] text-[11px] font-medium"
           >
             {bar.label}
           </text>
@@ -1290,7 +1290,7 @@ function WaterfallChart({
 function SensitivityBoard({ rows }: { rows: FpaScenarioCompareSensitivityRow[] }) {
   if (!rows.length) {
     return (
-      <p className="text-[12px] text-[#94a3b8] px-1 py-2">
+      <p className="text-[12px] text-[#141414] px-1 py-2">
         Sensitivity matrix will load when the compare API returns sensitivity rows.
       </p>
     )
@@ -1299,7 +1299,7 @@ function SensitivityBoard({ rows }: { rows: FpaScenarioCompareSensitivityRow[] }
     <div className="overflow-x-auto">
       <table className="w-full text-[11px] border-collapse">
         <thead>
-          <tr className="text-left text-[#667085] border-b border-[#eaecf0]">
+          <tr className="text-left text-[#111111] border-b border-[#eaecf0]">
             <th className="py-2 pr-3 font-semibold">Driver</th>
             <th className="py-2 px-2 font-semibold text-right">Low</th>
             <th className="py-2 px-2 font-semibold text-right">Base</th>
@@ -1309,12 +1309,12 @@ function SensitivityBoard({ rows }: { rows: FpaScenarioCompareSensitivityRow[] }
         <tbody>
           {rows.map((r) => (
             <tr key={r.driverCode} className="border-b border-[#f2f4f7]">
-              <td className="py-2 pr-3 font-medium text-[#344054]">{r.driverName}</td>
+              <td className="py-2 pr-3 font-medium text-[#111111]">{r.driverName}</td>
               <td className="py-2 px-2 text-right tabular-nums text-[#f04438]">
                 {r.low}
                 {r.unit || "%"}
               </td>
-              <td className="py-2 px-2 text-right tabular-nums text-[#344054]">
+              <td className="py-2 px-2 text-right tabular-nums text-[#111111]">
                 {r.base}
                 {r.unit || "%"}
               </td>

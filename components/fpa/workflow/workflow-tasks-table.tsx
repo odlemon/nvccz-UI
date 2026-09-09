@@ -23,13 +23,13 @@ function initials(name?: string | null) {
 }
 
 function PersonCell({ name }: { name?: string | null }) {
-  if (!name) return <span className="text-[#94a3b8]">—</span>
+  if (!name) return <span className="text-[#141414]">—</span>
   return (
     <div className="flex items-center gap-2 min-w-0">
-      <span className="h-6 w-6 rounded-full bg-[#e0e7ff] text-[10px] font-semibold text-[#3730a3] inline-flex items-center justify-center shrink-0">
+      <span className="h-6 w-6 rounded-full bg-[#e0e7ff] text-[11px] font-semibold text-[#3730a3] inline-flex items-center justify-center shrink-0">
         {initials(name)}
       </span>
-      <span className="text-[#0f172a] truncate">{name}</span>
+      <span className="text-[#000000] truncate">{name}</span>
     </div>
   )
 }
@@ -72,7 +72,7 @@ export function WorkflowTasksTable({
       <div className="fpa-thin-scroll overflow-auto flex-1 min-h-0 rounded-lg border border-[#e2e8f0]">
         <table className="w-full border-collapse text-[11px] min-w-[820px]">
           <thead>
-            <tr className="border-b border-[#e2e8f0] bg-[#f8fafc] text-[#64748b]">
+            <tr className="border-b border-[#e2e8f0] bg-[#f8fafc] text-[#111111]">
               <th className="text-left px-3 py-2.5 font-medium">Task</th>
               <th className="text-left px-2.5 py-2.5 font-medium">Department</th>
               <th className="text-left px-2.5 py-2.5 font-medium">Assignee</th>
@@ -86,7 +86,7 @@ export function WorkflowTasksTable({
           <tbody>
             {slice.length === 0 ? (
               <tr>
-                <td colSpan={8} className="px-4 py-12 text-center text-[#94a3b8]">
+                <td colSpan={8} className="px-4 py-12 text-center text-[#141414]">
                   No tasks match the current filters.
                 </td>
               </tr>
@@ -110,13 +110,13 @@ export function WorkflowTasksTable({
                       {task.title}
                     </span>
                   </td>
-                  <td className="px-2.5 py-2.5 text-[#475569]">
+                  <td className="px-2.5 py-2.5 text-[#111111]">
                     {task.departmentName || "—"}
                   </td>
                   <td className="px-2.5 py-2.5">
                     <PersonCell name={task.assigneeName} />
                   </td>
-                  <td className="px-2.5 py-2.5 text-[#475569] whitespace-nowrap">
+                  <td className="px-2.5 py-2.5 text-[#111111] whitespace-nowrap">
                     {formatShortDate(task.dueDate)}
                   </td>
                   <td className="px-2.5 py-2.5">
@@ -134,7 +134,7 @@ export function WorkflowTasksTable({
                       {String(task.status).replace(/_/g, " ")}
                     </FpaStatusBadge>
                   </td>
-                  <td className="px-2.5 py-2.5 text-[#475569] whitespace-nowrap">
+                  <td className="px-2.5 py-2.5 text-[#111111] whitespace-nowrap">
                     {task.submittedOn ? formatDateTime(task.submittedOn) : "—"}
                   </td>
                   <td className="px-2.5 py-2.5">
@@ -147,7 +147,7 @@ export function WorkflowTasksTable({
         </table>
       </div>
 
-      <div className="flex flex-wrap items-center justify-between gap-2 pt-3 text-[11px] text-[#64748b] shrink-0 mt-auto">
+      <div className="flex flex-wrap items-center justify-between gap-2 pt-3 text-[11px] text-[#111111] shrink-0 mt-auto">
         <p>
           Showing {total === 0 ? 0 : start + 1} to {Math.min(start + pageSize, total)} of {total}{" "}
           tasks
@@ -171,7 +171,7 @@ export function WorkflowTasksTable({
                 "h-7 min-w-7 px-1.5 rounded-lg border text-[11px] font-medium",
                 page === i
                   ? "border-[#2563eb] bg-[#2563eb] text-white"
-                  : "border-[#e2e8f0] text-[#475569] hover:bg-[#f8fafc]",
+                  : "border-[#e2e8f0] text-[#111111] hover:bg-[#f8fafc]",
               )}
             >
               {i + 1}

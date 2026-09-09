@@ -107,7 +107,7 @@ function docsBadge(status: DocsStatus) {
     case "In Progress":
       return "bg-[#ffedd5] text-[#c2410c]"
     default:
-      return "bg-[#f1f5f9] text-[#64748b]"
+      return "bg-[#f1f5f9] text-[#111111]"
   }
 }
 
@@ -118,7 +118,7 @@ function kycBadge(status: KycStatus) {
     case "In Review":
       return "bg-[#dbeafe] text-[#1d4ed8]"
     default:
-      return "bg-[#f1f5f9] text-[#64748b]"
+      return "bg-[#f1f5f9] text-[#111111]"
   }
 }
 
@@ -140,7 +140,7 @@ function fundingBadge(status: FundingStatus) {
     case "Scheduled":
       return "bg-[#e0f2fe] text-[#0369a1]"
     default:
-      return "bg-[#f1f5f9] text-[#64748b]"
+      return "bg-[#f1f5f9] text-[#111111]"
   }
 }
 
@@ -152,7 +152,7 @@ function CircleMark({ checked }: { checked: boolean }) {
       </span>
     )
   }
-  return <Circle className="mx-auto h-[18px] w-[18px] text-[#cbd5e1]" strokeWidth={1.75} />
+  return <Circle className="mx-auto h-[18px] w-[18px] text-[#141414]" strokeWidth={1.75} />
 }
 
 function StatusPill({
@@ -184,7 +184,7 @@ function InvestorLogo({ investor }: { investor: MappedCommitment }) {
   if (index >= sources.length) {
     return (
       <span
-        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-[4px] text-[10px] font-bold"
+        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-[4px] text-[11px] font-bold"
         style={{ backgroundColor: investor.logoBg, color: investor.logoText }}
       >
         {investor.logoLabel}
@@ -216,11 +216,11 @@ function KpiCard({ kpi }: { kpi: CommitmentKpi }) {
       >
         <Icon className="h-[18px] w-[18px]" strokeWidth={2} />
       </div>
-      <p className="mt-3 text-[12px] font-medium leading-none text-[#64748b]">{kpi.label}</p>
-      <p className="mt-2 text-[22px] font-bold leading-none tracking-tight text-[#0f172a]">
+      <p className="mt-3 text-[12px] font-medium leading-none text-[#111111]">{kpi.label}</p>
+      <p className="mt-2 text-[22px] font-bold leading-none tracking-tight text-[#000000]">
         {kpi.amount}
       </p>
-      <p className="mt-2 text-[11px] leading-none text-[#94a3b8]">
+      <p className="mt-2 text-[11px] leading-none text-[#141414]">
         {kpi.pctOfTarget}% of total committed
       </p>
       <div className="absolute inset-x-0 bottom-0 h-[3px] bg-[#f1f5f9]">
@@ -258,10 +258,10 @@ function ChecklistPanel({
       <div className="px-4 pt-3.5 pb-2">
         <div className="flex items-start justify-between gap-2">
           <div>
-            <h2 className="text-[13px] font-semibold text-[#0f172a]">Closing Checklist</h2>
-            <p className="mt-0.5 text-[11px] text-[#64748b]">{investorName}</p>
+            <h2 className="text-[13px] font-semibold text-[#000000]">Closing Checklist</h2>
+            <p className="mt-0.5 text-[11px] text-[#111111]">{investorName}</p>
           </div>
-          <p className="shrink-0 text-[11px] font-medium tabular-nums text-[#64748b]">
+          <p className="shrink-0 text-[11px] font-medium tabular-nums text-[#111111]">
             {completed}/{items.length} completed
           </p>
         </div>
@@ -281,11 +281,11 @@ function ChecklistPanel({
       ) : null}
 
       {loading ? (
-        <p className="flex items-center gap-2 px-4 py-4 text-[11px] text-[#94a3b8]">
+        <p className="flex items-center gap-2 px-4 py-4 text-[11px] text-[#141414]">
           <Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading checklist…
         </p>
       ) : items.length === 0 ? (
-        <p className="px-4 py-4 text-[11px] text-[#94a3b8]">
+        <p className="px-4 py-4 text-[11px] text-[#141414]">
           No closing checklist items recorded for this commitment yet.
         </p>
       ) : (
@@ -314,7 +314,7 @@ function ChecklistPanel({
                   ) : null}
                 </button>
                 <div className="min-w-0 flex-1">
-                  <p className="text-[12px] font-medium text-[#0f172a]">{item.label}</p>
+                  <p className="text-[12px] font-medium text-[#000000]">{item.label}</p>
                   <div className="mt-0.5 flex items-center gap-2 text-[11px]">
                     <span
                       className={cn(
@@ -323,12 +323,12 @@ function ChecklistPanel({
                           ? "text-[#16a34a]"
                           : item.status === "Pending"
                             ? "text-[#c2410c]"
-                            : "text-[#94a3b8]",
+                            : "text-[#141414]",
                       )}
                     >
                       {item.status}
                     </span>
-                    {item.date ? <span className="text-[#94a3b8]">{item.date}</span> : null}
+                    {item.date ? <span className="text-[#141414]">{item.date}</span> : null}
                   </div>
                 </div>
               </li>
@@ -358,30 +358,30 @@ function ClosingProgressCard({
     <div className={cn(CARD, "overflow-hidden")}>
       {/* Next Closing Event */}
       <div className="px-4 pt-3.5 pb-4">
-        <h2 className="text-[13px] font-semibold text-[#0f172a]">Next Closing Event</h2>
+        <h2 className="text-[13px] font-semibold text-[#000000]">Next Closing Event</h2>
         {event ? (
           <>
             <div className="mt-1 flex items-baseline justify-between gap-2">
-              <p className="text-[12px] text-[#64748b]">{event.title}</p>
+              <p className="text-[12px] text-[#111111]">{event.title}</p>
               <p className="text-lg font-bold tabular-nums text-[#7c3aed]">{event.amount}</p>
             </div>
             <div className="mt-3 space-y-2.5 text-[12px]">
               <div className="flex items-center justify-between">
-                <span className="text-[#94a3b8]">Expected Close Date</span>
-                <span className="font-medium text-[#0f172a]">{event.expectedCloseDate}</span>
+                <span className="text-[#141414]">Expected Close Date</span>
+                <span className="font-medium text-[#000000]">{event.expectedCloseDate}</span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-[#94a3b8]">Commitments</span>
-                <span className="font-medium text-[#0f172a]">{event.commitmentsCount}</span>
+                <span className="text-[#141414]">Commitments</span>
+                <span className="font-medium text-[#000000]">{event.commitmentsCount}</span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-[#94a3b8]">Target Amount</span>
-                <span className="font-medium text-[#0f172a]">{event.targetAmount}</span>
+                <span className="text-[#141414]">Target Amount</span>
+                <span className="font-medium text-[#000000]">{event.targetAmount}</span>
               </div>
               <div>
                 <div className="flex items-center justify-between">
-                  <span className="text-[#94a3b8]">Committed</span>
-                  <span className="font-medium text-[#0f172a]">
+                  <span className="text-[#141414]">Committed</span>
+                  <span className="font-medium text-[#000000]">
                     {event.committedAmount}{" "}
                     {event.targetAmount !== "—" ? (
                       <span className="text-[#7c3aed]">({event.committedPct}%)</span>
@@ -398,7 +398,7 @@ function ClosingProgressCard({
             </div>
           </>
         ) : (
-          <p className="mt-2 text-[12px] text-[#94a3b8]">No closings scheduled yet.</p>
+          <p className="mt-2 text-[12px] text-[#141414]">No closings scheduled yet.</p>
         )}
       </div>
 
@@ -406,9 +406,9 @@ function ClosingProgressCard({
 
       {/* Closing Timeline */}
       <div className="px-4 pt-3.5">
-        <h2 className="text-[13px] font-semibold text-[#0f172a]">Closing Timeline</h2>
+        <h2 className="text-[13px] font-semibold text-[#000000]">Closing Timeline</h2>
         {timeline.length === 0 ? (
-          <p className="mt-2 pb-3 text-[12px] text-[#94a3b8]">No closings recorded yet.</p>
+          <p className="mt-2 pb-3 text-[12px] text-[#141414]">No closings recorded yet.</p>
         ) : (
           <ol className="relative mt-3 space-y-0">
             {timeline.map((step, index) => (
@@ -445,15 +445,15 @@ function TimelineRow({ step, isLast }: { step: TimelineStep; isLast: boolean }) 
           className={cn(
             "text-[12px] leading-snug",
             step.state === "current"
-              ? "font-semibold text-[#0f172a]"
+              ? "font-semibold text-[#000000]"
               : step.state === "done"
-                ? "font-medium text-[#0f172a]"
-                : "font-medium text-[#64748b]",
+                ? "font-medium text-[#000000]"
+                : "font-medium text-[#111111]",
           )}
         >
           {step.label}
         </p>
-        <p className="mt-0.5 text-[11px] text-[#94a3b8]">{step.date}</p>
+        <p className="mt-0.5 text-[11px] text-[#141414]">{step.date}</p>
       </div>
     </li>
   )
@@ -499,7 +499,7 @@ function InvestorRow({
       <td className="whitespace-nowrap px-4 py-2.5">
         <div className="flex items-center gap-2.5">
           <InvestorLogo investor={investor} />
-          <span className="text-[12px] font-medium text-[#0f172a]">{investor.name}</span>
+          <span className="text-[12px] font-medium text-[#000000]">{investor.name}</span>
         </div>
       </td>
       <td className="px-3 py-2.5 text-center">
@@ -508,7 +508,7 @@ function InvestorRow({
       <td className="px-3 py-2.5 text-center">
         <CircleMark checked={investor.hardCircled} />
       </td>
-      <td className="whitespace-nowrap px-3 py-2.5 text-[12px] font-semibold tabular-nums text-[#0f172a]">
+      <td className="whitespace-nowrap px-3 py-2.5 text-[12px] font-semibold tabular-nums text-[#000000]">
         {investor.commitmentAmount}
       </td>
       <td className="px-3 py-2.5">
@@ -529,18 +529,18 @@ function InvestorRow({
           className={fundingBadge(investor.fundingStatus)}
         />
       </td>
-      <td className="whitespace-nowrap px-3 py-2.5 text-[12px] text-[#64748b]">
+      <td className="whitespace-nowrap px-3 py-2.5 text-[12px] text-[#111111]">
         {investor.closeDate ?? "—"}
       </td>
       <td className="whitespace-nowrap px-4 py-2.5">
         <div className="flex items-center gap-2">
           <span
-            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[9px] font-semibold text-white"
+            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold text-white"
             style={{ backgroundColor: investor.owner.avatarBg }}
           >
             {investor.owner.initials}
           </span>
-          <span className="text-[12px] text-[#0f172a]">{investor.owner.name}</span>
+          <span className="text-[12px] text-[#000000]">{investor.owner.name}</span>
         </div>
       </td>
     </tr>
@@ -874,10 +874,10 @@ export function FundraisingCommitments() {
     <div className="h-full overflow-y-auto bg-[#f8fafc] p-4 md:p-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-2">
-          <h1 className="text-xl font-bold tracking-tight text-[#0f172a] md:text-[22px]">
+          <h1 className="text-xl font-bold tracking-tight text-[#000000] md:text-[22px]">
             Commitments & Closings
           </h1>
-          {loading ? <Loader2 className="h-4 w-4 animate-spin text-[#94a3b8]" /> : null}
+          {loading ? <Loader2 className="h-4 w-4 animate-spin text-[#141414]" /> : null}
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Button
@@ -909,14 +909,14 @@ export function FundraisingCommitments() {
         <div className={cn(CARD, "flex min-w-0 flex-col overflow-hidden")}>
           <div className="flex flex-col gap-3 border-b border-[#f1f5f9] px-4 py-3 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex items-center gap-2">
-              <h2 className="text-[13px] font-semibold text-[#0f172a]">Investors</h2>
-              <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-[4px] bg-[#f1f5f9] px-1.5 text-[11px] font-semibold text-[#64748b]">
+              <h2 className="text-[13px] font-semibold text-[#000000]">Investors</h2>
+              <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-[4px] bg-[#f1f5f9] px-1.5 text-[11px] font-semibold text-[#111111]">
                 {mapped.length}
               </span>
             </div>
             <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center">
               <div className="relative min-w-0 sm:w-[200px]">
-                <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#94a3b8]" />
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#141414]" />
                 <Input
                   value={search}
                   onChange={(e) => {
@@ -972,7 +972,7 @@ export function FundraisingCommitments() {
                 className="h-8 w-8 shrink-0 rounded-full border-[#e2e8f0]"
                 onClick={() => toast.message("Advanced filters coming soon")}
               >
-                <Filter className="h-3.5 w-3.5 text-[#64748b]" />
+                <Filter className="h-3.5 w-3.5 text-[#111111]" />
                 <span className="sr-only">Filters</span>
               </Button>
             </div>
@@ -982,34 +982,34 @@ export function FundraisingCommitments() {
             <table className="w-full min-w-[980px] border-collapse text-left">
               <thead>
                 <tr className="border-b border-[#f1f5f9] bg-[#fafafa]">
-                  <th className="px-4 py-2.5 text-[11px] font-semibold text-[#94a3b8]">
+                  <th className="px-4 py-2.5 text-[11px] font-semibold text-[#141414]">
                     Investor
                   </th>
-                  <th className="px-3 py-2.5 text-center text-[11px] font-semibold text-[#94a3b8]">
+                  <th className="px-3 py-2.5 text-center text-[11px] font-semibold text-[#141414]">
                     Soft Circle
                   </th>
-                  <th className="px-3 py-2.5 text-center text-[11px] font-semibold text-[#94a3b8]">
+                  <th className="px-3 py-2.5 text-center text-[11px] font-semibold text-[#141414]">
                     Hard Circle
                   </th>
-                  <th className="px-3 py-2.5 text-[11px] font-semibold text-[#94a3b8]">
+                  <th className="px-3 py-2.5 text-[11px] font-semibold text-[#141414]">
                     Commitment Amount
                   </th>
-                  <th className="px-3 py-2.5 text-[11px] font-semibold text-[#94a3b8]">
+                  <th className="px-3 py-2.5 text-[11px] font-semibold text-[#141414]">
                     Docs Status
                   </th>
-                  <th className="px-3 py-2.5 text-[11px] font-semibold text-[#94a3b8]">
+                  <th className="px-3 py-2.5 text-[11px] font-semibold text-[#141414]">
                     KYC/AML Status
                   </th>
-                  <th className="px-3 py-2.5 text-[11px] font-semibold text-[#94a3b8]">
+                  <th className="px-3 py-2.5 text-[11px] font-semibold text-[#141414]">
                     Signature Status
                   </th>
-                  <th className="px-3 py-2.5 text-[11px] font-semibold text-[#94a3b8]">
+                  <th className="px-3 py-2.5 text-[11px] font-semibold text-[#141414]">
                     Funding Status
                   </th>
-                  <th className="px-3 py-2.5 text-[11px] font-semibold text-[#94a3b8]">
+                  <th className="px-3 py-2.5 text-[11px] font-semibold text-[#141414]">
                     Close Date
                   </th>
-                  <th className="px-4 py-2.5 text-[11px] font-semibold text-[#94a3b8]">
+                  <th className="px-4 py-2.5 text-[11px] font-semibold text-[#141414]">
                     Owner
                   </th>
                 </tr>
@@ -1021,7 +1021,7 @@ export function FundraisingCommitments() {
                   <tr>
                     <td
                       colSpan={10}
-                      className="px-4 py-10 text-center text-[13px] text-[#94a3b8]"
+                      className="px-4 py-10 text-center text-[13px] text-[#141414]"
                     >
                       {mapped.length === 0
                         ? "No commitments recorded yet."
@@ -1043,7 +1043,7 @@ export function FundraisingCommitments() {
           </div>
 
           <div className="flex flex-col gap-2 border-t border-[#f1f5f9] px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-[11px] text-[#94a3b8]">
+            <p className="text-[11px] text-[#141414]">
               Showing {from} to {to} of {filtered.length} investors
             </p>
             {filtered.length > PAGE_SIZE ? (
@@ -1073,7 +1073,7 @@ export function FundraisingCommitments() {
               footer={
                 <div className="space-y-3">
                   <div>
-                    <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-[#94a3b8]">
+                    <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-[#141414]">
                       Commitment lifecycle
                     </p>
                     <div className="flex gap-2">
@@ -1103,7 +1103,7 @@ export function FundraisingCommitments() {
                         Save
                       </Button>
                     </div>
-                    <p className="mt-1.5 text-[10px] leading-relaxed text-[#64748b]">
+                    <p className="mt-1.5 text-[11px] leading-relaxed text-[#111111]">
                       Signed confirms execution only. Admission and cash funding use the guarded actions below.
                     </p>
                   </div>
@@ -1158,7 +1158,7 @@ export function FundraisingCommitments() {
                 ? "bg-[#dcfce7] text-[#15803d]"
                 : state === "current"
                   ? "bg-[#dbeafe] text-[#1d4ed8]"
-                  : "bg-[#f1f5f9] text-[#64748b]",
+                  : "bg-[#f1f5f9] text-[#111111]",
           }
         })}
       />
@@ -1205,7 +1205,7 @@ export function FundraisingCommitments() {
             placeholder="0"
           />
         </FrField>
-        <p className="mt-2 text-[11px] text-[#64748b]">
+        <p className="mt-2 text-[11px] text-[#111111]">
           Recorded against cash received — signed documents alone do not mark a commitment as funded.
         </p>
       </FrDialogShell>

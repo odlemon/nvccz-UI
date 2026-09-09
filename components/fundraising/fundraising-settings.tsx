@@ -57,8 +57,8 @@ function StageList({
     <div className={cn(CARD, "overflow-hidden")}>
       <div className="flex items-center justify-between border-b border-[#f1f5f9] px-4 py-3">
         <div>
-          <h3 className="text-[13px] font-semibold text-[#0f172a]">{title}</h3>
-          <p className="mt-0.5 text-[11px] text-[#64748b]">{stages.length} stages</p>
+          <h3 className="text-[13px] font-semibold text-[#000000]">{title}</h3>
+          <p className="mt-0.5 text-[11px] text-[#111111]">{stages.length} stages</p>
         </div>
         <button
           type="button"
@@ -69,12 +69,12 @@ function StageList({
         </button>
       </div>
       {stages.length === 0 ? (
-        <p className="px-4 py-8 text-center text-[12px] text-[#94a3b8]">No stages configured yet.</p>
+        <p className="px-4 py-8 text-center text-[12px] text-[#141414]">No stages configured yet.</p>
       ) : (
         <ul className="divide-y divide-[#f1f5f9]">
           {stages.slice(0, 5).map((stage) => (
             <li key={stage.id} className="flex items-center justify-between gap-3 px-4 py-2.5">
-              <span className="min-w-0 truncate text-[12px] font-medium text-[#0f172a]">{stage.name}</span>
+              <span className="min-w-0 truncate text-[12px] font-medium text-[#000000]">{stage.name}</span>
               <div className="flex shrink-0 items-center gap-2">
                 <span
                   className="text-[11px] font-semibold tabular-nums"
@@ -85,7 +85,7 @@ function StageList({
                 <button
                   type="button"
                   onClick={() => onEdit(stage)}
-                  className="flex h-6 w-6 items-center justify-center rounded-full text-[#94a3b8] hover:bg-[#f1f5f9] hover:text-[#2563eb]"
+                  className="flex h-6 w-6 items-center justify-center rounded-full text-[#141414] hover:bg-[#f1f5f9] hover:text-[#2563eb]"
                   aria-label={`Edit ${stage.name}`}
                 >
                   <Pencil className="h-3 w-3" />
@@ -93,7 +93,7 @@ function StageList({
                 <button
                   type="button"
                   onClick={() => onDelete(stage)}
-                  className="flex h-6 w-6 items-center justify-center rounded-full text-[#94a3b8] hover:bg-[#fef2f2] hover:text-[#dc2626]"
+                  className="flex h-6 w-6 items-center justify-center rounded-full text-[#141414] hover:bg-[#fef2f2] hover:text-[#dc2626]"
                   aria-label={`Delete ${stage.name}`}
                 >
                   <Trash2 className="h-3 w-3" />
@@ -319,8 +319,8 @@ export function FundraisingSettings() {
   return (
     <div className="h-full overflow-y-auto bg-[#f8fafc] p-4 md:p-6">
       <div>
-        <h1 className="text-xl font-bold text-[#0f172a] md:text-[22px]">Settings</h1>
-        <p className="mt-1 text-[12px] text-[#64748b]">
+        <h1 className="text-xl font-bold text-[#000000] md:text-[22px]">Settings</h1>
+        <p className="mt-1 text-[12px] text-[#111111]">
           Pipeline stages, probabilities, stage gates, and module configuration
         </p>
       </div>
@@ -338,7 +338,7 @@ export function FundraisingSettings() {
                   "flex shrink-0 items-center gap-1.5 rounded-full border-b-2 px-3 pb-2.5 text-[12px] font-medium",
                   tab === t.id
                     ? "border-transparent bg-gradient-to-r from-blue-600 to-cyan-600 bg-[length:100%_2px] bg-bottom bg-no-repeat text-[#2563eb]"
-                    : "border-transparent text-[#94a3b8] hover:text-[#64748b]",
+                    : "border-transparent text-[#141414] hover:text-[#111111]",
                 )}
               >
                 <Icon className="h-3.5 w-3.5" />
@@ -352,7 +352,7 @@ export function FundraisingSettings() {
           {tab === "pipelines" ? (
             <div>
               <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-                <p className="text-[12px] text-[#64748b]">
+                <p className="text-[12px] text-[#111111]">
                   {loading
                     ? "Loading pipeline stages…"
                     : "PE / VC and Asset Management pipeline stages with configured win probabilities."}
@@ -365,7 +365,7 @@ export function FundraisingSettings() {
                 </Button>
               </div>
               {loading ? (
-                <div className="flex items-center justify-center gap-2 rounded-[6px] border border-[#e2e8f0] bg-white p-10 text-[13px] text-[#94a3b8]">
+                <div className="flex items-center justify-center gap-2 rounded-[6px] border border-[#e2e8f0] bg-white p-10 text-[13px] text-[#141414]">
                   <Loader2 className="h-4 w-4 animate-spin" /> Loading pipelines…
                 </div>
               ) : (
@@ -391,15 +391,15 @@ export function FundraisingSettings() {
 
           {tab === "gates" ? (
             <div>
-              <p className="mb-4 text-[12px] text-[#64748b]">
+              <p className="mb-4 text-[12px] text-[#111111]">
                 Requirements that must be met before an opportunity can advance into a stage.
               </p>
               {loading ? (
-                <div className="flex items-center justify-center gap-2 rounded-[6px] border border-[#e2e8f0] bg-white p-10 text-[13px] text-[#94a3b8]">
+                <div className="flex items-center justify-center gap-2 rounded-[6px] border border-[#e2e8f0] bg-white p-10 text-[13px] text-[#141414]">
                   <Loader2 className="h-4 w-4 animate-spin" /> Loading stage gates…
                 </div>
               ) : gates.length === 0 ? (
-                <div className="rounded-[6px] border border-[#e2e8f0] bg-white p-10 text-center text-[13px] text-[#94a3b8]">
+                <div className="rounded-[6px] border border-[#e2e8f0] bg-white p-10 text-center text-[13px] text-[#141414]">
                   No stage gates configured yet.
                 </div>
               ) : (
@@ -410,15 +410,15 @@ export function FundraisingSettings() {
                       className={cn(CARD, "flex flex-col gap-3 p-4 sm:flex-row sm:items-start sm:justify-between")}
                     >
                       <div className="min-w-0 flex-1">
-                        <span className="text-[12px] font-semibold text-[#0f172a]">
+                        <span className="text-[12px] font-semibold text-[#000000]">
                           Entering {gate.stageName}
                         </span>
                         {gate.requirements.length === 0 ? (
-                          <p className="mt-2 text-[11px] text-[#94a3b8]">No requirements configured</p>
+                          <p className="mt-2 text-[11px] text-[#141414]">No requirements configured</p>
                         ) : (
                           <ul className="mt-2 space-y-1">
                             {gate.requirements.map((req) => (
-                              <li key={req} className="flex items-start gap-2 text-[11px] text-[#64748b]">
+                              <li key={req} className="flex items-start gap-2 text-[11px] text-[#111111]">
                                 <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-[#c4b5fd]" />
                                 {req}
                               </li>
@@ -442,16 +442,16 @@ export function FundraisingSettings() {
 
           {tab === "amounts" ? (
             <div>
-              <p className="mb-4 text-[12px] text-[#64748b]">
+              <p className="mb-4 text-[12px] text-[#111111]">
                 Amount types are independent labels — each is tracked separately and never overwrites
                 another (edits append history).
               </p>
               {loading ? (
-                <div className="flex items-center justify-center gap-2 rounded-[6px] border border-[#e2e8f0] bg-white p-10 text-[13px] text-[#94a3b8]">
+                <div className="flex items-center justify-center gap-2 rounded-[6px] border border-[#e2e8f0] bg-white p-10 text-[13px] text-[#141414]">
                   <Loader2 className="h-4 w-4 animate-spin" /> Loading amount types…
                 </div>
               ) : amountTypes.length === 0 ? (
-                <div className="rounded-[6px] border border-[#e2e8f0] bg-white p-10 text-center text-[13px] text-[#94a3b8]">
+                <div className="rounded-[6px] border border-[#e2e8f0] bg-white p-10 text-center text-[13px] text-[#141414]">
                   No amount types configured yet.
                 </div>
               ) : (
@@ -462,13 +462,13 @@ export function FundraisingSettings() {
                         {i + 1}
                       </span>
                       <div className="min-w-0 flex-1">
-                        <span className="block truncate text-[12px] font-medium text-[#0f172a]">
+                        <span className="block truncate text-[12px] font-medium text-[#000000]">
                           {type.label}
                         </span>
-                        <span className="text-[9px] text-[#94a3b8]">{type.key}</span>
+                        <span className="text-[11px] text-[#141414]">{type.key}</span>
                       </div>
                       {savingAmountKey === type.key ? (
-                        <Loader2 className="h-3.5 w-3.5 animate-spin text-[#94a3b8]" />
+                        <Loader2 className="h-3.5 w-3.5 animate-spin text-[#141414]" />
                       ) : (
                         <Switch
                           checked={type.enabled}
@@ -485,15 +485,15 @@ export function FundraisingSettings() {
 
           {tab === "roles" ? (
             <div>
-              <p className="mb-4 text-[12px] text-[#64748b]">
+              <p className="mb-4 text-[12px] text-[#111111]">
                 Role summaries for fundraising module access. Managed in Admin.
               </p>
               {loading ? (
-                <div className="flex items-center justify-center gap-2 rounded-[6px] border border-[#e2e8f0] bg-white p-10 text-[13px] text-[#94a3b8]">
+                <div className="flex items-center justify-center gap-2 rounded-[6px] border border-[#e2e8f0] bg-white p-10 text-[13px] text-[#141414]">
                   <Loader2 className="h-4 w-4 animate-spin" /> Loading roles…
                 </div>
               ) : roles.length === 0 ? (
-                <div className="rounded-[6px] border border-[#e2e8f0] bg-white p-10 text-center text-[13px] text-[#94a3b8]">
+                <div className="rounded-[6px] border border-[#e2e8f0] bg-white p-10 text-center text-[13px] text-[#141414]">
                   No fundraising roles configured yet.
                 </div>
               ) : (
@@ -503,15 +503,15 @@ export function FundraisingSettings() {
                       <div className="flex items-start gap-2">
                         <Shield className="mt-0.5 h-4 w-4 text-[#7c3aed]" />
                         <div>
-                          <h3 className="text-[13px] font-semibold text-[#0f172a]">{role.name}</h3>
-                          <p className="mt-1 text-[11px] text-[#64748b]">{role.summary}</p>
+                          <h3 className="text-[13px] font-semibold text-[#000000]">{role.name}</h3>
+                          <p className="mt-1 text-[11px] text-[#111111]">{role.summary}</p>
                         </div>
                       </div>
                       <div className="mt-3 flex flex-wrap gap-1.5">
                         {role.permissions.map((p) => (
                           <span
                             key={p}
-                            className="rounded-[4px] bg-[#f1f5f9] px-2 py-0.5 text-[10px] font-medium text-[#475569]"
+                            className="rounded-[4px] bg-[#f1f5f9] px-2 py-0.5 text-[11px] font-medium text-[#111111]"
                           >
                             {p}
                           </span>
@@ -526,15 +526,15 @@ export function FundraisingSettings() {
 
           {tab === "notifications" ? (
             <div>
-              <p className="mb-4 text-[12px] text-[#64748b]">
+              <p className="mb-4 text-[12px] text-[#111111]">
                 Choose which events trigger in-app and email notifications for your account.
               </p>
               {loading ? (
-                <div className="flex items-center justify-center gap-2 rounded-[6px] border border-[#e2e8f0] bg-white p-10 text-[13px] text-[#94a3b8]">
+                <div className="flex items-center justify-center gap-2 rounded-[6px] border border-[#e2e8f0] bg-white p-10 text-[13px] text-[#141414]">
                   <Loader2 className="h-4 w-4 animate-spin" /> Loading notification settings…
                 </div>
               ) : notifications.length === 0 ? (
-                <div className="rounded-[6px] border border-[#e2e8f0] bg-white p-10 text-center text-[13px] text-[#94a3b8]">
+                <div className="rounded-[6px] border border-[#e2e8f0] bg-white p-10 text-center text-[13px] text-[#141414]">
                   No notification rules configured yet.
                 </div>
               ) : (
@@ -701,15 +701,15 @@ export function FundraisingSettings() {
         {(step) =>
           step === "flags" ? (
             <div className="space-y-2">
-              <p className="text-[11px] text-[#64748b]">
-                Entering <span className="font-semibold text-[#0f172a]">{editingGate?.stageName}</span> requires:
+              <p className="text-[11px] text-[#111111]">
+                Entering <span className="font-semibold text-[#000000]">{editingGate?.stageName}</span> requires:
               </p>
               {STAGE_GATE_FLAGS.map((f) => (
                 <label
                   key={f.key}
                   className={cn(CARD, "flex items-center justify-between gap-3 px-3 py-2.5 cursor-pointer")}
                 >
-                  <span className="text-[12px] text-[#0f172a]">{f.label}</span>
+                  <span className="text-[12px] text-[#000000]">{f.label}</span>
                   <Switch
                     checked={Boolean(gateFlags[f.key])}
                     onCheckedChange={(v) => setGateFlags((prev) => ({ ...prev, [f.key]: v }))}
@@ -737,7 +737,7 @@ function NotificationRowItem({
 }) {
   return (
     <li className="flex items-center justify-between gap-4 px-4 py-3">
-      <span className="text-[12px] text-[#0f172a]">{item.label}</span>
+      <span className="text-[12px] text-[#000000]">{item.label}</span>
       <Switch checked={item.enabled} onCheckedChange={(v) => onToggle(item, v)} />
     </li>
   )

@@ -310,7 +310,7 @@ export function kycChipClass(status: KycStatus): string {
     case "REJECTED":
       return "bg-[#fee2e2] text-[#dc2626]"
     default:
-      return "bg-[#f1f5f9] text-[#64748b]"
+      return "bg-[#f1f5f9] text-[#111111]"
   }
 }
 

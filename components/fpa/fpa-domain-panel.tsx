@@ -79,42 +79,42 @@ export function FpaDomainPanel({ category }: { category: DomainCategory }) {
 
       <div className="p-4 sm:p-5 space-y-4">
         {!selectedModelId ? (
-          <p className="text-sm text-[#94a3b8]">Select a model to load this domain view.</p>
+          <p className="text-sm text-[#141414]">Select a model to load this domain view.</p>
         ) : loading ? (
-          <div className="flex items-center gap-2 py-12 text-[#64748b]">
+          <div className="flex items-center gap-2 py-12 text-[#111111]">
             <Loader2 className="w-5 h-5 animate-spin" /> Loading {TITLES[category].toLowerCase()}…
           </div>
         ) : (
           <>
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
               <div className="rounded-md border border-[#e2e8f0] bg-white p-4">
-                <p className="text-xs text-[#64748b]">Line items</p>
+                <p className="text-xs text-[#111111]">Line items</p>
                 <p className="text-lg font-semibold mt-1 tabular-nums">{lineItems.length}</p>
               </div>
               <div className="rounded-md border border-[#e2e8f0] bg-white p-4">
-                <p className="text-xs text-[#64748b]">Drivers</p>
+                <p className="text-xs text-[#111111]">Drivers</p>
                 <p className="text-lg font-semibold mt-1 tabular-nums">{drivers.length}</p>
               </div>
               <div className="rounded-md border border-[#e2e8f0] bg-white p-4">
-                <p className="text-xs text-[#64748b]">Category</p>
+                <p className="text-xs text-[#111111]">Category</p>
                 <p className="text-lg font-semibold mt-1 capitalize">{category}</p>
               </div>
               <div className="rounded-md border border-[#e2e8f0] bg-white p-4">
-                <p className="text-xs text-[#64748b]">Model</p>
+                <p className="text-xs text-[#111111]">Model</p>
                 <p className="text-sm font-semibold mt-1 truncate">{selectedModelId.slice(0, 12)}…</p>
               </div>
             </div>
 
             <section className="rounded-md border border-[#e2e8f0] bg-white overflow-x-auto">
               <div className="px-4 pt-4 pb-2">
-                <h2 className="text-sm font-semibold text-[#0f172a]">Line items</h2>
+                <h2 className="text-sm font-semibold text-[#000000]">Line items</h2>
               </div>
               {lineItems.length === 0 ? (
-                <p className="p-6 text-sm text-[#94a3b8]">No line items in this domain response.</p>
+                <p className="p-6 text-sm text-[#141414]">No line items in this domain response.</p>
               ) : (
                 <table className="w-full text-sm min-w-[560px]">
                   <thead>
-                    <tr className="border-b border-[#e2e8f0] text-left text-xs text-[#64748b]">
+                    <tr className="border-b border-[#e2e8f0] text-left text-xs text-[#111111]">
                       <th className="px-4 py-3 font-medium">Code</th>
                       <th className="px-4 py-3 font-medium">Name</th>
                       <th className="px-4 py-3 font-medium">Type</th>
@@ -125,9 +125,9 @@ export function FpaDomainPanel({ category }: { category: DomainCategory }) {
                     {lineItems.map((li) => (
                       <tr key={li.id} className="border-t border-[#e2e8f0]">
                         <td className="px-4 py-3 font-mono text-xs">{li.code}</td>
-                        <td className="px-4 py-3 font-medium text-[#0f172a]">{li.name}</td>
-                        <td className="px-4 py-3 text-[#475569]">{li.lineItemType}</td>
-                        <td className="px-4 py-3 text-[#475569]">{li.category}</td>
+                        <td className="px-4 py-3 font-medium text-[#000000]">{li.name}</td>
+                        <td className="px-4 py-3 text-[#111111]">{li.lineItemType}</td>
+                        <td className="px-4 py-3 text-[#111111]">{li.category}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -137,14 +137,14 @@ export function FpaDomainPanel({ category }: { category: DomainCategory }) {
 
             <section className="rounded-md border border-[#e2e8f0] bg-white overflow-x-auto">
               <div className="px-4 pt-4 pb-2">
-                <h2 className="text-sm font-semibold text-[#0f172a]">Drivers</h2>
+                <h2 className="text-sm font-semibold text-[#000000]">Drivers</h2>
               </div>
               {drivers.length === 0 ? (
-                <p className="p-6 text-sm text-[#94a3b8]">No drivers in this domain response.</p>
+                <p className="p-6 text-sm text-[#141414]">No drivers in this domain response.</p>
               ) : (
                 <table className="w-full text-sm min-w-[480px]">
                   <thead>
-                    <tr className="border-b border-[#e2e8f0] text-left text-xs text-[#64748b]">
+                    <tr className="border-b border-[#e2e8f0] text-left text-xs text-[#111111]">
                       <th className="px-4 py-3 font-medium">Name</th>
                       <th className="px-4 py-3 font-medium">Code</th>
                       <th className="px-4 py-3 font-medium text-right">Value</th>
@@ -165,7 +165,7 @@ export function FpaDomainPanel({ category }: { category: DomainCategory }) {
               )}
             </section>
 
-            <p className="text-xs text-[#94a3b8]">
+            <p className="text-xs text-[#141414]">
               Hire plans, waterfalls, and monthly cash statement series are not in the domain API payload —
               see frontend feedback doc.
             </p>

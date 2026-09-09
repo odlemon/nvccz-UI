@@ -8,7 +8,7 @@ import { CurrencySelect } from "@/components/performance/currency-select"
 import { errorMessage, logFpaGap } from "@/lib/fpa/fpa-api-gaps"
 
 const FIELD =
-  "mt-1 w-full h-9 rounded-full border border-[#e2e8f0] px-3 text-sm text-[#0f172a] bg-white"
+  "mt-1 w-full h-9 rounded-full border border-[#e2e8f0] px-3 text-sm text-[#000000] bg-white"
 
 type Props = {
   open: boolean
@@ -108,14 +108,14 @@ export function BuilderModelSettingsDialog({
         className="w-full max-w-md rounded-xl border border-[#e2e8f0] bg-white shadow-xl"
       >
         <div className="flex items-center justify-between border-b border-[#e2e8f0] px-4 py-3">
-          <h2 id="builder-settings-title" className="text-sm font-semibold text-[#0f172a]">
+          <h2 id="builder-settings-title" className="text-sm font-semibold text-[#000000]">
             Calendar & currency
           </h2>
           <button
             type="button"
             disabled={busy}
             onClick={onClose}
-            className="h-8 w-8 inline-flex items-center justify-center rounded-full text-[#64748b] hover:bg-[#f8fafc]"
+            className="h-8 w-8 inline-flex items-center justify-center rounded-full text-[#111111] hover:bg-[#f8fafc]"
             aria-label="Close"
           >
             <X className="w-4 h-4" />
@@ -123,12 +123,12 @@ export function BuilderModelSettingsDialog({
         </div>
 
         <div className="px-4 py-4 space-y-3">
-          <p className="text-[12px] text-[#64748b]">
+          <p className="text-[12px] text-[#111111]">
             Update the planning horizon and base currency for{" "}
-            <span className="font-medium text-[#0f172a]">{model.name}</span>.
+            <span className="font-medium text-[#000000]">{model.name}</span>.
           </p>
 
-          <label className="block text-[11px] font-medium text-[#64748b]">
+          <label className="block text-[11px] font-medium text-[#111111]">
             Base currency <span className="text-[#b91c1c]">*</span>
             <div className="mt-1">
               <CurrencySelect
@@ -140,7 +140,7 @@ export function BuilderModelSettingsDialog({
           </label>
 
           <div className="grid grid-cols-2 gap-3">
-            <label className="block text-[11px] font-medium text-[#64748b]">
+            <label className="block text-[11px] font-medium text-[#111111]">
               Planning start <span className="text-[#b91c1c]">*</span>
               <input
                 type="date"
@@ -150,7 +150,7 @@ export function BuilderModelSettingsDialog({
                 onChange={(e) => setStartPeriod(e.target.value)}
               />
             </label>
-            <label className="block text-[11px] font-medium text-[#64748b]">
+            <label className="block text-[11px] font-medium text-[#111111]">
               Planning end <span className="text-[#b91c1c]">*</span>
               <input
                 type="date"
@@ -162,7 +162,7 @@ export function BuilderModelSettingsDialog({
             </label>
           </div>
 
-          <label className="block text-[11px] font-medium text-[#64748b]">
+          <label className="block text-[11px] font-medium text-[#111111]">
             Time granularity <span className="text-[#b91c1c]">*</span>
             <select
               className={FIELD}
@@ -184,7 +184,7 @@ export function BuilderModelSettingsDialog({
             type="button"
             disabled={busy}
             onClick={onClose}
-            className="h-9 rounded-full border border-[#e2e8f0] px-4 text-xs font-medium text-[#334155] hover:bg-[#f8fafc]"
+            className="h-9 rounded-full border border-[#e2e8f0] px-4 text-xs font-medium text-[#111111] hover:bg-[#f8fafc]"
           >
             Cancel
           </button>

@@ -162,3 +162,59 @@ real or dismissed as noise, not asserted from a single reading.
 - Cleared `matanho-*` localStorage keys repeatedly to force genuine cold loads.
 - Two throwaway inspection scripts were written to `nvccz/scripts/` and deleted afterwards.
 - No commits made in either repo. No migrations run. Nothing pushed or deployed.
+
+---
+
+## 9 Sep 2026 — cross-module sweep (Performance → Accounting), sidebar and typography
+
+Run because the Performance module writes into Accounting (timesheets), so Accounting was swept
+alongside it rather than in isolation. Method as before: `scripts/accounting-page-dump.mjs`
+(new, sibling of `perf-page-dump.mjs`) across all 27 accounting pages × 5 real roles = 135 dumps.
+
+**Sweep result:** 135/135 pages HTTP 200, zero mount failures, no `NaN` / `undefined` /
+`[object Object]` reaching any screen.
+
+### Fixed
+
+1. **Timesheets hero was fabricated and self-contradicting.** `spotlight('timesheets')` rendered
+   a hardcoded "84% billable utilisation / 12 submissions / 3 reviews", an invented 12-month
+   billable-conversion chart, and four invented project bars (MFI Review 91%, Growth Fund I 86%,
+   Workshop ERP 74%, Pension 69%) — directly above the page's own real KPI cards, which correctly
+   read "0 submitted timesheets / Billable utilisation 0%". Now derived from the same live arrays
+   `timesheets48()` already uses (`window.__ac52Timesheets` / `ac52LiveProjects()`). Verified both
+   ways: with no data it reads "— / no timesheet hours captured yet / 0 submissions"; after a real
+   employee submitted 8 billable hours it read "100% / 1 submission" against the real project name,
+   agreeing with the KPI card below it.
+
+2. **Sidebar could never collapse.** Two stale `v23`-generation rules pinned `--sidebar` to 282px
+   via selectors that matched permanently (`#app.v23-expanded` is always on; `#app:not(.collapsed)`
+   always matched because the live toggle flips `v25-expanded`, not `collapsed`). At `#id` +
+   `!important` they beat the newer v31 model (68px rail / 216px expanded), so both toggle states
+   rendered at 282px — the button changed its chevron and label but not the width, and the menu sat
+   wider than every other module (performance 242px, portfolio ~210–220px). Removed the dead
+   override, scoped the v23 presentation rules to the actually-expanded state, and added rail
+   styling keyed on `#app:not(.v25-expanded)` — necessary because every existing collapsed rule
+   keys on `.collapsed`, which `afterRenderV5()` and `sidebar23()` strip on every render. Rail
+   rules are scoped to >760px so the mobile off-canvas drawer keeps its labels. Verified at
+   1920/1600/1280/1100/900px: rail 68px, expanded 216px (206px ≤1100px), zero clipped nav items.
+
+### Cross-module flow verified end to end
+
+Employee logs 6h against a real project → `mine` 200 → submit → SUBMITTED → appears in the
+manager's team queue → employee correctly **403** on approving their own → manager approves →
+APPROVED, reflected back to the employee. All test data deleted afterwards.
+
+### Not a defect
+
+Per-page 403s for the Performance test users on `accounting/documents`, `consolidation/summary`,
+`fiscal-calendar`, `audit-logs` and `roles` are correct RBAC: those users were granted only
+`accounting.timesheets.*` (see `2026-09-08-performance-role-permissions`), not the other
+accounting domains.
+
+### Still fabricated (not fixed in this pass)
+
+`spotlight(page)` renders a hardcoded hero for **every** other accounting page too — payables 92%,
+receivables 42d DSO, expenses 96%, inventory 4.8×, assets 88%, and so on. Only the timesheets hero
+was corrected here because it is the Performance↔Accounting touchpoint and it contradicted real
+data on the same screen. The rest is a known, listed follow-up, not an oversight.
+

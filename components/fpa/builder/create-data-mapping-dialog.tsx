@@ -78,18 +78,18 @@ export function CreateDataMappingDialog({
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4">
       <div className="w-full max-w-md rounded-xl border border-[#e2e8f0] bg-white p-4 shadow-xl space-y-3">
         <div>
-          <h3 className="text-sm font-semibold text-[#0f172a]">
+          <h3 className="text-sm font-semibold text-[#000000]">
             {isEdit ? "Edit data mapping" : "Add data mapping"}
           </h3>
-          <p className="mt-0.5 text-[11px] text-[#64748b]">
+          <p className="mt-0.5 text-[11px] text-[#111111]">
             Link a source-system field to a model line item so imports and coverage stats work.
           </p>
         </div>
 
-        <label className="block text-xs text-[#64748b]">
+        <label className="block text-xs text-[#111111]">
           Source system
           <select
-            className="mt-1 w-full h-9 rounded-full border border-[#e2e8f0] px-3 text-sm text-[#0f172a]"
+            className="mt-1 w-full h-9 rounded-full border border-[#e2e8f0] px-3 text-sm text-[#000000]"
             value={sourceSystem}
             onChange={(e) => setSourceSystem(e.target.value)}
           >
@@ -101,20 +101,20 @@ export function CreateDataMappingDialog({
           </select>
         </label>
 
-        <label className="block text-xs text-[#64748b]">
+        <label className="block text-xs text-[#111111]">
           Source field
           <input
-            className="mt-1 w-full h-9 rounded-full border border-[#e2e8f0] px-3 text-sm font-mono text-[#0f172a]"
+            className="mt-1 w-full h-9 rounded-full border border-[#e2e8f0] px-3 text-sm font-mono text-[#000000]"
             placeholder="e.g. CSV.COL_REVENUE, XLS.Sheet1_B2, PROC.PO_AMOUNT, GL_ACCOUNT.4000"
             value={sourceField}
             onChange={(e) => setSourceField(e.target.value)}
           />
         </label>
 
-        <label className="block text-xs text-[#64748b]">
+        <label className="block text-xs text-[#111111]">
           Target line item
           <select
-            className="mt-1 w-full h-9 rounded-full border border-[#e2e8f0] px-3 text-sm text-[#0f172a]"
+            className="mt-1 w-full h-9 rounded-full border border-[#e2e8f0] px-3 text-sm text-[#000000]"
             value={targetLineItemId}
             onChange={(e) => setTargetLineItemId(e.target.value)}
             disabled={targets.length === 0}
@@ -132,10 +132,10 @@ export function CreateDataMappingDialog({
           </select>
         </label>
 
-        <label className="block text-xs text-[#64748b]">
+        <label className="block text-xs text-[#111111]">
           Status
           <select
-            className="mt-1 w-full h-9 rounded-full border border-[#e2e8f0] px-3 text-sm text-[#0f172a]"
+            className="mt-1 w-full h-9 rounded-full border border-[#e2e8f0] px-3 text-sm text-[#000000]"
             value={status}
             onChange={(e) => setStatus(e.target.value as CreateDataMappingInput["status"])}
           >
@@ -147,10 +147,10 @@ export function CreateDataMappingDialog({
           </select>
         </label>
 
-        <label className="block text-xs text-[#64748b]">
+        <label className="block text-xs text-[#111111]">
           Notes (optional)
           <input
-            className="mt-1 w-full h-9 rounded-full border border-[#e2e8f0] px-3 text-sm text-[#0f172a]"
+            className="mt-1 w-full h-9 rounded-full border border-[#e2e8f0] px-3 text-sm text-[#000000]"
             placeholder="Import rule, COA note…"
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
@@ -162,7 +162,7 @@ export function CreateDataMappingDialog({
         <div className="flex justify-end gap-2 pt-1">
           <button
             type="button"
-            className="h-9 rounded-full border border-[#e2e8f0] px-4 text-xs font-medium text-[#64748b]"
+            className="h-9 rounded-full border border-[#e2e8f0] px-4 text-xs font-medium text-[#111111]"
             onClick={onClose}
             disabled={busy}
           >

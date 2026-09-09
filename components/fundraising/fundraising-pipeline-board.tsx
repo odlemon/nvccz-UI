@@ -111,11 +111,11 @@ type OppRow = ReturnType<typeof mapOpportunityRow>
 function CardMetaRow({ label, value, strong }: { label: string; value: string; strong?: boolean }) {
   return (
     <div className="flex items-center justify-between gap-2 py-2">
-      <span className="text-[11px] text-[#94a3b8] shrink-0">{label}</span>
+      <span className="text-[11px] text-[#141414] shrink-0">{label}</span>
       <span
         className={cn(
           "text-[11px] text-right truncate",
-          strong ? "font-semibold text-[#0f172a]" : "font-medium text-[#334155]",
+          strong ? "font-semibold text-[#000000]" : "font-medium text-[#111111]",
         )}
       >
         {value}
@@ -133,17 +133,17 @@ function OpportunityCardContent({ row }: { row: OppRow }) {
       <div className="flex items-start gap-2.5 px-3 pt-3 pb-2.5">
         <TypeIcon className="w-[18px] h-[18px] text-[#3b82f6] shrink-0 mt-0.5" strokeWidth={1.75} />
         <div className="min-w-0 flex-1">
-          <p className="text-[13px] font-semibold text-[#0f172a] leading-snug">{row.investor}</p>
-          <p className="text-[11px] text-[#94a3b8] mt-0.5">{row.campaign}</p>
+          <p className="text-[13px] font-semibold text-[#000000] leading-snug">{row.investor}</p>
+          <p className="text-[11px] text-[#141414] mt-0.5">{row.campaign}</p>
         </div>
         <span
           className={cn(
-            "shrink-0 rounded-[4px] px-1.5 py-0.5 text-[9px] font-semibold",
+            "shrink-0 rounded-[4px] px-1.5 py-0.5 text-[11px] font-semibold",
             row.priority === "HIGH" || row.priority === "URGENT"
               ? "bg-[#fee2e2] text-[#dc2626]"
               : row.priority === "MEDIUM"
                 ? "bg-[#ffedd5] text-[#c2410c]"
-                : "bg-[#f1f5f9] text-[#64748b]",
+                : "bg-[#f1f5f9] text-[#111111]",
           )}
         >
           {row.priority}
@@ -154,17 +154,17 @@ function OpportunityCardContent({ row }: { row: OppRow }) {
         <CardMetaRow label="Indicative" value={row.indicative} strong />
         <CardMetaRow label="Soft circle" value={row.softCircle} />
         <div className="flex items-center justify-between gap-2 py-2">
-          <span className="text-[11px] text-[#94a3b8] shrink-0">Owner</span>
+          <span className="text-[11px] text-[#141414] shrink-0">Owner</span>
           <span className="inline-flex items-center gap-1.5 min-w-0">
             <span
               className={cn(
-                "w-5 h-5 rounded-full text-[8px] font-semibold flex items-center justify-center shrink-0",
+                "w-5 h-5 rounded-full text-[11px] font-semibold flex items-center justify-center shrink-0",
                 avatarTone(row.owner),
               )}
             >
               {ownerInitials}
             </span>
-            <span className="text-[11px] font-medium text-[#334155] truncate">{row.owner}</span>
+            <span className="text-[11px] font-medium text-[#111111] truncate">{row.owner}</span>
           </span>
         </div>
         <CardMetaRow label="Stage age" value={`${row.ageDays} days`} />
@@ -243,8 +243,8 @@ function StageRibbon({ label }: { label: string }) {
 function DetailRow({ label, value, children }: { label: string; value?: string; children?: ReactNode }) {
   return (
     <div className="flex items-center justify-between gap-3 px-4 py-2.5">
-      <span className="text-xs text-[#94a3b8] shrink-0">{label}</span>
-      {children ?? <span className="text-xs font-semibold text-[#0f172a] text-right">{value}</span>}
+      <span className="text-xs text-[#141414] shrink-0">{label}</span>
+      {children ?? <span className="text-xs font-semibold text-[#000000] text-right">{value}</span>}
     </div>
   )
 }
@@ -434,12 +434,12 @@ function DetailPanel({
             <div className="min-w-0 flex-1">
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
-                  <h2 className="text-sm font-semibold text-[#0f172a] leading-snug">{row.investor}</h2>
-                  <p className="text-xs text-[#94a3b8] mt-0.5">{row.campaign}</p>
+                  <h2 className="text-sm font-semibold text-[#000000] leading-snug">{row.investor}</h2>
+                  <p className="text-xs text-[#141414] mt-0.5">{row.campaign}</p>
                 </div>
                 <button
                   type="button"
-                  className="rounded-full p-1 text-[#94a3b8] hover:bg-[#f1f5f9] hover:text-[#475569] shrink-0"
+                  className="rounded-full p-1 text-[#141414] hover:bg-[#f1f5f9] hover:text-[#111111] shrink-0"
                   aria-label="More options"
                 >
                   <MoreHorizontal className="w-4 h-4" />
@@ -487,13 +487,13 @@ function DetailPanel({
             <span className="inline-flex items-center gap-1.5 min-w-0">
               <span
                 className={cn(
-                  "w-6 h-6 rounded-full text-[9px] font-semibold flex items-center justify-center shrink-0",
+                  "w-6 h-6 rounded-full text-[11px] font-semibold flex items-center justify-center shrink-0",
                   avatarTone(row.owner),
                 )}
               >
                 {row.owner !== "—" ? initialsFor(row.owner) : "—"}
               </span>
-              <span className="text-xs font-medium text-[#0f172a] truncate">{row.owner}</span>
+              <span className="text-xs font-medium text-[#000000] truncate">{row.owner}</span>
             </span>
           </DetailRow>
           <DetailRow label="Stage Age" value={`${row.ageDays} days`} />
@@ -505,18 +505,18 @@ function DetailPanel({
       <section className={cn(CARD, "overflow-hidden")}>
         <div className="flex items-center justify-between px-4 py-3 border-b border-[#f1f5f9]">
           <div className="flex items-center gap-2">
-            <h3 className="text-xs font-semibold text-[#0f172a]">Open Tasks</h3>
-            <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-[#f1f5f9] px-1.5 text-[10px] font-semibold text-[#64748b] tabular-nums">
+            <h3 className="text-xs font-semibold text-[#000000]">Open Tasks</h3>
+            <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-[#f1f5f9] px-1.5 text-[11px] font-semibold text-[#111111] tabular-nums">
               {tasks.length}
             </span>
           </div>
         </div>
         {loadingExtra ? (
-          <div className="flex items-center gap-2 px-4 py-4 text-[11px] text-[#94a3b8]">
+          <div className="flex items-center gap-2 px-4 py-4 text-[11px] text-[#141414]">
             <Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading…
           </div>
         ) : tasks.length === 0 ? (
-          <p className="px-4 py-4 text-[11px] text-[#94a3b8]">No open tasks for this opportunity.</p>
+          <p className="px-4 py-4 text-[11px] text-[#141414]">No open tasks for this opportunity.</p>
         ) : (
         <ul className="divide-y divide-[#f1f5f9]">
             {tasks.map((t) => (
@@ -525,10 +525,10 @@ function DetailPanel({
                   <Check className="w-4 h-4" strokeWidth={1.75} />
               </span>
               <div className="min-w-0 flex-1">
-                  <p className="text-xs font-medium text-[#0f172a] leading-snug">{t.title}</p>
-                  <p className="text-[11px] text-[#94a3b8] mt-0.5">{t.dueDate ? new Date(t.dueDate).toLocaleDateString() : "No due date"}</p>
+                  <p className="text-xs font-medium text-[#000000] leading-snug">{t.title}</p>
+                  <p className="text-[11px] text-[#141414] mt-0.5">{t.dueDate ? new Date(t.dueDate).toLocaleDateString() : "No due date"}</p>
               </div>
-              <span className="shrink-0 rounded-md bg-[#dcfce7] text-[#15803d] px-2 py-0.5 text-[10px] font-medium mt-0.5">
+              <span className="shrink-0 rounded-md bg-[#dcfce7] text-[#15803d] px-2 py-0.5 text-[11px] font-medium mt-0.5">
                   {t.status || "OPEN"}
               </span>
             </li>
@@ -538,21 +538,21 @@ function DetailPanel({
       </section>
 
       <section className={cn(CARD, "px-4 py-4")}>
-        <h3 className="text-xs font-semibold text-[#0f172a] mb-3">Recent Activity</h3>
+        <h3 className="text-xs font-semibold text-[#000000] mb-3">Recent Activity</h3>
         {timeline.length === 0 ? (
-          <p className="text-xs text-[#94a3b8]">No timeline events yet.</p>
+          <p className="text-xs text-[#141414]">No timeline events yet.</p>
         ) : (
         <ul className="space-y-3">
             {timeline.slice(0, 8).map((item, i) => (
               <li key={i} className="flex items-start gap-2.5">
-                <span className="w-7 h-7 rounded-full bg-[#f1f5f9] text-[#64748b] flex items-center justify-center shrink-0">
+                <span className="w-7 h-7 rounded-full bg-[#f1f5f9] text-[#111111] flex items-center justify-center shrink-0">
                   <FileText className="w-3.5 h-3.5" strokeWidth={2} />
                 </span>
               <div className="min-w-0 flex-1 pt-0.5">
-                  <p className="text-xs font-medium text-[#0f172a] leading-snug">
+                  <p className="text-xs font-medium text-[#000000] leading-snug">
                     {item.type === "stage" ? `Moved to ${item.toStageCode}` : `${item.amountType} updated → ${item.newValue}`}
                 </p>
-                  <p className="mt-1 text-[10px] text-[#94a3b8]">{item.at ? new Date(item.at).toLocaleString() : ""}</p>
+                  <p className="mt-1 text-[11px] text-[#141414]">{item.at ? new Date(item.at).toLocaleString() : ""}</p>
               </div>
             </li>
           ))}
@@ -709,14 +709,14 @@ export function FundraisingPipelineBoard({
           </Select>
         ) : null}
         {loading ? (
-          <span className="inline-flex items-center gap-1.5 text-xs text-[#94a3b8]">
+          <span className="inline-flex items-center gap-1.5 text-xs text-[#141414]">
             <Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading board…
           </span>
         ) : null}
       </div>
 
       {!loading && !board ? (
-        <div className="rounded-[12px] border border-[#e2e8f0] bg-white p-10 text-center text-[13px] text-[#94a3b8]">
+        <div className="rounded-[12px] border border-[#e2e8f0] bg-white p-10 text-center text-[13px] text-[#141414]">
           {campaigns.length === 0 ? "No campaigns yet — create one to start a pipeline." : "Select a campaign to view its board."}
         </div>
       ) : (
@@ -733,8 +733,8 @@ export function FundraisingPipelineBoard({
                   <kpi.icon className="w-7 h-7" strokeWidth={1.75} />
               </span>
               <div className="min-w-0 flex-1">
-                <p className="text-[11px] font-medium text-[#64748b] leading-tight truncate">{kpi.label}</p>
-                <p className="mt-0.5 text-xl font-semibold text-[#0f172a] tabular-nums tracking-tight leading-none">
+                <p className="text-[11px] font-medium text-[#111111] leading-tight truncate">{kpi.label}</p>
+                <p className="mt-0.5 text-xl font-semibold text-[#000000] tabular-nums tracking-tight leading-none">
                   {kpi.value}
                 </p>
                 </div>
@@ -763,10 +763,10 @@ export function FundraisingPipelineBoard({
                             className="w-2 h-2 rounded-full shrink-0"
                             style={{ backgroundColor: STAGE_DOT_COLORS[colIdx % STAGE_DOT_COLORS.length] }}
                           />
-                          <h3 className="text-sm font-semibold text-[#0f172a] truncate flex-1">
+                          <h3 className="text-sm font-semibold text-[#000000] truncate flex-1">
                             {col.stage.stageName || col.stage.stageCode}
                           </h3>
-                    <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full border border-[#e2e8f0] bg-white px-1.5 text-[11px] font-medium text-[#64748b] tabular-nums">
+                    <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full border border-[#e2e8f0] bg-white px-1.5 text-[11px] font-medium text-[#111111] tabular-nums">
                             {rows.length}
                     </span>
                   </div>
@@ -786,7 +786,7 @@ export function FundraisingPipelineBoard({
                     <button
                       type="button"
                             onClick={() => setCreateOpen(true)}
-                      className="w-full h-9 rounded-full text-xs font-medium text-[#64748b] hover:bg-white hover:text-[#334155] border border-transparent hover:border-[#e2e8f0] transition-colors inline-flex items-center justify-center gap-1"
+                      className="w-full h-9 rounded-full text-xs font-medium text-[#111111] hover:bg-white hover:text-[#111111] border border-transparent hover:border-[#e2e8f0] transition-colors inline-flex items-center justify-center gap-1"
                     >
                       <Plus className="w-3.5 h-3.5" />
                       Add Opportunity

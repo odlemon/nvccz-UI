@@ -95,10 +95,10 @@ function FilterSelect({
         className="h-10 min-w-[118px] inline-flex items-center rounded-full border border-[#d0d5dd] bg-white pl-3 pr-8 text-left hover:bg-[#f9fafb] disabled:cursor-not-allowed disabled:opacity-60"
       >
         <span className="flex flex-col justify-center min-w-0 py-1">
-          <span className="text-[9px] font-medium uppercase tracking-wide text-[#98a2b3] leading-none">{label}</span>
-          <span className="text-[12px] font-semibold text-[#101828] leading-tight mt-0.5 truncate">{value}</span>
+          <span className="text-[11px] font-medium uppercase tracking-wide text-[#141414] leading-none">{label}</span>
+          <span className="text-[12px] font-semibold text-[#000000] leading-tight mt-0.5 truncate">{value}</span>
         </span>
-        <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 size-4 text-[#98a2b3]" />
+        <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 size-4 text-[#141414]" />
       </button>
       {open ? (
         <div className={`absolute left-0 top-[calc(100%+4px)] z-40 min-w-[180px] ${R} border border-[#e4e7ec] bg-white py-1 shadow-lg`}>
@@ -109,7 +109,7 @@ function FilterSelect({
               onClick={() => { onChange(opt); setOpen(false) }}
               className={cn(
                 "w-full flex items-center justify-between gap-2 rounded-full px-3 py-2 text-left text-[12px] hover:bg-[#f9fafb]",
-                opt === value ? "text-[#1570ef] font-semibold" : "text-[#344054]",
+                opt === value ? "text-[#1570ef] font-semibold" : "text-[#111111]",
               )}
             >
               {opt}
@@ -358,8 +358,8 @@ export function FpaRollingForecast() {
         <div className="px-4 sm:px-5 pt-4 pb-3">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <h1 className="text-[18px] font-semibold text-[#101828]">Forecasts</h1>
-              <p className="text-[12px] text-[#667085] mt-0.5">
+              <h1 className="text-[18px] font-semibold text-[#000000]">Forecasts</h1>
+              <p className="text-[12px] text-[#111111] mt-0.5">
                 Rolling forecast · {closedCount} actual periods + {openCount} forecast periods
               </p>
             </div>
@@ -458,9 +458,9 @@ export function FpaRollingForecast() {
                 key={k.label}
                 className={`${R} border border-[#e4e7ec] bg-white px-4 py-3 text-left shadow-[0_1px_2px_rgba(16,24,40,0.03)]`}
               >
-                <p className="text-[11px] font-semibold text-[#667085] uppercase tracking-wider">{k.label}</p>
-                <p className="text-xl font-bold text-[#101828] mt-1 tabular-nums">{k.value}</p>
-                <p className="text-[11px] text-[#667085] mt-1">{k.delta}</p>
+                <p className="text-[11px] font-semibold text-[#111111] uppercase tracking-wider">{k.label}</p>
+                <p className="text-xl font-bold text-[#000000] mt-1 tabular-nums">{k.value}</p>
+                <p className="text-[11px] text-[#111111] mt-1">{k.delta}</p>
               </div>
             ))}
           </div>
@@ -472,8 +472,8 @@ export function FpaRollingForecast() {
           <section className={`${R} border border-[#e4e7ec] bg-white p-4`}>
             <div className="flex items-center justify-between mb-3">
               <div>
-                <h2 className="text-sm font-semibold text-[#101828]">Actual vs Forecast Trend</h2>
-                <p className="text-[11px] text-[#667085]">
+                <h2 className="text-sm font-semibold text-[#000000]">Actual vs Forecast Trend</h2>
+                <p className="text-[11px] text-[#111111]">
                   Revenue (millions) · actuals through {monthLabel(summary?.actualsCutoff)} · forecast starts {monthLabel(summary?.forecastStart)}
                 </p>
               </div>
@@ -515,7 +515,7 @@ export function FpaRollingForecast() {
                   </ComposedChart>
                 </ResponsiveContainer>
               ) : (
-                <div className="h-full flex items-center justify-center text-[12px] text-[#98a2b3]">
+                <div className="h-full flex items-center justify-center text-[12px] text-[#141414]">
                   {loading ? "Loading trend…" : "No trend periods available"}
                 </div>
               )}
@@ -524,8 +524,8 @@ export function FpaRollingForecast() {
 
           <section className={`${R} border border-[#e4e7ec] bg-white p-4`}>
             <div className="flex items-center justify-between mb-3">
-              <h2 className="text-sm font-semibold text-[#101828]">Method Comparison</h2>
-              <span className="text-[11px] text-[#667085]">Revenue ($M) by method</span>
+              <h2 className="text-sm font-semibold text-[#000000]">Method Comparison</h2>
+              <span className="text-[11px] text-[#111111]">Revenue ($M) by method</span>
             </div>
             <div className="h-[240px]">
               {initialLoading ? (
@@ -548,7 +548,7 @@ export function FpaRollingForecast() {
                   </ComposedChart>
                 </ResponsiveContainer>
               ) : (
-                <div className="h-full flex items-center justify-center text-[12px] text-[#98a2b3]">
+                <div className="h-full flex items-center justify-center text-[12px] text-[#141414]">
                   {loading ? "Loading methods…" : "No method comparison data available"}
                 </div>
               )}
@@ -559,8 +559,8 @@ export function FpaRollingForecast() {
         <section className={`${R} border border-[#e4e7ec] bg-white p-5 shadow-sm w-full`}>
           <div className="flex items-center justify-between flex-wrap gap-2 mb-4">
             <div>
-              <h2 className="text-[15px] font-semibold text-[#101828]">Rolling Horizon & Cut-off</h2>
-              <p className="text-[12px] text-[#667085] mt-0.5">
+              <h2 className="text-[15px] font-semibold text-[#000000]">Rolling Horizon & Cut-off</h2>
+              <p className="text-[12px] text-[#111111] mt-0.5">
                 Model: {model?.name || "—"} · Granularity: {model?.timeGranularity || "—"}
               </p>
             </div>
@@ -592,7 +592,7 @@ export function FpaRollingForecast() {
                 >
                   <span className="text-[12px] font-bold">{monthLabel(item.period, true)}</span>
                   <span className={cn(
-                    "text-[9px] uppercase tracking-wider font-bold px-1.5 py-0.5 rounded-full inline-flex items-center gap-0.5",
+                    "text-[11px] uppercase tracking-wider font-bold px-1.5 py-0.5 rounded-full inline-flex items-center gap-0.5",
                     isActual ? "bg-[#079455]/10 text-[#079455]" : "bg-[#1570ef]/10 text-[#1570ef]",
                   )}>
                     {isActual ? <Lock className="w-2.5 h-2.5" /> : null}
@@ -602,14 +602,14 @@ export function FpaRollingForecast() {
               )
             })}
             {!periods.length ? (
-              <p className="col-span-full py-4 text-center text-[12px] text-[#98a2b3]">
+              <p className="col-span-full py-4 text-center text-[12px] text-[#141414]">
                 {loading ? "Loading forecast periods…" : "No forecast periods available"}
               </p>
             ) : null}
           </div>
 
           <div className="space-y-2 border-t border-[#f2f4f7] pt-4">
-            <div className="flex items-center justify-between text-[12px] font-semibold text-[#344054]">
+            <div className="flex items-center justify-between text-[12px] font-semibold text-[#111111]">
               <span>Actuals cut-off month</span>
               <span className="text-[#2563eb]">{monthLabel(cutoffPeriod)}</span>
             </div>
@@ -635,7 +635,7 @@ export function FpaRollingForecast() {
                 </Button>
               </div>
             ) : null}
-            <p className="text-[11px] text-[#667085]">
+            <p className="text-[11px] text-[#111111]">
               Closed periods become actuals from Data Hub; open periods recalculate using the selected forecast method.
             </p>
           </div>
@@ -644,8 +644,8 @@ export function FpaRollingForecast() {
         <section className={`${R} border border-[#e4e7ec] bg-white p-4 w-full`}>
           <div className="flex items-center justify-between flex-wrap gap-2 mb-3">
             <div>
-              <h3 className="text-[14px] font-semibold text-[#101828]">Forecast Method</h3>
-              <p className="text-[11px] text-[#667085]">
+              <h3 className="text-[14px] font-semibold text-[#000000]">Forecast Method</h3>
+              <p className="text-[11px] text-[#111111]">
                 {method
                   ? `${method.confidence ? `${method.confidence} confidence · ` : ""}${method.label}`
                   : activeMethod || "No active method reported"}
@@ -669,7 +669,7 @@ export function FpaRollingForecast() {
                   "h-9 inline-flex items-center rounded-full border px-4 text-xs font-semibold transition-all shadow-sm gap-1 disabled:cursor-not-allowed disabled:opacity-60",
                   activeMethod.toLowerCase() === item.code.toLowerCase()
                     ? "border-[#2563eb] bg-[#eff8ff] text-[#175cd3]"
-                    : "border-[#d0d5dd] bg-white text-[#344054] hover:bg-[#f9fafb]",
+                    : "border-[#d0d5dd] bg-white text-[#111111] hover:bg-[#f9fafb]",
                   item.code.toLowerCase() === "ai" && "gap-1.5",
                 )}
               >
@@ -678,7 +678,7 @@ export function FpaRollingForecast() {
               </button>
             ))}
             {!summary?.methods?.length ? (
-              <p className="text-[12px] text-[#98a2b3]">
+              <p className="text-[12px] text-[#141414]">
                 {loading ? "Loading forecast methods…" : "No forecast methods available"}
               </p>
             ) : null}

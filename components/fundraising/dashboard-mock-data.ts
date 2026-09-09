@@ -579,7 +579,7 @@ export function stageChipClass(stage: string): string {
     return "bg-[#ffedd5] text-[#c2410c]"
   if (s.includes("data") || s.includes("propos") || s.includes("rfi") || s.includes("rfp"))
     return "bg-[#dbeafe] text-[#1d4ed8]"
-  return "bg-[#f1f5f9] text-[#475569]"
+  return "bg-[#f1f5f9] text-[#111111]"
 }
 
 export function taskStatusClass(status: DashTaskStatus): string {
@@ -594,7 +594,7 @@ export function taskStatusClass(status: DashTaskStatus): string {
     case "WAITING_ON_INTERNAL_TEAM":
       return "bg-[#ffedd5] text-[#c2410c]"
     default:
-      return "bg-[#f1f5f9] text-[#64748b]"
+      return "bg-[#f1f5f9] text-[#111111]"
   }
 }
 

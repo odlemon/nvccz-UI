@@ -177,7 +177,7 @@ function CommentItem({
     <article className={cn("flex gap-2.5", nested && "ml-8 mt-3")}>
       <span
         className={cn(
-          "h-8 w-8 shrink-0 rounded-full text-[10px] font-semibold inline-flex items-center justify-center",
+          "h-8 w-8 shrink-0 rounded-full text-[11px] font-semibold inline-flex items-center justify-center",
           comment.avatarTone,
         )}
       >
@@ -185,12 +185,12 @@ function CommentItem({
       </span>
       <div className="min-w-0 flex-1">
         <div className="flex items-baseline gap-2 flex-wrap">
-          <p className="text-[13px] font-semibold text-[#101828] truncate">
+          <p className="text-[13px] font-semibold text-[#000000] truncate">
             {comment.author}
           </p>
-          <span className="text-[11px] text-[#98a2b3] shrink-0">{comment.when}</span>
+          <span className="text-[11px] text-[#141414] shrink-0">{comment.when}</span>
         </div>
-        <p className="text-[13px] text-[#475467] mt-0.5 leading-relaxed">
+        <p className="text-[13px] text-[#111111] mt-0.5 leading-relaxed">
           {renderBodyWithMentions(comment.body)}
         </p>
         {onReply ? (
@@ -295,15 +295,15 @@ function TaskRow({
             <div className="min-w-0 flex-1">
               <p
                 className={cn(
-                  "text-[13px] font-medium text-[#101828] leading-snug",
-                  task.done && "line-through text-[#98a2b3]",
+                  "text-[13px] font-medium text-[#000000] leading-snug",
+                  task.done && "line-through text-[#141414]",
                 )}
               >
                 {task.title}
               </p>
-              <p className="text-[12px] text-[#667085] mt-0.5">{task.assignee}</p>
+              <p className="text-[12px] text-[#111111] mt-0.5">{task.assignee}</p>
               {task.kind === "owner_slice" ? (
-                <span className="inline-flex mt-1 rounded-full bg-[#eff6ff] px-2 py-0.5 text-[10px] font-medium text-[#1d4ed8]">
+                <span className="inline-flex mt-1 rounded-full bg-[#eff6ff] px-2 py-0.5 text-[11px] font-medium text-[#1d4ed8]">
                   Dept plan
                 </span>
               ) : null}
@@ -314,7 +314,7 @@ function TaskRow({
               ) : null}
               <ChevronDown
                 className={cn(
-                  "w-4 h-4 text-[#98a2b3] transition-transform",
+                  "w-4 h-4 text-[#141414] transition-transform",
                   expanded && "rotate-180",
                 )}
               />
@@ -326,47 +326,47 @@ function TaskRow({
       {expanded ? (
         <div className="ml-[30px] mt-2 rounded-xl border border-[#eaecf0] bg-[#f9fafb] px-3 py-2.5 space-y-2">
           <dl className="grid grid-cols-[88px_1fr] gap-x-2 gap-y-1.5 text-[12px]">
-            <dt className="text-[#98a2b3]">Status</dt>
-            <dd className="text-[#344054] font-medium capitalize">{statusLabel.toLowerCase()}</dd>
+            <dt className="text-[#141414]">Status</dt>
+            <dd className="text-[#111111] font-medium capitalize">{statusLabel.toLowerCase()}</dd>
             {task.priority ? (
               <>
-                <dt className="text-[#98a2b3]">Priority</dt>
-                <dd className="text-[#344054] font-medium capitalize">
+                <dt className="text-[#141414]">Priority</dt>
+                <dd className="text-[#111111] font-medium capitalize">
                   {String(task.priority).toLowerCase()}
                 </dd>
               </>
             ) : null}
             {task.departmentName || task.departmentId ? (
               <>
-                <dt className="text-[#98a2b3]">Department</dt>
-                <dd className="text-[#344054] font-medium">
+                <dt className="text-[#141414]">Department</dt>
+                <dd className="text-[#111111] font-medium">
                   {task.departmentName || task.departmentId}
                 </dd>
               </>
             ) : null}
-            <dt className="text-[#98a2b3]">Assignee</dt>
-            <dd className="text-[#344054] font-medium">{task.assignee || "Unassigned"}</dd>
+            <dt className="text-[#141414]">Assignee</dt>
+            <dd className="text-[#111111] font-medium">{task.assignee || "Unassigned"}</dd>
             {task.due || task.dueDate ? (
               <>
-                <dt className="text-[#98a2b3]">Due</dt>
-                <dd className="text-[#344054] font-medium">{task.due || task.dueDate}</dd>
+                <dt className="text-[#141414]">Due</dt>
+                <dd className="text-[#111111] font-medium">{task.due || task.dueDate}</dd>
               </>
             ) : null}
-            <dt className="text-[#98a2b3]">Type</dt>
-            <dd className="text-[#344054] font-medium">
+            <dt className="text-[#141414]">Type</dt>
+            <dd className="text-[#111111] font-medium">
               {task.kind === "owner_slice" ? "Department plan slice" : "Planning task"}
             </dd>
           </dl>
           {task.description ? (
             <div>
-              <p className="text-[11px] font-medium text-[#98a2b3] mb-0.5">Notes</p>
-              <p className="text-[12px] text-[#475467] leading-relaxed whitespace-pre-wrap">
+              <p className="text-[11px] font-medium text-[#141414] mb-0.5">Notes</p>
+              <p className="text-[12px] text-[#111111] leading-relaxed whitespace-pre-wrap">
                 {task.description}
               </p>
             </div>
           ) : null}
           {task.kind === "owner_slice" && !task.done ? (
-            <p className="text-[11px] text-[#667085]">
+            <p className="text-[11px] text-[#111111]">
               Complete this via <span className="font-medium">Submit my plan</span>, not the
               checkbox.
             </p>
@@ -419,7 +419,7 @@ function TaskRow({
                         type="button"
                         onClick={() => setReturning(false)}
                         disabled={busy}
-                        className="h-8 rounded-full border border-[#d0d5dd] bg-white px-3 text-[11px] font-medium text-[#344054] disabled:opacity-50"
+                        className="h-8 rounded-full border border-[#d0d5dd] bg-white px-3 text-[11px] font-medium text-[#111111] disabled:opacity-50"
                       >
                         Cancel
                       </button>
@@ -556,12 +556,12 @@ export function PlanningCollabSidebar({
                 "relative h-11 inline-flex items-center gap-1.5 text-[13px] font-medium border-b-2 -mb-px",
                 tab === t.id
                   ? "border-[#2563eb] text-[#2563eb]"
-                  : "border-transparent text-[#667085] hover:text-[#101828]",
+                  : "border-transparent text-[#111111] hover:text-[#000000]",
               )}
             >
               {t.label}
               {typeof t.badge === "number" && t.badge > 0 ? (
-                <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-[#f2f4f7] px-1.5 text-[11px] font-semibold text-[#667085]">
+                <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-[#f2f4f7] px-1.5 text-[11px] font-semibold text-[#111111]">
                   {t.badge}
                 </span>
               ) : null}
@@ -587,10 +587,10 @@ export function PlanningCollabSidebar({
                     }}
                     placeholder={commentPlaceholder}
                     disabled={disabledComment || postingComment || !onAddComment}
-                    className="h-10 w-full rounded-[10px] border border-[#d0d5dd] bg-white px-3.5 text-[13px] text-[#101828] placeholder:text-[#98a2b3] shadow-sm focus:outline-none focus:ring-2 focus:ring-[#2563eb]/20 focus:border-[#2563eb] disabled:opacity-50"
+                    className="h-10 w-full rounded-[10px] border border-[#d0d5dd] bg-white px-3.5 text-[13px] text-[#000000] placeholder:text-[#141414] shadow-sm focus:outline-none focus:ring-2 focus:ring-[#2563eb]/20 focus:border-[#2563eb] disabled:opacity-50"
                   />
                 </div>
-                <p className="-mt-2 mb-3 text-[11px] text-[#98a2b3]">
+                <p className="-mt-2 mb-3 text-[11px] text-[#141414]">
                   Replies, reactions, and attachments are unavailable.
                 </p>
 
@@ -605,7 +605,7 @@ export function PlanningCollabSidebar({
                     />
                   ))
                   ) : (
-                    <p className="py-8 text-center text-[13px] text-[#98a2b3]">No comments yet.</p>
+                    <p className="py-8 text-center text-[13px] text-[#141414]">No comments yet.</p>
                   )}
                 </div>
 
@@ -627,14 +627,14 @@ export function PlanningCollabSidebar({
                 <button
                   type="button"
                   onClick={() => setAssignOpen(true)}
-                  className="mb-2 inline-flex h-8 items-center justify-center gap-1.5 rounded-full border border-[#d0d5dd] bg-white px-3 text-[12px] font-medium text-[#344054] hover:bg-[#f9fafb]"
+                  className="mb-2 inline-flex h-8 items-center justify-center gap-1.5 rounded-full border border-[#d0d5dd] bg-white px-3 text-[12px] font-medium text-[#111111] hover:bg-[#f9fafb]"
                 >
                   <Plus className="w-3.5 h-3.5" />
                   Assign task
                 </button>
               ) : null}
               {displayTasks.length === 0 ? (
-                <p className="text-[12px] text-[#98a2b3] py-4 text-center">
+                <p className="text-[12px] text-[#141414] py-4 text-center">
                   No tasks yet. Assign one to chase department input.
                 </p>
               ) : (
@@ -665,7 +665,7 @@ export function PlanningCollabSidebar({
           {tab === "approvals" && (
             !approvalRows.length ? (
               <div className="py-8 px-2 text-center space-y-3">
-                <p className="text-[13px] text-[#98a2b3]">
+                <p className="text-[13px] text-[#141414]">
                   No approval events for this cycle yet.
                 </p>
               </div>
@@ -677,22 +677,22 @@ export function PlanningCollabSidebar({
                     className="rounded-lg border border-[#eaecf0] px-3 py-2.5"
                   >
                     <div className="flex items-start justify-between gap-2">
-                      <p className="text-[13px] text-[#475467] leading-relaxed">{a.text}</p>
+                      <p className="text-[13px] text-[#111111] leading-relaxed">{a.text}</p>
                       {a.status ? (
                         <span
                           className={cn(
-                            "shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold capitalize",
+                            "shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold capitalize",
                             a.status === "approved" && "bg-[#dcfce7] text-[#15803d]",
                             a.status === "returned" && "bg-[#fef2f2] text-[#dc2626]",
                             a.status === "submitted" && "bg-[#dbeafe] text-[#1d4ed8]",
-                            a.status === "pending" && "bg-[#f1f5f9] text-[#64748b]",
+                            a.status === "pending" && "bg-[#f1f5f9] text-[#111111]",
                           )}
                         >
                           {a.status}
                         </span>
                       ) : null}
                     </div>
-                    <p className="text-[11px] text-[#98a2b3] mt-1">{a.when}</p>
+                    <p className="text-[11px] text-[#141414] mt-1">{a.when}</p>
                   </li>
                 ))}
               </ul>
@@ -701,15 +701,15 @@ export function PlanningCollabSidebar({
 
           {tab === "activity" && (
             !activityRows.length ? (
-              <p className="text-[13px] text-[#98a2b3] text-center py-8">No recent activity.</p>
+              <p className="text-[13px] text-[#141414] text-center py-8">No recent activity.</p>
             ) : (
               <ul className="space-y-3">
                 {activityRows.map((a) => (
                   <li key={a.id} className="flex gap-3 text-[13px]">
-                    <span className="text-[11px] text-[#98a2b3] w-[4.5rem] shrink-0 pt-0.5">
+                    <span className="text-[11px] text-[#141414] w-[4.5rem] shrink-0 pt-0.5">
                       {a.when}
                     </span>
-                    <span className="text-[#475467] leading-relaxed">{a.text}</span>
+                    <span className="text-[#111111] leading-relaxed">{a.text}</span>
                   </li>
                 ))}
               </ul>
@@ -721,13 +721,13 @@ export function PlanningCollabSidebar({
       <Dialog open={allCommentsOpen} onOpenChange={setAllCommentsOpen}>
         <DialogContent className="sm:max-w-lg max-h-[85vh] flex flex-col gap-0 p-0 overflow-hidden rounded-xl">
           <DialogHeader className="px-5 py-4 border-b border-[#eaecf0] shrink-0">
-            <DialogTitle className="text-[16px] font-semibold text-[#101828]">
+            <DialogTitle className="text-[16px] font-semibold text-[#000000]">
               All comments
             </DialogTitle>
           </DialogHeader>
           <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
             {!localComments.length ? (
-              <p className="text-[13px] text-[#98a2b3] text-center py-10">No comments yet.</p>
+              <p className="text-[13px] text-[#141414] text-center py-10">No comments yet.</p>
             ) : (
               localComments.map((c) => (
                 <CommentItem
@@ -753,10 +753,10 @@ export function PlanningCollabSidebar({
                 }}
                 placeholder={commentPlaceholder}
                 disabled={disabledComment || postingComment || !onAddComment}
-                className="h-10 w-full rounded-lg border border-[#d0d5dd] bg-white px-3 text-[13px] text-[#101828] placeholder:text-[#98a2b3] focus:outline-none focus:ring-2 focus:ring-[#2563eb]/20 disabled:opacity-50"
+                className="h-10 w-full rounded-lg border border-[#d0d5dd] bg-white px-3 text-[13px] text-[#000000] placeholder:text-[#141414] focus:outline-none focus:ring-2 focus:ring-[#2563eb]/20 disabled:opacity-50"
               />
             </div>
-            <p className="mt-2 text-[11px] text-[#98a2b3]">
+            <p className="mt-2 text-[11px] text-[#141414]">
               Replies, reactions, and attachments are unavailable.
             </p>
           </div>
@@ -766,7 +766,7 @@ export function PlanningCollabSidebar({
       <Dialog open={allTasksOpen} onOpenChange={setAllTasksOpen}>
         <DialogContent className="sm:max-w-md max-h-[85vh] flex flex-col gap-0 p-0 overflow-hidden rounded-xl">
           <DialogHeader className="px-5 py-4 border-b border-[#eaecf0] shrink-0">
-            <DialogTitle className="text-[16px] font-semibold text-[#101828]">
+            <DialogTitle className="text-[16px] font-semibold text-[#000000]">
               All tasks
             </DialogTitle>
           </DialogHeader>
@@ -868,13 +868,13 @@ export function PlanningTasksCard({
         )}
       >
         <div className="flex items-center justify-between px-4 py-3 border-b border-[#eaecf0] gap-2">
-          <h3 className="text-[14px] font-semibold text-[#101828]">Tasks</h3>
+          <h3 className="text-[14px] font-semibold text-[#000000]">Tasks</h3>
           <div className="flex items-center gap-2">
             {canAssignTasks && onAssignTask ? (
               <button
                 type="button"
                 onClick={() => setAssignOpen(true)}
-                className="inline-flex h-8 items-center justify-center gap-1.5 rounded-full border border-[#d0d5dd] bg-white px-3 text-[12px] font-medium text-[#344054] hover:bg-[#f9fafb]"
+                className="inline-flex h-8 items-center justify-center gap-1.5 rounded-full border border-[#d0d5dd] bg-white px-3 text-[12px] font-medium text-[#111111] hover:bg-[#f9fafb]"
               >
                 <Plus className="w-3.5 h-3.5" />
                 Assign
@@ -901,7 +901,7 @@ export function PlanningTasksCard({
               ))}
             </ul>
           ) : (
-            <p className="py-6 text-center text-[12px] text-[#98a2b3]">No tasks yet.</p>
+            <p className="py-6 text-center text-[12px] text-[#141414]">No tasks yet.</p>
           )}
         </div>
       </section>
@@ -909,7 +909,7 @@ export function PlanningTasksCard({
       <Dialog open={allOpen} onOpenChange={setAllOpen}>
         <DialogContent className="sm:max-w-md max-h-[85vh] flex flex-col gap-0 p-0 overflow-hidden rounded-xl">
           <DialogHeader className="px-5 py-4 border-b border-[#eaecf0] flex-row items-center justify-between space-y-0 shrink-0">
-            <DialogTitle className="text-[16px] font-semibold text-[#101828]">
+            <DialogTitle className="text-[16px] font-semibold text-[#000000]">
               All tasks
             </DialogTitle>
           </DialogHeader>

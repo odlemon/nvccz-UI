@@ -51,7 +51,7 @@ function DeltaLine({
         "text-[11px] mt-1.5 font-medium leading-none",
         bad && "text-[#dc2626]",
         good && "text-[#16a34a]",
-        !bad && !good && "text-[#94a3b8]",
+        !bad && !good && "text-[#141414]",
       )}
     >
       {up ? "↑" : down ? "↓" : "·"} {Math.abs(delta)} vs last week
@@ -78,9 +78,9 @@ export function WorkflowReviewQueueCard({
   return (
     <section className="rounded-xl border border-[#e2e8f0] bg-white p-5 h-full flex flex-col min-w-0 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
       <div className="flex items-center gap-1.5 mb-6">
-        <h2 className="text-[13px] font-semibold text-[#0f172a]">Review Queue</h2>
+        <h2 className="text-[13px] font-semibold text-[#000000]">Review Queue</h2>
         <span
-          className="inline-flex h-[15px] w-[15px] items-center justify-center rounded-full border border-[#cbd5e1] text-[#94a3b8]"
+          className="inline-flex h-[15px] w-[15px] items-center justify-center rounded-full border border-[#cbd5e1] text-[#141414]"
           title="Tasks awaiting review or returned for correction"
         >
           <Info className="w-2.5 h-2.5" />
@@ -89,29 +89,29 @@ export function WorkflowReviewQueueCard({
 
       {empty ? (
         <div className="flex-1 flex flex-col justify-center py-2">
-          <p className="text-[28px] font-bold text-[#cbd5e1] tabular-nums leading-none">0</p>
-          <p className="text-[12px] text-[#64748b] mt-3 leading-relaxed">
+          <p className="text-[28px] font-bold text-[#141414] tabular-nums leading-none">0</p>
+          <p className="text-[12px] text-[#111111] mt-3 leading-relaxed">
             No items in the review queue yet.
           </p>
-          <p className="text-[11px] text-[#94a3b8] mt-1">
+          <p className="text-[11px] text-[#141414] mt-1">
             Pending and returned counts will appear when owners submit.
           </p>
         </div>
       ) : (
         <div className="flex-1 flex items-start pt-1">
           <div className="flex-1 min-w-0">
-            <p className="text-[36px] font-bold text-[#0f172a] tabular-nums tracking-tight leading-none">
+            <p className="text-[36px] font-bold text-[#000000] tabular-nums tracking-tight leading-none">
               {pending}
             </p>
-            <p className="text-[12px] text-[#64748b] mt-2.5 leading-none">Pending Approvals</p>
+            <p className="text-[12px] text-[#111111] mt-2.5 leading-none">Pending Approvals</p>
             <DeltaLine delta={pendingDelta} positiveIsBad />
           </div>
           <div className="w-px self-stretch bg-[#e2e8f0] mx-4 min-h-[72px]" />
           <div className="flex-1 min-w-0">
-            <p className="text-[36px] font-bold text-[#0f172a] tabular-nums tracking-tight leading-none">
+            <p className="text-[36px] font-bold text-[#000000] tabular-nums tracking-tight leading-none">
               {returned}
             </p>
-            <p className="text-[12px] text-[#64748b] mt-2.5 leading-none">Returned Items</p>
+            <p className="text-[12px] text-[#111111] mt-2.5 leading-none">Returned Items</p>
             <DeltaLine delta={returnedDelta} positiveIsBad={false} />
           </div>
         </div>
@@ -148,22 +148,22 @@ function ApprovalRow({
     <li className="flex items-center gap-2.5 min-w-0">
       <div
         className={cn(
-          "h-8 w-8 rounded-full text-[10px] font-semibold flex items-center justify-center shrink-0",
+          "h-8 w-8 rounded-full text-[11px] font-semibold flex items-center justify-center shrink-0",
           avatarClass(row.name, index),
         )}
       >
         {initials(row.name)}
       </div>
       <div className={cn("min-w-0", compact ? "w-[34%]" : "w-[28%] sm:w-[30%]")}>
-        <p className="text-[12px] font-semibold text-[#0f172a] truncate leading-tight">
+        <p className="text-[12px] font-semibold text-[#000000] truncate leading-tight">
           {row.name}
         </p>
-        <p className="text-[10px] text-[#94a3b8] truncate leading-tight mt-0.5">{row.role}</p>
+        <p className="text-[11px] text-[#141414] truncate leading-tight mt-0.5">{row.role}</p>
       </div>
       <p
         className={cn(
-          "text-[10px] text-[#64748b] tabular-nums flex-1 text-left sm:text-center truncate px-1",
-          !row.at && "italic text-[#94a3b8]",
+          "text-[11px] text-[#111111] tabular-nums flex-1 text-left sm:text-center truncate px-1",
+          !row.at && "italic text-[#141414]",
         )}
         title={row.at ? formatDateTime(row.at) : "Date not available"}
       >
@@ -193,9 +193,9 @@ export function WorkflowRecentApprovalsCard({
     <section className="rounded-xl border border-[#e2e8f0] bg-white p-5 h-full flex flex-col min-w-0 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
       <div className="flex items-center justify-between gap-2 mb-4">
         <div className="flex items-center gap-1.5 min-w-0">
-          <h2 className="text-[13px] font-semibold text-[#0f172a]">Recent Approvals</h2>
+          <h2 className="text-[13px] font-semibold text-[#000000]">Recent Approvals</h2>
           <span
-            className="inline-flex h-[15px] w-[15px] items-center justify-center rounded-full border border-[#cbd5e1] text-[#94a3b8]"
+            className="inline-flex h-[15px] w-[15px] items-center justify-center rounded-full border border-[#cbd5e1] text-[#141414]"
             title="Latest approvals on this cycle"
           >
             <Info className="w-2.5 h-2.5" />
@@ -212,8 +212,8 @@ export function WorkflowRecentApprovalsCard({
 
       {rows.length === 0 ? (
         <div className="flex-1 flex flex-col justify-center py-4">
-          <p className="text-[13px] font-medium text-[#475569]">No recent approvals</p>
-          <p className="text-[11px] text-[#94a3b8] mt-1 leading-relaxed">
+          <p className="text-[13px] font-medium text-[#111111]">No recent approvals</p>
+          <p className="text-[11px] text-[#141414] mt-1 leading-relaxed">
             Approvals will show here after FP&A or CFO actions on this cycle.
           </p>
         </div>

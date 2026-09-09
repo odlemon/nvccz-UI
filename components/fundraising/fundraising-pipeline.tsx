@@ -181,12 +181,12 @@ function MeetingRow({ item, dense = false }: { item: UpcomingItem; dense?: boole
         <Icon className="w-4 h-4" />
       </div>
       <div className="min-w-0 flex-1">
-        <p className="text-[13px] font-semibold text-[#0f172a] truncate leading-snug">{item.title}</p>
-        <p className="text-xs text-[#94a3b8] truncate mt-0.5">{item.subtitle}</p>
+        <p className="text-[13px] font-semibold text-[#000000] truncate leading-snug">{item.title}</p>
+        <p className="text-xs text-[#141414] truncate mt-0.5">{item.subtitle}</p>
       </div>
       <div className="text-right shrink-0 pl-2">
-        <p className="text-xs text-[#94a3b8] leading-tight">{item.date}</p>
-        <p className="text-xs font-medium text-[#475569] mt-0.5 leading-tight">{item.time}</p>
+        <p className="text-xs text-[#141414] leading-tight">{item.date}</p>
+        <p className="text-xs font-medium text-[#111111] mt-0.5 leading-tight">{item.time}</p>
       </div>
     </div>
   )
@@ -216,7 +216,7 @@ function ActivityRow({
         )}
       />
       <div className="min-w-0 flex-1">
-        <p className="text-[13px] text-[#0f172a] leading-snug">
+        <p className="text-[13px] text-[#000000] leading-snug">
           {item.parts.map((part, i) =>
             part.bold ? (
               <span key={i} className="font-semibold">
@@ -227,12 +227,12 @@ function ActivityRow({
             ),
           )}
         </p>
-        <div className="mt-1.5 flex items-baseline justify-between gap-3 text-[11px] text-[#94a3b8]">
+        <div className="mt-1.5 flex items-baseline justify-between gap-3 text-[11px] text-[#141414]">
           <span className="truncate">{item.actor}</span>
           <span className="shrink-0 tabular-nums whitespace-nowrap">{item.when}</span>
         </div>
         {showDetail && item.detail && (
-          <p className="mt-1.5 text-[11px] text-[#64748b] leading-relaxed">{item.detail}</p>
+          <p className="mt-1.5 text-[11px] text-[#111111] leading-relaxed">{item.detail}</p>
         )}
       </div>
     </div>
@@ -247,7 +247,7 @@ function ActivityTimeline({
   showDetail?: boolean
 }) {
   if (items.length === 0) {
-    return <p className="text-sm text-[#94a3b8] py-6 text-center">No recent activity.</p>
+    return <p className="text-sm text-[#141414] py-6 text-center">No recent activity.</p>
   }
 
   return (
@@ -652,7 +652,7 @@ export function FundraisingPipeline() {
       {/* Header */}
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
         <div className="space-y-3 min-w-0">
-          <h1 className="text-2xl sm:text-[28px] font-semibold tracking-tight text-[#0f172a]">
+          <h1 className="text-2xl sm:text-[28px] font-semibold tracking-tight text-[#000000]">
             {viewMode === "board" ? "Pipeline Board" : "Fundraising Pipeline"}
           </h1>
           <div className="flex flex-wrap items-center gap-2" role="tablist" aria-label="Fund type filter">
@@ -667,7 +667,7 @@ export function FundraisingPipeline() {
                   "h-8 rounded-full px-3.5 text-xs font-medium transition-colors",
                   filter === f.id
                     ? "bg-gradient-to-r from-blue-600 to-cyan-600 text-white shadow-sm"
-                    : "bg-[#f1f5f9] text-[#64748b] hover:bg-[#e2e8f0]",
+                    : "bg-[#f1f5f9] text-[#111111] hover:bg-[#e2e8f0]",
                 )}
               >
                 {f.label}
@@ -697,7 +697,7 @@ export function FundraisingPipeline() {
               Add Opportunity
             </Button>
             <div className="relative flex-1 sm:flex-none min-w-[148px]">
-              <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#64748b]">
+              <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#111111]">
                 {viewMode === "board" ? (
                   <Columns3 className="w-4 h-4" />
                 ) : (
@@ -705,7 +705,7 @@ export function FundraisingPipeline() {
                 )}
               </span>
               <select
-                className="h-10 w-full appearance-none rounded-full border border-[#e2e8f0] bg-white pl-9 pr-8 text-sm font-medium text-[#334155] outline-none shadow-sm"
+                className="h-10 w-full appearance-none rounded-full border border-[#e2e8f0] bg-white pl-9 pr-8 text-sm font-medium text-[#111111] outline-none shadow-sm"
                 value={viewMode}
                 onChange={(e) => setViewMode(e.target.value as PipelineViewMode)}
                 aria-label="Pipeline view"
@@ -722,7 +722,7 @@ export function FundraisingPipeline() {
             </div>
           </div>
           {viewMode === "overview" && (
-            <p className="text-xs text-[#94a3b8] flex items-center gap-1.5 sm:justify-end">
+            <p className="text-xs text-[#141414] flex items-center gap-1.5 sm:justify-end">
               <CalendarDays className="w-3.5 h-3.5" />
               {loadedAt ? `Loaded ${loadedAt.toLocaleString()}` : "Loading live data…"}
             </p>
@@ -748,11 +748,11 @@ export function FundraisingPipeline() {
                   <Icon className="w-4 h-4" />
                 </div>
               </div>
-              <p className="mt-2.5 text-[11px] font-medium text-[#94a3b8]">{kpi.label}</p>
-              <p className="mt-0.5 text-lg sm:text-xl font-semibold tracking-tight text-[#0f172a] tabular-nums">
+              <p className="mt-2.5 text-[11px] font-medium text-[#141414]">{kpi.label}</p>
+              <p className="mt-0.5 text-lg sm:text-xl font-semibold tracking-tight text-[#000000] tabular-nums">
                 {kpi.value}
               </p>
-              <p className="mt-0.5 text-[11px] text-[#64748b]">{kpi.meta}</p>
+              <p className="mt-0.5 text-[11px] text-[#111111]">{kpi.meta}</p>
               <div className="mt-2.5 h-1.5 rounded-full bg-[#f1f5f9] overflow-hidden">
                 <div className="h-full rounded-full transition-all" style={{ width: `${kpi.pct}%`, backgroundColor: kpi.bar }} />
               </div>
@@ -765,26 +765,26 @@ export function FundraisingPipeline() {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
         <section className={cn(CARD, "lg:col-span-5 xl:col-span-3 p-4")}>
           <div className="flex items-center justify-between mb-3">
-            <h2 className="text-sm font-semibold text-[#0f172a]">Pipeline by Stage</h2>
-            <button type="button" className="rounded-full p-1 text-[#cbd5e1]" aria-label="More">
+            <h2 className="text-sm font-semibold text-[#000000]">Pipeline by Stage</h2>
+            <button type="button" className="rounded-full p-1 text-[#141414]" aria-label="More">
               <MoreHorizontal className="w-4 h-4" />
             </button>
           </div>
           {stages.length > 0 ? (
           <PipelineFunnel stages={stages} />
           ) : (
-            <p className="py-12 text-center text-sm text-[#94a3b8]">No pipeline stage data.</p>
+            <p className="py-12 text-center text-sm text-[#141414]">No pipeline stage data.</p>
           )}
           <div className="mt-3 pt-3 border-t border-[#f1f5f9] flex items-center justify-between text-xs">
-            <span className="text-[#94a3b8]">Total Pipeline</span>
-            <span className="font-semibold text-[#0f172a] tabular-nums">{totalPipeline}</span>
+            <span className="text-[#141414]">Total Pipeline</span>
+            <span className="font-semibold text-[#000000] tabular-nums">{totalPipeline}</span>
           </div>
         </section>
 
         <section className={cn(CARD, "lg:col-span-7 xl:col-span-6 p-4 sm:p-5")}>
           <div className="flex items-center justify-between gap-2 mb-3">
             <div className="flex items-center gap-1.5 min-w-0">
-              <h2 className="text-sm font-semibold text-[#0f172a]">Capital Raised Over Time</h2>
+              <h2 className="text-sm font-semibold text-[#000000]">Capital Raised Over Time</h2>
               <span
                 className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-[#93c5fd] text-white shrink-0"
                 title="Cumulative committed and funded capital versus fundraising target"
@@ -793,7 +793,7 @@ export function FundraisingPipeline() {
               </span>
             </div>
             <select
-              className="h-8 shrink-0 rounded-full border border-[#e2e8f0] bg-white pl-3 pr-7 text-xs text-[#475569] outline-none shadow-sm appearance-none bg-[length:12px] bg-[right_0.55rem_center] bg-no-repeat"
+              className="h-8 shrink-0 rounded-full border border-[#e2e8f0] bg-white pl-3 pr-7 text-xs text-[#111111] outline-none shadow-sm appearance-none bg-[length:12px] bg-[right_0.55rem_center] bg-no-repeat"
               style={{
                 backgroundImage:
                   "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E\")",
@@ -807,7 +807,7 @@ export function FundraisingPipeline() {
             </select>
           </div>
 
-          <div className="flex flex-wrap items-center justify-center gap-5 pb-2 text-[11px] text-[#64748b]">
+          <div className="flex flex-wrap items-center justify-center gap-5 pb-2 text-[11px] text-[#111111]">
             <span className="inline-flex items-center gap-2">
               <span className="relative w-7 h-px bg-[#3b82f6]">
                 <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full bg-[#3b82f6]" />
@@ -828,7 +828,7 @@ export function FundraisingPipeline() {
 
           <div className="h-[240px] sm:h-[300px] mt-1">
             {capitalSeries.length === 0 ? (
-              <div className="flex h-full items-center justify-center text-center text-sm text-[#94a3b8]">
+              <div className="flex h-full items-center justify-center text-center text-sm text-[#141414]">
                 No dated commitment or funding series is available.
               </div>
             ) : (
@@ -963,7 +963,7 @@ export function FundraisingPipeline() {
 
         <section className={cn(CARD, "lg:col-span-12 xl:col-span-3 p-4")}>
           <div className="flex items-center justify-between mb-1">
-            <h2 className="text-sm font-semibold text-[#0f172a]">Upcoming Meetings & Tasks</h2>
+            <h2 className="text-sm font-semibold text-[#000000]">Upcoming Meetings & Tasks</h2>
             <button
               type="button"
               onClick={() => setMeetingsOpen(true)}
@@ -974,7 +974,7 @@ export function FundraisingPipeline() {
           </div>
           <ul className="divide-y divide-[#eeeeee]">
             {meetings.length === 0 ? (
-              <li className="py-10 text-center text-sm text-[#94a3b8]">No upcoming meetings.</li>
+              <li className="py-10 text-center text-sm text-[#141414]">No upcoming meetings.</li>
             ) : (
               meetings.slice(0, 5).map((item) => (
               <li key={item.id}>
@@ -990,12 +990,12 @@ export function FundraisingPipeline() {
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-4">
         <section className={cn(CARD, "xl:col-span-8 overflow-hidden")}>
           <div className="px-4 pt-4 pb-2">
-            <h2 className="text-sm font-semibold text-[#0f172a]">Top Investor Opportunities</h2>
+            <h2 className="text-sm font-semibold text-[#000000]">Top Investor Opportunities</h2>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-left">
               <thead>
-                <tr className="border-y border-[#eef2f7] text-xs text-[#94a3b8]">
+                <tr className="border-y border-[#eef2f7] text-xs text-[#141414]">
                   <th className="px-4 py-2.5 font-medium">Investor</th>
                   <th className="px-2.5 py-2.5 font-medium">Type</th>
                   <th className="px-2.5 py-2.5 font-medium">Stage</th>
@@ -1011,7 +1011,7 @@ export function FundraisingPipeline() {
                   <FrTableSkeleton columns={8} rows={6} />
                 ) : opportunities.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="px-4 py-10 text-center text-sm text-[#94a3b8]">
+                    <td colSpan={8} className="px-4 py-10 text-center text-sm text-[#141414]">
                       No opportunities yet.
                     </td>
                   </tr>
@@ -1022,16 +1022,16 @@ export function FundraisingPipeline() {
                         <div className="flex items-center gap-2.5 min-w-0">
                           <div
                             className={cn(
-                              "w-8 h-8 rounded-full text-[10px] font-semibold flex items-center justify-center shrink-0",
+                              "w-8 h-8 rounded-full text-[11px] font-semibold flex items-center justify-center shrink-0",
                               AVATAR_TONES[idx % AVATAR_TONES.length],
                             )}
                           >
                             {oppInitials(row.investor)}
                           </div>
-                          <span className="text-sm font-medium text-[#0f172a]">{row.investor}</span>
+                          <span className="text-sm font-medium text-[#000000]">{row.investor}</span>
                         </div>
                       </td>
-                      <td className="px-2.5 py-3 text-xs text-[#64748b]">{row.campaign}</td>
+                      <td className="px-2.5 py-3 text-xs text-[#111111]">{row.campaign}</td>
                       <td className="px-2.5 py-3">
                         <span
                           className={cn(
@@ -1042,7 +1042,7 @@ export function FundraisingPipeline() {
                           {row.stage}
                         </span>
                       </td>
-                      <td className="px-2.5 py-3 text-sm font-medium text-[#0f172a] tabular-nums whitespace-nowrap">
+                      <td className="px-2.5 py-3 text-sm font-medium text-[#000000] tabular-nums whitespace-nowrap">
                         {row.proposed !== "—" ? row.proposed : row.indicative}
                       </td>
                       <td className="px-2.5 py-3">
@@ -1052,21 +1052,21 @@ export function FundraisingPipeline() {
                         <div className="flex items-center gap-2">
                           <div
                             className={cn(
-                              "w-6 h-6 rounded-full text-[9px] font-semibold flex items-center justify-center shrink-0",
+                              "w-6 h-6 rounded-full text-[11px] font-semibold flex items-center justify-center shrink-0",
                               AVATAR_TONES[(idx + 2) % AVATAR_TONES.length],
                             )}
                           >
                             {oppInitials(embeddedPersonName(row.raw, "owner", row.owner))}
                           </div>
-                          <span className="text-xs text-[#475569] whitespace-nowrap">
+                          <span className="text-xs text-[#111111] whitespace-nowrap">
                             {embeddedPersonName(row.raw, "owner", row.owner)}
                           </span>
                         </div>
                       </td>
                       <td className="px-2.5 py-3">
-                        <p className="text-xs font-medium text-[#334155] whitespace-nowrap">{row.nextAction}</p>
+                        <p className="text-xs font-medium text-[#111111] whitespace-nowrap">{row.nextAction}</p>
                       </td>
-                      <td className="px-4 py-3 text-xs text-[#64748b] whitespace-nowrap">{row.ageDays}d in stage</td>
+                      <td className="px-4 py-3 text-xs text-[#111111] whitespace-nowrap">{row.ageDays}d in stage</td>
                     </tr>
                   ))
                 )}
@@ -1074,7 +1074,7 @@ export function FundraisingPipeline() {
             </table>
           </div>
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-4 py-3 border-t border-[#f1f5f9]">
-            <p className="text-xs text-[#94a3b8]">
+            <p className="text-xs text-[#141414]">
               Showing 1 to {Math.min(6, opportunities.length)} of {opportunities.length} opportunities
             </p>
             <button
@@ -1089,7 +1089,7 @@ export function FundraisingPipeline() {
 
         <section className={cn(CARD, "xl:col-span-4 p-4")}>
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-sm font-semibold text-[#0f172a]">Recent Activity</h2>
+            <h2 className="text-sm font-semibold text-[#000000]">Recent Activity</h2>
             <button
               type="button"
               onClick={() => setActivityOpen(true)}
@@ -1106,17 +1106,17 @@ export function FundraisingPipeline() {
       <Dialog open={meetingsOpen} onOpenChange={setMeetingsOpen}>
         <DialogContent className="max-w-lg rounded-[12px] p-0 gap-0 overflow-hidden">
           <DialogHeader className="px-5 pt-5 pb-3 border-b border-[#f1f5f9]">
-            <DialogTitle className="text-base font-semibold text-[#0f172a]">
+            <DialogTitle className="text-base font-semibold text-[#000000]">
               Upcoming Meetings & Tasks
             </DialogTitle>
-            <DialogDescription className="text-xs text-[#64748b]">
+            <DialogDescription className="text-xs text-[#111111]">
               {meetings.length} items for the current fund filter
             </DialogDescription>
           </DialogHeader>
           <div className="max-h-[min(70vh,560px)] overflow-y-auto px-5">
             <ul className="divide-y divide-[#eeeeee] pb-2">
               {meetings.length === 0 ? (
-                <li className="py-10 text-center text-sm text-[#94a3b8]">No upcoming meetings.</li>
+                <li className="py-10 text-center text-sm text-[#141414]">No upcoming meetings.</li>
               ) : (
                 meetings.map((item) => (
                 <li key={item.id} className="py-1">
@@ -1124,21 +1124,21 @@ export function FundraisingPipeline() {
                   {(item.owner || item.notes || item.status || item.location) && (
                     <div className="ml-12 mb-3 rounded-lg bg-[#f8fafc] border border-[#f1f5f9] px-3 py-2 space-y-1">
                       {item.status && (
-                        <p className="text-[11px] text-[#64748b]">
-                          Status: <span className="font-medium text-[#334155]">{item.status}</span>
+                        <p className="text-[11px] text-[#111111]">
+                          Status: <span className="font-medium text-[#111111]">{item.status}</span>
                         </p>
                       )}
                       {item.owner && (
-                        <p className="text-[11px] text-[#64748b]">
-                          Owner: <span className="font-medium text-[#334155]">{item.owner}</span>
+                        <p className="text-[11px] text-[#111111]">
+                          Owner: <span className="font-medium text-[#111111]">{item.owner}</span>
                         </p>
                       )}
                       {item.location && (
-                        <p className="text-[11px] text-[#64748b]">
-                          Location: <span className="font-medium text-[#334155]">{item.location}</span>
+                        <p className="text-[11px] text-[#111111]">
+                          Location: <span className="font-medium text-[#111111]">{item.location}</span>
                         </p>
                       )}
-                      {item.notes && <p className="text-[11px] text-[#475569] leading-relaxed">{item.notes}</p>}
+                      {item.notes && <p className="text-[11px] text-[#111111] leading-relaxed">{item.notes}</p>}
                     </div>
                   )}
                 </li>
@@ -1153,8 +1153,8 @@ export function FundraisingPipeline() {
       <Dialog open={activityOpen} onOpenChange={setActivityOpen}>
         <DialogContent className="max-w-lg rounded-[12px] p-0 gap-0 overflow-hidden">
           <DialogHeader className="px-5 pt-5 pb-3 border-b border-[#f1f5f9]">
-            <DialogTitle className="text-base font-semibold text-[#0f172a]">Recent Activity</DialogTitle>
-            <DialogDescription className="text-xs text-[#64748b]">
+            <DialogTitle className="text-base font-semibold text-[#000000]">Recent Activity</DialogTitle>
+            <DialogDescription className="text-xs text-[#111111]">
               Full activity log for the current filter
             </DialogDescription>
           </DialogHeader>
@@ -1168,10 +1168,10 @@ export function FundraisingPipeline() {
       <Dialog open={oppsOpen} onOpenChange={setOppsOpen}>
         <DialogContent className="max-w-3xl rounded-[12px] p-0 gap-0 overflow-hidden">
           <DialogHeader className="px-5 pt-5 pb-3 border-b border-[#f1f5f9]">
-            <DialogTitle className="text-base font-semibold text-[#0f172a]">
+            <DialogTitle className="text-base font-semibold text-[#000000]">
               Investor Opportunities
             </DialogTitle>
-            <DialogDescription className="text-xs text-[#64748b]">
+            <DialogDescription className="text-xs text-[#111111]">
               {opportunities.length} opportunities loaded
             </DialogDescription>
           </DialogHeader>
@@ -1185,12 +1185,12 @@ export function FundraisingPipeline() {
                     </div>
                     <div className="min-w-0 flex-1 space-y-2">
                       <div className="flex flex-wrap items-center gap-2 justify-between">
-                        <p className="text-sm font-semibold text-[#0f172a]">{row.investor}</p>
-                        <span className="text-sm font-medium text-[#0f172a] tabular-nums">
+                        <p className="text-sm font-semibold text-[#000000]">{row.investor}</p>
+                        <span className="text-sm font-medium text-[#000000] tabular-nums">
                           {row.proposed !== "—" ? row.proposed : row.indicative}
                         </span>
                       </div>
-                      <div className="flex flex-wrap items-center gap-2 text-xs text-[#64748b]">
+                      <div className="flex flex-wrap items-center gap-2 text-xs text-[#111111]">
                         <span>{row.campaign}</span>
                         <span
                           className={cn(
@@ -1204,8 +1204,8 @@ export function FundraisingPipeline() {
                       </div>
                       <div className="flex flex-wrap items-center gap-4">
                         <ProbText value={row.probability} />
-                        <p className="text-xs text-[#475569]">Next: {row.nextAction}</p>
-                        <p className="text-xs text-[#94a3b8]">{row.ageDays}d in stage</p>
+                        <p className="text-xs text-[#111111]">Next: {row.nextAction}</p>
+                        <p className="text-xs text-[#141414]">{row.ageDays}d in stage</p>
                       </div>
                     </div>
                   </div>
