@@ -26,6 +26,113 @@ export function startPayrollV6Runtime(rootEl, options = {}) {
   // Client assigns vendorsPage later without a prior declaration (classic-script
   // implicit global); must be declared inside this function scope.
   let vendorsPage;
+  /* BEGIN_PAYROLL_LIVE_BRIDGE */
+/**
+ * Live state handed over by the React host via api.hydrate(). Until the first
+ * hydrate lands this stays empty and the runtime renders its own fixtures, so
+ * a hydrate failure degrades to the previous behaviour instead of a blank page.
+ */
+const __pr6Live = {
+  ready: false,
+  permissions: null, // Set<string> of real backend permission names
+  roleName: null,
+  counts: null, // live sidebar badge counts, keyed by page id
+  errors: [],
+};
+
+/** True once the host has pushed at least one live payload. */
+function __pr6IsLive() {
+  return __pr6Live.ready === true;
+}
+
+/**
+ * Live sidebar badge count for a nav item. Returns null when we have no live
+ * number, and the caller then renders no badge at all — an absent badge is
+ * honest, a stale hardcoded one is not.
+ */
+function __pr6NavCount(pageId) {
+  if (!__pr6Live.counts) return null;
+  const v = __pr6Live.counts[pageId];
+  if (v === null || v === undefined) return null;
+  const n = Number(v);
+  if (!Number.isFinite(n) || n <= 0) return null;
+  return String(n);
+}
+
+/**
+ * Map the runtime's own permission vocabulary onto the backend catalogue.
+ * The runtime shipped with a client-side role simulator (`roles[state.role]`);
+ * once we are live, entitlement comes from the signed-in user's real grants.
+ */
+const __PR6_PERMISSION_MAP = {
+  'employee.view': ['payroll.employees.view', 'payroll.employees.manage'],
+  'employee.edit': ['payroll.employees.manage'],
+  'salary.view': ['payroll.components.view', 'payroll.components.manage'],
+  'salary.edit': ['payroll.components.manage'],
+  'payroll.prepare': ['payroll.runs.manage'],
+  'payroll.approve': ['payroll.runs.approve'],
+  'payroll.release': ['payroll.runs.release'],
+  'exceptions.resolve': ['payroll.exceptions.manage'],
+  'statutory.manage': ['payroll.tax.manage'],
+  'documents.manage': ['payroll.vault.manage'],
+  'reports.generate': ['payroll.reports.view', 'payroll.reports.manage'],
+  'audit.view': ['payroll.audit.view'],
+  'rbac.manage': ['payroll.access.manage'],
+  // Self-service is authenticated-only on the backend: every signed-in user
+  // may see their own pay, so this is always allowed.
+  'self.view': [],
+};
+
+/** Resolve a runtime permission id against the real backend grants. */
+function __pr6Can(permission) {
+  if (!__pr6IsLive() || !__pr6Live.permissions) return null; // fall through to mock roles
+  const mapped = __PR6_PERMISSION_MAP[permission];
+  if (!mapped) return false;
+  if (mapped.length === 0) return true;
+  return mapped.some((p) => __pr6Live.permissions.has(p));
+}
+
+/**
+ * Action interception.
+ *
+ * Registered in the capture phase before the runtime's own handlers, so a
+ * cancelled event never reaches the mock implementation. The host decides which
+ * action ids are live (its API_ACTIONS allowlist); anything it does not claim
+ * falls through untouched and keeps working as view-state.
+ */
+document.addEventListener(
+  'click',
+  (event) => {
+    const el = event.target && event.target.closest ? event.target.closest('[data-action]') : null;
+    if (!el) return;
+    const action = el.dataset ? el.dataset.action : null;
+    if (!action) return;
+
+    // Copy the dataset so the host gets ids/periods without holding a DOM ref.
+    const dataset = {};
+    try {
+      Object.keys(el.dataset || {}).forEach((k) => {
+        dataset[k] = el.dataset[k];
+      });
+    } catch (_) {}
+
+    const detail = { action, dataset, page: (typeof state !== 'undefined' ? state.page : null) };
+    let cancelled = false;
+    try {
+      const ev = new CustomEvent('matanho:before-action', { detail, cancelable: true });
+      window.dispatchEvent(ev);
+      cancelled = ev.defaultPrevented;
+    } catch (_) {}
+
+    if (cancelled) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+    }
+  },
+  true,
+);
+  /* END_PAYROLL_LIVE_BRIDGE */
+
 
 
 const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>[...r.querySelectorAll(s)];
@@ -78,7 +185,7 @@ const navGroups=[
 ];
 const state={page:(typeof initialPage==='string'&&initialPage)?initialPage:'overview',theme:safeStorage.getItem('matanho-payroll-theme')||'light',role:safeStorage.getItem('matanho-payroll-role')||'Payroll Manager',period:'June 2026',folder:'All documents',employeeSearch:'',reportDraft:null,activeDoc:null,notifications:7};
 
-const employees=[
+let employees=[
  {id:'EMP-0007',name:'Rudo Sibanda',initials:'RS',title:'Finance Officer',department:'Finance',branch:'Harare Head Office',type:'Permanent',start:'12 Feb 2022',currency:'USD / ZiG',base:2250,zig:165000,readiness:96,status:'Ready',bank:'Stanbic Bank **** 4521',tax:'10-284726-K-19',nssa:'073964821',email:'rudo.sibanda@arcusholdings.co.zw',phone:'+263 77 284 6193',documents:12,leave:'15.5 days',training:'Compliant'},
  {id:'EMP-0012',name:'Tendai Moyo',initials:'TM',title:'Payroll Manager',department:'People & Culture',branch:'Harare Head Office',type:'Permanent',start:'03 May 2021',currency:'USD / ZiG',base:3820,zig:295000,readiness:100,status:'Ready',bank:'CBZ Bank **** 1884',tax:'10-183623-J-10',nssa:'081264523',email:'tendai.moyo@arcusholdings.co.zw',phone:'+263 71 255 9004',documents:15,leave:'18.0 days',training:'Compliant'},
  {id:'EMP-0021',name:'Brian Chikota',initials:'BC',title:'Operations Supervisor',department:'Operations',branch:'Bulawayo Branch',type:'Permanent',start:'18 Aug 2020',currency:'USD',base:1880,zig:0,readiness:82,status:'Review',bank:'FBC Bank **** 2207',tax:'10-337821-P-14',nssa:'067341280',email:'brian.chikota@arcusholdings.co.zw',phone:'+263 78 312 7702',documents:9,leave:'8.5 days',training:'1 expiring'},
@@ -102,7 +209,7 @@ let exceptions=[
  {id:'EXC-0631',employee:'Nyasha Dube',employeeId:'EMP-0035',type:'Allowance duplication',severity:'Medium',source:'Bulk input file',amount:'USD 185.00',owner:'Tariro Moyo',age:'2h 12m',status:'Open',detail:'Transport allowance appears in both recurring and imported inputs.'},
  {id:'EXC-0637',employee:'Simbarashe Zhou',employeeId:'EMP-0078',type:'Cost centre mismatch',severity:'Medium',source:'GL mapping',amount:'USD 2,200.00',owner:'Rudo Sibanda',age:'5h 36m',status:'Investigating',detail:'Employee cost centre is inactive in the current finance ledger mapping.'}
 ];
-const documents=[
+let documents=[
  {id:'DOC-001',name:'June 2026 Payroll Control Pack',folder:'Payroll control packs',type:'Editable report',owner:'Tariro Moyo',modified:'28 Jun 2026 16:42',class:'Restricted',versions:7,status:'Approved',content:'Payroll calculation controls, exception register, maker-checker evidence and release confirmations for June 2026.'},
  {id:'DOC-002',name:'PAYE Return - June 2026',folder:'Statutory returns',type:'Compliance return',owner:'Rudo Sibanda',modified:'28 Jun 2026 15:18',class:'Confidential',versions:3,status:'Ready to file',content:'PAYE reconciliation and employee-level tax schedule generated from the approved June payroll.'},
  {id:'DOC-003',name:'NSSA P4 Schedule - June 2026',folder:'Statutory returns',type:'Compliance return',owner:'Rudo Sibanda',modified:'28 Jun 2026 14:56',class:'Confidential',versions:2,status:'Ready to file',content:'NSSA contribution schedule reconciled to payroll and general ledger control accounts.'},
@@ -112,8 +219,8 @@ const documents=[
  {id:'DOC-007',name:'Training Compliance Register Q2 2026',folder:'Training and compliance',type:'Compliance register',owner:'Chipo Ndlovu',modified:'25 Jun 2026 13:40',class:'Internal',versions:6,status:'Published',content:'Mandatory training completion, expiry risk and role permission impact register.'},
  {id:'DOC-008',name:'Payroll Access Review - Q2 2026',folder:'Access reviews',type:'Access certification',owner:'Internal Audit',modified:'26 Jun 2026 10:10',class:'Restricted',versions:5,status:'In review',content:'Quarterly certification of payroll roles, privileged access, segregation conflicts and dormant accounts.'}
 ];
-const folders=['All documents','Payroll control packs','Statutory returns','Employee records','Policies and procedures','Bank and payment files','Training and compliance','Access reviews'];
-const reportTemplates=[
+let folders=['All documents','Payroll control packs','Statutory returns','Employee records','Policies and procedures','Bank and payment files','Training and compliance','Access reviews'];
+let reportTemplates=[
  {id:'paye',name:'PAYE Reconciliation and Return Pack',category:'Statutory',desc:'Reconcile taxable earnings, PAYE, ledger control accounts and filing values with employee-level traceability.',freq:'Monthly',perm:'statutory.manage'},
  {id:'nssa',name:'NSSA Contribution Schedule',category:'Statutory',desc:'Employer and employee contribution schedule, exception analysis and payment control totals.',freq:'Monthly',perm:'statutory.manage'},
  {id:'aids',name:'AIDS Levy Control Report',category:'Statutory',desc:'Calculate and reconcile the statutory levy against PAYE with filing-ready supporting schedules.',freq:'Monthly',perm:'statutory.manage'},
@@ -127,7 +234,7 @@ const reportTemplates=[
  {id:'demographics',name:'Workforce Demographics and Cost',category:'Management',desc:'Headcount and employment cost analysis by entity, branch, department, grade and contract type.',freq:'Monthly',perm:'reports.generate'},
  {id:'termination',name:'Terminations and Final Pay Register',category:'Human capital',desc:'Final pay, leave encashment, deductions, approvals, exit documents and payment status.',freq:'Monthly',perm:'reports.generate'}
 ];
-const auditEvents=[
+let auditEvents=[
  ['28 Jun 2026 17:11','Tariro Moyo','PAYROLL_RELEASE_BLOCKED','PAY-2026-06-M','Release prevented: 3 critical controls remain open','Critical'],
  ['28 Jun 2026 16:58','Rudo Sibanda','REPORT_GENERATED','PAYE-2026-06','Generated PAYE return pack version 3','Information'],
  ['28 Jun 2026 16:42','Tariro Moyo','DOCUMENT_APPROVED','DOC-001','Approved June payroll control pack version 7','Approval'],
@@ -137,7 +244,7 @@ const auditEvents=[
  ['28 Jun 2026 11:17','Tariro Moyo','ROLE_ASSIGNED','USR-0042','Payroll Processor role assigned until 31 Jul 2026','Access'],
  ['27 Jun 2026 18:22','System','RULESET_PUBLISHED','ZW-2026.06','Approved statutory rules published for June','System']
 ];
-const userAccess=[
+let userAccess=[
  {name:'Tariro Moyo',initials:'TM',role:'Payroll Manager',scope:'All entities / all branches',mfa:'Enforced',last:'28 Jun 17:11',status:'Active'},
  {name:'Rudo Sibanda',initials:'RS',role:'Payroll Processor',scope:'Arcus Holdings / Harare',mfa:'Enforced',last:'28 Jun 16:58',status:'Active'},
  {name:'Chipo Ndlovu',initials:'CN',role:'HR Manager',scope:'All entities / HR records',mfa:'Enforced',last:'28 Jun 15:33',status:'Active'},
@@ -146,7 +253,7 @@ const userAccess=[
  {name:'Kudzai Maseko',initials:'KM',role:'Payroll Processor',scope:'Contract staff / Bulawayo',mfa:'Pending',last:'22 Jun 11:30',status:'Review'}
 ];
 
-function can(permission){return (roles[state.role]||[]).includes(permission)}
+function can(permission){const live=__pr6Can(permission);if(live!==null)return live;return (roles[state.role]||[]).includes(permission)}
 function permittedPage(id){return id==='overview'||!pagePermission[id]||can(pagePermission[id])||(id==='access'&&state.role!=='Employee')}
 function money(v,c='USD'){return c==='ZiG'?`ZiG ${Number(v).toLocaleString('en-US',{maximumFractionDigits:0})}`:`USD ${Number(v).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}`}
 function badge(text){const t=String(text).toLowerCase();let cls=t.includes('critical')||t.includes('blocked')||t.includes('overdue')||t.includes('rejected')?'red':t.includes('warning')||t.includes('review')||t.includes('pending')||t.includes('investig')||t.includes('expir')||t.includes('high')?'amber':t.includes('draft')||t.includes('calculated')||t.includes('medium')?'violet':t.includes('ready')||t.includes('approved')||t.includes('released')||t.includes('active')||t.includes('published')||t.includes('compliant')||t.includes('file')?'blue':'slate';return `<span class="status ${cls}">${text}</span>`}
@@ -163,7 +270,7 @@ function deny(permission){toast('Action restricted',`The ${state.role} role does
 function initials(name){return name.split(' ').map(x=>x[0]).slice(0,2).join('')}
 function maskSalary(e){return can('salary.view')?`${money(e.base)}${e.zig?` + ${money(e.zig,'ZiG')}`:''}`:'USD ****** / ZiG ******'}
 function renderNav(){
- $('#nav').innerHTML=navGroups.map(([g,items])=>`<div class="nav-group">${g}</div>${items.filter(([id])=>permittedPage(id)).map(([id,label,ico,count])=>`<button class="nav-item ${state.page===id?'active':''}" data-page="${id}" title="${label}"><span class="nav-icon">${icon(ico)}</span><span class="nav-label">${label}</span>${count?`<span class="nav-count">${count}</span>`:''}</button>`).join('')}`).join('');
+ $('#nav').innerHTML=navGroups.map(([g,items])=>`<div class="nav-group">${g}</div>${items.filter(([id])=>permittedPage(id)).map(([id,label,ico,count])=>`<button class="nav-item ${state.page===id?'active':''}" data-page="${id}" title="${label}"><span class="nav-icon">${icon(ico)}</span><span class="nav-label">${label}</span>${(()=>{const c=__pr6IsLive()?__pr6NavCount(id):count;return c?`<span class="nav-count">${c}</span>`:''})()}</button>`).join('')}`).join('');
 }
 function lineChart(){const vals=[188,194,201,199,214,228,225,238,246,252,257,265],zig=[5.1,5.3,5.5,5.6,6.1,6.3,6.4,6.7,6.8,7.0,7.2,7.46],months=['Jul','Aug','Sep','Oct','Nov','Dec','Jan','Feb','Mar','Apr','May','Jun'];const W=760,H=220,p=38;const x=i=>p+i*(W-2*p)/(vals.length-1), y=v=>H-p-(v-175)/(275-175)*(H-2*p);const path=vals.map((v,i)=>(i?'L':'M')+x(i)+' '+y(v)).join(' ');return `<div class="chart-shell"><svg viewBox="0 0 ${W} ${H}"><defs><linearGradient id="payArea" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1768ff" stop-opacity=".25"/><stop offset="1" stop-color="#1768ff" stop-opacity="0"/></linearGradient></defs>${[0,1,2,3,4].map(i=>`<line class="chart-grid" x1="${p}" x2="${W-p}" y1="${p+i*(H-2*p)/4}" y2="${p+i*(H-2*p)/4}"/>`).join('')}<path d="${path} L${x(vals.length-1)} ${H-p} L${p} ${H-p} Z" fill="url(#payArea)"/><path class="chart-line" d="${path}"/>${vals.map((v,i)=>`<circle class="chart-point" cx="${x(i)}" cy="${y(v)}" r="4"><title>${months[i]}: USD ${v},000 gross payroll; ZiG ${zig[i]}m</title></circle>`).join('')}${months.map((m,i)=>`<text class="chart-label" x="${x(i)}" y="${H-12}" text-anchor="middle">${m}</text>`).join('')}<text class="chart-title" x="14" y="16">USD gross payroll (thousands)</text></svg></div><div class="legend"><span><i style="background:var(--blue)"></i>USD gross payroll</span><span><i style="background:var(--violet)"></i>ZiG component shown in tooltip</span></div>`}
 function barChart(){const data=[['Finance',54],['Operations',92],['Commercial',41],['Technology',37],['People',26],['Procurement',14]];const W=650,H=230,p=42,bw=58,g=35,max=100;return `<div class="chart-shell"><svg viewBox="0 0 ${W} ${H}"><defs><linearGradient id="barGrad" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#1768ff"/><stop offset="1" stop-color="#62a0ff"/></linearGradient></defs>${[0,25,50,75,100].map(v=>`<line class="chart-grid" x1="${p}" x2="${W-15}" y1="${H-p-v/max*(H-2*p)}" y2="${H-p-v/max*(H-2*p)}"/><text class="chart-label" x="${p-8}" y="${H-p-v/max*(H-2*p)+3}" text-anchor="end">${v}</text>`).join('')}${data.map((d,i)=>{const x=p+20+i*(bw+g),h=d[1]/max*(H-2*p);return `<rect class="bar" x="${x}" y="${H-p-h}" width="${bw}" height="${h}"><title>${d[0]}: ${d[1]} employees</title></rect><text class="chart-label" x="${x+bw/2}" y="${H-18}" text-anchor="middle">${d[0].slice(0,7)}</text>`}).join('')}<text class="chart-title" x="14" y="16">Employees by department</text></svg></div>`}
@@ -1589,6 +1696,45 @@ init();
   wireTopProfile()
 
   api = {
+    /**
+     * Replace the runtime's fixtures with live API data and re-render.
+     * Injected by scripts/patch-payroll-runtime.mjs — see that script.
+     *
+     * Partial payloads are fine: only the keys present are replaced, so one
+     * failed loader does not blank the whole module.
+     */
+    hydrate(payload) {
+      if (!payload || typeof payload !== 'object') return;
+      try {
+        if (Array.isArray(payload.employees)) employees = payload.employees;
+        if (Array.isArray(payload.payrollRuns)) payrollRuns = payload.payrollRuns;
+        if (Array.isArray(payload.exceptions)) exceptions = payload.exceptions;
+        if (Array.isArray(payload.documents)) documents = payload.documents;
+        if (Array.isArray(payload.folders)) folders = payload.folders;
+        if (Array.isArray(payload.reportTemplates)) reportTemplates = payload.reportTemplates;
+        if (Array.isArray(payload.auditEvents)) auditEvents = payload.auditEvents;
+        if (Array.isArray(payload.userAccess)) userAccess = payload.userAccess;
+
+        if (Array.isArray(payload.permissions)) {
+          __pr6Live.permissions = new Set(payload.permissions);
+        }
+        if (payload.roleName) {
+          __pr6Live.roleName = payload.roleName;
+          // Keep the runtime's own role label in step so any remaining
+          // role-driven copy shows the real role rather than the mock default.
+          if (typeof state !== 'undefined') state.role = payload.roleName;
+        }
+        if (payload.counts && typeof payload.counts === 'object') {
+          __pr6Live.counts = payload.counts;
+        }
+        if (Array.isArray(payload.errors)) __pr6Live.errors = payload.errors;
+
+        __pr6Live.ready = true;
+        if (typeof render === 'function') render();
+      } catch (err) {
+        try { console.error('[payroll-v6] hydrate failed', err); } catch (_) {}
+      }
+    },
     setPage(page) {
       if (typeof permittedPage === 'function' && !permittedPage(page)) return;
       state.page = page;
@@ -1604,5 +1750,10 @@ init();
       rootEl.innerHTML = '';
     },
   };
+  try {
+    window.MatanhoUI = window.MatanhoUI || {};
+    window.MatanhoUI.hydrate = (payload) => api.hydrate && api.hydrate(payload);
+  } catch (_) {}
+
   return api;
 }
