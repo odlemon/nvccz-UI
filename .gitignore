@@ -48,3 +48,9 @@ scripts/_*.py
 .patch-performance-runtime.lock
 .perf-dumps/
 .acc-dumps/
+.lp-dumps/
+.lp-done/
+.lp-final/
+.lp-verify/
+.lp-check/
+.lp-shots/
