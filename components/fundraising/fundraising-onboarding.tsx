@@ -25,7 +25,7 @@ import {
   mandateStatusClass,
   type KycOnboardingStatus,
   type MandateOnboardingStatus,
-} from "./onboarding-mock-data"
+} from "./onboarding-presentation"
 import {
   FrDialogShell,
   FrField,

@@ -2,7 +2,7 @@
  * Map API records → existing Fundraising UI view models (no redesign).
  */
 import { asNumber } from '@/lib/api/fundraising-api'
-import type { InvestorOrg, KycStatus } from '@/components/fundraising/investors-mock-data'
+import type { InvestorOrg, KycStatus } from '@/components/fundraising/investors-presentation'
 
 const TYPE_LABEL: Record<string, InvestorOrg['type']> = {
   PENSION_FUND: 'Pension Fund',

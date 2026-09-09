@@ -18,7 +18,7 @@ import {
   kycChipClass,
   kycLabel,
   type InvestorOrg,
-} from "./investors-mock-data"
+} from "./investors-presentation"
 import {
   FrConfirmDialog,
   FrDialogShell,

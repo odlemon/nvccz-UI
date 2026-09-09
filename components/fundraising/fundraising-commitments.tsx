@@ -38,7 +38,7 @@ import {
   type KycStatus,
   type SignatureStatus,
   type TimelineStep,
-} from "./commitments-mock-data"
+} from "./commitments-presentation"
 import {
   FrDialogShell,
   FrField,

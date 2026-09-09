@@ -16,7 +16,7 @@ import {
   titleCase,
   type PipelineStageRow,
 } from "@/lib/fundraising/mappers"
-import { probabilityColor } from "./settings-mock-data"
+import { probabilityColor } from "./settings-presentation"
 import { FrConfirmDialog, FrDialogShell, FrField, FrFormFooter, FrViewAllDialog, frInputClass, frSelectClass } from "./fundraising-modals"
 import { FrSimpleWizard, ReviewList } from "./fundraising-create-wizards"
 

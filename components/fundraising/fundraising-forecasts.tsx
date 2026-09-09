@@ -49,7 +49,7 @@ import {
   SCENARIO_OPTIONS,
   type ScenarioAssumptions,
   type ScenarioId,
-} from "./forecasts-mock-data"
+} from "./forecasts-presentation"
 import {
   FrDialogShell,
   FrField,

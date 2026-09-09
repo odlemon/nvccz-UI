@@ -45,14 +45,14 @@ import { fundraisingApi, asNumber, toastFrError } from "@/lib/api/fundraising-ap
 import { exportFundraisingCsv } from "@/lib/fundraising/export"
 import { mapOpportunityRow, moneyLabel } from "@/lib/fundraising/mappers"
 import { FrTableSkeleton } from "@/components/fundraising/fundraising-modals"
-import { stageChipClass } from "./dashboard-mock-data"
+import { stageChipClass } from "./dashboard-presentation"
 import {
   type ActivityItem,
   type PipelineFilter,
   type PipelineKpi,
   type PipelineStage,
   type UpcomingItem,
-} from "./pipeline-mock-data"
+} from "./pipeline-presentation"
 import { FundraisingPipelineBoard } from "./fundraising-pipeline-board"
 
 type PipelineViewMode = "overview" | "board"

@@ -6,7 +6,7 @@ import { toast } from "sonner"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
-import { GEOGRAPHY_OPTIONS, commissionStatusClass, type PlacementAgentKpi } from "./placement-agents-mock-data"
+import { GEOGRAPHY_OPTIONS, commissionStatusClass, type PlacementAgentKpi } from "./placement-agents-presentation"
 import {
   FrDialogShell,
   FrField,

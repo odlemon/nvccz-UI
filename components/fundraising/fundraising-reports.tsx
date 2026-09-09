@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { Calendar, FileBarChart, Loader2, Play, Settings } from "lucide-react"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
@@ -16,11 +16,12 @@ import { fundraisingApi, toastFrError } from "@/lib/api/fundraising-api"
 import { formatCell, rowColumns, toRowsArray } from "@/lib/fundraising/mappers"
 import { downloadCsvPayload, exportFundraisingCsv } from "@/lib/fundraising/export"
 import {
-  FR_REPORTS,
   categoryClass,
+  scheduleToCadence,
+  toFrReport,
   type FrReport,
   type ReportSchedule,
-} from "./reports-mock-data"
+} from "./reports-presentation"
 import {
   FrDialogShell,
   FrField,
@@ -35,7 +36,8 @@ const CARD =
 const SCHEDULE_OPTIONS: ReportSchedule[] = ["Daily", "Weekly", "Monthly", "On demand"]
 
 export function FundraisingReports() {
-  const [reports] = useState(FR_REPORTS)
+  const [reports, setReports] = useState<FrReport[]>([])
+  const [reportsLoading, setReportsLoading] = useState(true)
   const [campaigns, setCampaigns] = useState<Record<string, any>[]>([])
   const [campaignsLoading, setCampaignsLoading] = useState(true)
   const [campaignId, setCampaignId] = useState("")
@@ -66,13 +68,41 @@ export function FundraisingReports() {
       .finally(() => setCampaignsLoading(false))
   }, [])
 
+  // The runnable catalogue and its schedules are both server state. Loading them together
+  // means a report card can say "Not scheduled" honestly rather than showing a cadence and
+  // owner that nothing on the backend actually holds.
+  const loadReports = useCallback(async () => {
+    setReportsLoading(true)
+    try {
+      const [catalogue, schedules] = await Promise.all([
+        fundraisingApi.listReports(),
+        fundraisingApi.listReportSchedules().catch(() => [] as any[]),
+      ])
+      const byKey = new Map<string, any>()
+      for (const s of schedules ?? []) {
+        const key = String(s?.reportKey ?? "")
+        if (key && !byKey.has(key)) byKey.set(key, s)
+      }
+      setReports((catalogue ?? []).map((entry: any) => toFrReport(entry, byKey.get(String(entry?.reportKey ?? "")))))
+    } catch (err) {
+      toastFrError(err, "Could not load the report catalogue")
+      setReports([])
+    } finally {
+      setReportsLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    void loadReports()
+  }, [loadReports])
+
   const resultRows = selected ? resultsByReport[selected.id] ?? [] : []
   const resultColumns = useMemo(() => rowColumns(resultRows).slice(0, 8), [resultRows])
 
   function openConfigure(report: FrReport) {
     setSelected(report)
     setForm({
-      schedule: report.schedule,
+      schedule: report.schedule ?? "On demand",
       recipients: "fundraising@nvccz.co.zw",
       format: "CSV",
       dateRange: "Last 30 days",
@@ -93,6 +123,28 @@ export function FundraisingReports() {
     }
     setRunning(true)
     try {
+      // A cadence other than "On demand" is a request to schedule the report, so persist it
+      // before running. Previously the dialog collected a cadence and threw it away.
+      if (form.schedule !== "On demand") {
+        try {
+          await fundraisingApi.createReportSchedule({
+            reportKey: selected.reportKey,
+            name: `${selected.name} — ${form.schedule}`,
+            cadence: scheduleToCadence(form.schedule),
+            recipients: form.recipients
+              .split(",")
+              .map((r) => r.trim())
+              .filter(Boolean),
+            format: form.format,
+            filters: campaignId ? { campaignId } : undefined,
+          })
+          toast.success(`Scheduled "${selected.name}" ${form.schedule.toLowerCase()}`)
+          void loadReports()
+        } catch (err) {
+          toastFrError(err, "Could not save the schedule")
+        }
+      }
+
       const data = await fundraisingApi.getReport(
         selected.reportKey,
         campaignId ? { campaignId } : undefined,
@@ -172,16 +224,20 @@ export function FundraisingReports() {
                 <dt className="flex items-center gap-1.5 text-[#141414]">
                   <Calendar className="h-3 w-3" /> Schedule
                 </dt>
-                <dd className="font-medium text-[#000000]">{report.schedule}</dd>
+                <dd className="font-medium text-[#000000]">
+                  {report.schedule ?? "Not scheduled"}
+                </dd>
               </div>
               <div className="flex items-center justify-between gap-2">
                 <dt className="text-[#141414]">Last run</dt>
                 <dd className="text-[#111111]">{lastRunAt[report.id] ?? "Not run yet"}</dd>
               </div>
-              <div className="flex items-center justify-between gap-2">
-                <dt className="text-[#141414]">Owner</dt>
-                <dd className="text-[#111111]">{report.owner}</dd>
-              </div>
+              {report.owner ? (
+                <div className="flex items-center justify-between gap-2">
+                  <dt className="text-[#141414]">Owner</dt>
+                  <dd className="text-[#111111]">{report.owner}</dd>
+                </div>
+              ) : null}
               {report.requiresCampaign ? (
                 <div className="flex items-center justify-between gap-2">
                   <dt className="text-[#141414]">Requires</dt>
@@ -212,7 +268,7 @@ export function FundraisingReports() {
         open={configureOpen}
         onOpenChange={setConfigureOpen}
         title={selected ? `Configure — ${selected.name}` : "Configure report"}
-        description="Schedule and recipients aren't persisted yet. Running executes immediately and downloads CSV."
+        description="Any cadence other than On demand is saved as a schedule. Running executes immediately and downloads CSV."
         size="md"
         footer={
           <FrFormFooter

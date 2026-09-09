@@ -36,7 +36,7 @@ import {
   frInputClass,
   requirementsFromError,
 } from "./fundraising-modals"
-import type { MandateStage } from "./mandates-mock-data"
+import type { MandateStage } from "./mandates-presentation"
 
 const CARD =
   "rounded-[12px] border border-[#e2e8f0] bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04)]"

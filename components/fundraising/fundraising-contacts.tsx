@@ -14,7 +14,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { influenceChipClass, type ContactInfluence } from "./contacts-mock-data"
+import { influenceChipClass, type ContactInfluence } from "./contacts-presentation"
 import {
   FrConfirmDialog,
   FrDialogShell,

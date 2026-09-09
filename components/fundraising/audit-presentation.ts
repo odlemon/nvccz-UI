@@ -1,3 +1,10 @@
+/**
+ * Presentation helpers for the fundraising audit screen:
+ * chip/label classes, option lists and shared types.
+ *
+ * All data on that screen comes from the API — nothing here fabricates values.
+ */
+
 export function auditActionClass(action: string): string {
   const a = String(action || "").toUpperCase()
   if (a.includes("CREATE")) return "bg-[#dcfce7] text-[#15803d]"

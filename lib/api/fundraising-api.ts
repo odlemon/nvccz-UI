@@ -937,10 +937,43 @@ async function getAnalyticsStageAgeing(params?: { campaignId?: string }) {
   return unwrapData(res)
 }
 
+/** Catalogue of runnable reports: [{ reportKey, label, requiresCampaignId }]. */
+async function listReports() {
+  const res = await apiClient.get<ApiResponse<any[]>>(`${FR}/reports`)
+  const data = unwrapData(res)
+  return Array.isArray(data) ? data : []
+}
+
 async function getReport(reportKey: string, params?: Record<string, string | number | boolean | undefined>) {
   const res = await apiClient.get<ApiResponse<any>>(
     `${FR}/reports/${reportKey}${qs(params)}`
   )
+  return unwrapData(res)
+}
+
+async function listReportSchedules(params?: { reportKey?: string }) {
+  const res = await apiClient.get<ApiResponse<any[] | FrPaginated<any>>>(
+    `${FR}/reports/schedules${qs(params)}`
+  )
+  const data = unwrapData(res)
+  if (Array.isArray(data)) return data
+  return (data as FrPaginated<any>).items ?? []
+}
+
+/**
+ * POST /fundraising/reports/schedules
+ * Contract per FundraisingRequirementsService.createReportSchedule: reportKey and name are
+ * required; cadence defaults to MONTHLY server-side; recipients accepts a JSON value.
+ */
+async function createReportSchedule(body: {
+  reportKey: string
+  name: string
+  cadence?: string
+  recipients?: unknown
+  format?: string
+  filters?: Record<string, unknown>
+}) {
+  const res = await apiClient.post<ApiResponse<any>>(`${FR}/reports/schedules`, body)
   return unwrapData(res)
 }
 
@@ -1298,7 +1331,10 @@ export const fundraisingApi = {
   getAnalyticsSource,
   getAnalyticsOwnerPerformance,
   getAnalyticsStageAgeing,
+  listReports,
   getReport,
+  listReportSchedules,
+  createReportSchedule,
   listAuditLogs,
   exportAuditLogs,
   // settings

@@ -42,7 +42,7 @@ import {
   taskStatusLabel,
   type DashActivity,
   type DashTaskStatus,
-} from "./dashboard-mock-data"
+} from "./dashboard-presentation"
 
 const CARD =
   "rounded-[6px] border border-[#e2e8f0] bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04)]"

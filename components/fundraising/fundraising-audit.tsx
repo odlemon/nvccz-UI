@@ -16,7 +16,7 @@ import {
 import { fundraisingApi, toastFrError } from "@/lib/api/fundraising-api"
 import { mapAuditLogRow, titleCase } from "@/lib/fundraising/mappers"
 import { downloadCsvPayload } from "@/lib/fundraising/export"
-import { auditActionClass } from "./audit-mock-data"
+import { auditActionClass } from "./audit-presentation"
 import { FrDialogShell, FrTableSkeleton } from "./fundraising-modals"
 
 const CARD =

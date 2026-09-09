@@ -20,7 +20,7 @@ import {
   statusClass,
   typeClass,
   type ApprovalStatus,
-} from "./approvals-mock-data"
+} from "./approvals-presentation"
 import {
   FrDialogShell,
   FrField,

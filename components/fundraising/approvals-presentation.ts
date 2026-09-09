@@ -1,3 +1,10 @@
+/**
+ * Presentation helpers for the fundraising approvals screen:
+ * chip/label classes, option lists and shared types.
+ *
+ * All data on that screen comes from the API — nothing here fabricates values.
+ */
+
 export type ApprovalStatus = "PENDING" | "APPROVED" | "REJECTED"
 
 export function priorityClass(priority: string | null | undefined) {

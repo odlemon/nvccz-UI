@@ -1,3 +1,10 @@
+/**
+ * Presentation helpers for the fundraising forecasts screen:
+ * chip/label classes, option lists and shared types.
+ *
+ * All data on that screen comes from the API — nothing here fabricates values.
+ */
+
 export type ScenarioId = "downside" | "base" | "upside"
 
 export type ScenarioAssumptions = {
