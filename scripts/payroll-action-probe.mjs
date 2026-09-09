@@ -103,6 +103,37 @@ page.on("response", async (r) => {
   calls.push(`${req.method()} ${r.status()} ${url.replace(/^https?:\/\/[^/]+/, "").split("?")[0]}`)
 })
 
+// Export actions produce a file rather than a request or a toast. Without
+// this they score as silent no-ops, which is the wrong answer for a control
+// that did exactly what it promised.
+const downloads = []
+const downloadBodies = []
+page.on("download", async (d) => {
+  downloads.push(d.suggestedFilename())
+  try {
+    const stream = await d.createReadStream()
+    if (stream) {
+      const chunks = []
+      for await (const c of stream) chunks.push(c)
+      downloadBodies.push(Buffer.concat(chunks).toString("utf8").slice(0, 400))
+    }
+  } catch (_) {}
+})
+
+/**
+ * Overlay state. Modals and drawers live in the shell, OUTSIDE #content, so
+ * comparing #content length alone scores "open a dialog" as a silent no-op --
+ * a false negative that would have condemned working controls.
+ */
+const overlayState = () =>
+  page.evaluate(() => ({
+    modal: (document.querySelector("#modal") || {}).className || "",
+    drawer: (document.querySelector("#drawer") || {}).className || "",
+    modalLen: ((document.querySelector("#modalBody") || {}).innerText || "").length,
+    drawerLen: ((document.querySelector("#drawerBody") || {}).innerText || "").length,
+  }))
+
+const overlayBefore = await overlayState()
 const before = await page.evaluate(() => document.querySelector("#content").innerText.length)
 
 // Some actions live behind a modal opened by another control (e.g. create-run
@@ -178,6 +209,12 @@ const toasts = await page.evaluate(() => {
   return Array.from(seen)
 })
 const after = await page.evaluate(() => document.querySelector("#content").innerText.length)
+const overlayAfter = await overlayState()
+const overlayChanged =
+  overlayBefore.modal !== overlayAfter.modal ||
+  overlayBefore.drawer !== overlayAfter.drawer ||
+  overlayBefore.modalLen !== overlayAfter.modalLen ||
+  overlayBefore.drawerLen !== overlayAfter.drawerLen
 
 const apiCalls = calls.filter((c) => !c.startsWith("GET 200 /api/payroll/me/access"))
 
@@ -189,13 +226,20 @@ for (const c of apiCalls) console.log(`  ${c}`)
 console.log(`TOASTS      ${toasts.length}`)
 for (const t of toasts) console.log(`  ${t}`)
 console.log(`CONTENT     ${before} -> ${after} chars`)
+console.log(`OVERLAY     modal "${overlayBefore.modal}"->"${overlayAfter.modal}" body ${overlayBefore.modalLen}->${overlayAfter.modalLen}`)
+console.log(`DOWNLOADS   ${downloads.length}`)
+for (const d of downloads) console.log(`  ${d}`)
+for (const b of downloadBodies) console.log(`  --- first 400 chars ---
+${b}`)
 if (opener) console.log(`MODAL       opened via "${opener}" -> ${modalOpened ?? "(no #modal)"}`)
 
 const writes = apiCalls.filter((c) => !c.startsWith("GET"))
 let verdict
 if (writes.length) verdict = "LIVE — reached a write endpoint"
+else if (downloads.length) verdict = `EXPORT — produced ${downloads.join(", ")}`
 else if (toasts.length) verdict = "REFUSED / MESSAGED — no write, but the UI said so"
 else if (after !== before) verdict = "VIEW-STATE — changed the screen, no API call"
+else if (overlayChanged) verdict = "VIEW-STATE — opened a dialog, no API call"
 else verdict = "SILENT NO-OP — no API call, no message, no visible change"
 console.log(`VERDICT     ${verdict}`)
 
