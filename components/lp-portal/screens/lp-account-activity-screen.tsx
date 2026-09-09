@@ -426,8 +426,12 @@ export function LpAccountActivityScreen({
         {kpiCards.map((card) => {
           const active = metric === card.id
           return (
+            // The hint is a sibling of the card button, not a child: InfoHintKpi renders its own
+            // <button> as the popover trigger, and a <button> inside a <button> is invalid HTML —
+            // React reported it as a hydration error on every load of this screen. Positioned
+            // absolutely so the card looks exactly as before.
+            <div key={card.id} className="relative">
             <button
-              key={card.id}
               type="button"
               onClick={() => {
                 if (card.id === "net") {
@@ -438,7 +442,7 @@ export function LpAccountActivityScreen({
                 setPage(1)
               }}
               className={cn(
-                "rounded-xl border bg-white p-3.5 text-left shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition",
+                "block w-full rounded-xl border bg-white p-3.5 text-left shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition",
                 active ? "border-[#93c5fd] ring-2 ring-[#bfdbfe]" : "border-[#e5e7eb] hover:border-[#cbd5e1]",
               )}
             >
@@ -455,7 +459,6 @@ export function LpAccountActivityScreen({
                   </span>
                   <p className="text-[12px] font-medium text-[#6b7280]">{card.label}</p>
                 </div>
-                <InfoHintKpi label={card.label} />
               </div>
               <p className="mt-3 text-[20px] font-bold tabular-nums tracking-[-0.03em] text-[#0f172a]">
                 {card.value}
@@ -464,6 +467,10 @@ export function LpAccountActivityScreen({
                 {card.count} Transactions
               </span>
             </button>
+            <div className="absolute right-3.5 top-3.5">
+              <InfoHintKpi label={card.label} />
+            </div>
+            </div>
           )
         })}
       </div>

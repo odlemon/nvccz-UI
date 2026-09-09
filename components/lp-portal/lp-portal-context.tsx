@@ -177,7 +177,16 @@ export function LpPortalProvider({ children }: { children: React.ReactNode }) {
         session?.defaultValuationStatus ??
         "FINAL") as ValuationStatus,
       presentationCurrency: session?.presentationCurrency ?? "USD",
-      unreadCounts: session?.unreadCounts ?? { requests: 0, messages: 0, notices: 0, notifications: 0 },
+      // The API returns these as STRINGS ("0"/"1"). Every consumer treats them as numbers —
+      // the topbar sums them for the bell badge — so "1" + "0" + "1" concatenated to "101",
+      // which then compared greater than 9 and rendered a "9+" badge for an investor whose real
+      // total was 2. Coerced once here so every consumer of the context gets numbers.
+      unreadCounts: {
+        requests: Number(session?.unreadCounts?.requests ?? 0) || 0,
+        messages: Number(session?.unreadCounts?.messages ?? 0) || 0,
+        notices: Number(session?.unreadCounts?.notices ?? 0) || 0,
+        notifications: Number(session?.unreadCounts?.notifications ?? 0) || 0,
+      },
       notifications,
       notificationsLoading,
       refreshKeys,
