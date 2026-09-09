@@ -836,6 +836,71 @@ function __pr6DeniedPageHtml(pageId) {
 }
 
 /**
+ * Payroll run register statistics. The page carried '2' open runs, '140'
+ * employees in scope, a gross of 362,960, '12' open exceptions and a
+ * "31 May 2026" last release, none of which came from anywhere.
+ */
+function __pr6RunStats() {
+  if (!__pr6IsLive()) return null;
+  const runs = Array.isArray(payrollRuns) ? payrollRuns : [];
+  const staff = Array.isArray(employees) ? employees : [];
+  const exc = Array.isArray(exceptions) ? exceptions : [];
+  const open = runs.filter((r) => String(r.rawStatus) !== 'COMPLETED');
+  const released = runs.filter((r) => String(r.rawStatus) === 'COMPLETED');
+  const latest = runs.length ? runs[0] : null;
+  const lastReleased = released.length ? released[0] : null;
+  const critical = exc.filter((e) => e && e.severity === 'Critical').length;
+  const high = exc.filter((e) => e && e.severity === 'High').length;
+  return {
+    openRuns: open.length,
+    openSub: open.length ? String(open[0].reference || open[0].period) : 'None in progress',
+    inScope: latest ? Number(latest.employees) || 0 : staff.length,
+    gross: latest ? Number(latest.grossUSD) || 0 : 0,
+    grossSub: latest ? String(latest.reference || latest.period) : 'No run',
+    exceptions: exc.length,
+    exceptionSub: `${critical} critical, ${high} high`,
+    lastRelease: lastReleased ? String(lastReleased.reference || lastReleased.period) : 'None yet',
+    totalRuns: runs.length,
+  };
+}
+
+/**
+ * Pay-period options for the Create Payroll Run dialog.
+ *
+ * The dialog offered exactly two hardcoded periods, "July 2026" and
+ * "June 2026". Both already have runs, and createPayrollRun rejects any period
+ * overlapping an existing one, so creating a run through the UI was impossible
+ * -- every choice returned "A payroll run already exists for this period".
+ *
+ * Offers the next twelve months that no run occupies, most recent first.
+ */
+function __pr6PeriodOptions() {
+  if (!__pr6IsLive()) return null;
+  const runs = Array.isArray(payrollRuns) ? payrollRuns : [];
+  const taken = new Set(
+    runs
+      .map((r) => String(r.reference || ''))
+      .filter(Boolean),
+  );
+  const MONTHS = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December',
+  ];
+  const out = [];
+  const now = new Date();
+  // Start from the month after the newest run, else from this month.
+  let y = now.getUTCFullYear();
+  let m = now.getUTCMonth() + 1;
+  for (let i = 0; i < 24 && out.length < 12; i += 1) {
+    const key = `${y}-${String(m).padStart(2, '0')}`;
+    if (!taken.has(key)) out.push(`${MONTHS[m - 1]} ${y}`);
+    m += 1;
+    if (m > 12) { m = 1; y += 1; }
+  }
+  return out.length ? out : null;
+}
+
+/**
  * Action interception.
  *
  * Registered in the capture phase before the runtime's own handlers, so a

@@ -235,9 +235,19 @@ export async function recordRunPayment(id: string, body: Record<string, any> = {
   return unwrapData(res)
 }
 
-/** Returns the bank batch as CSV text, not JSON. */
-export async function generateBankFile(id: string, bankTemplateId: string) {
-  return apiClient.post<any>(`${BASE}/payroll-runs/${id}/bank-file`, { bankTemplateId })
+/**
+ * Returns the bank batch as CSV text, not JSON.
+ *
+ * responseType 'text' is required: the default path calls response.json() and
+ * throws ApiError("Invalid response format") on the CSV body, which surfaced as
+ * an error toast even though the request had succeeded with a 200.
+ */
+export async function generateBankFile(id: string, bankTemplateId: string): Promise<string> {
+  return apiClient.post<string>(
+    `${BASE}/payroll-runs/${id}/bank-file`,
+    { bankTemplateId },
+    { responseType: "text" },
+  )
 }
 
 // ---------------------------------------------------------------------------

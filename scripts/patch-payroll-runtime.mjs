@@ -797,6 +797,32 @@ s = replaceOnce(
   "!__pr6IsLive()&&id==='access'",
 )
 
+s = replaceOnce(
+  s,
+  "<div class=\"grid kpis\">${kpi('Open payroll runs','2','June 2026 processing','calculator')}${kpi('Employees in scope','140','Monthly and executive groups','users','cyan')}${kpi('Current gross',money(362960),'USD before ZiG component','wallet','violet')}${kpi('Open exceptions','12','3 critical, 4 high','alert','red')}${kpi('Approval controls','4 / 6','Two controls outstanding','shield','amber')}${kpi('Last release','31 May 2026','Bank settlement completed','bank','cyan')}</div>",
+  "<div class=\"grid kpis\">${(()=>{const r=__pr6RunStats();"
+    + "if(!r)return `${kpi('Open payroll runs','2','June 2026 processing','calculator')}${kpi('Employees in scope','140','Monthly and executive groups','users','cyan')}`;"
+    + "return kpi('Open payroll runs',String(r.openRuns),r.openSub,'calculator')"
+    + "+kpi('Employees in scope',String(r.inScope),'On the latest run','users','cyan')"
+    + "+kpi('Current gross',money(r.gross),r.grossSub,'wallet','violet')"
+    + "+kpi('Open exceptions',String(r.exceptions),r.exceptionSub,'alert','red')"
+    + "+kpi('Runs on record',String(r.totalRuns),'All payroll periods','audit')"
+    + "+kpi('Last release',r.lastRelease,'Most recent completed run','bank','cyan')})()}</div>",
+  "runs register KPIs -> live",
+  "kpi('Open payroll runs',String(r.openRuns)",
+)
+
+// The Create Payroll Run dialog offered two hardcoded periods, both of which
+// already have runs, so every attempt returned "A payroll run already exists
+// for this period" and a run could not be created through the UI at all.
+s = replaceOnce(
+  s,
+  "<select id=\"runPeriod\"><option>July 2026</option><option>June 2026</option></select>",
+  "<select id=\"runPeriod\">${(()=>{const o=__pr6PeriodOptions();return o?o.map(x=>`<option>${x}</option>`).join(''):'<option>July 2026</option><option>June 2026</option>'})()}</select>",
+  "create-run period options -> live",
+  "__pr6PeriodOptions();return o?o.map",
+)
+
 // ---------------------------------------------------------------------------
 // 5. hydrate() on the api object
 // ---------------------------------------------------------------------------
