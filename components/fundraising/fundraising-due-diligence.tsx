@@ -209,6 +209,15 @@ export function FundraisingDueDiligence() {
     loadCases()
   }, [])
 
+  // Select the first case once the list arrives. Without this the screen opens with no case
+  // selected, so the Due Diligence Matrix renders an empty table with no explanation even
+  // when every case has items — it looked broken rather than unselected.
+  useEffect(() => {
+    if (selectedId || rawCases.length === 0) return
+    void selectCase(String(rawCases[0].id))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rawCases, selectedId])
+
   useEffect(() => {
     if (!addCaseOpen) return
     setLoadingRefs(true)
