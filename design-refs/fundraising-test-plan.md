@@ -362,6 +362,40 @@ carries every SRD field it lists as missing (trading name, registration number, 
 relationship owner, sanctions/risk/classification, asset-class and geographic preferences, next
 action), and the Campaigns and Investors exports it marks "backend-pending" both produce a CSV.
 
+### 6.3 Platform finding: the SYSADMIN profile cookie is silently dropped
+
+Found while chasing an intermittent "Access denied" on Due Diligence during a combined
+Trip A + B run. **This is not a fundraising defect** - it is platform-wide and sits in shared
+auth code - but it is worth recording because it makes every module intermittently deniable for
+the highest-privilege role, and because it shaped how the verification scripts authenticate.
+
+`setUserProfile` in `lib/utils/cookies.ts` writes the full profile, including
+`role.permissions`, with `document.cookie`. For SYSADMIN that URI-encodes to **5,675 bytes**,
+past the ~4,096-byte per-cookie limit browsers enforce. Measured directly:
+
+```
+app writes userProfile of 5675 bytes -> browser stored 0 bytes
+  => SILENTLY DROPPED by the browser
+```
+
+The write does not throw and nothing reports a failure. `getUserProfile()` therefore returns
+`null` on every subsequent load, and `authSlice` falls back to fetching `GET /users/:id` to
+learn the user's permissions.
+
+That fallback is correct and usually invisible. But it means permissions for the most
+privileged role depend on a network round trip on **every page load**. `ModuleGuard` handles
+the in-flight case properly - it renders `GuardLoading`, never a denial - so a slow response is
+harmless. A *failed* response is not: permissions resolve empty, `isLoading` goes false, and the
+user is told "Access denied" for a module they own. That is what was observed once, under load,
+with two agents driving the same dev server.
+
+Reproduced deliberately, not inferred. Not fixed here for two reasons: it is outside this
+module (`lib/utils/cookies.ts`, `lib/store/slices/authSlice.ts` and
+`components/permissions/PermissionGuards.tsx` are shared by every module), and that code is
+being actively changed by concurrent work on Payroll. Worth fixing separately - the obvious
+options are to store only what the guards read rather than the whole permission list, or to
+treat a failed profile fetch as an error state distinct from "no permissions".
+
 ---
 
 ## 7. Artefacts
