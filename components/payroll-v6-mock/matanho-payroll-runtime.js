@@ -40,6 +40,7 @@ const __pr6Live = {
   reference: null, // tax rules, allowance/deduction types, brackets, levies, courses
   dashboard: null, // /api/payroll/dashboard payload
   mypay: null, // self-service payslips, portal and leave balances
+  vendors: null, // supplier registry, read from the real Vendor table
   errors: [],
 };
 
@@ -933,6 +934,34 @@ function __pr6PeriodOptions() {
  * none of which existed: the runtime's logEvent() wrote to an in-memory array
  * that died with the page. The trail is now payroll_audit_events.
  */
+/**
+ * Vendors & Quotations rows and header figures.
+ *
+ * The screen shipped a hardcoded registry — "Medsure Health Fund", VEN-001 and friends, each with
+ * an invented rating, contract value and compliance percentage — plus KPI cards asserting 26
+ * registered vendors and USD 28,460 of negotiated savings. None of it came from anywhere.
+ *
+ * Returns null when there is no live vendor payload, so the caller can render an honest empty
+ * state instead of falling back to the fixture.
+ */
+function __pr6Vendors() {
+  const v = __pr6Live.vendors;
+  if (!v || !Array.isArray(v.items)) return null;
+  const s = v.summary || {};
+  return {
+    items: v.items,
+    total: Number(v.total) || v.items.length,
+    registered: Number(s.registered) || 0,
+    compliant: Number(s.compliant) || 0,
+    pending: Number(s.pending) || 0,
+    expired: Number(s.expired) || 0,
+    blacklisted: Number(s.blacklisted) || 0,
+    categories: Number(s.categories) || 0,
+    ratedCount: Number(s.ratedCount) || 0,
+    averageRating: s.averageRating == null ? null : Number(s.averageRating),
+  };
+}
+
 function __pr6AuditStats() {
   if (!__pr6IsLive()) return null;
   const rows = Array.isArray(auditEvents) ? auditEvents : [];
@@ -985,6 +1014,7 @@ document.addEventListener(
   true,
 );
   /* END_PAYROLL_LIVE_BRIDGE */
+
 
 
 
@@ -1691,9 +1721,9 @@ init();
   ];
 
   vendorsPage = function(){
-    const rows=vendorsV2.map(v=>`<tr data-vendor="${v.id}"><td><div class="access-user"><div class="vendor-logo">${v.initials}</div><div><strong class="link">${v.name}</strong><div class="tiny muted">${v.id} · ${v.category}</div></div></div></td><td>${v.country}</td><td>${v.contact}<div class="tiny muted">${v.email}</div></td><td><div style="display:flex;align-items:center;gap:7px"><div class="progress" style="width:62px"><span style="width:${v.compliance}%"></span></div><strong>${v.compliance}%</strong></div></td><td>${v.rating} / 5</td><td>${v.spend}</td><td>${badge(v.status)}</td><td><button class="btn small" data-vendor="${v.id}">${icon('eye')}Open</button></td></tr>`);
+    const __vn=__pr6Vendors();const rows=__vn?(__vn.items.length?__vn.items.map(v=>`<tr data-vendor="${v.id}"><td><div class="access-user"><div class="vendor-logo">${(v.name||'?').slice(0,2).toUpperCase()}</div><div><strong class="link">${v.name}</strong><div class="tiny muted">${v.category||'Uncategorised'}</div></div></div></td><td>${v.paymentTerms||'\u2014'}</td><td>${v.contactPerson||'\u2014'}<div class="tiny muted">${v.email||''}</div></td><td>${badge(v.complianceStatus)}</td><td>${v.rating==null?'<span class="tiny muted">Not rated</span>':v.rating+' / 5'}</td><td>${v.blacklisted?badge('Blacklisted'):badge('Active')}</td></tr>`):[`<tr><td colspan="6" class="tiny muted">No vendors are registered.</td></tr>`]):[`<tr><td colspan="6" class="tiny muted">Vendor registry unavailable for your role.</td></tr>`];
     return `<div class="page">${pageHead('HR and payroll procurement','Vendor Registry and Quotation Management','Govern vendors, issue secure bid forms by email, receive structured submissions, compare quotations and retain complete sourcing evidence.',button('Create RFQ','new-rfq','', 'file')+button('Add vendor','new-vendor','primary','plus'))}
-      <div class="grid kpis">${kpi('Registered vendors','26','18 approved and 8 in review','briefcase')}${kpi('Compliance ready','21','Five vendors require documents','shield','cyan')}${kpi('Open RFQs','4','Two close within seven days','file','amber')}${kpi('Bids received','17','Across active sourcing events','download','violet')}${kpi('Evaluated savings','USD 28,460','Year-to-date negotiated value','wallet','cyan')}${kpi('Expiring records','6','Within the next 60 days','calendar','amber')}</div>
+      <div class="grid kpis">${(()=>{const v=__pr6Vendors();if(!v)return kpi('Registered vendors','\u2014','Vendor registry unavailable for your role','briefcase');return kpi('Registered vendors',String(v.registered),v.categories+' categories','briefcase')+kpi('Compliance ready',String(v.compliant),v.pending+' pending, '+v.expired+' expired','shield','cyan')+kpi('Blacklisted',String(v.blacklisted),v.blacklisted?'Excluded from sourcing':'None excluded','shield',v.blacklisted?'amber':'')+kpi('Rated vendors',String(v.ratedCount),v.averageRating==null?'No ratings recorded':'Average '+v.averageRating+' / 5','briefcase','violet')})()}</div>
       <div class="vendor-layout"><section class="card"><div class="card-head"><div><h3>Vendor registry</h3><p>Due diligence, compliance, service performance and spend visibility</p></div><button class="btn small" data-action="download-vendor-register">${icon('download')}Export</button></div><div class="table-wrap"><table><thead><tr><th>Vendor</th><th>Coverage</th><th>Primary contact</th><th>Compliance</th><th>Rating</th><th>12-month spend</th><th>Status</th><th></th></tr></thead><tbody>${rows.join('')}</tbody></table></div></section><aside class="stack">${card('Open sourcing event','RFQ-HR-2026-014 · Medical aid administration',`<div class="card-body"><div class="profile-summary-strip"><div class="fact"><span>Invited</span><strong>6 vendors</strong></div><div class="fact"><span>Bids received</span><strong>3</strong></div><div class="fact"><span>Closes</span><strong>05 Aug 2026</strong></div><div class="fact"><span>Budget</span><strong>USD 32,000</strong></div></div>${progressRow('Submission progress',50,'3 of 6 invited vendors','cyan')}<div class="actions" style="margin-top:12px">${button('Send bid form','send-bid-form','primary','send')}${button('Preview form','preview-bid-form','', 'eye')}</div></div>`)}${card('Vendor control health','Registry-wide compliance position',`<div class="card-body">${progressRow('Tax clearance',92,'24 of 26 valid','cyan')}${progressRow('Bank verification',100,'All active vendors verified','cyan')}${progressRow('Data protection terms',85,'22 of 26 signed','amber')}${progressRow('Conflict declarations',96,'25 of 26 current','violet')}</div>`)}</aside></div>
       <div class="grid two" style="margin-top:12px"><section class="card"><div class="card-head"><div><h3>Quotation comparison</h3><p>Weighted technical, commercial and compliance evaluation</p></div><button class="btn small primary" data-action="compare-quotations">Open full comparison</button></div><div class="card-body quote-matrix"><div class="quote-row header"><div>Vendor</div><div>Technical</div><div>Commercial</div><div>Compliance</div><div>Total</div></div>${quoteRowsV2.map(q=>`<div class="quote-row"><div class="quote-cell" data-label="Vendor"><strong>${q.vendor}</strong><span>${q.price}</span></div><div class="quote-cell" data-label="Technical"><strong>${q.technical}%</strong><div class="score-bar"><i style="width:${q.technical}%"></i></div></div><div class="quote-cell" data-label="Commercial"><strong>${q.commercial}%</strong><div class="score-bar"><i style="width:${q.commercial}%"></i></div></div><div class="quote-cell" data-label="Compliance"><strong>${q.compliance}%</strong><div class="score-bar"><i style="width:${q.compliance}%"></i></div></div><div class="quote-cell" data-label="Weighted total">${badge(`${q.total}%${q.recommended?' · Preferred':''}`)}</div></div>`).join('')}</div></section><section class="card"><div class="card-head"><div><h3>System-generated vendor bid form</h3><p>Secure, structured and linked to the RFQ evidence record</p></div></div><div class="card-body"><div class="bid-form-preview"><h4>Medical Aid Administration · RFQ-HR-2026-014</h4><div class="bid-form-fields"><div class="bid-field"><span>Vendor identity</span><strong>Pre-filled from secure invitation</strong></div><div class="bid-field"><span>Pricing schedule</span><strong>Currency, tax and rate basis</strong></div><div class="bid-field"><span>Technical response</span><strong>Service, SLA and implementation</strong></div><div class="bid-field"><span>Compliance evidence</span><strong>Upload required documents</strong></div><div class="bid-field"><span>Declarations</span><strong>Conflicts and beneficial ownership</strong></div><div class="bid-field"><span>Submission control</span><strong>Timestamp and verification hash</strong></div></div></div><div class="actions" style="margin-top:12px">${button('Preview vendor experience','preview-bid-form','', 'eye')}${button('Email secure form','send-bid-form','primary','send')}</div></div></section></div>
     </div>`;
@@ -2599,6 +2629,9 @@ init();
         }
         if (Array.isArray(payload.leaveBalances)) {
           __pr6Live.leaveBalances = payload.leaveBalances;
+        }
+        if (payload.vendors !== undefined) {
+          __pr6Live.vendors = payload.vendors;
         }
         if (Array.isArray(payload.errors)) __pr6Live.errors = payload.errors;
 

@@ -213,7 +213,14 @@ for (const id of ids) {
   }
   page.off("response", onResponse)
 
-  const raw = text.match(/\d[\d,]*(?:\.\d+)?/g) || []
+  // Only free-standing numbers, and not the ones inside a date or a clock time. Scanning the raw
+  // text mined digits out of record ids — the cuid `cmtu17exj001dunw05vum616a` contributed a
+  // phantom "616" to the untraced list — and out of timestamps, which buried the values that
+  // actually need explaining. Same fix as scripts/lp-trace-numbers.mjs.
+  const scannable = text
+    .replace(/\b\d{1,2}:\d{2}(:\d{2})?\s*(AM|PM|am|pm)?/g, " ")
+    .replace(/\b\d{4}-\d{2}-\d{2}\b/g, " ")
+  const raw = scannable.match(/(?<![A-Za-z0-9])\d[\d,]*(?:\.\d+)?(?![A-Za-z0-9])/g) || []
   const onScreen = [...new Set(raw.map((s) => s.replace(/,/g, "")))]
   const unmatched = onScreen.filter((s) => {
     const n = Number(s)

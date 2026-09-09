@@ -345,6 +345,15 @@ export async function listLeaveBalances(): Promise<Record<string, any>[]> {
   return unwrapData(res) ?? []
 }
 
+/**
+ * Supplier registry for the Vendors & Quotations screen. Reads the real `Vendor` table; the screen
+ * previously rendered a hardcoded fixture of invented companies.
+ */
+export async function getPayrollVendors(): Promise<Record<string, any> | null> {
+  const res = await apiClient.get<ApiResponse<any>>(`${BASE}/vendors`)
+  return unwrapData(res) ?? null
+}
+
 export async function listBankTemplates(): Promise<Record<string, any>[]> {
   const res = await apiClient.get<ApiResponse<any[]>>(`${BASE}/bank-templates`)
   return unwrapData(res) ?? []

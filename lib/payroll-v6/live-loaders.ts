@@ -36,6 +36,7 @@ import {
   getMyLeaveBalances,
   listAuditEvents,
   type PayrollAccess,
+  getPayrollVendors,
 } from "@/lib/api/payroll-v6-api"
 
 export type LoaderError = { source: string; message: string; status?: number }
@@ -54,6 +55,7 @@ export type PayrollV6LivePayload = {
   reference: Record<string, any>
   leaveBalances: any[]
   mypay: Record<string, any>
+  vendors: Record<string, any> | null
   errors: LoaderError[]
 }
 
@@ -338,6 +340,7 @@ export async function loadPayrollV6LiveData(): Promise<PayrollV6LivePayload> {
   const canLeave = has("payroll.leave.view") || has("payroll.leave.manage")
   const canTraining = has("payroll.training.view") || has("payroll.training.manage")
   const canSettings = has("payroll.settings.view") || has("payroll.settings.manage")
+  const canVendors = has("payroll.vendors.view")
   const canDashboard = has("payroll.dashboard.view")
   const canAudit = has("payroll.audit.view")
 
@@ -358,6 +361,7 @@ export async function loadPayrollV6LiveData(): Promise<PayrollV6LivePayload> {
     myPortal,
     myLeave,
     auditRows,
+    vendorPayload,
   ] = await Promise.all([
     canDashboard ? safe("dashboard", getPayrollDashboard, null) : Promise.resolve(null),
     canEmployees ? safe("employees", listEmployees, [] as any[]) : Promise.resolve([] as any[]),
@@ -378,6 +382,9 @@ export async function loadPayrollV6LiveData(): Promise<PayrollV6LivePayload> {
     safe("employee/portal", getMyPayrollPortal, null),
     safe("employee/leave-balances", getMyLeaveBalances, [] as any[]),
     canAudit ? safe("audit", () => listAuditEvents(200), [] as any[]) : Promise.resolve([] as any[]),
+    // Vendors & Quotations rendered a hardcoded registry of invented suppliers; this is the real
+    // Vendor table. A role without payroll.vendors.view gets null, and the screen says so.
+    canVendors ? safe("vendors", getPayrollVendors, null) : Promise.resolve(null),
   ])
 
   // Annual leave balance per employee, for the roster's Leave column.
@@ -438,6 +445,8 @@ export async function loadPayrollV6LiveData(): Promise<PayrollV6LivePayload> {
 
   return {
     ready: true,
+    // Top level, not under `reference`: the runtime bridge reads `__pr6Live.vendors`.
+    vendors: vendorPayload ?? null,
     roleName: access?.roleName ?? null,
     permissions: access?.permissions ?? [],
     access,

@@ -193,6 +193,69 @@ s = replaceOnce(
 )
 
 // ---------------------------------------------------------------------------
+// 4a2. Vendors & Quotations registry and KPIs come from the real Vendor table
+// ---------------------------------------------------------------------------
+// The screen shipped a hardcoded registry — Medsure Health Fund, VEN-001 and
+// friends, each with an invented rating and compliance percentage — under KPI
+// cards asserting 26 registered vendors. It was the module's largest block of
+// untraced numbers. There is no fixture fallback: showing invented suppliers
+// when the real table is empty is the defect, so empty renders as empty.
+//
+// Both targets sit inside enormous minified lines that carry unrelated
+// statements after them — the rows line ends with the runtime's whole page
+// registry — so each match is bounded by its own terminator, never by the line.
+// `rows` must stay an ARRAY: the caller does `${rows.join('')}`.
+{
+  const label = "vendor registry + KPIs -> live"
+  // Guard on the patched CALL SITE, not the helper name: the injected bridge
+  // defines __pr6Vendors, so testing the name alone reports "already applied"
+  // against a freshly extracted runtime and silently skips this patch.
+  if (s.includes("const __vn=__pr6Vendors()")) {
+    console.log(`  skip (already)  ${label}`)
+    skipped += 1
+  } else {
+    const kpiRe = /<div class="grid kpis">\$\{kpi\('Registered vendors','26'[\s\S]*?<\/div>(?=\r?\n\s*<div class="vendor-layout")/
+    const rowsRe = /const rows=vendorsV2\.map\(v=>`<tr data-vendor[\s\S]*?<\/tr>`\);/
+    const kpiM = s.match(kpiRe)
+    const rowsM = s.match(rowsRe)
+    if (!kpiM || !rowsM) {
+      console.warn(`  MISS            ${label}`)
+      missed += 1
+    } else {
+      const emptyRow = (msg) =>
+        "[`<tr><td colspan=\"6\" class=\"tiny muted\">" + msg + "</td></tr>`]"
+      const liveRows = [
+        "const __vn=__pr6Vendors();",
+        "const rows=__vn?(__vn.items.length?__vn.items.map(v=>`<tr data-vendor=\"${v.id}\">",
+        "<td><div class=\"access-user\"><div class=\"vendor-logo\">${(v.name||'?').slice(0,2).toUpperCase()}</div>",
+        "<div><strong class=\"link\">${v.name}</strong><div class=\"tiny muted\">${v.category||'Uncategorised'}</div></div></div></td>",
+        "<td>${v.paymentTerms||'\\u2014'}</td>",
+        "<td>${v.contactPerson||'\\u2014'}<div class=\"tiny muted\">${v.email||''}</div></td>",
+        "<td>${badge(v.complianceStatus)}</td>",
+        "<td>${v.rating==null?'<span class=\"tiny muted\">Not rated</span>':v.rating+' / 5'}</td>",
+        "<td>${v.blacklisted?badge('Blacklisted'):badge('Active')}</td></tr>`)",
+        ":" + emptyRow("No vendors are registered.") + ")",
+        ":" + emptyRow("Vendor registry unavailable for your role.") + ";",
+      ].join("")
+      s = s.replace(rowsM[0], liveRows)
+
+      const liveKpis = [
+        '<div class="grid kpis">${(()=>{const v=__pr6Vendors();',
+        "if(!v)return kpi('Registered vendors','\\u2014','Vendor registry unavailable for your role','briefcase');",
+        "return kpi('Registered vendors',String(v.registered),v.categories+' categories','briefcase')",
+        "+kpi('Compliance ready',String(v.compliant),v.pending+' pending, '+v.expired+' expired','shield','cyan')",
+        "+kpi('Blacklisted',String(v.blacklisted),v.blacklisted?'Excluded from sourcing':'None excluded','shield',v.blacklisted?'amber':'')",
+        "+kpi('Rated vendors',String(v.ratedCount),v.averageRating==null?'No ratings recorded':'Average '+v.averageRating+' / 5','briefcase','violet')})()}</div>",
+      ].join("")
+      s = s.replace(kpiM[0], liveKpis)
+
+      console.log(`  patched         ${label}`)
+      applied += 1
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
 // 4b. Command-centre KPI cards come from data, not from literals
 // ---------------------------------------------------------------------------
 // The overview shipped with Employees '128', gross USD 264,720, gross ZiG
@@ -925,6 +988,11 @@ const HYDRATE_IMPL = `  api = {
         if (Array.isArray(payload.leaveBalances)) {
           __pr6Live.leaveBalances = payload.leaveBalances;
         }
+        // Vendors is an object, not an array, and null is meaningful: it is how a role
+        // without payroll.vendors.view is told the registry is not theirs to see.
+        if (payload.vendors !== undefined) {
+          __pr6Live.vendors = payload.vendors;
+        }
         if (Array.isArray(payload.errors)) __pr6Live.errors = payload.errors;
 
         __pr6Live.ready = true;
@@ -934,6 +1002,28 @@ const HYDRATE_IMPL = `  api = {
       }
     },
     setPage(page) {`
+
+// The hydrate body is marker-guarded, so a runtime that already has it never
+// picks up new keys. Vendors is carried separately for that reason: an object,
+// not an array, and null is meaningful — it is how a role without
+// payroll.vendors.view is told the registry is not theirs to see.
+if (s.includes("__pr6Live.vendors = payload.vendors")) {
+  console.log("  skip (already)  hydrate: carry vendors")
+  skipped += 1
+} else {
+  const anchor = "__pr6Live.leaveBalances = payload.leaveBalances;"
+  if (!s.includes(anchor)) {
+    console.warn("  MISS            hydrate: carry vendors")
+    missed += 1
+  } else {
+    s = s.replace(
+      anchor,
+      anchor + "\n        }\n        if (payload.vendors !== undefined) {\n          __pr6Live.vendors = payload.vendors;",
+    )
+    console.log("  patched         hydrate: carry vendors")
+    applied += 1
+  }
+}
 
 s = replaceOnce(s, API_ANCHOR, HYDRATE_IMPL, "api.hydrate()", "hydrate(payload) {")
 

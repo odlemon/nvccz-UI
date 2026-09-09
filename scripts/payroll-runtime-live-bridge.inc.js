@@ -28,6 +28,7 @@ const __pr6Live = {
   reference: null, // tax rules, allowance/deduction types, brackets, levies, courses
   dashboard: null, // /api/payroll/dashboard payload
   mypay: null, // self-service payslips, portal and leave balances
+  vendors: null, // supplier registry, read from the real Vendor table
   errors: [],
 };
 
@@ -921,6 +922,34 @@ function __pr6PeriodOptions() {
  * none of which existed: the runtime's logEvent() wrote to an in-memory array
  * that died with the page. The trail is now payroll_audit_events.
  */
+/**
+ * Vendors & Quotations rows and header figures.
+ *
+ * The screen shipped a hardcoded registry — "Medsure Health Fund", VEN-001 and friends, each with
+ * an invented rating, contract value and compliance percentage — plus KPI cards asserting 26
+ * registered vendors and USD 28,460 of negotiated savings. None of it came from anywhere.
+ *
+ * Returns null when there is no live vendor payload, so the caller can render an honest empty
+ * state instead of falling back to the fixture.
+ */
+function __pr6Vendors() {
+  const v = __pr6Live.vendors;
+  if (!v || !Array.isArray(v.items)) return null;
+  const s = v.summary || {};
+  return {
+    items: v.items,
+    total: Number(v.total) || v.items.length,
+    registered: Number(s.registered) || 0,
+    compliant: Number(s.compliant) || 0,
+    pending: Number(s.pending) || 0,
+    expired: Number(s.expired) || 0,
+    blacklisted: Number(s.blacklisted) || 0,
+    categories: Number(s.categories) || 0,
+    ratedCount: Number(s.ratedCount) || 0,
+    averageRating: s.averageRating == null ? null : Number(s.averageRating),
+  };
+}
+
 function __pr6AuditStats() {
   if (!__pr6IsLive()) return null;
   const rows = Array.isArray(auditEvents) ? auditEvents : [];
