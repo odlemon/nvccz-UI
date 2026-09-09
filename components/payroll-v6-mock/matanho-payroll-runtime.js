@@ -81,6 +81,10 @@ const __PR6_PERMISSION_MAP = {
   'reports.generate': ['payroll.reports.view', 'payroll.reports.manage'],
   'audit.view': ['payroll.audit.view'],
   'rbac.manage': ['payroll.access.manage'],
+  // Set by an enhancement IIFE: pagePermission.vendors = 'vendors.manage'.
+  // Missing this mapping denied the Vendors screen to every role including
+  // System Administrator, because an unmapped id used to return a hard false.
+  'vendors.manage': ['payroll.vendors.view', 'payroll.vendors.manage'],
   // Self-service is authenticated-only on the backend: every signed-in user
   // may see their own pay, so this is always allowed.
   'self.view': [],
@@ -90,7 +94,11 @@ const __PR6_PERMISSION_MAP = {
 function __pr6Can(permission) {
   if (!__pr6IsLive() || !__pr6Live.permissions) return null; // fall through to mock roles
   const mapped = __PR6_PERMISSION_MAP[permission];
-  if (!mapped) return false;
+  // An id we have no mapping for must NOT be a hard deny: pagePermission is
+  // extended by the enhancement IIFEs, and a missing entry locked System
+  // Administrator out of the Vendors screen. Fall through instead, so the
+  // decision is at least made against the role rather than by an oversight.
+  if (!mapped) return null;
   if (mapped.length === 0) return true;
   return mapped.some((p) => __pr6Live.permissions.has(p));
 }
