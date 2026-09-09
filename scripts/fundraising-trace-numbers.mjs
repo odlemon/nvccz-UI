@@ -119,11 +119,17 @@ if (user.id) {
 }
 const { hostname } = new URL(BASE)
 const common = { domain: hostname, path: "/", httpOnly: false, secure: false, sameSite: "Lax" }
-await context.addCookies([
+const cookies = [
   { name: "token", value: token, ...common },
   { name: "user", value: encodeURIComponent(JSON.stringify(user)), ...common },
-  { name: "userProfile", value: encodeURIComponent(JSON.stringify(profile)), ...common },
-])
+]
+// See fundraising-page-dump.mjs: a SYSADMIN userProfile exceeds the 4096-byte cookie limit,
+// so the app fetches it instead. Emulate that rather than injecting a trimmed profile.
+const profileValue = encodeURIComponent(JSON.stringify(profile))
+if (profileValue.length <= 3800) {
+  cookies.push({ name: "userProfile", value: profileValue, ...common })
+}
+await context.addCookies(cookies)
 
 const page = await context.newPage()
 page.setDefaultTimeout(60000)
@@ -145,13 +151,23 @@ for (const id of ids) {
   }
   page.on("response", onResponse)
 
-  try {
-    await page.goto(BASE + PAGES[id], { waitUntil: "domcontentloaded", timeout: 90000 })
-    await page.waitForSelector("h1, main", { timeout: 45000 })
-  } catch {}
-  await page.waitForTimeout(4500)
-
-  const text = await page.evaluate(() => (document.querySelector("main") || document.body).innerText)
+  // Same dev-server chunk race as fundraising-page-dump.mjs: retry once on a stuck
+  // "Loading…" so a compile-time artifact is not mistaken for an untraceable screen.
+  let text = ""
+  for (let attempt = 0; attempt < 2; attempt++) {
+    if (attempt > 0) {
+      payloadNumbers.clear()
+      endpoints.length = 0
+      await page.waitForTimeout(2500)
+    }
+    try {
+      await page.goto(BASE + PAGES[id], { waitUntil: "domcontentloaded", timeout: 90000 })
+      await page.waitForSelector("h1, main", { timeout: 45000 })
+    } catch {}
+    await page.waitForTimeout(4500)
+    text = await page.evaluate(() => (document.querySelector("main") || document.body).innerText)
+    if (text.trim() !== "Loading...") break
+  }
   page.off("response", onResponse)
 
   // Strip separators so "1,250,000.00" tests as 1250000. Dates and years are excluded up

@@ -106,11 +106,26 @@ async function seedAuthCookies(email, password) {
 
   const { hostname } = new URL(BASE)
   const common = { domain: hostname, path: "/", httpOnly: false, secure: false, sameSite: "Lax" }
-  await context.addCookies([
+  const cookies = [
     { name: "token", value: token, ...common },
     { name: "user", value: encodeURIComponent(JSON.stringify(user)), ...common },
-    { name: "userProfile", value: encodeURIComponent(JSON.stringify(profile)), ...common },
-  ])
+  ]
+
+  // userProfile carries role.permissions, which for SYSADMIN encodes to ~5.7KB — past the
+  // 4096-byte cookie limit. The app hits the same wall: setUserProfile writes it with
+  // document.cookie, the browser drops it, getUserProfile returns null and authSlice falls
+  // back to fetching the profile from the API. Emulate that fallback rather than injecting a
+  // trimmed profile, which would misrepresent the permissions the page actually sees.
+  const profileValue = encodeURIComponent(JSON.stringify(profile))
+  if (profileValue.length <= 3800) {
+    cookies.push({ name: "userProfile", value: profileValue, ...common })
+  } else {
+    console.log(
+      `  (userProfile ${profileValue.length}B exceeds the cookie limit — the app will fetch it, same as a real login)`,
+    )
+  }
+
+  await context.addCookies(cookies)
   return profile
 }
 
@@ -131,7 +146,13 @@ for (const id of pageIds) {
     if (m.type() === "error") errors.push(m.text().slice(0, 400))
   }
   const onPageError = (e) => errors.push(`PAGEERROR ${String(e).slice(0, 400)}`)
-  const onFailed = (r) => failed.push(`${r.failure()?.errorText || "failed"} ${r.url().slice(0, 160)}`)
+  // Next aborts its own RSC prefetches on navigation (`?_rsc=…`) and the socket.io transport
+  // reconnects on its own. Neither is a screen defect, so they are not counted as failures.
+  const benign = (u) => /[?&]_rsc=/.test(u) || u.includes("/socket.io/")
+  const onFailed = (r) => {
+    if (benign(r.url())) return
+    failed.push(`${r.failure()?.errorText || "failed"} ${r.url().slice(0, 160)}`)
+  }
   const onResponse = (r) => {
     const u = r.url()
     if (!u.includes("/api/")) return
@@ -145,14 +166,35 @@ for (const id of pageIds) {
   page.on("requestfailed", onFailed)
   page.on("response", onResponse)
 
+  // In dev, Next compiles routes on demand and this server is shared, so a page can land
+  // mid-compile and fail with ChunkLoadError / a stuck "Loading…". That is an artifact of the
+  // dev server, not of the screen, so retry once on those two signals only — a screen that is
+  // genuinely broken fails the same way twice and still gets reported.
   let navError = null
-  try {
-    await page.goto(BASE + PAGES[id], { waitUntil: "domcontentloaded", timeout: 90000 })
-    await page.waitForSelector("h1, main", { timeout: 45000 })
-  } catch (e) {
-    navError = String(e).slice(0, 200)
+  for (let attempt = 0; attempt < 2; attempt++) {
+    if (attempt > 0) {
+      errors.length = 0
+      failed.length = 0
+      calls.length = 0
+      await page.waitForTimeout(2500)
+    }
+    navError = null
+    try {
+      await page.goto(BASE + PAGES[id], { waitUntil: "domcontentloaded", timeout: 90000 })
+      await page.waitForSelector("h1, main", { timeout: 45000 })
+    } catch (e) {
+      navError = String(e).slice(0, 200)
+    }
+    await page.waitForTimeout(4500)
+
+    const chunkRace =
+      errors.some((e) => /ChunkLoadError|Loading chunk .* failed/i.test(e)) ||
+      (await page.evaluate(
+        () => ((document.querySelector("main") || document.body).innerText || "").trim() === "Loading...",
+      ))
+    if (!chunkRace) break
+    if (attempt === 0) console.log(`  ${id.padEnd(18)} (dev chunk race — retrying)`)
   }
-  await page.waitForTimeout(4500)
 
   const info = await page.evaluate(() => {
     const main = document.querySelector("main") || document.body
@@ -173,10 +215,11 @@ for (const id of pageIds) {
   page.off("response", onResponse)
 
   const nums = [...new Set((info.text.match(/\d[\d,]*(?:\.\d+)?/g) || []).map((s) => s.replace(/,/g, "")))]
-  // An "empty shell" is a page that rendered chrome but no substance: very little text and
-  // no table rows. Distinguishing this from a legitimately empty state matters, so both the
-  // text length and the row count are reported rather than a single verdict.
-  const shell = info.text.trim().length < 400 && info.rows === 0
+  // An "empty shell" is a page that rendered chrome but no substance. Row count is a poor
+  // proxy on its own: several of these screens render cards rather than a <table>, so a
+  // fully-populated screen legitimately reports rows=0. Judge on rendered text instead, and
+  // report rows and buttons separately so a real empty state is still visible in the dump.
+  const shell = info.text.trim().length < 200
 
   fs.writeFileSync(
     path.join(OUT, `${ROLE}__${id}.txt`),

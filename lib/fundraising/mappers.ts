@@ -415,8 +415,11 @@ export function mapDataRoomCard(raw: Record<string, any>, campaignName?: string)
     name: raw.name || 'Data Room',
     campaign: campaignName || raw.campaign?.name || raw.campaignName || '—',
     status: status === 'ACTIVE' ? 'Active' : status === 'EXPIRED' ? 'Expired' : status === 'REVOKED' ? 'Revoked' : 'Draft',
-    investorsInvited: access.length,
-    documents: documents.length || asNumber(raw.documentCount),
+    // The list endpoint returns counts under `_count` and no nested arrays; the detail
+    // endpoint returns the arrays themselves. Read whichever the payload actually carries
+    // rather than assuming one shape — reading only the arrays left these tiles on zero.
+    investorsInvited: access.length || asNumber(raw._count?.access),
+    documents: documents.length || asNumber(raw.documentCount ?? raw._count?.documents),
     views7d: asNumber(raw.views7d),
     downloads7d: asNumber(raw.downloads7d),
     expiresOn: raw.expiresOn ? fmtDate(raw.expiresOn) : '—',
