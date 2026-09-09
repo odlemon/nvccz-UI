@@ -517,7 +517,7 @@ s = replaceOnce(
   "<div class=\"band-stat\"><span>Gross earnings</span><strong>${money(2250)}</strong></div><div class=\"band-stat\"><span>Total deductions</span><strong>${money(620.86)}</strong></div><div class=\"band-stat\"><span>PAYE year to date</span><strong>${money(1945.23)}</strong></div>",
   "<div class=\"band-stat\"><span>Gross earnings</span><strong>${__mp?(__mp.hasPayslip?money(__mp.latest.gross):'\\u2014'):money(2250)}</strong></div><div class=\"band-stat\"><span>Total deductions</span><strong>${__mp?(__mp.hasPayslip?money(__mp.latest.deductions):'\\u2014'):money(620.86)}</strong></div><div class=\"band-stat\"><span>Payslips on record</span><strong>${__mp?__mp.slips.length:3}</strong></div>",
   "my pay: band stats -> live",
-  "'Payslips on record'",
+  "<span>Payslips on record</span>",
 )
 
 // Recent payslips list.
@@ -752,6 +752,49 @@ s = replaceEvery(
   "(documents[0]||__pr6DocumentPlaceholder)",
   "guard documents[0]",
   "(documents[0]||__pr6DocumentPlaceholder)",
+)
+
+// ---------------------------------------------------------------------------
+// 4l. Page-level access gating
+// ---------------------------------------------------------------------------
+// render() renders whatever state.page holds and never consults
+// permittedPage() -- only renderNav() filters the sidebar and only
+// api.setPage() guards in-app navigation. So a plain employee who reaches
+// /payroll-v6/approvals by URL got the full Maker-Checker screen, with the nav
+// link merely hidden. Now the page itself refuses, visibly.
+s = replaceOnce(
+  s,
+  " const fn=pages[state.page]||overviewPage;$('#content').innerHTML=fn();$('#content').scrollTop=0;",
+  " const fn=pages[state.page]||overviewPage;if(typeof permittedPage==='function'&&!permittedPage(state.page)){$('#content').innerHTML=__pr6DeniedPageHtml(state.page);$('#content').scrollTop=0;wireTopProfile();return;}$('#content').innerHTML=fn();$('#content').scrollTop=0;",
+  "render(): refuse unpermitted pages (base)",
+  // Unique to THIS replacement: the IIFE-override patch below also mentions
+  // __pr6DeniedPageHtml, so guarding on the helper name alone collides.
+  "wireTopProfile();return;}$('#content').innerHTML=fn()",
+)
+
+// The enhancement IIFE at the "V3" layer replaces render() outright rather than
+// delegating to it, so the base guard above never runs. This is the render that
+// actually paints. Same guard, second site.
+s = replaceOnce(
+  s,
+  "    const fn=pages[state.page]||overviewPage;\n    document.querySelector('#content').innerHTML=fn();\n    document.querySelector('#content').scrollTop=0;",
+  "    const fn=pages[state.page]||overviewPage;\n    if(typeof permittedPage==='function'&&!permittedPage(state.page)){document.querySelector('#content').innerHTML=__pr6DeniedPageHtml(state.page);document.querySelector('#content').scrollTop=0;}else{\n    document.querySelector('#content').innerHTML=fn();\n    document.querySelector('#content').scrollTop=0;}",
+  "render(): refuse unpermitted pages (IIFE override)",
+  "scrollTop=0;}else{",
+)
+
+// permittedPage() ends with `|| (id==='access' && state.role!=='Employee')`,
+// a carve-out written for the mock role simulator, where the plain-staff role
+// was literally named "Employee". Once state.role holds the real role name
+// ("Operations Member"), that clause is true for everybody and Roles & Access
+// Control opens to any signed-in user. When live, the permission check is
+// authoritative.
+s = replaceOnce(
+  s,
+  "||(id==='access'&&state.role!=='Employee')}",
+  "||(!__pr6IsLive()&&id==='access'&&state.role!=='Employee')}",
+  "permittedPage(): drop the access carve-out when live",
+  "!__pr6IsLive()&&id==='access'",
 )
 
 // ---------------------------------------------------------------------------

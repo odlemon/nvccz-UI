@@ -463,7 +463,7 @@ function __pr6DepartmentsV3() {
 /**
  * My Pay view for the signed-in user.
  *
- * The page rendered `(employees[0]||__pr6EmployeePlaceholder)` plus a fixed payslip (net 1,629.14,
+ * The page rendered the first roster entry plus a fixed payslip (net 1,629.14,
  * gross 2,250.00, deductions 620.86, ZiG 35,820, four invented monthly
  * payslips and six invented earnings lines), so every user saw the same
  * fabricated pay for somebody who was not them.
@@ -742,11 +742,11 @@ function __pr6DepartmentReadiness() {
 /**
  * Empty-collection placeholders.
  *
- * The runtime indexes (payrollRuns[0]||__pr6RunPlaceholder), (employees[0]||__pr6EmployeePlaceholder), (exceptions[0]||__pr6ExceptionPlaceholder) and
- * (documents[0]||__pr6DocumentPlaceholder) directly, because its fixtures were never empty. Once the data
+ * The runtime indexes element zero of payrollRuns, employees, exceptions and
+ * documents directly, because its fixtures were never empty. Once the data
  * is live those arrays legitimately CAN be empty — a department manager holds
  * no payroll.runs.view grant, so the loader never fetches runs and hydrate
- * hands over [] — and `(payrollRuns[0]||__pr6RunPlaceholder).id` then throws, taking the whole render
+ * hands over [] — and reading .id off element zero then throws, taking the whole render
  * down. Observed on the Approvals screen as deptmgr:
  *   [payroll-v6] hydrate failed TypeError: Cannot read properties of undefined
  *
@@ -826,6 +826,26 @@ const __pr6DocumentPlaceholder = {
   versions: 0,
   content: '',
 };
+
+/**
+ * Access-refusal panel. Shown in place of a page whose permission the
+ * signed-in role does not hold. The sidebar already hides the link, but the
+ * URL still worked: a plain employee reaching /payroll-v6/approvals got the
+ * full Maker-Checker screen. A hidden link is not access control.
+ */
+function __pr6DeniedPageHtml(pageId) {
+  var required = '';
+  try {
+    required = (typeof pagePermission !== 'undefined' && pagePermission[pageId]) || '';
+  } catch (_) {}
+  return (
+    '<div class="page"><section class="card"><div class="card-body" style="text-align:center;padding:48px 24px">' +
+    '<h3 style="margin:0 0 6px">You do not have access to this page</h3>' +
+    '<p class="muted" style="margin:0 0 4px">Your role does not hold the payroll permission this screen requires.</p>' +
+    (required ? '<p class="tiny muted">Required permission: ' + required + '</p>' : '') +
+    '</div></section></div>'
+  );
+}
 
 /**
  * Action interception.
@@ -989,7 +1009,7 @@ let userAccess=[
 ];
 
 function can(permission){const live=__pr6Can(permission);if(live!==null)return live;return (roles[state.role]||[]).includes(permission)}
-function permittedPage(id){return id==='overview'||!pagePermission[id]||can(pagePermission[id])||(id==='access'&&state.role!=='Employee')}
+function permittedPage(id){return id==='overview'||!pagePermission[id]||can(pagePermission[id])||(!__pr6IsLive()&&id==='access'&&state.role!=='Employee')}
 function money(v,c='USD'){return c==='ZiG'?`ZiG ${Number(v).toLocaleString('en-US',{maximumFractionDigits:0})}`:`USD ${Number(v).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}`}
 function badge(text){const t=String(text).toLowerCase();let cls=t.includes('critical')||t.includes('blocked')||t.includes('overdue')||t.includes('rejected')?'red':t.includes('warning')||t.includes('review')||t.includes('pending')||t.includes('investig')||t.includes('expir')||t.includes('high')?'amber':t.includes('draft')||t.includes('calculated')||t.includes('medium')?'violet':t.includes('ready')||t.includes('approved')||t.includes('released')||t.includes('active')||t.includes('published')||t.includes('compliant')||t.includes('file')?'blue':'slate';return `<span class="status ${cls}">${text}</span>`}
 function button(label,action,cls='',ico=''){return `<button class="btn ${cls}" data-action="${action}">${ico?icon(ico):''}${label}</button>`}
@@ -1208,7 +1228,7 @@ function myPayPage(){
 function render(){
  renderNav();
  const pages={overview:overviewPage,employees:employeesPage,onboarding:onboardingPage,runs:runsPage,inputs:inputsPage,exceptions:exceptionsPage,approvals:approvalsPage,close:closePage,components:componentsPage,calendar:calendarPage,tax:taxPage,training:trainingPage,leave:leavePage,vault:vaultPage,reports:reportsPage,audit:auditPage,access:accessPage,settings:settingsPage,mypay:myPayPage};
- const fn=pages[state.page]||overviewPage;$('#content').innerHTML=fn();$('#content').scrollTop=0;
+ const fn=pages[state.page]||overviewPage;if(typeof permittedPage==='function'&&!permittedPage(state.page)){$('#content').innerHTML=__pr6DeniedPageHtml(state.page);$('#content').scrollTop=0;wireTopProfile();return;}$('#content').innerHTML=fn();$('#content').scrollTop=0;
  wireTopProfile();
 }
 function wireTopProfile(){
@@ -1605,8 +1625,9 @@ init();
     renderNav();
     const pages={overview:overviewPage,employees:employeesPage,onboarding:onboardingPage,runs:runsPage,inputs:inputsPage,exceptions:exceptionsPage,approvals:approvalsPage,close:closePage,components:componentsPage,calendar:calendarPage,tax:taxPage,training:trainingPage,leave:leavePage,vendors:vendorsPage,vault:vaultPage,reports:reportsPage,audit:auditPage,access:accessPage,settings:settingsPage,mypay:myPayPage};
     const fn=pages[state.page]||overviewPage;
+    if(typeof permittedPage==='function'&&!permittedPage(state.page)){document.querySelector('#content').innerHTML=__pr6DeniedPageHtml(state.page);document.querySelector('#content').scrollTop=0;}else{
     document.querySelector('#content').innerHTML=fn();
-    document.querySelector('#content').scrollTop=0;
+    document.querySelector('#content').scrollTop=0;}
     updateSidebarControl();
   };
 

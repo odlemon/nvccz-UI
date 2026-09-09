@@ -451,7 +451,7 @@ function __pr6DepartmentsV3() {
 /**
  * My Pay view for the signed-in user.
  *
- * The page rendered `employees[0]` plus a fixed payslip (net 1,629.14,
+ * The page rendered the first roster entry plus a fixed payslip (net 1,629.14,
  * gross 2,250.00, deductions 620.86, ZiG 35,820, four invented monthly
  * payslips and six invented earnings lines), so every user saw the same
  * fabricated pay for somebody who was not them.
@@ -730,11 +730,11 @@ function __pr6DepartmentReadiness() {
 /**
  * Empty-collection placeholders.
  *
- * The runtime indexes payrollRuns[0], employees[0], exceptions[0] and
- * documents[0] directly, because its fixtures were never empty. Once the data
+ * The runtime indexes element zero of payrollRuns, employees, exceptions and
+ * documents directly, because its fixtures were never empty. Once the data
  * is live those arrays legitimately CAN be empty — a department manager holds
  * no payroll.runs.view grant, so the loader never fetches runs and hydrate
- * hands over [] — and `payrollRuns[0].id` then throws, taking the whole render
+ * hands over [] — and reading .id off element zero then throws, taking the whole render
  * down. Observed on the Approvals screen as deptmgr:
  *   [payroll-v6] hydrate failed TypeError: Cannot read properties of undefined
  *
@@ -814,6 +814,26 @@ const __pr6DocumentPlaceholder = {
   versions: 0,
   content: '',
 };
+
+/**
+ * Access-refusal panel. Shown in place of a page whose permission the
+ * signed-in role does not hold. The sidebar already hides the link, but the
+ * URL still worked: a plain employee reaching /payroll-v6/approvals got the
+ * full Maker-Checker screen. A hidden link is not access control.
+ */
+function __pr6DeniedPageHtml(pageId) {
+  var required = '';
+  try {
+    required = (typeof pagePermission !== 'undefined' && pagePermission[pageId]) || '';
+  } catch (_) {}
+  return (
+    '<div class="page"><section class="card"><div class="card-body" style="text-align:center;padding:48px 24px">' +
+    '<h3 style="margin:0 0 6px">You do not have access to this page</h3>' +
+    '<p class="muted" style="margin:0 0 4px">Your role does not hold the payroll permission this screen requires.</p>' +
+    (required ? '<p class="tiny muted">Required permission: ' + required + '</p>' : '') +
+    '</div></section></div>'
+  );
+}
 
 /**
  * Action interception.
