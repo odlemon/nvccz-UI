@@ -195,6 +195,71 @@ analytics tables below were found.
 | 10 | Forecasts' Funnel / Source / Owner tables each showed one row reading `Name unavailable / Campaignid / cmttz...` | Trace flagged `54`, which came from a campaign id string | `toRowsArray` now converts the keyed-object analytics shapes; backend returns owner names |
 | 11 | 20 `*-mock-data.ts` fixtures, two carrying fabricated KPI money and counts | Read of the fixtures | Deleted; genuine helpers moved to `*-presentation.ts` |
 
+### 5.3 Control inventory - every wizard, dialog and export
+
+Definition-of-done item 4 asks that every control is live, honestly view-state-only, or
+honestly disabled, and names `fundraising-create-wizards.tsx` and `fundraising-modals.tsx`
+specifically. A scan for empty handlers is not enough to show that, so every control in those
+two files was enumerated and traced to the call it makes.
+
+**Wizards (`fundraising-create-wizards.tsx`)** - 4 concrete wizards, all reaching a create
+endpoint:
+
+| Wizard | Submit label | Reaches |
+|---|---|---|
+| `FrOpportunityWizard` | Create opportunity | `createOpportunity` |
+| `FrCampaignWizard` | Create campaign | `createCampaign`, `activateCampaign` |
+| `FrMandateWizard` | Create mandate | `createMandate` |
+| `FrCommitmentWizard` | Record commitment | `createCommitment` |
+
+`FrSimpleWizard` is a generic host - it does nothing itself and delegates to the caller's
+`onFinish`. All ten callers pass a handler that reaches the API:
+
+| Screen | Handler | Reaches |
+|---|---|---|
+| Agreements | `submitCreate` | `createAgreement`, `addSignatory` |
+| Communications | inline | `createCommunication` |
+| Contacts | `handleCreate` | `createContact` |
+| Data Rooms | `submitCreateRoom` | `createDataRoom`, `createDataRoomFolder`, `grantDataRoomAccess` |
+| Investors | `handleCreate` | `createInvestor` |
+| Onboarding | `startCase` | `createKycCase`, `patchKycCase`, `activateMandate` |
+| Placement Agents | `addAppointment` | `createPlacementAgent` |
+| Settings | `submitAddStage` | `createPipelineStage`, `patchPipelineStage` |
+| Settings | `saveGate` | `patchStageGates`, `patchNotificationSettings` |
+
+**Dialogs (`fundraising-modals.tsx`)** - `FrDialogShell`, `FrFormFooter`, `FrField`,
+`FrTableSkeleton`, `FrWizardShell`, `FrRequirementsDialog` and `FrViewAllDialog` are
+presentational shells with no behaviour of their own. The two that carry an action both have
+live handlers at every call site:
+
+| Dialog | Screen | Handler | Reaches |
+|---|---|---|---|
+| `FrConfirmDialog` | Campaigns | `runAction` | `patchCampaign`, `pauseCampaign`, `submitCampaignForApproval` |
+| `FrConfirmDialog` | Contacts | `archiveSelected` | `archiveContact` |
+| `FrConfirmDialog` | Investors | `archiveSelected` | `patchInvestor` |
+| `FrConfirmDialog` | Settings | `confirmDeleteStage` | `deletePipelineStage` |
+| `FrPromptDialog` | Campaigns (x2) | `runAction` | as above |
+| `FrPromptDialog` | Meetings | `handleCancelMeeting` | `cancelMeeting` |
+| `FrPromptDialog` | Pipeline board | `markLost` | `markOpportunityLost`, `setOpportunityStatus` |
+
+**Other action dialogs**: Record Funding (`fundCommitment`), Save scenario
+(`createForecastScenario`), Send invite (`grantDataRoomAccess`), Create folder
+(`createDataRoomFolder`), Save Appointment (`patchPlacementAgent`), Run now (`getReport` +
+`createReportSchedule`).
+
+**Export controls** - all 18, across every screen that offers one, produce a real file. Most
+build a CSV client-side through `exportFundraisingCsv`; Documents, Due Diligence and Audit go
+through the server export endpoints (`exportDocuments`, `exportDdqCase`, `exportAuditLogs`) and
+stream the payload back through `downloadCsvPayload`. None is a no-op.
+
+**The two controls that are deliberately not live**, both of which say so rather than failing
+silently:
+
+| Control | Screen | Behaviour |
+|---|---|---|
+| "Advanced filters" | Commitments | Shows a toast reading "Advanced filters coming soon". Honest, though it would be better as a disabled control - left as-is because removing a documented affordance is a product decision, not a bug fix |
+| DDQ export fallback | Due Diligence | When the server export is unavailable it exports the loaded data instead and says so: "Server export unavailable; exported the loaded data instead" |
+
 ---
 
 ## 6. Role matrix
