@@ -113,7 +113,11 @@ end date.
 Verified: trend reads Jun/Jul/Aug 2026 at 33,702.96 net over 12 employees each,
 September zero because no run exists for it.
 
-### 1.5 Data
+### 1.5 Payroll audit trail
+
+See §2.7 — built during this work rather than left as an ask.
+
+### 1.6 Data
 
 - `scripts/seed-payroll-v6-baseline.ts` — the payroll tables were **completely
   empty** (0 employees, 0 runs, 0 payslips, 0 salary structures), so no screen
@@ -188,12 +192,26 @@ No payroll document store. Blocks `upload-document`, `create-document`,
 `save-document`. The screen currently renders the runtime's own document
 fixtures.
 
-### 2.7 Payroll audit trail — MEDIUM
+### 2.7 Payroll audit trail — BUILT
 
-`logEvent()` writes to an in-memory array that dies with the page. There is an
-`AuditTrail` model in the schema but no payroll-scoped read endpoint, so the
-Audit screen shows fixture events. Needs
-`GET /payroll/audit?entity=&from=&to=`.
+Was: `logEvent()` wrote to an in-memory array that died with the page, so the
+governance screen showed six invented events and nothing that actually happened
+was recorded. `ActivityLog` exists but is performance/portfolio shaped
+(`goalId`, `taskId`, `kpiId`) and payroll never wrote to it.
+
+Now: `payroll_audit_events`, created by
+`npm run db:migrate:payroll-v6-audit-table` (idempotent raw SQL, managed
+outside Prisma so schema.prisma cannot drift), written on run created,
+submitted, approved, rejected and processed, and read by
+`GET /api/payroll/audit` behind `payroll.audit.view`.
+
+Recording is best-effort and swallows its own errors — an audit write must
+never fail the payroll run it is recording — and the read returns an empty
+trail rather than a 500 on a database without the migration.
+
+Still open on this: employee-record changes are not yet audited (only the run
+lifecycle is), and there is no evidence-hash chain behind the screen's
+"Verify ledger hash" control.
 
 ### 2.8 Onboarding pipeline — LOW
 
