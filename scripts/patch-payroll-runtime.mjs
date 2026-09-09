@@ -557,6 +557,168 @@ s = replaceOnce(
 )
 
 // ---------------------------------------------------------------------------
+// 4i. Leave, training and statutory rule registers
+// ---------------------------------------------------------------------------
+// Leave rows keyed their used/pending/liability columns off the ROW INDEX
+// ([5,8,12,3,9,2,4] etc), so the numbers beside an employee belonged to nobody.
+s = replaceOnce(
+  s,
+  " const rows=employees.slice(0,7).map((e,i)=>`<tr data-employee=\"${e.id}\"><td><div class=\"access-user\"><div class=\"mini-avatar\">${e.initials}</div><strong class=\"link\">${e.name}</strong></div></td><td>${e.department}</td><td>${e.leave}</td><td>${[5,8,12,3,9,2,4][i]} days</td><td>${[1,0,3,2,0,4,1][i]} pending</td><td class=\"money\">${can('salary.view')?money([1480,2940,1320,1670,720,2860,810][i]):'Restricted'}</td><td>${badge(i===4?'Review':'Within policy')}</td></tr>`);",
+  " const __lv=__pr6LeaveRows();\n const rows=__lv?__lv.map(r=>`<tr data-employee=\"${r.employeeNumber}\"><td><div class=\"access-user\"><div class=\"mini-avatar\">${r.initials}</div><strong class=\"link\">${r.name}</strong></div></td><td>${r.department}</td><td>${r.available} days</td><td>\\u2014</td><td>\\u2014</td><td class=\"money\">${can('salary.view')?money(r.liability):'Restricted'}</td><td>${badge('Within policy')}</td></tr>`):employees.slice(0,7).map((e,i)=>`<tr data-employee=\"${e.id}\"><td><div class=\"access-user\"><div class=\"mini-avatar\">${e.initials}</div><strong class=\"link\">${e.name}</strong></div></td><td>${e.department}</td><td>${e.leave}</td><td>${[5,8,12,3,9,2,4][i]} days</td><td>${[1,0,3,2,0,4,1][i]} pending</td><td class=\"money\">${can('salary.view')?money([1480,2940,1320,1670,720,2860,810][i]):'Restricted'}</td><td>${badge(i===4?'Review':'Within policy')}</td></tr>`);",
+  "leave register rows -> live",
+  "const __lv=__pr6LeaveRows();",
+)
+
+s = replaceOnce(
+  s,
+  "<div class=\"grid kpis\">${kpi('Annual leave liability',money(184620),'Estimated financial provision','wallet')}${kpi('Average balance','14.2 days','Across active employees','calendar','cyan')}${kpi('Pending requests','17','Manager decisions outstanding','clock','amber')}${kpi('Policy exceptions','4','Above carry-forward threshold','alert','red')}${kpi('Medical aid enrolled','112','87.5% of employees','heart','violet')}${kpi('Loan deductions','19','Active employee loans','calculator')}</div>",
+  "<div class=\"grid kpis\">${(()=>{const l=__pr6LeaveStats();" +
+    "if(!l)return `${kpi('Annual leave liability',money(184620),'Estimated financial provision','wallet')}${kpi('Average balance','14.2 days','Across active employees','calendar','cyan')}`;" +
+    "return kpi('Annual leave liability',money(l.liability),'Accrued days at basic/22 per day','wallet')" +
+    "+kpi('Average balance',l.average+' days','Across employees with a balance','calendar','cyan')" +
+    "+kpi('Employees with leave',String(l.employees),'Holding an annual balance','users','violet')" +
+    "+kpi('Leave types',String(l.types),'Configured balance categories','settings')})()}</div>",
+  "leave KPIs -> live",
+  "'Accrued days at basic/22 per day'",
+)
+
+// Training: six invented courses with fabricated completion rates.
+s = replaceOnce(
+  s,
+  " const rows=certs.map(c=>",
+  " const rows=(__pr6TrainingRows()||certs).map(c=>",
+  "training register rows -> live",
+  "(__pr6TrainingRows()||certs)",
+)
+
+s = replaceOnce(
+  s,
+  "<div class=\"grid kpis\">${kpi('Total employees','128','All employment categories','users')}${kpi('Fully compliant','94','73.4% across requirements','check','cyan')}${kpi('Due within 30 days','21','Certification expiry risk','clock','amber')}${kpi('Overdue','13','May affect operational access','alert','red')}${kpi('Average completion','91.7%','Across mandatory courses','graduation','violet')}${kpi('Permissions affected','6','Access restrictions pending','lock','amber')}</div>",
+  "<div class=\"grid kpis\">${(()=>{const t=__pr6TrainingStats();" +
+    "if(!t)return `${kpi('Total employees','128','All employment categories','users')}${kpi('Fully compliant','94','73.4% across requirements','check','cyan')}`;" +
+    "return kpi('Total employees',String(t.employees),'All employment categories','users')" +
+    "+kpi('Courses in catalogue',String(t.courses),'Configured training courses','graduation','cyan')" +
+    "+kpi('Certifications recorded',String(t.certifications),'Across all employees','check','violet')" +
+    "+kpi('Mandatory courses',String(t.mandatory),'Required for compliance','shield','amber')})()}</div>",
+  "training KPIs -> live",
+  "'Courses in catalogue'",
+)
+
+// Statutory rules: five invented rule versions and their approvers.
+s = replaceOnce(
+  s,
+  " const rows=rules.map(r=>",
+  " const rows=(__pr6TaxRows()||rules).map(r=>",
+  "statutory rule rows -> live",
+  "(__pr6TaxRows()||rules)",
+)
+
+s = replaceOnce(
+  s,
+  "<div class=\"grid kpis\">${kpi('Published rules','14','Current Zimbabwe ruleset','shield','cyan')}${kpi('Draft versions','2','Not yet applied to payroll','edit','violet')}${kpi('Automated tests','182','175 passed, 7 under review','audit')}${kpi('Employees impacted','128','June ruleset population','users')}${kpi('Estimated PAYE',money(42967),'June 2026 control total','wallet','cyan')}${kpi('Next review','15 Jul 2026','Quarterly rule certification','calendar','amber')}</div>",
+  "<div class=\"grid kpis\">${(()=>{const t=__pr6TaxStats();" +
+    "if(!t)return `${kpi('Published rules','14','Current Zimbabwe ruleset','shield','cyan')}${kpi('Draft versions','2','Not yet applied to payroll','edit','violet')}`;" +
+    "return kpi('Tax rules',String(t.rules),'Configured statutory rules','shield','cyan')" +
+    "+kpi('PAYE brackets',String(t.brackets),'Progressive band table','settings','violet')" +
+    "+kpi('Statutory levies',String(t.levies),'AIDS levy, NSSA and SDL','audit')" +
+    "+kpi('Employees impacted',String(t.employees),'On the active payroll','users')" +
+    "+kpi('Statutory deductions',money(t.deductions),t.period+' control total','wallet','cyan')})()}</div>",
+  "statutory KPIs -> live",
+  "'Configured statutory rules'",
+)
+
+// ---------------------------------------------------------------------------
+// 4j. Remaining progress rows that had no backend behind them
+// ---------------------------------------------------------------------------
+s = replaceOnce(
+  s,
+  "${progressRow('Payroll inputs',97,'1,247 of 1,284 valid','cyan')}",
+  "${(()=>{const c=__pr6RunCoverage();return c?progressRow('Employees paid',c.pct,c.paid+' of '+c.total+' on the roster','cyan'):progressRow('Payroll inputs',97,'1,247 of 1,284 valid','cyan')})()}",
+  "overview: payroll inputs row -> live run coverage",
+  "'Employees paid',c.pct",
+)
+
+s = replaceOnce(
+  s,
+  "${progressRow('Maker-checker review',78,'4 of 6 controls','amber')}",
+  "${(()=>{const o=__pr6OverviewStats();return o?progressRow('Payroll run progress',Math.round((o.runStage/6)*100),'Stage '+o.runStage+' of 6','amber'):progressRow('Maker-checker review',78,'4 of 6 controls','amber')})()}",
+  "overview: maker-checker row -> live",
+  "'Payroll run progress'",
+)
+
+s = replaceOnce(
+  s,
+  "${progressRow('Basic salary',79,'USD 208,640','cyan')}",
+  "${(()=>{const m=__pr6PayrollMix();return m?progressRow('Basic salary',m.basicPct,money(m.basic),'cyan'):progressRow('Basic salary',79,'USD 208,640','cyan')})()}",
+  "components: basic salary mix -> live",
+  "progressRow('Basic salary',m.basicPct",
+)
+
+s = replaceOnce(
+  s,
+  "${progressRow('Allowances',19,'USD 49,756','violet')}",
+  "${(()=>{const m=__pr6PayrollMix();return m?progressRow('Allowances',m.allowancePct,money(m.allowances),'violet'):progressRow('Allowances',19,'USD 49,756','violet')})()}",
+  "components: allowances mix -> live",
+  "progressRow('Allowances',m.allowancePct",
+)
+
+s = replaceOnce(
+  s,
+  "${progressRow('Formula test coverage',96,'182 of 190 tests passed','cyan')}",
+  "${(()=>{const h=__pr6ComponentHealth();return h?progressRow('Active components',h.activePct,h.active+' of '+h.total+' active','cyan'):progressRow('Formula test coverage',96,'182 of 190 tests passed','cyan')})()}",
+  "components: test coverage row -> live",
+  "'Active components',h.activePct",
+)
+
+s = replaceOnce(
+  s,
+  "${progressRow('Approval queue',74,'3 changes awaiting review','amber')}",
+  "${(()=>{const h=__pr6ComponentHealth();return h?progressRow('Statutory deductions',h.statutoryPct,h.statutory+' statutory of '+(h.total-h.active+h.active)+' components','amber'):progressRow('Approval queue',74,'3 changes awaiting review','amber')})()}",
+  "components: approval queue row -> live",
+  "'Statutory deductions',h.statutoryPct",
+)
+
+// Training: per-department bars for departments that do not exist here.
+{
+  const label = "training: department bars -> live"
+  const find =
+    "${progressRow('Finance',98,'98% complete')}${progressRow('People & Culture',100,'100% complete','cyan')}${progressRow('Operations',86,'86% complete','amber')}${progressRow('Commercial',89,'89% complete','violet')}${progressRow('Technology',96,'96% complete')}${progressRow('Procurement',93,'93% complete','cyan')}"
+  // Guard on the call site, not the helper name: the bridge defines it.
+  if (s.includes("x.pct+'% payroll-ready ('")) {
+    console.log(`  skip (already)  ${label}`)
+    skipped += 1
+  } else if (!s.includes(find)) {
+    console.warn(`  MISS            ${label}`)
+    missed += 1
+  } else {
+    s = s.replace(
+      find,
+      "${(()=>{const d=__pr6DepartmentReadiness();return d?d.map(x=>progressRow(x.name,x.pct,x.pct+'% payroll-ready ('+x.count+')','cyan')).join(''):`" +
+        find.replace(/\$\{/g, "${") +
+        "`})()}",
+    )
+    console.log(`  patch           ${label}`)
+    applied += 1
+  }
+}
+
+s = replaceOnce(
+  s,
+  "${progressRow('Variable pay',8,'USD 21,140','amber')}",
+  "${(()=>{const m=__pr6PayrollMix();return m?progressRow('Net pay',Math.max(0,100-m.deductionPct),money(m.gross-m.deductions),'amber'):progressRow('Variable pay',8,'USD 21,140','amber')})()}",
+  "components: variable pay row -> live net pay",
+  "progressRow('Net pay',Math.max(0,100-m.deductionPct)",
+)
+
+s = replaceOnce(
+  s,
+  "${progressRow('Deductions',29,'USD 77,444','red')}",
+  "${(()=>{const m=__pr6PayrollMix();return m?progressRow('Deductions',m.deductionPct,money(m.deductions),'red'):progressRow('Deductions',29,'USD 77,444','red')})()}",
+  "components: deductions row -> live",
+  "progressRow('Deductions',m.deductionPct",
+)
+
+// ---------------------------------------------------------------------------
 // 5. hydrate() on the api object
 // ---------------------------------------------------------------------------
 const API_ANCHOR = `  api = {
@@ -603,6 +765,9 @@ const HYDRATE_IMPL = `  api = {
         }
         if (payload.mypay && typeof payload.mypay === 'object') {
           __pr6Live.mypay = payload.mypay;
+        }
+        if (Array.isArray(payload.leaveBalances)) {
+          __pr6Live.leaveBalances = payload.leaveBalances;
         }
         if (Array.isArray(payload.errors)) __pr6Live.errors = payload.errors;
 

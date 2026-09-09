@@ -482,6 +482,248 @@ function __pr6MyPayView() {
 }
 
 /**
+ * Leave register.
+ *
+ * The page rendered seven employees against index-keyed fixtures — used-YTD
+ * from [5,8,12,3,9,2,4], pending from [1,0,3,2,0,4,1] and liability from
+ * [1480,2940,1320,1670,720,2860,810] — so a row's numbers had nothing to do
+ * with the employee beside them.
+ *
+ * Liability is a real derivation: accrued days x daily rate, where the daily
+ * rate is the monthly basic over 22 working days. Used-YTD and pending have no
+ * backend source (there is no leave-request table), so they show a dash.
+ */
+function __pr6LeaveRows() {
+  if (!__pr6IsLive()) return null;
+  const balances = Array.isArray(__pr6Live.leaveBalances) ? __pr6Live.leaveBalances : [];
+  if (!balances.length) return null;
+  const staff = Array.isArray(employees) ? employees : [];
+  const byNumber = new Map(staff.map((e) => [e.id, e]));
+
+  const annual = balances.filter((b) => String(b.leaveType).toUpperCase() === 'ANNUAL');
+  return annual.map((b) => {
+    const emp = byNumber.get(b.employeeNumber);
+    const basic = emp ? Number(emp.base) || 0 : 0;
+    const days = Number(b.balance) || 0;
+    return {
+      employeeNumber: b.employeeNumber,
+      name: b.name,
+      initials: emp ? emp.initials : '--',
+      department: b.department,
+      available: days,
+      liability: basic > 0 ? (basic / 22) * days : 0,
+    };
+  });
+}
+
+function __pr6LeaveStats() {
+  const rows = __pr6LeaveRows();
+  if (!rows) return null;
+  const totalLiability = rows.reduce((s, r) => s + r.liability, 0);
+  const avg = rows.length
+    ? (rows.reduce((s, r) => s + r.available, 0) / rows.length).toFixed(1)
+    : '0.0';
+  const balances = Array.isArray(__pr6Live.leaveBalances) ? __pr6Live.leaveBalances : [];
+  const types = Array.from(new Set(balances.map((b) => b.leaveType)));
+  return {
+    liability: totalLiability,
+    average: avg,
+    employees: rows.length,
+    types: types.length,
+  };
+}
+
+/**
+ * Training register. The fixture invented six courses with enrolment,
+ * completion and pass-rate columns (128/121/7/94.5% and so on). The real
+ * catalogue is payroll_compliance courses; assignment and certification counts
+ * come from the certifications endpoint, which is currently empty, so those
+ * columns read 0 rather than a fabricated 94.5%.
+ */
+function __pr6TrainingRows() {
+  if (!__pr6IsLive()) return null;
+  const ref = __pr6Ref();
+  const courses = Array.isArray(ref.courses) ? ref.courses : [];
+  if (!courses.length) return null;
+  const certs = Array.isArray(ref.certifications) ? ref.certifications : [];
+
+  return courses.map((c) => {
+    const mine = certs.filter((x) => x.courseId === c.id || x.courseCode === c.code);
+    const done = mine.filter((x) => String(x.status || '').toUpperCase() === 'ACTIVE').length;
+    const assigned = mine.length;
+    const pct = assigned ? `${((done / assigned) * 100).toFixed(1)}%` : '0%';
+    return [
+      c.title || c.code || 'Course',
+      String(assigned),
+      String(done),
+      String(assigned - done),
+      pct,
+      c.renewalPeriodMonths ? `${c.renewalPeriodMonths} month renewal` : '—',
+    ];
+  });
+}
+
+function __pr6TrainingStats() {
+  const rows = __pr6TrainingRows();
+  if (!rows) return null;
+  const ref = __pr6Ref();
+  const certs = Array.isArray(ref.certifications) ? ref.certifications : [];
+  const staff = Array.isArray(employees) ? employees : [];
+  return {
+    courses: rows.length,
+    employees: staff.length,
+    certifications: certs.length,
+    mandatory: (Array.isArray(ref.courses) ? ref.courses : []).filter((c) => c.required || c.isMandatory).length,
+  };
+}
+
+/**
+ * Statutory rule register. The fixture listed five invented rule versions
+ * ("ZW-PAYE-2026.06" approved by "Tawanda Chirenje") and KPIs of 14 published
+ * rules, 182 automated tests and an estimated PAYE of 42,967. The real
+ * configuration is tax_rules plus the ZIMRA bracket and levy tables.
+ */
+function __pr6TaxRows() {
+  if (!__pr6IsLive()) return null;
+  const ref = __pr6Ref();
+  const rules = Array.isArray(ref.taxRules) ? ref.taxRules : [];
+  const brackets = Array.isArray(ref.brackets) ? ref.brackets : [];
+  const levies = Array.isArray(ref.levies) ? ref.levies : [];
+  if (!rules.length && !brackets.length && !levies.length) return null;
+
+  const out = [];
+  for (const r of rules) {
+    out.push([
+      r.type || 'RULE',
+      r.name || '—',
+      r.currency ? r.currency.code : 'USD',
+      r.effectiveDate ? String(r.effectiveDate).slice(0, 10) : '—',
+      r.isActive === false ? 'Inactive' : 'Active',
+      '—',
+    ]);
+  }
+  for (const l of levies) {
+    out.push([
+      l.levyCode || 'LEVY',
+      `${l.levyCode} (${l.currencyCode})`,
+      l.currencyCode || '—',
+      l.effectiveFrom ? String(l.effectiveFrom).slice(0, 10) : '—',
+      l.isActive === false ? 'Inactive' : 'Active',
+      l.rate !== null && l.rate !== undefined ? `Rate ${(Number(l.rate) * 100).toFixed(2)}%` : (l.ceiling ? `Ceiling ${Number(l.ceiling).toLocaleString('en-US')}` : '—'),
+    ]);
+  }
+  return out;
+}
+
+function __pr6TaxStats() {
+  const rows = __pr6TaxRows();
+  if (!rows) return null;
+  const ref = __pr6Ref();
+  const runs = Array.isArray(payrollRuns) ? payrollRuns : [];
+  const latest = runs.length ? runs[0] : null;
+  return {
+    rules: (Array.isArray(ref.taxRules) ? ref.taxRules : []).length,
+    brackets: (Array.isArray(ref.brackets) ? ref.brackets : []).length,
+    levies: (Array.isArray(ref.levies) ? ref.levies : []).length,
+    employees: (Array.isArray(employees) ? employees : []).length,
+    deductions: latest ? Number(latest.deductions) || 0 : 0,
+    period: latest ? String(latest.reference || latest.period) : '—',
+  };
+}
+
+/**
+ * Payroll mix for the latest run: how much of gross is basic versus allowances.
+ * The fixture showed 'USD 208,640' basic / 'USD 49,756' allowances / 79% / 19%.
+ * Basic comes from the employee roster and allowances are the remainder of the
+ * run's gross, so the two always reconcile to the gross actually paid.
+ */
+function __pr6PayrollMix() {
+  if (!__pr6IsLive()) return null;
+  const runs = Array.isArray(payrollRuns) ? payrollRuns : [];
+  const staff = Array.isArray(employees) ? employees : [];
+  const latest = runs.length ? runs[0] : null;
+  if (!latest) return null;
+  const gross = Number(latest.grossUSD) || 0;
+  if (gross <= 0) return null;
+  const basic = staff.reduce((s, e) => s + (Number(e.base) || 0), 0);
+  const allowances = Math.max(0, gross - basic);
+  return {
+    gross,
+    basic,
+    allowances,
+    basicPct: Math.round((basic / gross) * 100),
+    allowancePct: Math.round((allowances / gross) * 100),
+    deductions: Number(latest.deductions) || 0,
+    deductionPct: Math.round(((Number(latest.deductions) || 0) / gross) * 100),
+  };
+}
+
+/**
+ * Coverage of the latest run: how many employees it actually paid against the
+ * roster. Replaces a "1,247 of 1,284 valid" input-batch figure that had no
+ * backend behind it at all (there is no payroll input-batch store).
+ */
+function __pr6RunCoverage() {
+  if (!__pr6IsLive()) return null;
+  const runs = Array.isArray(payrollRuns) ? payrollRuns : [];
+  const staff = Array.isArray(employees) ? employees : [];
+  const latest = runs.length ? runs[0] : null;
+  if (!latest || !staff.length) return null;
+  const paid = Number(latest.employees) || 0;
+  return {
+    paid,
+    total: staff.length,
+    pct: staff.length ? Math.round((paid / staff.length) * 100) : 0,
+  };
+}
+
+/**
+ * Component catalogue health: active versus inactive, and how many deduction
+ * types are statutory. Replaces '182 of 190 tests passed' and '3 changes
+ * awaiting review', neither of which has any backend equivalent.
+ */
+function __pr6ComponentHealth() {
+  if (!__pr6IsLive()) return null;
+  const ref = __pr6Ref();
+  const allow = Array.isArray(ref.allowanceTypes) ? ref.allowanceTypes : [];
+  const ded = Array.isArray(ref.deductionTypes) ? ref.deductionTypes : [];
+  const all = allow.concat(ded);
+  if (!all.length) return null;
+  const active = all.filter((c) => c.isActive !== false).length;
+  const statutory = ded.filter((d) => d.isStatutory).length;
+  return {
+    total: all.length,
+    active,
+    activePct: all.length ? Math.round((active / all.length) * 100) : 0,
+    statutory,
+    statutoryPct: ded.length ? Math.round((statutory / ded.length) * 100) : 0,
+  };
+}
+
+/**
+ * Payroll readiness per department, from the employee roster. Replaces the
+ * training page's invented per-department completion bars (Finance 98%,
+ * Operations 86%, Commercial 89%, Technology 96%, Procurement 93%) — those
+ * departments do not even exist in this database.
+ */
+function __pr6DepartmentReadiness() {
+  if (!__pr6IsLive()) return null;
+  const staff = Array.isArray(employees) ? employees : [];
+  if (!staff.length) return null;
+  const byDept = new Map();
+  for (const e of staff) {
+    const d = e.department || 'Unassigned';
+    const cur = byDept.get(d) || { sum: 0, n: 0 };
+    cur.sum += Number(e.readiness) || 0;
+    cur.n += 1;
+    byDept.set(d, cur);
+  }
+  return Array.from(byDept.entries())
+    .map(([name, v]) => ({ name, pct: Math.round(v.sum / v.n), count: v.n }))
+    .sort((a, b) => b.count - a.count);
+}
+
+/**
  * Action interception.
  *
  * Registered in the capture phase before the runtime's own handlers, so a
