@@ -439,7 +439,10 @@ function __pr6TrendV3() {
   if (!__pr6IsLive()) return null;
   const d = __pr6Live.dashboard;
   const trend = d && Array.isArray(d.monthlyTrend) ? d.monthlyTrend : null;
-  if (!trend || !trend.length) return null;
+  // Live with no dashboard is a real answer, not "not loaded". A role without
+  // payroll.dashboard.view (a plain employee) must not be shown the fixture's
+  // 24 months of invented payroll; an empty series is the honest rendering.
+  if (!trend || !trend.length) return [];
   return trend.map((t) => [
     `${t.month} ${t.year}`,
     Number(t.totalPayroll) || 0,
@@ -457,7 +460,8 @@ function __pr6DepartmentsV3() {
   if (!__pr6IsLive()) return null;
   const d = __pr6Live.dashboard;
   const rows = d && Array.isArray(d.departmentDistribution) ? d.departmentDistribution : null;
-  if (!rows || !rows.length) return null;
+  // Same reasoning as __pr6TrendV3: empty beats fabricated.
+  if (!rows || !rows.length) return [];
   const max = rows.reduce((m, r) => Math.max(m, Number(r.total) || 0), 0) || 1;
   return rows.map((r) => ({
     name: r.department || 'Unassigned',
@@ -691,13 +695,16 @@ function __pr6RunCoverage() {
   if (!__pr6IsLive()) return null;
   const runs = Array.isArray(payrollRuns) ? payrollRuns : [];
   const staff = Array.isArray(employees) ? employees : [];
+  // Live with nothing to show is a real answer: falling back to null here put
+  // the fixture's "1,247 of 1,284 valid" back on screen for a role that cannot
+  // see payroll at all.
   const latest = runs.length ? runs[0] : null;
-  if (!latest || !staff.length) return null;
-  const paid = Number(latest.employees) || 0;
+  const paid = latest ? Number(latest.employees) || 0 : 0;
+  const total = staff.length;
   return {
     paid,
-    total: staff.length,
-    pct: staff.length ? Math.round((paid / staff.length) * 100) : 0,
+    total,
+    pct: total ? Math.round((paid / total) * 100) : 0,
   };
 }
 
@@ -1807,6 +1814,7 @@ init();
     return (__pr6TrendV3()||payrollTrendDataV3_fixture).slice(-n);
   };
   const trendSummaryV3 = rows => {
+    if(!rows||!rows.length)return{last:['\u2014',0,0],change:0,avg:0};
     const first=rows[0],last=rows[rows.length-1],avg=rows.reduce((a,r)=>a+r[1],0)/rows.length;
     const change=((last[1]-first[1])/first[1])*100;
     return {last,change,avg};
@@ -1814,6 +1822,7 @@ init();
 
   lineChart = function(){
     const rows=payrollRangeRowsV3();
+    if(!rows||!rows.length){return `<section class="chart-module" id="payrollTrendChart"><div class="card-body" style="text-align:center;padding:40px 20px"><p class="muted">No payroll trend data available.</p><p class="tiny muted">Either no payroll has been processed yet, or your role cannot view the payroll dashboard.</p></div></section>`;}
     const labels=rows.map(r=>r[0]);
     const usd=rows.map(r=>r[1]);
     const zig=rows.map(r=>r[2]);

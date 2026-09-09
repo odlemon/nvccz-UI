@@ -427,7 +427,10 @@ function __pr6TrendV3() {
   if (!__pr6IsLive()) return null;
   const d = __pr6Live.dashboard;
   const trend = d && Array.isArray(d.monthlyTrend) ? d.monthlyTrend : null;
-  if (!trend || !trend.length) return null;
+  // Live with no dashboard is a real answer, not "not loaded". A role without
+  // payroll.dashboard.view (a plain employee) must not be shown the fixture's
+  // 24 months of invented payroll; an empty series is the honest rendering.
+  if (!trend || !trend.length) return [];
   return trend.map((t) => [
     `${t.month} ${t.year}`,
     Number(t.totalPayroll) || 0,
@@ -445,7 +448,8 @@ function __pr6DepartmentsV3() {
   if (!__pr6IsLive()) return null;
   const d = __pr6Live.dashboard;
   const rows = d && Array.isArray(d.departmentDistribution) ? d.departmentDistribution : null;
-  if (!rows || !rows.length) return null;
+  // Same reasoning as __pr6TrendV3: empty beats fabricated.
+  if (!rows || !rows.length) return [];
   const max = rows.reduce((m, r) => Math.max(m, Number(r.total) || 0), 0) || 1;
   return rows.map((r) => ({
     name: r.department || 'Unassigned',
@@ -679,13 +683,16 @@ function __pr6RunCoverage() {
   if (!__pr6IsLive()) return null;
   const runs = Array.isArray(payrollRuns) ? payrollRuns : [];
   const staff = Array.isArray(employees) ? employees : [];
+  // Live with nothing to show is a real answer: falling back to null here put
+  // the fixture's "1,247 of 1,284 valid" back on screen for a role that cannot
+  // see payroll at all.
   const latest = runs.length ? runs[0] : null;
-  if (!latest || !staff.length) return null;
-  const paid = Number(latest.employees) || 0;
+  const paid = latest ? Number(latest.employees) || 0 : 0;
+  const total = staff.length;
   return {
     paid,
-    total: staff.length,
-    pct: staff.length ? Math.round((paid / staff.length) * 100) : 0,
+    total,
+    pct: total ? Math.round((paid / total) * 100) : 0,
   };
 }
 

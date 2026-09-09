@@ -824,6 +824,30 @@ s = replaceOnce(
 )
 
 // ---------------------------------------------------------------------------
+// 4m. Charts must survive an empty series
+// ---------------------------------------------------------------------------
+// A role without payroll.dashboard.view gets no trend data, and the honest
+// rendering is an empty chart -- but trendSummaryV3 reads rows[0][1] and threw
+// "Cannot read properties of undefined (reading '1')", which killed hydrate and
+// left the PRE-hydrate fixture render on screen. Denying the data therefore made
+// the screen show MORE invented numbers, not fewer.
+s = replaceOnce(
+  s,
+  "    const rows=payrollRangeRowsV3();",
+  "    const rows=payrollRangeRowsV3();\n    if(!rows||!rows.length){return `<section class=\"chart-module\" id=\"payrollTrendChart\"><div class=\"card-body\" style=\"text-align:center;padding:40px 20px\"><p class=\"muted\">No payroll trend data available.</p><p class=\"tiny muted\">Either no payroll has been processed yet, or your role cannot view the payroll dashboard.</p></div></section>`;}",
+  "trend chart: empty-series guard",
+  "No payroll trend data available.",
+)
+
+s = replaceOnce(
+  s,
+  "  const trendSummaryV3 = rows => {\n    const first=rows[0],last=rows[rows.length-1],avg=rows.reduce((a,r)=>a+r[1],0)/rows.length;",
+  "  const trendSummaryV3 = rows => {\n    if(!rows||!rows.length)return{last:['\\u2014',0,0],change:0,avg:0};\n    const first=rows[0],last=rows[rows.length-1],avg=rows.reduce((a,r)=>a+r[1],0)/rows.length;",
+  "trendSummaryV3: empty guard",
+  "if(!rows||!rows.length)return{last:",
+)
+
+// ---------------------------------------------------------------------------
 // 5. hydrate() on the api object
 // ---------------------------------------------------------------------------
 const API_ANCHOR = `  api = {
