@@ -847,6 +847,16 @@ s = replaceOnce(
   "if(!rows||!rows.length)return{last:",
 )
 
+// The audit screen's KPIs were invented too: 4,812 events, 42 privileged,
+// 318 sensitive views, 9 blocked and a 100% evidence-hash claim.
+s = replaceOnce(
+  s,
+  "<div class=\"grid kpis\">${kpi('Events this period','4,812','Across all payroll workspaces','audit')}${kpi('Privileged events','42','Role and configuration changes','key','violet')}${kpi('Sensitive data views','318','Compensation and bank fields','eye')}${kpi('Blocked actions','9','Prevented by policy controls','lock','red')}${kpi('Evidence hashes','100%','All events cryptographically linked','shield','cyan')}${kpi('Retention','7 years','Zimbabwe payroll evidence policy','calendar')}</div>",
+  "<div class=\"grid kpis\">${(()=>{const a=__pr6AuditStats();if(!a)return `${kpi('Events this period','4,812','Across all payroll workspaces','audit')}${kpi('Privileged events','42','Role and configuration changes','key','violet')}`;return kpi('Events recorded',String(a.total),'In the payroll audit trail','audit')+kpi('Approval events',String(a.approvals),'Submissions, approvals and rejections','key','violet')+kpi('Change events',String(a.changes),'Runs created, processed and released','eye')+kpi('Distinct actors',String(a.actors),'Users who acted on payroll','users','cyan')+kpi('Retention','7 years','Zimbabwe payroll evidence policy','calendar')})()}</div>",
+  "audit KPIs -> live",
+  "kpi('Events recorded',String(a.total)",
+)
+
 // ---------------------------------------------------------------------------
 // 5. hydrate() on the api object
 // ---------------------------------------------------------------------------

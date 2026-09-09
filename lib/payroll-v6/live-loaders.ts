@@ -34,6 +34,7 @@ import {
   getMyPayslips,
   getMyPayrollPortal,
   getMyLeaveBalances,
+  listAuditEvents,
   type PayrollAccess,
 } from "@/lib/api/payroll-v6-api"
 
@@ -47,6 +48,7 @@ export type PayrollV6LivePayload = {
   employees: any[]
   payrollRuns: any[]
   exceptions: any[]
+  auditEvents: any[]
   counts: Record<string, number | null>
   dashboard: Record<string, any> | null
   reference: Record<string, any>
@@ -337,6 +339,7 @@ export async function loadPayrollV6LiveData(): Promise<PayrollV6LivePayload> {
   const canTraining = has("payroll.training.view") || has("payroll.training.manage")
   const canSettings = has("payroll.settings.view") || has("payroll.settings.manage")
   const canDashboard = has("payroll.dashboard.view")
+  const canAudit = has("payroll.audit.view")
 
   const [
     dashboard,
@@ -354,6 +357,7 @@ export async function loadPayrollV6LiveData(): Promise<PayrollV6LivePayload> {
     myPayslips,
     myPortal,
     myLeave,
+    auditRows,
   ] = await Promise.all([
     canDashboard ? safe("dashboard", getPayrollDashboard, null) : Promise.resolve(null),
     canEmployees ? safe("employees", listEmployees, [] as any[]) : Promise.resolve([] as any[]),
@@ -373,6 +377,7 @@ export async function loadPayrollV6LiveData(): Promise<PayrollV6LivePayload> {
     safe("employee/payslips", getMyPayslips, [] as any[]),
     safe("employee/portal", getMyPayrollPortal, null),
     safe("employee/leave-balances", getMyLeaveBalances, [] as any[]),
+    canAudit ? safe("audit", () => listAuditEvents(200), [] as any[]) : Promise.resolve([] as any[]),
   ])
 
   // Annual leave balance per employee, for the roster's Leave column.
@@ -398,6 +403,17 @@ export async function loadPayrollV6LiveData(): Promise<PayrollV6LivePayload> {
     certsByEmployee.set(key, entry)
   }
 
+  // The audit screen renders rows as tuples:
+  // [timestamp, actor, action, record, detail, class]
+  const auditEvents = (auditRows ?? []).map((a: any) => [
+    a.occurredAt ? new Date(a.occurredAt).toLocaleString("en-GB", { hour12: false }) : DASH,
+    a.actorName || DASH,
+    a.action || DASH,
+    a.entityLabel || a.entityId || DASH,
+    a.detail || DASH,
+    a.eventClass || "Change",
+  ])
+
   const employees = adaptEmployees(employeeRows ?? [], leaveByEmployee, certsByEmployee)
   const payrollRuns = adaptRuns(runsResult?.runs ?? [])
   const exceptions = deriveExceptions(employees)
@@ -409,6 +425,7 @@ export async function loadPayrollV6LiveData(): Promise<PayrollV6LivePayload> {
     runs: canRuns ? payrollRuns.filter((r) => r.rawStatus !== "COMPLETED").length : null,
     approvals: canRuns ? payrollRuns.filter((r) => r.rawStatus === "PENDING_APPROVAL").length : null,
     exceptions: exceptions.length || null,
+    audit: canAudit ? (auditRows ?? []).length || null : null,
     training: canTraining ? (courses ?? []).length || null : null,
     onboarding: null, // no onboarding pipeline on the backend yet
     inputs: null, // no input-batch store on the backend yet
@@ -427,6 +444,7 @@ export async function loadPayrollV6LiveData(): Promise<PayrollV6LivePayload> {
     employees,
     payrollRuns,
     exceptions,
+    auditEvents,
     counts,
     dashboard,
     leaveBalances: (leaveRows ?? []).map((l: any) => ({

@@ -928,6 +928,24 @@ function __pr6PeriodOptions() {
 }
 
 /**
+ * Audit trail statistics. The screen carried '4,812' events, '42' privileged,
+ * '318' sensitive views, '9' blocked actions and a "100%" evidence-hash claim,
+ * none of which existed: the runtime's logEvent() wrote to an in-memory array
+ * that died with the page. The trail is now payroll_audit_events.
+ */
+function __pr6AuditStats() {
+  if (!__pr6IsLive()) return null;
+  const rows = Array.isArray(auditEvents) ? auditEvents : [];
+  const cls = (r) => String((r && r[5]) || '');
+  return {
+    total: rows.length,
+    approvals: rows.filter((r) => cls(r) === 'Approval').length,
+    changes: rows.filter((r) => cls(r) === 'Change').length,
+    actors: new Set(rows.map((r) => String((r && r[1]) || '')).filter(Boolean)).size,
+  };
+}
+
+/**
  * Action interception.
  *
  * Registered in the capture phase before the runtime's own handlers, so a
@@ -1262,7 +1280,7 @@ function reportsPage(){
 function auditPage(){
  const rows=auditEvents.map(a=>`<tr><td>${a[0]}</td><td><strong>${a[1]}</strong></td><td><span class="link">${a[2]}</span></td><td>${a[3]}</td><td>${a[4]}</td><td>${badge(a[5])}</td><td><button class="btn small" data-action="audit-evidence">Evidence</button></td></tr>`);
  return `<div class="page">${pageHead('Immutable governance history','Payroll Audit Trail','Search every sensitive view, change, approval, rule publication, calculation, report generation and release action with evidence hashes and source lineage.',button('Verify ledger hash','verify-audit','', 'shield')+button('Export audit evidence','export-audit','primary','download'))}
- <div class="grid kpis">${kpi('Events this period','4,812','Across all payroll workspaces','audit')}${kpi('Privileged events','42','Role and configuration changes','key','violet')}${kpi('Sensitive data views','318','Compensation and bank fields','eye')}${kpi('Blocked actions','9','Prevented by policy controls','lock','red')}${kpi('Evidence hashes','100%','All events cryptographically linked','shield','cyan')}${kpi('Retention','7 years','Zimbabwe payroll evidence policy','calendar')}</div>
+ <div class="grid kpis">${(()=>{const a=__pr6AuditStats();if(!a)return `${kpi('Events this period','4,812','Across all payroll workspaces','audit')}${kpi('Privileged events','42','Role and configuration changes','key','violet')}`;return kpi('Events recorded',String(a.total),'In the payroll audit trail','audit')+kpi('Approval events',String(a.approvals),'Submissions, approvals and rejections','key','violet')+kpi('Change events',String(a.changes),'Runs created, processed and released','eye')+kpi('Distinct actors',String(a.actors),'Users who acted on payroll','users','cyan')+kpi('Retention','7 years','Zimbabwe payroll evidence policy','calendar')})()}</div>
  ${tableCard('Immutable event ledger','Filter by actor, action, record, time, entity or severity',['Timestamp','Actor','Action','Record','Detail','Class',''],rows,`<button class="btn small" data-action="audit-filter">Advanced filters</button>`)}
  </div>`;
 }

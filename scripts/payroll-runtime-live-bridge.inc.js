@@ -916,6 +916,24 @@ function __pr6PeriodOptions() {
 }
 
 /**
+ * Audit trail statistics. The screen carried '4,812' events, '42' privileged,
+ * '318' sensitive views, '9' blocked actions and a "100%" evidence-hash claim,
+ * none of which existed: the runtime's logEvent() wrote to an in-memory array
+ * that died with the page. The trail is now payroll_audit_events.
+ */
+function __pr6AuditStats() {
+  if (!__pr6IsLive()) return null;
+  const rows = Array.isArray(auditEvents) ? auditEvents : [];
+  const cls = (r) => String((r && r[5]) || '');
+  return {
+    total: rows.length,
+    approvals: rows.filter((r) => cls(r) === 'Approval').length,
+    changes: rows.filter((r) => cls(r) === 'Change').length,
+    actors: new Set(rows.map((r) => String((r && r[1]) || '')).filter(Boolean)).size,
+  };
+}
+
+/**
  * Action interception.
  *
  * Registered in the capture phase before the runtime's own handlers, so a

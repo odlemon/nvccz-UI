@@ -25,6 +25,7 @@
  *                       /statutory/brackets, /statutory/levies, /salary-structures,
  *                       /leave-balances, /bank-templates
  *   GET    /payroll/compliance/courses|assignments|certifications|dashboard/expiring
+ *   GET    /payroll/audit                                  payroll audit trail, newest first
  *
  * Authorisation: every route except the `/employee/*` self-service group and
  * `/me/access` is guarded by a payroll.* permission. A 403 here means the
@@ -317,6 +318,32 @@ export async function listLeaveBalances(): Promise<Record<string, any>[]> {
 
 export async function listBankTemplates(): Promise<Record<string, any>[]> {
   const res = await apiClient.get<ApiResponse<any[]>>(`${BASE}/bank-templates`)
+  return unwrapData(res) ?? []
+}
+
+// ---------------------------------------------------------------------------
+// Audit trail
+// ---------------------------------------------------------------------------
+
+export type PayrollAuditEvent = {
+  id: string
+  occurredAt: string
+  actorUserId: string | null
+  actorName: string | null
+  actorRole: string | null
+  action: string
+  eventClass: string
+  entityType: string | null
+  entityId: string | null
+  entityLabel: string | null
+  detail: string | null
+}
+
+/** Newest first. Requires payroll.audit.view. */
+export async function listAuditEvents(limit = 100): Promise<PayrollAuditEvent[]> {
+  const res = await apiClient.get<ApiResponse<PayrollAuditEvent[]>>(
+    `${BASE}/audit?limit=${limit}`,
+  )
   return unwrapData(res) ?? []
 }
 
