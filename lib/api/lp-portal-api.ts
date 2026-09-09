@@ -1309,6 +1309,55 @@ const liveLpPortalApi = new LpPortalApiService()
  * A Proxy rather than a hand-written façade so the two implementations cannot drift out of sync
  * with this file: any method either side gains is dispatched automatically.
  */
+/**
+ * Keys the API returns as numeric STRINGS that the UI treats as numbers.
+ *
+ * A type audit of every LP GET found 148 numeric-string fields. Most are monetary decimals,
+ * which are strings on purpose — Prisma serialises Decimal that way to preserve precision, and
+ * the screens run them through `parseDecimal`. These are the ones that are plain counts, where
+ * a string silently turns arithmetic into concatenation and comparison into string comparison.
+ *
+ * Two of these already shipped as visible bugs: a conversation's `unreadCount` summed to "00",
+ * and the session's `unreadCounts` summed to "101" for a real total of 2, which rendered the
+ * notification bell as "9+". The pagination fields are the same hazard one step removed —
+ * `lp-document-centre-screen` survives today only because `Math.min`/`-` happen to coerce,
+ * while `setPage(totalPages)` puts a string into page state.
+ *
+ * Deliberately a key allowlist, not "coerce anything numeric-looking": widening it to money
+ * would destroy the precision those strings exist to protect.
+ */
+const LP_COUNT_KEYS = new Set([
+  "page",
+  "pageSize",
+  "total",
+  "totalPages",
+  "count",
+  "unreadCount",
+  "investmentCount",
+  "newThisWeek",
+  "requiresSignature",
+  "secureDownloadsYtd",
+  "openCount",
+  "paidCallCount",
+  "dueSoonCount",
+])
+
+const isNumericString = (v: unknown): v is string =>
+  typeof v === "string" && v.trim() !== "" && !Number.isNaN(Number(v))
+
+/** Recursively coerce the count-like keys above; everything else is passed through untouched. */
+function coerceLpCounts<T>(node: T): T {
+  if (Array.isArray(node)) return node.map((v) => coerceLpCounts(v)) as unknown as T
+  if (node && typeof node === "object") {
+    const out: Record<string, unknown> = {}
+    for (const [k, v] of Object.entries(node as Record<string, unknown>)) {
+      out[k] = LP_COUNT_KEYS.has(k) && isNumericString(v) ? Number(v) : coerceLpCounts(v)
+    }
+    return out as unknown as T
+  }
+  return node
+}
+
 export const lpPortalApi = new Proxy(liveLpPortalApi, {
   get(target, prop, receiver) {
     const name = String(prop)
@@ -1323,6 +1372,15 @@ export const lpPortalApi = new Proxy(liveLpPortalApi, {
         return (mockFn as (...args: unknown[]) => unknown).bind(mockLpPortalApi)
       }
     }
-    return (value as (...args: unknown[]) => unknown).bind(target)
+    // Normalise count-like fields on the way out, so every screen sees numbers instead of each
+    // call site having to remember to coerce. Blobs (downloads) are passed straight through.
+    const bound = (value as (...args: unknown[]) => unknown).bind(target)
+    return (...args: unknown[]) => {
+      const res = bound(...args)
+      if (res instanceof Promise) {
+        return res.then((r) => (r instanceof Blob ? r : coerceLpCounts(r)))
+      }
+      return res
+    }
   },
 }) as LpPortalApiService
