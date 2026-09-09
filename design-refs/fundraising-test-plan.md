@@ -310,6 +310,58 @@ record created by the previous one - so this is one chain, not four unrelated in
 Records created by these runs are removed afterwards by
 `npm run db:cleanup:fundraising-test-artefacts`, so they do not accumulate in the demo dataset.
 
+**Trip D - 5 steps, 0 failures.** Pipeline board: stage transition by drag, and the amount
+editor.
+
+This closes the one part of definition-of-done 7a that had only ever been done through the API
+by the UAT script: advancing an opportunity through pipeline stages *in the UI*. The board
+moves a card by drag-and-drop only - SRD section 27 requires server-validated drag-and-drop -
+and dnd-kit is wired to a `PointerSensor` with a 6px activation distance, so synthetic drag
+events are ignored. The test drives real mouse press / move / release.
+
+```
+200 POST  /fundraising/opportunities/:id/transition     <- the drag
+200 PATCH /fundraising/opportunities/:id                <- the amount edit
+```
+
+A refused move would have been an equally valid outcome, and is asserted for: the board must
+surface an unmet stage gate as a checklist. Silence fails the test either way.
+
+The same trip covers guardrails G2/G4 from `fundraising-gap-analysis.md`:
+
+- submitting the amount editor with a blank reason attempts **no write** - SRD section 7
+  requires a reason on every amount change
+- a reasoned change reaches `patchOpportunity` and lands in the immutable history
+
+Verified in the database afterwards, not just from the 200:
+
+```
+amount history:  INDICATIVE 2500000 -> 6250000  | "E2E amount change ..."
+stage history:   DISCOVERY -> QUALIFIED
+```
+
+and both appear in `GET /opportunities/:id/timeline`, which returns all 7 events for that
+opportunity. (An earlier check of mine reported the timeline as empty - that was my probe
+reading the wrong key. The endpoint returns them under `data.events`.)
+
+### 6.2 Reconciliation with `fundraising-gap-analysis.md`
+
+That file is dated 2026-07-17 and, like the QA-issues file, understates the current state. Its
+four cross-tab guardrails - the ones it marks highest priority - are all now closed, verified
+in code and, for G2/G4, exercised in Trip D:
+
+| # | Guardrail | State |
+|---|---|---|
+| G1 | Stage-gate / activation / compliance failures surfaced as a **checklist**, not just a toast | **Closed** - `FrRequirementsDialog` is wired on Campaigns, Commitments, Mandates, Onboarding and the Pipeline board, which is exactly the set the file asks for |
+| G2 | Amount edits require a reason, with immutable history | **Closed** - the board's amount editor refuses a blank reason and writes through `patchOpportunity`; history verified in the database |
+| G3 | Communications / meetings / tasks link to opportunity and investor | **Closed** - `opportunityId` is sent by both, with a picker in the wizard |
+| G4 | Independent amount types never overwrite each other | **Closed** - the editor is per amount type (`AMOUNT_TYPES` selector), patching one field at a time |
+
+Several per-tab items it lists as partial are also closed - the Investors create wizard now
+carries every SRD field it lists as missing (trading name, registration number, jurisdiction,
+relationship owner, sanctions/risk/classification, asset-class and geographic preferences, next
+action), and the Campaigns and Investors exports it marks "backend-pending" both produce a CSV.
+
 ---
 
 ## 7. Artefacts
