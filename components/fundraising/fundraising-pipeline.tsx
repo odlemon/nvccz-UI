@@ -124,12 +124,28 @@ function embeddedPersonName(raw: Record<string, any>, key: "owner" | "user", map
   )
 }
 
+/**
+ * Normalise GET /fundraising/analytics/funnel into rows.
+ *
+ * The endpoint returns `data.funnel` as an object keyed by stage code
+ * (`{ SIGNED: { count, amount }, … }`), not an array. Requiring an array here meant this
+ * always returned [] and the caller silently fell back to grouping opportunities — which was
+ * itself reading the wrong field, so every stage collapsed into one "Unspecified" bucket.
+ */
 function rowsFromAnalytics(value: unknown): Record<string, any>[] {
   if (Array.isArray(value)) return value
   if (!value || typeof value !== "object") return []
   const record = value as Record<string, any>
   const rows = record.stages || record.items || record.data || record.funnel
-  return Array.isArray(rows) ? rows : []
+  if (Array.isArray(rows)) return rows
+  if (rows && typeof rows === "object") {
+    return Object.entries(rows as Record<string, any>).map(([stageCode, v]) => ({
+      stageCode,
+      count: asNumber((v as any)?.count),
+      amount: asNumber((v as any)?.amount),
+    }))
+  }
+  return []
 }
 
 /** Solid icon tiles matching the Upcoming Meetings design. */
@@ -471,31 +487,59 @@ export function FundraisingPipeline() {
   }, [dashboard, rawOpportunities])
 
   const stages: PipelineStage[] = useMemo(() => {
-    const analyticRows = rowsFromAnalytics(funnelAnalytics).filter((row) => {
-      if (filter === "all") return true
-      const campaignId = String(row.campaignId || row.campaign?.id || "")
-      return campaignIds.has(campaignId)
-    })
-    const sourceRows: Array<{ name: string; count: number; amount: number }> =
+    // Stage code -> display name and pipeline order, taken from the stage each opportunity
+    // actually sits on. The funnel analytics return codes only, so this supplies the label
+    // and the ordering; every code the funnel reports has at least one opportunity, so every
+    // code resolves.
+    const nameByCode = new Map<string, string>()
+    const orderByCode = new Map<string, number>()
+    for (const row of rawOpportunities) {
+      const stage = row.currentStage
+      const code = String(stage?.stageCode ?? "")
+      if (!code) continue
+      if (!nameByCode.has(code)) nameByCode.set(code, String(stage?.stageName || code))
+      if (!orderByCode.has(code)) orderByCode.set(code, asNumber(stage?.sortOrder, 999))
+    }
+
+    // The funnel endpoint takes no campaign-type filter, so it only matches the screen when
+    // no filter is applied. Under a filter, group the opportunities the server already
+    // filtered instead of showing campaign-wide totals against a narrowed view.
+    const analyticRows = filter === "all" ? rowsFromAnalytics(funnelAnalytics) : []
+
+    const sourceRows: Array<{ code: string; name: string; count: number; amount: number }> =
       analyticRows.length > 0
-        ? analyticRows.map((row) => ({
-            name: String(row.stageName || row.name || row.stageCode || row.code || "Unspecified"),
-            count: asNumber(row.count ?? row.opportunityCount),
-            amount: asNumber(row.amount ?? row.totalAmount ?? row.pipelineAmount),
-          }))
+        ? analyticRows.map((row) => {
+            const code = String(row.stageCode || row.code || "")
+            return {
+              code,
+              name: String(row.stageName || row.name || nameByCode.get(code) || code || "Unspecified"),
+              count: asNumber(row.count ?? row.opportunityCount),
+              amount: asNumber(row.amount ?? row.totalAmount ?? row.pipelineAmount),
+            }
+          })
         : Array.from(
-            rawOpportunities.reduce((map, row) => {
-              const name = String(row.stage?.name || row.stageName || row.stageCode || "Unspecified")
-              const current = map.get(name) || { name, count: 0, amount: 0 }
-              current.count += 1
-              current.amount += asNumber(
-                row.proposedAmount ?? row.indicativeAmount ?? row.softCircleAmount ?? row.expectedAum,
-              )
-              map.set(name, current)
-              return map
-            }, new Map<string, { name: string; count: number; amount: number }>())
+            rawOpportunities
+              .reduce((map, row) => {
+                // The API nests the stage under `currentStage`; there is no flat stageName
+                // or stageCode on an opportunity.
+                const code = String(row.currentStage?.stageCode ?? "")
+                const name = String(row.currentStage?.stageName || code || "Unspecified")
+                const key = code || name
+                const current = map.get(key) || { code, name, count: 0, amount: 0 }
+                current.count += 1
+                current.amount += asNumber(
+                  row.proposedAmount ?? row.indicativeAmount ?? row.softCircleAmount ?? row.expectedAum,
+                )
+                map.set(key, current)
+                return map
+              }, new Map<string, { code: string; name: string; count: number; amount: number }>())
               .values(),
           )
+
+    sourceRows.sort(
+      (a, b) => (orderByCode.get(a.code) ?? 999) - (orderByCode.get(b.code) ?? 999),
+    )
+
     const totalCount = sourceRows.reduce((sum, row) => sum + row.count, 0)
     return sourceRows.map((row, index) => ({
       name: row.name,
@@ -505,7 +549,7 @@ export function FundraisingPipeline() {
       pct: totalCount > 0 ? Math.round((row.count / totalCount) * 100) : 0,
       color: STAGE_COLORS[index % STAGE_COLORS.length],
     }))
-  }, [funnelAnalytics, filter, campaignIds, rawOpportunities])
+  }, [funnelAnalytics, filter, rawOpportunities])
 
   const totalPipeline = useMemo(
     () => moneyLabel(stages.reduce((sum, stage) => sum + stage.amountNum, 0)),

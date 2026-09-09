@@ -74,6 +74,10 @@ function mapSafeAuditLogRow(raw: Record<string, any>) {
         raw.createdBy,
         raw.performedBy,
       ) || "System",
+    // The API does not resolve the audited object into a name, but the snapshot it stores
+    // in newValue/previousValue carries one (fullName, legalName, title, name…). Read it
+    // from there before giving up, so the Object column identifies the record rather than
+    // reading "Name unavailable" on every row.
     objectName:
       auditLabel(
         raw.objectName,
@@ -84,6 +88,8 @@ function mapSafeAuditLogRow(raw: Record<string, any>) {
         raw.campaign,
         raw.investor,
         raw.opportunity,
+        raw.newValue,
+        raw.previousValue,
       ) || "Name unavailable",
     summary: auditSummary(raw),
   }

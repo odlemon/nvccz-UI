@@ -1172,6 +1172,91 @@ do not alternate between object and string across list responses.
 
 ---
 
+## 9. Data-room 7-day activity counts — ✅ SHIPPED in this pass
+
+**Status: ✅ Built on BE + FE wired** (`feature/fundraising-live`).
+
+### The gap
+
+`components/fundraising/fundraising-data-rooms.tsx` renders four tiles — Active rooms,
+Documents, **Views (7d)** and **Downloads (7d)** — both per room and aggregated for the
+campaign. `GET /api/fundraising/campaigns/:campaignId/data-rooms` returned neither a
+`views7d` nor a `downloads7d` field, so `mapDataRoomCard` read `undefined` and both tiles
+were **structurally zero for every room, forever**, regardless of how much access activity
+the room had. Nothing on screen said so; the tiles looked live.
+
+This is the failure mode this module was audited for: a plausible number that no payload
+backs.
+
+### What was added
+
+`FundraisingSrdService.listDataRooms` now aggregates `fundraising_data_room_access_logs`
+over a rolling 7-day window and returns the counts alongside the existing `_count`:
+
+```json
+{
+  "id": "frs-dataroom-02",
+  "name": "Mandate Programme Data Room",
+  "status": "ACTIVE",
+  "_count": { "documents": 10, "access": 3 },
+  "views7d": 6,
+  "downloads7d": 3
+}
+```
+
+- `VIEW` and `PREVIEW` actions count towards `views7d`; `DOWNLOAD` counts towards
+  `downloads7d`. Only `success: true` rows are counted — a blocked attempt is not a view.
+- Counted with a single `groupBy` over all rooms in the campaign, so the endpoint stays one
+  round trip regardless of room count.
+
+### FE change that went with it
+
+`mapDataRoomCard` also read `documents` and `access` only from nested arrays. The **detail**
+endpoint returns those arrays; the **list** endpoint returns `_count` instead. So the
+Documents tile and the invited-investor count were also zero on the list view while the
+payload plainly carried 10 and 3. The mapper now reads whichever shape the payload carries.
+
+### Verified
+
+Seeded 2 rooms × (5 folders, 10 documents, 3 access grants, 9 access events). Live response
+returned `views7d: 6, downloads7d: 3` — matching the seed exactly (9 events per room, every
+third a `DOWNLOAD`). Screen then rendered Documents 10, Views (7d) 6, Downloads (7d) 3.
+
+---
+
+## 10. Report schedules — endpoint existed, FE was discarding the input
+
+**Status: ✅ FE wired to the existing BE contract** (no BE change needed).
+
+`fundraising-reports.tsx` rendered a hardcoded seven-report catalogue with invented owners
+and cadences, while `GET /api/fundraising/reports` already served the real catalogue and
+`GET|POST /api/fundraising/reports/schedules` already existed. The Configure dialog collected
+a cadence and recipients and threw both away — its own description admitted "Schedule and
+recipients aren't persisted yet".
+
+FE now loads the catalogue from `GET /fundraising/reports`, joins live schedules from
+`GET /fundraising/reports/schedules`, shows **"Not scheduled"** rather than inventing a
+cadence, hides Owner when no schedule exists, and persists any cadence other than
+"On demand" through `POST /fundraising/reports/schedules`.
+
+**Contract note for the API team:** the create body is
+`{ reportKey, name, cadence, recipients, format, filters }` — `reportKey` **and `name`** are
+both required (`FundraisingRequirementsService.createReportSchedule` throws
+`VALIDATION_ERROR` without either), and the field is `cadence`, not `frequency`. Worth
+adding to `fundraising-frontend-api.md`, as it is not documented there.
+
+---
+
+## Dead code removed in this pass
+
+`src/routes/fundraisingIrRoutes.ts` and `src/routes/investorIrRoutes.ts` were **mounted
+nowhere** in `src/app.ts` and imported by nothing in `src/` or `scripts/`. Their surface
+(6 and 6 routes) was a strict subset of the mounted `fundraisingRoutes` (~110 unique routes)
+and `investorRoutes`. They were an earlier parallel implementation. Deleted rather than left
+as a second, competing surface.
+
+---
+
 ## Related docs
 
 - [`fundraising-gap-analysis.md`](./fundraising-gap-analysis.md) — full FE/BE gap matrix (this pass)
