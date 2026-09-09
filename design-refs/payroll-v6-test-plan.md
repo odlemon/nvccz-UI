@@ -130,6 +130,18 @@ EMP-0003, 19 days on 2,975 → `(2975/22)*19 = 2569.32` ✓ on screen.
 
 ### 4.3 What remains untraced, and why
 
+Untraced totals by role — lower-privilege roles see fewer numbers because the
+loaders fetch only what their grants allow and refused pages render no figures
+at all:
+
+| Role | Untraced across 20 screens |
+|---|---|
+| sysadmin | 102 |
+| exec (CEO) | 73 |
+| hr | 46 |
+| deptmgr | 14 |
+| employee | 8 |
+
 Final per-screen figures, as sysadmin:
 
 | Screen | Left | What they are |
