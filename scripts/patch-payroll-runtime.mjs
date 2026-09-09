@@ -398,7 +398,7 @@ s = replaceOnce(
 s = replaceOnce(
   s,
   "<h2>Approval review is 78% complete</h2>",
-  "<h2>${(()=>{const c=__pr6ApprovalCompare();if(!c)return 'Approval review is 78% complete';const st=String(c.current.rawStatus||'');return st==='PENDING_APPROVAL'?'Awaiting independent approval':st==='APPROVED'?'Approved, awaiting release':st==='COMPLETED'?'Released':'Draft payroll run'})()}</h2>",
+  "<h2>${(()=>{const c=__pr6ApprovalCompare();if(!c)return 'Approval review is 78% complete';if(!c.hasRun)return 'No payroll run to review';const st=String(c.current.rawStatus||'');return st==='PENDING_APPROVAL'?'Awaiting independent approval':st==='APPROVED'?'Approved, awaiting release':st==='COMPLETED'?'Released':'Draft payroll run'})()}</h2>",
   "approval band headline -> live",
   "'Awaiting independent approval'",
 )
@@ -716,6 +716,42 @@ s = replaceOnce(
   "${(()=>{const m=__pr6PayrollMix();return m?progressRow('Deductions',m.deductionPct,money(m.deductions),'red'):progressRow('Deductions',29,'USD 77,444','red')})()}",
   "components: deductions row -> live",
   "progressRow('Deductions',m.deductionPct",
+)
+
+// ---------------------------------------------------------------------------
+// 4k. Empty-collection guards
+// ---------------------------------------------------------------------------
+// The runtime indexes these arrays directly because its fixtures were never
+// empty. Live, they can be: a department manager has no payroll.runs.view
+// grant, so hydrate hands over [] and `payrollRuns[0].id` throws, taking the
+// whole render with it. Observed on Approvals as deptmgr.
+s = replaceEvery(
+  s,
+  "payrollRuns[0]",
+  "(payrollRuns[0]||__pr6RunPlaceholder)",
+  "guard payrollRuns[0]",
+  "(payrollRuns[0]||__pr6RunPlaceholder)",
+)
+s = replaceEvery(
+  s,
+  "employees[0]",
+  "(employees[0]||__pr6EmployeePlaceholder)",
+  "guard employees[0]",
+  "(employees[0]||__pr6EmployeePlaceholder)",
+)
+s = replaceEvery(
+  s,
+  "exceptions[0]",
+  "(exceptions[0]||__pr6ExceptionPlaceholder)",
+  "guard exceptions[0]",
+  "(exceptions[0]||__pr6ExceptionPlaceholder)",
+)
+s = replaceEvery(
+  s,
+  "documents[0]",
+  "(documents[0]||__pr6DocumentPlaceholder)",
+  "guard documents[0]",
+  "(documents[0]||__pr6DocumentPlaceholder)",
 )
 
 // ---------------------------------------------------------------------------

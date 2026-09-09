@@ -290,8 +290,11 @@ function __pr6TaxRows() {
 function __pr6ApprovalCompare() {
   if (!__pr6IsLive()) return null;
   const runs = Array.isArray(payrollRuns) ? payrollRuns : [];
-  if (runs.length === 0) return null;
-  const cur = runs[0];
+  // Live but with no runs is a real answer, not "no data yet". Returning null
+  // here would fall back to the fixture and show a department manager a
+  // preparer named Rudo Sibanda and "3 unresolved critical" for a payroll they
+  // cannot even see.
+  const cur = runs.length ? runs[0] : __pr6RunPlaceholder;
   const prev = runs.length > 1 ? runs[1] : null;
 
   const delta = (a, b) => {
@@ -307,6 +310,7 @@ function __pr6ApprovalCompare() {
   };
 
   const prevLabel = prev ? String(prev.reference || prev.period) : 'No prior run';
+  const hasRun = runs.length > 0;
   const curLabel = String(cur.reference || cur.period);
 
   return {
@@ -319,7 +323,8 @@ function __pr6ApprovalCompare() {
       ['Net pay', prev ? __pr6Money(prev.netUSD) : '—', __pr6Money(cur.netUSD), delta(cur.netUSD, prev && prev.netUSD), review(cur.netUSD, prev && prev.netUSD)],
     ],
     current: cur,
-    owner: cur.owner || '—',
+    hasRun,
+    owner: hasRun ? (cur.owner || '—') : '—',
     criticalOpen: (Array.isArray(exceptions) ? exceptions : []).filter(
       (e) => e && e.severity === 'Critical' && e.status !== 'Resolved',
     ).length,
@@ -334,8 +339,7 @@ function __pr6ApprovalCompare() {
 function __pr6CloseStats() {
   if (!__pr6IsLive()) return null;
   const runs = Array.isArray(payrollRuns) ? payrollRuns : [];
-  const cur = runs.length ? runs[0] : null;
-  if (!cur) return null;
+  const cur = runs.length ? runs[0] : __pr6RunPlaceholder;
   const headcount = Number(cur.employees) || 0;
   return {
     headcount,
@@ -459,7 +463,7 @@ function __pr6DepartmentsV3() {
 /**
  * My Pay view for the signed-in user.
  *
- * The page rendered `employees[0]` plus a fixed payslip (net 1,629.14,
+ * The page rendered `(employees[0]||__pr6EmployeePlaceholder)` plus a fixed payslip (net 1,629.14,
  * gross 2,250.00, deductions 620.86, ZiG 35,820, four invented monthly
  * payslips and six invented earnings lines), so every user saw the same
  * fabricated pay for somebody who was not them.
@@ -736,6 +740,94 @@ function __pr6DepartmentReadiness() {
 }
 
 /**
+ * Empty-collection placeholders.
+ *
+ * The runtime indexes (payrollRuns[0]||__pr6RunPlaceholder), (employees[0]||__pr6EmployeePlaceholder), (exceptions[0]||__pr6ExceptionPlaceholder) and
+ * (documents[0]||__pr6DocumentPlaceholder) directly, because its fixtures were never empty. Once the data
+ * is live those arrays legitimately CAN be empty — a department manager holds
+ * no payroll.runs.view grant, so the loader never fetches runs and hydrate
+ * hands over [] — and `(payrollRuns[0]||__pr6RunPlaceholder).id` then throws, taking the whole render
+ * down. Observed on the Approvals screen as deptmgr:
+ *   [payroll-v6] hydrate failed TypeError: Cannot read properties of undefined
+ *
+ * These placeholders render as dashes and zeros, so an empty screen says "no
+ * data" instead of crashing or inventing a value.
+ */
+const __PR6_DASH = '—';
+
+const __pr6RunPlaceholder = {
+  id: __PR6_DASH,
+  reference: __PR6_DASH,
+  period: 'No payroll run',
+  group: __PR6_DASH,
+  employees: 0,
+  currency: 'USD',
+  grossUSD: 0,
+  grossZiG: 0,
+  deductions: 0,
+  netUSD: 0,
+  status: 'None',
+  rawStatus: 'NONE',
+  approvalStatus: 'NONE',
+  stage: 1,
+  owner: __PR6_DASH,
+  variance: null,
+};
+
+const __pr6EmployeePlaceholder = {
+  id: __PR6_DASH,
+  recordId: null,
+  name: 'No employee records',
+  initials: '--',
+  email: null,
+  department: __PR6_DASH,
+  title: __PR6_DASH,
+  branch: __PR6_DASH,
+  type: __PR6_DASH,
+  start: __PR6_DASH,
+  phone: __PR6_DASH,
+  base: 0,
+  zig: 0,
+  currency: 'USD',
+  bank: __PR6_DASH,
+  tax: __PR6_DASH,
+  nssa: __PR6_DASH,
+  readiness: 0,
+  status: 'None',
+  leave: __PR6_DASH,
+  training: __PR6_DASH,
+  documents: __PR6_DASH,
+  terminated: false,
+  isActive: false,
+};
+
+const __pr6ExceptionPlaceholder = {
+  id: __PR6_DASH,
+  employee: 'No exceptions',
+  employeeId: __PR6_DASH,
+  type: 'None',
+  severity: 'Low',
+  source: __PR6_DASH,
+  amount: __PR6_DASH,
+  owner: null,
+  age: null,
+  status: 'None',
+  detail: 'No payroll exceptions are outstanding.',
+};
+
+const __pr6DocumentPlaceholder = {
+  id: __PR6_DASH,
+  name: 'No documents',
+  folder: __PR6_DASH,
+  type: __PR6_DASH,
+  owner: __PR6_DASH,
+  modified: __PR6_DASH,
+  class: __PR6_DASH,
+  versions: 0,
+  content: '',
+};
+
+/**
  * Action interception.
  *
  * Registered in the capture phase before the runtime's own handlers, so a
@@ -980,9 +1072,9 @@ function exceptionsPage(){
  </div>`;
 }
 function approvalsPage(){
- const current=payrollRuns[0];
+ const current=(payrollRuns[0]||__pr6RunPlaceholder);
  return `<div class="page">${pageHead('Governed review','Maker-Checker Payroll Approval Review','Review period variances, sampled calculations, source evidence, unresolved exceptions and sensitive master-data changes before approval.',button('Download review pack','download-review-pack','', 'download')+button('Submit decision','approval-decision','primary','shield'))}
- <div class="panel-band"><div class="eyebrow" style="color:#7eb6ff">${current.id} - ${current.period}</div><h2>${(()=>{const c=__pr6ApprovalCompare();if(!c)return 'Approval review is 78% complete';const st=String(c.current.rawStatus||'');return st==='PENDING_APPROVAL'?'Awaiting independent approval':st==='APPROVED'?'Approved, awaiting release':st==='COMPLETED'?'Released':'Draft payroll run'})()}</h2><p>The maker cannot approve their own payroll. Final approval requires an independent approver and completion of all release-blocking controls.</p><div class="band-stats"><div class="band-stat"><span>Prepared by</span><strong>${(()=>{const c=__pr6ApprovalCompare();return c?c.owner:'Rudo Sibanda'})()}</strong></div><div class="band-stat"><span>Gross payroll</span><strong>${money(current.grossUSD)}</strong></div><div class="band-stat"><span>Unresolved critical</span><strong>${(()=>{const c=__pr6ApprovalCompare();return c?c.criticalOpen:3})()}</strong></div></div></div>
+ <div class="panel-band"><div class="eyebrow" style="color:#7eb6ff">${current.id} - ${current.period}</div><h2>${(()=>{const c=__pr6ApprovalCompare();if(!c)return 'Approval review is 78% complete';if(!c.hasRun)return 'No payroll run to review';const st=String(c.current.rawStatus||'');return st==='PENDING_APPROVAL'?'Awaiting independent approval':st==='APPROVED'?'Approved, awaiting release':st==='COMPLETED'?'Released':'Draft payroll run'})()}</h2><p>The maker cannot approve their own payroll. Final approval requires an independent approver and completion of all release-blocking controls.</p><div class="band-stats"><div class="band-stat"><span>Prepared by</span><strong>${(()=>{const c=__pr6ApprovalCompare();return c?c.owner:'Rudo Sibanda'})()}</strong></div><div class="band-stat"><span>Gross payroll</span><strong>${money(current.grossUSD)}</strong></div><div class="band-stat"><span>Unresolved critical</span><strong>${(()=>{const c=__pr6ApprovalCompare();return c?c.criticalOpen:3})()}</strong></div></div></div>
  <div class="grid two">
   <div class="stack">
    ${card('Payroll summary - before vs current','Movement, variance and materiality review',`<div class="table-wrap"><table><thead><tr><th>Measure</th><th>${(()=>{const c=__pr6ApprovalCompare();return c?c.prevLabel:'May 2026'})()}</th><th>${(()=>{const c=__pr6ApprovalCompare();return c?c.curLabel:'June 2026'})()}</th><th>Variance</th><th>Review</th></tr></thead><tbody>${((__pr6ApprovalCompare()||{}).rows||[['Headcount','126','128','+2','Expected'],['Gross USD','USD 256,180.00','USD 264,720.00','+3.3%','Expected'],['Gross ZiG','ZiG 7,134,000','ZiG 7,459,664','+4.6%','Review'],['PAYE','USD 41,280.00','USD 42,967.00','+4.1%','Expected'],['Overtime','USD 8,420.00','USD 11,984.00','+42.3%','Investigate'],['Net pay','USD 181,200.00','USD 187,276.00','+3.4%','Expected']]).map(r=>`<tr><td><strong>${r[0]}</strong></td><td>${r[1]}</td><td>${r[2]}</td><td>${r[3]}</td><td>${badge(r[4])}</td></tr>`).join('')}</tbody></table></div>`)}
@@ -1100,8 +1192,8 @@ function settingsPage(){
 }
 function myPayPage(){
  const __mp=__pr6MyPayView();
- // employees[0] is the first person in the roster, not the signed-in user.
- const e=__mp?{leave:(__mp.annualLeave===null?'\u2014':__mp.annualLeave+' days'),bank:__mp.self.bank,tax:__mp.self.tax,nssa:__mp.self.nssa,currency:__mp.self.currency,id:__mp.self.employeeNumber,title:'\u2014',department:__mp.self.department,branch:'\u2014',type:'\u2014',start:__mp.self.start}:employees[0];
+ // (employees[0]||__pr6EmployeePlaceholder) is the first person in the roster, not the signed-in user.
+ const e=__mp?{leave:(__mp.annualLeave===null?'\u2014':__mp.annualLeave+' days'),bank:__mp.self.bank,tax:__mp.self.tax,nssa:__mp.self.nssa,currency:__mp.self.currency,id:__mp.self.employeeNumber,title:'\u2014',department:__mp.self.department,branch:'\u2014',type:'\u2014',start:__mp.self.start}:(employees[0]||__pr6EmployeePlaceholder);
  return `<div class="page">${pageHead('Employee self-service','My Pay','Secure employee access to payslips, tax summaries, bank details, leave, employment records, training and personal documents.',button('Update bank details','ess-bank-change','', 'bank')+button('Download June payslip','download-payslip','primary','download'))}
  <div class="panel-band"><div class="eyebrow" style="color:#7eb6ff">${__mp&&__mp.latest?String(__mp.latest.period).toUpperCase()+' NET PAY':'NET PAY'}</div><h2>${__mp?(__mp.hasPayslip?money(__mp.latest.net):'No payslip yet'):money(1629.14)}</h2><p>${__mp?(__mp.hasPayslip?'Pay period '+__mp.latest.period:'No payroll run has been processed for you yet.'):'Payment date: 30 June 2026'}</p><div class="band-stats"><div class="band-stat"><span>Gross earnings</span><strong>${__mp?(__mp.hasPayslip?money(__mp.latest.gross):'\u2014'):money(2250)}</strong></div><div class="band-stat"><span>Total deductions</span><strong>${__mp?(__mp.hasPayslip?money(__mp.latest.deductions):'\u2014'):money(620.86)}</strong></div><div class="band-stat"><span>Payslips on record</span><strong>${__mp?__mp.slips.length:3}</strong></div><div class="band-stat"><span>Leave available</span><strong>${e.leave}</strong></div></div></div>
  <div class="grid three">
@@ -1132,7 +1224,7 @@ function openDrawer(title,sub,body,foot=''){$('#drawerHead').innerHTML=`<div><h2
 function closeDrawer(){$('#drawer').classList.remove('open');$('#drawerBackdrop').classList.remove('open')}
 function openModal(title,sub,body,foot='',wide=false){$('#modalHead').innerHTML=`<div><h2>${title}</h2><p>${sub}</p></div>${closeButton('modal')}`;$('#modalBody').innerHTML=body;$('#modalFoot').innerHTML=foot||`<button class="btn" data-action="close-modal">Close</button>`;$('#modal').classList.toggle('wide',wide);$('#modal').classList.add('open');$('#modalBackdrop').classList.add('open')}
 function closeModal(){$('#modal').classList.remove('open','wide');$('#modalBackdrop').classList.remove('open')}
-function employeeDrawer(id){const e=employees.find(x=>x.id===id)||employees[0];const body=`<div class="employee-profile"><div class="photo-avatar">${e.initials}</div><div><div class="eyebrow">${e.id} - ${badge(e.status)}</div><h2 style="font-size:22px;margin:0">${e.name}</h2><div class="muted" style="margin-top:4px">${e.title} - ${e.department} - ${e.branch}</div><div class="profile-facts"><div class="fact"><span>Employment type</span><strong>${e.type}</strong></div><div class="fact"><span>Start date</span><strong>${e.start}</strong></div><div class="fact"><span>Payroll currency</span><strong>${e.currency}</strong></div></div></div></div>
+function employeeDrawer(id){const e=employees.find(x=>x.id===id)||(employees[0]||__pr6EmployeePlaceholder);const body=`<div class="employee-profile"><div class="photo-avatar">${e.initials}</div><div><div class="eyebrow">${e.id} - ${badge(e.status)}</div><h2 style="font-size:22px;margin:0">${e.name}</h2><div class="muted" style="margin-top:4px">${e.title} - ${e.department} - ${e.branch}</div><div class="profile-facts"><div class="fact"><span>Employment type</span><strong>${e.type}</strong></div><div class="fact"><span>Start date</span><strong>${e.start}</strong></div><div class="fact"><span>Payroll currency</span><strong>${e.currency}</strong></div></div></div></div>
  <div class="tabs" style="margin-top:18px"><button class="tab active">Employment</button><button class="tab">Compensation</button><button class="tab">Bank and statutory</button><button class="tab">Documents</button><button class="tab">Leave</button><button class="tab">Training</button><button class="tab">Audit</button></div>
  <div class="grid two"><section class="drawer-section"><h3>Employment details</h3><div class="form-grid">${[['Job title',e.title],['Department',e.department],['Branch',e.branch],['Contract type',e.type],['Start date',e.start],['Line manager','Tawanda Chirenje']].map(x=>`<div class="fact"><span>${x[0]}</span><strong>${x[1]}</strong></div>`).join('')}</div></section><section class="drawer-section"><h3>Payroll readiness</h3><div style="display:flex;gap:16px;align-items:center"><div class="readiness-ring" style="--pct:${e.readiness}%"><strong>${e.readiness}%</strong></div><div style="flex:1">${progressRow('Employee master',100,'Complete','cyan')}${progressRow('Statutory data',e.tax==='Pending'?45:100,e.tax==='Pending'?'Tax number missing':'Complete',e.tax==='Pending'?'red':'cyan')}${progressRow('Documents',e.documents/16*100,`${e.documents} records retained`,'violet')}</div></div></section></div>
  <section class="drawer-section"><h3>Compensation summary</h3><div class="grid four"><div class="fact"><span>Monthly base</span><strong>${maskSalary(e)}</strong></div><div class="fact"><span>Housing allowance</span><strong>${can('salary.view')?money(e.base*.15):'Restricted'}</strong></div><div class="fact"><span>Estimated net</span><strong>${can('salary.view')?money(e.base*.72):'Restricted'}</strong></div><div class="fact"><span>Cost centre</span><strong>${e.department.slice(0,3).toUpperCase()}-001</strong></div></div></section>
@@ -1140,10 +1232,10 @@ function employeeDrawer(id){const e=employees.find(x=>x.id===id)||employees[0];c
  <section class="drawer-section"><h3>Contact and employee services</h3><div class="grid two"><div class="fact"><span>Email</span><strong>${e.email}</strong></div><div class="fact"><span>Mobile</span><strong>${e.phone}</strong></div><div class="fact"><span>Leave available</span><strong>${e.leave}</strong></div><div class="fact"><span>Training status</span><strong>${e.training}</strong></div></div></section>
  <section class="drawer-section"><h3>Recent governed activity</h3><div class="timeline"><div class="timeline-item"><div><strong>Payroll readiness recalculated</strong><p>Employee master, statutory data and documents were revalidated.</p></div><time>Today</time></div><div class="timeline-item warn"><div><strong>Bank details reviewed</strong><p>Independent verification requested before the payroll freeze.</p></div><time>26 Jun</time></div><div class="timeline-item"><div><strong>Compensation review approved</strong><p>Annual review version 3 approved by delegated authority.</p></div><time>01 Jun</time></div></div></section>`;
  openDrawer(e.name,`${e.id} - Governed employee and compensation record`,body,`${button('Open document vault','employee-documents','', 'folder')}${button('Edit employee','edit-employee','primary','edit')}`)}
-function runDrawer(id){const r=payrollRuns.find(x=>x.id===id)||payrollRuns[0];openDrawer(r.id,`${r.period} - ${r.group}`,`${workflow(r.stage)}<div class="grid three" style="margin:16px 0"><div class="fact"><span>Employees</span><strong>${r.employees}</strong></div><div class="fact"><span>Gross USD</span><strong>${money(r.grossUSD)}</strong></div><div class="fact"><span>Gross ZiG</span><strong>${r.grossZiG?money(r.grossZiG,'ZiG'):'Not applicable'}</strong></div><div class="fact"><span>Deductions</span><strong>${money(r.deductions)}</strong></div><div class="fact"><span>Net USD</span><strong>${money(r.netUSD)}</strong></div><div class="fact"><span>Variance</span><strong>${r.variance>0?'+':''}${r.variance}%</strong></div></div><div class="drawer-section"><h3>Control status</h3>${[['Employee population','128 expected / 128 included','Complete'],['Input batch','1,247 rows committed','Complete'],['Calculation version','v2026.06.4 locked','Complete'],['Exceptions','3 critical remain open','Blocked'],['Maker-checker','4 of 6 controls complete','Review'],['Release authority','Not yet available','Pending']].map(x=>`<div class="list-row"><div class="list-main"><strong>${x[0]}</strong><span>${x[1]}</span></div>${badge(x[2])}</div>`).join('')}</div><div class="drawer-section"><h3>Calculation evidence</h3><div class="callout blue"><span class="kpi-icon">${icon('shield')}</span><div><strong>Ruleset ZW-2026.06</strong><p>Calculation hash 74f2a90c...e81c - source inputs and rule versions retained.</p></div></div></div>`,`${button('Download evidence','download-run-evidence','', 'download')}${button('Open current stage',r.stage<4?'inputs':r.stage===4?'approvals':'close','primary','arrow')}`)}
-function exceptionDrawer(id){const e=exceptions.find(x=>x.id===id)||exceptions[0];openDrawer(e.type,`${e.id} - ${e.employee} - ${e.severity}`,`<div class="callout ${e.severity==='Critical'?'red':'amber'}"><span class="kpi-icon ${e.severity==='Critical'?'red':'amber'}">${icon('alert')}</span><div><strong>${e.detail}</strong><p>Source: ${e.source} - Value affected: ${e.amount}</p></div></div><div class="grid three" style="margin:15px 0"><div class="fact"><span>Employee</span><strong>${e.employee}</strong></div><div class="fact"><span>Owner</span><strong>${e.owner}</strong></div><div class="fact"><span>Age</span><strong>${e.age}</strong></div><div class="fact"><span>Severity</span><strong>${e.severity}</strong></div><div class="fact"><span>Status</span><strong>${e.status}</strong></div><div class="fact"><span>Payroll run</span><strong>PAY-2026-06-M</strong></div></div><div class="drawer-section"><h3>Source record comparison</h3><div class="table-wrap"><table><thead><tr><th>Field</th><th>Employee master</th><th>Payroll input</th><th>Expected</th></tr></thead><tbody><tr><td>Value</td><td>${e.amount}</td><td>${e.type.includes('Bank')?'Changed account':'Imported value'}</td><td>${e.type.includes('Bank')?'Independent verification':'Policy compliant value'}</td></tr><tr><td>Last changed</td><td>26 Jun 2026 15:33</td><td>28 Jun 2026 09:04</td><td>Before payroll freeze</td></tr><tr><td>Changed by</td><td>Chipo Ndlovu</td><td>Bulk import service</td><td>Authorised role</td></tr></tbody></table></div></div><div class="drawer-section"><h3>Investigation notes</h3><textarea id="exceptionNote" style="width:100%;min-height:110px;border:1px solid var(--line);border-radius:11px;background:var(--surface);padding:10px" placeholder="Record evidence, checks performed and resolution basis..."></textarea></div><div class="drawer-section"><h3>Case history</h3><div class="timeline"><div class="timeline-item bad"><div><strong>Exception created</strong><p>Validation rule identified a release-blocking condition.</p></div><time>09:04</time></div><div class="timeline-item warn"><div><strong>Assigned to ${e.owner}</strong><p>Case routed by severity and data ownership.</p></div><time>09:06</time></div></div></div>`,`${button('Escalate','escalate-exception','', 'send')}<button class="btn primary" data-action="resolve-exception" data-id="${e.id}">${icon('check')}Resolve with evidence</button>`)}
+function runDrawer(id){const r=payrollRuns.find(x=>x.id===id)||(payrollRuns[0]||__pr6RunPlaceholder);openDrawer(r.id,`${r.period} - ${r.group}`,`${workflow(r.stage)}<div class="grid three" style="margin:16px 0"><div class="fact"><span>Employees</span><strong>${r.employees}</strong></div><div class="fact"><span>Gross USD</span><strong>${money(r.grossUSD)}</strong></div><div class="fact"><span>Gross ZiG</span><strong>${r.grossZiG?money(r.grossZiG,'ZiG'):'Not applicable'}</strong></div><div class="fact"><span>Deductions</span><strong>${money(r.deductions)}</strong></div><div class="fact"><span>Net USD</span><strong>${money(r.netUSD)}</strong></div><div class="fact"><span>Variance</span><strong>${r.variance>0?'+':''}${r.variance}%</strong></div></div><div class="drawer-section"><h3>Control status</h3>${[['Employee population','128 expected / 128 included','Complete'],['Input batch','1,247 rows committed','Complete'],['Calculation version','v2026.06.4 locked','Complete'],['Exceptions','3 critical remain open','Blocked'],['Maker-checker','4 of 6 controls complete','Review'],['Release authority','Not yet available','Pending']].map(x=>`<div class="list-row"><div class="list-main"><strong>${x[0]}</strong><span>${x[1]}</span></div>${badge(x[2])}</div>`).join('')}</div><div class="drawer-section"><h3>Calculation evidence</h3><div class="callout blue"><span class="kpi-icon">${icon('shield')}</span><div><strong>Ruleset ZW-2026.06</strong><p>Calculation hash 74f2a90c...e81c - source inputs and rule versions retained.</p></div></div></div>`,`${button('Download evidence','download-run-evidence','', 'download')}${button('Open current stage',r.stage<4?'inputs':r.stage===4?'approvals':'close','primary','arrow')}`)}
+function exceptionDrawer(id){const e=exceptions.find(x=>x.id===id)||(exceptions[0]||__pr6ExceptionPlaceholder);openDrawer(e.type,`${e.id} - ${e.employee} - ${e.severity}`,`<div class="callout ${e.severity==='Critical'?'red':'amber'}"><span class="kpi-icon ${e.severity==='Critical'?'red':'amber'}">${icon('alert')}</span><div><strong>${e.detail}</strong><p>Source: ${e.source} - Value affected: ${e.amount}</p></div></div><div class="grid three" style="margin:15px 0"><div class="fact"><span>Employee</span><strong>${e.employee}</strong></div><div class="fact"><span>Owner</span><strong>${e.owner}</strong></div><div class="fact"><span>Age</span><strong>${e.age}</strong></div><div class="fact"><span>Severity</span><strong>${e.severity}</strong></div><div class="fact"><span>Status</span><strong>${e.status}</strong></div><div class="fact"><span>Payroll run</span><strong>PAY-2026-06-M</strong></div></div><div class="drawer-section"><h3>Source record comparison</h3><div class="table-wrap"><table><thead><tr><th>Field</th><th>Employee master</th><th>Payroll input</th><th>Expected</th></tr></thead><tbody><tr><td>Value</td><td>${e.amount}</td><td>${e.type.includes('Bank')?'Changed account':'Imported value'}</td><td>${e.type.includes('Bank')?'Independent verification':'Policy compliant value'}</td></tr><tr><td>Last changed</td><td>26 Jun 2026 15:33</td><td>28 Jun 2026 09:04</td><td>Before payroll freeze</td></tr><tr><td>Changed by</td><td>Chipo Ndlovu</td><td>Bulk import service</td><td>Authorised role</td></tr></tbody></table></div></div><div class="drawer-section"><h3>Investigation notes</h3><textarea id="exceptionNote" style="width:100%;min-height:110px;border:1px solid var(--line);border-radius:11px;background:var(--surface);padding:10px" placeholder="Record evidence, checks performed and resolution basis..."></textarea></div><div class="drawer-section"><h3>Case history</h3><div class="timeline"><div class="timeline-item bad"><div><strong>Exception created</strong><p>Validation rule identified a release-blocking condition.</p></div><time>09:04</time></div><div class="timeline-item warn"><div><strong>Assigned to ${e.owner}</strong><p>Case routed by severity and data ownership.</p></div><time>09:06</time></div></div></div>`,`${button('Escalate','escalate-exception','', 'send')}<button class="btn primary" data-action="resolve-exception" data-id="${e.id}">${icon('check')}Resolve with evidence</button>`)}
 function documentHtml(doc){return `<div class="document-page" id="documentEditor" contenteditable="false"><div class="doc-head"><div><div class="doc-brand">MATANHO</div><div style="font-size:10px;color:#1768ff;font-weight:800">PAYROLL AND HUMAN CAPITAL</div></div><div class="doc-meta">Document ID: ${doc.id}<br>Version: ${doc.versions}<br>Classification: ${doc.class}</div></div><h1>${doc.name}</h1><p><strong>Status:</strong> ${doc.status} &nbsp; <strong>Owner:</strong> ${doc.owner}</p><p>${doc.content}</p><h2>1. Purpose and scope</h2><p>This governed record supports the payroll and human-capital control environment for Arcus Holdings Private Limited. It is generated from approved source data and retains a complete version, approval and distribution history.</p><h2>2. Control summary</h2><table><thead><tr><th>Control</th><th>Result</th><th>Evidence</th></tr></thead><tbody><tr><td>Population reconciliation</td><td>Complete</td><td>128 employees reconciled</td></tr><tr><td>Calculation verification</td><td>Complete</td><td>Ruleset ZW-2026.06</td></tr><tr><td>Exception management</td><td>Review</td><td>3 critical cases open</td></tr><tr><td>Maker-checker approval</td><td>Pending</td><td>4 of 6 controls complete</td></tr></tbody></table><h2>3. Management commentary</h2><p>Click Edit to update this section. Saved changes create a new document version and are recorded in the immutable audit trail.</p><h2>4. Approval record</h2><p>Prepared by: Rudo Sibanda<br>Reviewed by: Tariro Moyo<br>Final authority: Pending</p></div>`}
-function documentDrawer(id){const d=documents.find(x=>x.id===id)||documents[0];state.activeDoc=d.id;openDrawer(d.name,`${d.id} - ${d.folder} - Version ${d.versions}`,`<div class="editable-note">Preview mode. Select Edit to make governed changes and create a new version.</div><div class="doc-preview">${documentHtml(d)}</div>`,`${button('Download editable DOC','download-doc','', 'download')}${button('Export PDF','download-doc-pdf','', 'file')}${button('Edit document','edit-document','primary','edit')}`)}
+function documentDrawer(id){const d=documents.find(x=>x.id===id)||(documents[0]||__pr6DocumentPlaceholder);state.activeDoc=d.id;openDrawer(d.name,`${d.id} - ${d.folder} - Version ${d.versions}`,`<div class="editable-note">Preview mode. Select Edit to make governed changes and create a new version.</div><div class="doc-preview">${documentHtml(d)}</div>`,`${button('Download editable DOC','download-doc','', 'download')}${button('Export PDF','download-doc-pdf','', 'file')}${button('Edit document','edit-document','primary','edit')}`)}
 function openNewEmployee(){if(!can('employee.edit'))return deny('employee.edit');openModal('New Employee and Contract Onboarding','Create a governed employment and payroll record.',`<div class="stepper"><div class="step done"><b>1</b><span>Identity</span></div><div class="step active"><b>2</b><span>Employment</span></div><div class="step"><b>3</b><span>Compensation</span></div><div class="step"><b>4</b><span>Bank and tax</span></div><div class="step"><b>5</b><span>Documents</span></div><div class="step"><b>6</b><span>Review</span></div></div><div class="form-grid"><div class="form-field"><label>First name</label><input id="newFirst" value="Kundai"></div><div class="form-field"><label>Surname</label><input id="newLast" value="Marufu"></div><div class="form-field"><label>Job title</label><input id="newTitle" value="Risk Analyst"></div><div class="form-field"><label>Department</label><select id="newDept"><option>Risk and Compliance</option><option>Finance</option><option>Operations</option></select></div><div class="form-field"><label>Branch</label><select><option>Harare Head Office</option><option>Bulawayo Branch</option></select></div><div class="form-field"><label>Employment type</label><select><option>Permanent</option><option>Contract</option></select></div><div class="form-field"><label>Start date</label><input type="date" value="2026-07-01"></div><div class="form-field"><label>Payroll currency</label><select><option>USD / ZiG</option><option>USD</option><option>ZiG</option></select></div><div class="form-field"><label>Monthly base USD</label><input value="2150.00"></div><div class="form-field"><label>Monthly base ZiG</label><input value="125000"></div><div class="form-field full"><label>Onboarding control note</label><textarea>Offer and identity documents verified. Compensation requires HR Manager review before payroll activation.</textarea></div></div>`,`${button('Save draft','save-onboarding','', 'file')}${button('Continue and validate','complete-onboarding','primary','arrow')}`)}
 function openNewRun(){if(!can('payroll.prepare'))return deny('payroll.prepare');openModal('Create Payroll Run','Configure the period, pay group, dual-currency treatment, exchange rate and statutory rules.',`<div class="stepper"><div class="step active"><b>1</b><span>Period and currency</span></div><div class="step"><b>2</b><span>Inputs</span></div><div class="step"><b>3</b><span>Validate</span></div><div class="step"><b>4</b><span>Review</span></div></div><div class="form-grid"><div class="form-field"><label>Pay period</label><select id="runPeriod"><option>July 2026</option><option>June 2026</option></select></div><div class="form-field"><label>Pay group</label><select id="runGroup"><option>Monthly Staff</option><option>Executives</option><option>Contract Staff</option></select></div><div class="form-field"><label>Calculation date</label><input type="date" value="2026-07-24"></div><div class="form-field"><label>Payment date</label><input type="date" value="2026-07-31"></div><div class="form-field"><label>Processing currencies</label><select><option>USD and ZiG</option><option>USD only</option><option>ZiG only</option></select></div><div class="form-field"><label>Exchange rate source</label><select><option>Approved treasury rate</option><option>RBZ reference rate</option></select></div><div class="form-field"><label>USD / ZiG rate</label><input value="31.8420"></div><div class="form-field"><label>Statutory ruleset</label><select><option>ZW-2026.06 - Published</option></select></div><div class="form-field full"><div class="callout blue"><span class="kpi-icon">${icon('shield')}</span><div><strong>Impact preview</strong><p>128 employees in scope. 4 employees require data review before inputs can be committed.</p></div></div></div></div>`,`${button('Save draft','save-run','', 'file')}${button('Create and continue','create-run','primary','arrow')}`)}
 function uploadDocumentModal(){if(!can('documents.manage'))return deny('documents.manage');openModal('Upload to Document Vault','Files are virus scanned, classified, versioned and protected by data-scope permissions.',`<div class="form-grid"><div class="form-field full"><label>Select files</label><input type="file" id="docFile" multiple></div><div class="form-field"><label>Folder</label><select id="docFolder">${folders.slice(1).map(f=>`<option>${f}</option>`).join('')}</select></div><div class="form-field"><label>Classification</label><select id="docClass"><option>Internal</option><option>Confidential</option><option>Restricted</option><option>Highly restricted</option></select></div><div class="form-field"><label>Retention policy</label><select><option>Payroll evidence - 7 years</option><option>Employee record - employment + 7 years</option><option>Policy - superseded + 7 years</option></select></div><div class="form-field"><label>Approval workflow</label><select><option>HR Manager review</option><option>Payroll Manager review</option><option>No approval required</option></select></div><div class="form-field full"><label>Description</label><textarea id="docDescription" placeholder="Describe the document and its control purpose..."></textarea></div></div>`,`${button('Cancel','close-modal')}${button('Upload and classify','confirm-upload','primary','upload')}`)}
@@ -1190,17 +1282,17 @@ function handleAction(action,el){
   case 'edit-employee':if(!can('employee.edit'))deny('employee.edit');else genericModal('Edit Employee Record','Sensitive employment changes are versioned and routed for review.');break;
   case 'resolve-exception':{if(!can('exceptions.resolve'))return deny('exceptions.resolve');const x=exceptions.find(v=>v.id===el.dataset.id);if(x){x.status='Resolved';logEvent('PAYROLL_EXCEPTION_RESOLVED',x.id,`Resolved ${x.type} for ${x.employee}`,'Change');toast('Exception resolved',`${x.id} is now resolved and will be revalidated.`);closeDrawer();render()}break}
   case 'escalate-exception':toast('Exception escalated','The case owner and Payroll Manager have been notified.','warn');break;
-  case 'approve-payroll':if(!can('payroll.approve'))deny('payroll.approve');else if(exceptions.some(x=>x.severity==='Critical'&&x.status!=='Resolved'))toast('Approval blocked','Resolve all critical exceptions before approval can be recorded.','bad');else{payrollRuns[0].status='Approved';payrollRuns[0].stage=5;logEvent('PAYROLL_APPROVED',payrollRuns[0].id,'Payroll approved after all controls passed','Approval');toast('Payroll approved','The run is ready for final release.');render()}break;
-  case 'reject-payroll':if(!can('payroll.approve'))deny('payroll.approve');else{payrollRuns[0].status='Returned for correction';logEvent('PAYROLL_REJECTED',payrollRuns[0].id,'Payroll returned for correction','Approval');toast('Payroll returned','The preparer has been notified with the reviewer comment.','warn');render()}break;
+  case 'approve-payroll':if(!can('payroll.approve'))deny('payroll.approve');else if(exceptions.some(x=>x.severity==='Critical'&&x.status!=='Resolved'))toast('Approval blocked','Resolve all critical exceptions before approval can be recorded.','bad');else{(payrollRuns[0]||__pr6RunPlaceholder).status='Approved';(payrollRuns[0]||__pr6RunPlaceholder).stage=5;logEvent('PAYROLL_APPROVED',(payrollRuns[0]||__pr6RunPlaceholder).id,'Payroll approved after all controls passed','Approval');toast('Payroll approved','The run is ready for final release.');render()}break;
+  case 'reject-payroll':if(!can('payroll.approve'))deny('payroll.approve');else{(payrollRuns[0]||__pr6RunPlaceholder).status='Returned for correction';logEvent('PAYROLL_REJECTED',(payrollRuns[0]||__pr6RunPlaceholder).id,'Payroll returned for correction','Approval');toast('Payroll returned','The preparer has been notified with the reviewer comment.','warn');render()}break;
   case 'record-decision':{const d=$('#decisionType')?.value||'Return for correction';logEvent('PAYROLL_DECISION_RECORDED','PAY-2026-06-M',`${d}: ${$('#decisionBasis')?.value||''}`,'Approval');closeModal();toast('Decision recorded',`${d} was written to the immutable approval trail.`);break}
-  case 'release-payroll':if(!can('payroll.release'))deny('payroll.release');else if(exceptions.some(x=>x.severity==='Critical'&&x.status!=='Resolved')||payrollRuns[0].status!=='Approved')toast('Release blocked','Critical exceptions and maker-checker approval must be complete before release.','bad');else{payrollRuns[0].status='Released';payrollRuns[0].stage=6;logEvent('PAYROLL_RELEASED',payrollRuns[0].id,'Bank batches, payslips and GL journals released','Approval');toast('Payroll released','Bank, payslip and ledger distribution has started.');render()}break;
+  case 'release-payroll':if(!can('payroll.release'))deny('payroll.release');else if(exceptions.some(x=>x.severity==='Critical'&&x.status!=='Resolved')||(payrollRuns[0]||__pr6RunPlaceholder).status!=='Approved')toast('Release blocked','Critical exceptions and maker-checker approval must be complete before release.','bad');else{(payrollRuns[0]||__pr6RunPlaceholder).status='Released';(payrollRuns[0]||__pr6RunPlaceholder).stage=6;logEvent('PAYROLL_RELEASED',(payrollRuns[0]||__pr6RunPlaceholder).id,'Bank batches, payslips and GL journals released','Approval');toast('Payroll released','Bank, payslip and ledger distribution has started.');render()}break;
   case 'commit-inputs':if(!can('payroll.prepare'))deny('payroll.prepare');else{logEvent('INPUT_BATCH_COMMITTED','INP-2026-06-04','1,247 valid rows committed; 37 rows retained in isolation','Change');toast('Valid inputs committed','1,247 rows entered the calculation population.');}break;
   case 'resolve-input':toast('Validation case opened','The source row and employee record are ready for correction.');break;
   case 'edit-document':{if(!can('documents.manage'))return deny('documents.manage');const editor=$('#documentEditor');if(editor){editor.contentEditable='true';editor.focus();$('.editable-note',$('#drawerBody')).textContent='Edit mode is active. Saving creates a new governed version.';$('#drawerFoot').innerHTML=`${button('Cancel edit','cancel-doc-edit')}${button('Save new version','save-document','primary','check')}`;}break}
   case 'cancel-doc-edit':documentDrawer(state.activeDoc);break;
   case 'save-document':{const d=documents.find(x=>x.id===state.activeDoc);if(d){d.versions++;d.modified='Just now';d.status='In review';d.content=$('#documentEditor')?.innerText.slice(0,300)||d.content;logEvent('DOCUMENT_VERSION_CREATED',d.id,`Created version ${d.versions} of ${d.name}`,'Change');toast('Document version saved',`Version ${d.versions} has been routed for review.`);documentDrawer(d.id)}break}
-  case 'download-doc':{const d=documents.find(x=>x.id===state.activeDoc)||documents[0];htmlToDoc(`${fileName(d.name)}_v${d.versions}.doc`,d.name,$('#documentEditor')?.innerHTML||documentHtml(d));toast('Editable document downloaded','A Microsoft Word compatible file was created.');break}
-  case 'download-doc-pdf':{const d=documents.find(x=>x.id===state.activeDoc)||documents[0];downloadBlob(`${fileName(d.name)}_v${d.versions}.pdf`,createSimplePdf(d.name,textFromEditor('#documentEditor')));toast('PDF exported','The previewed document was exported as PDF.');break}
+  case 'download-doc':{const d=documents.find(x=>x.id===state.activeDoc)||(documents[0]||__pr6DocumentPlaceholder);htmlToDoc(`${fileName(d.name)}_v${d.versions}.doc`,d.name,$('#documentEditor')?.innerHTML||documentHtml(d));toast('Editable document downloaded','A Microsoft Word compatible file was created.');break}
+  case 'download-doc-pdf':{const d=documents.find(x=>x.id===state.activeDoc)||(documents[0]||__pr6DocumentPlaceholder);downloadBlob(`${fileName(d.name)}_v${d.versions}.pdf`,createSimplePdf(d.name,textFromEditor('#documentEditor')));toast('PDF exported','The previewed document was exported as PDF.');break}
   case 'confirm-upload':{const f=$('#docFile')?.files?.[0];const name=f?.name||'Uploaded Payroll Evidence.pdf';const d={id:`DOC-${String(documents.length+1).padStart(3,'0')}`,name,folder:$('#docFolder')?.value||'Payroll control packs',type:'Uploaded evidence',owner:'Tariro Moyo',modified:'Just now',class:$('#docClass')?.value||'Restricted',versions:1,status:'In review',content:$('#docDescription')?.value||'Uploaded governed payroll evidence.'};documents.unshift(d);logEvent('DOCUMENT_UPLOADED',d.id,`Uploaded and classified ${d.name}`,'Change');closeModal();state.folder=d.folder;render();toast('Document uploaded',`${d.name} was scanned, classified and versioned.`);break}
   case 'confirm-create-document':{const d={id:`DOC-${String(documents.length+1).padStart(3,'0')}`,name:$('#createdDocName')?.value||'New Payroll Document',folder:$('#createdDocFolder')?.value||'Payroll control packs',type:'Editable document',owner:'Tariro Moyo',modified:'Just now',class:'Restricted',versions:1,status:'Draft',content:$('#createdDocContent')?.value||'New editable document.'};documents.unshift(d);logEvent('DOCUMENT_CREATED',d.id,`Created editable document ${d.name}`,'Change');closeModal();state.folder=d.folder;render();documentDrawer(d.id);break}
   case 'download-report-doc':{const r=state.reportDraft||reportTemplates[0];htmlToDoc(`${fileName(r.name)}_June_2026.doc`,r.name,$('#reportEditor')?.innerHTML||'');toast('Editable report downloaded','The current report version was exported to a Word-compatible document.');break}
@@ -1398,7 +1490,7 @@ init();
   };
 
   employeeDrawer = function(id,tab='Employment'){
-    const e=employees.find(x=>x.id===id)||employees[0];
+    const e=employees.find(x=>x.id===id)||(employees[0]||__pr6EmployeePlaceholder);
     state.activeEmployeeTab=tab;
     const tabs=['Employment','Compensation','Bank and statutory','Documents','Leave','Training','Audit'];
     const body=`<div class="employee-profile">${employeeImage(e,'employee-photo')}<div><div class="eyebrow">${e.id} · ${badge(e.status)}</div><h2 style="font-size:21px;margin:0">${e.name}</h2><div class="muted" style="margin-top:4px">${e.title} · ${e.department} · ${e.branch}</div><div class="profile-facts"><div class="fact"><span>Employment type</span><strong>${e.type}</strong></div><div class="fact"><span>Start date</span><strong>${e.start}</strong></div><div class="fact"><span>Payroll currency</span><strong>${e.currency}</strong></div></div></div></div><div class="employee-tabs" role="tablist">${tabs.map(t=>`<button class="tab ${t===tab?'active':''}" data-employee-tab="${attr(t)}" data-employee-id="${e.id}" role="tab">${t}</button>`).join('')}</div><div id="employeeTabPanel">${employeeTabPanel(e,tab)}</div>`;
@@ -1536,7 +1628,7 @@ init();
     const employeeTab=event.target.closest('[data-employee-tab]');
     if(employeeTab){
       event.preventDefault();event.stopImmediatePropagation();
-      const employee=employees.find(x=>x.id===employeeTab.dataset.employeeId)||employees[0];
+      const employee=employees.find(x=>x.id===employeeTab.dataset.employeeId)||(employees[0]||__pr6EmployeePlaceholder);
       document.querySelectorAll('.employee-tabs .tab').forEach(t=>t.classList.toggle('active',t===employeeTab));
       const panel=document.querySelector('#employeeTabPanel');
       if(panel) panel.innerHTML=employeeTabPanel(employee,employeeTab.dataset.employeeTab);

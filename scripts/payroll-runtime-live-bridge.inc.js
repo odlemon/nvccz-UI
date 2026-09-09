@@ -278,8 +278,11 @@ function __pr6TaxRows() {
 function __pr6ApprovalCompare() {
   if (!__pr6IsLive()) return null;
   const runs = Array.isArray(payrollRuns) ? payrollRuns : [];
-  if (runs.length === 0) return null;
-  const cur = runs[0];
+  // Live but with no runs is a real answer, not "no data yet". Returning null
+  // here would fall back to the fixture and show a department manager a
+  // preparer named Rudo Sibanda and "3 unresolved critical" for a payroll they
+  // cannot even see.
+  const cur = runs.length ? runs[0] : __pr6RunPlaceholder;
   const prev = runs.length > 1 ? runs[1] : null;
 
   const delta = (a, b) => {
@@ -295,6 +298,7 @@ function __pr6ApprovalCompare() {
   };
 
   const prevLabel = prev ? String(prev.reference || prev.period) : 'No prior run';
+  const hasRun = runs.length > 0;
   const curLabel = String(cur.reference || cur.period);
 
   return {
@@ -307,7 +311,8 @@ function __pr6ApprovalCompare() {
       ['Net pay', prev ? __pr6Money(prev.netUSD) : '—', __pr6Money(cur.netUSD), delta(cur.netUSD, prev && prev.netUSD), review(cur.netUSD, prev && prev.netUSD)],
     ],
     current: cur,
-    owner: cur.owner || '—',
+    hasRun,
+    owner: hasRun ? (cur.owner || '—') : '—',
     criticalOpen: (Array.isArray(exceptions) ? exceptions : []).filter(
       (e) => e && e.severity === 'Critical' && e.status !== 'Resolved',
     ).length,
@@ -322,8 +327,7 @@ function __pr6ApprovalCompare() {
 function __pr6CloseStats() {
   if (!__pr6IsLive()) return null;
   const runs = Array.isArray(payrollRuns) ? payrollRuns : [];
-  const cur = runs.length ? runs[0] : null;
-  if (!cur) return null;
+  const cur = runs.length ? runs[0] : __pr6RunPlaceholder;
   const headcount = Number(cur.employees) || 0;
   return {
     headcount,
@@ -722,6 +726,94 @@ function __pr6DepartmentReadiness() {
     .map(([name, v]) => ({ name, pct: Math.round(v.sum / v.n), count: v.n }))
     .sort((a, b) => b.count - a.count);
 }
+
+/**
+ * Empty-collection placeholders.
+ *
+ * The runtime indexes payrollRuns[0], employees[0], exceptions[0] and
+ * documents[0] directly, because its fixtures were never empty. Once the data
+ * is live those arrays legitimately CAN be empty — a department manager holds
+ * no payroll.runs.view grant, so the loader never fetches runs and hydrate
+ * hands over [] — and `payrollRuns[0].id` then throws, taking the whole render
+ * down. Observed on the Approvals screen as deptmgr:
+ *   [payroll-v6] hydrate failed TypeError: Cannot read properties of undefined
+ *
+ * These placeholders render as dashes and zeros, so an empty screen says "no
+ * data" instead of crashing or inventing a value.
+ */
+const __PR6_DASH = '—';
+
+const __pr6RunPlaceholder = {
+  id: __PR6_DASH,
+  reference: __PR6_DASH,
+  period: 'No payroll run',
+  group: __PR6_DASH,
+  employees: 0,
+  currency: 'USD',
+  grossUSD: 0,
+  grossZiG: 0,
+  deductions: 0,
+  netUSD: 0,
+  status: 'None',
+  rawStatus: 'NONE',
+  approvalStatus: 'NONE',
+  stage: 1,
+  owner: __PR6_DASH,
+  variance: null,
+};
+
+const __pr6EmployeePlaceholder = {
+  id: __PR6_DASH,
+  recordId: null,
+  name: 'No employee records',
+  initials: '--',
+  email: null,
+  department: __PR6_DASH,
+  title: __PR6_DASH,
+  branch: __PR6_DASH,
+  type: __PR6_DASH,
+  start: __PR6_DASH,
+  phone: __PR6_DASH,
+  base: 0,
+  zig: 0,
+  currency: 'USD',
+  bank: __PR6_DASH,
+  tax: __PR6_DASH,
+  nssa: __PR6_DASH,
+  readiness: 0,
+  status: 'None',
+  leave: __PR6_DASH,
+  training: __PR6_DASH,
+  documents: __PR6_DASH,
+  terminated: false,
+  isActive: false,
+};
+
+const __pr6ExceptionPlaceholder = {
+  id: __PR6_DASH,
+  employee: 'No exceptions',
+  employeeId: __PR6_DASH,
+  type: 'None',
+  severity: 'Low',
+  source: __PR6_DASH,
+  amount: __PR6_DASH,
+  owner: null,
+  age: null,
+  status: 'None',
+  detail: 'No payroll exceptions are outstanding.',
+};
+
+const __pr6DocumentPlaceholder = {
+  id: __PR6_DASH,
+  name: 'No documents',
+  folder: __PR6_DASH,
+  type: __PR6_DASH,
+  owner: __PR6_DASH,
+  modified: __PR6_DASH,
+  class: __PR6_DASH,
+  versions: 0,
+  content: '',
+};
 
 /**
  * Action interception.
