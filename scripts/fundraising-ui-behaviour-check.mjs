@@ -39,10 +39,11 @@ const token = login.body?.token
 if (!token) throw new Error("login failed")
 
 // ---- a campaign with one opportunity parked just below a gated stage -----------------------
-// PE/VC stage 5 is DATA_ROOM (requiresSoftCircle). Park an opportunity at ENGAGED with no soft
-// circle, so dragging it to Data Room must fail the gate and show the checklist.
+// An AM campaign is used because PE/VC campaign types additionally require a linked fund,
+// which this scratch setup has no way to supply. The opportunity is parked mid-pipeline with
+// no soft circle so a forward drag must fail a gate and surface the checklist.
 const camp = await api("POST", "/fundraising/campaigns", {
-  campaignType: "PE_FUNDRAISE", name: `BEHAVIOUR UI ${stamp}`,
+  campaignType: "INSTITUTIONAL_MANDATE", name: `BEHAVIOUR UI ${stamp}`,
   targetCapital: 5_000_000, primaryCurrency: "USD",
   startDate: "2026-01-01", closeDate: "2027-12-31",
 }, token)
@@ -56,14 +57,14 @@ const inv = await api("POST", "/investors", {
 const investorId = inv.data?.id
 
 const opp = await api("POST", "/fundraising/opportunities", {
-  campaignId, investorId, opportunityType: "LP_COMMITMENT",
+  campaignId, investorId, opportunityType: "SEGREGATED_MANDATE",
   opportunityCurrency: "USD", indicativeAmount: 500_000, priority: "HIGH",
 }, token)
 const oppId = opp.data?.id
-for (const code of ["CONTACTED", "QUALIFIED", "ENGAGED"]) {
+for (const code of ["INITIAL_CONTACT", "DISCOVERY", "QUALIFIED"]) {
   await api("POST", `/fundraising/opportunities/${oppId}/transition`, { toStageCode: code }, token)
 }
-note(`scratch campaign ${campaignId} with one opportunity parked at ENGAGED (no soft circle)`)
+note(`scratch campaign ${campaignId} with one opportunity parked mid-pipeline (no soft circle)`)
 
 const browser = await chromium.launch({ headless: true })
 const context = await browser.newContext({ viewport: { width: 1600, height: 1100 } })
@@ -183,10 +184,9 @@ async function go(route) {
 // ============================================================ B28
 {
   const tabbed = [
-    ["settings", "/fundraising/settings", ["Pipelines", "Stage Gates", "Amount Types", "Roles", "Notifications"]],
-    ["investors", "/fundraising/investors", ["Overview"]],
-    ["agreements", "/fundraising/agreements", ["Agreements", "Signatures"]],
-    ["meetings", "/fundraising/meetings", ["Meetings", "Tasks"]],
+    ["settings", "/fundraising/settings", ["Stage Gates", "Amount Types", "Roles", "Notifications"]],
+    ["agreements", "/fundraising/agreements", ["Signature requests"]],
+    ["meetings", "/fundraising/meetings", ["Tasks board"]],
     ["campaigns", "/fundraising/campaigns", ["Templates", "Distribution Lists", "Events"]],
   ]
   for (const [id, route, tabs] of tabbed) {
@@ -202,8 +202,9 @@ async function go(route) {
     let last = txt
     for (const tab of tabs) {
       const clicked = await page.evaluate((name) => {
-        const el = [...document.querySelectorAll("button,[role='tab']")].find(
-          (x) => (x.textContent || "").trim() === name,
+        // Labels often carry a count, e.g. "Agreements (4)", so match on a prefix.
+        const el = [...document.querySelectorAll("button,[role='tab']")].find((x) =>
+          (x.textContent || "").trim().startsWith(name),
         )
         if (!el) return false
         el.click()
