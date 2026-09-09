@@ -69,9 +69,22 @@ EXCLUDE_PREFIXES = (
 EXCLUDE_NAMES = {".env", ".env.local", "tmp-report-placeholder-audit.json"}
 
 
+def is_build_output_dir(name: str) -> bool:
+    """Any Next build output directory, matched by shape rather than by name.
+
+    EXCLUDE_DIRS lists `.next-staff` / `.next-lp` / `.next-investee` / `.next-apply`, but new
+    ones keep appearing (`.next-staff-review`, `.next-lp-review`, `.next-investee-review` from
+    .claude/launch.json, `.next-build-verify` from a local build check) and every one that is
+    not on the list gets packed. That is how a UI tarball reached 869 MB and spent over an hour
+    uploading — 1.8 GB of `.next-staff-review` alone. Matching the prefix means a build dir
+    created tomorrow is excluded without anyone remembering to edit this file.
+    """
+    return name == ".next" or name.startswith(".next-")
+
+
 def skip(rel: str) -> bool:
     parts = Path(rel).parts
-    if any(p in EXCLUDE_DIRS for p in parts):
+    if any(p in EXCLUDE_DIRS or is_build_output_dir(p) for p in parts):
         return True
     norm = rel.replace("\\", "/")
     if any(norm.startswith(p) for p in EXCLUDE_PREFIXES):
@@ -85,7 +98,7 @@ def skip(rel: str) -> bool:
 def make_tarball(root: Path, arc_prefix: str, out_path: Path) -> str:
     with tarfile.open(out_path, mode="w:gz") as tar:
         for dirpath, dirs, files in os.walk(root):
-            dirs[:] = [d for d in dirs if d not in EXCLUDE_DIRS]
+            dirs[:] = [d for d in dirs if d not in EXCLUDE_DIRS and not is_build_output_dir(d)]
             for name in files:
                 full = Path(dirpath) / name
                 rel = str(full.relative_to(root))

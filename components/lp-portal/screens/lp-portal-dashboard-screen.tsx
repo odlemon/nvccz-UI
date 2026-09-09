@@ -290,8 +290,13 @@ export function LpPortalDashboardScreen() {
     const distributed = parseDecimal(kpis.distributions) / 1_000_000
     const remaining = Math.max(parseDecimal(kpis.currentNav) / 1_000_000 - distributed, 0)
     const commitment = parseDecimal(kpis.totalCommitment)
-    const pct = (value: number) =>
-      commitment > 0 ? `${((value * 1_000_000 / commitment) * 100).toFixed(1)}%` : "—"
+    // Takes the RAW amount, in the same units as `commitment` (which is not scaled down).
+    // The `* 1_000_000` that used to be here was applied on top of call sites that already
+    // pass `xxx * 1_000_000` to undo their own conversion to millions, so every share was
+    // multiplied by a million twice over — the Capital Position legend read "$1.25M
+    // (5000000.0%)" where it should read 5.0%.
+    const pct = (rawValue: number) =>
+      commitment > 0 ? `${((rawValue / commitment) * 100).toFixed(1)}%` : "—"
     return [
       {
         name: "Paid-In Capital",

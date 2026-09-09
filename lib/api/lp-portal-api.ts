@@ -1,6 +1,6 @@
 import { apiClient } from "./api-client"
 import { createIdempotencyKey } from "@/lib/lp-portal/format"
-import { LP_PORTAL_USE_MOCK } from "@/lib/lp-portal/config"
+import { isLpDomainLive, type LpDataDomain } from "@/lib/lp-portal/config"
 import { mockLpPortalApi } from "@/lib/lp-portal/mock-api"
 
 // ── Envelopes ──────────────────────────────────────────────────────────
@@ -523,7 +523,8 @@ export interface LpServiceRequest {
   createdAt: string
   updatedAt: string
   priority?: string
-  submittedBy?: string
+  /** The API returns an actor object here, not a bare name. */
+  submittedBy?: string | { id?: string; email?: string; name?: string } | null
   attachments?: LpServiceRequestAttachment[]
   messages?: Array<{
     id: string
@@ -1154,8 +1155,19 @@ class LpPortalApiService {
     return apiClient.patch(`${this.BASE}/colleagues/${membershipId}/revoke`)
   }
 
-  getBankInstructionChanges(): Promise<LpPortalResponse<LpBankInstructionChange[]>> {
-    return apiClient.get(`${this.BASE}/bank-instructions/changes`)
+  async getBankInstructionChanges(): Promise<LpPortalResponse<LpBankInstructionChange[]>> {
+    // The API answers `{ data: { items: [...] } }` here while this method's contract — and every
+    // caller, e.g. useLpOrganisation -> LpOrganisationScreen — expects a bare array. The mock
+    // store returned the array directly, so the mismatch only appeared once the organisation
+    // domain went live, where it threw "(…).map is not a function" during render and took the
+    // whole screen down via the error boundary. Normalised here so the boundary is the one place
+    // that knows about the envelope.
+    const res = await apiClient.get<LpPortalResponse<LpBankInstructionChange[] | { items?: LpBankInstructionChange[] }>>(
+      `${this.BASE}/bank-instructions/changes`,
+    )
+    const payload = res?.data as LpBankInstructionChange[] | { items?: LpBankInstructionChange[] } | undefined
+    const items = Array.isArray(payload) ? payload : payload?.items ?? []
+    return { ...res, data: items } as LpPortalResponse<LpBankInstructionChange[]>
   }
 
   submitBankInstructionChange(
@@ -1197,6 +1209,120 @@ class LpPortalApiService {
   }
 }
 
-export const lpPortalApi = LP_PORTAL_USE_MOCK
-  ? (mockLpPortalApi as unknown as LpPortalApiService)
-  : new LpPortalApiService()
+/**
+ * Which data domain each API method belongs to.
+ *
+ * This is the seam that lets the portal migrate off the mock store one area at a time instead
+ * of in a single swap. A method missing from this map falls back to live, so a newly added
+ * method reaches the real API by default rather than silently returning mock data — the failure
+ * mode that would otherwise be invisible.
+ */
+const LP_METHOD_DOMAIN: Record<string, LpDataDomain> = {
+  getSession: "session",
+  getRealtime: "session",
+
+  getDashboard: "dashboard",
+  getDashboardActions: "dashboard",
+  getDashboardRecentActivity: "dashboard",
+
+  getCapitalCallSummary: "capital",
+  getCapitalCalls: "capital",
+  getCapitalCall: "capital",
+  getCapitalCallDocuments: "capital",
+  acknowledgeCapitalCall: "capital",
+  uploadPaymentConfirmation: "capital",
+  downloadCapitalCallNotice: "capital",
+  getDistributions: "capital",
+  getDistribution: "capital",
+  downloadDistribution: "capital",
+  downloadDistributionStatement: "capital",
+
+  getAccountActivity: "activity",
+  exportAccountActivity: "activity",
+  getLedger: "activity",
+  getLedgerEntry: "activity",
+
+  getDealingOverview: "dealing",
+  getDealingRules: "dealing",
+  getDealingRequests: "dealing",
+  exportDealingRequests: "dealing",
+  getDealingBankAccounts: "dealing",
+  estimateSubscription: "dealing",
+  submitSubscription: "dealing",
+  estimateRedemption: "dealing",
+  submitRedemption: "dealing",
+
+  getPerformance: "performance",
+  getPerformanceHistory: "performance",
+  getPerformanceBenchmarks: "performance",
+  getPerformanceByFund: "performance",
+  downloadPerformanceReport: "performance",
+  requestPerformanceReport: "performance",
+  getJob: "performance",
+
+  getDocumentsSummary: "documents",
+  getDocuments: "documents",
+  getDocument: "documents",
+  downloadDocument: "documents",
+  previewDocument: "documents",
+  getVault: "documents",
+  downloadVaultDocument: "documents",
+  verifyVaultDocument: "documents",
+
+  getNotices: "notices",
+  getNotice: "notices",
+  acknowledgeNotice: "notices",
+  getNotifications: "notices",
+
+  getRequests: "requests",
+  getRequest: "requests",
+  createRequest: "requests",
+  replyToRequest: "requests",
+  uploadRequestAttachment: "requests",
+  getMessages: "requests",
+  getMessageThread: "requests",
+  replyToMessageThread: "requests",
+  markMessageThreadRead: "requests",
+
+  getOrganisation: "organisation",
+  getColleagues: "organisation",
+  inviteColleague: "organisation",
+  updateColleague: "organisation",
+  revokeColleague: "organisation",
+  getBankInstructionChanges: "organisation",
+  submitBankInstructionChange: "organisation",
+
+  getSettings: "settings",
+  updateNotificationSettings: "settings",
+  updateDisplaySettings: "settings",
+  getMfaSettings: "settings",
+
+  getReports: "reports",
+  downloadReport: "reports",
+}
+
+const liveLpPortalApi = new LpPortalApiService()
+
+/**
+ * Routes each call to the live client or the mock store based on its domain.
+ *
+ * A Proxy rather than a hand-written façade so the two implementations cannot drift out of sync
+ * with this file: any method either side gains is dispatched automatically.
+ */
+export const lpPortalApi = new Proxy(liveLpPortalApi, {
+  get(target, prop, receiver) {
+    const name = String(prop)
+    const value = Reflect.get(target, prop, receiver)
+    if (typeof value !== "function") return value
+
+    const domain = LP_METHOD_DOMAIN[name]
+    // Unmapped methods stay live on purpose — see the note on LP_METHOD_DOMAIN.
+    if (domain && !isLpDomainLive(domain)) {
+      const mockFn = (mockLpPortalApi as Record<string, unknown>)[name]
+      if (typeof mockFn === "function") {
+        return (mockFn as (...args: unknown[]) => unknown).bind(mockLpPortalApi)
+      }
+    }
+    return (value as (...args: unknown[]) => unknown).bind(target)
+  },
+}) as LpPortalApiService

@@ -1246,14 +1246,14 @@ export function LpRequestsMessagesScreen({
               <div className="mt-4 border-t border-[#f1f5f9] pt-3">
                 <div className="flex items-center justify-between gap-2">
                   <h3 className="text-[12px] font-semibold text-[#111827]">
-                    Attachments ({selectedRequest.attachments.length})
+                    Attachments ({(selectedRequest.attachments?.length ?? 0)})
                   </h3>
                 </div>
-                {selectedRequest.attachments.length === 0 ? (
+                {(selectedRequest.attachments?.length ?? 0) === 0 ? (
                   <p className="mt-2 text-[12px] text-[#9ca3af]">No attachments.</p>
                 ) : (
                   <ul className="mt-2 space-y-2">
-                    {selectedRequest.attachments.map((file) => (
+                    {(selectedRequest.attachments ?? []).map((file) => (
                       <li
                         key={file.name}
                         className="flex items-center gap-2 rounded-lg border border-[#e5e7eb] px-2.5 py-2"

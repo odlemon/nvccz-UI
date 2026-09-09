@@ -902,12 +902,23 @@ export const MODULE_CONFIG: ModuleConfig[] = [
     color: "oklch(0.60 0.14 220)",
     hiddenFromSwitcher: true,
     externalPortalUrl: LP_PORTAL_EXTERNAL_URL,
+    // These mirror the LP portal's own navigation. /investments is deliberately absent:
+    // it is a compatibility redirect map (commitment/capital-account/holdings -> dashboard or
+    // account-activity), not a screen, so listing it would send staff through a redirect.
+    // The previous list pointed at /ledger,
+    // /vault, /reports and /colleagues, which are now redirect stubs onto the screens below —
+    // so every entry bounced through a redirect and the four newer screens were missing.
     subModules: [
       { id: "lp-dashboard", name: "Dashboard", path: "/lp-portal", icon: BarChart3, description: "Fund overview, NAV/IRR metrics, and FX rates" },
-      { id: "lp-ledger", name: "Capital Account", path: "/lp-portal/ledger", icon: DollarSign, description: "Capital calls, distributions, and fees ledger" },
-      { id: "lp-vault", name: "Document Vault", path: "/lp-portal/vault", icon: FileText, description: "Tax, audit, and performance report documents" },
-      { id: "lp-reports", name: "Performance Reports", path: "/lp-portal/reports", icon: CiFileOn, description: "Historical performance report deliveries" },
-      { id: "lp-colleagues", name: "Colleagues", path: "/lp-portal/colleagues", icon: Users, description: "Manage colleague access to your LP account" },
+      { id: "lp-performance", name: "Performance", path: "/lp-portal/performance", icon: BarChart3, description: "Returns, history and benchmark comparison" },
+      { id: "lp-account-activity", name: "Account Activity", path: "/lp-portal/account-activity", icon: DollarSign, description: "Capital account ledger and transaction history" },
+      { id: "lp-capital-activity", name: "Capital Calls & Distributions", path: "/lp-portal/capital-activity", icon: DollarSign, description: "Capital calls, distributions and payment confirmations" },
+      { id: "lp-dealing", name: "Subscriptions & Redemptions", path: "/lp-portal/subscriptions-redemptions", icon: CiFileOn, description: "Subscription and redemption dealing requests" },
+      { id: "lp-documents", name: "Documents", path: "/lp-portal/documents", icon: FileText, description: "Statements, tax, audit and fund reports" },
+      { id: "lp-requests", name: "Requests & Messages", path: "/lp-portal/requests", icon: CiFileOn, description: "Service requests and correspondence with the GP" },
+      { id: "lp-notices", name: "Notices", path: "/lp-portal/notices", icon: CiFileOn, description: "Notices requiring acknowledgement" },
+      { id: "lp-organisation", name: "My Organisation", path: "/lp-portal/organisation", icon: Users, description: "Colleague access and bank instruction changes" },
+      { id: "lp-settings", name: "Settings", path: "/lp-portal/settings", icon: CiFileOn, description: "Notification, display and MFA preferences" },
     ],
   },
 
