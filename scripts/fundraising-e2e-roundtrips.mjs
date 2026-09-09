@@ -462,8 +462,60 @@ async function tripB() {
   }
 }
 
+// ============================================================ TRIP C
+/**
+ * A role without fundraising edit rights must be refused *visibly*. The API returns 403 with
+ * a message; this asserts the user actually sees it rather than the dialog closing as though
+ * the write had succeeded.
+ *
+ * Run as a non-editing role:
+ *   node scripts/fundraising-e2e-roundtrips.mjs --trip=c --email=perf.exec@nts.local
+ */
+async function tripC() {
+  console.log(`\n── Trip C: write refusal is visible in the UI (as ${EMAIL})\n`)
+
+  const txt = await go("/fundraising/investors")
+  if (!txt) return bad("investors screen", "did not render")
+  step("investors screen renders for a non-editing role", txt.split("\n")[0])
+
+  if (!(await clickText("Add Investor"))) {
+    step("Add Investor is not offered to this role", "control absent — honestly hidden")
+    return
+  }
+  await fillField("Legal name", `Refusal probe ${stamp}`)
+  for (let i = 0; i < 3; i++) {
+    if (!(await clickText("Next"))) break
+  }
+  const beforeWrites = writes.length
+  if (!(await clickText("Create investor"))) return bad("submit as non-editing role", "submit not found")
+
+  // sonner toasts default to about 4s, so poll from just after the click rather than waiting
+  // it out and then concluding nothing was shown.
+  let toastText = ""
+  for (let i = 0; i < 12; i++) {
+    await page.waitForTimeout(400)
+    toastText = await page.evaluate(() => {
+      const el = document.querySelector("[data-sonner-toaster]") || document.body
+      return (el.innerText || "").trim()
+    })
+    if (/permission|denied|forbidden|failed|could not/i.test(toastText)) break
+  }
+  await shot("c1-refusal")
+
+  const refused = writes.slice(beforeWrites).find((w) => w.startsWith("403"))
+  if (refused) step("write refused by the API", refused)
+  else bad("write refused", `expected a 403; saw ${writes.slice(beforeWrites).join(", ") || "no write"}`)
+
+  if (/permission|denied|forbidden|failed|could not/i.test(toastText)) {
+    step("refusal is visible on screen", toastText.split("\n").slice(0, 2).join(" — "))
+  } else {
+    bad("refusal visibility", "API refused but nothing on screen told the user")
+  }
+}
+
 if (TRIP === "a" || TRIP === "both") await tripA()
 if (TRIP === "b" || TRIP === "both") await tripB()
+if (TRIP === "c") await tripC()
 
 console.log(`\nWrites observed (${writes.length}):`)
 for (const w of writes) console.log("  " + w)
