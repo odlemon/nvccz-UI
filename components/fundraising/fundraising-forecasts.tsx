@@ -106,6 +106,8 @@ function analyticsRows(rows: Record<string, any>[], kind: AnalyticsKind) {
         : kind === "source"
           ? ["source", "sourceName", "sourceLabel", "sourceCode"]
           : ["stage", "stageName", "stageLabel", "stageCode"]
+    // `code` is what toRowsArray emits when the endpoint returns its rows as an object keyed
+    // by stage / source / owner id, which all three of these analytics endpoints do.
     const identity =
       kind === "owner"
         ? row.ownerName ||
@@ -115,8 +117,8 @@ function analyticsRows(rows: Record<string, any>[], kind: AnalyticsKind) {
           embeddedName(row.user) ||
           "Name unavailable"
         : kind === "source"
-          ? row.sourceName || row.sourceLabel || row.source || row.sourceCode
-          : row.stageName || row.stageLabel || row.stage || row.stageCode
+          ? row.sourceName || row.sourceLabel || row.source || row.sourceCode || row.code
+          : row.stageName || row.stageLabel || row.stage || row.stageCode || row.code
 
     mapped[kind === "owner" ? "Owner" : kind === "source" ? "Source" : "Stage"] =
       identity === "Name unavailable"
@@ -128,6 +130,10 @@ function analyticsRows(rows: Record<string, any>[], kind: AnalyticsKind) {
     for (const [key, value] of Object.entries(row)) {
       if (
         key === "raw" ||
+        // `code` is the map key toRowsArray emits and is already shown as the identity
+        // column; for owner rows it is a raw user id, so repeating it helps nobody.
+        key === "code" ||
+        key === "ownerName" ||
         identityKeys.includes(key) ||
         /(^|_)(id|uuid)$/i.test(key) ||
         /Id$/.test(key)
