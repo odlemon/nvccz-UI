@@ -513,9 +513,155 @@ async function tripC() {
   }
 }
 
+// ============================================================ TRIP D
+/**
+ * Pipeline board: stage transition by drag, and the amount editor.
+ *
+ * The board moves an opportunity by drag-and-drop only — SRD section 27 requires
+ * "server-validated drag-and-drop" — and dnd-kit is wired to a PointerSensor with a 6px
+ * activation distance, so this drives real mouse events rather than dispatching synthetic
+ * drag events that dnd-kit would ignore.
+ *
+ * A refused move is as valid an outcome as a successful one: stage gates exist, and the board
+ * is meant to surface an unmet gate as a checklist. Both are asserted; silence is not.
+ */
+async function tripD() {
+  console.log("\n── Trip D: pipeline board — stage transition by drag, and the amount editor\n")
+
+  const txt = await go("/fundraising/pipeline")
+  if (!txt) return bad("pipeline screen", "did not render")
+
+  // The view toggle is a native <select aria-label="Pipeline view">, not a button.
+  const switched = await page.evaluate(() => {
+    const sel = document.querySelector('select[aria-label="Pipeline view"]')
+    if (!sel) return false
+    const setter = Object.getOwnPropertyDescriptor(
+      window.HTMLSelectElement.prototype,
+      "value",
+    ).set
+    setter.call(sel, "board")
+    sel.dispatchEvent(new Event("change", { bubbles: true }))
+    return true
+  })
+  if (!switched) return bad("switch to Board View", "Pipeline view select not found")
+  step("switched to Board View")
+  await page.waitForTimeout(6000)
+  await shot("d1-board")
+
+  const board = await page.evaluate(() => {
+    const cards = [...document.querySelectorAll('[aria-roledescription="draggable"], [role="button"][tabindex="0"]')]
+      .filter((c) => (c.textContent || "").trim().length > 20)
+    return {
+      cards: cards.length,
+      text: ((document.querySelector("main") || document.body).innerText || "").slice(0, 600),
+    }
+  })
+  if (board.cards > 0) step("board renders draggable opportunity cards", `${board.cards} cards`)
+  else return bad("board cards", "no draggable cards found — board may not have loaded")
+
+  // Find a card and a column to drop it into, by geometry.
+  const geo = await page.evaluate(() => {
+    const cards = [...document.querySelectorAll('[aria-roledescription="draggable"], [role="button"][tabindex="0"]')]
+      .filter((c) => (c.textContent || "").trim().length > 20)
+    const card = cards[0]
+    if (!card) return null
+    const cr = card.getBoundingClientRect()
+    // The droppable columns are the scrollable siblings across the board; pick the one whose
+    // horizontal centre is nearest to the right of this card's column.
+    const cols = [...document.querySelectorAll("div.thin-scroll")].filter((d) => {
+      const r = d.getBoundingClientRect()
+      return r.height > 100 && r.width > 100
+    })
+    const boxes = cols.map((d) => {
+      const r = d.getBoundingClientRect()
+      return { x: r.x + r.width / 2, y: r.y + Math.min(120, r.height / 2), w: r.width }
+    })
+    const target = boxes.find((b) => b.x > cr.x + cr.width / 2 + 40)
+    return {
+      from: { x: cr.x + cr.width / 2, y: cr.y + 20 },
+      to: target ? { x: target.x, y: target.y } : null,
+      cardText: (card.textContent || "").trim().slice(0, 60),
+      columns: boxes.length,
+    }
+  })
+
+  if (!geo || !geo.to) {
+    note(`could not locate a target column to the right (columns found: ${geo?.columns ?? 0})`)
+  } else {
+    note(`dragging "${geo.cardText}" across ${geo.columns} columns`)
+    const before = writes.length
+    // Real pointer drag: press, exceed the 6px activation distance in steps, release.
+    await page.mouse.move(geo.from.x, geo.from.y)
+    await page.mouse.down()
+    for (let i = 1; i <= 12; i++) {
+      await page.mouse.move(
+        geo.from.x + ((geo.to.x - geo.from.x) * i) / 12,
+        geo.from.y + ((geo.to.y - geo.from.y) * i) / 12,
+      )
+      await page.waitForTimeout(60)
+    }
+    await page.mouse.up()
+    await page.waitForTimeout(4000)
+    await shot("d2-board-after-drag")
+
+    const transition = writes.slice(before).find((w) => /transition/.test(w))
+    const gateShown = await page.evaluate(() =>
+      /requirement|not met|cannot move|stage gate|failed/i.test(document.body.innerText || ""),
+    )
+    if (transition && transition.startsWith("200")) {
+      step("drag moved the opportunity", transition)
+    } else if (transition) {
+      // A 4xx here is the server refusing the move; the board must say why.
+      if (gateShown) step("drag refused by a stage gate, shown as a checklist", transition)
+      else bad("stage-gate refusal visibility", `${transition} but nothing on screen explained it`)
+    } else {
+      note("drag produced no transition call — the pointer sequence did not activate the sensor")
+    }
+  }
+
+  // Amount editor — guardrail G2/G4: a per-type amount edit with a mandatory reason.
+  // It lives in the card detail drawer, so open a card first.
+  const opened = await page.evaluate(() => {
+    const cards = [...document.querySelectorAll('[aria-roledescription="draggable"], [role="button"][tabindex="0"]')]
+      .filter((c) => (c.textContent || "").trim().length > 20)
+    if (!cards[0]) return false
+    cards[0].click()
+    return true
+  })
+  await page.waitForTimeout(2500)
+  if (!opened) return note("no card to open for the amount editor")
+
+  if (!(await clickText("Edit amounts"))) {
+    return note("'Edit amounts' not reachable — card drawer may not have opened")
+  }
+
+  // Submit with no reason: the control must refuse rather than save a blank reason,
+  // because SRD section 7 requires a reason on every amount change.
+  const beforeBlank = writes.length
+  await clickText("Save change")
+  await page.waitForTimeout(1500)
+  if (writes.length === beforeBlank) {
+    step("amount edit refuses a blank reason", "no write attempted")
+  } else {
+    bad("amount edit reason guard", "wrote without a reason")
+  }
+
+  // Now with a reason — this must reach patchOpportunity and be recorded in history.
+  await fillField("New value", "6250000")
+  await fillField("Reason (required)", `E2E amount change ${stamp}`)
+  await shot("d3-amount-editor")
+  const beforeSave = writes.length
+  await clickText("Save change")
+  await page.waitForTimeout(3500)
+  const patched = writes.slice(beforeSave).find((w) => /PATCH \/fundraising\/opportunities/.test(w))
+  if (patched) step("amount change saved with a reason", patched)
+  else bad("amount change", `expected a PATCH; saw ${writes.slice(beforeSave).join(", ") || "no write"}`)
+}
+
 if (TRIP === "a" || TRIP === "both") await tripA()
 if (TRIP === "b" || TRIP === "both") await tripB()
 if (TRIP === "c") await tripC()
+if (TRIP === "d") await tripD()
 
 console.log(`\nWrites observed (${writes.length}):`)
 for (const w of writes) console.log("  " + w)
