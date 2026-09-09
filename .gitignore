@@ -54,3 +54,8 @@ scripts/_*.py
 .lp-verify/
 .lp-check/
 .lp-shots/
+
+# Fundraising verification output (scripts/fundraising-*.mjs)
+.fr-dump/
+.fr-trace/
+.fr-e2e/

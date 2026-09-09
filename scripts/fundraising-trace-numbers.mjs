@@ -168,6 +168,10 @@ for (const id of ids) {
     text = await page.evaluate(() => (document.querySelector("main") || document.body).innerText)
     if (text.trim() !== "Loading...") break
   }
+
+  // A page still stuck on the loading boundary has nothing to trace. Reporting that as
+  // "fully traced" because it rendered zero numbers would be a false pass, so call it out.
+  const stuck = text.trim() === "Loading..." || text.trim().length < 60
   page.off("response", onResponse)
 
   // Strip separators so "1,250,000.00" tests as 1250000. Dates and years are excluded up
@@ -180,6 +184,11 @@ for (const id of ids) {
     if (n === 0) return false                                        // zero proves nothing
     if (n >= 1900 && n <= 2100 && Number.isInteger(n)) return false  // years
     if (Number.isInteger(n) && n <= 31) return false                 // day-of-month, small counts
+    // Run stamps embedded in record NAMES, e.g. "UAT Campaign 1788934927757". These are
+    // characters in a title, not a figure the screen is reporting, but the digit scan cannot
+    // tell the difference. No real fundraising amount renders as a bare 10+ digit integer
+    // with no separators, so excluding them removes noise without hiding a value.
+    if (Number.isInteger(n) && s.length >= 10 && !s.includes(".")) return false
     return !payloadNumbers.has(String(n)) && !payloadNumbers.has(n.toFixed(2))
   })
 
@@ -200,18 +209,21 @@ for (const id of ids) {
     ].join("\n"),
     "utf8",
   )
-  summary.push({ id, untraced: unmatched.length })
+  summary.push({ id, untraced: unmatched.length, stuck })
   console.log(
     `  ${id.padEnd(18)} endpoints=${String(endpoints.length).padStart(2)}  numbers=${String(onScreen.length).padStart(3)}` +
-      `  untraced=${unmatched.length}${unmatched.length ? "  -> " + unmatched.slice(0, 10).join(", ") : ""}`,
+      `  untraced=${unmatched.length}${unmatched.length ? "  -> " + unmatched.slice(0, 10).join(", ") : ""}` +
+      `${stuck ? "  ** DID NOT RENDER — not traced **" : ""}`,
   )
 }
 
 await browser.close()
-const dirty = summary.filter((s) => s.untraced)
+const dirty = summary.filter((s) => s.untraced || s.stuck)
 console.log(`\ntraces in ${OUT}`)
 console.log(
   dirty.length
-    ? `${dirty.length}/${summary.length} screens have untraced numbers to explain`
+    ? `${dirty.length}/${summary.length} screens need attention ` +
+        `(${summary.filter((s) => s.stuck).length} did not render, ` +
+        `${summary.filter((s) => s.untraced && !s.stuck).length} have numbers to explain)`
     : `all ${summary.length} screens fully traced`,
 )

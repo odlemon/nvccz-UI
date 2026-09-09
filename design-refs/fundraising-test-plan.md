@@ -118,17 +118,132 @@ was checked against them by hand rather than eyeballed:
 The coverage ratio matching to 16 significant figures confirms the backend implements the SRD
 formula rather than an approximation.
 
+**These are the figures at the time of that check.** `targetTotal` later rose to 320,000,000
+because `npm run uat:fundraising:srd` creates a fresh campaign on every run, and it was run
+several times during this work. The relationship was re-verified against the higher total at
+the end: remaining to target = 320,000,000 − 79,000,000 = **241,000,000**, which is what the
+dashboard renders. The absolute totals move with the dataset; the derivations hold.
+
 ---
 
 ## 5. Per-screen results
 
-_(populated from the runs below — see §7 for the raw artefacts)_
+Page dump as `sysadmin`, all 20 screens, after the fixes in 5.2. "rows" counts
+`<table><tbody><tr>` - several screens render cards rather than a table and legitimately
+report 0.
+
+| # | Screen | API calls | Rows | Console errors | Failed requests | Verdict |
+|---|---|---:|---:|---:|---:|---|
+| 1 | Dashboard | 7 | 13 | 0 | 0 | Live |
+| 2 | Campaigns | 12 | 0 (cards) | 0 | 0 | Live |
+| 3 | Investor Organisations | 3 | 17 | 0 | 0 | Live |
+| 4 | Contacts | 20 | 29 | 0 | 0 | Live |
+| 5 | Pipeline | 8 | 6 | 0 | 0 | Live |
+| 6 | Mandates & RFPs | 5 | 7 | 0 | 0 | Live |
+| 7 | Due Diligence | 4 | 8 | 0 | 0 | Live - matrix populated after the auto-select fix |
+| 8 | Data Rooms | 4 | 0 (cards) | 0 | 0 | Live - tiles fixed, see 5.2 |
+| 9 | Communications | 3 | 18 | 0 | 0 | Live |
+| 10 | Meetings & Tasks | 5 | 0 (calendar) | 0 | 0 | Live |
+| 11 | Documents | 3 | 0 (tree) | 0 | 0 | Live - 400 on virtual docs fixed |
+| 12 | Agreements & Signatures | 3 | 0 (cards) | 0 | 0 | Live |
+| 13 | Commitments & Closings | 6 | 6 | 0 | 0 | Live - KPI buckets fixed |
+| 14 | Client Onboarding | 6 | 7 | 0 | 0 | Live |
+| 15 | Placement Agents | 6 | 4 | 0 | 0 | Live |
+| 16 | Forecasts & Analytics | 10 | 9 | 0 | 0 | Live - analytics tables fixed |
+| 17 | Reports | 5 | 0 (cards) | 0 | 0 | Live - catalogue now from the API |
+| 18 | Approvals | 3 | 5 | 0 | 0 | Live - names resolved |
+| 19 | Audit Logs | 3 | 7 | 0 | 0 | Live - actor resolved |
+| 20 | Settings | 3 | 0 (cards) | 0 | 0 | Live |
+
+**No screen renders an empty shell, and no screen logs a console error or a failed request.**
+
+### 5.1 Number trace - every unmatched value accounted for
+
+The trace flags any on-screen number absent from the payloads that screen fetched. Fourteen of
+the twenty screens come back with nothing to explain. The rest are listed here in full; none is
+a hardcoded value.
+
+| Screen | Value | Explanation |
+|---|---|---|
+| Dashboard | `US$52.0M` | Soft Circled in PE/VC mode - sum of `softCircleAmount` over the PE campaign's opportunities: 15 + 25 + 12 = 52M |
+| Dashboard | `US$241.0M` | Remaining to target, SRD 25.3 - `targetTotal` 320M minus `signedTotal` 79M = 241M |
+| Dashboard, Pipeline, Audit | `38`, `36`, `35`, `50`, `58` | Minutes and seconds inside rendered timestamps (`12:38:15`) - the digit scan cannot distinguish these from figures |
+| Pipeline | `US$83.0M` | Soft Circles across all campaigns - sum of `softCircleAmount` over all opportunities = 83,000,000, confirmed against the payload |
+| Pipeline | `160`, `240` | Recharts Y-axis tick labels on "Capital Raised Over Time" (`US$0M / 80M / 160M / 240M`) - computed from the domain, not from data |
+| Commitments | `US$79.00M` | Sum of `commitmentAmount` over the 5 commitments in the payload |
+| Commitments | `US$53.00M` | Sum of `fundedAmount` over the same 5 |
+| Commitments | `67` | 53 / 79 = 67% of total committed |
+| Audit | `127.0`, `0.1` | Fragments of the IP address `127.0.0.1` in the IP column |
+
+Where a value could not be explained it was treated as a defect and fixed - that is how the
+pipeline stage bucketing, the data-room tiles, the commitment KPI buckets and the Forecasts
+analytics tables below were found.
+
+### 5.2 Defects found and fixed
+
+| # | Defect | Evidence it was real | Fix |
+|---|---|---|---|
+| 1 | Reports rendered a hardcoded 7-report catalogue with invented owners ("Tariro Moyo") and cadences, while `GET /fundraising/reports` served the real one | `useState(FR_REPORTS)` at `fundraising-reports.tsx:38` | Loads catalogue + schedules from the API; says "Not scheduled" rather than inventing a cadence; hides Owner when there is no schedule |
+| 2 | The Configure dialog collected a cadence and recipients and discarded them - its own text admitted "aren't persisted yet" | Read of `runReport` | Persists via `POST /fundraising/reports/schedules` |
+| 3 | Pipeline by Stage put all 17 opportunities in one "Unspecified" bucket worth 100% | Screen showed `Unspecified 17 US$175.5M 100%` | Two stacked bugs: `rowsFromAnalytics` required an array but `/analytics/funnel` returns an object keyed by stage code; the fallback read `row.stageName`, but the API nests it under `row.currentStage`. Both fixed, ordered by `sortOrder` |
+| 4 | Data-room "Documents", "Views (7d)" and "Downloads (7d)" were structurally zero forever | API returned `_count.documents: 10` while the tile read 0; no `views7d` field existed at all | Backend now aggregates a rolling 7-day window from the access log; mapper reads `_count` as well as the nested arrays |
+| 5 | Every activity feed and the audit screen showed "Name unavailable" for the actor | `audit-logs` returned `userId` only | Backend resolves actors in one batched lookup, returning `userName`/`userRole` |
+| 6 | Approvals showed "Name unavailable" for Campaign, Investor and Requester | Approval rows store only `objectType`/`objectId`/`requestedById` | Backend resolves per object type in batched lookups |
+| 7 | Due Diligence matrix was empty on arrival even though every case carried its 8 items | `selectedId` initialised to `null` and only set on click | Selects the first case once the list loads |
+| 8 | Documents 400'd on every visit | `GET /documents/dr-...` - the index merges virtual data-room/agreement rows that the detail endpoint rejects by design | Frontend no longer requests detail for `dr-`/`agr-` ids |
+| 9 | Commitments reported US$54M committed / US$33M funded against a payload summing to 79M / 53M | Trace flagged `54.00`; the admitted row was absent from every bucket | The seeder wrote a non-canonical status `ADMITTED`; the service writes `ADMITTED_AT_CLOSE`. Seed corrected |
+| 10 | Forecasts' Funnel / Source / Owner tables each showed one row reading `Name unavailable / Campaignid / cmttz...` | Trace flagged `54`, which came from a campaign id string | `toRowsArray` now converts the keyed-object analytics shapes; backend returns owner names |
+| 11 | 20 `*-mock-data.ts` fixtures, two carrying fabricated KPI money and counts | Read of the fixtures | Deleted; genuine helpers moved to `*-presentation.ts` |
 
 ---
 
 ## 6. Role matrix
 
-_(populated after the per-role runs)_
+Measured against the running API with `scripts/fundraising-role-matrix.mjs`, and the UI half
+with `fundraising-e2e-roundtrips.mjs --trip=c`.
+
+| Role | roleCode | Read | Create investor | Create opportunity | What the user sees |
+|---|---|---|---|---|---|
+| `perf.sysadmin` | SYSADMIN | allowed | allowed | allowed | Full module |
+| `perf.exec` | CEO | allowed | **403** | **403** | Screens load; submitting shows "You do not have permission to edit fundraising data" |
+| `perf.deptmgr` | OPS_MGR | allowed | **403** | **403** | Same as above - refusal toast observed |
+| `perf.hr` | HR_MGR | allowed (API) | **403** | **403** | **"Access denied"** - the module guard blocks the screen before any control is offered |
+| `perf.employee` | OPS_MEM | allowed (API) | **403** | **403** | Redirected away from the module entirely |
+
+Every refusal is honest: either the module is blocked at the guard, the control is not offered,
+or the write is refused with a message the user can see. **No silent no-ops were found.**
+
+One caveat worth recording: the first measurement reported the refusal as invisible. That was a
+measurement error, not a defect - sonner clears a toast after about four seconds and the check
+ran at exactly four seconds. Polling from the click shows the message every time, and the check
+now polls.
+
+### 6.1 End-to-end round trips
+
+`scripts/fundraising-e2e-roundtrips.mjs` - every step performed by clicking and typing in the
+real UI, and verified by reading the screen afterwards rather than trusting a 2xx.
+
+**Trip A - 14 steps, 0 failures.** Investor organisation -> contact linked to that investor ->
+opportunity on an active campaign for that investor -> commitment against that opportunity ->
+closings surface. Writes observed:
+
+```
+201 POST /investors
+201 POST /investors/:id/contacts
+201 POST /fundraising/opportunities
+201 POST /fundraising/commitments
+```
+
+Each record was confirmed visible on screen before the next step, and each step selected the
+record created by the previous one - so this is one chain, not four unrelated inserts.
+
+**Trip B - 10 steps, 0 failures.** DDQ case -> matrix items grouped by answer-library category
+(all six present: Organisation, Performance, ESG, Operations, Compliance, Commercial) -> export
+-> approvals -> decide. The decision was observed reaching
+`POST /fundraising/approvals/:id/decide`, and the row moving out of Pending on screen (2 -> 1).
+
+Records created by these runs are removed afterwards by
+`npm run db:cleanup:fundraising-test-artefacts`, so they do not accumulate in the demo dataset.
 
 ---
 
