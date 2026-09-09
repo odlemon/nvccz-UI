@@ -78,6 +78,20 @@ function LoginForm() {
   useEffect(() => {
     if (!isAuthenticated || !isSubmitting || isFetchingDetails) return
 
+    // An invited investor signs in with a password we generated and emailed them. Until they
+    // choose their own, the only place they may go is the set-password screen — the requirement
+    // is meaningless if the portal lets them straight past it.
+    if (user?.mustChangePassword) {
+      toast.info("Set your password", {
+        description: "Choose your own password before continuing.",
+      })
+      setTimeout(() => {
+        window.location.href = "/set-password"
+      }, 100)
+      setIsSubmitting(false)
+      return
+    }
+
     if (userDetails) {
       const redirect = getRoleBasedRedirect(
         userDetails,

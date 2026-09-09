@@ -86,8 +86,15 @@ export const STAFF_PUBLIC_PASS_THROUGH = [
   '/broker-instruction',
 ] as const
 
-const LP_PREFIXES = ['/lp-portal', ...AUTH_ROUTES]
-const INVESTEE_PREFIXES = ['/investee-portal-v8', ...AUTH_ROUTES]
+/**
+ * `/set-password` is the forced password change for a signed-in user whose password we issued (an
+ * invited investor). It is listed here rather than added to AUTH_ROUTES on purpose: auth routes
+ * redirect an already-authenticated user to the portal home, which is precisely what this page
+ * must not do — the user arrives holding a valid session and has to stay put until they choose a
+ * password. Omitting it produced a redirect loop, /set-password -> /lp-portal -> /set-password.
+ */
+const LP_PREFIXES = ['/lp-portal', '/set-password', ...AUTH_ROUTES]
+const INVESTEE_PREFIXES = ['/investee-portal-v8', '/set-password', ...AUTH_ROUTES]
 /** Apply portal: public form only (no staff chrome, no auth). */
 const APPLY_PREFIXES = ['/funding-application']
 /** Vendor portal: public vendor workflows (no staff chrome, no auth). */

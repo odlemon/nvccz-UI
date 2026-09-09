@@ -43,6 +43,7 @@ import {
   formatMultiple,
   formatPercent,
   formatUnits,
+  niceAxisMax,
   parseDecimal,
 } from "@/lib/lp-portal/format"
 import { useLpDashboardBundle } from "@/lib/lp-portal/hooks"
@@ -219,10 +220,10 @@ export function LpPortalDashboardScreen() {
     [historyData],
   )
 
-  const chartYMax = React.useMemo(() => {
-    const maxVal = Math.max(...visibleChartData.flatMap((p) => [p.nav, p.paidIn]), 1)
-    return Math.ceil(maxVal / 50) * 50 || 250
-  }, [visibleChartData])
+  const chartYMax = React.useMemo(
+    () => niceAxisMax(Math.max(...visibleChartData.flatMap((p) => [p.nav, p.paidIn]), 1)),
+    [visibleChartData],
+  )
 
   const lastIndex = Math.max(visibleChartData.length - 1, 0)
 
@@ -233,7 +234,7 @@ export function LpPortalDashboardScreen() {
       {
         label: "Total Commitment",
         value: formatMoneyCompact(kpis.totalCommitment, presentationCurrency),
-        helper: `${kpis.investmentCount} Investments`,
+        helper: `${kpis.investmentCount} ${kpis.investmentCount === 1 ? "Commitment" : "Commitments"}`,
         href: "/lp-portal/investments",
         icon: Gauge,
         iconBg: "bg-[#eaf2ff]",
@@ -258,7 +259,11 @@ export function LpPortalDashboardScreen() {
       {
         label: "Current NAV",
         value: formatMoneyCompact(kpis.currentNav, presentationCurrency),
-        helper: `${formatMultiple(kpis.tvpi)} TVPI`,
+        // SRD section 34's dashboard wireframe carries a ratio row of Net IRR / TVPI / DPI / RVPI.
+        // TVPI and DPI sit on this card and the Distributions card respectively, but RVPI had no
+        // home on the dashboard at all - it appeared only on the Performance screen. It belongs
+        // next to NAV, being residual NAV over paid-in.
+        helper: `${formatMultiple(kpis.tvpi)} TVPI · ${formatMultiple(kpis.rvpi)} RVPI`,
         icon: CircleDollarSign,
         iconBg: "bg-[#f3e8ff]",
         iconColor: "text-[#7c3aed]",
@@ -286,6 +291,7 @@ export function LpPortalDashboardScreen() {
     const kpis = data?.dashboard.kpis
     if (!kpis) return []
     const paidIn = parseDecimal(kpis.paidIn) / 1_000_000
+    const outstanding = parseDecimal(kpis.outstandingCalled ?? "0") / 1_000_000
     const unfunded = parseDecimal(kpis.unfunded) / 1_000_000
     const distributed = parseDecimal(kpis.distributions) / 1_000_000
     const remaining = Math.max(parseDecimal(kpis.currentNav) / 1_000_000 - distributed, 0)
@@ -305,6 +311,19 @@ export function LpPortalDashboardScreen() {
         percent: pct(paidIn * 1_000_000),
         color: "#1a56db",
       },
+      // Unfunded is commitment minus CALLED, so without this slice the panel showed 5.0% and
+      // 92.5% and silently lost the 2.5% the investor has been called for and still owes.
+      ...(outstanding > 0
+        ? [
+            {
+              name: "Called, Not Yet Paid",
+              value: outstanding,
+              display: formatMoneyCompact(kpis.outstandingCalled ?? "0", presentationCurrency),
+              percent: pct(outstanding * 1_000_000),
+              color: "#f59e0b",
+            },
+          ]
+        : []),
       {
         name: "Unfunded Commitment",
         value: unfunded,
@@ -567,7 +586,7 @@ export function LpPortalDashboardScreen() {
                 <YAxis
                   domain={[0, chartYMax]}
                   ticks={Array.from({ length: 6 }, (_, i) => (chartYMax / 5) * i)}
-                  tickFormatter={(value) => (value === 0 ? "$0" : `$${value}M`)}
+                  tickFormatter={(value) => (value === 0 ? "$0" : `$${Number(value.toPrecision(3))}M`)}
                   tick={{ fontSize: 10, fill: "#94a3b8" }}
                   tickLine={false}
                   axisLine={false}

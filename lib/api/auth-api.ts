@@ -37,6 +37,11 @@ export interface LoginUser {
   department: string | null
   role: string | null
   isApplicant: boolean
+  /**
+   * True when the password was issued by us rather than chosen by the user — an invited investor
+   * is emailed a temporary one. The portal must send them to set their own before anything else.
+   */
+  mustChangePassword?: boolean
 }
 
 export interface LoginResponse {
@@ -59,6 +64,24 @@ export interface LoginCredentials {
 }
 
 export const authApiService = {
+  /** Change the signed-in user's own password. Clears `mustChangePassword` server-side. */
+  async changePassword(currentPassword: string, newPassword: string, token: string): Promise<{ success: boolean; message: string }> {
+    const base = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://127.0.0.1:3009/api'
+    const response = await fetch(`${base}/auth/change-password`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ currentPassword, newPassword }),
+    })
+    const data = await response.json().catch(() => ({}))
+    if (!response.ok || data?.success === false) {
+      throw new Error(data?.message || 'Could not change your password')
+    }
+    return { success: true, message: data?.message || 'Password changed' }
+  },
+
   async login(credentials: LoginCredentials): Promise<LoginResponse> {
     const portal =
       credentials.portal ||

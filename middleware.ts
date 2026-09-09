@@ -375,6 +375,25 @@ export function middleware(request: NextRequest) {
     }
   }
 
+  // A password we issued must be replaced before anything else is reachable. An invited investor
+  // signs in with a temporary password emailed to them; until they choose their own, every route
+  // except the set-password screen itself bounces back to it. Enforced here rather than only on
+  // the login redirect, so typing a URL cannot walk around the requirement.
+  if (token && !isAuthRoute(pathname) && pathname !== '/set-password') {
+    const userCookie = request.cookies.get(process.env.NEXT_PUBLIC_AUTH_USER_KEY || 'user')
+    if (userCookie?.value) {
+      try {
+        const parsed = JSON.parse(decodeURIComponent(userCookie.value))
+        if (parsed?.mustChangePassword === true) {
+          return NextResponse.redirect(new URL('/set-password', request.url))
+        }
+      } catch {
+        // An unparseable cookie is handled by the existing profile checks below; it is not this
+        // guard's business to sign anyone out.
+      }
+    }
+  }
+
   // LP / investee portals: require auth; investee also rejects non-applicant cookies at the edge.
   if (PORTAL_ID === 'lp' || PORTAL_ID === 'investee') {
     if (!token && !isAuthRoute(pathname)) {

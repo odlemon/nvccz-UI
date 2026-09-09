@@ -38,7 +38,9 @@
     ".next-investee/types/**/*.ts",
     ".next-apply/types/**/*.ts",
     ".next-staff-review/types/**/*.ts",
-    ".next-build-verify/types/**/*.ts"
+    ".next-build-verify/types/**/*.ts",
+    ".next-staff-uat/types/**/*.ts",
+    ".next-lp-uat/types/**/*.ts"
   ],
   "exclude": [
     "node_modules"

@@ -75,6 +75,8 @@ export interface LpSession {
 export interface LpDashboardKpis {
   totalCommitment: string
   paidIn: string
+  called?: string
+  outstandingCalled?: string
   unfunded: string
   currentNav: string
   distributions: string
@@ -82,7 +84,10 @@ export interface LpDashboardKpis {
   tvpi: string
   dpi: string
   rvpi: string
+  /** The investor's own fund commitments — the count behind Total Commitment. */
   investmentCount: number
+  /** Non-exited portfolio companies held by the funds they are invested in. */
+  portfolioCompanyCount?: number
 }
 
 export interface LpOpenEndedSummary {
@@ -361,10 +366,14 @@ export interface LpPerformanceMetrics {
 export interface LpPerformanceByFundRow {
   fundId: string
   fundName: string
-  netIrr: string
-  tvpi: string
-  dpi: string
-  rvpi: string
+  /**
+   * Private-capital multiples. Null for OPEN_ENDED funds, which have no called or paid-in capital
+   * to define them against — see SRD sections 3 and 37. Render an absent measure as "—", never 0.
+   */
+  netIrr: string | null
+  tvpi: string | null
+  dpi: string | null
+  rvpi: string | null
   nav: string
   paidIn: string
   distributions: string
@@ -411,10 +420,17 @@ export interface LpPerformanceHistory {
 
 export interface LpBenchmarkSeries {
   metric: string
+  benchmarkId?: string
   asOfDate: string
+  /** FINAL when approved points exist, otherwise UNAVAILABLE. */
   valuationStatus: string
+  /** False when no approved series is configured for this benchmark and metric. */
+  configured?: boolean
   series: Array<{ date: string; label: string; value: string }>
-  note: string
+  source?: string | null
+  approvedAt?: string | null
+  /** Only set when the benchmark is not configured; never developer placeholder prose. */
+  note: string | null
 }
 
 export interface LpJobStatus {
@@ -1334,6 +1350,7 @@ const LP_COUNT_KEYS = new Set([
   "count",
   "unreadCount",
   "investmentCount",
+  "portfolioCompanyCount",
   "newThisWeek",
   "requiresSignature",
   "secureDownloadsYtd",
