@@ -113,11 +113,15 @@ end date.
 Verified: trend reads Jun/Jul/Aug 2026 at 33,702.96 net over 12 employees each,
 September zero because no run exists for it.
 
-### 1.5 Payroll audit trail
+### 1.5 Employee provisioning
+
+See §2.1 — built during this work rather than left as an ask.
+
+### 1.6 Payroll audit trail
 
 See §2.7 — built during this work rather than left as an ask.
 
-### 1.6 Data
+### 1.7 Data
 
 - `scripts/seed-payroll-v6-baseline.ts` — the payroll tables were **completely
   empty** (0 employees, 0 runs, 0 payslips, 0 salary structures), so no screen
@@ -141,18 +145,27 @@ Migration logged in `design-refs/vps-pending-migrations.md` as
 Ordered by value. Each blocks specific UI that currently has no endpoint to
 call; see `payroll-v6-action-inventory.md` for the affected action ids.
 
-### 2.1 Employee create/update through the module UI — HIGH
+### 2.1 Employee create through the module UI — BUILT
 
-`POST`/`PUT /payroll/employees` exist and are guarded, but the runtime's "Add
-employee" form has no `userId` field, and `Employee.userId` is required and
-unique (an employee is backed by a user account). Wiring this needs either:
+Was: `POST`/`PUT /payroll/employees` existed and were guarded, but
+`Employee.userId` is required and unique and the form collected only a name,
+job title and department — no email, no employee number, no salary — so there
+was nothing to create a user account from and the control was decorative. It
+also pre-filled a fake person ("Kundai Marufu").
 
-- a backend route that provisions the `User` and `Employee` together, or
-- a user-picker in the form.
+Now: `POST /payroll/employees/with-user` provisions both rows in one
+transaction, behind `payroll.employees.manage`. The account gets a random
+password — none is accepted from the caller and none is returned — so
+onboarding runs the normal reset flow. Validation reports every missing field
+at once; a duplicate email or employee number is a 409 naming which.
+The form gained the three missing fields and its fake defaults were cleared.
 
-Recommend the former: `POST /payroll/employees/with-user`, taking name, email,
-employee number, department, salary and bank details, creating both rows in one
-transaction.
+Verified: created through the API and again through the browser form
+(`POST 201`, roster reloaded); empty input returns all five validation
+messages; a plain employee gets 403. Both probe records were removed afterwards.
+
+**Still open:** employee *update* (`edit-employee`) is not wired, and employee
+changes are not written to the audit trail (§2.7).
 
 ### 2.2 Payroll input batches — HIGH
 

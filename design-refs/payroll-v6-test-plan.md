@@ -72,7 +72,13 @@ Untraced numbers across the 20 screens, as sysadmin:
 |---|---|
 | Before any work | **204** |
 | After the KPI/fixture work | 100 |
-| Final | see §4.3 |
+| **Final** | **102** |
+
+The final figure is not lower than the interim one because the dataset grew:
+building the audit trail added a screen full of real events whose `detail`
+strings embed amounts (e.g. "gross 42208.999952307813633"), and the tracer only
+matches numeric payload *values*, not numbers inside a sentence. Those are
+payload data by construction.
 
 ### 4.1 What was found and fixed
 
@@ -124,17 +130,22 @@ EMP-0003, 19 days on 2,975 → `(2975/22)*19 = 2569.32` ✓ on screen.
 
 ### 4.3 What remains untraced, and why
 
+Final per-screen figures, as sysadmin:
+
 | Screen | Left | What they are |
 |---|---|---|
-| vendors | ~24 | **No backend.** Whole screen is fixture-rendered; see backend-asks §2.5. |
-| inputs | ~13 | **No backend.** No input-batch store; backend-asks §2.2. |
-| leave | 11 | The liability derivation above — all verified. |
-| overview | 11 | Chart axis ticks (8415/16850/25285/33720 are computed from the live series) and id fragments. |
-| audit | 8 | **No backend.** Audit events are in-memory; backend-asks §2.7. |
-| approvals | 5 | Sampled-payslip figures inside the review drawer. |
+| vendors | 25 | **No backend.** Whole screen is fixture-rendered; backend-asks §2.5. |
+| overview | 14 | Chart axis ticks (computed from the live series) and id fragments. |
+| inputs | 13 | **No backend.** No input-batch store; backend-asks §2.2. |
+| leave | 11 | The liability derivation above — all verified by hand. |
+| audit | 6 | Amounts embedded in real event `detail` strings. |
+| approvals | 6 | Sampled-payslip figures inside the review drawer. |
 | employees | 5 | Masked account-number fragments split by the tokeniser. |
-| mypay | 4 | Fragments of `0040006412` and `63-1445720B16` — real payload values. |
-| tax, training, settings | **0** | Fully traced. |
+| mypay, access | 4 each | Account-number / national-id fragments and gauge percentages. |
+| runs, calendar | 3 each | Id fragments and calendar day numbers. |
+| onboarding, exceptions | 2 each | Fixture remnants on screens with no backend. |
+| vault, reports, components, close | 1 each | A single derived or fragment value. |
+| **tax, training, settings** | **0** | Fully traced. |
 
 The tokeniser splits `0040006412` into `6412` and `63-1445720B16` into `63` and
 `1445720`; those are payload values, not fabrications.
@@ -290,11 +301,26 @@ Verified by restoring a clean pre-patch runtime and re-patching:
 
 All runtime edits go through this script. The runtime is never hand-edited.
 
+## 10a. Capabilities built rather than left as asks
+
+Two of the gaps in the backend-asks list were built during this work rather
+than written down and handed on:
+
+- **Payroll audit trail** (§2.7) — `payroll_audit_events` plus write points on
+  the run lifecycle and `GET /api/payroll/audit`. The screen now shows the real
+  sequence with real actors, and the maker-checker separation is visible in the
+  data: SysAdmin created and submitted, Perf Executive approved, SysAdmin
+  processed.
+- **Employee provisioning** (§2.1) — `POST /payroll/employees/with-user`
+  creating the user account and employee record in one transaction, plus the
+  three form fields the record cannot be created without. Verified by creating
+  a real employee through the browser form and then removing it.
+
 ## 11. Known limitations
 
 1. **Screens with no backend** — Vendors, Inputs & Validation, Pay Groups &
-   Calendar, Onboarding, Document Vault and Audit Trail still render the
-   runtime's fixtures because there is nothing to call. Each is itemised in
+   Calendar, Onboarding and Document Vault still render the runtime's fixtures
+   because there is nothing to call. Each is itemised in
    `payroll-v6-backend-asks.md` §2 with what would need building. They are
    reachable and look finished, which is a risk: they should either be built or
    removed from the nav before anyone treats them as real.
