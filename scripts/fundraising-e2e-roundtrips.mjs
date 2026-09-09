@@ -658,10 +658,126 @@ async function tripD() {
   else bad("amount change", `expected a PATCH; saw ${writes.slice(beforeSave).join(", ") || "no write"}`)
 }
 
+// ============================================================ TRIP E
+/**
+ * Closings: schedule one, give the three sign-offs, then run it.
+ *
+ * Definition-of-done 7a ends with "run a closing", and until this the screen could only
+ * *list* closings — createClosing, patchClosing and postClosingReadiness existed in the API
+ * client and were called by no component.
+ */
+async function tripE() {
+  console.log("\n── Trip E: schedule a closing, sign it off, run it\n")
+
+  const txt = await go("/fundraising/commitments")
+  if (!txt) return bad("commitments screen", "did not render")
+  step("commitments screen renders")
+
+  if (!(await clickText("New Closing"))) return bad("open the New Closing dialog", "control not found")
+  if (!(await selectOptionByText("Campaign", "Arcus Growth Fund III")))
+    return bad("select campaign", "not in dropdown")
+  await fillField("Name", `E2E Close ${stamp}`)
+  await selectOptionByText("Close type", "Interim close")
+  await fillField("Closing date", "2027-02-28")
+  await fillField("Target amount (US$)", "18000000")
+  await shot("e1-new-closing")
+
+  const beforeCreate = writes.length
+  if (!(await clickText("Schedule closing"))) return bad("submit closing", "Schedule closing not found")
+  await page.waitForTimeout(4000)
+  const created = writes.slice(beforeCreate).find((w) => /POST \/fundraising\/closings/.test(w))
+  if (created) step("closing created through the API", created)
+  else return bad("closing created", `expected POST /closings; saw ${writes.slice(beforeCreate).join(", ") || "no write"}`)
+
+  const afterCreate = await screenText()
+  if (afterCreate.includes(`E2E Close ${stamp}`)) step("new closing is the next closing event on screen")
+  else note("closing created but a different closing is still next in the queue")
+
+  // Run must be blocked until all three sign-offs are recorded.
+  const blocked = await page.evaluate(() => {
+    const b = [...document.querySelectorAll("button")].find((x) =>
+      /Run close|Schedule close/.test(x.textContent || ""),
+    )
+    return b ? b.disabled : null
+  })
+  if (blocked === true) step("run is gated until legal, compliance and fund ops sign off")
+  else if (blocked === false) note("run was already enabled — the closing in view is already signed off")
+  else note("run control not found")
+
+  // Record the sign-offs that are missing. The chips are toggles, so clicking one that is
+  // already green *withdraws* that sign-off — clicking all three blindly can leave the
+  // closing less ready than it started.
+  for (const label of ["Legal", "Compliance", "Fund ops"]) {
+    const already = await page.evaluate((l) => {
+      const b = [...document.querySelectorAll("button")].find((x) => (x.textContent || "").trim() === l)
+      return b ? b.className.includes("dcfce7") : null
+    }, label)
+    if (already === null) {
+      bad(`${label} chip`, "not found on the closing card")
+      continue
+    }
+    if (already) {
+      step(`${label} already signed off`, "left alone — clicking would withdraw it")
+      continue
+    }
+    const before = writes.length
+    await clickText(label)
+    await page.waitForTimeout(2500)
+    const hit = writes.slice(before).find((w) => /readiness/.test(w))
+    if (hit) step(`${label} sign-off recorded`, hit)
+    else bad(`${label} sign-off`, "no readiness call observed")
+  }
+  await shot("e2-readiness")
+
+  const nowEnabled = await page.evaluate(() => {
+    const b = [...document.querySelectorAll("button")].find((x) =>
+      /Run close|Schedule close/.test(x.textContent || ""),
+    )
+    return b ? !b.disabled : null
+  })
+  if (nowEnabled) step("run becomes available once all three sign-offs are in")
+  else bad("run gating", "still disabled after all three sign-offs")
+
+  // Advance to COMPLETED. A closing already at SCHEDULED needs one step, one at PLANNED
+  // needs two, so drive it until the card reports Completed rather than assuming a count.
+  for (let pass = 1; pass <= 2; pass++) {
+    const state = await page.evaluate(() => {
+      const b = [...document.querySelectorAll("button")].find((x) =>
+        /Run close|Schedule close/.test(x.textContent || ""),
+      )
+      const done = /Completed/i.test(
+        ((document.querySelector("main") || document.body).innerText || ""),
+      )
+      return { label: b ? (b.textContent || "").trim() : null, disabled: b ? b.disabled : true, done }
+    })
+    if (!state.label || state.disabled) {
+      if (pass === 1) bad("closing advance", "no enabled Run control")
+      break
+    }
+    const before = writes.length
+    await clickText(state.label)
+    await page.waitForTimeout(4000)
+    const hit = writes.slice(before).find((w) => /PATCH \/fundraising\/closings/.test(w))
+    if (hit) step(`closing advanced (${state.label})`, hit)
+    else bad(`closing advance ${pass}`, "no PATCH observed")
+
+    const nowDone = await page.evaluate(() =>
+      /Status\s*\n?\s*Completed/i.test((document.querySelector("main") || document.body).innerText || ""),
+    )
+    if (nowDone) break
+  }
+
+  const final = await screenText()
+  if (/Completed/i.test(final)) step("closing reaches Completed on screen")
+  else note("closing advanced but the card does not show Completed in this view")
+  await shot("e3-closing-complete")
+}
+
 if (TRIP === "a" || TRIP === "both") await tripA()
 if (TRIP === "b" || TRIP === "both") await tripB()
 if (TRIP === "c") await tripC()
 if (TRIP === "d") await tripD()
+if (TRIP === "e") await tripE()
 
 console.log(`\nWrites observed (${writes.length}):`)
 for (const w of writes) console.log("  " + w)

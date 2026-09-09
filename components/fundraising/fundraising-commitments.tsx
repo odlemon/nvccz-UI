@@ -50,6 +50,7 @@ import {
   requirementsFromError,
   type FrRequirementsState,
   frInputClass,
+  frSelectClass,
 } from "./fundraising-modals"
 import { FrCommitmentWizard } from "./fundraising-create-wizards"
 import { fundraisingApi, asNumber, toastFrError } from "@/lib/api/fundraising-api"
@@ -91,6 +92,8 @@ type ChecklistRow = {
 }
 
 type ClosingEventVM = {
+  id: string
+  status: string
   title: string
   amount: string
   expectedCloseDate: string
@@ -98,6 +101,9 @@ type ClosingEventVM = {
   targetAmount: string
   committedAmount: string
   committedPct: number
+  legalReady: boolean
+  complianceReady: boolean
+  fundReady: boolean
 }
 
 function docsBadge(status: DocsStatus) {
@@ -342,15 +348,34 @@ function ChecklistPanel({
   )
 }
 
+function titleCaseStatus(v: string) {
+  return String(v || "")
+    .split("_")
+    .map((w) => w.charAt(0) + w.slice(1).toLowerCase())
+    .join(" ")
+}
+
 /** Next Closing Event + Closing Timeline in a single card. */
 function ClosingProgressCard({
   event,
   timeline,
   onViewCalendar,
+  onNewClosing,
+  onAdvance,
+  onToggleReadiness,
+  advancing,
+  canAdvance,
+  advanceLabel,
 }: {
   event: ClosingEventVM | null
   timeline: TimelineStep[]
   onViewCalendar: () => void
+  onNewClosing: () => void
+  onAdvance: () => void
+  onToggleReadiness: (field: "legalReady" | "complianceReady" | "fundReady", next: boolean) => void
+  advancing: boolean
+  canAdvance: boolean
+  advanceLabel: string
 }) {
   const barWidth = event ? Math.min(event.committedPct, 100) : 0
 
@@ -395,6 +420,38 @@ function ClosingProgressCard({
                   />
                 </div>
               </div>
+              {/* SRD section 22: a closing is gated on legal, compliance and fund operations
+                  sign-off. Show the three flags so the disabled Run control is explicable. */}
+              <div className="flex items-center justify-between pt-1">
+                <span className="text-[#141414]">Readiness</span>
+                <span className="flex gap-1.5">
+                  {([
+                    ["Legal", "legalReady", event.legalReady],
+                    ["Compliance", "complianceReady", event.complianceReady],
+                    ["Fund ops", "fundReady", event.fundReady],
+                  ] as const).map(([label, field, ready]) => (
+                    <button
+                      key={label}
+                      type="button"
+                      disabled={advancing}
+                      onClick={() => onToggleReadiness(field, !ready)}
+                      title={ready ? `Withdraw ${label} sign-off` : `Record ${label} sign-off`}
+                      className={cn(
+                        "rounded-[4px] px-1.5 py-0.5 text-[11px] font-medium transition-colors",
+                        ready
+                          ? "bg-[#dcfce7] text-[#15803d] hover:bg-[#bbf7d0]"
+                          : "bg-[#f1f5f9] text-[#141414] hover:bg-[#e2e8f0]",
+                      )}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-[#141414]">Status</span>
+                <span className="font-medium text-[#000000]">{titleCaseStatus(event.status)}</span>
+              </div>
             </div>
           </>
         ) : (
@@ -417,7 +474,7 @@ function ClosingProgressCard({
           </ol>
         )}
       </div>
-      <div className="border-t border-[#f1f5f9] px-4 py-3 text-center">
+      <div className="border-t border-[#f1f5f9] px-4 py-3 flex flex-wrap items-center justify-between gap-2">
         <button
           type="button"
           onClick={onViewCalendar}
@@ -425,6 +482,28 @@ function ClosingProgressCard({
         >
           View closing calendar &gt;
         </button>
+        <div className="flex flex-wrap gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            className="h-8 rounded-full px-3 text-[11px]"
+            onClick={onNewClosing}
+          >
+            New Closing
+          </Button>
+          <Button
+            type="button"
+            variant="gradient-info"
+            className="h-8 rounded-full px-3 text-[11px] font-semibold shadow-sm"
+            onClick={onAdvance}
+            disabled={!canAdvance || advancing}
+            // A closing can only be run once legal, compliance and fund operations have all
+            // signed off — the same three flags the readiness row above shows.
+            title={canAdvance ? undefined : "All three readiness sign-offs are required first"}
+          >
+            {advancing ? "Working…" : advanceLabel}
+          </Button>
+        </div>
       </div>
     </div>
   )
@@ -560,6 +639,16 @@ export function FundraisingCommitments() {
   const [loading, setLoading] = useState(true)
   const [rawCommitments, setRawCommitments] = useState<Record<string, any>[]>([])
   const [rawClosings, setRawClosings] = useState<Record<string, any>[]>([])
+  const [campaigns, setCampaigns] = useState<Record<string, any>[]>([])
+  const [newClosingOpen, setNewClosingOpen] = useState(false)
+  const [advancingClosing, setAdvancingClosing] = useState(false)
+  const [closingForm, setClosingForm] = useState({
+    campaignId: "",
+    name: "",
+    closeType: "FIRST_CLOSE",
+    closingDate: "",
+    targetAmount: "",
+  })
   const [rawInvestors, setRawInvestors] = useState<Record<string, any>[]>([])
 
   const [checklist, setChecklist] = useState<ChecklistRow[]>([])
@@ -577,19 +666,22 @@ export function FundraisingCommitments() {
   async function loadData() {
     setLoading(true)
     try {
-      const [commitments, closings, investors] = await Promise.all([
+      const [commitments, closings, investors, campaignList] = await Promise.all([
         fundraisingApi.listCommitments(),
         fundraisingApi.listClosings(),
         fundraisingApi.listInvestors({ pageSize: 200 }),
+        fundraisingApi.listCampaigns(),
       ])
       setRawCommitments(commitments ?? [])
       setRawClosings(closings ?? [])
       setRawInvestors(investors?.items ?? [])
+      setCampaigns(campaignList ?? [])
     } catch (err) {
       toastFrError(err, "Could not load commitments")
       setRawCommitments([])
       setRawClosings([])
       setRawInvestors([])
+      setCampaigns([])
     } finally {
       setLoading(false)
     }
@@ -598,6 +690,77 @@ export function FundraisingCommitments() {
   useEffect(() => {
     loadData()
   }, [])
+
+  async function submitNewClosing() {
+    if (!closingForm.campaignId) {
+      toast.error("Select a campaign")
+      throw new Error("validation")
+    }
+    if (!closingForm.closingDate) {
+      toast.error("A closing date is required")
+      throw new Error("validation")
+    }
+    try {
+      await fundraisingApi.createClosing({
+        campaignId: closingForm.campaignId,
+        closeType: closingForm.closeType,
+        closingDate: closingForm.closingDate,
+        name: closingForm.name.trim() || undefined,
+        targetAmount: closingForm.targetAmount ? asNumber(closingForm.targetAmount) : undefined,
+        status: "PLANNED",
+      })
+      toast.success("Closing scheduled")
+      setNewClosingOpen(false)
+      setClosingForm({ campaignId: "", name: "", closeType: "FIRST_CLOSE", closingDate: "", targetAmount: "" })
+      await loadData()
+    } catch (err) {
+      toastFrError(err, "Could not schedule the closing")
+      throw err
+    }
+  }
+
+  /**
+   * Advance the next closing one step: PLANNED -> SCHEDULED -> COMPLETED.
+   *
+   * Running a close is gated on all three sign-offs, matching SRD section 22 — a mandate or
+   * fund close cannot be executed until legal, compliance and fund operations have cleared it.
+   * The button is disabled until then and says why, rather than failing on submit.
+   */
+  /** Record or withdraw one of the three closing sign-offs. */
+  async function toggleClosingReadiness(
+    field: "legalReady" | "complianceReady" | "fundReady",
+    next: boolean,
+  ) {
+    if (!nextClosingEvent) return
+    setAdvancingClosing(true)
+    try {
+      await fundraisingApi.postClosingReadiness(nextClosingEvent.id, { [field]: next })
+      await loadData()
+    } catch (err) {
+      toastFrError(err, "Could not update closing readiness")
+    } finally {
+      setAdvancingClosing(false)
+    }
+  }
+
+  async function advanceClosing() {
+    if (!nextClosingEvent) return
+    const current = String(nextClosingEvent.status).toUpperCase()
+    const next = current === "PLANNED" ? "SCHEDULED" : "COMPLETED"
+    setAdvancingClosing(true)
+    try {
+      await fundraisingApi.patchClosing(nextClosingEvent.id, {
+        status: next,
+        ...(next === "COMPLETED" ? { closedAt: new Date().toISOString() } : {}),
+      })
+      toast.success(next === "COMPLETED" ? "Closing completed" : "Closing scheduled")
+      await loadData()
+    } catch (err) {
+      toastFrError(err, "Could not update the closing")
+    } finally {
+      setAdvancingClosing(false)
+    }
+  }
 
   const investorsById = useMemo(() => {
     const map: Record<string, any> = {}
@@ -712,14 +875,22 @@ export function FundraisingCommitments() {
     if (!next) return null
     const linked = mapped.filter((c) => c.closingId === String(next.id))
     const committed = linked.reduce((sum, c) => sum + c.commitmentAmountRaw, 0)
+    // targetAmount and the progress bar were hardcoded to "—" and 0 even though a closing
+    // carries a real targetAmount, so the card showed an empty bar against live commitments.
+    const target = asNumber(next.targetAmount)
     return {
-      title: `${closeTypeLabel(next.closeType)} — ${next.campaignId ? "Campaign" : "Fund"}`,
+      id: String(next.id),
+      status: String(next.status ?? "PLANNED"),
+      title: `${closeTypeLabel(next.closeType)} — ${next.name ?? (next.campaignId ? "Campaign" : "Fund")}`,
       amount: moneyFmt(committed),
       expectedCloseDate: fmtDate(next.closingDate) ?? "—",
       commitmentsCount: linked.length,
-      targetAmount: "—",
+      targetAmount: target > 0 ? moneyFmt(target) : "—",
       committedAmount: moneyFmt(committed),
-      committedPct: 0,
+      committedPct: target > 0 ? Math.round((committed / target) * 100) : 0,
+      legalReady: Boolean(next.legalReady),
+      complianceReady: Boolean(next.complianceReady),
+      fundReady: Boolean(next.fundReady),
     }
   }, [sortedClosings, mapped])
 
@@ -1135,6 +1306,22 @@ export function FundraisingCommitments() {
             event={nextClosingEvent}
             timeline={closingTimeline}
             onViewCalendar={() => setCalendarOpen(true)}
+            onNewClosing={() => setNewClosingOpen(true)}
+            onAdvance={advanceClosing}
+            onToggleReadiness={toggleClosingReadiness}
+            advancing={advancingClosing}
+            canAdvance={
+              !!nextClosingEvent &&
+              String(nextClosingEvent.status).toUpperCase() !== "COMPLETED" &&
+              nextClosingEvent.legalReady &&
+              nextClosingEvent.complianceReady &&
+              nextClosingEvent.fundReady
+            }
+            advanceLabel={
+              nextClosingEvent && String(nextClosingEvent.status).toUpperCase() === "PLANNED"
+                ? "Schedule close"
+                : "Run close"
+            }
           />
         </aside>
       </div>
@@ -1182,6 +1369,75 @@ export function FundraisingCommitments() {
       />
 
       <FrCommitmentWizard open={addOpen} onOpenChange={setAddOpen} onCreated={loadData} />
+
+      <FrDialogShell
+        open={newClosingOpen}
+        onOpenChange={setNewClosingOpen}
+        title="Schedule a closing"
+        description="Creates a closing record. It stays PLANNED until legal, compliance and fund operations sign off."
+        size="md"
+        footer={
+          <FrFormFooter
+            onCancel={() => setNewClosingOpen(false)}
+            onSubmit={() => {
+              void submitNewClosing().catch(() => {})
+            }}
+            submitLabel="Schedule closing"
+          />
+        }
+      >
+        <div className="space-y-3">
+          <FrField label="Campaign">
+            <select
+              className={frSelectClass}
+              value={closingForm.campaignId}
+              onChange={(e) => setClosingForm((f) => ({ ...f, campaignId: e.target.value }))}
+            >
+              <option value="">Select campaign</option>
+              {campaigns.map((c) => (
+                <option key={c.id} value={String(c.id)}>
+                  {c.name} {c.status ? `(${c.status})` : ""}
+                </option>
+              ))}
+            </select>
+          </FrField>
+          <FrField label="Name">
+            <input
+              className={frInputClass}
+              value={closingForm.name}
+              onChange={(e) => setClosingForm((f) => ({ ...f, name: e.target.value }))}
+              placeholder="e.g. Fund III Second Close"
+            />
+          </FrField>
+          <FrField label="Close type">
+            <select
+              className={frSelectClass}
+              value={closingForm.closeType}
+              onChange={(e) => setClosingForm((f) => ({ ...f, closeType: e.target.value }))}
+            >
+              <option value="FIRST_CLOSE">First close</option>
+              <option value="INTERIM_CLOSE">Interim close</option>
+              <option value="FINAL_CLOSE">Final close</option>
+            </select>
+          </FrField>
+          <FrField label="Closing date">
+            <input
+              type="date"
+              className={frInputClass}
+              value={closingForm.closingDate}
+              onChange={(e) => setClosingForm((f) => ({ ...f, closingDate: e.target.value }))}
+            />
+          </FrField>
+          <FrField label="Target amount (US$)">
+            <input
+              className={frInputClass}
+              value={closingForm.targetAmount}
+              onChange={(e) => setClosingForm((f) => ({ ...f, targetAmount: e.target.value }))}
+              placeholder="e.g. 40000000"
+            />
+          </FrField>
+        </div>
+      </FrDialogShell>
 
       <FrDialogShell
         open={fundOpen}
