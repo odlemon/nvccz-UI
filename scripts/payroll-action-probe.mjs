@@ -176,8 +176,16 @@ if (!found) {
   process.exit(0)
 }
 
-if (FIELD) {
-  const [id, ...rest] = FIELD.split("=")
+// --field may be repeated, or given once as "a=1;b=2", so a form with several
+// required inputs can be filled in one run.
+const fieldSpecs = process.argv
+  .filter((a) => a.startsWith("--field="))
+  .flatMap((a) => a.slice("--field=".length).split(";"))
+  .map((f) => f.trim())
+  .filter(Boolean)
+
+for (const spec of fieldSpecs) {
+  const [id, ...rest] = spec.split("=")
   const value = rest.join("=")
   const ok = await page.evaluate((id) => !!document.querySelector(`#${id}`), id)
   console.log(`FIELD       #${id} present: ${ok}`)
@@ -187,6 +195,7 @@ if (FIELD) {
       if (el) {
         el.value = value
         el.dispatchEvent(new Event("input", { bubbles: true }))
+        el.dispatchEvent(new Event("change", { bubbles: true }))
       }
     },
     [id, value],

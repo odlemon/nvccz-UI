@@ -858,6 +858,23 @@ s = replaceOnce(
 )
 
 // ---------------------------------------------------------------------------
+// 4n. The Add Employee form could not create anything
+// ---------------------------------------------------------------------------
+// Employee.userId is required and unique, and the form collected only a name,
+// job title and department -- no email, no employee number, no salary -- so
+// there was nothing to create a user account from and the control could never
+// work. It also pre-filled a fake person ("Kundai Marufu"), which is exactly
+// how invented records get saved by accident. Fields are now empty and the
+// three the backend requires are present.
+s = replaceOnce(
+  s,
+  "<div class=\"form-grid\"><div class=\"form-field\"><label>First name</label><input id=\"newFirst\" value=\"Kundai\"></div><div class=\"form-field\"><label>Surname</label><input id=\"newLast\" value=\"Marufu\"></div>",
+  "<div class=\"form-grid\"><div class=\"form-field\"><label>First name</label><input id=\"newFirst\" value=\"\"></div><div class=\"form-field\"><label>Surname</label><input id=\"newLast\" value=\"\"></div><div class=\"form-field\"><label>Work email</label><input id=\"newEmail\" type=\"email\" placeholder=\"first.last@nts.local\"></div><div class=\"form-field\"><label>Employee number</label><input id=\"newEmployeeNumber\" placeholder=\"EMP-0000\"></div><div class=\"form-field\"><label>Basic salary</label><input id=\"newBasicSalary\" type=\"number\" min=\"0\" step=\"0.01\" placeholder=\"0.00\"></div>",
+  "new employee form: add the fields a real record needs",
+  "newEmployeeNumber",
+)
+
+// ---------------------------------------------------------------------------
 // 5. hydrate() on the api object
 // ---------------------------------------------------------------------------
 const API_ANCHOR = `  api = {

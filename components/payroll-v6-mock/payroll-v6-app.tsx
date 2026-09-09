@@ -43,6 +43,7 @@ const API_ACTIONS = new Set([
   "release-payroll",
   "download-close-pack",
   // Employee lifecycle
+  "complete-onboarding",
   "suspend-employee",
   "reinstate-employee",
   "terminate-employee",

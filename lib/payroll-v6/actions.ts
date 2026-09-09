@@ -19,6 +19,7 @@
  */
 import {
   approveRun,
+  createEmployeeWithUser,
   createPayrollRun,
   generateBankFile,
   getMyPayrollAccess,
@@ -199,6 +200,50 @@ export async function handlePayrollV6Action(
             content,
             mime: "text/csv",
           },
+        }
+      }
+
+      // ------------------------------------------------------------ people
+      case "complete-onboarding": {
+        const denied = await requirePermission("payroll.employees.manage")
+        if (denied) return denied
+
+        const val = (id: string) =>
+          (document.querySelector<HTMLInputElement | HTMLSelectElement>(`#${id}`)?.value || "").trim()
+
+        const firstName = val("newFirst")
+        const lastName = val("newLast")
+        const email = val("newEmail")
+        const employeeNumber = val("newEmployeeNumber")
+        const basicSalary = val("newBasicSalary")
+        const departmentCode = val("newDept")
+
+        // Report every missing field at once rather than one per attempt.
+        const missing: string[] = []
+        if (!firstName) missing.push("first name")
+        if (!lastName) missing.push("surname")
+        if (!email) missing.push("work email")
+        if (!employeeNumber) missing.push("employee number")
+        if (!basicSalary) missing.push("basic salary")
+        if (missing.length) {
+          return {
+            handled: true,
+            error: `Cannot create the employee — missing ${missing.join(", ")}.`,
+          }
+        }
+
+        const created = await createEmployeeWithUser({
+          firstName,
+          lastName,
+          email,
+          employeeNumber,
+          departmentCode: departmentCode || null,
+          basicSalary,
+        })
+        return {
+          handled: true,
+          reload: true,
+          message: `${firstName} ${lastName} created as ${(created as any)?.employeeNumber ?? employeeNumber}.`,
         }
       }
 

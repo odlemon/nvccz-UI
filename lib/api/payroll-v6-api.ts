@@ -9,6 +9,7 @@
  *   GET    /payroll/dashboard                            command-centre metrics and trends
  *   GET    /payroll/employees                            employee roster
  *   POST   /payroll/employees                            create employee
+ *   POST   /payroll/employees/with-user                  create employee + user account
  *   PUT    /payroll/employees/:id                        update employee
  *   POST   /payroll/employees/:id/terminate|suspend|reinstate
  *   GET    /payroll/payroll-runs                         run register (paginated)
@@ -155,6 +156,34 @@ export async function listEmployees(): Promise<PayrollEmployee[]> {
 
 export async function createEmployee(body: Record<string, any>) {
   const res = await apiClient.post<ApiResponse<PayrollEmployee>>(`${BASE}/employees`, body)
+  return unwrapData(res)
+}
+
+/**
+ * Create the employee AND the user account behind it.
+ *
+ * Employee.userId is required and unique, so a plain POST /employees cannot be
+ * driven from a form that has no user id. This provisions both in one
+ * transaction; no password is sent or returned.
+ */
+export async function createEmployeeWithUser(body: {
+  firstName: string
+  lastName: string
+  email: string
+  employeeNumber: string
+  departmentCode?: string | null
+  basicSalary: number | string
+  currencyId?: string | null
+  bankName?: string | null
+  branchCode?: string | null
+  accountNumber?: string | null
+  idNumber?: string | null
+  zimraBpNumber?: string | null
+}) {
+  const res = await apiClient.post<ApiResponse<PayrollEmployee>>(
+    `${BASE}/employees/with-user`,
+    body,
+  )
   return unwrapData(res)
 }
 
