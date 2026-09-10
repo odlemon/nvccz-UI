@@ -4,7 +4,7 @@
 
 | Severity | Open | Fixed (pending verification) | Verified |
 |---|---|---|---|
-| CRITICAL | 0 | 4 | 0 |
+| CRITICAL | 0 | 5 | 0 |
 | HIGH | 0 | 0 | 0 |
 | MEDIUM | 0 | 0 | 0 |
 | LOW | 0 | 0 | 0 |
@@ -520,3 +520,111 @@ and wants its own verification pass.
 **Status:** FIXED (pending verification) — diagnosed, not yet fixed. The fix is three separate corrections in the
 posting path plus a decision on the four journals already written, and it is not being
 started at the tail of a long session.
+
+---
+
+## FINDING-005
+
+**Title:** Role checks match role names as raw substrings, so every applicant is an Investment Committee member and the Board Chair has fundraising edit rights
+**Module:** Fundraising (root cause is shared authorisation) · **Dimension:** UAT
+**Category:** Permission
+**Severity:** CRITICAL
+**Persona affected:** every external applicant; Board Chair; Accountants; any Officer
+**Surface:** backend
+
+### Steps to reproduce
+
+1. Read `hasAnySignal` in `src/services/performanceScorecardSupport.ts`.
+2. Evaluate `DealExecutionPackAccessService.isIcMember` against a user whose role is
+   `applicant`.
+3. Evaluate `FundraisingAccessService.isInvestorRelations` against roleCode `BOARD_CHAIR`.
+4. `POST /api/fundraising/campaigns` as `board.chair@nts.com`.
+
+### Expected
+
+A role check identifies the role it names.
+
+### Actual
+
+`hasAnySignal` matches each fragment as a **plain substring** across four fields — role
+name, role code, department role and department:
+
+```ts
+return fragments.some((fragment) =>
+  signals.some((signal) => signal.includes(fragment.toLowerCase()))
+);
+```
+
+Several call sites pass two- and three-letter fragments, which collide with ordinary
+words:
+
+| Predicate | Fragment | Collides with | Grants |
+|---|---|---|---|
+| `isIcMember` | `"ic"` | **appl·ic·ant**, off·ic·er | Investment Committee access to deal execution packs |
+| `isInvestorRelations` (fundraising) | `"ir"` | **cha·ir**, d·ir·ector | **edit** rights over all fundraising data |
+| `isInvestorRelations` (quarterly statements) | `"ir"` | same | statement access |
+| `isCompliance` (fundraising) | `"cco"` | **a·cco·untant** | view **and close** deals |
+| `isCco` (deal packs) | `"cco"` | a·cco·untant | CCO authority |
+
+Measured against the 36 real users in this database:
+
+```
+InvestmentCommittee      10 of 36 users matched — ALL unintended
+                         6 of them external applicant accounts
+IR -> fundraising EDIT    1 of 36 matched — board.chair@nts.com, via roleCode BOARD_CHAIR
+```
+
+Every external founder who applies for funding was classified as an Investment Committee
+member. The Board Chair held edit rights over fundraising data through the letters in
+"chair".
+
+### Evidence
+
+`POST /api/fundraising/campaigns` as `board.chair@nts.com` was admitted past
+`requireFundraisingEdit` before the fix and returns **403** after it.
+
+**Reproducibility:** Always
+**Suspected area:** `FundraisingAccessService`, `DealExecutionPackAccessService`,
+`QuarterlyStatementAccessService`, all via `hasAnySignal`
+**Upstream dependency?** **Yes** — `hasAnySignal` is shared by 26 call sites.
+
+### Fix applied
+
+The tempting fix is to make `hasAnySignal` match on word boundaries. That would have
+broken it: fragments like `"_mgr"` and `" manager"` are deliberately infix, and `` would
+stop them matching `hr_mgr`. Changing shared matching semantics under 26 call sites to fix
+five of them is the wrong trade.
+
+Instead the five ambiguous fragments were removed at their call sites, and an exact
+role-code check added where a code exists:
+
+- `isIcMember` — dropped `"ic"`, added exact `INV_COMM_MEM` / `IC_MEMBER`. The real code
+  existed in `hardcodedRoles.ts` and was never checked.
+- `isInvestorRelations` ×2 — dropped `"ir"`, added exact `IR` / `INVESTOR_RELATIONS`.
+- `isCompliance` and `isCco` — dropped `"cco"`. `isCco` already had an exact `CCO` check,
+  so the fragment added nothing but the collision.
+
+Nothing was weakened: the unambiguous fragments that identify the intended roles are
+untouched.
+
+### Verification
+
+Against the 36 real users, and against synthetic users holding each intended role:
+
+```
+unintended matches   IC 10 -> 0     IR 1 -> 0
+intended still match Investor Relations, roleCode IR, Compliance Officer, roleCode CCO,
+                     Investment Committee Member, roleCode INV_COMM_MEM   — all YES
+former collisions    applicant, Board Chairman, Accountant, deptRole Officer — all clean
+Compliance Officer   still matches, still 1 user
+```
+
+At the endpoint:
+
+```
+board.chair@nts.com           POST /fundraising/campaigns -> 403  (was admitted)
+payroll.compliance@nts.local  POST /fundraising/campaigns -> 403  (view+close, not edit)
+perf.sysadmin@nts.local       POST /fundraising/campaigns -> 400  (past the guard)
+```
+
+**Status:** FIXED (pending verification) — re-asserted every cycle as roadmap item **X.5**.
