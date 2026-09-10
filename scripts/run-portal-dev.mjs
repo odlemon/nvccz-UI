@@ -45,6 +45,24 @@ const env = {
   NEXT_DIST_DIR: distDir,
 }
 
+// Per-portal auth cookie names, for the same reason as the distDir above.
+//
+// Cookies are scoped by host, not by port, so on localhost every portal shares
+// one session: signing in to the LP portal on :3110 silently re-authenticates
+// the staff portal on :3001 as that LP, and the staff screens then render empty
+// with "Employee record not found". In production the portals sit on separate
+// hostnames and this cannot happen, so this is a local-development concern
+// only — but it makes testing two portals side by side impossible, and a blank
+// screen caused by it reads exactly like a broken page.
+//
+// An explicit override in the environment still wins.
+if (!process.env.NEXT_PUBLIC_AUTH_TOKEN_KEY) {
+  env.NEXT_PUBLIC_AUTH_TOKEN_KEY = `token_${portal}`
+}
+if (!process.env.NEXT_PUBLIC_AUTH_PROFILE_KEY) {
+  env.NEXT_PUBLIC_AUTH_PROFILE_KEY = `userProfile_${portal}`
+}
+
 if (portal === "staff") {
   env.NEXT_PUBLIC_INVESTEE_PORTAL_URL =
     env.NEXT_PUBLIC_INVESTEE_PORTAL_URL || "http://localhost:3120"
