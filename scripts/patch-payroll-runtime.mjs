@@ -294,7 +294,7 @@ s = replaceOnce(
 // ---------------------------------------------------------------------------
 {
   const label = "inputs band stats -> live"
-  if (s.includes("__pr6InputsBand()")) {
+  if (s.includes("'INPUT BATCH '+b.latest.reference")) {
     console.log(`  skip (already)  ${label}`)
     skipped += 1
   } else {
@@ -360,7 +360,7 @@ s = replaceOnce(
 // RESOLVED — so that stat becomes resolved rows rather than an invented count.
 {
   const label = "inputs band figures -> live"
-  if (s.includes("__pr6InputsBandStats()")) {
+  if (s.includes("stat('Rows uploaded',b.totalRows)")) {
     console.log(`  skip (already)  ${label}`)
     skipped += 1
   } else {
@@ -392,7 +392,7 @@ s = replaceOnce(
 // fabricate a substitute the band reports what the pipeline actually knows.
 {
   const label = "onboarding band figures -> live"
-  if (s.includes("__pr6OnboardingBand()")) {
+  if (s.includes("stat('Open onboarding cases',o.inProgress)")) {
     console.log(`  skip (already)  ${label}`)
     skipped += 1
   } else {
@@ -421,7 +421,7 @@ s = replaceOnce(
 // The bar was pinned at 97% with the caption "1,247 of 1,284 rows valid".
 {
   const label = "inputs progress bar -> live"
-  if (s.includes("__pr6InputsProgress()")) {
+  if (s.includes("' of '+b.totalRows+' rows valid'")) {
     console.log(`  skip (already)  ${label}`)
     skipped += 1
   } else {
@@ -492,7 +492,7 @@ s = replaceOnce(
 // substitute invention.
 {
   const label = "calendar KPI cards -> live"
-  if (s.includes("__pr6CalendarKpis()")) {
+  if (s.includes("c.total+' configured in total'")) {
     console.log(`  skip (already)  ${label}`)
     skipped += 1
   } else {
@@ -535,6 +535,116 @@ s = replaceOnce(
         "if(!c)return kpi('Pay periods','\\u2014','Calendar not visible to your role','shield','cyan');" +
         "return kpi('Pay periods',String(c.periods),'Configured across all groups','shield','cyan')" +
         "+kpi('Open periods',String(c.openPeriods),c.openPeriods?'Accepting inputs':'None open','clock','violet')})()}"
+      s = s.replace(m[0], live)
+      console.log(`  patched         ${label}`)
+      applied += 1
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 4a12. The open sourcing event card reads the real RFQ
+// ---------------------------------------------------------------------------
+// The card asserted "RFQ-HR-2026-014 · Medical aid administration" with 6
+// invited, 3 bids received, closing 05 Aug 2026, a USD 32,000 budget and a 50%
+// submission bar. PayrollRfq/PayrollRfqBid now hold sourcing events.
+//
+// Two separate replacements, deliberately: the subtitle and the facts strip sit
+// inside one card(...) call, and matching across it would cut through the call
+// and leave its closing arguments orphaned.
+{
+  const label = "sourcing event subtitle -> live"
+  if (s.includes("__pr6RfqSubtitle")) {
+    console.log(`  skip (already)  ${label}`)
+    skipped += 1
+  } else {
+    const needle = "'Open sourcing event','RFQ-HR-2026-014 · Medical aid administration'"
+    if (!s.includes(needle)) {
+      console.warn(`  MISS            ${label}`)
+      missed += 1
+    } else {
+      const live =
+        "'Open sourcing event',`${(()=>{const __pr6RfqSubtitle=1;const q=__pr6Rfqs();" +
+        "if(!q)return 'Not visible to your role';" +
+        "const r=q.rfqs.find(x=>x.status==='OPEN'||x.status==='EVALUATING')||q.rfqs[0];" +
+        "return r?(r.reference+' · '+r.title):'No sourcing event has been raised'})()}`"
+      s = s.replace(needle, live)
+      console.log(`  patched         ${label}`)
+      applied += 1
+    }
+  }
+}
+
+{
+  const label = "sourcing event facts -> live"
+  if (s.includes("__pr6RfqFacts")) {
+    console.log(`  skip (already)  ${label}`)
+    skipped += 1
+  } else {
+    // Bounded to the strip and the bar that follows it, both inside the same card body.
+    const re = /<div class="profile-summary-strip"><div class="fact"><span>Invited<\/span>[\s\S]*?\$\{progressRow\('Submission progress',50,'3 of 6 invited vendors','cyan'\)\}/
+    const m = s.match(re)
+    if (!m) {
+      console.warn(`  MISS            ${label}`)
+      missed += 1
+    } else {
+      const live = [
+        "${(()=>{const __pr6RfqFacts=1;const q=__pr6Rfqs();",
+        "const fact=(l,v)=>`<div class=\"fact\"><span>${l}</span><strong>${v}</strong></div>`;",
+        "if(!q)return `<div class=\"profile-summary-strip\">`+fact('Invited','\\u2014')+fact('Bids received','\\u2014')+`</div>`;",
+        "const r=q.rfqs.find(x=>x.status==='OPEN'||x.status==='EVALUATING')||q.rfqs[0];",
+        "if(!r)return `<div class=\"profile-summary-strip\">`+fact('Invited','0')+fact('Bids received','0')+`</div>`;",
+        "const pct=r.invitedCount?Math.round((r.bidCount/r.invitedCount)*100):0;",
+        "return `<div class=\"profile-summary-strip\">`",
+        "+fact('Invited',r.invitedCount+' vendor'+(r.invitedCount===1?'':'s'))",
+        "+fact('Bids received',r.bidCount)",
+        "+fact('Closes',r.closingDate?String(r.closingDate).slice(0,10):'\\u2014')",
+        "+fact('Status',r.status)+`</div>`",
+        "+progressRow('Submission progress',pct,r.bidCount+' of '+r.invitedCount+' invited vendors','cyan')})()}",
+      ].join("")
+      s = s.replace(m[0], live)
+      console.log(`  patched         ${label}`)
+      applied += 1
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 4a13. Quotation comparison matrix reads the real bids
+// ---------------------------------------------------------------------------
+// The matrix rendered `quoteRowsV2`, a hardcoded set of vendors with invented
+// technical, commercial and compliance percentages and prices. PayrollRfqBid
+// now holds the three scores and the amount, and the service returns a weighted
+// score that is null — not zero — when nobody has scored a bid.
+{
+  const label = "quotation matrix -> live"
+  if (s.includes("__pr6QuoteRows")) {
+    console.log(`  skip (already)  ${label}`)
+    skipped += 1
+  } else {
+    // Bounded to the whole interpolation, so the fixture's arrow body goes with it rather than
+    // being left behind as dead code iterating an empty array.
+    const re = /\$\{quoteRowsV2\.map\(q=>[\s\S]*?\)\.join\(''\)\}/
+    const m = s.match(re)
+    if (!m) {
+      console.warn(`  MISS            ${label}`)
+      missed += 1
+    } else {
+      const live = [
+        "${(()=>{const __pr6QuoteRows=1;const q=__pr6Rfqs();",
+        "if(!q)return `<div class=\"quote-row\"><div class=\"quote-cell\">Not visible to your role</div></div>`;",
+        "const r=q.rfqs.find(x=>x.status==='OPEN'||x.status==='EVALUATING')||q.rfqs[0];",
+        "const bids=r?r.bids.filter(b=>b.status!=='INVITED'):[];",
+        "if(!bids.length)return `<div class=\"quote-row\"><div class=\"quote-cell\">No bids have been submitted.</div></div>`;",
+        "const cell=(l,v)=>`<div class=\"quote-cell\" data-label=\"${l}\"><strong>${v==null?'\\u2014':v+'%'}</strong>",
+        "<div class=\"score-bar\"><i style=\"width:${v==null?0:v}%\"></i></div></div>`;",
+        "return bids.map(b=>`<div class=\"quote-row\">",
+        "<div class=\"quote-cell\" data-label=\"Vendor\"><strong>${b.vendorName}</strong>",
+        "<span>${b.amount==null?'\\u2014':b.currencyCode+' '+Number(b.amount).toLocaleString()}</span></div>`",
+        "+cell('Technical',b.technicalScore)+cell('Commercial',b.commercialScore)+cell('Compliance',b.complianceScore)",
+        "+`<div class=\"quote-cell\" data-label=\"Total\"><strong>${b.weightedScore==null?'Not scored':b.weightedScore+'%'}</strong></div></div>`",
+        ").join('')})()}",
+      ].join("")
       s = s.replace(m[0], live)
       console.log(`  patched         ${label}`)
       applied += 1
