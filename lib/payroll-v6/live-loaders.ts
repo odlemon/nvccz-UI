@@ -254,8 +254,17 @@ function adaptRuns(rows: any[]): any[] {
       group: r.dualCurrency ? "Dual currency" : "Monthly Staff",
       employees: employeeCount,
       currency: r.currency?.code ?? "USD",
-      grossUSD: gross,
-      grossZiG: num(r.fxRateUsdZig) > 0 && r.dualCurrency ? gross * num(r.fxRateUsdZig) : 0,
+      // The command centre labels these "USD component" and "local component".
+      // grossUSD used to be the COMBINED total, overstating the USD side by the
+      // converted ZiG, and grossZiG was gross * fxRate gated on `dualCurrency`
+      // -- a flag that is false on every run in this data, so ZiG rendered 0
+      // while each run carried 155,772.24 ZiG in legs. The API now returns the
+      // real split from employee_payroll_legs.
+      //
+      // The fallback is for runs with no legs at all, where the USD component
+      // genuinely is the total and there is no ZiG side.
+      grossUSD: r.grossUsdComponent != null ? num(r.grossUsdComponent) : gross,
+      grossZiG: r.grossZigComponent != null ? num(r.grossZigComponent) : 0,
       deductions: num(r.totalDeductions),
       netUSD: num(r.totalNetPay),
       status: statusLabel(r.status, r.approvalStatus),

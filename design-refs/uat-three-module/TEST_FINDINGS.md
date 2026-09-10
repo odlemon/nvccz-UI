@@ -5,7 +5,7 @@
 | Severity | Open | Fixed (pending verification) | Verified |
 |---|---|---|---|
 | CRITICAL | 0 | 6 | 0 |
-| HIGH | 3 | 1 | 0 |
+| HIGH | 3 | 2 | 0 |
 | MEDIUM | 0 | 1 | 0 |
 | LOW | 0 | 0 | 0 |
 
@@ -1002,3 +1002,94 @@ guessed at.
 
 **Status:** FIXED (pending verification) for the logging and error defects; the dead access
 check is **OPEN** pending a decision on staff scoping.
+
+---
+
+## FINDING-010
+
+**Title:** The payroll command centre reports the wrong USD figure and zero ZiG on every run
+**Module:** Payroll · **Dimension:** UI-UX / UAT · **Category:** Calculation
+**Severity:** HIGH
+**Persona affected:** anyone reading the payroll landing screen — Payroll Manager, CFO, CEO
+**Surface:** Internal App · **Screen:** Payroll Operations Command Centre, roadmap **P.3**
+**Viewport:** All
+
+### Steps to reproduce
+
+1. Sign in to the staff portal and open `/payroll`.
+2. Read the two "Gross payroll" cards.
+3. Compare with `employee_payroll_legs` for the run they name.
+
+### Expected
+
+Cards labelled *"2026-10 USD component"* and *"2026-10 local component"* report that run's
+USD and ZiG components.
+
+### Actual
+
+```
+on screen        USD 42,209.00        ZiG 0
+in the legs      USD 36,359.30        ZiG 155,772.24
+```
+
+The USD card overstated its component by **5,849.70** — it was showing the *combined*
+total — and the ZiG card reported **nothing at all** against 155,772.24 ZiG of actual
+local-currency payroll. Both wrong on **all four** completed runs.
+
+Three causes, in `lib/payroll-v6/live-loaders.ts`:
+
+```ts
+grossUSD: gross,                                                    // the COMBINED total
+grossZiG: num(r.fxRateUsdZig) > 0 && r.dualCurrency ? gross * num(r.fxRateUsdZig) : 0,
+```
+
+1. `grossUSD` was `totalGrossPay`, the combined figure, presented as the USD component.
+2. `grossZiG` was the *whole run* re-expressed in ZiG, not the ZiG component — so even
+   with the flag set it would have shown 1,123,982, which is also not the answer.
+3. `dualCurrency` is **false on every run in this database** despite each carrying ZiG
+   legs, so the expression short-circuited to `0`.
+
+`GET /payroll/payroll-runs` exposed no per-currency data at all, so the UI had nothing true
+to read.
+
+This is the pattern the repo's own guidance warns about — *"Hardcoded values masquerading
+as live data… don't trust a plausible-looking number"*. It also survived the earlier
+number-tracing work, because `0` and `42209` both trace to real sources. They are simply
+the wrong sources.
+
+**Reproducibility:** Always, all four completed runs
+**Suspected area:** `nvccz/src/controllers/PayrollController.ts` `getAllPayrollRuns`,
+`nvccz-new/lib/payroll-v6/live-loaders.ts` `adaptRuns`
+
+### Fix applied
+
+`getAllPayrollRuns` now aggregates `employee_payroll_legs` by currency for the runs it
+returns and attaches `grossUsdComponent`, `grossZigComponent`, `currencyComponents` and
+`isDualCurrency`. Components are **null**, not `0`, when a run has no legs in that
+currency — so a run with nothing recorded cannot assert a zero.
+
+`adaptRuns` reads those, falling back to the combined total only for runs with no legs at
+all, where the USD component genuinely is the total.
+
+`dualCurrency` was left alone. It is wrong, but nothing now depends on it, and correcting
+a stored flag across historical runs is a data migration rather than part of this fix.
+
+### Verification
+
+In the browser, at `/payroll`:
+
+```
+before   Gross payroll USD 42,209.00 · 2026-10 USD component
+         Gross payroll ZiG 0         · 2026-10 local component
+after    Gross payroll USD 36,359.30 · 2026-10 USD component
+         Gross payroll ZiG 155,772   · 2026-10 local component
+```
+
+API, showing the empty draft run correctly reporting null rather than zero:
+
+```
+2026-10  total 42208.99995  USD comp 36359.3  ZiG comp 155772.245  dual=True
+2026-09  total 0            USD comp None     ZiG comp None        dual=False
+```
+
+**Status:** FIXED (pending verification).
