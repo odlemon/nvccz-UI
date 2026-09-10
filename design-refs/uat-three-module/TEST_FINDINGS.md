@@ -5,7 +5,7 @@
 | Severity | Open | Fixed (pending verification) | Verified |
 |---|---|---|---|
 | CRITICAL | 0 | 6 | 0 |
-| HIGH | 3 | 2 | 0 |
+| HIGH | 3 | 3 | 0 |
 | MEDIUM | 1 | 2 | 0 |
 | LOW | 0 | 0 | 0 |
 
@@ -1218,3 +1218,79 @@ At 375 the **"Switch module" control is positioned entirely outside the viewport
 cannot be reached on a phone. It sits in shared top-bar chrome used by the staff portal
 too, so changing it reaches beyond the LP portal; recorded rather than adjusted. For an LP
 specifically the module switcher has nothing to switch to, so the practical impact is low.
+
+---
+
+## FINDING-012
+
+**Title:** Every fundraising screen scrolls sideways on a phone — the sidebar never collapses
+**Module:** Fundraising · **Dimension:** UI-UX · **Category:** Responsiveness
+**Severity:** HIGH
+**Persona affected:** anyone opening fundraising on a phone or small tablet
+**Surface:** Internal App · **Screen:** all 19 fundraising screens
+**Viewport:** 375 and 768
+
+### Steps to reproduce
+
+1. Open any `/fundraising` screen at a 375px viewport.
+2. Measure `document.documentElement.scrollWidth` against `clientWidth`.
+
+### Actual
+
+```
+viewport            375
+document width      457      <- 82px of horizontal page scroll
+sidebar <aside>     240      still full width at 375
+usable content      135px
+```
+
+The sidebar is `useState(false)` with **no responsive behaviour of any kind**. At 375 it
+holds its full 240px, leaving 135px for the entire page — so the shared top bar's
+right-hand cluster (187px intrinsic: module switcher, notifications, avatar) cannot fit and
+extends to 457px, dragging the document 82px wider than the screen. A second "My Tasks"
+rail renders at 101px alongside it.
+
+Payroll does not have this problem: its vendored shell handles its own mobile layout and
+measures a clean 375 at every screen tested. The fundraising module uses the shared chrome,
+which has no mobile story.
+
+There is already a comment in `shared-topbar.tsx` recording that someone hit a related
+375px problem — the search field overlapping the right-hand controls — and fixed the centre
+section's margins. The right section's ability to push the document wider was left.
+
+**Reproducibility:** Always, every fundraising screen
+**Suspected area:** `nvccz-new/components/layout/fundraising-sidebar.tsx`
+
+### Fix applied
+
+The sidebar already had a working `collapsed` state at 68px; it was only ever driven by the
+user's own toggle. It now also tracks a `(max-width: 1023px)` media query, so it starts
+collapsed on small screens and expands again when the window grows. A manual toggle holds
+until the breakpoint itself changes.
+
+Chosen over hiding the sidebar behind a hamburger, which would have meant designing a
+mobile navigation pattern for a 19-screen module — design work, not a defect fix. Collapsed
+to icons keeps every destination reachable.
+
+### Verification
+
+```
+375   /fundraising              sidebar 68px   document 375   no page scroll
+375   /fundraising/investors    sidebar 68px   document 375   no page scroll
+                                table 960px wide, inside its own scroll container — correct
+1440  /fundraising/investors    sidebar 240px  document 1425  no page scroll
+```
+
+Desktop is unchanged.
+
+### A measurement correction that mattered
+
+The first pass over these screens used `window.innerWidth` as the viewport and reported
+them **clean**. In the emulated pane `innerWidth` reads 457 while the real layout viewport
+(`documentElement.clientWidth`) is 375 — so the overflow threshold was 82px too lenient,
+which is exactly the size of the overflow. Re-measured against `clientWidth`, the defect
+appeared immediately. The payroll results were gathered while `innerWidth` happened to read
+375 correctly and were re-confirmed against `clientWidth` afterwards.
+
+This is the fourth measurement error caught before reporting in this engagement, and the
+first that was hiding a real defect rather than inventing one.

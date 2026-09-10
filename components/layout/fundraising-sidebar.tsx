@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { ChevronsLeft, ChevronsRight } from "lucide-react"
@@ -13,6 +13,27 @@ export function FundraisingSidebar() {
   const pathname = usePathname()
   const { hasSubModuleAccess, isLoading, hasModuleAccess } = useRolePermissions()
   const [collapsed, setCollapsed] = useState(false)
+
+  // The sidebar had no responsive behaviour at all: at a 375px viewport it
+  // stayed 240px wide, which left 135px for the entire page and pushed the
+  // shared top bar's right-hand controls to 457px — 82px past the viewport —
+  // so every fundraising screen scrolled horizontally. Collapsed it is 68px,
+  // which leaves room for the top bar to fit.
+  //
+  // Payroll does not have this problem because its vendored shell handles its
+  // own mobile layout; this module uses the shared chrome.
+  //
+  // Tracks the breakpoint rather than forcing a value once, so expanding a
+  // desktop window restores the full sidebar. A manual toggle holds until the
+  // breakpoint itself changes.
+  useEffect(() => {
+    if (typeof window === "undefined" || !window.matchMedia) return
+    const mq = window.matchMedia("(max-width: 1023px)")
+    const apply = () => setCollapsed(mq.matches)
+    apply()
+    mq.addEventListener("change", apply)
+    return () => mq.removeEventListener("change", apply)
+  }, [])
   const module = getModuleById("fundraising")
 
   const activeSubModuleId = useMemo(() => {
