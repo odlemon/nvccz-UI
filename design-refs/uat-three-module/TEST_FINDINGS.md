@@ -5,8 +5,8 @@
 | Severity | Open | Fixed (pending verification) | Verified |
 |---|---|---|---|
 | CRITICAL | 0 | 6 | 0 |
-| HIGH | 2 | 0 | 0 |
-| MEDIUM | 0 | 0 | 0 |
+| HIGH | 3 | 1 | 0 |
+| MEDIUM | 0 | 1 | 0 |
 | LOW | 0 | 0 | 0 |
 
 ---
@@ -908,3 +908,97 @@ the mechanical part is small, and the decision it encodes is not mine to make.
 
 **Status:** OPEN — diagnosed, quantified and evidenced; fix recommended, awaiting a
 decision on trigger, mapping and auto-provisioning.
+
+---
+
+## FINDING-009
+
+**Title:** Data room access control is dead code, and failed document access was never logged
+**Module:** Fundraising · **Dimension:** UAT / QAT · **Category:** Permission / Functional
+**Severity:** HIGH (access control) · MEDIUM (unhandled error)
+**Persona affected:** every investor whose data room documents are held
+**Surface:** backend · **Screen / Flow:** data rooms, roadmap **F.8**
+
+### Steps to reproduce
+
+1. `GET /api/fundraising/data-rooms/frs-dataroom-01` as any staff user holding no grant.
+2. `GET .../documents/:documentId/download` for a document whose file is not stored.
+3. Count rows in `fundraising_data_room_access_logs` before and after.
+
+### Actual — three defects in one function
+
+**1. The access check cannot fire.** `FundraisingSrdService.downloadDataRoomDocument`:
+
+```ts
+const access = await prisma.fundraisingDataRoomAccess.findFirst({
+  where: { dataRoomId, revokedAt: null, OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }] },
+});
+const isStaff = true; // route is authenticated staff; investor portal would check access.investorId
+if (!isStaff && !access) {
+  throw FundraisingIrError.forbidden("No data room access", "ACCESS_DENIED");
+}
+```
+
+`isStaff` is the literal `true`, so `!isStaff` is always false and the `ACCESS_DENIED`
+branch is unreachable. The `access` row is queried and then discarded — and the query does
+not filter on `investorId` at all, so it would match *any* live grant on the room rather
+than the caller's.
+
+The consequence is that everything the access model expresses is unenforced:
+`permission_level` (VIEW vs DOWNLOAD), `download_limit`, `expires_at` and `revoked_at`.
+Two of the six grants in this database are **REVOKED** and that is not honoured.
+
+Confirmed by measurement — three staff users, none holding any grant:
+
+```
+perf.employee@nts.local        10 docs, 5 folders
+payroll.compliance@nts.local   10 docs, 5 folders
+fr.fundmanager@nts.local       10 docs, 5 folders
+grants are held by investors:  frs-inv-01, frs-inv-02, frs-inv-03
+```
+
+**2. Failed access was never logged.** The log write sat *after* the file fetch, so a
+download that threw left no trace. The table carries `success` and `failureReason` columns
+that nothing populated. An access log that records only successful reads is not an access
+log — and for a data room it is the control that matters most.
+
+**3. A missing stored file produced an unhandled 500.** `doc.fileUrl!` asserted non-null on
+a nullable column, so a document row with neither `storagePath` nor `fileUrl` reached
+`RemoteUploadService` and threw `Cannot read properties of null (reading 'split')`.
+
+### Fix applied — defects 2 and 3
+
+Every attempt is now logged, before the result is known and regardless of outcome, with
+`success` and `failureReason` populated; a logging failure is caught so it can never mask
+the download result. A document with no stored file returns a clean **404
+`DOCUMENT_FILE_MISSING`** instead of a TypeError.
+
+Verified:
+
+```
+download returns: 404 {"code":"DOCUMENT_FILE_MISSING","message":"This document has no stored file"}
+access logs 18 -> 19
+newest row: {"action":"DOWNLOAD","success":0,"failure_reason":"DOCUMENT_FILE_MISSING","user_id":"..."}
+```
+
+The probe's own log row is left in place. `fundraising_data_room_access_logs` is an
+append-only audit table, and deleting rows to tidy a test run is exactly the wrong
+instinct — the same position taken on the fundraising audit trail earlier.
+
+### Not fixed — defect 1, the dead access check
+
+Making the check live requires deciding what it should mean for a **staff** caller, and
+the comment in the code shows the author knew: *"investor portal would check
+access.investorId"*. There is no investor-facing route today, so there is no investor
+context to check against, and simply deleting `isStaff` would refuse every staff user and
+take the feature down.
+
+The shape it probably wants: staff access scoped to the campaign that owns the data room
+(which `requireFundraisingView` already provides on the campaign-scoped routes but not on
+`/data-rooms/:dataRoomId`), and grant enforcement — `permission_level`, `expires_at`,
+`revoked_at`, `download_limit` — applied when an investor context exists. That is the same
+internal least-privilege decision recorded under FINDING-006, and it is raised rather than
+guessed at.
+
+**Status:** FIXED (pending verification) for the logging and error defects; the dead access
+check is **OPEN** pending a decision on staff scoping.
