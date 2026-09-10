@@ -5,7 +5,7 @@
 | Severity | Open | Fixed (pending verification) | Verified |
 |---|---|---|---|
 | CRITICAL | 0 | 6 | 0 |
-| HIGH | 1 | 0 | 0 |
+| HIGH | 2 | 0 | 0 |
 | MEDIUM | 0 | 0 | 0 |
 | LOW | 0 | 0 | 0 |
 
@@ -812,3 +812,99 @@ checking the ground truth first prevented one.
 **FINDING-007 reproduced in both cycles** — the requester decided its own approval and was
 allowed. Logged by the probe as a NOTE rather than asserted either way, because the policy
 decision on approver authority is still open.
+
+---
+
+## FINDING-008
+
+**Title:** A commitment recorded in Fundraising never becomes an LP capital account — the two modules use different commitment models and nothing bridges them
+**Module:** Fundraising → LP Portal · **Dimension:** UAT · **Category:** Functional
+**Severity:** HIGH
+**Persona affected:** every LP who commits capital; IR reporting on what was raised
+**Surface:** backend · **Screen / Flow:** roadmap **F.4**, the handoff
+
+### Steps to reproduce
+
+1. Run the fundraising lifecycle to a recorded commitment (F.1 does this).
+2. Query `investment_commitments`, which is what the LP Portal reads.
+3. Look for the commitment.
+
+### Expected
+
+Capital committed through Fundraising appears in the committing investor's LP portal.
+
+### Actual
+
+It does not, and cannot, because the two modules keep commitments in **different tables**:
+
+| | Table | Keyed by | Written by |
+|---|---|---|---|
+| Fundraising writes | `fundraising_commitments` | opportunity / investor / campaign / fund | `POST /fundraising/commitments` |
+| **LP Portal reads** | `investment_commitments` | `(clientId, fundId)` unique | `ClientService`, `FundraisingCloseService` |
+
+Measured in this database:
+
+```
+fundraising_commitments   5     with a client_id populated: 0
+investment_commitments    6     <- what the LP Portal reads
+ORPHAN A: 5 of 5 fundraising commitments have no matching investment_commitment
+   frs-commit-001   15,000,000 USD  FUNDED              client=NONE
+   frs-commit-002   25,000,000 USD  PARTIALLY_FUNDED    client=NONE
+   frs-commit-003   12,000,000 USD  SIGNED              client=NONE
+   frs-commit-011   18,000,000 USD  FUNDED              client=NONE
+   frs-commit-012    9,000,000 USD  ADMITTED_AT_CLOSE   client=NONE
+```
+
+**79,000,000 USD of committed capital, two of it marked FUNDED, none of it visible to any
+LP.** The `client_id` column on `fundraising_commitments` is the intended link and is
+never populated.
+
+There **is** promotion code — `FundraisingCloseService.closeDeal` creates the `Client`, the
+`InvestmentCommitment` and a portal user. It is unreachable from the product:
+
+- it is invoked only from **deal** paths (`/deals/:dealId/close`, `FundraisingDealService`,
+  `FundraisingAgreementService`)
+- the frontend client states outright, in its own header, *"Mounts: /fundraising,
+  /investors — never /v1 or /fundraising/deals"*, and calls only campaigns, opportunities,
+  commitments and closings
+- `fundraising_pipeline_deals` holds **0 rows** — the legacy path has never been used here
+- the SRD `createClosing` writes a `fundraising_closings` row and promotes nothing
+
+Orphan direction B is clean: all three LP portal users do have commitments behind them.
+But those came from seeds — every `investment_commitments` row is labelled `LP-SRD-SEED`
+or `Portfolio V11 full demo commitment`. **The promotion has never run in either
+direction.**
+
+### This qualifies an earlier result
+
+X.1–X.3 verified that LP capital accounts reconcile to their allocation rows, and they do.
+That reconciliation is against **seeded** commitments, not against anything Fundraising
+produced. The LP Portal is internally consistent; it is simply not connected to the module
+that is supposed to feed it.
+
+**Reproducibility:** Always
+**Suspected area:** `FundraisingSrdService.createClosing`, `FundraisingCloseService`
+**Upstream dependency?** Cross-module by nature — the seam itself is the defect.
+
+### Recommended fix — needs a product decision first
+
+Wire the SRD closing path to the promotion that already exists, rather than writing a
+second one. The open questions are genuinely product ones, and getting them wrong creates
+client records and sends investor invitations:
+
+1. **When does promotion fire?** On closing creation, on a closing reaching a terminal
+   status, or on a commitment reaching `ADMITTED_AT_CLOSE`? The commitment statuses in the
+   data (`SIGNED`, `ADMITTED_AT_CLOSE`, `PARTIALLY_FUNDED`, `FUNDED`) suggest
+   `ADMITTED_AT_CLOSE` is the intended trigger.
+2. **How does `investor_organisations` map to `Client`?** `closeDeal` creates a Client from
+   a deal's prospect fields. The SRD path has an `investor_organisation`, which is a
+   different record with different fields.
+3. **Is portal access auto-provisioned?** `closeDeal` creates a portal user and sends an
+   invitation. Doing that automatically on every close is a policy choice, not a bug fix —
+   and with the mail guard off it emails real investors.
+
+Not implemented unilaterally for the same reason the four unbalanced journals were not:
+the mechanical part is small, and the decision it encodes is not mine to make.
+
+**Status:** OPEN — diagnosed, quantified and evidenced; fix recommended, awaiting a
+decision on trigger, mapping and auto-provisioning.
