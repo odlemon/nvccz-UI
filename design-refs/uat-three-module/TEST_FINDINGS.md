@@ -6,7 +6,7 @@
 |---|---|---|---|
 | CRITICAL | 0 | 6 | 0 |
 | HIGH | 3 | 3 | 0 |
-| MEDIUM | 1 | 3 | 0 |
+| MEDIUM | 3 | 3 | 0 |
 | LOW | 0 | 0 | 0 |
 
 ---
@@ -1515,3 +1515,93 @@ states and the other two modules have not been run yet.
 
 `scripts/_uat/_routes.mjs` now holds the screen list, the deliberate LP aliases and the
 auth seeding, shared by both sweeps so they cannot drift apart.
+
+---
+
+# Cycle 0 — X.9 complete: loading, empty and error states, all three modules
+
+`scripts/_uat/state-sweep.mjs`, **174 checks** — 58 screens x 3 states. Each state induced
+by intercepting the API rather than waiting for the backend to misbehave.
+
+| Module | Checks | error | empty | loading |
+|---|---|---|---|---|
+| Payroll | 60 | **0 fail** — every screen reports it | 15 | 1 |
+| Fundraising | 60 | **20 fail** — no message at all | 10 | 12 |
+| LP Portal | 54 | **18 fail** | 18 | 15 |
+
+### What the three states actually showed
+
+**Payroll reports failure on every screen** — 20 of 20, through a toast
+(*"Could not load 3 payroll data sources"*). **None offers a retry.** The roadmap asks for
+an error that is *actionable*; a toast that names the failure and then dismisses is
+informative but not actionable, and it is gone by the time the user looks up. The one
+screen that does offer a retry is the access panel from FINDING-013.
+
+**Fundraising says nothing.** 20 of 20 screens render their normal chrome — headings,
+empty tables, zeroed cards — with no toast and no inline message when every data call
+returns 500. A user cannot distinguish "no campaigns" from "the server is down", and the
+figures on screen read as real.
+
+**The LP portal crashes.** Not a missing empty state: `pageerror: Cannot read properties of
+undefined (reading 'length')`, repeatedly, and React unmounts the tree — `<body>` measures
+**0 characters**. A white screen, no message, nothing to retry.
+
+### FINDING-014 — the LP portal has no error boundary
+
+**Severity:** MEDIUM · **Module:** LP Portal · **Dimension:** QAT · **Category:** Missing State
+
+An unexpected payload shape takes the whole page down to a white screen. Confirmed on
+`/lp-portal/notices` and `/lp-portal/requests` with a 45s wait and the session and access
+calls left working, so it is not a timing or auth artefact.
+
+**Stated with its caveat:** the shape was induced — `{success:true,data:[]}` where those
+screens expect an object — and the API does not return that today. What the test proves is
+not "empty data breaks the LP portal" but "**a payload the client does not expect unmounts
+the page with no error boundary and no message**". That is a real robustness gap: any
+client/server contract skew, partial outage or version drift produces a white screen for an
+external user, with nothing to act on. Payroll under identical treatment toasts and stays
+up.
+
+**Status:** OPEN — an error boundary around the LP screens, and defensive reads where a
+payload shape is assumed.
+
+### FINDING-015 — fundraising screens never report a failed load
+
+**Severity:** MEDIUM · **Module:** Fundraising · **Dimension:** UI-UX · **Category:** Missing State
+
+20 of 20 screens render normally with every API call returning 500 — no toast, no inline
+state. The screens show empty tables and zero totals, which are indistinguishable from a
+genuine "nothing here yet". Payroll's host raises a toast for exactly this case; the
+fundraising module has no equivalent.
+
+**Status:** OPEN.
+
+### Loading states — 28 screens show nothing at all
+
+With every data call held for 4s, 28 checks found neither a skeleton nor any text. Payroll
+is nearly clean (1); fundraising (12) and LP (15) are not. Reported at lower confidence
+than the error results: the sweep looks 1.5s after `domcontentloaded`, which on a dev
+server can precede the first paint, so some of these are likely the compile rather than a
+missing skeleton. Worth re-running against a production build before acting.
+
+### Rows rendered while the API returned nothing
+
+12 screens rendered 1 row, and a few rendered 5, 6, 8, 9 and 21, with every collection
+endpoint returning empty. That is the signature this codebase has a history of — fixtures
+surviving behind live data. **Not yet a finding:** the same shape mismatch that crashes the
+LP screens could equally leave a component holding its previous state, so these need
+per-endpoint empty payloads shaped like the real contract before the count means anything.
+
+### Four corrections to the instrument, all before reporting
+
+1. **Faulting `/me/access` and `/lp-portal/session`.** Blanking identity is not testing a
+   data state — it stripped permissions, so every payroll screen rendered the access panel
+   and every LP screen rendered nothing. **44 false failures.**
+2. **Deleting toasts before measuring.** Inherited from the responsive sweep, where toasts
+   are not layout. Here they are the answer: payroll went from 18 "silent" screens to 0
+   once the toast was read instead of removed. Counting the product as broken for telling
+   the user would have been the worst kind of false finding.
+3. **Excluding `/users/`** alongside auth, for the same reason as (1).
+4. **The empty-state row count**, added mid-run to catch fixtures, is reported as
+   unresolved rather than as a finding, because (1) showed how easily a synthetic payload
+   produces a misleading signal.

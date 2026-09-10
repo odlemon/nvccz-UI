@@ -33,10 +33,16 @@ const mods = MODULES.filter((m) => ONLY === "all" || ONLY === m.id)
 
 /** Vocabulary a screen uses when it is being honest about its state. */
 const READ = `(() => {
-  document.querySelectorAll('[data-sonner-toaster],[class*="toast" i]').forEach((n) => n.remove());
+  // Toasts are READ here, not removed. The responsive sweep strips them because
+  // they are not layout; this one must not, because these modules report a
+  // failed data load through a toast ("Could not load 3 payroll data sources")
+  // rather than an inline panel. Deleting it first and then calling the screen
+  // silent would be counting the product as broken for telling the user.
+  const toastText = [...document.querySelectorAll('[data-sonner-toast],[class*="toast" i]')]
+    .map((n) => n.innerText || '').join(' ');
   const main = document.querySelector('main') || document.body;
   const text = (main.innerText || '').trim();
-  const lower = text.toLowerCase();
+  const lower = (text + ' ' + toastText).toLowerCase();
   const spinner = !!document.querySelector(
     '[class*="animate-spin"],[class*="skeleton" i],[data-loading],[aria-busy="true"],[role="progressbar"]'
   );
@@ -44,8 +50,14 @@ const READ = `(() => {
     chars: text.length,
     spinner,
     saysError: /error|failed|could not|couldn.t|unable|went wrong|unavailable|problem/.test(lower),
+    viaToast: /error|failed|could not|couldn.t|unable/.test(toastText.toLowerCase()),
     saysRetry: /retry|try again|reload|refresh/.test(lower),
     saysEmpty: /no |none|nothing|empty|not found|0 result|no records|no data|yet\\b/.test(lower),
+    // Rows still on screen when every API returned [] means the screen is
+    // rendering its own fixtures. This codebase has a documented history of
+    // "hardcoded values masquerading as live data", and the empty state is
+    // where that shows up most clearly.
+    rows: document.querySelectorAll('tbody tr, [role=row]').length,
     sample: text.slice(0, 120).replace(/\\s+/g, ' '),
   };
 })()`
@@ -69,6 +81,16 @@ try {
         // screen never renders and every state would "fail" for the wrong reason.
         await page.unrouteAll({ behavior: "ignoreErrors" }).catch(() => {})
         await page.route("**/api/**", async (r) => {
+          // Identity and entitlement are not "data". Blanking or failing these
+          // does not test a screen's empty state -- it strips the caller's
+          // permissions, and every payroll screen then renders the access panel
+          // while every LP screen renders nothing at all. That produced 44 false
+          // failures before it was excluded. Only the data calls are faulted.
+          const url = r.request().url()
+          if (/\/auth\/|\/me\/access|\/lp-portal\/session|\/users\//.test(url)) {
+            await r.continue()
+            return
+          }
           if (state === "error") {
             await r.fulfill({ status: 500, contentType: "application/json", body: JSON.stringify({ success: false, message: "Simulated upstream failure" }) })
           } else if (state === "empty") {
@@ -104,6 +126,7 @@ try {
           else if (!r.saysError) why = `no error message shown — "${r.sample.slice(0, 60)}"`
         } else if (state === "empty") {
           if (r.chars < 60) why = `blank (${r.chars} chars) with empty data`
+          else if (r.rows > 0) why = `${r.rows} row(s) rendered while the API returned nothing`
           else if (!r.saysEmpty && !r.saysError) why = `no empty state — "${r.sample.slice(0, 60)}"`
         } else {
           if (!r.spinner && r.chars < 60) why = `nothing on screen while loading (no skeleton, ${r.chars} chars)`
@@ -113,7 +136,10 @@ try {
           failures.push({ mod: mod.id, route, state, why })
           console.log(`  ${state.padEnd(7)} ${route.padEnd(34)} FAIL  ${why}`)
         } else {
-          const note = state === "error" && !r.saysRetry ? " (no retry offered)" : ""
+          const note =
+            state === "error"
+              ? (r.viaToast ? " (via toast)" : "") + (r.saysRetry ? "" : " (no retry offered)")
+              : ""
           console.log(`  ${state.padEnd(7)} ${route.padEnd(34)} ok${note}`)
         }
       }
