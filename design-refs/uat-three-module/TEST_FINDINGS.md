@@ -1093,3 +1093,49 @@ API, showing the empty draft run correctly reporting null rather than zero:
 ```
 
 **Status:** FIXED (pending verification).
+
+---
+
+# Cycle 0 — X.8 tab navigation
+
+The roadmap flags this as a **C-tier** item because the codebase has a documented history of
+it: *"tabbed pages navigate to a different route instead of switching content in place —
+found on Reviews, Reports, Enterprise Risk Register in Performance; Application tab in Deal
+Detail."*
+
+Tested in a real browser. For each control: record URL and a content hash, click, wait,
+record again. A defect is any of — the URL changed, the active state did not move, or the
+content did not change.
+
+| Module | Group | Controls | Result |
+|---|---|---|---|
+| Payroll | chart range 6M / 12M / 24M | 3 | in place |
+| Payroll | chart series Both / USD / ZiG | 3 | in place |
+| Payroll | department mode | 3 | in place |
+| Payroll | Earnings & Deductions filters | 4 | in place — rows 18 → 13 → 10 → 11 → 8 |
+| Fundraising | dashboard PE/VC ↔ Asset Mgmt | 2 | in place |
+| Fundraising | DDQ case selector (master-detail) | 4 | in place |
+| LP Portal | period Since Inception / 3Y / 1Y / YTD | 5 | in place |
+
+**24 controls across 7 groups in all three modules. None navigated away. None failed to
+switch.** The historical defect does not reproduce on the surfaces tested.
+
+### Three measurement corrections, all made before reporting
+
+Each of these would have produced a false finding:
+
+1. **Chart toggles measured on `innerText`.** Series and department toggles reported "no
+   content change" because they redraw an **SVG** — the text is identical. Re-measured
+   against the chart markup and all six pass.
+2. **The already-selected item.** The DDQ sweep clicked cases in list order, so the first
+   was the one already open and correctly did nothing. Re-run in an order that enters every
+   case from a different one: all pass.
+3. **`form_input` on React forms.** It sets a value without triggering React state, so the
+   login silently never submitted and looked like a broken button. Real keystrokes work.
+   All UI testing uses typing.
+
+### Coverage — what this does and does not cover
+
+Seven tab groups on five screens, out of **59 screens**. These are the tabbed surfaces
+found on the screens visited so far, not an exhaustive sweep of the module. The remaining
+screens' tabbed surfaces are still to be walked, and X.8 is not complete until they are.
