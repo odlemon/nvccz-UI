@@ -13,6 +13,13 @@
  * A control that is legitimately view-state produces no API call and no toast —
  * that is a pass, reported as VIEW-STATE. A control that produces neither and
  * claims to save is the defect this exists to catch.
+ *
+ * PROBING A WRITE WRITES. `save-paygroup` creates a pay group, which
+ * scripts/_uat/clean-payroll-probes.js in the backend repo removes;
+ * `save-employee` overwrites a field on a REAL employee and a PUT has no undo,
+ * so read the current value first and put it back afterwards. Leaving probe
+ * values in the data the probe verifies is a defect this project has already
+ * had to clean up once, in fundraising.
  */
 import { chromium } from "playwright"
 
@@ -154,6 +161,10 @@ const before = await page.evaluate(() => document.querySelector("#content").inne
 // and is present-but-hidden even when closed, so searching first would find an
 // unclickable copy and the click would look like a silent no-op. Open the
 // dialog first whenever one is known, then take the VISIBLE element.
+// A value may be a single action id or a list of steps clicked in order. A step
+// beginning with "[" is a raw selector, for controls that are not [data-action]
+// at all: the employee drawer opens from a table row carrying [data-employee],
+// and the Edit employee button only exists once that drawer is open.
 const OPENERS = {
   "create-run": "new-run",
   "save-run": "new-run",
@@ -163,19 +174,25 @@ const OPENERS = {
   "confirm-upload": "upload-document",
   "confirm-create-document": "create-document",
   "save-paygroup": "new-paygroup",
+  "save-employee": ["[data-employee]", "edit-employee"],
 }
 const opener = OPENERS[ACTION]
 let modalOpened = null
 if (opener) {
-  const o = await page.$(`[data-action="${opener}"]`)
-  if (o) {
+  for (const step of Array.isArray(opener) ? opener : [opener]) {
+    const selector = step.startsWith("[") ? step : `[data-action="${step}"]`
+    const o = await page.$(selector)
+    if (!o) {
+      console.log(`OPENER      ${selector} not found — later steps skipped`)
+      break
+    }
     await o.click({ force: true })
     await page.waitForTimeout(2500)
-    modalOpened = await page.evaluate(() => {
-      const m = document.querySelector("#modal")
-      return m ? m.className : null
-    })
   }
+  modalOpened = await page.evaluate(() => {
+    const m = document.querySelector("#modal")
+    return m ? m.className : null
+  })
 }
 let found = await page.$(`[data-action="${ACTION}"]:visible`)
 if (!found) found = await page.$(`[data-action="${ACTION}"]`)

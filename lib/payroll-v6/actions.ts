@@ -304,7 +304,7 @@ export async function handlePayrollV6Action(
         return { handled: true, reload: true, message: `Pay group ${name} created.` }
       }
 
-      case "edit-employee": {
+      case "save-employee": {
         const denied = await requirePermission("payroll.employees.manage")
         if (denied) return denied
         const id = detail.dataset?.recordId || detail.dataset?.id

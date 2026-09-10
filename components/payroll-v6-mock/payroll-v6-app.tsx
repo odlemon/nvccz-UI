@@ -46,8 +46,11 @@ const API_ACTIONS = new Set([
   "complete-onboarding",
   "suspend-employee",
   "reinstate-employee",
-  // Employee update: the controller existed but had no route, so the control 404d.
-  "edit-employee",
+  // Employee update. `edit-employee` itself is deliberately NOT here: it opens
+  // the form (client-side) and `save-employee` submits it, the same split the
+  // pay-group controls use. Claiming the opener meant the form never opened
+  // and the handler found no fields to read.
+  "save-employee",
   // Payslip: the runtime built a PDF client-side from hardcoded content.
   "download-payslip",
   "preview-payslip",

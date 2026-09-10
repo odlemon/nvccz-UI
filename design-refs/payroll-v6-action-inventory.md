@@ -50,7 +50,7 @@ Anything not on the allowlist keeps the runtime's own client-side behaviour.
 | `suspend-employee` | `POST /payroll/employees/:id/suspend` | `payroll.employees.manage` |
 | `reinstate-employee` | `POST /payroll/employees/:id/reinstate` | `payroll.employees.manage` |
 | `terminate-employee` | `POST /payroll/employees/:id/terminate` | `payroll.employees.manage` |
-| `edit-employee` | `PUT /payroll/employees/:id` | `payroll.employees.manage` |
+| `save-employee` | `PUT /payroll/employees/:id` | `payroll.employees.manage` |
 | `complete-onboarding` | `POST /payroll/employees/with-user` | `payroll.employees.manage` |
 | `save-paygroup` | `POST /payroll/pay-groups` | `payroll.calendar.manage` |
 | `download-payslip` | `GET /payroll/employee/payslips/:id/download` | own payslip |
@@ -66,19 +66,27 @@ Each checks its permission first and returns a visible refusal
 These are page ids; `handleAction` short-circuits on `pageIds.has(action)` and
 calls `goPage()`.
 
-### VIEW — client-side view state (24)
+### VIEW — client-side view state (27)
 
 `close-drawer`, `close-modal`, `client-design-sign-out`, `profile-menu`,
 `employee-documents`, `access-filter`, `audit-filter`, `cancel-doc-edit`,
 `edit-document`, `edit-report`, `preview-report`, `v5-edit-report`,
 `open-onboarding`, `open-rule`, `training-detail`, `employee-audit`,
 `vendor-documents`, `compare-quotations`, `compare-runs`, `drill-payroll`,
-`chart-open-runs`, `chart-open-employees`, `mark-read`, `new-employee`
+`chart-open-runs`, `chart-open-employees`, `mark-read`, `new-employee`,
+`edit-employee`, `new-paygroup`, `new-run`
 
 Drawers, modals, tab/filter switches and in-page navigation. All legitimately
-client-side — none of them claims to persist anything. `new-employee` opens the
-create-employee dialog; its submit control is `complete-onboarding`, which is
-LIVE.
+client-side — none of them claims to persist anything. Three are dialog
+openers whose submit control is LIVE: `new-employee` -> `complete-onboarding`,
+`edit-employee` -> `save-employee`, `new-paygroup` -> `save-paygroup`.
+
+`edit-employee` was itself on the allowlist until 10 September 2026, so the
+host claimed the click, the runtime's dialog never opened, and the handler
+looked for form fields that did not exist — every click ended at "Nothing to
+update". Splitting opener from submit is what makes the control work; a submit
+control must also carry the record it acts on (`data-record-id`), the omission
+that made the payslip button a silent no-op.
 
 ### VIEW — chart interaction (4)
 
@@ -112,7 +120,7 @@ anything else. It now carries `data-payslip-id`, downloads the backend's own
 hash-verified PDF from `GET /payroll/employee/payslips/:id/download`, and is
 disabled outright when the signed-in user has no payslip.
 
-### UNWIRED — the endpoint exists, the control does not use it (15)
+### UNWIRED — the endpoint exists, the control does not use it (16)
 
 **Updated 10 September 2026.** Four of the domains below had no backend when
 this inventory was first written and now do — inputs, pay groups and calendar,
@@ -128,7 +136,7 @@ capability, and each is a contained piece of work.
 | `upload-inputs` | Inputs & Validation | `POST /payroll/inputs/batches` |
 | `resolve-input` | Inputs & Validation | `PATCH /payroll/inputs/rows/:rowId/resolve` |
 | `edit-paygroup` | Pay Groups & Calendar | `PATCH /payroll/pay-groups/:id` |
-| `edit-schedule`, `edit-schedule-v2` | Pay Groups & Calendar | `PUT /payroll/pay-groups/:id/periods` |
+| `edit-schedule`, `edit-schedule-v2`, `save-schedule-v2` | Pay Groups & Calendar | `PUT /payroll/pay-groups/:id/periods` |
 | `copy-calendar`, `copy-calendar-v2` | Pay Groups & Calendar | `PUT /payroll/pay-groups/:id/periods` |
 | `save-onboarding` | Onboarding | `POST /payroll/onboarding/candidates` |
 | `new-rfq`, `save-rfq-v2` | Vendors & Quotations | `POST /payroll/rfqs` |

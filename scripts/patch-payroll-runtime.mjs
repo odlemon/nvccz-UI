@@ -1635,6 +1635,94 @@ s = replaceOnce(
 )
 
 // ---------------------------------------------------------------------------
+// 4a17. Edit employee opens a real form and names the employee it edits
+// ---------------------------------------------------------------------------
+// `edit-employee` sat on the host's API_ACTIONS allowlist, so the host claimed
+// the click and the runtime's own genericModal('Edit Employee Record', ...)
+// never opened. The handler then looked for #editBankName and its siblings,
+// which exist nowhere in this runtime, so every click ended at "Nothing to
+// update -- change a field first". The control was live in name only, and was
+// worse than before the wiring: it used to at least open a dialog.
+//
+// Split the way new-paygroup / save-paygroup already are: `edit-employee`
+// opens the form client-side, `save-employee` submits it and is the id the
+// host claims. The submit button carries the employee's record id, the same
+// omission that made the payslip button a silent no-op.
+//
+// Fields start blank on purpose. Blank means "leave alone" (the handler says
+// so), and the account number and salary are masked or permission-gated on
+// screen -- prefilling them would put values in the DOM that the module
+// deliberately does not show.
+{
+  const label = "edit-employee button carries its record id"
+  if (s.includes("data-action=\"edit-employee\" data-record-id")) {
+    console.log(`  skip (already)  ${label}`)
+    skipped += 1
+  } else {
+    const needle = "${button('Edit employee','edit-employee','primary','edit')}"
+    if (!s.includes(needle)) {
+      console.warn(`  MISS            ${label}`)
+      missed += 1
+    } else {
+      // split/join, not replace: the drawer is rendered from two call sites
+      // (the base one and the V3 override) and a plain replace would leave the
+      // second without an id -- the same trap the KPI cards sprang.
+      const live =
+        "<button class=\"btn primary\" data-action=\"edit-employee\" data-record-id=\"${e.recordId||''}\">" +
+        "${icon('edit')}Edit employee</button>"
+      s = s.split(needle).join(live)
+      console.log(`  patched         ${label}`)
+      applied += 1
+    }
+  }
+}
+
+{
+  const label = "edit-employee -> real form"
+  if (s.includes("editAccountNumber")) {
+    console.log(`  skip (already)  ${label}`)
+    skipped += 1
+  } else {
+    const needle =
+      "case 'edit-employee':if(!can('employee.edit'))deny('employee.edit');else genericModal('Edit Employee Record','Sensitive employment changes are versioned and routed for review.');break;"
+    if (!s.includes(needle)) {
+      console.warn(`  MISS            ${label}`)
+      missed += 1
+    } else {
+      const hint = "placeholder=\"Leave blank to keep current\""
+      const field = (id, lbl, extra) =>
+        "<div class=\"form-field\"><label>" + lbl + "</label><input id=\"" + id + "\" " + extra + "></div>"
+      const body = [
+        "<div class=\"form-grid\">",
+        field("editBankName", "Bank name", hint),
+        field("editBranchCode", "Branch code", hint),
+        field("editAccountNumber", "Account number", hint),
+        field("editBasicSalary", "Basic salary", "type=\"number\" step=\"0.01\" min=\"0\" " + hint),
+        field("editIdNumber", "ID number", hint),
+        field("editNextOfKin", "Next of kin", hint),
+        field("editAddress", "Address", hint),
+        "</div>",
+      ].join("")
+      const live = [
+        "case 'edit-employee':{",
+        "if(!can('employee.edit')){deny('employee.edit');break}",
+        "const __rid=(el&&el.dataset&&el.dataset.recordId)||'';",
+        "if(!__rid){toast('No employee selected','Open an employee record before editing it.','warn');break}",
+        "openModal('Edit Employee Record',",
+        "'Leave a field blank to keep its current value. Bank and salary changes are versioned and routed for review.',",
+        "`" + body + "`,",
+        "`<button class=\"btn primary\" data-action=\"save-employee\" data-record-id=\"${__rid}\">${icon('check')}Save changes</button>`);",
+        "break}",
+      ].join("")
+      s = s.replace(needle, live)
+      console.log(`  patched         ${label}`)
+      applied += 1
+    }
+  }
+}
+
+
+// ---------------------------------------------------------------------------
 
 console.log("")
 if (missed > 0) {

@@ -331,20 +331,74 @@ than written down and handed on:
 
 ## 11. Known limitations
 
-1. **Screens with no backend** — Vendors, Inputs & Validation, Pay Groups &
+**Items 1-3 were closed after this run; see §12.**
+
+1. ~~**Screens with no backend** — Vendors, Inputs & Validation, Pay Groups &
    Calendar, Onboarding and Document Vault still render the runtime's fixtures
-   because there is nothing to call. Each is itemised in
-   `payroll-v6-backend-asks.md` §2 with what would need building. They are
-   reachable and look finished, which is a risk: they should either be built or
-   removed from the nav before anyone treats them as real.
-2. **`new-employee` / `edit-employee`** are not wired. The endpoints exist, but
-   the runtime's form has no `userId` and `Employee.userId` is required —
-   backend-asks §2.1.
-3. **Payslip PDF** — the backend serves a real hash-verified PDF; the UI still
-   builds one client-side. Wiring, not capability.
+   because there is nothing to call.~~ All but Document Vault were built. Each
+   remaining gap is itemised in `payroll-v6-backend-asks.md` §2.
+2. ~~**`new-employee` / `edit-employee`** are not wired.~~ Both wired; see §12.
+3. ~~**Payslip PDF** — the UI still builds one client-side.~~ Now downloads the
+   backend's hash-verified PDF; see §12.
 4. **Environment instability during testing.** The two dev servers are shared
    with another agent working in the same checkout; the API restarted mid-sweep
    several times, producing `ECONNREFUSED`/`ECONNRESET` in some runs. Every such
    run was re-run and the results above are from clean runs. One transient
    `500` on `GET /payroll-runs` as HR did not reproduce (200 on three
    consecutive retries) and is recorded as environmental, not a defect.
+
+## 12. Follow-up — 10 September 2026
+
+### The module moved to `/payroll`
+
+The V6 port served `/payroll-v6` while `/payroll` served the frozen legacy
+payroll app. It now serves `/payroll`, the legacy module moved to
+`/payroll-legacy`, and `/payroll-v6` 308-redirects. Verified against both a dev
+server and a production build: all 20 screens render at the new paths with 22
+live endpoints each and an untraced count of 27 — identical to the count before
+the rename, so nothing regressed.
+
+### `edit-employee` was live in name only — found and fixed
+
+Wiring `edit-employee` had put it on the host's `API_ACTIONS` allowlist. The
+host claims a listed action with `preventDefault()` *before* the runtime's own
+handler runs, so the runtime's `genericModal('Edit Employee Record', ...)` never
+opened — and the handler then searched for `#editBankName` and its siblings,
+which exist nowhere in the runtime. Every click ended at "Nothing to update —
+change a field first". The control was worse after wiring than before it, and
+nothing caught this because the probe was never run against it: it lives inside
+the employee drawer, which opens from a `[data-employee]` row rather than a
+`[data-action]` control, and the probe could only click the latter.
+
+Three fixes, each a repeat of a trap this module has already sprung:
+
+1. **Opener and submit must be separate ids.** `edit-employee` now opens the
+   form client-side and `save-employee` submits it — the same split
+   `new-paygroup` / `save-paygroup` already used. Claiming the opener is what
+   suppressed the form.
+2. **A submit control must carry the record it acts on.** The button carries
+   `data-record-id`; without it the handler has nothing to PUT to, exactly as
+   the payslip button had nothing to download.
+3. **The probe must be able to reach the control.** `OPENERS` now accepts a
+   list of steps and a raw selector, so it can open the drawer and then the
+   dialog.
+
+Fields start blank, and blank means "leave alone". The account number and
+salary are masked or permission-gated on screen; prefilling them would put
+values in the DOM the module deliberately does not show.
+
+Verified: `save-employee` as sysadmin →
+`PUT 200 /api/payroll/employees/cmttpxaut000tun9wr86sl9y4`, verdict
+**LIVE — reached a write endpoint**. The field it wrote was read back and
+restored, since a PUT has no undo.
+
+### `suspend-employee`, `reinstate-employee`, `terminate-employee` have no control
+
+All three are on the allowlist, have handlers in `lib/payroll-v6/actions.ts`
+and real guarded endpoints — and no button anywhere in the runtime emits them.
+`grep` finds no occurrence of "suspend", "reinstate" or "terminat" as an action
+in the runtime, and the probe reports NOT PRESENT for each on every screen.
+Employee status changes are therefore **not reachable from the payroll UI**.
+Recorded here rather than fixed: adding three controls to the employee drawer
+is new UI, not a repair, and the terminate path in particular needs a reason
+field and a confirmation step before it goes anywhere near a real employee.
