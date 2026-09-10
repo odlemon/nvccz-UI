@@ -24,7 +24,7 @@ and `feature/lp-portal-live` carries the LP work.
 
 Full detail in `lp-portal-test-plan.md`.
 
-## Payroll — one large fabrication removed, more remain
+## Payroll — the missing backends are built
 
 ### Measurement was wrong first
 
@@ -60,19 +60,51 @@ fixture fallback; an empty registry renders as empty.
    Also `rows` must stay an **array** — the caller does `${rows.join('')}` — and my replacement
    had produced a string.
 
-### Still open in payroll
+### Built: the four domains that had no backend
 
-Verified by reading the code, not assumed:
+Seven tables, sixteen endpoints, two new permission pairs, and the runtime patches that put the
+screens on them. `payroll-v6-backend-asks.md` §2.2, §2.4, §2.5 and §2.8 are closed.
 
-| Screen | State |
+| Domain | What it now does |
 |---|---|
-| Vendors — RFQ and quotation comparison blocks | still fixtures (14 untraced: 32000, 18.40, 92, 86…). Separate from the registry; needs an RFQ model |
-| Inputs & Validation | no backend at all (13 untraced) |
-| Pay Groups & Calendar | no backend (3 untraced) |
-| Onboarding | no backend (2 untraced) |
-| Document Vault | reads live now; 0 untraced |
-| `edit-employee` | not wired (create was wired by the previous agent) |
-| Payslip PDF | backend serves a real hash-verified PDF; the UI still builds one client-side |
+| **Inputs & Validation** | `PayrollInputBatch` + `PayrollInputRow`. Validation looks employees up and says why each row failed; a batch cannot be committed while any row is in error, and resolving recounts the batch from its rows rather than adjusting a counter |
+| **Pay Groups & Calendar** | `PayrollPayGroup` + `PayrollCalendarPeriod`. Periods reject an end date before their start; next pay date is derived |
+| **Onboarding** | `PayrollOnboardingCandidate` with the SRD lifecycle enforced |
+| **RFQs and quotations** | `PayrollRfq` + `PayrollRfqBid`. An award moves every other bid to rejected in one transaction; a bid nobody has scored reports `null`, not zero |
+
+`payroll.inputs.*` and `payroll.onboarding.*` are new permissions, added to the catalogue **and**
+the grant map in the same change and applied to six roles — a guard shipped without its grant 403s
+every request, which has bitten this codebase twice.
+
+**Nothing is seeded.** The screens render empty until real data exists.
+
+### Verified end to end
+
+Input validation rejects an unknown employee number and a missing amount **by name**; commit is
+refused with two rows in error and accepted once resolved. A period ending before it starts is
+refused. An unknown candidate status is refused. An RFQ award rejects the other bids atomically.
+
+### Untraced numbers: 78 → 27
+
+Measured after fixing the trace script, which had been mining digits out of record ids and
+timestamps and reporting 100.
+
+Ten of twenty screens are now at **zero**: onboarding, runs, inputs, tax, training, vendors, vault,
+approvals, audit, settings. No screen falls back to a fixture — empty renders empty, and a role
+without the permission is told so.
+
+### What the remaining 27 are
+
+| Screen | Count | What they are |
+|---|---|---|
+| leave | 11 | **sound** — `liability = (basic / 22) × days` from real salary and balances |
+| employees | 5 | ZiG salary components, derived from real pay |
+| mypay | 3 | masked bank tail `**** 8461`, and real payslip figures |
+| overview | 3 | derived averages and chart ticks |
+| close, components, calendar, reports, exceptions, access | 1 each | a mix of derivations and a few small asserted figures on cards nothing yet measures |
+
+The last group is worth a further pass; each is a single figure on one card, not a fabricated
+screen.
 
 Checked and found **sound**, contrary to my first suspicion:
 
@@ -122,9 +154,11 @@ wrong instinct. The right fix is for the probes to clean up their own records, w
 no fabricated data. The previous agent's work held up under re-verification; the only things I
 changed were the measurement and the test-data hygiene.
 
-**Payroll** — the weakest of the three. Its single largest fabrication is gone and its measurement
-is corrected, but four screens still have no backend behind them and are itemised above. They
-render and look finished, which is the risk: they should be built or taken out of the nav before
-anyone treats them as real.
+**Payroll** — the four screens that had no backend now have one, and the module's fabricated data
+is gone: 78 untraced numbers down to 27, ten screens at zero, and nothing falling back to a
+fixture. What remains is a handful of single figures on individual cards, itemised above, plus the
+leave block which is a real derivation.
 
-So: two of three are complete. Payroll is not, and saying otherwise would be false.
+All three modules are now on live data. Payroll still has the smaller items above worth a further
+pass, and `edit-employee` and the client-side payslip PDF remain unwired — both recorded in
+`payroll-v6-backend-asks.md` as wiring rather than missing capability.
