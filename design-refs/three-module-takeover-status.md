@@ -116,7 +116,15 @@ wrong instinct. The right fix is for the probes to clean up their own records, w
 
 ## Honest position
 
-The LP portal is done to the standard asked. Payroll has had its single largest fabrication
-removed and its measurement corrected, but four screens still have no backend and are itemised
-above. Fundraising has not been verified by me at all. Claiming all three are complete would be
-false.
+**LP portal** — done to the standard asked.
+
+**Fundraising** — verified and sound. All 20 screens live, 24/24 end-to-end, role refusals real,
+no fabricated data. The previous agent's work held up under re-verification; the only things I
+changed were the measurement and the test-data hygiene.
+
+**Payroll** — the weakest of the three. Its single largest fabrication is gone and its measurement
+is corrected, but four screens still have no backend behind them and are itemised above. They
+render and look finished, which is the risk: they should be built or taken out of the nav before
+anyone treats them as real.
+
+So: two of three are complete. Payroll is not, and saying otherwise would be false.
