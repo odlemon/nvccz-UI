@@ -6,7 +6,7 @@
 |---|---|---|---|
 | CRITICAL | 0 | 6 | 0 |
 | HIGH | 3 | 3 | 0 |
-| MEDIUM | 2 | 2 | 0 |
+| MEDIUM | 1 | 3 | 0 |
 | LOW | 0 | 0 | 0 |
 
 ---
@@ -1435,8 +1435,63 @@ that happened at the tail of a long session, which is exactly where this sits. T
 diagnosis is complete and the change is small — it should be made deliberately, at the
 start of a session, with the patch re-run and verified.
 
-**Status:** OPEN — diagnosed and isolated to a single call; fix designed, deliberately not
-made late in a session.
+### Fix applied
+
+The loader carries the distinction instead of collapsing it — `accessUnavailable` is set
+when the access call itself failed — and `__pr6DeniedPageHtml` renders a separate panel for
+that case:
+
+> **We could not verify your access**
+> Payroll could not reach the permissions service, so this screen is held back until it
+> can. Your role has not changed.  ·  **[ Try again ]**
+
+Failing closed is unchanged and was never in question. What changed is that the user is
+told what happened and given something to do about it.
+
+The retry is deliberately **not** a `[data-action]`: the host claims only its own allowlist
+and the runtime has no case for it, so it would fall through and do nothing. It dispatches
+`payroll-v6:reload-request`, which the host already listens for.
+
+### A trap worth recording
+
+The hydrate assignment first went into the **existing** hydrate patch's replacement string,
+and silently did nothing. That patch is guarded and reports `skip (already)` on a patched
+runtime, so editing its replacement string changes nothing. The bridge is re-injected
+wholesale on every run, which is why the panel and the `__pr6Live` field landed while this
+one line did not — and the symptom was the old message still appearing after a clean
+rebuild, which looked exactly like staleness. It is now its own guarded patch, **4a18**.
+
+The runtime change is **40 insertions, 0 deletions**, `missed=0`, parses, idempotent. The
+recorded incident that made this a start-of-session task was a patch whose match ate the
+page registry; a purely additive diff is the evidence that did not happen here.
+
+### Verification
+
+On a clean rebuild, all three paths:
+
+```
+access call fails, user holds ALL 34 grants  ->  "could not verify" + retry button
+genuinely unpermitted role                   ->  still refused, message unchanged
+normal load                                  ->  unaffected, 1704 chars
+```
+
+And the retry itself, with the fault cleared: **161 -> 1704 chars, panel gone, no page
+reload**. That closes the roadmap's "retry works" criterion, not just "a retry is offered".
+
+The state sweep that found this goes from **20 of 20** payroll screens failing the error
+state to **2**.
+
+### Still open — two screens fail quietly
+
+`/payroll` and `/payroll/mypay` render their normal content with no inline error state when
+every API call fails. They are ungated, so they never reach the denial path; they simply
+render with empty data. The host does raise a toast — *"Could not load N payroll data
+sources"* — so the user is not told nothing, but a toast dismisses and an empty dashboard
+does not. Recorded rather than fixed: an inline state for ungated screens is a separate
+piece of work.
+
+**Status:** FIXED (pending verification) for the misleading denial; the two quiet screens
+above remain open.
 
 ---
 
