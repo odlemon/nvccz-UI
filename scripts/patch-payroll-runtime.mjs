@@ -748,6 +748,43 @@ s = replaceOnce(
 }
 
 // ---------------------------------------------------------------------------
+// 4a15. The payslip download button carries the payslip it means
+// ---------------------------------------------------------------------------
+// The header button was labelled "Download June payslip" and carried no id, so
+// the runtime's own handler built a PDF client-side from hardcoded content —
+// every employee downloaded the same invented payslip for Rudo Sibanda. The
+// backend already issues a real, hash-verified PDF from
+// GET /payroll/employee/payslips/:id/download; the button just had nothing to
+// ask for. It now names the user's latest payslip period and carries its id,
+// and is disabled outright when they have none.
+{
+  const label = "payslip button carries its id"
+  if (s.includes("data-payslip-id")) {
+    console.log(`  skip (already)  ${label}`)
+    skipped += 1
+  } else {
+    const needle = "button('Download June payslip','download-payslip','primary','download')"
+    if (!s.includes(needle)) {
+      console.warn(`  MISS            ${label}`)
+      missed += 1
+    } else {
+      const live = [
+        "(()=>{const m=__pr6MyPay();",
+        "const slip=m&&m.latest?m.latest:null;",
+        "if(!slip)return `<button class=\"btn primary\" disabled title=\"No payslip has been issued to you yet\">",
+        "${icon('download')}No payslip available</button>`;",
+        "const period=slip.period||slip.periodLabel||'latest';",
+        "return `<button class=\"btn primary\" data-action=\"download-payslip\" data-payslip-id=\"${slip.id}\">",
+        "${icon('download')}Download ${period} payslip</button>`})()",
+      ].join("")
+      s = s.replace(needle, live)
+      console.log(`  patched         ${label}`)
+      applied += 1
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
 // 4b. Command-centre KPI cards come from data, not from literals
 // ---------------------------------------------------------------------------
 // The overview shipped with Employees '128', gross USD 264,720, gross ZiG

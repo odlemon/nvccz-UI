@@ -284,6 +284,27 @@ export async function generateBankFile(id: string, bankTemplateId: string): Prom
 // Payslips
 // ---------------------------------------------------------------------------
 
+/**
+ * The payslip PDF the backend actually issues — hash-verified, with a `/verify` companion.
+ *
+ * The module's download control built a PDF client-side from hardcoded content ("Rudo Sibanda",
+ * "June 2026 Payslip"), so every employee downloaded the same invented document whatever their
+ * own pay was.
+ */
+export async function downloadPayslipPdf(payslipId: string): Promise<Blob> {
+  const base = process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:3009/api"
+  const token = typeof document !== "undefined"
+    ? (document.cookie.split("; ").find((c) => c.startsWith((process.env.NEXT_PUBLIC_AUTH_TOKEN_KEY || "token") + "="))?.split("=")[1] ?? "")
+    : ""
+  const res = await fetch(`${base}/payroll/employee/payslips/${payslipId}/download`, {
+    headers: token ? { Authorization: `Bearer ${decodeURIComponent(token)}` } : {},
+  })
+  if (!res.ok) {
+    throw new Error(`Payslip download failed (${res.status})`)
+  }
+  return res.blob()
+}
+
 export async function getPayslip(employeeId: string, payrollRunId: string): Promise<Payslip> {
   const res = await apiClient.get<ApiResponse<Payslip>>(
     `${BASE}/payslips/${employeeId}/${payrollRunId}`,

@@ -46,6 +46,11 @@ const API_ACTIONS = new Set([
   "complete-onboarding",
   "suspend-employee",
   "reinstate-employee",
+  // Employee update: the controller existed but had no route, so the control 404d.
+  "edit-employee",
+  // Payslip: the runtime built a PDF client-side from hardcoded content.
+  "download-payslip",
+  "preview-payslip",
   "terminate-employee",
 ])
 

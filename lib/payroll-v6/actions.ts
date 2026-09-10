@@ -31,6 +31,8 @@ import {
   reinstateEmployee,
   suspendEmployee,
   terminateEmployee,
+  updateEmployee,
+  downloadPayslipPdf,
   toastPayrollError,
 } from "@/lib/api/payroll-v6-api"
 
@@ -273,6 +275,59 @@ export async function handlePayrollV6Action(
         if (!id) return { handled: true, error: "No employee selected." }
         await terminateEmployee(id, {})
         return { handled: true, reload: true, message: "Employee terminated." }
+      }
+
+      case "edit-employee": {
+        const denied = await requirePermission("payroll.employees.manage")
+        if (denied) return denied
+        const id = detail.dataset?.recordId || detail.dataset?.id
+        if (!id) return { handled: true, error: "No employee selected." }
+
+        const val = (name: string) =>
+          (document.querySelector<HTMLInputElement | HTMLSelectElement>(
+            `#edit${name}, [name="edit${name}"]`,
+          )?.value || "").trim()
+
+        // Only send what the form actually carries: a blank field means "leave alone", not "clear".
+        const body: Record<string, string> = {}
+        for (const [field, key] of [
+          ["BankName", "bankName"],
+          ["BranchCode", "branchCode"],
+          ["AccountNumber", "accountNumber"],
+          ["BasicSalary", "basicSalary"],
+          ["IdNumber", "idNumber"],
+          ["Address", "address"],
+          ["NextOfKin", "nextOfKin"],
+        ] as const) {
+          const v = val(field)
+          if (v) body[key] = v
+        }
+        if (!Object.keys(body).length) {
+          return { handled: true, error: "Nothing to update — change a field first." }
+        }
+
+        await updateEmployee(id, body)
+        return { handled: true, reload: true, message: "Employee updated." }
+      }
+
+      case "download-payslip":
+      case "preview-payslip": {
+        // The runtime built this PDF client-side from hardcoded content, so every employee got the
+        // same invented payslip. The backend issues a real, hash-verified one.
+        const id = detail.dataset?.payslipId || detail.dataset?.recordId || detail.dataset?.id
+        if (!id) {
+          return { handled: true, error: "No payslip selected." }
+        }
+        const blob = await downloadPayslipPdf(id)
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement("a")
+        a.href = url
+        a.download = `payslip-${id}.pdf`
+        document.body.appendChild(a)
+        a.click()
+        a.remove()
+        URL.revokeObjectURL(url)
+        return { handled: true, message: "Payslip downloaded." }
       }
 
       default:
