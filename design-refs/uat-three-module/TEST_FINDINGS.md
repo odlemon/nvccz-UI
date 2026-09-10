@@ -6,7 +6,7 @@
 |---|---|---|---|
 | CRITICAL | 0 | 6 | 0 |
 | HIGH | 3 | 3 | 0 |
-| MEDIUM | 1 | 2 | 0 |
+| MEDIUM | 2 | 2 | 0 |
 | LOW | 0 | 0 | 0 |
 
 ---
@@ -1364,3 +1364,99 @@ check in place, `/performance` loads its own screen at all three viewports.
 A full three-module run takes ~20 minutes and the LP session expired partway through the
 last one, turning the tail into `redirected to /login`. Per-module runs
 (`--module=lp`) avoid it. Worth re-seeding auth per module before the Stage 4 cycles.
+
+---
+
+## FINDING-013
+
+**Title:** When the payroll permission call fails, every screen tells the user their role lacks access
+**Module:** Payroll · **Dimension:** UI-UX / QAT · **Category:** Missing State
+**Severity:** MEDIUM
+**Persona affected:** every payroll user, during any backend disruption
+**Surface:** Internal App · **Screen:** all 20 payroll screens · roadmap **X.9**
+
+### Steps to reproduce
+
+1. Sign in as System Administrator, who holds all 34 payroll grants.
+2. Make `GET /api/payroll/me/access` return 500. Nothing else.
+3. Open any payroll screen.
+
+### Expected
+
+A screen that cannot determine the user's access says so, and offers a retry.
+
+### Actual
+
+> **You do not have access to this page**
+> Your role does not hold the payroll permission this screen requires.
+
+Shown to an account holding **every** payroll permission. Isolated to the single call:
+
+| Failing call | Result |
+|---|---|
+| `/payroll/me/access` | **"You do not have access to this page"** on every screen |
+| `/payroll/employees` | screen renders normally — a data failure does not cause it |
+
+The cause is in `lib/payroll-v6/live-loaders.ts`:
+
+```ts
+const access = await safe<PayrollAccess | null>("me/access", getMyPayrollAccess, null)
+const permissions = new Set(access?.permissions ?? [])
+```
+
+`safe()` swallows the failure and yields `null`, which collapses to an **empty permission
+set**. Every `has()` returns false, so `permittedPage()` refuses each screen and the runtime
+renders `__pr6DeniedPageHtml`. "Could not determine access" and "has no access" are
+indistinguishable by the time the UI sees them.
+
+Failing closed is the right posture and is not in question. The **message** is: during an
+outage every payroll user is told their access has been revoked, which invites support
+escalations and can mask a real incident. It is also the opposite of actionable — the user
+retries nothing, because they have been told it is a permissions problem.
+
+Two screens behave differently and are worth noting: `/payroll` and `/payroll/mypay` render
+their normal content with no indication anything failed at all.
+
+**Reproducibility:** Always
+**Suspected area:** `nvccz-new/lib/payroll-v6/live-loaders.ts` line ~349, and the runtime's
+`__pr6DeniedPageHtml` path
+
+### Recommended fix — not applied
+
+Carry the distinction rather than collapsing it: have the loader report
+`accessUnavailable` when the call fails, and give the runtime a second panel for that case —
+"We could not verify your access. Retry." — separate from the permission refusal.
+
+Not applied here because the second half is a runtime change and must go through
+`scripts/patch-payroll-runtime.mjs`. This project has a recorded incident where a rushed
+runtime patch matched `[^
+]*` across a minified line and ate the entire page registry;
+that happened at the tail of a long session, which is exactly where this sits. The
+diagnosis is complete and the change is small — it should be made deliberately, at the
+start of a session, with the patch re-run and verified.
+
+**Status:** OPEN — diagnosed and isolated to a single call; fix designed, deliberately not
+made late in a session.
+
+---
+
+# Cycle 0 — X.9 instrument
+
+`scripts/_uat/state-sweep.mjs` induces each state deterministically by intercepting the
+API, rather than waiting for the backend to misbehave:
+
+| State | Induced by | A screen fails when |
+|---|---|---|
+| error | every `/api/**` returns 500 | it goes blank, or says nothing about the failure |
+| empty | every `/api/**` returns `{success:true,data:[]}` | it goes blank, or shows no empty state |
+| loading | every `/api/**` held 4s | nothing is on screen — no skeleton, no text |
+
+Only the data API is intercepted; Next's own assets load normally, or every screen would
+fail for the wrong reason.
+
+**First run — payroll, error state: 20 of 20 screens.** 18 report the permission denial
+above; `/payroll` and `/payroll/mypay` render as though nothing is wrong. The remaining
+states and the other two modules have not been run yet.
+
+`scripts/_uat/_routes.mjs` now holds the screen list, the deliberate LP aliases and the
+auth seeding, shared by both sweeps so they cannot drift apart.
