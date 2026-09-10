@@ -1294,3 +1294,73 @@ appeared immediately. The payroll results were gathered while `innerWidth` happe
 
 This is the fourth measurement error caught before reporting in this engagement, and the
 first that was hiding a real defect rather than inventing one.
+
+---
+
+# Cycle 0 — X.10 responsive sweep, all 59 screens
+
+`nvccz/../nvccz-new/scripts/_uat/responsive-sweep.mjs` — every screen in the three modules
+at 375, 768 and 1440. **174 screen/viewport checks.** Scripted rather than hand-driven
+because the brief requires this re-run on every verification cycle.
+
+| Module | Screens | Checks | Failing |
+|---|---|---|---|
+| Payroll | 20 | 60 | **0** |
+| Fundraising | 20 | 60 | **0** |
+| LP Portal | 18 | 54 | 0 after the module-switcher fix (dedicated run) |
+
+**No screen in any module forces horizontal page scroll at any viewport** — the roadmap's
+actual X.10 criterion — after FINDING-011 and FINDING-012 were fixed. Every wide table sits
+in its own `overflow-x` container, which is the pattern the roadmap asks for.
+
+### The module switcher, fixed
+
+The LP top bar rendered `ModuleSwitcherButton` unconditionally with `shrink-0`, so it could
+not compress and sat outside the viewport on **all 18 LP screens at 375 and 768** — the
+sweep failed every one of them on that single control. It is now hidden below `lg`,
+matching the pattern the same file already uses (`lg:hidden` on the menu, `md:block` on
+search). Safe to hide rather than relocate: an LP holds one module and `modules.ts` marks
+`lp-portal` `hiddenFromSwitcher`, and small-screen navigation lives in the sheet menu.
+
+### Still open
+
+- **`/lp-portal/subscriptions-redemptions` renders thin** at 375 (83 chars) and 768 (142),
+  but not at 1440. Content that only appears at desktop width.
+- **A control reading "1 portal items need …" sits off-screen at 768** on most LP screens.
+  A freshly loaded page at the same viewport has no such element and no offscreen control
+  at all, so it is transient; removing toast containers before measuring did not clear it,
+  and the cause is not yet established. It causes no page scroll.
+
+### Six measurement corrections, all made before reporting
+
+This sweep produced more false results than real ones until it was corrected. Recorded
+because the corrections are the reason the numbers can be trusted:
+
+1. **`innerWidth` vs `clientWidth`.** Under emulation `innerWidth` read 457 against a real
+   375 layout, making the overflow threshold 82px too lenient — exactly the size of the
+   fundraising overflow it was meant to catch. **This one was hiding a real defect.**
+2. **Fixed waits.** 3500ms on the first viewport and 1200ms on the rest reported 20 screens
+   as "renders empty" that were still compiling. The giveaway: the same route passed at one
+   viewport and failed at another. Now waits for content.
+3. **Controls inside horizontal scrollers.** Payroll's row actions live in `.table-wrap`
+   (`clientWidth` 349, `scrollWidth` 704) and are reached by scrolling the table — the
+   pattern the roadmap requires. Seven false failures.
+4. **Toasts caught mid-animation.** A toast raised on the previous route was still sliding
+   in when the next was measured, reported as an unreachable control on 16 screens.
+5. **No route-integrity check.** The sweep measured whatever it landed on: an aliased route
+   scored "ok" against the screen it had been redirected to.
+6. **Deliberate aliases treated as failures.** Eight LP routes redirect to merged screens by
+   design — `dealing/page.tsx` is a bare `redirect(...)`. Now recorded as expected, and only
+   an unintended destination fails.
+
+### A correction to something reported earlier in this session
+
+I said `/lp-portal/performance` redirects to a blank dashboard. **It does not.** That
+reading came from a browser session left stale by the dev-server restart. With the route
+check in place, `/performance` loads its own screen at all three viewports.
+
+### Known limitation
+
+A full three-module run takes ~20 minutes and the LP session expired partway through the
+last one, turning the tail into `redirected to /login`. Per-module runs
+(`--module=lp`) avoid it. Worth re-seeding auth per module before the Stage 4 cycles.

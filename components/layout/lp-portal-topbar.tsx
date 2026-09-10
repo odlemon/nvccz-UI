@@ -384,7 +384,21 @@ export function LpPortalTopbar() {
             </DropdownMenuContent>
           </DropdownMenu>
 
-          <ModuleSwitcherButton currentModule="lp-portal" moduleName={moduleName} onClick={() => window.__openArcusAppSwitcher?.()} />
+          {/*
+            Hidden below lg. The button is shrink-0, so at 375 and 768 it could
+            not compress and pushed this cluster past the viewport on all 18 LP
+            screens — the responsive sweep failed every one of them on exactly
+            this control. The rest of this top bar already hides affordances at
+            breakpoints (lg:hidden on the menu, md:block on search), so this
+            follows the file's own pattern.
+
+            Safe to hide rather than relocate: an LP holds one module, and
+            lib/config/modules.ts marks lp-portal hiddenFromSwitcher. Navigation
+            for small screens lives in the sheet menu, which stays.
+          */}
+          <div className="hidden lg:block">
+            <ModuleSwitcherButton currentModule="lp-portal" moduleName={moduleName} onClick={() => window.__openArcusAppSwitcher?.()} />
+          </div>
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
