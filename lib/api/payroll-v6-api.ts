@@ -354,6 +354,30 @@ export async function getPayrollVendors(): Promise<Record<string, any> | null> {
   return unwrapData(res) ?? null
 }
 
+/**
+ * The four domains that had no backend until now — Inputs & Validation, Pay Groups & Calendar,
+ * Onboarding and the RFQ half of Vendors. Each screen previously rendered the runtime's fixtures.
+ */
+export async function listPayrollInputBatches(): Promise<Record<string, any> | null> {
+  const res = await apiClient.get<ApiResponse<any>>(`${BASE}/inputs/batches`)
+  return unwrapData(res) ?? null
+}
+
+export async function listPayrollPayGroups(): Promise<Record<string, any> | null> {
+  const res = await apiClient.get<ApiResponse<any>>(`${BASE}/pay-groups`)
+  return unwrapData(res) ?? null
+}
+
+export async function listPayrollOnboarding(): Promise<Record<string, any> | null> {
+  const res = await apiClient.get<ApiResponse<any>>(`${BASE}/onboarding/candidates`)
+  return unwrapData(res) ?? null
+}
+
+export async function listPayrollRfqs(): Promise<Record<string, any> | null> {
+  const res = await apiClient.get<ApiResponse<any>>(`${BASE}/rfqs`)
+  return unwrapData(res) ?? null
+}
+
 export async function listBankTemplates(): Promise<Record<string, any>[]> {
   const res = await apiClient.get<ApiResponse<any[]>>(`${BASE}/bank-templates`)
   return unwrapData(res) ?? []

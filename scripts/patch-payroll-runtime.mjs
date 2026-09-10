@@ -256,6 +256,293 @@ s = replaceOnce(
 }
 
 // ---------------------------------------------------------------------------
+// 4a3. Inputs & Validation reads the real batches
+// ---------------------------------------------------------------------------
+// The screen hardcoded a five-row error list and a band reading "1,247 valid
+// rows are ready. 37 rows remain isolated." over "1,284 uploaded". None of it
+// was backed by anything — PayrollInputBatch/PayrollInputRow did not exist.
+{
+  const label = "inputs validation rows -> live"
+  if (s.includes("const __ib=__pr6Inputs()")) {
+    console.log(`  skip (already)  ${label}`)
+    skipped += 1
+  } else {
+    const re = /const errors=\[\['Line 44'[^\n]*?\n\s*const rows=errors\.map\([^\n]*?\);/
+    const m = s.match(re)
+    if (!m) {
+      console.warn(`  MISS            ${label}`)
+      missed += 1
+    } else {
+      const live = [
+        "const __ib=__pr6Inputs();",
+        "const rows=__ib?(__ib.latest&&__ib.latest.errorRows>0?",
+        "[`<tr><td colspan=\"6\" class=\"tiny muted\">Open the batch to see its ${__ib.errorRows} isolated row(s).</td></tr>`]",
+        ":[`<tr><td colspan=\"6\" class=\"tiny muted\">",
+        "${__ib.batches.length?'No rows are isolated. All uploaded rows passed validation.':'No input batches have been uploaded.'}",
+        "</td></tr>`])",
+        ":[`<tr><td colspan=\"6\" class=\"tiny muted\">Payroll inputs are not visible to your role.</td></tr>`];",
+      ].join("")
+      s = s.replace(m[0], live)
+      console.log(`  patched         ${label}`)
+      applied += 1
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 4a4. Inputs band: valid / isolated / uploaded come from the batch
+// ---------------------------------------------------------------------------
+{
+  const label = "inputs band stats -> live"
+  if (s.includes("__pr6InputsBand()")) {
+    console.log(`  skip (already)  ${label}`)
+    skipped += 1
+  } else {
+    const re = /<div class="eyebrow" style="color:#7eb6ff">INPUT BATCH INP-2026-06-04<\/div><h2>1,247 valid rows are ready\. 37 rows remain isolated\.<\/h2>/
+    const m = s.match(re)
+    if (!m) {
+      console.warn(`  MISS            ${label}`)
+      missed += 1
+    } else {
+      const live =
+        '<div class="eyebrow" style="color:#7eb6ff">${(()=>{const b=__pr6Inputs();' +
+        "return b?(b.latest?'INPUT BATCH '+b.latest.reference:'NO INPUT BATCH'):'INPUT BATCHES UNAVAILABLE'})()}</div>" +
+        '<h2>${(()=>{const b=__pr6Inputs();' +
+        "if(!b)return 'Payroll inputs are not visible to your role.';" +
+        "if(!b.latest)return 'No input batches have been uploaded.';" +
+        "return b.validRows+' valid row'+(b.validRows===1?'':'s')+' ready. '+b.errorRows+' row'+(b.errorRows===1?'':'s')+' isolated.'})()}</h2>"
+      s = s.replace(m[0], live)
+      console.log(`  patched         ${label}`)
+      applied += 1
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 4a5. Onboarding pipeline reads real candidates
+// ---------------------------------------------------------------------------
+{
+  const label = "onboarding pipeline -> live"
+  if (s.includes("const __ob=__pr6Onboarding()")) {
+    console.log(`  skip (already)  ${label}`)
+    skipped += 1
+  } else {
+    const re = /const candidates=\[\['ONB-026'[^\n]*?\n\s*const rows=candidates\.map\([^\n]*?\);/
+    const m = s.match(re)
+    if (!m) {
+      console.warn(`  MISS            ${label}`)
+      missed += 1
+    } else {
+      const live = [
+        "const __ob=__pr6Onboarding();",
+        "const rows=__ob?(__ob.candidates.length?__ob.candidates.map(c=>`<tr data-candidate=\"${c.id}\">",
+        "<td><div class=\"access-user\"><div class=\"mini-avatar\">${(c.name||'?').split(' ').map(x=>x[0]).join('').slice(0,2).toUpperCase()}</div>",
+        "<strong class=\"link\">${c.name}</strong></div></td>",
+        "<td>${c.position||'\\u2014'}</td><td>${c.department||'\\u2014'}</td>",
+        "<td>${c.startDate?String(c.startDate).slice(0,10):'\\u2014'}</td>",
+        "<td>${badge(c.status)}</td></tr>`)",
+        ":[`<tr><td colspan=\"5\" class=\"tiny muted\">No candidates are in onboarding.</td></tr>`])",
+        ":[`<tr><td colspan=\"5\" class=\"tiny muted\">Onboarding is not visible to your role.</td></tr>`];",
+      ].join("")
+      s = s.replace(m[0], live)
+      console.log(`  patched         ${label}`)
+      applied += 1
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 4a6. Inputs band stats: uploaded / valid / warnings / errors from the batch
+// ---------------------------------------------------------------------------
+// The band header was made live above, but the four figures beneath it still
+// read 1,284 uploaded / 1,247 valid / 29 warnings / 8 errors from the fixture.
+// There is no "warning" severity in the model — a row is VALID, ERROR or
+// RESOLVED — so that stat becomes resolved rows rather than an invented count.
+{
+  const label = "inputs band figures -> live"
+  if (s.includes("__pr6InputsBandStats()")) {
+    console.log(`  skip (already)  ${label}`)
+    skipped += 1
+  } else {
+    const re = /<div class="band-stat"><span>Rows uploaded<\/span><strong>1,284<\/strong><\/div><div class="band-stat"><span>Valid<\/span><strong>1,247<\/strong><\/div><div class="band-stat"><span>Warnings<\/span><strong>29<\/strong><\/div><div class="band-stat"><span>Errors<\/span><strong>8<\/strong><\/div>/
+    const m = s.match(re)
+    if (!m) {
+      console.warn(`  MISS            ${label}`)
+      missed += 1
+    } else {
+      const live =
+        "${(()=>{const b=__pr6Inputs();" +
+        "const stat=(l,v)=>`<div class=\"band-stat\"><span>${l}</span><strong>${v}</strong></div>`;" +
+        "if(!b)return stat('Rows uploaded','\\u2014')+stat('Valid','\\u2014')+stat('Resolved','\\u2014')+stat('Errors','\\u2014');" +
+        "const resolved=b.batches.reduce((n,x)=>n+(x.totalRows-x.validRows-x.errorRows),0);" +
+        "return stat('Rows uploaded',b.totalRows)+stat('Valid',b.validRows)+stat('Resolved',Math.max(0,resolved))+stat('Errors',b.errorRows)})()}"
+      s = s.replace(m[0], live)
+      console.log(`  patched         ${label}`)
+      applied += 1
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 4a7. Onboarding band stats come from the candidate pipeline
+// ---------------------------------------------------------------------------
+// "Open onboarding cases 2 / Average completion time 2.4 days / First-time-right
+// 94% / Missing documents 3" were all invented. Completion time and
+// first-time-right have nothing behind them in the model, so rather than
+// fabricate a substitute the band reports what the pipeline actually knows.
+{
+  const label = "onboarding band figures -> live"
+  if (s.includes("__pr6OnboardingBand()")) {
+    console.log(`  skip (already)  ${label}`)
+    skipped += 1
+  } else {
+    const re = /<div class="band-stat"><span>Open onboarding cases<\/span><strong>2<\/strong><\/div><div class="band-stat"><span>Average completion time<\/span><strong>2\.4 days<\/strong><\/div><div class="band-stat"><span>First-time-right rate<\/span><strong>94%<\/strong><\/div><div class="band-stat"><span>Missing documents<\/span><strong>3<\/strong><\/div>/
+    const m = s.match(re)
+    if (!m) {
+      console.warn(`  MISS            ${label}`)
+      missed += 1
+    } else {
+      const live =
+        "${(()=>{const o=__pr6Onboarding();" +
+        "const stat=(l,v)=>`<div class=\"band-stat\"><span>${l}</span><strong>${v}</strong></div>`;" +
+        "if(!o)return stat('Open onboarding cases','\\u2014')+stat('Completed','\\u2014')+stat('Awaiting documents','\\u2014')+stat('Total candidates','\\u2014');" +
+        "return stat('Open onboarding cases',o.inProgress)+stat('Completed',o.complete)" +
+        "+stat('Awaiting documents',o.byStatus.DOCUMENTS||0)+stat('Total candidates',o.total)})()}"
+      s = s.replace(m[0], live)
+      console.log(`  patched         ${label}`)
+      applied += 1
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 4a8. Inputs validation-completion bar reflects the real batch
+// ---------------------------------------------------------------------------
+// The bar was pinned at 97% with the caption "1,247 of 1,284 rows valid".
+{
+  const label = "inputs progress bar -> live"
+  if (s.includes("__pr6InputsProgress()")) {
+    console.log(`  skip (already)  ${label}`)
+    skipped += 1
+  } else {
+    const re = /progressRow\('Validation completion',97,'1,247 of 1,284 rows valid','cyan'\)/
+    const m = s.match(re)
+    if (!m) {
+      console.warn(`  MISS            ${label}`)
+      missed += 1
+    } else {
+      const live =
+        "${(()=>{const b=__pr6Inputs();" +
+        "if(!b)return progressRow('Validation completion',0,'Payroll inputs are not visible to your role','cyan');" +
+        "if(!b.totalRows)return progressRow('Validation completion',0,'No rows have been uploaded','cyan');" +
+        "return progressRow('Validation completion',b.validPct===null?0:b.validPct," +
+        "b.validRows+' of '+b.totalRows+' rows valid','cyan')})()}"
+      // progressRow(...) is interpolated inside a template literal, so the call is replaced by an
+      // IIFE that returns the same markup rather than by another bare call.
+      s = s.replace("${" + m[0] + "}", live)
+      console.log(`  patched         ${label}`)
+      applied += 1
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 4a9. Pay Groups & Calendar reads the real calendar
+// ---------------------------------------------------------------------------
+// The screen built six months from hardcoded arrays of cut-off and pay dates.
+// PayrollPayGroup/PayrollCalendarPeriod now hold them.
+{
+  const label = "pay calendar rows -> live"
+  if (s.includes("const __cal=__pr6PayGroups()")) {
+    console.log(`  skip (already)  ${label}`)
+    skipped += 1
+  } else {
+    const re = /const months=\['Jul 2026'[^\n]*?\n\s*const rows=months\.map\([^\n]*?\);/
+    const m = s.match(re)
+    if (!m) {
+      console.warn(`  MISS            ${label}`)
+      missed += 1
+    } else {
+      const live = [
+        "const __cal=__pr6PayGroups();",
+        "const __periods=__cal?__cal.groups.flatMap(g=>(g.periods||[]).map(p=>({g:g.name,...p}))):null;",
+        "const rows=__periods?(__periods.length?__periods.map(p=>`<tr>",
+        "<td><strong>${p.periodLabel}</strong><div class=\"tiny muted\">${p.g}</div></td>",
+        "<td>${p.cutoffDate?String(p.cutoffDate).slice(0,10):'\\u2014'}</td>",
+        "<td>${p.payDate?String(p.payDate).slice(0,10):'\\u2014'}</td>",
+        "<td>${badge(p.status)}</td></tr>`)",
+        ":[`<tr><td colspan=\"4\" class=\"tiny muted\">No pay periods are configured.</td></tr>`])",
+        ":[`<tr><td colspan=\"4\" class=\"tiny muted\">The payroll calendar is not visible to your role.</td></tr>`];",
+      ].join("")
+      s = s.replace(m[0], live)
+      console.log(`  patched         ${label}`)
+      applied += 1
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 4a10. Pay Groups & Calendar KPI cards come from the calendar
+// ---------------------------------------------------------------------------
+// "Active pay groups 4 / 195 employees across all groups", "Schedule controls
+// 18 / 18" and "Approval SLAs 96% on time over the last 12 periods" were all
+// asserted. Group and period counts are real; headcount-per-group, milestone
+// completeness and approval SLA have nothing behind them in the model, so they
+// are replaced by figures the calendar can actually answer rather than by a
+// substitute invention.
+{
+  const label = "calendar KPI cards -> live"
+  if (s.includes("__pr6CalendarKpis()")) {
+    console.log(`  skip (already)  ${label}`)
+    skipped += 1
+  } else {
+    const re = /<div class="grid kpis">\$\{kpi\('Active pay groups','4','195 employees across all groups','users'\)\}/
+    const m = s.match(re)
+    if (!m) {
+      console.warn(`  MISS            ${label}`)
+      missed += 1
+    } else {
+      const live =
+        '<div class="grid kpis">${(()=>{const c=__pr6PayGroups();' +
+        "if(!c)return kpi('Active pay groups','\\u2014','Calendar not visible to your role','users');" +
+        "return kpi('Active pay groups',String(c.active),c.total+' configured in total','users')})()}"
+      s = s.replace(m[0], live)
+      console.log(`  patched         ${label}`)
+      applied += 1
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 4a11. Retire the two calendar KPIs nothing can answer
+// ---------------------------------------------------------------------------
+// "Schedule controls 18 / 18" and "Approval SLAs 96%" measure things the model
+// does not record. Replaced with period counts, which it does.
+{
+  const label = "calendar unanswerable KPIs -> period counts"
+  if (s.includes("kpi('Open periods'")) {
+    console.log(`  skip (already)  ${label}`)
+    skipped += 1
+  } else {
+    const re = /\$\{kpi\('Schedule controls','18 \/ 18','All required milestones configured','shield','cyan'\)\}\$\{kpi\('Approval SLAs','96%','On time over the last 12 periods','clock','violet'\)\}/
+    const m = s.match(re)
+    if (!m) {
+      console.warn(`  MISS            ${label}`)
+      missed += 1
+    } else {
+      const live =
+        "${(()=>{const c=__pr6PayGroups();" +
+        "if(!c)return kpi('Pay periods','\\u2014','Calendar not visible to your role','shield','cyan');" +
+        "return kpi('Pay periods',String(c.periods),'Configured across all groups','shield','cyan')" +
+        "+kpi('Open periods',String(c.openPeriods),c.openPeriods?'Accepting inputs':'None open','clock','violet')})()}"
+      s = s.replace(m[0], live)
+      console.log(`  patched         ${label}`)
+      applied += 1
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
 // 4b. Command-centre KPI cards come from data, not from literals
 // ---------------------------------------------------------------------------
 // The overview shipped with Employees '128', gross USD 264,720, gross ZiG
@@ -1007,6 +1294,23 @@ const HYDRATE_IMPL = `  api = {
 // picks up new keys. Vendors is carried separately for that reason: an object,
 // not an array, and null is meaningful — it is how a role without
 // payroll.vendors.view is told the registry is not theirs to see.
+// The vendors hydrate line is already in the committed runtime, so that patch skips and the four
+// domains added afterwards would never be carried. This adds them beside it, guarded separately.
+if (s.includes("__pr6Live.inputBatches = payload.inputBatches")) {
+  console.log("  skip (already)  hydrate: carry the four new domains")
+  skipped += 1
+} else if (!s.includes("__pr6Live.vendors = payload.vendors;")) {
+  console.warn("  MISS            hydrate: carry the four new domains")
+  missed += 1
+} else {
+  s = s.replace(
+    "__pr6Live.vendors = payload.vendors;",
+    "__pr6Live.vendors = payload.vendors;\n        }\n        if (payload.inputBatches !== undefined) {\n          __pr6Live.inputBatches = payload.inputBatches;\n        }\n        if (payload.payGroups !== undefined) {\n          __pr6Live.payGroups = payload.payGroups;\n        }\n        if (payload.onboarding !== undefined) {\n          __pr6Live.onboarding = payload.onboarding;\n        }\n        if (payload.rfqs !== undefined) {\n          __pr6Live.rfqs = payload.rfqs;",
+  )
+  console.log("  patched         hydrate: carry the four new domains")
+  applied += 1
+}
+
 if (s.includes("__pr6Live.vendors = payload.vendors")) {
   console.log("  skip (already)  hydrate: carry vendors")
   skipped += 1
@@ -1018,7 +1322,7 @@ if (s.includes("__pr6Live.vendors = payload.vendors")) {
   } else {
     s = s.replace(
       anchor,
-      anchor + "\n        }\n        if (payload.vendors !== undefined) {\n          __pr6Live.vendors = payload.vendors;",
+      anchor + "\n        }\n        for (const __k of ['vendors','inputBatches','payGroups','onboarding','rfqs']) {\n          if (payload[__k] !== undefined) __pr6Live[__k] = payload[__k];\n        }\n        if (false) {",
     )
     console.log("  patched         hydrate: carry vendors")
     applied += 1

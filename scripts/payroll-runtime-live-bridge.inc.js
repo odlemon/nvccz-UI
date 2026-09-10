@@ -29,6 +29,10 @@ const __pr6Live = {
   dashboard: null, // /api/payroll/dashboard payload
   mypay: null, // self-service payslips, portal and leave balances
   vendors: null, // supplier registry, read from the real Vendor table
+  inputBatches: null, // payroll input batches and their validation rows
+  payGroups: null, // pay groups with their calendar periods
+  onboarding: null, // onboarding candidates
+  rfqs: null, // sourcing events and vendor bids
   errors: [],
 };
 
@@ -932,6 +936,73 @@ function __pr6PeriodOptions() {
  * Returns null when there is no live vendor payload, so the caller can render an honest empty
  * state instead of falling back to the fixture.
  */
+/**
+ * Inputs & Validation. The screen hardcoded a five-row error list and a band reading
+ * "1,247 valid rows are ready. 37 rows remain isolated" over "1,284 uploaded" — none of it backed
+ * by anything. Returns null when the role cannot see inputs, so the caller says so rather than
+ * falling back to the fixture.
+ */
+function __pr6Inputs() {
+  const p = __pr6Live.inputBatches;
+  if (!p || !Array.isArray(p.items)) return null;
+  const s = p.summary || {};
+  const latest = p.items[0] || null;
+  return {
+    batches: p.items,
+    latest,
+    totalRows: Number(s.totalRows) || 0,
+    validRows: Number(s.validRows) || 0,
+    errorRows: Number(s.errorRows) || 0,
+    awaitingCommit: Number(s.awaitingCommit) || 0,
+    // Percentage of rows that passed validation; null when nothing has been uploaded, because
+    // 0% and "no data" are different statements.
+    validPct: Number(s.totalRows) > 0 ? Math.round((Number(s.validRows) / Number(s.totalRows)) * 100) : null,
+  };
+}
+
+/** Pay groups with their calendar periods. Replaces a hardcoded single "Monthly Staff" group. */
+function __pr6PayGroups() {
+  const p = __pr6Live.payGroups;
+  if (!p || !Array.isArray(p.items)) return null;
+  const s = p.summary || {};
+  return {
+    groups: p.items,
+    total: Number(p.total) || p.items.length,
+    active: Number(s.active) || 0,
+    periods: Number(s.periods) || 0,
+    openPeriods: Number(s.openPeriods) || 0,
+  };
+}
+
+/** Onboarding pipeline. */
+function __pr6Onboarding() {
+  const p = __pr6Live.onboarding;
+  if (!p || !Array.isArray(p.items)) return null;
+  const s = p.summary || {};
+  return {
+    candidates: p.items,
+    total: Number(p.total) || p.items.length,
+    inProgress: Number(s.inProgress) || 0,
+    complete: Number(s.complete) || 0,
+    byStatus: s.byStatus || {},
+  };
+}
+
+/** Sourcing events and their bids, for the RFQ half of the Vendors screen. */
+function __pr6Rfqs() {
+  const p = __pr6Live.rfqs;
+  if (!p || !Array.isArray(p.items)) return null;
+  const s = p.summary || {};
+  return {
+    rfqs: p.items,
+    open: Number(s.open) || 0,
+    evaluating: Number(s.evaluating) || 0,
+    awarded: Number(s.awarded) || 0,
+    bidsReceived: Number(s.bidsReceived) || 0,
+    closingSoon: Number(s.closingSoon) || 0,
+  };
+}
+
 function __pr6Vendors() {
   const v = __pr6Live.vendors;
   if (!v || !Array.isArray(v.items)) return null;

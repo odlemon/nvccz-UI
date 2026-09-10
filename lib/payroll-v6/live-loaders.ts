@@ -37,6 +37,10 @@ import {
   listAuditEvents,
   type PayrollAccess,
   getPayrollVendors,
+  listPayrollInputBatches,
+  listPayrollPayGroups,
+  listPayrollOnboarding,
+  listPayrollRfqs,
 } from "@/lib/api/payroll-v6-api"
 
 export type LoaderError = { source: string; message: string; status?: number }
@@ -56,6 +60,10 @@ export type PayrollV6LivePayload = {
   leaveBalances: any[]
   mypay: Record<string, any>
   vendors: Record<string, any> | null
+  inputBatches: Record<string, any> | null
+  payGroups: Record<string, any> | null
+  onboarding: Record<string, any> | null
+  rfqs: Record<string, any> | null
   errors: LoaderError[]
 }
 
@@ -341,6 +349,9 @@ export async function loadPayrollV6LiveData(): Promise<PayrollV6LivePayload> {
   const canTraining = has("payroll.training.view") || has("payroll.training.manage")
   const canSettings = has("payroll.settings.view") || has("payroll.settings.manage")
   const canVendors = has("payroll.vendors.view")
+  const canInputs = has("payroll.inputs.view") || has("payroll.inputs.manage")
+  const canCalendar = has("payroll.calendar.view") || has("payroll.calendar.manage")
+  const canOnboarding = has("payroll.onboarding.view") || has("payroll.onboarding.manage")
   const canDashboard = has("payroll.dashboard.view")
   const canAudit = has("payroll.audit.view")
 
@@ -362,6 +373,10 @@ export async function loadPayrollV6LiveData(): Promise<PayrollV6LivePayload> {
     myLeave,
     auditRows,
     vendorPayload,
+    inputBatchPayload,
+    payGroupPayload,
+    onboardingPayload,
+    rfqPayload,
   ] = await Promise.all([
     canDashboard ? safe("dashboard", getPayrollDashboard, null) : Promise.resolve(null),
     canEmployees ? safe("employees", listEmployees, [] as any[]) : Promise.resolve([] as any[]),
@@ -385,6 +400,10 @@ export async function loadPayrollV6LiveData(): Promise<PayrollV6LivePayload> {
     // Vendors & Quotations rendered a hardcoded registry of invented suppliers; this is the real
     // Vendor table. A role without payroll.vendors.view gets null, and the screen says so.
     canVendors ? safe("vendors", getPayrollVendors, null) : Promise.resolve(null),
+    canInputs ? safe("inputs/batches", listPayrollInputBatches, null) : Promise.resolve(null),
+    canCalendar ? safe("pay-groups", listPayrollPayGroups, null) : Promise.resolve(null),
+    canOnboarding ? safe("onboarding/candidates", listPayrollOnboarding, null) : Promise.resolve(null),
+    canVendors ? safe("rfqs", listPayrollRfqs, null) : Promise.resolve(null),
   ])
 
   // Annual leave balance per employee, for the roster's Leave column.
@@ -447,6 +466,10 @@ export async function loadPayrollV6LiveData(): Promise<PayrollV6LivePayload> {
     ready: true,
     // Top level, not under `reference`: the runtime bridge reads `__pr6Live.vendors`.
     vendors: vendorPayload ?? null,
+    inputBatches: inputBatchPayload ?? null,
+    payGroups: payGroupPayload ?? null,
+    onboarding: onboardingPayload ?? null,
+    rfqs: rfqPayload ?? null,
     roleName: access?.roleName ?? null,
     permissions: access?.permissions ?? [],
     access,

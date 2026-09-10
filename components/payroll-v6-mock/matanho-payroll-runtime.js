@@ -41,6 +41,10 @@ const __pr6Live = {
   dashboard: null, // /api/payroll/dashboard payload
   mypay: null, // self-service payslips, portal and leave balances
   vendors: null, // supplier registry, read from the real Vendor table
+  inputBatches: null, // payroll input batches and their validation rows
+  payGroups: null, // pay groups with their calendar periods
+  onboarding: null, // onboarding candidates
+  rfqs: null, // sourcing events and vendor bids
   errors: [],
 };
 
@@ -944,6 +948,73 @@ function __pr6PeriodOptions() {
  * Returns null when there is no live vendor payload, so the caller can render an honest empty
  * state instead of falling back to the fixture.
  */
+/**
+ * Inputs & Validation. The screen hardcoded a five-row error list and a band reading
+ * "1,247 valid rows are ready. 37 rows remain isolated" over "1,284 uploaded" — none of it backed
+ * by anything. Returns null when the role cannot see inputs, so the caller says so rather than
+ * falling back to the fixture.
+ */
+function __pr6Inputs() {
+  const p = __pr6Live.inputBatches;
+  if (!p || !Array.isArray(p.items)) return null;
+  const s = p.summary || {};
+  const latest = p.items[0] || null;
+  return {
+    batches: p.items,
+    latest,
+    totalRows: Number(s.totalRows) || 0,
+    validRows: Number(s.validRows) || 0,
+    errorRows: Number(s.errorRows) || 0,
+    awaitingCommit: Number(s.awaitingCommit) || 0,
+    // Percentage of rows that passed validation; null when nothing has been uploaded, because
+    // 0% and "no data" are different statements.
+    validPct: Number(s.totalRows) > 0 ? Math.round((Number(s.validRows) / Number(s.totalRows)) * 100) : null,
+  };
+}
+
+/** Pay groups with their calendar periods. Replaces a hardcoded single "Monthly Staff" group. */
+function __pr6PayGroups() {
+  const p = __pr6Live.payGroups;
+  if (!p || !Array.isArray(p.items)) return null;
+  const s = p.summary || {};
+  return {
+    groups: p.items,
+    total: Number(p.total) || p.items.length,
+    active: Number(s.active) || 0,
+    periods: Number(s.periods) || 0,
+    openPeriods: Number(s.openPeriods) || 0,
+  };
+}
+
+/** Onboarding pipeline. */
+function __pr6Onboarding() {
+  const p = __pr6Live.onboarding;
+  if (!p || !Array.isArray(p.items)) return null;
+  const s = p.summary || {};
+  return {
+    candidates: p.items,
+    total: Number(p.total) || p.items.length,
+    inProgress: Number(s.inProgress) || 0,
+    complete: Number(s.complete) || 0,
+    byStatus: s.byStatus || {},
+  };
+}
+
+/** Sourcing events and their bids, for the RFQ half of the Vendors screen. */
+function __pr6Rfqs() {
+  const p = __pr6Live.rfqs;
+  if (!p || !Array.isArray(p.items)) return null;
+  const s = p.summary || {};
+  return {
+    rfqs: p.items,
+    open: Number(s.open) || 0,
+    evaluating: Number(s.evaluating) || 0,
+    awarded: Number(s.awarded) || 0,
+    bidsReceived: Number(s.bidsReceived) || 0,
+    closingSoon: Number(s.closingSoon) || 0,
+  };
+}
+
 function __pr6Vendors() {
   const v = __pr6Live.vendors;
   if (!v || !Array.isArray(v.items)) return null;
@@ -1014,6 +1085,7 @@ document.addEventListener(
   true,
 );
   /* END_PAYROLL_LIVE_BRIDGE */
+
 
 
 
@@ -1188,10 +1260,9 @@ function employeesPage(){
  </div>`;
 }
 function onboardingPage(){
- const candidates=[['ONB-026','Kundai Marufu','Risk Analyst','01 Jul 2026','Compensation review','Chipo Ndlovu'],['ONB-027','Rutendo Zinyemba','Branch Administrator','08 Jul 2026','Documents outstanding','Chipo Ndlovu']];
- const rows=candidates.map(c=>`<tr data-action="open-onboarding"><td><span class="link">${c[0]}</span></td><td><strong>${c[1]}</strong><div class="tiny muted">${c[2]}</div></td><td>${c[3]}</td><td>${badge(c[4])}</td><td>${c[5]}</td><td><button class="btn small" data-action="open-onboarding">Continue ${icon('arrow')}</button></td></tr>`);
+ const __ob=__pr6Onboarding();const rows=__ob?(__ob.candidates.length?__ob.candidates.map(c=>`<tr data-candidate="${c.id}"><td><div class="access-user"><div class="mini-avatar">${(c.name||'?').split(' ').map(x=>x[0]).join('').slice(0,2).toUpperCase()}</div><strong class="link">${c.name}</strong></div></td><td>${c.position||'\u2014'}</td><td>${c.department||'\u2014'}</td><td>${c.startDate?String(c.startDate).slice(0,10):'\u2014'}</td><td>${badge(c.status)}</td></tr>`):[`<tr><td colspan="5" class="tiny muted">No candidates are in onboarding.</td></tr>`]):[`<tr><td colspan="5" class="tiny muted">Onboarding is not visible to your role.</td></tr>`];
  return `<div class="page">${pageHead('Governed employment setup','New Employee and Contract Onboarding','Capture identity, employment, compensation, statutory eligibility, bank details, documents, approvals and dual-currency allocation through a controlled workflow.',button('Import employees','import-employees','', 'upload')+button('Start onboarding','new-employee','primary','plus'))}
- <div class="panel-band"><div class="eyebrow" style="color:#7eb6ff">CONTROLLED ONBOARDING</div><h2>One employment record. One auditable source of truth.</h2><p>Every change is validated, versioned and routed to the right maker-checker authority before the employee becomes payroll-ready.</p><div class="band-stats"><div class="band-stat"><span>Open onboarding cases</span><strong>2</strong></div><div class="band-stat"><span>Average completion time</span><strong>2.4 days</strong></div><div class="band-stat"><span>First-time-right rate</span><strong>94%</strong></div><div class="band-stat"><span>Missing documents</span><strong>3</strong></div></div></div>
+ <div class="panel-band"><div class="eyebrow" style="color:#7eb6ff">CONTROLLED ONBOARDING</div><h2>One employment record. One auditable source of truth.</h2><p>Every change is validated, versioned and routed to the right maker-checker authority before the employee becomes payroll-ready.</p><div class="band-stats">${(()=>{const o=__pr6Onboarding();const stat=(l,v)=>`<div class="band-stat"><span>${l}</span><strong>${v}</strong></div>`;if(!o)return stat('Open onboarding cases','\u2014')+stat('Completed','\u2014')+stat('Awaiting documents','\u2014')+stat('Total candidates','\u2014');return stat('Open onboarding cases',o.inProgress)+stat('Completed',o.complete)+stat('Awaiting documents',o.byStatus.DOCUMENTS||0)+stat('Total candidates',o.total)})()}</div></div>
  ${card('Onboarding workflow','Identity, contract, compensation and statutory readiness',`<div class="card-body">${workflow(3)}</div>`)}<div style="height:14px"></div>
  ${tableCard('Active onboarding cases','Draft and in-progress employee records',['Case','Employee','Start date','Current stage','Owner',''],rows)}
  </div>`;
@@ -1204,11 +1275,10 @@ function runsPage(){
  </div>`;
 }
 function inputsPage(){
- const errors=[['Line 44','EMP-0044','Tax number','Required value is missing','Critical'],['Line 109','EMP-0035','Transport allowance','Duplicate recurring component','Critical'],['Line 278','EMP-0021','Overtime hours','61% above six-month average','Warning'],['Line 331','EMP-0063','Contract end date','Falls before payment date','Critical'],['Line 402','EMP-0078','Cost centre','Mapping is inactive','Warning']];
- const rows=errors.map(e=>`<tr><td>${e[0]}</td><td><span class="link" data-employee="${e[1]}">${e[1]}</span></td><td>${e[2]}</td><td>${e[3]}</td><td>${badge(e[4])}</td><td><button class="btn small" data-action="resolve-input">Resolve</button></td></tr>`);
+ const __ib=__pr6Inputs();const rows=__ib?(__ib.latest&&__ib.latest.errorRows>0?[`<tr><td colspan="6" class="tiny muted">Open the batch to see its ${__ib.errorRows} isolated row(s).</td></tr>`]:[`<tr><td colspan="6" class="tiny muted">${__ib.batches.length?'No rows are isolated. All uploaded rows passed validation.':'No input batches have been uploaded.'}</td></tr>`]):[`<tr><td colspan="6" class="tiny muted">Payroll inputs are not visible to your role.</td></tr>`];
  return `<div class="page">${pageHead('Controlled data intake','Payroll Inputs Import and Validation','Map, validate and safely commit bulk payroll inputs while isolating errors, warnings, duplicates and outliers before calculation.',button('Download template','download-input-template','', 'download')+button('Upload input file','upload-inputs','primary','upload'))}
- <div class="panel-band"><div class="eyebrow" style="color:#7eb6ff">INPUT BATCH INP-2026-06-04</div><h2>1,247 valid rows are ready. 37 rows remain isolated.</h2><p>The valid population can be committed without allowing invalid rows into calculation. Every correction preserves the original file, mapping and reviewer evidence.</p><div class="band-stats"><div class="band-stat"><span>Rows uploaded</span><strong>1,284</strong></div><div class="band-stat"><span>Valid</span><strong>1,247</strong></div><div class="band-stat"><span>Warnings</span><strong>29</strong></div><div class="band-stat"><span>Errors</span><strong>8</strong></div></div></div>
- ${card('Import workflow','Upload, map, validate and commit',`<div class="card-body"><div class="stepper"><div class="step done"><b>1</b><span>Upload</span></div><div class="step done"><b>2</b><span>Map columns</span></div><div class="step active"><b>3</b><span>Validate</span></div><div class="step"><b>4</b><span>Commit</span></div></div>${progressRow('Validation completion',97,'1,247 of 1,284 rows valid','cyan')}<div class="actions" style="margin-top:13px">${button('Export error file','export-errors','', 'download')}${button('Commit valid rows','commit-inputs','primary','check')}</div></div>`)}<div style="height:14px"></div>
+ <div class="panel-band"><div class="eyebrow" style="color:#7eb6ff">${(()=>{const b=__pr6Inputs();return b?(b.latest?'INPUT BATCH '+b.latest.reference:'NO INPUT BATCH'):'INPUT BATCHES UNAVAILABLE'})()}</div><h2>${(()=>{const b=__pr6Inputs();if(!b)return 'Payroll inputs are not visible to your role.';if(!b.latest)return 'No input batches have been uploaded.';return b.validRows+' valid row'+(b.validRows===1?'':'s')+' ready. '+b.errorRows+' row'+(b.errorRows===1?'':'s')+' isolated.'})()}</h2><p>The valid population can be committed without allowing invalid rows into calculation. Every correction preserves the original file, mapping and reviewer evidence.</p><div class="band-stats">${(()=>{const b=__pr6Inputs();const stat=(l,v)=>`<div class="band-stat"><span>${l}</span><strong>${v}</strong></div>`;if(!b)return stat('Rows uploaded','\u2014')+stat('Valid','\u2014')+stat('Resolved','\u2014')+stat('Errors','\u2014');const resolved=b.batches.reduce((n,x)=>n+(x.totalRows-x.validRows-x.errorRows),0);return stat('Rows uploaded',b.totalRows)+stat('Valid',b.validRows)+stat('Resolved',Math.max(0,resolved))+stat('Errors',b.errorRows)})()}</div></div>
+ ${card('Import workflow','Upload, map, validate and commit',`<div class="card-body"><div class="stepper"><div class="step done"><b>1</b><span>Upload</span></div><div class="step done"><b>2</b><span>Map columns</span></div><div class="step active"><b>3</b><span>Validate</span></div><div class="step"><b>4</b><span>Commit</span></div></div>${(()=>{const b=__pr6Inputs();if(!b)return progressRow('Validation completion',0,'Payroll inputs are not visible to your role','cyan');if(!b.totalRows)return progressRow('Validation completion',0,'No rows have been uploaded','cyan');return progressRow('Validation completion',b.validPct===null?0:b.validPct,b.validRows+' of '+b.totalRows+' rows valid','cyan')})()}<div class="actions" style="margin-top:13px">${button('Export error file','export-errors','', 'download')}${button('Commit valid rows','commit-inputs','primary','check')}</div></div>`)}<div style="height:14px"></div>
  ${tableCard('Validation issues','Errors remain isolated from the calculation engine',['Source row','Employee','Field','Validation message','Severity',''],rows)}
  </div>`;
 }
@@ -1257,8 +1327,7 @@ function componentsPage(){
  </div>`;
 }
 function calendarPage(){
- const months=['Jul 2026','Aug 2026','Sep 2026','Oct 2026','Nov 2026','Dec 2026'];
- const rows=months.map((m,i)=>`<tr><td><strong>${m}</strong></td><td>${['20 Jul','20 Aug','21 Sep','20 Oct','20 Nov','18 Dec'][i]}</td><td>${['23 Jul','24 Aug','24 Sep','23 Oct','23 Nov','21 Dec'][i]}</td><td>${['24 Jul','25 Aug','25 Sep','26 Oct','24 Nov','22 Dec'][i]}</td><td>${['27 Jul','27 Aug','28 Sep','28 Oct','26 Nov','23 Dec'][i]}</td><td>${['31 Jul','31 Aug','30 Sep','30 Oct','30 Nov','31 Dec'][i]}</td><td>${badge(i===0?'Open':'Scheduled')}</td><td><button class="btn small" data-action="edit-schedule">Edit</button></td></tr>`);
+ const __cal=__pr6PayGroups();const __periods=__cal?__cal.groups.flatMap(g=>(g.periods||[]).map(p=>({g:g.name,...p}))):null;const rows=__periods?(__periods.length?__periods.map(p=>`<tr><td><strong>${p.periodLabel}</strong><div class="tiny muted">${p.g}</div></td><td>${p.cutoffDate?String(p.cutoffDate).slice(0,10):'\u2014'}</td><td>${p.payDate?String(p.payDate).slice(0,10):'\u2014'}</td><td>${badge(p.status)}</td></tr>`):[`<tr><td colspan="4" class="tiny muted">No pay periods are configured.</td></tr>`]):[`<tr><td colspan="4" class="tiny muted">The payroll calendar is not visible to your role.</td></tr>`];
  return `<div class="page">${pageHead('Payroll administration','Pay Groups and Payroll Calendar','Define pay groups, cut-offs, calculation dates, review windows, approvals, payments and statutory deadlines across entities and branches.',button('Copy prior year','copy-calendar','', 'refresh')+button('Create pay group','new-paygroup','primary','plus'))}
  <div class="grid two" style="margin-bottom:14px">
   ${card('Pay groups','Population, currency and processing cadence',`<div class="card-body list">${[['Monthly Staff','128 employees','USD / ZiG','Active'],['Executives','12 employees','USD','Active'],['Contract Staff','34 employees','ZiG','Active'],['Commission Sales','21 employees','USD / ZiG','Review']].map((x,i)=>`<div class="list-row" data-action="edit-paygroup"><div class="list-icon ${i===3?'amber':''}">${icon('users')}</div><div class="list-main"><strong>${x[0]}</strong><span>${x[1]} - ${x[2]}</span></div>${badge(x[3])}</div>`).join('')}</div>`)}
@@ -1693,7 +1762,7 @@ init();
     const milestones=[['Inputs close','20 Jul','Cut-off'],['Calculate','23 Jul','System'],['Review','24 Jul','Maker-checker'],['Approve','27 Jul','Authority'],['Payment','31 Jul','Bank'],['Statutory','10 Aug','Filing']];
     const rows=calendarPeriods.map((r,i)=>`<tr data-calendar-milestone="${i}"><td data-label="Period"><strong>${r[0]}</strong></td><td data-label="Input cut-off">${r[1]}</td><td data-label="Calculation">${r[2]}</td><td data-label="Review">${r[3]}</td><td data-label="Approval">${r[4]}</td><td data-label="Payment">${r[5]}</td><td data-label="Statutory filing">${r[6]}</td><td data-label="Status">${badge(r[7])}</td><td data-label="Action"><button class="btn small" data-action="edit-schedule-v2" data-period="${r[0]}">Edit</button></td></tr>`);
     return `<div class="page">${pageHead('Payroll administration','Pay Groups and Payroll Calendar','Define populations, currencies, cut-offs, calculation dates, review windows, approvals, payments and statutory deadlines across entities and branches.',button('Copy prior year','copy-calendar-v2','', 'refresh')+button('Create pay group','new-paygroup','primary','plus'))}
-      <div class="grid kpis">${kpi('Active pay groups','4','195 employees across all groups','users')}${kpi('Next input cut-off',group.cutoff,`${group.name} · ${group.employees} employees`,'calendar','amber')}${kpi('Next payment',group.payment,`${group.currency} settlement`,'bank','cyan')}${kpi('Schedule controls','18 / 18','All required milestones configured','shield','cyan')}${kpi('Approval SLAs','96%','On time over the last 12 periods','clock','violet')}${kpi('Calendar conflicts','0','No holiday or banking conflicts','check','cyan')}</div>
+      <div class="grid kpis">${(()=>{const c=__pr6PayGroups();if(!c)return kpi('Active pay groups','\u2014','Calendar not visible to your role','users');return kpi('Active pay groups',String(c.active),c.total+' configured in total','users')})()}${kpi('Next input cut-off',group.cutoff,`${group.name} · ${group.employees} employees`,'calendar','amber')}${kpi('Next payment',group.payment,`${group.currency} settlement`,'bank','cyan')}${(()=>{const c=__pr6PayGroups();if(!c)return kpi('Pay periods','\u2014','Calendar not visible to your role','shield','cyan');return kpi('Pay periods',String(c.periods),'Configured across all groups','shield','cyan')+kpi('Open periods',String(c.openPeriods),c.openPeriods?'Accepting inputs':'None open','clock','violet')})()}${kpi('Calendar conflicts','0','No holiday or banking conflicts','check','cyan')}</div>
       <div class="calendar-layout"><aside class="paygroup-list">${payGroupsV2.map(g=>`<article class="paygroup-card ${g.id===group.id?'active':''}" data-paygroup="${g.id}"><div class="paygroup-card-head"><strong>${g.name}</strong>${badge(g.status)}</div><p>${g.employees} employees · ${g.currency}</p><div class="paygroup-meta"><span class="meta-chip">${g.cadence}</span><span class="meta-chip">Cut-off ${g.cutoff}</span><span class="meta-chip">Pay ${g.payment}</span></div></article>`).join('')}</aside><section class="calendar-board"><div class="milestone-strip">${milestones.map((m,i)=>`<article class="milestone-card ${i===0?'active':''}" data-calendar-milestone="${i}"><span>${m[2]}</span><strong>${m[0]}</strong><span style="margin-top:4px">${m[1]}</span></article>`).join('')}</div><section class="card"><div class="card-head"><div><h3>${group.name} · payroll calendar</h3><p>${group.employees} employees · ${group.currency} · governed milestone schedule</p></div><button class="btn small" data-action="edit-schedule-v2" data-period="July 2026">Edit active period</button></div><div class="table-wrap calendar-table"><table class="responsive-table"><thead><tr><th>Period</th><th>Input cut-off</th><th>Calculation</th><th>Review</th><th>Approval</th><th>Payment</th><th>Statutory filing</th><th>Status</th><th></th></tr></thead><tbody>${rows.join('')}</tbody></table></div></section><div class="schedule-health"><div class="fact"><span>Freeze rule</span><strong>5 business days before payment</strong></div><div class="fact"><span>Late-input authority</span><strong>Payroll Manager + business owner</strong></div><div class="fact"><span>Release authority</span><strong>CFO or delegated treasury authority</strong></div></div></section></div>
     </div>`;
   };
@@ -2632,6 +2701,18 @@ init();
         }
         if (payload.vendors !== undefined) {
           __pr6Live.vendors = payload.vendors;
+        }
+        if (payload.inputBatches !== undefined) {
+          __pr6Live.inputBatches = payload.inputBatches;
+        }
+        if (payload.payGroups !== undefined) {
+          __pr6Live.payGroups = payload.payGroups;
+        }
+        if (payload.onboarding !== undefined) {
+          __pr6Live.onboarding = payload.onboarding;
+        }
+        if (payload.rfqs !== undefined) {
+          __pr6Live.rfqs = payload.rfqs;
         }
         if (Array.isArray(payload.errors)) __pr6Live.errors = payload.errors;
 
