@@ -33,6 +33,7 @@ import {
   terminateEmployee,
   updateEmployee,
   downloadPayslipPdf,
+  createPayrollPayGroup,
   toastPayrollError,
 } from "@/lib/api/payroll-v6-api"
 
@@ -275,6 +276,32 @@ export async function handlePayrollV6Action(
         if (!id) return { handled: true, error: "No employee selected." }
         await terminateEmployee(id, {})
         return { handled: true, reload: true, message: "Employee terminated." }
+      }
+
+      case "save-paygroup": {
+        const denied = await requirePermission("payroll.calendar.manage")
+        if (denied) return denied
+
+        const val = (id: string) =>
+          (document.querySelector<HTMLInputElement | HTMLSelectElement>(`#${id}`)?.value || "").trim()
+
+        const name = val("newPayGroupName")
+        const code = val("newPayGroupCode")
+        const missing: string[] = []
+        if (!name) missing.push("group name")
+        if (!code) missing.push("code")
+        if (missing.length) {
+          return { handled: true, error: `Cannot create the pay group — missing ${missing.join(", ")}.` }
+        }
+
+        await createPayrollPayGroup({
+          name,
+          code,
+          frequency: val("newPayGroupFrequency") || "MONTHLY",
+          payDayOfMonth: val("newPayGroupPayDay") || null,
+          currencyCode: val("newPayGroupCurrency") || "USD",
+        })
+        return { handled: true, reload: true, message: `Pay group ${name} created.` }
       }
 
       case "edit-employee": {

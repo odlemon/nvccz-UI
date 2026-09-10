@@ -51,6 +51,8 @@ const API_ACTIONS = new Set([
   // Payslip: the runtime built a PDF client-side from hardcoded content.
   "download-payslip",
   "preview-payslip",
+  // Pay group creation: the control opened a modal with no fields.
+  "save-paygroup",
   "terminate-employee",
 ])
 

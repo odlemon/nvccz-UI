@@ -36,6 +36,18 @@ const PAGES = {
   components: "/payroll-v6/components",
   tax: "/payroll-v6/tax",
   leave: "/payroll-v6/leave",
+  // The probe covered half the module; a control on a page it did not know could not be
+  // exercised at all, which is how a silent no-op stayed invisible.
+  onboarding: "/payroll-v6/onboarding",
+  exceptions: "/payroll-v6/exceptions",
+  calendar: "/payroll-v6/calendar",
+  training: "/payroll-v6/training",
+  vendors: "/payroll-v6/vendors",
+  vault: "/payroll-v6/vault",
+  reports: "/payroll-v6/reports",
+  audit: "/payroll-v6/audit",
+  access: "/payroll-v6/access",
+  settings: "/payroll-v6/settings",
 }
 
 const arg = (n, d) => {
@@ -150,6 +162,7 @@ const OPENERS = {
   "save-onboarding": "new-employee",
   "confirm-upload": "upload-document",
   "confirm-create-document": "create-document",
+  "save-paygroup": "new-paygroup",
 }
 const opener = OPENERS[ACTION]
 let modalOpened = null

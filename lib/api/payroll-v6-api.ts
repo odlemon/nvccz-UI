@@ -384,6 +384,12 @@ export async function listPayrollInputBatches(): Promise<Record<string, any> | n
   return unwrapData(res) ?? null
 }
 
+/** Create a pay group. The Create Pay Group control opened a modal with no fields until now. */
+export async function createPayrollPayGroup(body: Record<string, any>) {
+  const res = await apiClient.post<ApiResponse<any>>(`${BASE}/pay-groups`, body)
+  return unwrapData(res)
+}
+
 export async function listPayrollPayGroups(): Promise<Record<string, any> | null> {
   const res = await apiClient.get<ApiResponse<any>>(`${BASE}/pay-groups`)
   return unwrapData(res) ?? null

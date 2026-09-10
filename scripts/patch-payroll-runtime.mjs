@@ -785,6 +785,50 @@ s = replaceOnce(
 }
 
 // ---------------------------------------------------------------------------
+// 4a16. Create Pay Group opens a real form, not a placeholder
+// ---------------------------------------------------------------------------
+// `new-paygroup` called genericModal('Create Pay Group', ...) — a dialog with
+// no fields and nothing to submit, so the control looked live and did nothing.
+// PayrollPayGroup now exists behind POST /payroll/pay-groups, so the form has
+// somewhere to go. Same openModal + form-field shape the onboarding form uses.
+{
+  const label = "new-paygroup -> real form"
+  if (s.includes("newPayGroupCode")) {
+    console.log(`  skip (already)  ${label}`)
+    skipped += 1
+  } else {
+    const needle =
+      "case 'new-paygroup':genericModal('Create Pay Group','Define population, calendar, currencies and approval authority.');break;"
+    if (!s.includes(needle)) {
+      console.warn(`  MISS            ${label}`)
+      missed += 1
+    } else {
+      const field = (id, lbl, extra) =>
+        "<div class=\"form-field\"><label>" + lbl + "</label><input id=\"" + id + "\" " + extra + "></div>"
+      const body = [
+        "<div class=\"form-grid\">",
+        field("newPayGroupName", "Group name", "placeholder=\"Monthly Staff\""),
+        field("newPayGroupCode", "Code", "placeholder=\"MTH-STAFF\""),
+        "<div class=\"form-field\"><label>Frequency</label><select id=\"newPayGroupFrequency\">",
+        "<option value=\"MONTHLY\">Monthly</option><option value=\"FORTNIGHTLY\">Fortnightly</option>",
+        "<option value=\"WEEKLY\">Weekly</option></select></div>",
+        field("newPayGroupPayDay", "Pay day of month", "type=\"number\" min=\"1\" max=\"31\" placeholder=\"25\""),
+        field("newPayGroupCurrency", "Currency", "value=\"USD\""),
+        "</div>",
+      ].join("")
+      const live =
+        "case 'new-paygroup':openModal('Create Pay Group'," +
+        "'Define the population, its cycle and the currency it is paid in.'," +
+        "`" + body + "`," +
+        "`${button('Create pay group','save-paygroup','primary','plus')}`);break;"
+      s = s.replace(needle, live)
+      console.log(`  patched         ${label}`)
+      applied += 1
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
 // 4b. Command-centre KPI cards come from data, not from literals
 // ---------------------------------------------------------------------------
 // The overview shipped with Employees '128', gross USD 264,720, gross ZiG
