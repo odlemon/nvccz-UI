@@ -4,7 +4,7 @@
 
 | Severity | Open | Fixed (pending verification) | Verified |
 |---|---|---|---|
-| CRITICAL | 1 | 3 | 0 |
+| CRITICAL | 0 | 4 | 0 |
 | HIGH | 0 | 0 | 0 |
 | MEDIUM | 0 | 0 | 0 |
 | LOW | 0 | 0 | 0 |
@@ -446,6 +446,77 @@ paid a wrong amount, but the stored payslip totals are not money. Recorded here 
 than as its own finding because it shares a root with the above and should be fixed in
 the same pass.
 
-**Status:** OPEN — diagnosed, not yet fixed. The fix is three separate corrections in the
+### Fix applied
+
+Three corrections in `PayrollService.createPayrollJournalEntry`:
+
+1. **No double count.** The legs branch now ends in `continue`. Legs are the authoritative
+   statutory record when present and the deduction rows mirror them; the deduction loop
+   remains the path for employees with no legs.
+2. **Currency conversion.** A `toRunCurrency` helper converts each leg by its own
+   `currencyCode` using the run's `fxRateUsdZig`. A ZiG leg with no usable rate now throws
+   rather than contributing a silently wrong number, and an unrecognised currency throws.
+3. **Nothing is written unless it balances.** Lines are built into an array, debit and
+   credit totals are summed **from that array**, and the entry and its lines are created
+   only if they agree. The back-solving assignment is gone: net wages is derived from the
+   components, a negative result throws, and a gap over 0.05 against the run's own net pay
+   throws, because that means the breakdown and the payslips disagree.
+
+**Correction to the diagnosis above:** the first write-up said the error was swallowed. It
+was not. The caller does pass `rethrowOnError: true` and does mark the run FAILED. The
+guard was wired correctly and simply could not fire, because net pay was reassigned to
+`gross - PAYE - NSSA - SDL` before the check, making `totalCredit` equal `totalGrossPay`
+by construction. The check validated variables, not the lines it had written.
+
+### Verification
+
+Full lifecycle for a fresh period, via `scripts/_uat/payroll-lifecycle-probe.mjs`:
+
+```
+Gross Pay Expense: 2026-11       dr  42209.00   cr        0.00
+PAYE Payable: 2026-11            dr      0.00   cr     7820.74
+NSSA/Pension Payable: 2026-11    dr      0.00   cr      474.24
+SDL Payable: 2026-11             dr      0.00   cr      211.06
+Net Wages Payable: 2026-11       dr      0.00   cr    33702.96
+                                 ---------      ---------
+                                  42209.00       42209.00      balanced
+```
+
+The arithmetic confirms the diagnosis to the cent. NSSA posts **474.24**, exactly
+`378.00 + 2562.84 / 26.6291` - converted, with the doubling gone. SDL posts **211.06** =
+`181.81 + 778.861 / 26.6291`.
+
+The same run proved **P.2**: the Payroll Manager was refused 403 on approving its own run,
+the CFO rejected it, the maker resubmitted, the CFO approved, the run processed. First time
+this module's segregation of duties has actually functioned. The probe deletes the run and
+its journal afterwards.
+
+### Still open - the four journals already posted
+
+The fix stops new ones; it does not touch what is already in the ledger.
+
+```
+2026-06  dr 42209.00  cr 67732.61  OUT BY 25523.61  net-pay line MISSING
+2026-07  dr 42209.00  cr 67732.61  OUT BY 25523.61  net-pay line MISSING
+2026-08  dr 42209.00  cr 67732.61  OUT BY 25523.61  net-pay line MISSING
+2026-10  dr 42209.00  cr 67732.61  OUT BY 25523.61  net-pay line MISSING
+                                   total misstatement 102,094.46 on the credit side
+```
+
+`scripts/_uat/report-unbalanced-payroll-journals.mjs` reports this and writes nothing.
+Correcting posted GL is an accounting decision - a correcting journal and a void-and-repost
+leave different audit trails - so its `--void` path exists but is not taken unilaterally.
+
+### Still open - money precision on split contracts
+
+Unchanged by this fix: it lives in the payslip calculation, not the posting. Six of twelve
+payslips store a gross like `3705.9999857298969924`. The route is `splitGrossByContract`,
+then rounding the ZiG leg to ZiG cents, then dividing back by the fx rate for the aggregate
+with no re-rounding. The per-currency legs the employee is actually paid are clean, so
+nobody is paid a wrong amount. The fix is to round the recombined aggregate while keeping
+`gross - deductions = net` true after rounding, which is a change to the calculation path
+and wants its own verification pass.
+
+**Status:** FIXED (pending verification) — diagnosed, not yet fixed. The fix is three separate corrections in the
 posting path plus a decision on the four journals already written, and it is not being
 started at the tail of a long session.
