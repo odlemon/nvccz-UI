@@ -4,7 +4,7 @@
 
 | Severity | Open | Fixed (pending verification) | Verified |
 |---|---|---|---|
-| CRITICAL | 0 | 2 | 0 |
+| CRITICAL | 0 | 3 | 0 |
 | HIGH | 0 | 0 | 0 |
 | MEDIUM | 0 | 0 | 0 |
 | LOW | 0 | 0 | 0 |
@@ -195,3 +195,145 @@ repository**. They should be rotated and moved to environment variables. Not act
 here because rotating a live credential is the owner's call, and doing it silently during
 a test engagement would be the wrong way to make that change. Raised in the Stage 1
 report.
+
+---
+
+## FINDING-003
+
+**Title:** An investee account can sign in to the staff portal, read the whole staff directory, and create an IT Manager account
+**Module:** Cross-cutting (Auth / Users) — reached while testing LP Portal isolation
+**Dimension:** UAT · **Category:** Permission / Data Integrity
+**Severity:** CRITICAL
+**Persona affected:** every staff member and every portfolio company in the system
+**Surface:** Internal App (staff API) · **Screen / Flow:** login, then `GET`/`POST /api/users`
+
+### Steps to reproduce
+
+1. `POST /api/auth/login` with `{ email: "company.nts@arcus.co.zw", password, portal: "staff" }` —
+   an INVESTEE account, i.e. an external portfolio company.
+2. With the returned token, `GET /api/users`.
+3. With the same token, `POST /api/users` creating `{ roleCode: "IT_MGR" }`.
+
+### Expected
+
+An external portfolio-company account is refused at the staff portal, and the staff
+user directory and account-creation endpoint are unreachable to it.
+
+### Actual
+
+All three succeeded.
+
+1. **Login admitted.** `assertPortalLoginAllowed` ends its staff branch in a default
+   `return { ok: true }`. The INVESTEE account matched none of the earlier cases — its
+   role *name* is `INVESTEE` and its `roleCode` is `null`, so the applicant check missed
+   it — and fell through to the default.
+2. **`GET /api/users` returned 200 with 30 full user records** — names, emails, roles,
+   departments and voting power, including admins, board members and **other portfolio
+   companies**. One investee could enumerate every other investee and all staff.
+3. **`POST /api/users` returned 201** and created an `IT_MGR` account, **returning its
+   temporary password in the response body**.
+
+`userRoutes.ts` applied `router.use(authenticate)` and nothing else. `authenticate`
+proves a token is valid, not that its holder is staff. Neither the list nor the create
+route carried any permission guard.
+
+This is a complete privilege-escalation path from an external tenant to a staff account.
+
+### Evidence
+
+```
+POST /api/users  (as company.nts@arcus.co.zw)
+HTTP 201
+{"success":true,"data":{"user":{"email":"escalation.probe@nts.local","roleCode":"IT_MGR"},
+ "temporaryPassword":"<redacted>"}}
+```
+
+The account created by this probe was deleted immediately; user count returned to its
+prior value.
+
+**Viewport:** n/a (API) · **Reproducibility:** Always
+**Suspected area:** `nvccz/src/utils/portalAuth.ts` · `nvccz/src/routes/userRoutes.ts`
+**Upstream dependency?** **Yes** — Auth, which every portal depends on.
+
+### Fix applied
+
+Two independent layers, because either alone leaves a hole. A token minted before the
+login fix stays valid until it expires, so the route guard has to hold on its own.
+
+**Layer 1 — portal admission** (`portalAuth.ts`). Added `isExternalPortalUser()` and a
+final check in the staff branch, so investee, applicant and LP role tokens are refused
+regardless of whether the earlier checks recognise them.
+
+Narrowing the staff portal to `isGpStaff()` instead would have been the obvious move and
+would have taken the platform down: `GP_ROLE_CODES` is only
+`{admin, fund_manager, cfo}`, so HR, Payroll, Operations and Analyst roles are not "GP
+staff". Classifying the external types closes the hole without locking out staff.
+
+**Layer 2 — route authorisation** (`userRoutes.ts`, `permissionAuth.ts`). Added
+`requireInternalStaffUser()`:
+
+- `GET /` — staff check, not a specific permission. Every staff role legitimately needs
+  the directory (assignment pickers, reviewer selection), so a permission here would
+  break working features.
+- `POST /` — `requireInternalStaffUser()` **and** `requirePermission("manage_users")`.
+  Creating an account is privilege granting.
+
+**Grant shipped with the guard.** Only the `admin` role held `manage_users`, so the guard
+alone would have 403'd System Administrator, which legitimately creates users and did so
+minutes earlier. `scripts/run-user-management-permission-migration.ts` grants it to
+System Administrator, idempotently. HR Manager is a plausible future holder and was
+deliberately **not** added — that is a product decision, not a regression fix.
+
+**Blast radius (flagged):** `portalAuth.ts` and `permissionAuth.ts` are Auth, the highest
+blast radius after Portfolio. Both changes are additive — a new exported helper and a new
+middleware — and no existing check was altered or relaxed.
+
+### Verification
+
+```
+LAYER 1 — staff portal admission
+  investee         refused — "This account is not authorized for the staff portal."
+  applicant        refused — "Applicant accounts must use the investee portal."
+  LP               refused — "LP accounts must use the LP portal."
+  SysAdmin / HR Manager / Payroll Manager / plain staff   all admitted
+
+LAYER 2 — /api/users with a VALID non-staff token (LP, via its own portal)
+  GET  /users -> 403        POST /users -> 403
+
+NO LOCKOUT
+  SysAdmin, HR Manager, Payroll Manager, plain staff   GET /users -> 200
+  SysAdmin POST /users -> 201
+```
+
+Layer 2 is proven with a *valid* token rather than a rejected login, so it holds
+independently of layer 1.
+
+**Status:** FIXED (pending verification) — re-asserted every cycle as roadmap item **X.5**.
+
+---
+
+# Cycle 0 — isolation block result
+
+Roadmap items **X.1, X.2** and the cross-portal login matrix, run as
+`nvccz/scripts/_uat/lp-isolation-probe.mjs`.
+
+| Axis | Result |
+|---|---|
+| Cross-portal admission (7 combinations) | **PASS** — 3 external types refused, 4 staff roles admitted |
+| **X.1** cross-organisation, LP A vs B/C | **PASS** — 104 replayed ids, **0** returned 200 |
+| **X.2** intra-organisation role, SIGNATORY vs VIEWER | **PASS** — 4/4 signatory-only writes refused 403 |
+
+The LP Portal's own scoping is sound: `LpPortalAccessService` derives the LP context from
+the token's `userId` via `lpUserRelation`, never from a client id in the request, so there
+is no id to tamper with. Every cross-tenant detail and download route refused.
+
+**The leak was not in the LP Portal.** It was in shared Auth, found because the probe
+tested which portal accepts which account rather than assuming the boundary held.
+
+### Probe correction
+
+The phase-2 summary initially printed `leaks.length`, which already carried the phase-0
+login leak, so it reported "1 returned 200" when phase 2 had found none. Fixed to report
+only its own leaks before any conclusion was drawn from it. The applicant row was also
+passing for the wrong reason — `"Invalid credentials."` rather than a portal refusal,
+because that account's password was not aligned — and now proves the control it claims to.
