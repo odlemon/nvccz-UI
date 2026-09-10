@@ -4,8 +4,8 @@
 
 | Severity | Open | Fixed (pending verification) | Verified |
 |---|---|---|---|
-| CRITICAL | 0 | 5 | 0 |
-| HIGH | 0 | 0 | 0 |
+| CRITICAL | 0 | 6 | 0 |
+| HIGH | 1 | 0 | 0 |
 | MEDIUM | 0 | 0 | 0 |
 | LOW | 0 | 0 | 0 |
 
@@ -628,3 +628,145 @@ perf.sysadmin@nts.local       POST /fundraising/campaigns -> 400  (past the guar
 ```
 
 **Status:** FIXED (pending verification) — re-asserted every cycle as roadmap item **X.5**.
+
+---
+
+## FINDING-006
+
+**Title:** An external LP can read the whole fundraising module — commitments, KYC cases, DDQ evidence, data rooms
+**Module:** Fundraising · **Dimension:** UAT · **Category:** Permission / Data Integrity
+**Severity:** CRITICAL
+**Persona affected:** every investor in the pipeline; every LP is a potential reader
+**Surface:** backend
+
+### Steps to reproduce
+
+1. Sign in as `lp.test@arcus.co.zw` through the **LP portal** (`portal: "lp"`).
+2. With that token, `GET /api/fundraising/commitments/frs-commit-001`.
+3. Repeat against `/api/fundraising/kyc-cases`.
+
+### Expected
+
+Fundraising is an internal module. An external LP token reaches none of it.
+
+### Actual
+
+**200**, with another investor's full commitment record:
+
+```
+commitmentAmount     15000000          currency  USD
+investor             {...}             investorId frs-inv-01
+sideLetter           ...               complianceStatus CLEARED
+capitalCallContact   capital.calls@arcus.example
+signedAt / admissionDate / fundedAmount / status FUNDED
+```
+
+`fundraisingRoutes.ts` applied `router.use(authenticate)` and then guarded routes
+individually. **67 of its 179 route declarations carried no fundraising guard at all** —
+`/commitments`, `/closings`, `/mandates`, `/communications`, `/kyc-cases/:caseId`,
+`/ddq/cases/:caseId/export`, `/ddq/cases/:caseId/items/:itemId/evidence/:evidenceId/download`,
+`/data-rooms/:dataRoomId` among them. `authenticate` proves a token is valid; an LP portal
+token is valid.
+
+The irony is instructive: the LP Portal's own routes passed every isolation axis in this
+engagement (X.1–X.3, 104 cross-tenant attempts, zero leaks) because
+`LpPortalAccessService` derives scope from the token's user. The disclosure was in the
+module the LP is not supposed to be able to reach at all.
+
+**Reproducibility:** Always
+**Suspected area:** `nvccz/src/routes/fundraisingRoutes.ts`
+**Upstream dependency?** No — the fundraising router itself.
+
+### Fix applied
+
+`router.use(requireInternalStaffUser())` immediately after `authenticate`, refusing the
+whole module to external portal accounts rather than route by route — so a route added
+later cannot silently reopen it.
+
+Verified safe before applying: `lib/api/fundraising-api.ts` is the only client, and it is
+imported solely by `components/fundraising`, `lib/fundraising`, `components/portfolio-v11-mock`
+and `lib/portfolio-v11` — all staff surfaces. No LP or investee screen touches it, and the
+router has no token-based public routes.
+
+### Verification
+
+```
+                 commitment   kyc-cases
+EXTERNAL LP         403          403      (was 200 / 200)
+plain staff         200          200
+fund manager        200          200
+compliance          200          200
+sysadmin            200          200
+```
+
+### Still open — internal least privilege
+
+A plain Operations Member still reads commitments and KYC cases at 200. That is a
+different question from external exposure: it is about which *staff* should see what, it
+spans 67 routes, and over-tightening would break working staff screens. Recorded rather
+than fixed, because choosing the internal audience for each of those routes is a product
+decision, not a regression fix.
+
+**Status:** FIXED (pending verification) for the external exposure; internal least
+privilege above remains open.
+
+---
+
+## FINDING-007
+
+**Title:** Fundraising approvals can be decided by the person who requested them
+**Module:** Fundraising · **Dimension:** UAT · **Category:** Permission
+**Severity:** HIGH
+**Persona affected:** Fund Manager, and anyone relying on an approval as a control
+**Surface:** backend · **Screen / Flow:** approvals, roadmap **F.3**
+
+### Steps to reproduce
+
+1. `POST /api/fundraising/approvals` as a Fund Manager.
+2. `POST /api/fundraising/approvals/:approvalId/decide` as **the same user**.
+
+### Expected
+
+An approval is a second pair of eyes. The requester cannot decide their own request.
+
+### Actual
+
+Both routes are guarded by the same `requireFundraisingEdit`, and
+`FundraisingSrdService.decideApproval` never compares the deciding `userId` with
+`existing.requestedById`. It checks only that the request exists and is `PENDING`.
+
+This is not hypothetical. **Every approval in the database was decided by the person who
+raised it**, including a closing sign-off:
+
+```
+cmtucutvd0085unjok9dvb98e  APPROVED  req=oqfojl  dec=oqfojl  OPPORTUNITY STAGE_OVERRIDE
+frs-appr-05                REJECTED  req=oqfojl  dec=oqfojl  OPPORTUNITY STAGE_OVERRIDE
+frs-appr-04                APPROVED  req=oqfojl  dec=oqfojl  CLOSING     CLOSING_SIGN_OFF
+```
+
+5 of 5, same actor on both sides.
+
+The data model anticipates two people: `fundraising_approval_requests` carries
+`requested_by_id` and `decided_by_id` as separate columns, and the module already
+distinguishes authority elsewhere with a separate `requireFundraisingClose` guard. Payroll
+states the same principle explicitly — *"the maker and the checker are never granted to
+the same non-admin role"* — and this module has no equivalent.
+
+**Reproducibility:** Always
+**Suspected area:** `nvccz/src/services/fundraising/FundraisingSrdService.ts` line ~1582,
+`nvccz/src/routes/fundraisingRoutes.ts` line ~290
+
+### Recommended fix — needs a policy decision first
+
+`decideApproval` should refuse when `userId === existing.requestedById`, mirroring
+payroll's maker-checker.
+
+**Not applied unilaterally.** In a small firm the Fund Manager may be the only holder of
+`requireFundraisingEdit`, in which case refusing self-decision blocks the approval
+workflow entirely rather than strengthening it. The right shape is probably a distinct
+approver capability — as payroll has with `runs.approve` — rather than a bare
+requester-not-decider check. That is a product decision about who approves, and it is
+raised rather than imposed, the same way the four already-posted journals were.
+
+**Status:** OPEN — diagnosed and evidenced, fix recommended, awaiting a decision on who
+should hold approval authority.
