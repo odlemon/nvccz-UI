@@ -653,6 +653,101 @@ s = replaceOnce(
 }
 
 // ---------------------------------------------------------------------------
+// 4a14. The last asserted KPIs: report what is known, or nothing
+// ---------------------------------------------------------------------------
+// Four cards stated figures with no source at all — MFA coverage 97.6%,
+// Evidence completeness 96%, Records validated 116, and an approvals sample
+// table of invented employees and recalculated amounts. Three of the four
+// measure things this model does not record; inventing a replacement
+// computation would be the same defect wearing a different number, so they
+// report an em dash and say why. "Records validated" can be answered from the
+// employee and exception data already loaded, so it is.
+{
+  const label = "MFA coverage KPI -> honest"
+  const needle = "kpi('MFA coverage','97.6%','1 user pending enrolment','shield','cyan')"
+  if (s.includes("MFA enrolment is not tracked")) {
+    console.log(`  skip (already)  ${label}`)
+    skipped += 1
+  } else if (!s.includes(needle)) {
+    console.warn(`  MISS            ${label}`)
+    missed += 1
+  } else {
+    // The same card is defined on more than one screen, so replace every occurrence.
+    s = s.split(needle).join("kpi('MFA coverage','\\u2014','MFA enrolment is not tracked for staff accounts','shield','cyan')")
+    console.log(`  patched         ${label}`)
+    applied += 1
+  }
+}
+
+{
+  const label = "evidence completeness KPI -> honest"
+  const needle = "kpi('Evidence completeness','96%','Source and approval lineage','audit','cyan')"
+  if (s.includes("No completeness measure is recorded")) {
+    console.log(`  skip (already)  ${label}`)
+    skipped += 1
+  } else if (!s.includes(needle)) {
+    console.warn(`  MISS            ${label}`)
+    missed += 1
+  } else {
+    s = s.split(needle).join("kpi('Evidence completeness','\\u2014','No completeness measure is recorded','audit','cyan')")
+    console.log(`  patched         ${label}`)
+    applied += 1
+  }
+}
+
+{
+  const label = "records validated KPI -> live"
+  const needle = "kpi('Records validated','116','Employees clear of exceptions','check','cyan')"
+  if (s.includes("__pr6RecordsValidated")) {
+    console.log(`  skip (already)  ${label}`)
+    skipped += 1
+  } else if (!s.includes(needle)) {
+    console.warn(`  MISS            ${label}`)
+    missed += 1
+  } else {
+    const live = [
+      "${(()=>{const __pr6RecordsValidated=1;",
+      "const emps=Array.isArray(__pr6Live.employees)?__pr6Live.employees:null;",
+      "if(!emps)return kpi('Records validated','\\u2014','Employee records are not visible to your role','check','cyan');",
+      "const exc=Array.isArray(__pr6Live.exceptions)?__pr6Live.exceptions:[];",
+      "const flagged=new Set(exc.map(e=>e.employeeNumber||e.employeeId).filter(Boolean));",
+      "const clear=emps.filter(e=>!flagged.has(e.id)&&!flagged.has(e.recordId)).length;",
+      "return kpi('Records validated',String(clear),'Of '+emps.length+' employees, clear of exceptions','check','cyan')})()}",
+    ].join("")
+    s = s.replace("${" + needle + "}", live)
+    console.log(`  patched         ${label}`)
+    applied += 1
+  }
+}
+
+{
+  const label = "approvals sample recalculation -> live"
+  if (s.includes("__pr6ApprovalSample")) {
+    console.log(`  skip (already)  ${label}`)
+    skipped += 1
+  } else {
+    const re = /\$\{\[\['Rudo Sibanda','Bank change'[\s\S]*?\)\.join\(''\)\}/
+    const m = s.match(re)
+    if (!m) {
+      console.warn(`  MISS            ${label}`)
+      missed += 1
+    } else {
+      const live = [
+        "${(()=>{const __pr6ApprovalSample=1;",
+        "const runs=Array.isArray(__pr6Live.payrollRuns)?__pr6Live.payrollRuns:null;",
+        "if(!runs)return `<tr><td colspan=\"5\" class=\"tiny muted\">Payroll runs are not visible to your role.</td></tr>`;",
+        "return `<tr><td colspan=\"5\" class=\"tiny muted\">",
+        "${runs.length?'Open a run to review its recalculated lines.':'No payroll runs are awaiting approval.'}",
+        "</td></tr>`})()}",
+      ].join("")
+      s = s.replace(m[0], live)
+      console.log(`  patched         ${label}`)
+      applied += 1
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
 // 4b. Command-centre KPI cards come from data, not from literals
 // ---------------------------------------------------------------------------
 // The overview shipped with Employees '128', gross USD 264,720, gross ZiG
