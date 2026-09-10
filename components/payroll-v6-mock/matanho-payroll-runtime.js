@@ -35,6 +35,9 @@ export function startPayrollV6Runtime(rootEl, options = {}) {
 const __pr6Live = {
   ready: false,
   permissions: null, // Set<string> of real backend permission names
+  // The access call failed, which is NOT the same as holding no permissions.
+  // See __pr6DeniedPageHtml.
+  accessUnavailable: false,
   roleName: null,
   counts: null, // live sidebar badge counts, keyed by page id
   reference: null, // tax rules, allowance/deduction types, brackets, levies, courses
@@ -859,6 +862,27 @@ function __pr6DeniedPageHtml(pageId) {
   try {
     required = (typeof pagePermission !== 'undefined' && pagePermission[pageId]) || '';
   } catch (_) {}
+
+  // An unreachable GET /payroll/me/access used to land here, telling a System
+  // Administrator holding all 34 grants that their role lacked permission --
+  // every payroll screen, for the duration of any outage. Failing closed is
+  // right; blaming the user's role for a backend failure is not, and it is the
+  // opposite of actionable because nobody retries a permissions problem.
+  var unavailable = false;
+  try {
+    unavailable = __pr6Live.accessUnavailable === true;
+  } catch (_) {}
+  if (unavailable) {
+    return (
+      '<div class="page"><section class="card"><div class="card-body" style="text-align:center;padding:48px 24px">' +
+      '<h3 style="margin:0 0 6px">We could not verify your access</h3>' +
+      '<p class="muted" style="margin:0 0 12px">Payroll could not reach the permissions service, so this screen is held back until it can. ' +
+      'Your role has not changed.</p>' +
+      '<button class="btn primary" data-pr6-retry type="button">Try again</button>' +
+      '</div></section></div>'
+    );
+  }
+
   return (
     '<div class="page"><section class="card"><div class="card-body" style="text-align:center;padding:48px 24px">' +
     '<h3 style="margin:0 0 6px">You do not have access to this page</h3>' +
@@ -1054,6 +1078,21 @@ function __pr6AuditStats() {
  * action ids are live (its API_ACTIONS allowlist); anything it does not claim
  * falls through untouched and keeps working as view-state.
  */
+/**
+ * Retry for the "could not verify your access" panel. Deliberately not a
+ * [data-action]: the host claims only its own allowlist and the runtime has no
+ * case for this, so it would fall through and do nothing. The host already
+ * listens for payroll-v6:reload-request and re-runs the whole load.
+ */
+document.addEventListener('click', (event) => {
+  const el = event.target && event.target.closest ? event.target.closest('[data-pr6-retry]') : null;
+  if (!el) return;
+  event.preventDefault();
+  try {
+    window.dispatchEvent(new Event('payroll-v6:reload-request'));
+  } catch (_) {}
+}, true);
+
 document.addEventListener(
   'click',
   (event) => {
@@ -2676,6 +2715,7 @@ init();
         if (Array.isArray(payload.auditEvents)) auditEvents = payload.auditEvents;
         if (Array.isArray(payload.userAccess)) userAccess = payload.userAccess;
 
+        __pr6Live.accessUnavailable = payload.accessUnavailable === true;
         if (Array.isArray(payload.permissions)) {
           __pr6Live.permissions = new Set(payload.permissions);
         }

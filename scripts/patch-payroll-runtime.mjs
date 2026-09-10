@@ -1723,6 +1723,38 @@ s = replaceOnce(
 
 
 // ---------------------------------------------------------------------------
+// 4a18. hydrate carries accessUnavailable
+// ---------------------------------------------------------------------------
+// Its own patch, not an edit to the hydrate replacement above: that one is
+// guarded and reports "skip (already)" on a patched runtime, so changing its
+// replacement string changes nothing. The bridge is re-injected wholesale each
+// run, which is why the panel and the __pr6Live field landed while this line
+// silently did not.
+//
+// FINDING-013: a failed GET /payroll/me/access collapses to an empty permission
+// set, so every screen showed "You do not have access to this page" to accounts
+// holding all 34 grants. The flag lets __pr6DeniedPageHtml tell the two apart.
+{
+  const label = "hydrate: carry accessUnavailable"
+  if (s.includes("__pr6Live.accessUnavailable = payload")) {
+    console.log(`  skip (already)  ${label}`)
+    skipped += 1
+  } else {
+    const needle = "        if (Array.isArray(payload.permissions)) {"
+    if (!s.includes(needle)) {
+      console.warn(`  MISS            ${label}`)
+      missed += 1
+    } else {
+      const live =
+        "        __pr6Live.accessUnavailable = payload.accessUnavailable === true;\n" + needle
+      s = s.replace(needle, live)
+      console.log(`  patched         ${label}`)
+      applied += 1
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
 
 console.log("")
 if (missed > 0) {

@@ -50,6 +50,8 @@ export type PayrollV6LivePayload = {
   roleName: string | null
   permissions: string[]
   access: PayrollAccess | null
+  /** The access call itself failed — not the same as holding no permissions. */
+  accessUnavailable: boolean
   employees: any[]
   payrollRuns: any[]
   exceptions: any[]
@@ -347,6 +349,15 @@ export async function loadPayrollV6LiveData(): Promise<PayrollV6LivePayload> {
   // Access first: it decides which of the rest are even worth attempting and
   // supplies the grants the runtime gates its UI on.
   const access = await safe<PayrollAccess | null>("me/access", getMyPayrollAccess, null)
+
+  // safe() records the failure and hands back the fallback, so a failed access
+  // call and a user holding no grants both arrive here as an empty permission
+  // set. FINDING-013: that made every payroll screen render "You do not have
+  // access to this page" during an outage, to accounts holding all 34 grants.
+  // The distinction is carried rather than collapsed; the runtime shows a
+  // different panel for it.
+  const accessUnavailable = access === null && errors.some((e) => e.source === "me/access")
+
   const permissions = new Set(access?.permissions ?? [])
   const has = (p: string) => permissions.has(p)
 
@@ -473,6 +484,7 @@ export async function loadPayrollV6LiveData(): Promise<PayrollV6LivePayload> {
 
   return {
     ready: true,
+    accessUnavailable,
     // Top level, not under `reference`: the runtime bridge reads `__pr6Live.vendors`.
     vendors: vendorPayload ?? null,
     inputBatches: inputBatchPayload ?? null,
