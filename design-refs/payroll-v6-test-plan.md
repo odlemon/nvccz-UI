@@ -299,7 +299,8 @@ route.**
 | Errors in `payroll-v6` / `lib/payroll-v6` | **0** |
 
 The 997 are pre-existing, mostly in `stock-price-module` and the legacy
-`app/payroll/` module (69 of them), which was not touched.
+frozen payroll module, now at `app/payroll-legacy/` (69 of them), which was
+not touched.
 
 ## 10. Runtime patch reproducibility
 

@@ -319,26 +319,26 @@ console.log("nav bridge", rt.includes("__PAYROLL_V6_NAV__"))
 
 // --- nav map ---
 const pages = [
-  ["overview", "/payroll-v6", "Command Centre"],
-  ["employees", "/payroll-v6/employees", "Employees"],
-  ["onboarding", "/payroll-v6/onboarding", "Onboarding"],
-  ["runs", "/payroll-v6/runs", "Payroll Runs"],
-  ["inputs", "/payroll-v6/inputs", "Inputs & Validation"],
-  ["exceptions", "/payroll-v6/exceptions", "Exception Workbench"],
-  ["approvals", "/payroll-v6/approvals", "Maker-Checker Review"],
-  ["close", "/payroll-v6/close", "Close & Distribution"],
-  ["components", "/payroll-v6/components", "Earnings & Deductions"],
-  ["calendar", "/payroll-v6/calendar", "Pay Groups & Calendar"],
-  ["tax", "/payroll-v6/tax", "Tax & Statutory Rules"],
-  ["training", "/payroll-v6/training", "Training & Compliance"],
-  ["leave", "/payroll-v6/leave", "Leave & Benefits"],
-  ["vendors", "/payroll-v6/vendors", "Vendors & Quotations"],
-  ["vault", "/payroll-v6/vault", "Document Vault"],
-  ["reports", "/payroll-v6/reports", "Compliance Reports"],
-  ["audit", "/payroll-v6/audit", "Audit Trail"],
-  ["access", "/payroll-v6/access", "Roles & Access Control"],
-  ["settings", "/payroll-v6/settings", "Settings & Integrations"],
-  ["mypay", "/payroll-v6/mypay", "My Pay"],
+  ["overview", "/payroll", "Command Centre"],
+  ["employees", "/payroll/employees", "Employees"],
+  ["onboarding", "/payroll/onboarding", "Onboarding"],
+  ["runs", "/payroll/runs", "Payroll Runs"],
+  ["inputs", "/payroll/inputs", "Inputs & Validation"],
+  ["exceptions", "/payroll/exceptions", "Exception Workbench"],
+  ["approvals", "/payroll/approvals", "Maker-Checker Review"],
+  ["close", "/payroll/close", "Close & Distribution"],
+  ["components", "/payroll/components", "Earnings & Deductions"],
+  ["calendar", "/payroll/calendar", "Pay Groups & Calendar"],
+  ["tax", "/payroll/tax", "Tax & Statutory Rules"],
+  ["training", "/payroll/training", "Training & Compliance"],
+  ["leave", "/payroll/leave", "Leave & Benefits"],
+  ["vendors", "/payroll/vendors", "Vendors & Quotations"],
+  ["vault", "/payroll/vault", "Document Vault"],
+  ["reports", "/payroll/reports", "Compliance Reports"],
+  ["audit", "/payroll/audit", "Audit Trail"],
+  ["access", "/payroll/access", "Roles & Access Control"],
+  ["settings", "/payroll/settings", "Settings & Integrations"],
+  ["mypay", "/payroll/mypay", "My Pay"],
 ]
 
 const navTs = `/** Payroll V6 page id → Next path */
@@ -352,8 +352,8 @@ export const PR6_PATH_TO_PAGE: Record<string, string> = Object.fromEntries(
 
 export function pathToPr6Page(pathname: string): string {
   if (pathname in PR6_PATH_TO_PAGE) return PR6_PATH_TO_PAGE[pathname]
-  if (pathname.startsWith('/payroll-v6/')) {
-    const seg = pathname.replace('/payroll-v6/', '').split('/')[0]
+  if (pathname.startsWith('/payroll/')) {
+    const seg = pathname.replace('/payroll/', '').split('/')[0]
     if (seg && PR6_PAGE_TO_PATH[seg]) return seg
   }
   return 'overview'

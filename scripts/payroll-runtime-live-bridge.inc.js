@@ -838,8 +838,9 @@ const __pr6DocumentPlaceholder = {
 /**
  * Access-refusal panel. Shown in place of a page whose permission the
  * signed-in role does not hold. The sidebar already hides the link, but the
- * URL still worked: a plain employee reaching /payroll-v6/approvals got the
- * full Maker-Checker screen. A hidden link is not access control.
+ * URL still worked: a plain employee reaching /payroll/approvals (then
+ * /payroll-v6/approvals) got the full Maker-Checker screen. A hidden link is
+ * not access control.
  */
 function __pr6DeniedPageHtml(pageId) {
   var required = '';

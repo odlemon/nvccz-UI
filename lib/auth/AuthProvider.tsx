@@ -37,8 +37,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
       (pathname?.startsWith('/home/') ?? false) ||
       pathname === '/portfolio' ||
       (pathname?.startsWith('/portfolio/') ?? false) ||
-      pathname === '/payroll-v6' ||
-      (pathname?.startsWith('/payroll-v6/') ?? false) ||
+      pathname === '/payroll' ||
+      (pathname?.startsWith('/payroll/') ?? false) ||
       pathname === '/performance' ||
       (pathname?.startsWith('/performance/') ?? false) ||
       pathname === '/fundraising-kyc' ||

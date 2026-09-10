@@ -92,7 +92,7 @@ export function PayrollV6App() {
       shellHtml: PAYROLL_V6_SHELL_HTML,
       initialPage,
       onNavigate: (page: string) => {
-        const path = PR6_PAGE_TO_PATH[page] || "/payroll-v6"
+        const path = PR6_PAGE_TO_PATH[page] || "/payroll"
         if (pathnameRef.current !== path) router.push(path)
       },
     })

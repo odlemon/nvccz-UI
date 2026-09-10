@@ -157,7 +157,7 @@ data-quality blockers on employee records, but resolution is not persisted:
 
 ## Reconciliation of routes vs navigation
 
-`app/payroll-v6/` has 19 route folders plus `page.tsx`; `lib/payroll-v6-mock/nav.ts`
+`app/payroll/` has 19 route folders plus `page.tsx`; `lib/payroll-v6-mock/nav.ts`
 maps 20 page ids and the sidebar renders all of them. The 10 submodules listed
 in `lib/config/modules.ts` are a **subset** used by the app switcher, not the
 module's own navigation — the remaining 10 pages are reachable from the sidebar

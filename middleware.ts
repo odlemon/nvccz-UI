@@ -135,11 +135,15 @@ const routePermissions: Record<string, { module: string; subModule?: string }> =
   '/performance-legacy/goals': { module: 'performance-management', subModule: 'goals-management' },
   '/performance-legacy/tasks': { module: 'performance-management', subModule: 'taskManagement' },
 
-  // Payroll routes
-  '/payroll': { module: 'payroll', subModule: 'payroll-dashboard' },
-  '/payroll/employees': { module: 'payroll', subModule: 'payroll-employees' },
-  '/payroll/payroll-runs': { module: 'payroll', subModule: 'payroll-runs' },
-  '/payroll/payslips': { module: 'payroll', subModule: 'payroll-payslips' },
+  // Payroll -- legacy, frozen (moved to /payroll-legacy so the V6 port can serve
+  // /payroll). The V6 module is deliberately absent from this map: it enforces
+  // page access inside the runtime against its own payroll.* grants
+  // (__pr6DeniedPageHtml), and gating it here on the legacy module's grants
+  // would refuse people the V6 permissions do admit.
+  '/payroll-legacy': { module: 'payroll', subModule: 'payroll-dashboard' },
+  '/payroll-legacy/employees': { module: 'payroll', subModule: 'payroll-employees' },
+  '/payroll-legacy/payroll-runs': { module: 'payroll', subModule: 'payroll-runs' },
+  '/payroll-legacy/payslips': { module: 'payroll', subModule: 'payroll-payslips' },
 
   // Accounting — legacy, frozen (moved to /accounting-legacy)
   '/accounting-legacy': { module: 'accounting', subModule: 'accounting-dashboard' },
@@ -235,6 +239,15 @@ export function middleware(request: NextRequest) {
   // Permanent rename: /portfolio-v11 → /portfolio
   if (pathname === '/portfolio-v11' || pathname.startsWith('/portfolio-v11/')) {
     const dest = pathname.replace(/^\/portfolio-v11/, '/portfolio') || '/portfolio'
+    const url = request.nextUrl.clone()
+    url.pathname = dest
+    return NextResponse.redirect(url, 308)
+  }
+
+  // Permanent rename: /payroll-v6 → /payroll. The frozen legacy payroll module
+  // moved to /payroll-legacy to free the name, as accounting and performance did.
+  if (pathname === '/payroll-v6' || pathname.startsWith('/payroll-v6/')) {
+    const dest = pathname.replace(/^\/payroll-v6/, '/payroll') || '/payroll'
     const url = request.nextUrl.clone()
     url.pathname = dest
     return NextResponse.redirect(url, 308)

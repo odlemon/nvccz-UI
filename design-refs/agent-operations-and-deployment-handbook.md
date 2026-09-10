@@ -563,7 +563,7 @@ npm run db:seed:portfolio-v11-local-demo
 | **Accounting V52** | `/accounting-v52` | [`accounting-v52-ui-handoff.md`](./accounting-v52-ui-handoff.md) |
 | **Procurement V23** | `/procurement-v23` | [`procurement-v23-ui-handoff.md`](./procurement-v23-ui-handoff.md) |
 | **Performance V22** | `/performance-v22` | [`performance-v22-ui-handoff.md`](./performance-v22-ui-handoff.md) |
-| **Payroll V6** | `/payroll-v6` | [`payroll-v6-ui-handoff.md`](./payroll-v6-ui-handoff.md) |
+| **Payroll V6** | `/payroll` | [`payroll-v6-ui-handoff.md`](./payroll-v6-ui-handoff.md) |
 
 ### Legacy live modules (pre-mock, still in repo)
 

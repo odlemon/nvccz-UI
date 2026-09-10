@@ -160,5 +160,19 @@ fixture. What remains is a handful of single figures on individual cards, itemis
 leave block which is a real derivation.
 
 All three modules are now on live data. Payroll still has the smaller items above worth a further
-pass, and `edit-employee` and the client-side payslip PDF remain unwired — both recorded in
-`payroll-v6-backend-asks.md` as wiring rather than missing capability.
+pass.
+
+### Closed since this was written (10 September 2026)
+
+- **`edit-employee`** — the controller existed but had no route, so the control 404d.
+  `PUT /payroll/employees/:id` added; the action is on the host allowlist.
+- **The payslip PDF** — was built in the browser from hardcoded content, so every employee
+  downloaded the same invented payslip for "Rudo Sibanda". The button now carries
+  `data-payslip-id` and downloads the backend's own hash-verified PDF from
+  `GET /payroll/employee/payslips/:id/download`; it is disabled outright when the user has no
+  payslip. Verified: `%PDF-1.3`, 2,602 bytes, named for the real payslip id.
+- **Create Pay Group** — opened a modal with no fields. It now has a real form behind
+  `POST /payroll/pay-groups`, and the action probe covers all 20 screens rather than 10.
+- **The route is now `/payroll`.** The V6 port serves `/payroll`; the frozen legacy payroll
+  module moved to `/payroll-legacy`, as accounting and performance did before it. `/payroll-v6`
+  308-redirects, so existing links keep working.

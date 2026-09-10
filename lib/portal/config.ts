@@ -67,11 +67,9 @@ export const STAFF_PUBLIC_PASS_THROUGH = [
   '/applications/form',
   '/home',
   '/portfolio',
-  '/payroll-v6',
-  // The V52 accounting port now serves /accounting (renamed from
-  // /accounting-v52). Note this list is matched with startsWith, so this entry
-  // also covers /accounting-legacy — the frozen legacy module, which previously
-  // required login. Narrow this if legacy must stay authenticated.
+  // The V6 payroll port now serves /payroll (renamed from /payroll-v6).
+  '/payroll',
+  // The V52 accounting port now serves /accounting (renamed from /accounting-v52).
   '/accounting',
   '/procurement-v23',
   // '/performance' deliberately REMOVED (8 Sep 2026). This list is checked at
@@ -106,8 +104,17 @@ export function isAuthRoute(pathname: string): boolean {
   return AUTH_ROUTES.some((r) => pathname === r || pathname.startsWith(`${r}/`))
 }
 
+/**
+ * Matched on whole path segments, not raw prefixes. Plain `startsWith` made
+ * `/accounting` also admit `/accounting-legacy` and `/accounting-v2` — frozen
+ * modules that had required login — and after the payroll rename `/payroll`
+ * would likewise have opened `/payroll-legacy` to anyone. This list runs before
+ * the token check in middleware, so a stray prefix match publishes a module.
+ */
 export function isStaffPublicPassThrough(pathname: string): boolean {
-  return STAFF_PUBLIC_PASS_THROUGH.some((route) => pathname.startsWith(route))
+  return STAFF_PUBLIC_PASS_THROUGH.some(
+    (route) => pathname === route || pathname.startsWith(`${route}/`),
+  )
 }
 
 /** True when staff should bounce public apply traffic to the dedicated apply domain. */

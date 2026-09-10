@@ -255,7 +255,7 @@ export function PayrollDashboardV2() {
                             </Button>
                         )}
                         <Button
-                            onClick={() => router.push("/payroll/runs")}
+                            onClick={() => router.push("/payroll-legacy/runs")}
                             variant="gradient-create"
                             className="h-10 px-6 rounded-full gap-2 shadow-sm font-semibold text-xs"
                         >

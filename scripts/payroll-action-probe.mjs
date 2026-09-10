@@ -26,28 +26,28 @@ const ROLES = {
 const PASSWORD = "admin123"
 
 const PAGES = {
-  overview: "/payroll-v6",
-  employees: "/payroll-v6/employees",
-  runs: "/payroll-v6/runs",
-  approvals: "/payroll-v6/approvals",
-  close: "/payroll-v6/close",
-  inputs: "/payroll-v6/inputs",
-  mypay: "/payroll-v6/mypay",
-  components: "/payroll-v6/components",
-  tax: "/payroll-v6/tax",
-  leave: "/payroll-v6/leave",
+  overview: "/payroll",
+  employees: "/payroll/employees",
+  runs: "/payroll/runs",
+  approvals: "/payroll/approvals",
+  close: "/payroll/close",
+  inputs: "/payroll/inputs",
+  mypay: "/payroll/mypay",
+  components: "/payroll/components",
+  tax: "/payroll/tax",
+  leave: "/payroll/leave",
   // The probe covered half the module; a control on a page it did not know could not be
   // exercised at all, which is how a silent no-op stayed invisible.
-  onboarding: "/payroll-v6/onboarding",
-  exceptions: "/payroll-v6/exceptions",
-  calendar: "/payroll-v6/calendar",
-  training: "/payroll-v6/training",
-  vendors: "/payroll-v6/vendors",
-  vault: "/payroll-v6/vault",
-  reports: "/payroll-v6/reports",
-  audit: "/payroll-v6/audit",
-  access: "/payroll-v6/access",
-  settings: "/payroll-v6/settings",
+  onboarding: "/payroll/onboarding",
+  exceptions: "/payroll/exceptions",
+  calendar: "/payroll/calendar",
+  training: "/payroll/training",
+  vendors: "/payroll/vendors",
+  vault: "/payroll/vault",
+  reports: "/payroll/reports",
+  audit: "/payroll/audit",
+  access: "/payroll/access",
+  settings: "/payroll/settings",
 }
 
 const arg = (n, d) => {
