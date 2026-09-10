@@ -770,3 +770,45 @@ raised rather than imposed, the same way the four already-posted journals were.
 
 **Status:** OPEN — diagnosed and evidenced, fix recommended, awaiting a decision on who
 should hold approval authority.
+
+---
+
+# Cycle 0 — Fundraising lifecycle (F.1, F.2, F.3, F.5)
+
+Run as the Fund Manager via `nvccz/scripts/_uat/fundraising-lifecycle-probe.mjs`,
+**two full cycles**, per the brief.
+
+| Step | Result |
+|---|---|
+| campaign created | PASS |
+| submitted for approval, decided, **activated** | PASS |
+| opportunity created | PASS |
+| pipeline stages seeded per campaign | PASS — 13 stages |
+| opportunity advanced through stages | PASS — 2 transitions each |
+| commitment recorded, amount stored as submitted | PASS — 11,000,000 / 12,000,000 USD |
+| approval request raised and decided | PASS |
+| closing created | PASS |
+| **F.5** metrics report what was committed | PASS — matches the rows exactly |
+| campaign target unchanged | PASS — 50,000,000 |
+| row counts return to baseline | PASS — nothing left behind |
+
+**2 for 2, no defects found in the lifecycle itself.**
+
+Two things learned in the process rather than assumed:
+
+**The lifecycle is longer than the brief describes.** A campaign starts DRAFT and refuses
+opportunities — *"Campaign must be ACTIVE to create opportunities"* — and activation runs
+through its own approval. So the real sequence begins `submit-for-approval → decide →
+activate`, which the first version of the probe skipped entirely.
+
+**A probe correction, made before its numbers were trusted.** F.5 initially read
+`GET /campaigns/:id` and reported *"API says 0 while 11,000,000 is committed"* across both
+cycles. That was the probe's mistake: the campaign record carries `targetCapital` and no
+raised figure at all. The raised totals live on `/campaigns/:campaignId/metrics` under
+`commitmentTotals`, and read there the assertion passes. This is the second time in this
+engagement that a measurement error nearly produced a false finding, and the second time
+checking the ground truth first prevented one.
+
+**FINDING-007 reproduced in both cycles** — the requester decided its own approval and was
+allowed. Logged by the probe as a NOTE rather than asserted either way, because the policy
+decision on approver authority is still open.
