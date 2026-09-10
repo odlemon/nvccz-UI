@@ -4,7 +4,7 @@
 
 | Severity | Open | Fixed (pending verification) | Verified |
 |---|---|---|---|
-| CRITICAL | 0 | 3 | 0 |
+| CRITICAL | 1 | 3 | 0 |
 | HIGH | 0 | 0 | 0 |
 | MEDIUM | 0 | 0 | 0 |
 | LOW | 0 | 0 | 0 |
@@ -337,3 +337,115 @@ login leak, so it reported "1 returned 200" when phase 2 had found none. Fixed t
 only its own leaks before any conclusion was drawn from it. The applicant row was also
 passing for the wrong reason — `"Invalid credentials."` rather than a portal refusal,
 because that account's password was not aligned — and now proves the control it claims to.
+
+---
+
+## FINDING-004
+
+**Title:** Every payroll run posts an unbalanced journal to the general ledger, and the error is swallowed
+**Module:** Payroll → Accounting · **Dimension:** UAT · **Category:** Calculation / Data Integrity
+**Severity:** CRITICAL
+**Persona affected:** Accounting, CFO, auditors — and anyone relying on the GL
+**Surface:** backend · **Screen / Flow:** payroll run processing, roadmap **P.5**
+
+### Steps to reproduce
+
+1. Process any payroll run containing at least one employee on a split-currency
+   contract (`salarySplitUsdPct` < 1).
+2. Read the journal entry referenced by `payroll_runs.journal_entry_id`.
+3. Sum its debit and credit lines.
+
+### Expected
+
+Double entry: `DR Gross Pay Expense = CR (PAYE + NSSA/Pension + SDL + Net Wages Payable)`.
+The entry balances, or nothing is posted.
+
+### Actual
+
+**4 of 4 completed runs posted an unbalanced entry**, each identically wrong:
+
+| Period | Lines | Debit | Credit | Balanced | Net-pay line |
+|---|---|---|---|---|---|
+| 2026-06 | 4 | 42,209.00 | 67,732.61 | **NO** — out by 25,523.61 | **MISSING** |
+| 2026-07 | 4 | 42,209.00 | 67,732.61 | **NO** — out by 25,523.61 | **MISSING** |
+| 2026-08 | 4 | 42,209.00 | 67,732.61 | **NO** — out by 25,523.61 | **MISSING** |
+| 2026-10 | 4 | 42,209.00 | 67,732.61 | **NO** — out by 25,523.61 | **MISSING** |
+
+Three defects compound, in `PayrollService.ts` around lines 854-919 and 1060-1070.
+
+**1 — Deductions are counted twice.** The aggregation loop reads a leg loop *and*
+a deductions loop for the same employee, and the second is not in an `else`:
+
+```ts
+if (employeePayroll.legs?.length) {
+  for (const leg of employeePayroll.legs) {
+    totalPAYE = totalPAYE.add(leg.payeAmount).add(leg.aidsLevyAmount);   // legs
+    totalNSSA = totalNSSA.add(leg.nssaAmount);
+  }
+}
+for (const deduction of employeePayroll.deductions) {                     // and again
+  if (bucket === 'PAYE') totalPAYE = totalPAYE.add(deduction.amount);
+```
+
+NSSA proves it exactly: legs sum to 2,940.84 and the journal credits **5,881.68**,
+precisely double. PAYE: legs 29,995.206 + deductions 30,895.057 = **60,890.263**, the
+exact figure posted.
+
+**2 — ZiG amounts are added to USD without conversion.** The leg loop sums
+`leg.payeAmount` regardless of `leg.currencyCode`. For 2026-10 the ZiG legs carry
+23,276.346 ZiG of PAYE, added directly to 6,718.860 USD. At the run's own rate of
+26.6291 the ZiG portion is worth 874.09 USD, so the correct total PAYE is **7,592.95**,
+not 29,995.21 — and not the 60,890.26 actually posted.
+
+**3 — The failure is swallowed and the corrupt entry is left posted.** The lines are
+written *before* the balance check. Because inflated deductions make the recomputed net
+pay negative (42,209 − 60,890 − 5,882 − 961 = **−25,524**), `if (totalNetPay.gt(0))`
+is false, so the Net Wages Payable line is never created. The balance check then
+throws — and the surrounding `catch` logs it and returns unless `rethrowOnError` is
+set. The run is marked **COMPLETED**, `journal_entry_id` is populated, and an
+unbalanced entry sits in the ledger with nothing surfaced to the user.
+
+The third is the most serious: an invalid journal is *persisted* and the error hidden.
+A transaction that cannot balance must roll back, not report success.
+
+### Evidence
+
+Journal for 2026-10, as stored:
+
+```
+Gross Pay Expense: 2026-10       dr 42209.00   cr 0
+PAYE Payable: 2026-10            dr 0          cr 60890.263
+NSSA/Pension Payable: 2026-10    dr 0          cr 5881.680
+SDL Payable: 2026-10             dr 0          cr 960.671
+                                 ----------    -----------
+                                 42209.00      67732.614     out by 25523.614
+```
+
+Leg sums for the same run (fx 26.6291):
+
+```
+USD  n=12  paye 6718.860  nssa 378.00   sdl 181.810
+ZIG  n=6   paye 23276.346 nssa 2562.84  sdl 778.861
+```
+
+**Viewport:** n/a · **Reproducibility:** Always — 4 of 4 runs
+**Suspected area:** `nvccz/src/services/PayrollService.ts`
+**Upstream dependency?** **Yes** — the defect is in payroll, but the damage lands in
+Accounting's ledger. In scope to fix under the agreed rule, and the GL data already
+written will need correcting separately.
+
+### Related — money precision
+
+Six of twelve payslips in each run store a gross that is not a representable currency
+amount, e.g. `3705.9999857298969924` instead of `3706.00`. Exactly the six employees on
+split contracts. The mechanism is a round trip: `splitGrossByContract` multiplies out to
+ZiG, the ZiG leg is rounded to two ZiG cents, and the aggregate USD figure is obtained by
+dividing back by the fx rate without re-rounding. The per-currency legs the employee is
+actually paid are clean — only the combined figure carries the residue — so nobody is
+paid a wrong amount, but the stored payslip totals are not money. Recorded here rather
+than as its own finding because it shares a root with the above and should be fixed in
+the same pass.
+
+**Status:** OPEN — diagnosed, not yet fixed. The fix is three separate corrections in the
+posting path plus a decision on the four journals already written, and it is not being
+started at the tail of a long session.
