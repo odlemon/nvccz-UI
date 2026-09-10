@@ -82,12 +82,37 @@ Checked and found **sound**, contrary to my first suspicion:
 - **Overview chart** values (8415k, 16850k, 25285k…) are Y-axis tick labels, not a fabricated
   series. The trend itself reads `dashboard.monthlyTrend` and returns empty when absent.
 
-## Fundraising — not yet started
+## Fundraising — verified, and it holds up
 
-Tooling exists (`fundraising-trace-numbers.mjs`, `fundraising-role-matrix.mjs`,
-`fundraising-e2e-roundtrips.mjs`, `uat-fundraising-srd.mjs`). Nothing verified by me yet; the
-previous agent's own results are in `fundraising-test-plan.md` and should be re-run rather than
-trusted, exactly as the payroll measurement turned out to need.
+Re-run rather than trusted, and it survived the re-run. Fixed the measurement first, as with
+payroll: the trace mined digits out of ids and timestamps.
+
+| Check | Result |
+|---|---|
+| Number trace, 20 screens as sysadmin | **all 20 render**; every untraced value explained |
+| End-to-end round trips | **24 passed, 0 failed**, with 5 real writes observed (investor, contact, opportunity, commitment, approval decision) |
+| Role matrix, 5 roles | only SYSADMIN may write; CEO, HR_MGR, OPS_MGR and OPS_MEM all **403** with a visible message, not a silent no-op |
+
+Every untraced number resolves and none is fabricated:
+
+- compact money — `US$52.0M`, `US$129.9M`, `US$291.0M`, `US$79.00M`
+- `127.0` and `0.1` — the `127.0.0.1` in the audit trail's IP column
+- the rest were **records the probe scripts left in the database**
+
+### Finding: the probes pollute the data they verify
+
+`fundraising-role-matrix.mjs` and `fundraising-e2e-roundtrips.mjs` create real records and leave
+them — the role matrix says so outright, because `/investors` has no delete route. They accumulate
+every run and show up on the fundraising screens as genuine pipeline; the audit screen was listing
+`E2E Close 363542` and `BEHAVIOUR close 875180` among real activity.
+
+Removed 4 closings and 2 investor organisations (with their commitments, opportunities and
+contacts, which hold required references and must go first). `scripts/_uat/clean-fundraising-probes.js`
+does this and is matched only against the names the probes give themselves.
+
+**The audit-trail entries stay.** `FundraisingAuditLog` has no delete route and should not have
+one — an append-only audit is correct, and deleting rows to tidy a test run would be exactly the
+wrong instinct. The right fix is for the probes to clean up their own records, which they now can.
 
 ## Honest position
 
