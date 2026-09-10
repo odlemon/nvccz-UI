@@ -490,13 +490,20 @@ export function LpPortalDashboardScreen() {
 
           return (
             <Panel key={kpi.label} className="min-h-[118px] px-4 py-3.5">
+              {/*
+                The label used to sit on one line beside the icon, sharing the
+                row with the info button, which left it 84px in a card a sixth
+                of the row wide. Four of the six labels were cut at every
+                viewport tested -- 375, 768 and 1440 -- so an LP saw $25.00M and
+                $23.50M side by side under "Total Com..." and "Unfunded ...".
+                Wrapping alone was not enough: "Commitment" on its own needs
+                90px. The icon and the info button now share the top row and the
+                label takes the card's full width beneath them.
+              */}
               <div className="flex items-start justify-between gap-2">
-                <div className="flex min-w-0 items-center gap-2.5">
-                  <span className={cn("flex size-9 shrink-0 items-center justify-center rounded-lg", kpi.iconBg, kpi.iconColor)}>
-                    <Icon className="size-[18px]" strokeWidth={2} />
-                  </span>
-                  <span className="truncate text-[13px] font-medium leading-4 text-[#475569]">{kpi.label}</span>
-                </div>
+                <span className={cn("flex size-9 shrink-0 items-center justify-center rounded-lg", kpi.iconBg, kpi.iconColor)}>
+                  <Icon className="size-[18px]" strokeWidth={2} />
+                </span>
                 <button
                   type="button"
                   className="mt-0.5 flex size-4 shrink-0 items-center justify-center rounded-full text-[#94a3b8] transition-colors hover:bg-slate-100 hover:text-slate-600"
@@ -506,6 +513,7 @@ export function LpPortalDashboardScreen() {
                   <Info className="size-3.5" strokeWidth={2} />
                 </button>
               </div>
+              <span className="mt-2 block text-[13px] font-medium leading-4 text-[#475569]">{kpi.label}</span>
               <p className="mt-3 text-[24px] font-bold leading-7 tracking-[-0.03em] text-[#0f172a]">{kpi.value}</p>
               {helper}
             </Panel>

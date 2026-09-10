@@ -6,7 +6,7 @@
 |---|---|---|---|
 | CRITICAL | 0 | 6 | 0 |
 | HIGH | 3 | 2 | 0 |
-| MEDIUM | 0 | 1 | 0 |
+| MEDIUM | 1 | 2 | 0 |
 | LOW | 0 | 0 | 0 |
 
 ---
@@ -1139,3 +1139,82 @@ Each of these would have produced a false finding:
 Seven tab groups on five screens, out of **59 screens**. These are the tabbed surfaces
 found on the screens visited so far, not an exhaustive sweep of the module. The remaining
 screens' tabbed surfaces are still to be walked, and X.8 is not complete until they are.
+
+---
+
+## FINDING-011
+
+**Title:** Four of the six KPI labels on the LP dashboard are cut off — at every viewport
+**Module:** LP Portal · **Dimension:** UI-UX · **Category:** UI Inconsistency
+**Severity:** MEDIUM
+**Persona affected:** every LP, on their primary screen
+**Surface:** LP Portal (external) · **Screen:** `/lp-portal` dashboard
+**Viewport:** All — 375, 768 **and 1440**
+
+### Steps to reproduce
+
+1. Sign in to the LP portal as `lp.test@arcus.co.zw`.
+2. Read the six KPI cards at any viewport.
+
+### Expected
+
+An LP can tell which figure is which.
+
+### Actual
+
+```
+Total Com…    $25.00M          Paid-In Ca…   $1.35M
+Unfunded …    $23.50M          Current NAV   $237.9K
+Distributio…  $318.8K          Net IRR       1.0%
+```
+
+Four of six labels truncated. The two that matter most — **Total Commitment $25.00M** and
+**Unfunded Commitment $23.50M** — both render as "…Com…" and sit next to each other, so the
+LP cannot tell committed capital from uncalled capital. The helper lines underneath
+("1 Commitment", "94.0% of Commitment") disambiguate them only if you already know what you
+are looking at.
+
+Measured, not eyeballed:
+
+```
+1440   "Total Commitment"     needs 125px, has 84
+       "Unfunded Commitment"  needs 160px, has 84
+ 768   "Unfunded Commitment"  needs 160px, has 124
+ 375   all five money labels  need 83-160px, have 58
+```
+
+Notably this is **not** a mobile-only problem. It was worst at 375 but present at full
+desktop width, which is where an LP is most likely to be reading it.
+
+**Reproducibility:** Always
+**Suspected area:** `nvccz-new/components/lp-portal/screens/lp-portal-dashboard-screen.tsx`
+
+### Fix applied
+
+The label was a single `truncate` line sharing a flex row with a 36px icon and the info
+button, leaving it 84px inside a card a sixth of the row wide.
+
+Wrapping to two lines was tried first and was **not enough** — "Commitment" on its own
+needs 90px against 84 available, so the word still clipped. The icon and the info button
+now share the top row and the label takes the card's full width beneath them, which gives
+it 154px.
+
+### Verification
+
+At all three viewports, on the real page:
+
+```
+1440   no label clipped   no horizontal page scroll
+ 768   no label clipped   no horizontal page scroll
+ 375   no label clipped   no horizontal page scroll
+```
+
+At 375 "Unfunded Commitment" wraps to two lines and reads in full.
+
+### Also observed, not fixed
+
+At 375 the **"Switch module" control is positioned entirely outside the viewport**
+(left edge at 414px against a 375px viewport). It is clipped rather than hidden, so it
+cannot be reached on a phone. It sits in shared top-bar chrome used by the staff portal
+too, so changing it reaches beyond the LP portal; recorded rather than adjusted. For an LP
+specifically the module switcher has nothing to switch to, so the practical impact is low.
