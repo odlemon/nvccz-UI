@@ -176,7 +176,14 @@ for (const id of ids) {
 
   // Strip separators so "1,250,000.00" tests as 1250000. Dates and years are excluded up
   // front: they are not the kind of number this is looking for.
-  const raw = text.match(/\d[\d,]*(?:\.\d+)?/g) || []
+  // Only free-standing numbers, and not the ones inside a date or a clock time. Scanning raw
+  // text mines digits out of record ids and timestamps, which buries the values that actually
+  // need explaining — on payroll that inflated the untraced count by a fifth. Same fix as
+  // scripts/lp-trace-numbers.mjs and scripts/payroll-trace-numbers.mjs.
+  const scannable = text
+    .replace(/\b\d{1,2}:\d{2}(:\d{2})?\s*(AM|PM|am|pm)?/g, " ")
+    .replace(/\b\d{4}-\d{2}-\d{2}\b/g, " ")
+  const raw = scannable.match(/(?<![A-Za-z0-9])\d[\d,]*(?:\.\d+)?(?![A-Za-z0-9])/g) || []
   const onScreen = [...new Set(raw.map((s) => s.replace(/,/g, "")))]
   const unmatched = onScreen.filter((s) => {
     const n = Number(s)
