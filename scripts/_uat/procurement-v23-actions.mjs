@@ -64,13 +64,21 @@ const STATIC_CACHE = new Map()
 async function serveStatic(route) {
   const url = route.request().url()
   const hit = STATIC_CACHE.get(url)
-  if (hit) return route.fulfill({ status: 200, headers: hit.headers, body: hit.body })
-  const res = await route.fetch()
-  const body = await res.body()
-  // The body arrives decoded, so the transfer headers no longer describe it.
-  const headers = Object.fromEntries(Object.entries(res.headers()).filter(([k]) => !/^(content-encoding|content-length|transfer-encoding)$/i.test(k)))
-  if (res.status() === 200) STATIC_CACHE.set(url, { headers, body })
-  return route.fulfill({ status: res.status(), headers, body })
+  try {
+    if (hit) return await route.fulfill({ status: 200, headers: hit.headers, body: hit.body })
+    // route.fetch gives up after 30 s by default, and one large chunk over a slow link takes longer.
+    const res = await route.fetch({ timeout: Number(process.env.UAT_LOAD_TIMEOUT_MS || 60000) })
+    const body = await res.body()
+    // The body arrives decoded, so the transfer headers no longer describe it.
+    const headers = Object.fromEntries(Object.entries(res.headers()).filter(([k]) => !/^(content-encoding|content-length|transfer-encoding)$/i.test(k)))
+    if (res.status() === 200) STATIC_CACHE.set(url, { headers, body })
+    return await route.fulfill({ status: res.status(), headers, body })
+  } catch (error) {
+    // A handler that throws takes the whole run down; let the browser fetch it itself instead. This
+    // also fails harmlessly when a step has already closed its browser.
+    console.log(`  (static cache skipped ${url.split("/").pop()}: ${String(error.message || error).split("\n")[0]})`)
+    return route.continue().catch(() => {})
+  }
 }
 
 async function session(email, route) {
