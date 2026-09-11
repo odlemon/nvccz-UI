@@ -397,7 +397,8 @@ s = replaceOnce(
   "'auditEventsLive','prViewV11'];",
   "'auditEventsLive','prViewV11','quotationsLive','evaluationLive'];",
   "hydrate() -> quotations and evaluation matrices",
-  "'quotationsLive','evaluationLive'];",
+  // Guard without the closing bracket: patch 22 appends the letterhead to this list.
+  "'quotationsLive','evaluationLive'",
 )
 
 // ---------------------------------------------------------------------------
@@ -759,6 +760,301 @@ s = replaceUnique(
   "reports: Run exports the live records",
   "if(__pr23Live()){const t=getReport(a.dataset.id);__pr23ExportFile('xls',t.name);",
 )
+
+// ---------------------------------------------------------------------------
+// 22. Full UI census: pages by role, filters that filter, charts and headlines from records, vault
+//     counts, tenders awaiting evaluation, vendor tax status without a country, the approver's own
+//     queue, empty registers that say so, and posting a pending journal
+// ---------------------------------------------------------------------------
+
+/** Replace every occurrence of `find`; the runtime is known to hold exactly `expected` of them. */
+function replaceEvery(src, find, repl, label, alreadyMarker, expected) {
+  if (alreadyMarker && src.includes(alreadyMarker)) {
+    console.log(`  skip (already)  ${label}`)
+    skipped += 1
+    return src
+  }
+  const n = src.split(find).length - 1
+  if (n !== expected) {
+    console.warn(`  MISS            ${label} (${n} occurrences, expected ${expected})`)
+    missed += 1
+    return src
+  }
+  console.log(`  patch           ${label} (x${n})`)
+  applied += 1
+  return src.split(find).join(repl)
+}
+
+// Every page was offered to every role; a requester saw registers they cannot read as empty.
+s = replaceUnique(
+  s,
+  "$('#nav').innerHTML=navGroups.map(([g,items])=>`<div class=\"nav-group\">${g}</div>${items.map(",
+  "$('#nav').innerHTML=navGroups.map(([g,items])=>[g,__pr23Live()?items.filter(([id])=>__pr23PageAllowed(id)):items]).filter(([,items])=>items.length).map(([g,items])=>`<div class=\"nav-group\">${g}</div>${items.map(",
+  "sidebar: only the pages the role can open",
+  "items.filter(([id])=>__pr23PageAllowed(id))",
+)
+s = replaceUnique(
+  s,
+  "$('#workspace').innerHTML=(pages[state.page]||dashboardPage)();",
+  "$('#workspace').innerHTML=(__pr23Live()&&!__pr23PageAllowed(state.page))?__pr23NoAccessHtml(state.page):(pages[state.page]||dashboardPage)();if(__pr23Live()&&state.filterApplied)requestAnimationFrame(()=>__pr23ApplyTableFilters());",
+  "render: a page the role cannot open says so; applied filters survive a re-render",
+  "__pr23NoAccessHtml(state.page)",
+)
+
+// The filter bar stored its choices and filtered nothing, while its toast said charts, KPIs and tables had changed.
+s = replaceUnique(
+  s,
+  "options(['FY 2026','Q3 2026','Q2 2026','YTD 2026'],state.filters.period)",
+  "options(__pr23Live()?__pr23FilterOptions('period'):['FY 2026','Q3 2026','Q2 2026','YTD 2026'],state.filters.period)",
+  "filter bar: year choices",
+  "__pr23FilterOptions('period')",
+)
+s = replaceUnique(
+  s,
+  "options(['All categories','Technology','Medical','Agriculture','Facilities','Fleet'],state.filters.category)",
+  "options(__pr23Live()?__pr23FilterOptions('category'):['All categories','Technology','Medical','Agriculture','Facilities','Fleet'],state.filters.category)",
+  "filter bar: departments on record",
+  "__pr23FilterOptions('category')",
+)
+s = replaceUnique(
+  s,
+  "options(['All statuses','Approved','Under review','Blocked'],state.filters.status)",
+  "options(__pr23Live()?__pr23FilterOptions('status'):['All statuses','Approved','Under review','Blocked'],state.filters.status)",
+  "filter bar: statuses on record",
+  "__pr23FilterOptions('status')",
+)
+s = replaceUnique(
+  s,
+  "<select data-filter=\"currency\">${options(['USD','ZiG','ZAR'],state.filters.currency)}</select>",
+  "${__pr23Live()?'':`<select data-filter=\"currency\">${options(['USD','ZiG','ZAR'],state.filters.currency)}</select>`}",
+  "filter bar: no currency choice (records carry their own currency)",
+  "${__pr23Live()?'':`<select data-filter=\"currency\">",
+)
+s = replaceUnique(
+  s,
+  "render();toast('Dashboard filters applied','Charts, KPIs and tables now use the selected period, category, status and currency.');break;",
+  "render();if(__pr23Live())requestAnimationFrame(()=>toast('Filters applied',__pr23ApplyTableFilters()));else toast('Dashboard filters applied','Charts, KPIs and tables now use the selected period, category, status and currency.');break;",
+  "filter bar: Apply filters the registers and says how many rows match",
+  "toast('Filters applied',__pr23ApplyTableFilters())",
+)
+s = replaceUnique(
+  s,
+  "state.filterApplied=false;render();toast('Filters reset','Showing the full authorised population.');break;",
+  "state.filterApplied=false;render();toast('Filters reset',__pr23Live()?'Showing every record your role can see.':'Showing the full authorised population.');break;",
+  "filter bar: Reset says what is shown",
+  "'Showing every record your role can see.'",
+)
+
+// Charts that section 9 emptied are drawn from records where the records answer them.
+s = replaceUnique(
+  s,
+  "function bars(items,id){if(__pr23Live())return __pr23NoData('No recorded data for this chart yet.');",
+  "function bars(items,id){if(__pr23Live())return __pr23LiveBars(items,id);",
+  "bars(): live bars where records answer the chart",
+  "function bars(items,id){if(__pr23Live())return __pr23LiveBars(items,id);",
+)
+s = replaceUnique(
+  s,
+  "bars = function(items,id){if(__pr23Live())return __pr23NoData('No recorded data for this chart yet.');",
+  "bars = function(items,id){if(__pr23Live())return __pr23LiveBars(items,id);",
+  "bars (V5 reassignment): live bars",
+  "bars = function(items,id){if(__pr23Live())return __pr23LiveBars(items,id);",
+)
+s = replaceUnique(
+  s,
+  "function lineChart(id){if(__pr23Live())return __pr23NoData('No trend data is recorded for this chart yet.');",
+  "function lineChart(id){if(__pr23Live())return __pr23LiveLine(id);",
+  "lineChart(): live monthly lines",
+  "function lineChart(id){if(__pr23Live())return __pr23LiveLine(id);",
+)
+s = replaceUnique(
+  s,
+  "lineChart = function(id){if(__pr23Live())return __pr23NoData('No trend data is recorded for this chart yet.');",
+  "lineChart = function(id){if(__pr23Live())return __pr23LiveLine(id);",
+  "lineChart (V5 reassignment): live monthly lines",
+  "lineChart = function(id){if(__pr23Live())return __pr23LiveLine(id);",
+)
+
+// Document Vault: folder tiles and vault health were fixture counts ("Invoices & AP 4,102 records").
+// Two runtime layers (V5 and V11) each carry the folder list.
+s = replaceEvery(
+  s,
+  "const folders=[['Annual Plans','184','Planning baselines and amendments'],",
+  "const folders=__pr23Live()?__pr23VaultFolders():[['Annual Plans','184','Planning baselines and amendments'],",
+  "document vault: folder counts from stored files",
+  "const folders=__pr23Live()?__pr23VaultFolders():",
+  2,
+)
+s = replaceUnique(
+  s,
+  "${[['Annual Plans','184'],['Tenders & Bids','2,410'],['Contracts & Awards','1,286'],['Orders & GRNs','3,928'],['Invoices & AP','4,102'],['Audit Evidence','576']].map(x=>",
+  "${(__pr23Live()?__pr23VaultFolders().slice(0,6):[['Annual Plans','184'],['Tenders & Bids','2,410'],['Contracts & Awards','1,286'],['Orders & GRNs','3,928'],['Invoices & AP','4,102'],['Audit Evidence','576']]).map(x=>",
+  "document vault (base page): folder counts from stored files",
+  "__pr23VaultFolders().slice(0,6)",
+)
+s = replaceEvery(
+  s,
+  "<span>7 files require review</span>",
+  "<span>${__pr23Live()?__pr23PendingReviewText():'7 files require review'}</span>",
+  "document vault health: files awaiting review",
+  "__pr23PendingReviewText()",
+  2,
+)
+s = replaceEvery(
+  s,
+  "<span>12 active secure links</span></div>${status('Active')}",
+  "<span>${__pr23Live()?'External sharing is not tracked for vault files':'12 active secure links'}</span></div>${__pr23Live()?status('Not tracked'):status('Active')}",
+  "document vault health: no invented share count",
+  "External sharing is not tracked for vault files",
+  2,
+)
+
+// Analysis headlines were fixture narratives ("$5.12m committed against an $8.24m plan").
+for (const [kind, find] of [
+  ["spend", "<div class=\"analysis-hero\"><div><h2>$5.12m committed against an $8.24m plan</h2><p>Commitments are 62.1% of the annual plan. Technology is ahead of phasing because the cybersecurity programme moved into Q3.</p></div><div class=\"analysis-value\">62.1%</div></div>"],
+  ["cycle", "<div class=\"analysis-hero\"><div><h2>287 active procurement records</h2><p>19 records are outside their target service level. Tender clarification and invoice exception resolution currently create the largest delays.</p></div><div class=\"analysis-value\">8.4 days</div></div>"],
+  ["category", "<div class=\"analysis-hero\"><div><h2>$5.12m managed category spend</h2><p>Technology and medical equipment represent 62% of committed value. Supplier concentration remains within policy, except for diagnostic equipment.</p></div><div class=\"analysis-value\">7.8%</div></div>"],
+  ["exceptions", "<div class=\"analysis-hero\"><div><h2>15 invoice exceptions require action</h2><p>Price variance is the largest cause by value. Six invoices also require withholding tax because the vendor has no valid ITF263.</p></div><div class=\"analysis-value\">$326k</div></div>"],
+  ["reports", "<div class=\"analysis-hero\"><div><h2>286 report downloads this month</h2><p>Executive plan-vs-actual reports have the highest repeat usage. Excel is the dominant working format, while signed PDF is used for committees and boards.</p></div><div class=\"analysis-value\">18 schedules</div></div>"],
+]) {
+  s = replaceUnique(s, find, "${__pr23Live()?__pr23AnalysisHero('" + kind + "'):'" + find + "'}", `analysis headline (${kind}) -> from records`, "__pr23AnalysisHero('" + kind + "')")
+}
+
+// Bid Evaluation listed awarded tenders as "ready for evaluation".
+s = replaceUnique(
+  s,
+  "const rows=state.tenders.filter(t=>t.bids>0).map(t=>`<tr data-action=\"open-evaluation\"",
+  "const rows=state.tenders.filter(t=>t.bids>0&&(!__pr23Live()||t.stage==='Evaluation')).map(t=>`<tr data-action=\"open-evaluation\"",
+  "bid evaluation: only tenders with bids and no award",
+  "t.bids>0&&(!__pr23Live()||t.stage==='Evaluation')",
+)
+
+// Vendor tax: the record holds no country, and "not Zimbabwe" made every vendor a non-resident for specialist review.
+s = replaceEvery(
+  s,
+  "vendor.country!=='Zimbabwe'",
+  "(vendor.country!=='Zimbabwe'&&__pr23CountryKnown(vendor))",
+  "vendor tax rule: an unknown country is not non-resident",
+  "__pr23CountryKnown(vendor)",
+  3,
+)
+s = replaceUnique(
+  s,
+  ":status('Complete')}</td><td>${v.rating} / 5</td>",
+  ":(__pr23Live()&&!(v.complianceDocs||[]).length?status('Not on file'):status('Complete'))}</td><td>${v.rating} / 5</td>",
+  "vendor registry: no documents on file is not \"Complete\"",
+  "status('Not on file')",
+)
+s = replaceUnique(
+  s,
+  "kpi('Expiring / expired',expiring.length,'Automated reminders active'",
+  "kpi('Expiring / expired',expiring.length,__pr23Live()?'Tax clearance expired or expiring':'Automated reminders active'",
+  "vendor registry: no claim that reminders are running",
+  "'Tax clearance expired or expiring'",
+)
+
+// Requisitions: the approver queue listed every department's pending requests to a head of another department.
+s = replaceUnique(
+  s,
+  "r.rawStatus ? r.rawStatus === 'PENDING_APPROVAL' : !/Approved|Rejected/i",
+  "r.rawStatus ? r.awaitingMe !== false && r.rawStatus === 'PENDING_APPROVAL' : !/Approved|Rejected/i",
+  "requisitions: approver queue holds only what this approver can decide",
+  "r.awaitingMe !== false && r.rawStatus",
+)
+s = replaceUnique(
+  s,
+  "kpi('My open requests',rowsSource.length,",
+  "kpi('My open requests',(__pr23Live()?rowsSource.filter(r=>['DRAFT','PENDING_APPROVAL','REJECTED'].includes(String(r.rawStatus||'').toUpperCase())):rowsSource).length,",
+  "requisitions: \"My open requests\" counts drafts, pending and returned only",
+  "['DRAFT','PENDING_APPROVAL','REJECTED'].includes(String(r.rawStatus||'').toUpperCase())",
+)
+
+// Command Centre: "Pending approvals" counted every pending requisition; "My approval queue" listed the latest requisitions.
+s = replaceUnique(
+  s,
+  "const approvals=state.requisitions.filter(x=>/Pending|review/i.test(x.status)).length;",
+  "const approvals=__pr23Live()?(state.approvalPromptsV6||[]).length:state.requisitions.filter(x=>/Pending|review/i.test(x.status)).length;",
+  "command centre: pending approvals are the user's own decisions",
+  "const approvals=__pr23Live()?(state.approvalPromptsV6||[]).length:",
+)
+s = replaceUnique(
+  s,
+  "card('My approval queue','Time-sensitive decisions',`<div class=\"card-body list\">${state.requisitions.slice(0,4).map(r=>",
+  "card('My approval queue','Time-sensitive decisions',`<div class=\"card-body list\">${__pr23Live()?__pr23MyQueueHtml():state.requisitions.slice(0,4).map(r=>",
+  "command centre: my approval queue lists my decisions",
+  "${__pr23Live()?__pr23MyQueueHtml():",
+)
+
+// An empty register printed its headers and nothing else.
+s = replaceUnique(
+  s,
+  "const table=(heads,rows,attrs='')=>`<div class=\"table-wrap\"><table ${attrs}><thead><tr>${heads.map(h=>`<th>${h}</th>`).join('')}</tr></thead><tbody>${rows.join('')}</tbody></table></div>`;",
+  "const table=(heads,rows,attrs='')=>`<div class=\"table-wrap\"><table ${attrs}><thead><tr>${heads.map(h=>`<th>${h}</th>`).join('')}</tr></thead><tbody>${(__pr23Live()&&!rows.length)?`<tr><td colspan=\"${heads.length}\" class=\"pr23-empty-row\" style=\"text-align:center;color:#64748b;padding:18px 12px\">No records to show yet.</td></tr>`:rows.join('')}</tbody></table></div>`;",
+  "table(): an empty register says so",
+  "class=\"pr23-empty-row\"",
+)
+
+// Paying an invoice creates its journal as PENDING, so the queue offers Post for those (section 20 hid it).
+s = replaceUnique(
+  s,
+  "<td>${__pr23Live()?'':`<button class=\"btn small\" data-action=\"post-journal\" data-id=\"${j.id}\">Post</button>`}</td>",
+  "<td>${__pr23Live()?'':`<button class=\"btn small\" data-action=\"post-journal\" data-id=\"${j.id}\">Post</button>`}${__pr23Live()&&j.status==='Pending'?`<button class=\"btn small\" data-action=\"post-journal\" data-id=\"${j.id}\">Post</button>`:''}</td>",
+  "journal queue: Post on pending journals",
+  "__pr23Live()&&j.status==='Pending'?`<button",
+)
+
+s = replaceOnce(
+  s,
+  "'quotationsLive','evaluationLive'];",
+  "'quotationsLive','evaluationLive','letterhead'];",
+  "hydrate() -> the organisation's letterhead",
+  "'evaluationLive','letterhead'",
+)
+
+// A requester could not correct a draft or a rejected requisition: the edit form only changed the
+// browser's copy, its motivation was sample text, and a rejected request offered no edit at all.
+s = replaceUnique(
+  s,
+  "const canEdit = /Draft|Returned|Information requested|revision/i.test(r.status);",
+  "const canEdit = __pr23Live() ? ['DRAFT','REJECTED'].includes(String(r.rawStatus||'').toUpperCase()) : /Draft|Returned|Information requested|revision/i.test(r.status);",
+  "requisitions: drafts and rejected requests offer Edit request",
+  "['DRAFT','REJECTED'].includes(String(r.rawStatus||'').toUpperCase()) :",
+)
+s = replaceUnique(
+  s,
+  "<div class=\"field\"><label>Category</label><select name=\"category\"><option>${escV11(r.category)}</option><option>Technology</option><option>Medical</option><option>Agriculture</option><option>Facilities</option><option>Fleet</option></select></div><div class=\"field\"><label>Estimated value</label><input name=\"amount\" type=\"number\" value=\"${Number(r.amount)}\" required></div>",
+  "${__pr23Live()?'':`<div class=\"field\"><label>Category</label><select name=\"category\"><option>${escV11(r.category)}</option><option>Technology</option><option>Medical</option><option>Agriculture</option><option>Facilities</option><option>Fleet</option></select></div><div class=\"field\"><label>Estimated value</label><input name=\"amount\" type=\"number\" value=\"${Number(r.amount)}\" required></div>`}",
+  "requisition edit form: no sample categories or a total that is really the lines' estimate",
+  "${__pr23Live()?'':`<div class=\"field\"><label>Category</label><select name=\"category\">",
+)
+s = replaceUnique(
+  s,
+  "<textarea name=\"justification\">The requirement supports approved departmental operations and service-delivery objectives. Procurement should validate the specification and sourcing route before commitment.</textarea>",
+  "<textarea name=\"justification\">${__pr23Live()?escV11(r.justification||''):'The requirement supports approved departmental operations and service-delivery objectives. Procurement should validate the specification and sourcing route before commitment.'}</textarea>",
+  "requisition edit form: the requester's own justification",
+  "escV11(r.justification||'')",
+)
+s = replaceUnique(
+  s,
+  "if (mode === 'edit') foot += actionV11('Save changes','save-pr-v11',r.id,'primary','document');",
+  "if (mode === 'edit') foot += actionV11(__pr23Live()?'Save draft':'Save changes','save-pr-v11',r.id,__pr23Live()?'':'primary','document') + (__pr23Live()?actionV11('Save and submit','submit-pr-v11',r.id,'primary','approve'):'');",
+  "requisition edit form: save, or save and submit",
+  "actionV11('Save and submit','submit-pr-v11'",
+)
+
+// Generated documents fell back to the fixture company's address and mailbox when a field was blank;
+// in a live session the letterhead comes from the company profile and a blank field stays blank.
+for (const [find, fixture, count] of [
+  ["lh.company || 'Matanho Holdings Limited'", "'Matanho Holdings Limited'", 2],
+  ["lh.company||'Matanho Holdings Limited'", "'Matanho Holdings Limited'", 1],
+  ["lh.address || 'Harare, Zimbabwe'", "'Harare, Zimbabwe'", 1],
+  ["lh.address||'Harare, Zimbabwe'", "'Harare, Zimbabwe'", 1],
+  ["lh.contact || 'procurement@matanho.africa'", "'procurement@matanho.africa'", 1],
+  ["lh.contact||'procurement@matanho.africa'", "'procurement@matanho.africa'", 1],
+]) {
+  const repl = find.replace(fixture, `(__pr23Live()?'':${fixture})`)
+  s = replaceEvery(s, find, repl, `letterhead: no fixture fallback in "${find}"`, repl, count)
+}
 
 console.log(`\n${applied} applied, ${skipped} already in place, ${missed} missed`)
 if (missed) {

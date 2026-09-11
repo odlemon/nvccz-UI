@@ -699,4 +699,264 @@ document.addEventListener('change', event => {
   }
 }, __pr23Sig);
 
+// ---------------------------------------------------------------- page access by role (full UI census)
+
+/** Pages that need a view grant; any page not listed is open to every staff user. */
+const __PR23_PAGE_GRANTS = {
+  dashboard: ['dashboard.view'],
+  analytics: ['dashboard.view'],
+  reports: ['dashboard.view'],
+  plan: ['plans.view', 'plans.manage', 'plans.approve'],
+  tenders: ['rfq.view', 'rfq.manage'],
+  quotations: ['quotations.view', 'quotations.manage'],
+  evaluation: ['rfq.view', 'quotations.view'],
+  vendors: ['vendors.view', 'vendors.manage'],
+  contracts: ['contracts.view', 'contracts.manage'],
+  orders: ['orders.view', 'orders.manage'],
+  receiving: ['receiving.view', 'receiving.manage', 'receiving.approve'],
+  invoices: ['invoices.view', 'invoices.approve', 'invoices.pay'],
+  accounts: ['invoices.view', 'invoices.pay'],
+  documents: ['documents.view', 'documents.manage'],
+  audit: ['audit.view'],
+};
+
+const __PR23_PAGE_TITLES = {
+  dashboard: 'Command Centre', plan: 'Annual Procurement Plan', approvals: 'Approval Centre', requisitions: 'Purchase Requisitions',
+  tenders: 'Tenders & RFx', quotations: 'Quotation Comparison', evaluation: 'Bid Evaluation', vendors: 'Vendor Registry',
+  contracts: 'Contracts & Awards', orders: 'Purchase Orders', receiving: 'Receiving & Inspection', invoices: 'Invoices & 3-Way Match',
+  accounts: 'Accounts & Asset Transfers', documents: 'Document Vault', reports: 'Reports Vault', audit: 'Audit & Compliance',
+  settings: 'Configuration & RBAC', analytics: 'Analytics',
+};
+
+/**
+ * Whether the signed-in role may open a page. Until the live load lands (no access yet) every page
+ * is allowed, so nothing flashes a refusal; a privileged role opens every page.
+ */
+function __pr23PageAllowed(page) {
+  const live = __pr23Live();
+  const access = live && live.access;
+  if (!access || access.isPrivileged) return true;
+  const grants = __PR23_PAGE_GRANTS[page];
+  return !grants || grants.some(__pr23Can);
+}
+
+/** Said instead of a page of empty registers, which reads as "nothing exists" rather than "not yours". */
+function __pr23NoAccessHtml(page) {
+  const title = __PR23_PAGE_TITLES[page] || 'This page';
+  const open = Object.keys(__PR23_PAGE_TITLES).filter(p => p !== page && __pr23PageAllowed(p));
+  const links = open.map(p => `<div class="list-row" data-page="${p}" style="cursor:pointer"><div class="list-main"><strong>${__pr23Esc(__PR23_PAGE_TITLES[p])}</strong><span>Open</span></div></div>`).join('');
+  return `<div class="page">${pageHead('Procurement access', title, `Your role does not include ${title}. Procurement access is granted on your role in Admin → Roles.`, '')}${card('Pages your role can open', 'Choose where to go', `<div class="card-body list">${links}</div>`)}</div>`;
+}
+
+// ---------------------------------------------------------------- filter bar (full UI census)
+
+/** Filter choices built from the records loaded now, so every choice matches something. */
+function __pr23FilterOptions(kind) {
+  const uniq = xs => [...new Set(xs.filter(v => v && v !== '—'))].sort((a, b) => String(a).localeCompare(String(b)));
+  if (kind === 'status') {
+    return ['All statuses', ...uniq(['requisitions', 'tenders', 'orders', 'grns', 'invoices', 'plans', 'contractsV6', 'documents', 'vendors']
+      .flatMap(k => (state[k] || []).map(r => r.status || r.stage)))];
+  }
+  if (kind === 'category') return ['All categories', ...uniq(['requisitions', 'orders', 'grns', 'plans'].flatMap(k => (state[k] || []).map(r => r.entity)))];
+  const year = new Date().getFullYear();
+  return ['All years', `FY ${year - 1}`, `FY ${year}`, `FY ${year + 1}`];
+}
+
+/**
+ * Apply the filter bar to the page's tables: a row stays when its text carries the chosen status,
+ * department and year. Returns what happened, for the toast. KPI cards and charts are not filtered,
+ * and the message says so rather than claiming they were.
+ */
+function __pr23ApplyTableFilters() {
+  const f = state.filters || {};
+  const want = [];
+  if (f.status && f.status !== 'All statuses') want.push(f.status);
+  if (f.category && f.category !== 'All categories') want.push(f.category);
+  const year = String(f.period || '').match(/\d{4}/);
+  if (year) want.push(year[0]);
+  const rows = [...document.querySelectorAll('#workspace table tbody tr')].filter(r => !r.querySelector('.pr23-empty-row'));
+  let shown = 0;
+  for (const row of rows) {
+    const text = (row.innerText || row.textContent || '').toLowerCase();
+    const keep = want.every(w => text.includes(String(w).toLowerCase()));
+    row.style.display = keep ? '' : 'none';
+    if (keep) shown += 1;
+  }
+  if (!rows.length) return 'This page has no register to filter. KPI cards and charts always cover every record your role can see.';
+  return `${shown} of ${rows.length} row${rows.length === 1 ? '' : 's'} match ${want.length ? want.join(', ') : 'every filter'}. KPI cards and charts still cover every record.`;
+}
+
+// ---------------------------------------------------------------- charts from records (full UI census)
+
+/** Bars drawn from the records behind the chart's id. The fixture chart's own items are ignored. */
+function __pr23LiveBars(items, id) {
+  const key = String(id || '');
+  const orders = (state.orders || []).filter(o => String(o.rawStatus || '').toUpperCase() !== 'CANCELLED');
+  const group = (rows, by, value) => {
+    const m = new Map();
+    for (const r of rows) {
+      const g = by(r);
+      if (!g || g === '—') continue;
+      m.set(g, (m.get(g) || 0) + (Number(value(r)) || 0));
+    }
+    return [...m.entries()].filter(e => e[1] > 0).sort((a, b) => b[1] - a[1]).slice(0, 6);
+  };
+  let rows = [];
+  let unit = 'share';
+  if (/supplier/i.test(key)) rows = group(orders, o => o.vendor, o => o.amount);
+  else if (/category|entity|spend/i.test(key)) rows = group(orders, o => o.entity, o => o.amount);
+  else if (/bid|score/i.test(key)) {
+    const t = state.evaluationTender;
+    rows = (state.quotationsLive || []).filter(q => (!t || q.rfq === t) && q.evaluationScore != null).map(q => [q.vendor, Number(q.evaluationScore)]).slice(0, 6);
+    unit = 'score';
+  } else if (/invoice|exception|match/i.test(key)) {
+    const m = new Map();
+    for (const i of state.invoices || []) {
+      for (const flag of i.matchFlags || []) {
+        const k = String((flag && (flag.type || flag.code || flag.flag)) || flag || '').replace(/_/g, ' ').toLowerCase();
+        if (k) m.set(k, (m.get(k) || 0) + 1);
+      }
+    }
+    rows = [...m.entries()].sort((a, b) => b[1] - a[1]).slice(0, 6);
+    unit = 'count';
+  }
+  if (!rows.length) return __pr23NoData('No recorded data for this chart yet.');
+  const total = rows.reduce((t, r) => t + r[1], 0) || 1;
+  const max = Math.max(...rows.map(r => r[1])) || 1;
+  return `<div class="bars" data-chart="${__pr23Esc(key)}">${rows.map(([label, v]) => {
+    const width = unit === 'score' ? Math.max(0, Math.min(100, v)) : Math.round((v / (unit === 'share' ? total : max)) * 100);
+    const shown = unit === 'share' ? `${Math.round((v / total) * 100)}%` : String(Math.round(v));
+    return `<div class="bar-row"><span>${__pr23Esc(label)}</span><div class="bar-track"><div class="bar-fill" style="width:${width}%"></div></div><b>${shown}</b></div>`;
+  }).join('')}</div>`;
+}
+
+/** Twelve months of the current year from real records: commitments and payments, or invoice matching. */
+function __pr23LiveLine(id) {
+  const key = String(id || '');
+  const year = new Date().getFullYear();
+  const monthOf = d => {
+    const t = d ? new Date(d) : null;
+    return t && !Number.isNaN(t.getTime()) && t.getFullYear() === year ? t.getMonth() : -1;
+  };
+  const isMoney = !/invoice|match/i.test(key);
+  const series = [];
+  if (isMoney) {
+    const committed = Array(12).fill(0);
+    const paid = Array(12).fill(0);
+    for (const o of state.orders || []) {
+      if (String(o.rawStatus || '').toUpperCase() === 'CANCELLED') continue;
+      const m = monthOf(o.orderDate);
+      if (m >= 0) committed[m] += Number(o.amount) || 0;
+    }
+    for (const i of state.invoices || []) {
+      if (String(i.paymentStatus || '').toUpperCase() !== 'PAID') continue;
+      const m = monthOf(i.paidAt);
+      if (m >= 0) paid[m] += Number(i.amount) || 0;
+    }
+    series.push(['Committed spend', '#55536f', committed], ['Actual spend', '#11866f', paid]);
+  } else {
+    const matched = Array(12).fill(0);
+    const other = Array(12).fill(0);
+    for (const i of state.invoices || []) {
+      const m = monthOf(i.invoiceDate);
+      if (m < 0) continue;
+      if (i.match === 'Matched') matched[m] += 1;
+      else other[m] += 1;
+    }
+    series.push(['Matched', '#11866f', matched], ['Not matched', '#b45309', other]);
+  }
+  if (!series.some(s => s[2].some(v => v > 0))) return __pr23NoData('No trend data is recorded for this chart yet.');
+  const max = Math.max(...series.flatMap(s => s[2])) || 1;
+  const x = i => 58 + i * (642 / 11);
+  const y = v => 252 - (v / max) * 205;
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const fmt = v => (isMoney ? (v >= 1e6 ? `$${(v / 1e6).toFixed(1)}m` : v >= 1e3 ? `$${Math.round(v / 1e3)}k` : `$${Math.round(v)}`) : String(Math.round(v)));
+  const grid = [0, 0.5, 1].map(f => `<line x1="52" x2="700" y1="${y(max * f).toFixed(1)}" y2="${y(max * f).toFixed(1)}" stroke="#e5e7eb"/><text x="4" y="${(y(max * f) + 4).toFixed(1)}" font-size="11" fill="#64748b">${fmt(max * f)}</text>`).join('');
+  const axis = months.map((m, i) => `<text x="${(x(i) - 10).toFixed(1)}" y="280" font-size="11" fill="#64748b">${m}</text>`).join('');
+  const lines = series.map(([name, color, vals]) =>
+    `<path d="${vals.map((v, i) => `${i ? 'L' : 'M'} ${x(i).toFixed(1)} ${y(v).toFixed(1)}`).join(' ')}" fill="none" stroke="${color}" stroke-width="2.5"/>` +
+    vals.map((v, i) => (v ? `<circle cx="${x(i).toFixed(1)}" cy="${y(v).toFixed(1)}" r="3.5" fill="${color}"><title>${name}, ${months[i]}: ${fmt(v)}</title></circle>` : '')).join('')).join('');
+  return `<div class="chart" data-chart="${__pr23Esc(key)}"><svg viewBox="0 0 740 300" preserveAspectRatio="xMidYMid meet" role="img" aria-label="${__pr23Esc(series.map(s => s[0]).join(' and '))} by month, ${year}">${grid}${axis}${lines}</svg></div>`;
+}
+
+// ---------------------------------------------------------------- document vault (full UI census)
+
+/** Folder tiles counted from the vault's stored files; templates are layouts, counted as such. */
+function __pr23VaultFolders() {
+  const docs = state.documents || [];
+  const count = name => docs.filter(d => d.folder === name).length;
+  return [
+    ['Annual Plans', count('Annual Plans'), 'Planning baselines and amendments'],
+    ['Tenders & Bids', count('Tenders & Bids'), 'Tender packs, bids and evaluation evidence'],
+    ['Contracts & Awards', count('Contracts & Awards'), 'Award notices, contracts and eSign certificates'],
+    ['Orders & GRNs', count('Orders & GRNs'), 'Purchase orders, receipts and inspections'],
+    ['Invoices & AP', count('Invoices & AP'), 'Invoices, match records and approvals'],
+    ['Audit Evidence', count('Audit Evidence'), 'Immutable logs and compliance exports'],
+    ['Templates', (state.documentTemplates || []).filter(t => t.folder !== 'Report Templates').length, 'Controlled document layouts'],
+    ['Report Templates', (state.reportTemplates || []).length, 'Management and statutory report layouts'],
+  ];
+}
+
+function __pr23PendingReviewText() {
+  const n = (state.documents || []).filter(d => String(d.rawStatus || '').toUpperCase() === 'UNDER_REVIEW').length;
+  return n ? `${n} file${n === 1 ? '' : 's'} awaiting review` : 'No file awaits review';
+}
+
+// ---------------------------------------------------------------- analysis headlines (full UI census)
+
+/** The headline over each analysis page, from the records rather than the fixture's narrative. */
+function __pr23AnalysisHero(kind) {
+  const orders = (state.orders || []).filter(o => String(o.rawStatus || '').toUpperCase() !== 'CANCELLED');
+  const committed = orders.reduce((t, o) => t + (Number(o.amount) || 0), 0);
+  const hero = (h2, p, v) => `<div class="analysis-hero"><div><h2>${__pr23Esc(h2)}</h2><p>${__pr23Esc(p)}</p></div><div class="analysis-value">${__pr23Esc(v)}</div></div>`;
+  if (kind === 'spend') {
+    const plans = (state.plans || []).filter(p => String(p.rawStatus || '').toUpperCase() === 'APPROVED');
+    const budget = plans.reduce((t, p) => t + (Number(p.budget) || 0), 0);
+    if (!budget) return hero(`${money(committed)} committed`, `${orders.length} purchase order${orders.length === 1 ? '' : 's'}, not cancelled. No approved procurement plan has a budget to measure commitments against.`, '—');
+    const pct = Math.round((committed / budget) * 1000) / 10;
+    return hero(`${money(committed)} committed against ${money(budget)} of approved plans`, `Commitments are ${pct}% of ${plans.length} approved plan budget${plans.length === 1 ? '' : 's'}, counting purchase orders that are not cancelled.`, `${pct}%`);
+  }
+  if (kind === 'category') {
+    const m = new Map();
+    for (const o of orders) if (o.entity && o.entity !== '—') m.set(o.entity, (m.get(o.entity) || 0) + (Number(o.amount) || 0));
+    const top = [...m.entries()].sort((a, b) => b[1] - a[1])[0];
+    if (!top) return hero('No committed spend yet', 'Spend by department appears once purchase orders are raised.', '—');
+    return hero(`${money(committed)} committed across ${m.size} department${m.size === 1 ? '' : 's'}`, `${top[0]} holds the largest share of committed value.`, `${committed ? Math.round((top[1] / committed) * 100) : 0}%`);
+  }
+  if (kind === 'exceptions') {
+    const open = (state.invoices || []).filter(i => i.match && i.match !== 'Matched' && String(i.rawStatus || '').toUpperCase() !== 'REJECTED');
+    const value = open.reduce((t, i) => t + (Number(i.amount) || 0), 0);
+    return open.length
+      ? hero(`${open.length} invoice${open.length === 1 ? '' : 's'} not fully matched`, 'From the three-way match: a price or quantity discrepancy, a missing receipt, or no purchase order.', money(value))
+      : hero('Every open invoice is matched', 'No open invoice has a discrepancy, a missing receipt or a missing purchase order.', money(0));
+  }
+  if (kind === 'cycle') {
+    const up = v => String(v || '').toUpperCase();
+    const open = (state.requisitions || []).filter(r => ['PENDING_APPROVAL', 'APPROVED'].includes(up(r.rawStatus))).length
+      + (state.tenders || []).filter(t => t.stage === 'Published' || t.stage === 'Evaluation').length
+      + orders.filter(o => ['DRAFT', 'APPROVED', 'SENT', 'ACKNOWLEDGED', 'PARTIALLY_DELIVERED'].includes(up(o.rawStatus))).length
+      + (state.invoices || []).filter(i => up(i.rawStatus) === 'DRAFT').length;
+    return hero(`${open} open procurement record${open === 1 ? '' : 's'}`, 'Requisitions awaiting a decision or sourcing, tenders in market, orders not yet delivered and invoices awaiting approval. Service levels are not tracked yet.', '—');
+  }
+  return hero('Report usage is not tracked yet', 'Reports run from the Reports Vault export the live registers; downloads and schedules are not logged.', '—');
+}
+
+// ---------------------------------------------------------------- command centre queue and vendor tax (full UI census)
+
+/** "My approval queue": the decisions the signed-in user can take, not the latest requisitions. */
+function __pr23MyQueueHtml() {
+  const prompts = (state.approvalPromptsV6 || []).slice(0, 4);
+  if (!prompts.length) {
+    return '<div class="list-row"><div class="list-main"><strong>Nothing awaits your decision</strong><span>Requisitions, awards, receipts, invoices and plans you can decide appear here.</span></div></div>';
+  }
+  return prompts.map(a => `<div class="list-row" data-page="approvals" style="cursor:pointer"><div class="list-main"><strong>${__pr23Esc(a.title)}</strong><span>${__pr23Esc(a.type)} · ${__pr23Esc(a.record)}${a.amount != null ? ` · ${money(a.amount)}` : ''}</span></div>${status('Awaiting me')}</div>`).join('');
+}
+
+/** The vendor record holds no country; unknown is not the same as non-resident. */
+function __pr23CountryKnown(vendor) {
+  if (!__pr23Live()) return true;
+  const c = vendor && vendor.country;
+  return Boolean(c && c !== '—');
+}
+
 /* END_PROCUREMENT_LIVE_BRIDGE */

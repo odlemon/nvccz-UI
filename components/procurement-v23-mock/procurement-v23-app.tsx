@@ -40,6 +40,19 @@ type ProcurementUi = {
 
 const runtimeUi = () => (window as unknown as { MatanhoProcurementUI?: ProcurementUi }).MatanhoProcurementUI
 
+/**
+ * A load failure worth telling the user about, without the server's internals. A database or ORM
+ * message ("Invalid `prisma.x.count()` invocation: Can't reach database server…") means nothing to
+ * them and names the infrastructure; say what they can do instead.
+ */
+function readableLoadError(message: string | undefined): string {
+  const text = String(message ?? "").trim()
+  if (!text || /prisma|invocation|database server|ECONNREFUSED|ETIMEDOUT|P\d{4}|stack|at \w+ \(/i.test(text)) {
+    return "the server could not read it just now; try again shortly"
+  }
+  return text.length > 160 ? `${text.slice(0, 157)}…` : text
+}
+
 export function ProcurementV23App() {
   const rootRef = useRef<HTMLDivElement>(null)
   const apiRef = useRef<RuntimeApi | null>(null)
@@ -86,7 +99,7 @@ export function ProcurementV23App() {
           if (hard.length) {
             toast.error(
               hard.length === 1 ? `Could not load ${hard[0].source}` : `Could not load ${hard.length} procurement data sources`,
-              { description: hard.map((e) => `${e.source}: ${e.message}`).slice(0, 4).join(" · ") },
+              { description: hard.map((e) => `${e.source}: ${readableLoadError(e.message)}`).slice(0, 4).join(" · ") },
             )
           }
         })

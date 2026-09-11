@@ -163,6 +163,17 @@ export async function submitRequisition(id: string): Promise<ProcurementRecord> 
   return unwrapData(await apiClient.put<ApiResponse<ProcurementRecord>>(`/procurement/requisitions/${encodeURIComponent(id)}/submit`))
 }
 
+/**
+ * The requester corrects their own DRAFT or REJECTED requisition: PUT /procurement/requisitions/:id
+ * {title, justification, sourcingCategory, items[]}. Resubmitting a rejected one needs a real change.
+ */
+export async function updateRequisition(
+  id: string,
+  body: { title?: string; justification?: string | null; sourcingCategory?: string | null },
+): Promise<ProcurementRecord> {
+  return unwrapData(await apiClient.put<ApiResponse<ProcurementRecord>>(`/procurement/requisitions/${encodeURIComponent(id)}`, body))
+}
+
 export async function approveRequisition(id: string): Promise<ProcurementRecord> {
   return unwrapData(await apiClient.put<ApiResponse<ProcurementRecord>>(`/procurement/requisitions/${encodeURIComponent(id)}/approve`))
 }
@@ -318,6 +329,27 @@ export async function matchProcurementInvoice(id: string): Promise<ProcurementRe
 
 /** GET /cashbook/banks — the bank and cash accounts a payment can be made from (Accounting owns them). */
 export const listBanks = () => list("/cashbook/banks")
+
+/**
+ * Post a PENDING journal to the ledger: PATCH /accounting/journal-entries/:id/post. Paying a
+ * procurement invoice creates its expense journal as PENDING; the accounting grants decide who posts.
+ */
+export async function postJournalEntry(id: string): Promise<ProcurementRecord> {
+  return unwrapData(await apiClient.patch<ApiResponse<ProcurementRecord>>(`/accounting/journal-entries/${encodeURIComponent(id)}/post`, {}))
+}
+
+/**
+ * The organisation's letterhead identity: GET /company-profile (legalName, registrationNumber,
+ * taxNumber, email, phone, website, logoUrl, addresses[]). A 404 means none is set up yet.
+ */
+export async function getCompanyProfile(): Promise<ProcurementRecord | null> {
+  try {
+    return unwrapData(await apiClient.get<ApiResponse<ProcurementRecord>>("/company-profile"))
+  } catch (err) {
+    if (readProcurementError(err).status === 404) return null
+    throw err
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Registers: document vault, contracts, annual plans (nvccz src/routes/procurementRegistersRoutes.ts)

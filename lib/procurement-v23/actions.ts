@@ -37,6 +37,7 @@ import {
   createRfq,
   createVendor,
   payProcurementInvoice,
+  postJournalEntry,
   readProcurementError,
   rejectGoodsReceivedNote,
   rejectProcurementInvoice,
@@ -45,6 +46,7 @@ import {
   scoreQuotation,
   sendPurchaseOrder,
   submitRequisition,
+  updateRequisition,
 } from "@/lib/api/procurement-v23-api"
 import type { ProcurementV23LivePayload } from "@/lib/procurement-v23/live-loaders"
 
@@ -64,6 +66,8 @@ export type ProcurementActionResult = {
 export const LIVE_ACTIONS = [
   "submit-pr",
   "save-pr",
+  "save-pr-v11",
+  "submit-pr-v11",
   "approve-pr-v11",
   "confirm-reject-pr-v11",
   "approve-prompt-v6",
@@ -92,6 +96,7 @@ export const LIVE_ACTIONS = [
   "confirm-upload-document-v5",
   "confirm-upload-document-v6",
   "confirm-upload-version-v11",
+  "post-journal",
 ] as const
 
 /**
@@ -114,11 +119,9 @@ export const NOT_YET_LIVE_ACTIONS = [
   "submit-quote-recommendation-v5",
   "approve-invoice",
   "approve-match-v5",
-  "save-pr-v11",
   "create-plan-confirm",
   "save-plan-line-v6",
   "save-and-esign-contract-v6",
-  "post-journal",
   "confirm-asset-transfer",
   "send-invitations",
 ] as const
@@ -182,6 +185,11 @@ const UNCONNECTED_TERMINAL_STEPS = new Set<string>([
   "access-review",
   "archive-record",
   "validate-plan-v5",
+  // The OCR queue lists fixture files (invoice_aug_001.pdf, medequip_44019.pdf); its Capture and
+  // Process buttons announced captures that never happened. Found by the full UI census.
+  "run-ocr-v5",
+  "capture-ocr-item-v5",
+  "process-ocr-ready-v5",
 ])
 
 /**
@@ -289,6 +297,34 @@ export async function handleProcurementV23Action(
           handled: true,
           reload: true,
           message: `${number} submitted to the ${department} department head for approval.`,
+        }
+      }
+
+      case "save-pr-v11":
+      case "submit-pr-v11": {
+        // The requester corrects their own draft or rejected requisition, then saves it or submits it.
+        const r = byDisplayId("requisitions", detail.dataset.id)
+        if (!r) return { handled: true, error: "That requisition is no longer in your register. Refresh and try again." }
+        const raw = String(r.rawStatus ?? "").toUpperCase()
+        if (raw !== "DRAFT" && raw !== "REJECTED") {
+          return { handled: true, error: `${r.id} is ${String(r.status).toLowerCase()} and can no longer be changed by its requester.` }
+        }
+        const form = document.querySelector<HTMLFormElement>("#editPrFormV11")
+        if (form && !form.reportValidity()) return { handled: true }
+        const title = val('#editPrFormV11 [name="title"]')
+        if (!title) return { handled: true, error: "A requirement title is required." }
+        await updateRequisition(r.recordId, { title, justification: val('#editPrFormV11 [name="justification"]') || null })
+        if (action === "save-pr-v11") {
+          closeRuntimeOverlay()
+          return { handled: true, reload: true, message: `${r.id} saved.` }
+        }
+        await submitRequisition(r.recordId)
+        closeRuntimeOverlay()
+        const head = r.department ? `the ${r.department} department head` : "the department head"
+        return {
+          handled: true,
+          reload: true,
+          message: raw === "REJECTED" ? `${r.id} corrected and resubmitted to ${head}.` : `${r.id} submitted to ${head} for approval.`,
         }
       }
 
@@ -818,6 +854,19 @@ export async function handleProcurementV23Action(
         return { handled: true, reload: true, message: `${out.contractNumber} ${activating ? "is now active" : "was terminated"}.` }
       }
 
+      // ---------------------------------------------------------------- journals
+      case "post-journal": {
+        // Paying an invoice creates its expense journal as PENDING. Posting is an accounting decision,
+        // so the ledger's own permission check decides who may; a refusal is shown as it comes back.
+        const j = byDisplayId("journals", detail.dataset.id)
+        if (!j) return { handled: true, error: "That journal is no longer in the queue. Refresh and try again." }
+        if (String(j.status).toUpperCase() !== "PENDING") {
+          return { handled: true, error: `${j.id} is already ${String(j.status).toLowerCase()}; nothing was posted again.` }
+        }
+        await postJournalEntry(j.recordId)
+        return { handled: true, reload: true, message: `${j.id} posted to the ledger.` }
+      }
+
       // ---------------------------------------------------------------- document vault
       case "confirm-upload-document-v5":
       case "confirm-upload-document-v6": {
@@ -895,7 +944,7 @@ export async function handleProcurementV23Action(
         if (notes) fd.append("notes", notes)
         await payProcurementInvoice(invoiceId, fd)
         closeRuntimeOverlay()
-        return { handled: true, reload: true, message: `${inv.id} paid to ${inv.vendor}; the accounting entries were posted.` }
+        return { handled: true, reload: true, message: `${inv.id} paid to ${inv.vendor}. Its expense journal was created and awaits posting in Accounts.` }
       }
 
       default:
