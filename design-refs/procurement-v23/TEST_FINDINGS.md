@@ -7,8 +7,8 @@
 |---|---|---|---|
 | CRITICAL | 0 | 0 | 1 |
 | HIGH | 0 | 1 | 0 |
-| MEDIUM | 0 | 0 | 0 |
-| LOW | 1 | 0 | 0 |
+| MEDIUM | 0 | 1 | 0 |
+| LOW | 0 | 1 | 0 |
 
 ---
 
@@ -228,13 +228,96 @@ The grants are defaults, not business sign-off, and can be changed per role in A
   or System Administrator: **500**. `reviewQuotation` throws, and the controller hands every
   error to `next(error)`, including "not found".
 - `POST /vendor-quotations/submit` (public, the vendor's own route) with an empty body: **500**.
+- The same submit with a portal token that carries no RFQ id: **500** "Invalid RFQ portal token".
 
 ### Expected
 
 404 and 400. A 500 tells the vendor or the desk that the system broke, not that the request
 was wrong, and it hides real failures in the error log.
 
-**Status:** OPEN. Accept is the award path the V23 wiring will call, so it is fixed there.
+### Root cause
+
+`VendorQuotationService` throws a plain `Error` for every problem, and every controller method
+passes it to `next(error)`. The error middleware answers any error without a status as 500.
+
+### Fix
+
+Commit `b7e2163` on `feature/procurement-v23-live` (nvccz). `VendorQuotationController` sets
+the status before handing the error on:
+
+- "not found" → 404;
+- "already been …" → 409;
+- a missing field, or a bad or expired token → 400.
+
+Prisma errors are left alone and stay 500.
+
+### Verification
+
+| Request | Before | After |
+|---|---|---|
+| Accept an unknown quotation (Procurement Manager) | 500 | **404** "Quotation not found" |
+| Reject an unknown quotation | 500 | **404** |
+| Read an unknown quotation | 500 | **404** |
+| Public submit, empty body | 500 | **400** "vendorPortalToken is required" |
+| Public submit, forged token | 500 | **400** "Invalid vendor portal token signature" |
+
+**Status:** FIXED LOCALLY — not deployed.
+
+---
+
+## PROC-FINDING-004
+
+**Title:** Accounts payable cannot capture a supplier invoice — the staff path of the invoice endpoint is unreachable
+**Module:** Procurement (backend) · **Dimension:** QAT · **Category:** Functional / Routing
+**Severity:** MEDIUM
+**Persona affected:** Accountant, Finance Officer
+**Surface:** API · `POST /api/procurement/invoices`
+
+### Steps to reproduce
+
+1. Run a requisition through to an approved goods received note (`nvccz/scripts/_uat/procurement-p2p-flow.mjs` does this).
+2. Sign in as the Accountant.
+3. `POST /api/procurement/invoices` with the PO id, the vendor id, an invoice date, a due
+   date and the invoice lines.
+
+### Expected
+
+201, a captured invoice. The controller has a staff branch for exactly this: it requires an
+invoice date and a vendor id when the caller is staff.
+
+### Actual
+
+**400** "vendorPortalToken is required for vendor-submitted invoices". Every staff capture is
+refused this way, whatever the role. An invoice can only enter procurement through the vendor's
+emailed link.
+
+### Root cause
+
+The route is the public vendor submission route and is declared **before**
+`router.use(authenticate)`. Nothing ever reads the Authorization header on it, so `req.user`
+is never set, and the controller treats every request as a vendor's.
+
+### Fix
+
+Commit `b7e2163` on `feature/procurement-v23-live` (nvccz):
+
+- **With an Authorization header,** the route authenticates the token, holds the caller to
+  internal staff, and requires `procurement.intake.manage`. The controller's staff branch then
+  applies.
+- **Without a header,** it is still the vendor's token-signed submission, unchanged.
+
+### Verification
+
+| | Before | After |
+|---|---|---|
+| Accountant captures the invoice for `PO_20260911_0001` | 400 | **201** `INV_20260911_0001`, then approved by the Finance Manager |
+| Staff persona without the capture grant | 400 (vendor token demanded) | **403** |
+| LP portal token | 400 | **403** |
+| No Authorization header, no vendor token | 400 | 400 (vendor path, unchanged) |
+
+The authorisation probe now carries this row, and every asserted cell matches the policy.
+
+**Status:** FIXED LOCALLY — not deployed.
 
 ---
 
