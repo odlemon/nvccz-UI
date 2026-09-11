@@ -717,6 +717,31 @@ s = replaceUnique(
   "if(__pr23Live())return __pr23ContractModal(id);",
 )
 
+// ---------------------------------------------------------------------------
+// 20. Exports carry the register they are named for; Accounts shows real payables and journals
+// ---------------------------------------------------------------------------
+s = replaceUnique(
+  s,
+  "function exportFile(format,title='Matanho Procurement Report'){",
+  "function exportFile(format,title='Matanho Procurement Report'){if(__pr23Live())return __pr23ExportFile(format,title);",
+  "exports -> live register by name",
+  "if(__pr23Live())return __pr23ExportFile(format,title);",
+)
+s = replaceUnique(
+  s,
+  "if(state.accountTab==='payments') content=table(",
+  "if(state.accountTab==='payments') content=__pr23Live()?__pr23PayablesTable():table(",
+  "accounts payable tab -> approved and paid invoices",
+  "content=__pr23Live()?__pr23PayablesTable():table(",
+)
+s = replaceUnique(
+  s,
+  "<td><button class=\"btn small\" data-action=\"post-journal\" data-id=\"${j.id}\">Post</button></td>",
+  "<td>${__pr23Live()?'':`<button class=\"btn small\" data-action=\"post-journal\" data-id=\"${j.id}\">Post</button>`}</td>",
+  "journal queue: no Post button on journals the payment already posted",
+  "${__pr23Live()?'':`<button class=\"btn small\" data-action=\"post-journal\"",
+)
+
 console.log(`\n${applied} applied, ${skipped} already in place, ${missed} missed`)
 if (missed) {
   console.error("One or more patches did not find their anchor. The runtime is NOT fully patched.")

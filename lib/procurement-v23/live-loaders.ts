@@ -186,7 +186,6 @@ function vendorStatus(v: ProcurementRecord): string {
 
 /** Collections with no backend behind them yet. Emptied so the demo records never show. */
 const NO_BACKEND_YET = [
-  "journals",
   "assets",
   "reports",
   "notifications",
@@ -430,7 +429,24 @@ export async function loadProcurementV23LiveData(): Promise<ProcurementV23LivePa
       !["PAID", "PARTIALLY_PAID"].includes(String(inv.paymentStatus ?? "").toUpperCase()),
     outstanding: num(inv.totalAmount),
     matchFlags: Array.isArray(inv.aiDiscrepancies?.flags) ? inv.aiDiscrepancies.flags : [],
+    journal: inv.journalEntry?.referenceNumber ?? null,
+    journalStatus: inv.journalEntry?.status ?? null,
   }))
+
+  // ----------------------------------------------------------------- journal queue
+  // Paying an invoice posts its expense recognition journal (ProcurementService.payProcurementInvoice),
+  // so the queue lists those real journals; nothing waits to be posted by hand.
+  const journalsView = invoices
+    .filter((inv) => inv.journalEntry?.referenceNumber)
+    .map((inv) => ({
+      id: inv.journalEntry.referenceNumber,
+      recordId: inv.journalEntry.id,
+      source: `Invoice ${inv.invoiceNumber ?? inv.id} · ${inv.vendor?.name ?? DASH}`,
+      debit: (num(inv.taxAmount) ?? 0) > 0 ? "Expense + VAT input" : "Expense",
+      credit: "Accounts payable",
+      amount: num(inv.totalAmount) ?? 0,
+      status: titleCase(inv.journalEntry.status ?? "POSTED"),
+    }))
 
   // ----------------------------------------------------------------- quotations and evaluation
   const openQuote = (s: unknown) => ["SUBMITTED", "UNDER_REVIEW"].includes(String(s ?? "").toUpperCase())
@@ -918,6 +934,7 @@ export async function loadProcurementV23LiveData(): Promise<ProcurementV23LivePa
     plans: plansView,
     planItems: planItemsView,
     documents: documentsView,
+    journals: journalsView,
   }
   for (const key of NO_BACKEND_YET) hydrate[key] = []
 
@@ -965,7 +982,7 @@ const NO_REMINDER_AUTOMATION = {
 /** What the runtime is hydrated with before the first live load lands: no demo records at all. */
 export const EMPTY_PROCUREMENT_HYDRATE: Record<string, unknown> = {
   ...Object.fromEntries(
-    ["requisitions", "tenders", "vendors", "orders", "grns", "invoices", "approvalPromptsV6", "auditEventsLive", "quotationsLive", "plans", "planItems", "documents", ...NO_BACKEND_YET].map((k) => [k, []]),
+    ["requisitions", "tenders", "vendors", "orders", "grns", "invoices", "approvalPromptsV6", "auditEventsLive", "quotationsLive", "plans", "planItems", "documents", "journals", ...NO_BACKEND_YET].map((k) => [k, []]),
   ),
   complianceReminderSettingsV7: NO_REMINDER_AUTOMATION,
   evaluationLive: {},

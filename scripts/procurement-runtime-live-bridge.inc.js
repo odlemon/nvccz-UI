@@ -552,6 +552,96 @@ function __pr23ContractModal(id) {
   );
 }
 
+// ---------------------------------------------------------------- exports
+
+/**
+ * The live records an export titled `title` should contain. The vendored exportFile wrote the
+ * tenders table into every CSV and Excel file whatever its name ("AP Bank Upload Batch", "Audit
+ * Trail", a report template) and a title-only PDF, so each export now picks its register by name.
+ */
+function __pr23ExportRows(title) {
+  const t = String(title || '');
+  const live = __pr23Live() || {};
+  const n = v => (v == null || v === '—' ? '' : v);
+  const pick = (re) => re.test(t);
+  if (pick(/bank|payable|payment/i)) {
+    // A bank upload batch is what is still to be paid; an accounts payable listing is every approved invoice.
+    const onlyUnpaid = pick(/bank/i);
+    return [['Invoice', 'Vendor', 'Purchase order', 'Amount', 'Currency', 'Due', 'Status', 'Payment'],
+      ...(state.invoices || []).filter(i => String(i.rawStatus || '').toUpperCase() === 'APPROVED' && (!onlyUnpaid || i.payable)).map(i => [i.id, i.vendor, n(i.po), i.amount, n(i.currency), n(i.due), i.status, n(i.paymentStatus)])];
+  }
+  if (pick(/audit/i)) return [['Event', 'Action', 'Record', 'Actor', 'Time', 'Class'], ...(state.auditEventsLive || []).map(e => (Array.isArray(e) ? e : [e.id, e.event, e.record, e.actor, e.time, e.class]))];
+  if (pick(/evaluation|bid|quotation|comparison/i)) return [['Quotation', 'RFQ', 'Vendor', 'Amount', 'Currency', 'Status', 'Technical score', 'Submitted'], ...(state.quotationsLive || []).map(q => [q.id, n(q.rfq), q.vendor, q.amount, n(q.currency), q.status, n(q.evaluationScore), n(q.submitted)])];
+  if (pick(/approval/i)) return [['Approval', 'Type', 'Record', 'Title', 'Amount', 'Role', 'Status'], ...(state.approvalPromptsV6 || []).map(a => [a.id, a.type, a.record, a.title, n(a.amount), a.role, a.status])];
+  if (pick(/vendor|supplier/i)) return [['Vendor', 'Category', 'BP number', 'VAT number', 'Status', 'Tax clearance', 'Email', 'Spend'], ...(state.vendors || []).map(v => [v.name, v.category, v.bp, v.vat, v.status, v.itf, n(v.email), v.spend])];
+  if (pick(/contract/i)) return [['Contract', 'Title', 'Vendor', 'Value', 'Start', 'End', 'Status'], ...(state.contractsV6 || []).map(c => [c.id, c.title, c.vendor, c.value, n(c.start), n(c.end), c.status])];
+  if (pick(/plan|budget/i)) return [['Line', 'Plan', 'Requirement', 'Department', 'Category', 'Quarter', 'Method', 'Estimated value', 'Status'], ...(state.planItems || []).map(i => [i.id, i.plan, i.description, i.entity, i.category, i.quarter, i.method, i.budget, i.status])];
+  if (pick(/invoice/i)) return [['Invoice', 'Vendor', 'Purchase order', 'Amount', 'Match', 'Status', 'Due'], ...(state.invoices || []).map(i => [i.id, i.vendor, n(i.po), i.amount, i.match, i.status, n(i.due)])];
+  if (pick(/\border|\bPO\b/i)) return [['Purchase order', 'Vendor', 'Department', 'Amount', 'Currency', 'Status', 'Delivery'], ...(state.orders || []).map(o => [o.id, o.vendor, o.entity, o.amount, n(o.currency), o.status, n(o.delivery)])];
+  if (pick(/requisition|demand/i)) return [['Requisition', 'Title', 'Department', 'Estimate', 'Status', 'Requested by'], ...(state.requisitions || []).map(r => [r.id, r.title, r.entity, n(r.amount), r.status, r.owner])];
+  if (pick(/grn|receipt|receiv/i)) return [['GRN', 'Purchase order', 'Item', 'Value accepted', 'Status', 'Received'], ...(state.grns || []).map(g => [g.id, g.po, g.item, g.value, g.status, g.received])];
+  if (pick(/configuration|rbac|permission/i)) return [['Permission'], ...(((live.access || {}).permissions) || []).map(p => [p])];
+  // A named report or analysis: one line per register, from the records loaded now.
+  const sum = (rows, key) => rows.reduce((s, r) => s + (Number(r[key]) || 0), 0);
+  return [['Register', 'Records', 'Value'],
+    ['Requisitions', (state.requisitions || []).length, sum(state.requisitions || [], 'amount')],
+    ['Tenders (RFQs)', (state.tenders || []).length, ''],
+    ['Quotations', (state.quotationsLive || []).length, sum(state.quotationsLive || [], 'amount')],
+    ['Purchase orders', (state.orders || []).length, sum(state.orders || [], 'amount')],
+    ['Goods received notes', (state.grns || []).length, sum(state.grns || [], 'value')],
+    ['Invoices', (state.invoices || []).length, sum(state.invoices || [], 'amount')],
+    ['Contracts', (state.contractsV6 || []).filter(c => c.kind === 'contract').length, sum((state.contractsV6 || []).filter(c => c.kind === 'contract'), 'value')],
+    ['Plan lines', (state.planItems || []).length, sum(state.planItems || [], 'budget')],
+    ['Vendors', (state.vendors || []).length, '']];
+}
+
+/** A plain one-page PDF of the export's first rows, with the row count stated. */
+function __pr23PdfBlob(title, rows) {
+  const clean = s => String(s == null ? '' : s).replace(/[()\\]/g, '').replace(/[^\x20-\x7E]/g, ' ').slice(0, 118);
+  const body = rows.slice(1);
+  const shown = body.slice(0, 52);
+  const lines = [
+    `BT /F1 15 Tf 40 760 Td (${clean(title)}) Tj ET`,
+    `BT /F1 8 Tf 40 744 Td (Generated ${clean(new Date().toISOString().slice(0, 16).replace('T', ' '))} from live procurement records. ${body.length} row(s)${body.length > shown.length ? `, first ${shown.length} shown` : ''}.) Tj ET`,
+    `BT /F1 8 Tf 40 724 Td (${clean(rows[0].join(' | '))}) Tj ET`,
+    ...shown.map((r, i) => `BT /F1 8 Tf 40 ${710 - i * 13} Td (${clean(r.join(' | '))}) Tj ET`),
+  ];
+  const text = lines.join('\n');
+  const objs = ['1 0 obj <</Type/Catalog/Pages 2 0 R>> endobj', '2 0 obj <</Type/Pages/Kids[3 0 R]/Count 1>> endobj', '3 0 obj <</Type/Page/Parent 2 0 R/MediaBox[0 0 612 792]/Resources<</Font<</F1 5 0 R>>>>/Contents 4 0 R>> endobj', `4 0 obj <</Length ${text.length}>> stream\n${text}\nendstream endobj`, '5 0 obj <</Type/Font/Subtype/Type1/BaseFont/Helvetica>> endobj'];
+  let out = '%PDF-1.4\n';
+  const offsets = [];
+  objs.forEach(o => { offsets.push(out.length); out += o + '\n'; });
+  const xref = out.length;
+  out += `xref\n0 6\n0000000000 65535 f \n${offsets.map(x => String(x).padStart(10, '0') + ' 00000 n ').join('\n')}\ntrailer <</Size 6/Root 1 0 R>>\nstartxref\n${xref}\n%%EOF`;
+  return new Blob([out], { type: 'application/pdf' });
+}
+
+function __pr23ExportFile(format, title) {
+  const name = String(title || 'Matanho Procurement Export');
+  const base = name.replace(/[^a-z0-9]+/gi, '_').replace(/^_|_$/g, '') || 'export';
+  const rows = __pr23ExportRows(name);
+  if (format === 'pdf') return downloadBlob(__pr23PdfBlob(name, rows), base + '.pdf');
+  if (format === 'json') {
+    const [head, ...body] = rows;
+    return downloadBlob(new Blob([JSON.stringify(body.map(r => Object.fromEntries(head.map((h, i) => [h, r[i]]))), null, 2)], { type: 'application/json' }), base + '.json');
+  }
+  const csv = rows.map(r => r.map(v => `"${String(v == null ? '' : v).replace(/"/g, '""')}"`).join(',')).join('\n');
+  if (format === 'csv') return downloadBlob(new Blob([csv], { type: 'text/csv' }), base + '.csv');
+  const html = `<html><body><table>${rows.map(r => `<tr>${r.map(v => `<td>${__pr23Esc(v)}</td>`).join('')}</tr>`).join('')}</table></body></html>`;
+  return downloadBlob(new Blob([html], { type: 'application/vnd.ms-excel' }), base + '.xls');
+}
+
+// ---------------------------------------------------------------- accounts payable tab
+
+/** Approved and paid invoices, replacing the two fixture payment batches. */
+function __pr23PayablesTable() {
+  const rows = (state.invoices || [])
+    .filter(i => String(i.rawStatus || '').toUpperCase() === 'APPROVED')
+    .map(i => `<tr><td><strong class="link">${__pr23Esc(i.id)}</strong></td><td>${__pr23Esc(i.vendor)}</td><td>${__pr23Esc(i.po)}</td><td class="money">${money(i.amount || 0)}</td><td>${__pr23Esc(i.currency || '')}</td><td>${__pr23Esc(i.due)}</td><td>${status(i.status)}</td><td>${i.payable && __pr23Can('invoices.pay') ? `<button class="btn small" data-action="record-payment-v23" data-id="${__pr23Esc(i.recordId)}">Record payment</button>` : ''}</td></tr>`);
+  if (!rows.length) return __pr23NoData('No invoice has been approved for payment yet.');
+  return table(['Invoice', 'Vendor', 'Purchase order', 'Amount', 'Currency', 'Due', 'Status', ''], rows);
+}
+
 // Re-draw dependent parts of the live forms when a select changes. Removed with the runtime (__pr23Sig).
 document.addEventListener('change', event => {
   const target = event.target;
