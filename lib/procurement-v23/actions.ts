@@ -27,6 +27,7 @@ import {
   createVendor,
   readProcurementError,
   rejectGoodsReceivedNote,
+  rejectProcurementInvoice,
   rejectQuotation,
   rejectRequisition,
   scoreQuotation,
@@ -334,7 +335,9 @@ export async function handleProcurementV23Action(
             await rejectGoodsReceivedNote(p.targetId, withDecision)
             break
           case "invoice":
-            return { handled: true, error: "Rejecting a procurement invoice is not supported by the backend yet. Nothing was changed." }
+            if (!has("invoices.approve")) return refuse("rejecting invoices")
+            await rejectProcurementInvoice(p.targetId, withDecision)
+            break
           default:
             return { handled: true, error: "This approval type is not connected to the backend yet." }
         }

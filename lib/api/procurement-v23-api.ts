@@ -301,6 +301,15 @@ export async function approveProcurementInvoice(id: string, isTaxable = true): P
   )
 }
 
+/** PUT /procurement/invoices/:id/reject — an invoice awaiting approval; reason required. */
+export async function rejectProcurementInvoice(id: string, rejectionReason: string): Promise<ProcurementRecord> {
+  return unwrapData(
+    await apiClient.put<ApiResponse<ProcurementRecord>>(`/procurement/invoices/${encodeURIComponent(id)}/reject`, {
+      rejectionReason,
+    }),
+  )
+}
+
 export async function payProcurementInvoice(id: string, form: FormData): Promise<ProcurementRecord> {
   return unwrapData(await apiClient.postFormData<ApiResponse<ProcurementRecord>>(`/procurement/invoices/${encodeURIComponent(id)}/payment`, form))
 }

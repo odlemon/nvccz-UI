@@ -15,6 +15,7 @@
  *   8. Procurement Manager awards RFQ-C from the award panel             -> chosen quotation ACCEPTED, PO raised, RFQ AWARDED
  *   9. Procurement Officer records a GRN against PO-B (live form)        -> GRN RECEIVED
  *  10. Accountant captures the supplier invoice for PO-B (live form)     -> invoice DRAFT
+ *  11. Finance Manager rejects a DRAFT invoice from the Approval Centre -> invoice REJECTED, reason stored
  *
  * Needs the dataset from nvccz/scripts/_uat/procurement-p2p-flow.mjs (PR-B pending approval,
  * RFQ-B with two quotations). Records made here are titled "UAT P2P" so the flow's --reset
@@ -366,6 +367,32 @@ await step("10 Accountant captures the invoice for PO-B (live form)", async (ope
     invoices.length === before + 1 && inv?.status === "DRAFT",
     label,
     `${po.poNumber}: invoices ${before} -> ${invoices.length}${inv ? `, ${inv.invoiceNumber} ${inv.status} total ${inv.totalAmount}` : ""} · "${toast}"${suffix(errors)}`,
+  )
+})
+
+// ------------------------------------------------------------------ 11. reject an invoice
+await step("11 Finance Manager rejects an invoice (Approval Centre)", async (open) => {
+  const label = "11 Finance Manager rejects an invoice (Approval Centre)"
+  const email = "payroll.finmgr@nts.local"
+  const target = ((await api(email, "/procurement/invoices")) ?? []).find((i) => String(i.status).toUpperCase() === "DRAFT")
+  if (!target) return record(false, label, "no DRAFT invoice to reject — step 10 captures one")
+  const { page, errors } = await open(email, "/procurement-v23/approvals")
+  const id = `INVOICE-${target.invoiceNumber}`
+  const review = `[data-action="open-approval-v6"][data-id="${id}"]`
+  if (!(await promptOnScreen(page, review))) return record(false, label, await explainMissingPrompt(page, review, errors))
+  await page.click(review)
+  await page.click(`[data-action="reject-approval-v6"][data-id="${id}"]`)
+  await page.waitForSelector("#rejectApprovalFormV6")
+  await page.selectOption('#rejectApprovalFormV6 [name="decision"]', "Reject")
+  await page.fill('#rejectApprovalFormV6 [name="reason"]', `UAT P2P invoice does not match the delivery ${RUN}`)
+  await page.click(`[data-action="confirm-reject-approval-v6"][data-id="${id}"]`)
+  const toast = await toasts(page)
+  const after = ((await api(email, "/procurement/invoices")) ?? []).find((i) => i.id === target.id)
+  const reason = String(after?.rejectionReason ?? "")
+  record(
+    after?.status === "REJECTED" && (!("rejectionReason" in (after ?? {})) || reason.includes(String(RUN))),
+    label,
+    `${target.invoiceNumber} -> ${after?.status}${reason ? `, reason "${reason.slice(0, 60)}"` : ""} · "${toast}"${suffix(errors)}`,
   )
 })
 
