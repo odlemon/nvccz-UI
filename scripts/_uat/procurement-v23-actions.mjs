@@ -60,13 +60,16 @@ async function session(email, route) {
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 } })
   await seedAuth(context, staff.base, email, staff.portal)
   const page = await context.newPage()
-  page.setDefaultTimeout(30000)
+  // A remote run (dev over the internet, often while the VPS builds) needs more than the local
+  // defaults: UAT_TIMEOUT_MS for actions and navigation, UAT_LOAD_TIMEOUT_MS for the first render.
+  page.setDefaultTimeout(Number(process.env.UAT_TIMEOUT_MS || 30000))
+  const loadTimeout = Number(process.env.UAT_LOAD_TIMEOUT_MS || 60000)
   const errors = []
   page.on("pageerror", (e) => errors.push(String(e.message || e).slice(0, 200)))
-  await page.goto(staff.base + route, { waitUntil: "domcontentloaded" })
-  await page.waitForSelector(".procurement-v23-root", { timeout: 60000 })
+  await page.goto(staff.base + route, { waitUntil: "domcontentloaded", timeout: loadTimeout })
+  await page.waitForSelector(".procurement-v23-root", { timeout: loadTimeout })
   // The live load has landed once the host has published the caller's access.
-  await page.waitForFunction(() => Boolean(window.__pr23Live && window.__pr23Live.access), null, { timeout: 60000 })
+  await page.waitForFunction(() => Boolean(window.__pr23Live && window.__pr23Live.access), null, { timeout: loadTimeout })
   await page.waitForTimeout(800)
   return { browser, page, errors }
 }
