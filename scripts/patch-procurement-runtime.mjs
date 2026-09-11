@@ -1042,6 +1042,32 @@ s = replaceUnique(
   "actionV11('Save and submit','submit-pr-v11'",
 )
 
+// Actuals vs Plan "Management observations" was fixture text (a solar pump programme, fleet tyres, a
+// clinical budget) whose rows opened a budget that does not exist.
+{
+  const find = "card('Management observations','Quantity, timing and department budget signals',`<div class=\"card-body list\"><div class=\"list-row\" data-action=\"open-plan-actual-v6\" data-id=\"PPI-0002\"><div class=\"list-main\"><strong>Solar pump programme behind quantity plan</strong><span>12 of 18 ordered; no accepted receipt recorded</span></div>${status('Attention')}</div><div class=\"list-row\" data-action=\"open-plan-actual-v6\" data-id=\"PPI-0004\"><div class=\"list-main\"><strong>Fleet tyre quantity variance</strong><span>190 of 640 received; framework remains within value</span></div>${status('Review')}</div><div class=\"list-row\" data-action=\"open-department-budget-v6\" data-id=\"Clinical Services\"><div class=\"list-main\"><strong>Clinical Services budget utilisation</strong><span>High utilisation following MRI capital purchase</span></div>${status('High')}</div></div>`)"
+  const repl = find.replace("signals',`", "signals',__pr23Live()?__pr23PlanObservationsHtml():`")
+  s = replaceUnique(s, find, repl, "actuals vs plan: management observations from approved plans", "__pr23PlanObservationsHtml()")
+}
+
+// Opening a department budget with none recorded crashed the page ("reading 'department'").
+s = replaceUnique(
+  s,
+  "const b=state.departmentBudgetsV6.find(x=>x.department===name)||state.departmentBudgetsV6[0];",
+  "const b=state.departmentBudgetsV6.find(x=>x.department===name)||state.departmentBudgetsV6[0];if(!b){toast('No department budget',`No approved plan budget is recorded for ${name||'this department'}.`);return;}",
+  "department budget detail: no crash when no budget is recorded",
+  "if(!b){toast('No department budget',",
+)
+
+// "Share" announced a secure, expiring link that was never created; it copies the page's own address.
+s = replaceUnique(
+  s,
+  "case 'share-record':toast('Secure link copied','The access-controlled link expires in seven days.');break;",
+  "case 'share-record':if(__pr23Live()){__pr23CopyPageLink();break;}toast('Secure link copied','The access-controlled link expires in seven days.');break;",
+  "activity menu: Share copies the page link and says what it is",
+  "if(__pr23Live()){__pr23CopyPageLink();break;}",
+)
+
 // Generated documents fell back to the fixture company's address and mailbox when a field was blank;
 // in a live session the letterhead comes from the company profile and a blank field stays blank.
 for (const [find, fixture, count] of [

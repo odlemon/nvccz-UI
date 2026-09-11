@@ -190,6 +190,13 @@ const UNCONNECTED_TERMINAL_STEPS = new Set<string>([
   "run-ocr-v5",
   "capture-ocr-item-v5",
   "process-ocr-ready-v5",
+  // Found by the full UI census: the eSign envelope modal is a sample, and opening its tabs crashed
+  // the page; the vendor inbox crashed on an empty mailbox (vendor messaging is not connected); the
+  // Actuals vs Plan filter announced a recalculation that never ran.
+  "signature-queue",
+  "open-vendor-inbox-v6",
+  "open-vendor-message-v6",
+  "apply-plan-actual-filter-v6",
 ])
 
 /**

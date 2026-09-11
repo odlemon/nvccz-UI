@@ -952,6 +952,36 @@ function __pr23MyQueueHtml() {
   return prompts.map(a => `<div class="list-row" data-page="approvals" style="cursor:pointer"><div class="list-main"><strong>${__pr23Esc(a.title)}</strong><span>${__pr23Esc(a.type)} · ${__pr23Esc(a.record)}${a.amount != null ? ` · ${money(a.amount)}` : ''}</span></div>${status('Awaiting me')}</div>`).join('');
 }
 
+/**
+ * Actuals vs Plan "Management observations": approved plans whose orders already exceed what was
+ * planned or budgeted, from the records. The fixture listed a solar pump programme and a clinical budget.
+ */
+function __pr23PlanObservationsHtml() {
+  const plans = (state.plans || []).filter(p => String(p.rawStatus || '').toUpperCase() === 'APPROVED');
+  const rows = [];
+  for (const p of plans) {
+    if (p.budget > 0 && p.committed > p.budget) rows.push([p, `${money(p.committed)} ordered against a budget of ${money(p.budget)}`, 'High']);
+    else if (p.planned > 0 && p.committed > p.planned) rows.push([p, `${money(p.committed)} ordered against ${money(p.planned)} planned`, 'Attention']);
+  }
+  if (!rows.length) {
+    return `<div class="card-body list"><div class="list-row"><div class="list-main"><strong>Nothing needs attention</strong><span>${plans.length ? `No approved plan has orders beyond its plan or budget (${plans.length} checked).` : 'No procurement plan has been approved yet.'}</span></div></div></div>`;
+  }
+  return `<div class="card-body list">${rows.map(([p, text, level]) => `<div class="list-row"><div class="list-main"><strong>${__pr23Esc(p.id)} · ${__pr23Esc(p.name)}</strong><span>${__pr23Esc(text)}</span></div>${status(level)}</div>`).join('')}</div>`;
+}
+
+/** Share: the page's own address, copied. No expiring or special link exists, so none is claimed. */
+function __pr23CopyPageLink() {
+  const href = location.href;
+  const done = () => toast('Link copied', 'Anyone who opens it signs in and sees only what their role allows.');
+  const fallback = () => toast('Copy this link', href);
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(href).then(done, fallback);
+    else fallback();
+  } catch (e) {
+    fallback();
+  }
+}
+
 /** The vendor record holds no country; unknown is not the same as non-resident. */
 function __pr23CountryKnown(vendor) {
   if (!__pr23Live()) return true;

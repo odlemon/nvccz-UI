@@ -1002,7 +1002,15 @@ export async function loadProcurementV23LiveData(): Promise<ProcurementV23LivePa
     "SoD checks": { value: "Enforced", sub: "Authors cannot approve their own plans; decisions are role-bound" },
     "eSign coverage": unknown("eSignature is not connected"),
     "Value in market": {
-      value: money(sum(openRfqs.map((t) => requisitionsView.find((r) => r.id === t.requisition)).filter(Boolean), (r: any) => r.amount)),
+      value: money(
+        sum(
+          openRfqs.flatMap((t) => {
+            const r = requisitionsView.find((x) => x.id === t.requisition)
+            return r ? [r] : []
+          }),
+          (r) => r.amount,
+        ),
+      ),
       sub: "Requisition estimates behind open RFQs",
     },
     Committed: { value: money(committed), sub: `${liveOrders.length} purchase order${liveOrders.length === 1 ? "" : "s"}, not cancelled` },
