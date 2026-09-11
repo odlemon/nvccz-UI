@@ -4,12 +4,19 @@ export type PortalId = 'staff' | 'lp' | 'investee' | 'apply' | 'vendor' | 'event
 export const PORTAL_ID: PortalId =
   (process.env.NEXT_PUBLIC_PORTAL as PortalId) || 'staff'
 
+/**
+ * Takes the env *value*, not its name. Next inlines only literal `process.env.NEXT_PUBLIC_X`
+ * references at build time; a computed `process.env[key]` is left as a runtime lookup, and the
+ * portal containers carry no NEXT_PUBLIC_* vars at runtime. So in production builds every URL here
+ * read '' — the staff middleware then redirected /vendor-quotations/rfq-respond to
+ * "-quotations/rfq-respond" and answered 500 to vendors opening their RFQ invitation.
+ */
 function portalExternalUrl(
-  envKey: string,
+  value: string | undefined,
   localDevPort: number,
   productionDefault: string,
 ): string {
-  if (process.env[envKey]) return process.env[envKey] as string
+  if (value) return value
   if (process.env.NODE_ENV === 'development') {
     return `http://localhost:${localDevPort}`
   }
@@ -17,13 +24,13 @@ function portalExternalUrl(
 }
 
 export const LP_PORTAL_EXTERNAL_URL = portalExternalUrl(
-  'NEXT_PUBLIC_LP_PORTAL_URL',
+  process.env.NEXT_PUBLIC_LP_PORTAL_URL,
   3110,
   '',
 )
 
 export const INVESTEE_PORTAL_EXTERNAL_URL = portalExternalUrl(
-  'NEXT_PUBLIC_INVESTEE_PORTAL_URL',
+  process.env.NEXT_PUBLIC_INVESTEE_PORTAL_URL,
   3120,
   '',
 )
@@ -34,7 +41,7 @@ export const INVESTEE_PORTAL_EXTERNAL_URL = portalExternalUrl(
  * Set via NEXT_PUBLIC_APPLY_PORTAL_URL at build time — no production default.
  */
 export const APPLY_PORTAL_EXTERNAL_URL = portalExternalUrl(
-  'NEXT_PUBLIC_APPLY_PORTAL_URL',
+  process.env.NEXT_PUBLIC_APPLY_PORTAL_URL,
   3130,
   '',
 )
@@ -44,7 +51,7 @@ export const APPLY_PORTAL_EXTERNAL_URL = portalExternalUrl(
  * Set via NEXT_PUBLIC_VENDOR_PORTAL_URL at build time.
  */
 export const VENDOR_PORTAL_EXTERNAL_URL = portalExternalUrl(
-  'NEXT_PUBLIC_VENDOR_PORTAL_URL',
+  process.env.NEXT_PUBLIC_VENDOR_PORTAL_URL,
   3140,
   '',
 )
@@ -54,7 +61,7 @@ export const VENDOR_PORTAL_EXTERNAL_URL = portalExternalUrl(
  * Set via NEXT_PUBLIC_EVENTS_PORTAL_URL at build time.
  */
 export const EVENTS_PORTAL_EXTERNAL_URL = portalExternalUrl(
-  'NEXT_PUBLIC_EVENTS_PORTAL_URL',
+  process.env.NEXT_PUBLIC_EVENTS_PORTAL_URL,
   3150,
   '',
 )
@@ -82,6 +89,14 @@ export const STAFF_PUBLIC_PASS_THROUGH = [
   // scope. See design-refs/performance-role-matrix.md §1.
   '/fundraising-kyc',
   '/broker-instruction',
+  // Vendor pages opened from emailed, signed-token links. When the staff build has a vendor portal
+  // URL the middleware forwards these there first; without one they must still open here rather
+  // than bounce a supplier to the staff login.
+  '/vendor-quotations',
+  '/vendor/quotation/submit',
+  '/vendor/invoice/submit',
+  '/vendor-portal',
+  '/public-tenders',
 ] as const
 
 /**

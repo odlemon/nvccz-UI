@@ -353,10 +353,15 @@ export function middleware(request: NextRequest) {
     }
     if (
       shouldRedirectVendorToPortal() &&
+      /^https?:\/\//i.test(VENDOR_PORTAL_EXTERNAL_URL) &&
       (pathname.startsWith('/vendor-portal') || pathname.startsWith('/vendor/') || pathname.startsWith('/vendor-quotations') || pathname.startsWith('/public-tenders'))
     ) {
-      const suffix = pathname.replace(/^\/(vendor-portal|vendor|vendor-quotations|public-tenders)/, '') || ''
-      return NextResponse.redirect(`${VENDOR_PORTAL_EXTERNAL_URL}${suffix}`)
+      // The vendor build serves these same paths (VENDOR_PREFIXES), so forward the whole path and
+      // the query. Stripping the prefix turned /vendor-quotations/rfq-respond into
+      // "-quotations/rfq-respond" (the alternation matched `vendor` first) and dropped the signed
+      // token that RFQ invitation and PO invoice emails carry.
+      const base = VENDOR_PORTAL_EXTERNAL_URL.replace(/\/$/, '')
+      return NextResponse.redirect(`${base}${pathname}${request.nextUrl.search}`)
     }
     if (
       shouldRedirectEventsToPortal() &&
