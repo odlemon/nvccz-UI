@@ -18,7 +18,7 @@ vendored demo records or a success toast for a save that did not happen.
 |---|---|---|
 | Access (all screens) | `GET /procurement/me/access` *(added)* | — |
 | Command Centre | requisitions, RFQs, POs, GRNs, invoices, vendors (KPIs, cycle donut, attention list derived) | — |
-| Approval Centre | prompts built from real pending decisions | approve and reject: requisition, award (quotation accept), GRN; approve only: invoice |
+| Approval Centre | prompts built from real pending decisions | approve and reject: requisition, award (quotation accept), GRN, invoice |
 | Purchase Requisitions | `GET /procurement/requisitions`, `/my`, `/pending-approval` | raise and submit, save draft, approve, reject |
 | Tenders & RFx | `GET /procurement/rfq`, `GET /vendor-quotations` | send an RFQ from an approved requisition (tender builder) |
 | Bid Evaluation | real bids and `GET /procurement/rfqs/:id/comparison-matrix` | evaluation-team technical scores; award from the award panel |
@@ -95,12 +95,16 @@ Priority reflects what blocks a real procure-to-pay cycle first.
 - **Proposal:** an evaluation record per evaluator × quotation × criterion, with the weights
   stored on the RFQ, and an aggregated score returned by the matrix.
 
-### 5. Invoice rejection — MEDIUM
+### 5. Invoice rejection — DONE
 
-- **Screen:** Approval Centre → Reject on an invoice prompt.
-- **Gap:** no endpoint. The UI refuses the action with that said.
-- **Proposal:** `PUT /procurement/invoices/:id/reject` `{ rejectionReason }` behind
-  `procurement.invoices.approve`. It sets `REJECTED` and records an audit event.
+- **Screen:** Approval Centre → Review → Reject / return on an invoice prompt.
+- **Built:** `PUT /procurement/invoices/:id/reject` `{ rejectionReason }` behind
+  `procurement.invoices.approve` (nvccz `321fcdc`), wired in the Approval Centre
+  (nvccz-new, same day).
+  - Only an invoice awaiting approval can be rejected.
+  - It sets `REJECTED` with the reason and a content fingerprint, and writes a `REJECT` audit
+    event. Nothing is posted.
+- **Verified:** actions UAT step 11 and the authorisation probe row.
 
 ### 6. Three-way match result on staff-captured invoices — MEDIUM
 
