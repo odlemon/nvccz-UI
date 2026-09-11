@@ -492,7 +492,8 @@ s = replaceOnce(
 // substitute invention.
 {
   const label = "calendar KPI cards -> live"
-  if (s.includes("c.total+' configured in total'")) {
+  // Also skipped once 4a19 has replaced the calendar override these KPIs lived in.
+  if (s.includes("c.total+' configured in total'") || s.includes("calendarPage = function(){ return __pr6CalendarPageHtml(); };")) {
     console.log(`  skip (already)  ${label}`)
     skipped += 1
   } else {
@@ -520,7 +521,8 @@ s = replaceOnce(
 // does not record. Replaced with period counts, which it does.
 {
   const label = "calendar unanswerable KPIs -> period counts"
-  if (s.includes("kpi('Open periods'")) {
+  // Also skipped once 4a19 has replaced the calendar override this KPI lived in.
+  if (s.includes("kpi('Open periods'") || s.includes("calendarPage = function(){ return __pr6CalendarPageHtml(); };")) {
     console.log(`  skip (already)  ${label}`)
     skipped += 1
   } else {
@@ -1755,6 +1757,143 @@ s = replaceOnce(
 }
 
 // ---------------------------------------------------------------------------
+
+
+// ---------------------------------------------------------------------------
+// 4a19. FINDING-017 — Access, Vault and Calendar render live data only
+// ---------------------------------------------------------------------------
+// The three screens are page overrides defined by the enhancement IIFEs, each reading a
+// fixture: userAccess/roles (six people who are not employees, a matrix of ticks, KPIs of
+// 42 users and 2 SoD conflicts), documents (a register of control packs nobody uploaded)
+// and payGroupsV2/calendarPeriods (July 2026 pay dates). The earlier calendar patch
+// "pay calendar rows -> live" edited the BASE calendarPage, which this override hides —
+// the exact trap replaceEvery's comment describes.
+//
+// Each override body becomes a one-line delegate into the bridge. The page logic lives in
+// scripts/payroll-runtime-live-bridge.inc.js, which is re-injected wholesale on every run,
+// so later edits to it land. An edit to the replacement string of an already-applied patch
+// does not (see 4a18) — which is why the logic is not in these replacement strings.
+
+/** Replace a whole `  name = function(){ ... };` override with a delegate call. */
+function replaceOverride(src, name, delegateCall, label) {
+  // Guard on the patched call site, never on the helper name: the bridge is injected
+  // first and DEFINES __pr6CalendarPageHtml(), so a helper-name marker would always be
+  // found and the override would never be replaced (the 4a18 trap).
+  const marker = `${name} = function(){ return ${delegateCall}; };`
+  if (src.includes(marker)) {
+    console.log(`  skip (already)  ${label}`)
+    skipped += 1
+    return src
+  }
+  const start = `  ${name} = function(){`
+  const count = src.split(start).length - 1
+  if (count !== 1) {
+    console.warn(`  MISS            ${label} (${count} override definitions, expected exactly 1)`)
+    missed += 1
+    return src
+  }
+  const a = src.indexOf(start)
+  const endToken = "\n  };"
+  const b = src.indexOf(endToken, a)
+  if (b < 0) {
+    console.warn(`  MISS            ${label} (no closing "  };" after the override)`)
+    missed += 1
+    return src
+  }
+  console.log(`  patch           ${label}`)
+  applied += 1
+  return src.slice(0, a) + `  ${name} = function(){ return ${delegateCall}; };` + src.slice(b + endToken.length)
+}
+
+s = replaceOverride(s, "calendarPage", "__pr6CalendarPageHtml()", "calendar override -> live delegate")
+s = replaceOverride(s, "accessPage", "__pr6AccessPageHtml()", "access override -> live delegate")
+s = replaceOverride(s, "vaultPage", "__pr6VaultPageHtml()", "vault override -> live delegate")
+
+// The document drawer rendered the fixture's `content` text as an editable "governed"
+// preview with version numbers; the upload dialog promised virus scanning, retention
+// policies and an approval workflow that do not exist.
+s = replaceOnce(
+  s,
+  "function documentDrawer(id){",
+  "function documentDrawer(id){if(__pr6IsLive())return __pr6DocumentDrawer(id);",
+  "document drawer -> live delegate",
+  "return __pr6DocumentDrawer(id)",
+)
+s = replaceOnce(
+  s,
+  "function uploadDocumentModal(){",
+  "function uploadDocumentModal(){if(__pr6IsLive())return __pr6UploadModal();",
+  "upload dialog -> live delegate",
+  "return __pr6UploadModal()",
+)
+
+// Both screens were gated on the MANAGE grant, so every view-only holder — Internal
+// Auditor, CFO, CEO, Finance Manager — was refused the access review and the vault their
+// backend grants allow. documents.view and rbac.view map to the view grants in the bridge.
+s = replaceOnce(s, "vault:'documents.manage',", "vault:'documents.view',", "vault page gated on the view grant", "vault:'documents.view'")
+s = replaceOnce(s, "access:'rbac.manage',", "access:'rbac.view',", "access page gated on the view grant", "access:'rbac.view'")
+
+// The calendar was gated on payroll.prepare (runs.manage), refusing every holder of
+// payroll.calendar.view -- CEO, CFO, Finance Manager, Internal Auditor -- although the
+// loader fetches pay groups for exactly those grants. calendar.view maps in the bridge.
+s = replaceOnce(s, "calendar:'payroll.prepare',", "calendar:'calendar.view',", "calendar page gated on the view grant", "calendar:'calendar.view'")
+
+// Before the first hydrate can() falls back to the mock role table, which has neither
+// documents.view nor calendar.view, so those screens would flash "You do not have access"
+// for a moment. Access already had this pre-hydrate allowance; each page renders a loading
+// panel until live data arrives, and the real grant decides from then on.
+//
+// Separate clauses, never one merged (id==='access'||id==='vault'): an earlier form of this
+// patch merged them, which erased the text the older "drop the access carve-out when live"
+// patch guards on, so that patch reported MISS on every run after the first. A runtime
+// already carrying the merged form is converted.
+{
+  const label = "vault and calendar not refused before the first hydrate"
+  const clause = (id) => `(!__pr6IsLive()&&id==='${id}'&&state.role!=='Employee')`
+  const wanted = clause("access") + "||" + clause("vault") + "||" + clause("calendar")
+  const merged = "(!__pr6IsLive()&&(id==='access'||id==='vault')&&state.role!=='Employee')"
+  const partial = clause("access") + "||" + clause("vault")
+  if (s.includes(wanted)) {
+    console.log(`  skip (already)  ${label}`)
+    skipped += 1
+  } else if (s.includes(merged)) {
+    s = s.replace(merged, wanted)
+    console.log(`  patched         ${label} (converted the merged clause)`)
+    applied += 1
+  } else if (s.includes(partial + "}")) {
+    s = s.replace(partial + "}", wanted + "}")
+    console.log(`  patched         ${label}`)
+    applied += 1
+  } else if (s.includes(clause("access") + "}")) {
+    s = s.replace(clause("access") + "}", wanted + "}")
+    console.log(`  patched         ${label}`)
+    applied += 1
+  } else {
+    console.warn(`  MISS            ${label}`)
+    missed += 1
+  }
+}
+
+{
+  const label = "hydrate: carry accessRoster"
+  if (s.includes("__pr6Live.accessRoster = payload.accessRoster")) {
+    console.log(`  skip (already)  ${label}`)
+    skipped += 1
+  } else {
+    const needle = "        if (Array.isArray(payload.permissions)) {"
+    if (!s.includes(needle)) {
+      console.warn(`  MISS            ${label}`)
+      missed += 1
+    } else {
+      s = s.replace(
+        needle,
+        "        if (payload.accessRoster !== undefined) __pr6Live.accessRoster = payload.accessRoster;\n" + needle,
+      )
+      console.log(`  patched         ${label}`)
+      applied += 1
+    }
+  }
+}
 
 console.log("")
 if (missed > 0) {

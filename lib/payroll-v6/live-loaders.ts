@@ -41,6 +41,8 @@ import {
   listPayrollPayGroups,
   listPayrollOnboarding,
   listPayrollRfqs,
+  getPayrollAccessRoster,
+  listPayrollDocuments,
 } from "@/lib/api/payroll-v6-api"
 
 export type LoaderError = { source: string; message: string; status?: number }
@@ -66,6 +68,12 @@ export type PayrollV6LivePayload = {
   payGroups: Record<string, any> | null
   onboarding: Record<string, any> | null
   rfqs: Record<string, any> | null
+  /** Payroll access register: users, role matrix and the enforced segregation rule. */
+  accessRoster: Record<string, any> | null
+  /** Document register in the runtime row shape; [] when the role cannot see the vault. */
+  documents: any[]
+  /** "All documents" followed by the categories the backend accepts. */
+  folders: string[]
   errors: LoaderError[]
 }
 
@@ -374,6 +382,8 @@ export async function loadPayrollV6LiveData(): Promise<PayrollV6LivePayload> {
   const canOnboarding = has("payroll.onboarding.view") || has("payroll.onboarding.manage")
   const canDashboard = has("payroll.dashboard.view")
   const canAudit = has("payroll.audit.view")
+  const canAccessRegister = has("payroll.access.view") || has("payroll.access.manage")
+  const canVault = has("payroll.vault.view") || has("payroll.vault.manage")
 
   const [
     dashboard,
@@ -397,6 +407,8 @@ export async function loadPayrollV6LiveData(): Promise<PayrollV6LivePayload> {
     payGroupPayload,
     onboardingPayload,
     rfqPayload,
+    rosterPayload,
+    documentPayload,
   ] = await Promise.all([
     canDashboard ? safe("dashboard", getPayrollDashboard, null) : Promise.resolve(null),
     canEmployees ? safe("employees", listEmployees, [] as any[]) : Promise.resolve([] as any[]),
@@ -424,6 +436,8 @@ export async function loadPayrollV6LiveData(): Promise<PayrollV6LivePayload> {
     canCalendar ? safe("pay-groups", listPayrollPayGroups, null) : Promise.resolve(null),
     canOnboarding ? safe("onboarding/candidates", listPayrollOnboarding, null) : Promise.resolve(null),
     canVendors ? safe("rfqs", listPayrollRfqs, null) : Promise.resolve(null),
+    canAccessRegister ? safe("access/roster", getPayrollAccessRoster, null) : Promise.resolve(null),
+    canVault ? safe("documents", listPayrollDocuments, null) : Promise.resolve(null),
   ])
 
   // Annual leave balance per employee, for the roster's Leave column.
@@ -464,6 +478,34 @@ export async function loadPayrollV6LiveData(): Promise<PayrollV6LivePayload> {
   const payrollRuns = adaptRuns(runsResult?.runs ?? [])
   const exceptions = deriveExceptions(employees)
 
+  // The vault renders rows as {id, name, folder, owner, modified, class, ...}. Only what the
+  // backend holds is filled in; nothing is defaulted to resemble a versioning or approval
+  // workflow the vault does not have. A role that cannot see the vault gets an empty
+  // register, never the runtime's fixture one (FINDING-017).
+  const classLabel = (c: unknown) => {
+    const s = String(c ?? "").toLowerCase().split("_").join(" ")
+    return s ? s.charAt(0).toUpperCase() + s.slice(1) : DASH
+  }
+  const vaultDocuments = ((documentPayload as any)?.items ?? []).map((d: any) => ({
+    id: d.id,
+    reference: d.reference ?? d.id,
+    name: d.name,
+    folder: d.category,
+    type: d.mimeType ?? "File",
+    owner: d.uploadedBy?.name ?? DASH,
+    modified: d.createdAt
+      ? new Date(d.createdAt).toLocaleString("en-GB", {
+          day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: false,
+        })
+      : DASH,
+    class: classLabel(d.classification),
+    classification: d.classification,
+    periodLabel: d.periodLabel ?? null,
+    run: d.payrollRun?.name ?? null,
+    sizeBytes: d.fileSizeBytes ?? null,
+  }))
+  const vaultFolders = ["All documents", ...(((documentPayload as any)?.categories as string[] | undefined) ?? [])]
+
   // Sidebar badges. Every one of these is a count of records we actually hold;
   // a page with nothing countable gets null and renders no badge at all.
   const counts: Record<string, number | null> = {
@@ -491,6 +533,9 @@ export async function loadPayrollV6LiveData(): Promise<PayrollV6LivePayload> {
     payGroups: payGroupPayload ?? null,
     onboarding: onboardingPayload ?? null,
     rfqs: rfqPayload ?? null,
+    accessRoster: rosterPayload ?? null,
+    documents: vaultDocuments,
+    folders: vaultFolders,
     roleName: access?.roleName ?? null,
     permissions: access?.permissions ?? [],
     access,

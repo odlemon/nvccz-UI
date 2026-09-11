@@ -36,6 +36,7 @@ const __pr6Live = {
   payGroups: null, // pay groups with their calendar periods
   onboarding: null, // onboarding candidates
   rfqs: null, // sourcing events and vendor bids
+  accessRoster: null, // payroll access register: users, role matrix, segregation rule (4a19)
   errors: [],
 };
 
@@ -77,6 +78,11 @@ const __PR6_PERMISSION_MAP = {
   'reports.generate': ['payroll.reports.view', 'payroll.reports.manage'],
   'audit.view': ['payroll.audit.view'],
   'rbac.manage': ['payroll.access.manage'],
+  // View-only gates for the vault, access and calendar screens (4a19). Gating them on a
+  // manage or prepare grant refused every view-only role the backend lets in.
+  'documents.view': ['payroll.vault.view', 'payroll.vault.manage'],
+  'rbac.view': ['payroll.access.view', 'payroll.access.manage'],
+  'calendar.view': ['payroll.calendar.view', 'payroll.calendar.manage'],
   // Set by an enhancement IIFE: pagePermission.vendors = 'vendors.manage'.
   // Missing this mapping denied the Vendors screen to every role including
   // System Administrator, because an unmapped id used to return a hard false.
@@ -1112,5 +1118,446 @@ document.addEventListener(
   },
   true,
 );
+
+
+/**
+ * FINDING-017 — Roles and Access, Document Vault and Pay Calendar render live data only.
+ *
+ * Each of these screens was a page override from the enhancement IIFEs reading a fixture:
+ * userAccess + roles (six people who are not employees, a matrix of ticks, KPIs of "42"
+ * users and "2" SoD conflicts), documents (a register nobody uploaded) and
+ * payGroupsV2 + calendarPeriods (July 2026 pay dates). The overrides are now one-line
+ * delegates into the builders below (patch 4a19). Before the first hydrate they render a
+ * loading panel, never the fixtures.
+ */
+function __pr6Esc(v) {
+  return String(v == null ? '' : v)
+    .split('&').join('&amp;')
+    .split('<').join('&lt;')
+    .split('>').join('&gt;')
+    .split('"').join('&quot;')
+    .split("'").join('&#39;');
+}
+
+function __pr6Has(permission) {
+  return !!(__pr6Live.permissions && __pr6Live.permissions.has(permission));
+}
+
+function __pr6LoadFailed(source) {
+  return (__pr6Live.errors || []).some((e) => e && e.source === source);
+}
+
+function __pr6FileSize(bytes) {
+  if (bytes == null) return '—';
+  const b = Number(bytes);
+  if (!Number.isFinite(b)) return '—';
+  if (b < 1024) return b + ' B';
+  if (b < 1048576) return Math.round(b / 1024) + ' KB';
+  return (b / 1048576).toFixed(1) + ' MB';
+}
+
+function __pr6PendingPanel(eyebrow, title, desc, message, retry) {
+  return '<div class="page">' + pageHead(eyebrow, title, desc) +
+    '<section class="card"><div class="card-body" style="text-align:center;padding:40px 24px">' +
+    '<p class="muted" style="margin:0 0 12px">' + message + '</p>' +
+    (retry ? '<button class="btn primary" data-pr6-retry type="button">Try again</button>' : '') +
+    '</div></section></div>';
+}
+
+/** Readable names for the backend's payroll grants. Unknown ids fall back to the id. */
+const __PR6_PERMISSION_LABELS = {
+  'payroll.dashboard.view': 'View command centre',
+  'payroll.employees.view': 'View employee records',
+  'payroll.employees.manage': 'Change employee records',
+  'payroll.runs.view': 'View payroll runs',
+  'payroll.runs.manage': 'Prepare payroll runs (maker)',
+  'payroll.runs.approve': 'Approve payroll runs (checker)',
+  'payroll.runs.release': 'Release pay and bank files',
+  'payroll.components.view': 'View earnings and deductions',
+  'payroll.components.manage': 'Change earnings and deductions',
+  'payroll.tax.view': 'View tax and statutory rules',
+  'payroll.tax.manage': 'Change tax and statutory rules',
+  'payroll.leave.view': 'View leave',
+  'payroll.leave.manage': 'Change leave',
+  'payroll.training.view': 'View training',
+  'payroll.training.manage': 'Change training',
+  'payroll.vault.view': 'View and download documents',
+  'payroll.vault.manage': 'Upload documents',
+  'payroll.reports.view': 'View reports',
+  'payroll.reports.manage': 'Generate reports',
+  'payroll.audit.view': 'View audit trail',
+  'payroll.access.view': 'View payroll access register',
+  'payroll.access.manage': 'Change payroll access',
+  'payroll.settings.view': 'View settings',
+  'payroll.settings.manage': 'Change settings',
+  'payroll.vendors.view': 'View vendors',
+  'payroll.vendors.manage': 'Manage vendors and RFQs',
+  'payroll.calendar.view': 'View pay calendar',
+  'payroll.calendar.manage': 'Change pay calendar',
+  'payroll.exceptions.view': 'View exceptions',
+  'payroll.exceptions.manage': 'Resolve exceptions',
+  'payroll.inputs.view': 'View inputs',
+  'payroll.inputs.manage': 'Commit inputs',
+  'payroll.onboarding.view': 'View onboarding',
+  'payroll.onboarding.manage': 'Manage onboarding',
+};
+
+function __pr6PermissionLabel(p) {
+  return __PR6_PERMISSION_LABELS[p] || p;
+}
+
+// ------------------------------------------------------------------ access
+
+function __pr6AccessPageHtml() {
+  const eyebrow = 'Identity, authority and segregation';
+  const title = 'Roles and Access Control';
+  const desc = 'Who holds payroll authority, computed from the grants the payroll routes enforce.';
+  if (!__pr6IsLive()) return __pr6PendingPanel(eyebrow, title, desc, 'Loading the payroll access register…');
+
+  const r = __pr6Live.accessRoster;
+  if (!r || !Array.isArray(r.users)) {
+    return __pr6LoadFailed('access/roster')
+      ? __pr6PendingPanel(eyebrow, title, desc, 'The payroll access register could not be loaded.', true)
+      : __pr6PendingPanel(eyebrow, title, desc, 'Your role cannot view the payroll access register.');
+  }
+
+  const esc = __pr6Esc;
+  const s = r.summary || {};
+  const users = r.users;
+  const perms = Array.isArray(r.permissions) ? r.permissions : [];
+  const roles = Array.isArray(r.roles) ? r.roles : [];
+  const dash = '—';
+
+  const kpis =
+    kpi('Users with payroll access', String(s.usersWithPayrollAccess != null ? s.usersWithPayrollAccess : users.length), 'Hold at least one payroll grant', 'users') +
+    kpi('Privileged users', String(s.privileged || 0), 'Change access, release pay, or approve own run', 'key', 'violet') +
+    kpi('MFA coverage', s.mfaCoveragePct == null ? dash : s.mfaCoveragePct + '%', (s.mfaEnrolled || 0) + ' of ' + users.length + ' enrolled', 'shield', 'cyan') +
+    kpi('Self-approval exempt', String(s.selfApprovalConflicts || 0), 'Can approve a run they submitted', 'alert', s.selfApprovalConflicts ? 'amber' : '') +
+    kpi('Terminated with access', String(s.terminatedWithAccess || 0), 'Employee terminated, grants still held', 'lock', s.terminatedWithAccess ? 'red' : 'cyan');
+
+  const duties = (u) => [u.canPrepare ? 'Maker' : '', u.canApprove ? 'Checker' : '', u.canRelease ? 'Release' : ''].filter(Boolean);
+
+  // Five compact columns. The runtime styles .access-user-table table with min-width:920px,
+  // which inside the two-column access grid pushed Status and Grants out of view and cut the
+  // duty chips mid-word at 1440px. The inline min-width on the table lets it fit its card;
+  // below the runtime's breakpoint the cards take over exactly as before.
+  const userRows = users.map((u) => {
+    const dutyText = duties(u).join(' · ') || '<span class="muted">View only</span>';
+    return '<tr>' +
+      '<td><div class="access-user"><div class="mini-avatar">' + esc(u.initials) + '</div><div><strong>' + esc(u.name) + '</strong><div class="tiny muted">' + esc(u.email) + (u.department ? ' · ' + esc(u.department) : '') + '</div></div></div></td>' +
+      '<td><div>' + esc(u.roleName || dash) + '</div><div class="tiny muted">' + u.permissions.length + ' of ' + perms.length + ' grants</div></td>' +
+      '<td><div>' + dutyText + '</div>' + (u.selfApproval ? '<div class="tiny delta warn">Self-approval exempt</div>' : '') + '</td>' +
+      '<td style="white-space:nowrap">' + badge(u.mfaEnrolled ? 'Enrolled' : 'Not enrolled') + '</td>' +
+      '<td style="white-space:nowrap">' + badge(u.status) + '</td>' +
+      '</tr>';
+  });
+
+  const userCards = users.map((u) =>
+    '<article class="access-user-card"><div class="access-user-card-head"><div class="access-user"><div class="mini-avatar">' + esc(u.initials) + '</div><div><strong>' + esc(u.name) + '</strong><div class="tiny muted">' + esc(u.roleName || dash) + '</div></div></div>' + badge(u.status) + '</div>' +
+    '<div class="access-user-card-meta">' +
+    '<div class="fact"><span>Department</span><strong>' + esc(u.department || dash) + '</strong></div>' +
+    '<div class="fact"><span>MFA</span><strong>' + (u.mfaEnrolled ? 'Enrolled' : 'Not enrolled') + '</strong></div>' +
+    '<div class="fact"><span>Duties</span><strong>' + (duties(u).join(', ') || 'View only') + (u.selfApproval ? ' · self-approval exempt' : '') + '</strong></div>' +
+    '<div class="fact"><span>Grants</span><strong>' + u.permissions.length + ' of ' + perms.length + '</strong></div>' +
+    '</div></article>'
+  ).join('');
+
+  const usersCard = users.length
+    ? '<section class="card access-card"><div class="card-head"><div><h3>User access register</h3><p>Everyone holding at least one payroll grant</p></div></div>' +
+      '<div class="table-wrap access-user-table"><table style="min-width:0;width:100%"><thead><tr><th>User</th><th>Role</th><th>Duties</th><th>MFA</th><th>Status</th></tr></thead><tbody>' + userRows.join('') + '</tbody></table></div>' +
+      '<div class="access-user-cards">' + userCards + '</div></section>'
+    : card('User access register', 'Everyone holding at least one payroll grant', '<div class="card-body" style="text-align:center;padding:36px 24px"><strong>No user holds a payroll grant.</strong></div>');
+
+  const seg = r.segregation || {};
+  const exemptUsers = Array.isArray(seg.exemptUsers) ? seg.exemptUsers : [];
+  const segCard =
+    '<section class="card access-card"><div class="card-head"><div><h3>Segregation of duties</h3><p>The rule the payroll backend enforces</p></div></div><div class="card-body sod-list">' +
+    '<div class="sod-rule"><span class="kpi-icon amber">' + icon('lock') + '</span><div><strong>' + esc(seg.rule || dash) + '</strong><div class="tiny muted">' + esc(seg.exception || '') + '</div></div>' + badge('Enforced') + '</div>' +
+    (exemptUsers.length
+      ? '<div class="callout amber" style="margin-top:12px"><span class="kpi-icon amber">' + icon('alert') + '</span><div><strong>' + exemptUsers.length + (exemptUsers.length === 1 ? ' user is' : ' users are') + ' exempt from this rule</strong><ul style="margin:6px 0 0;padding-left:18px">' +
+        exemptUsers.map((x) => '<li><strong>' + esc(x.name) + '</strong> <span class="muted">' + esc(x.roleName || '') + '</span></li>').join('') +
+        '</ul></div></div>'
+      : '<p class="tiny muted" style="margin:12px 0 0">No user with payroll access is exempt.</p>') +
+    '<p class="tiny muted" style="margin:12px 0 0">No other segregation rule is enforced by the payroll backend. Bank-detail changes, statutory rule changes and report filing have no maker-checker control.</p>' +
+    '</div></section>';
+
+  const matrixRows = perms.map((p) =>
+    '<tr><td><strong>' + esc(__pr6PermissionLabel(p)) + '</strong><div class="tiny muted">' + esc(p) + '</div></td>' +
+    roles.map((role) => '<td style="text-align:center">' + (role.permissions.indexOf(p) >= 0 ? '&#10003;' : '<span class="muted">·</span>') + '</td>').join('') +
+    '</tr>'
+  ).join('');
+
+  const roleCards = roles.map((role) =>
+    '<article class="role-access-card"><header class="role-access-card-head"><div><h4>' + esc(role.name) + '</h4><p>' + role.permissions.length + ' of ' + perms.length + ' grants · ' + role.userCount + (role.userCount === 1 ? ' user' : ' users') + '</p></div></header>' +
+    '<div class="role-permission-list">' + role.permissions.map((p) => '<div class="role-permission-row"><div><strong>' + esc(__pr6PermissionLabel(p)) + '</strong><span>' + esc(p) + '</span></div></div>').join('') + '</div></article>'
+  ).join('');
+
+  const matrix = roles.length
+    ? '<section class="card role-matrix-card"><div class="card-head access-toolbar"><div><h3>Role permission matrix</h3><p>Stored grants per role. Read-only: grants are defined in payrollPermissions.ts and applied by the payroll permissions migration.</p></div></div>' +
+      '<div class="role-matrix-scroll"><table><thead><tr><th>Permission</th>' +
+      roles.map((role) => '<th>' + esc(role.name) + '<div class="tiny muted">' + role.userCount + (role.userCount === 1 ? ' user' : ' users') + '</div></th>').join('') +
+      '</tr></thead><tbody>' + matrixRows + '</tbody></table></div><div class="role-card-grid">' + roleCards + '</div></section>'
+    : '';
+
+  return '<div class="page access-dashboard">' + pageHead(eyebrow, title, desc) +
+    '<div class="grid kpis">' + kpis + '</div>' +
+    '<div class="access-primary-grid">' + usersCard + segCard + '</div>' +
+    matrix + '</div>';
+}
+
+// ------------------------------------------------------------------- vault
+
+function __pr6VaultPageHtml() {
+  const eyebrow = 'Governed records management';
+  const title = 'Payroll and HR Document Vault';
+  const desc = 'Payroll and HR documents held behind the payroll vault permissions. Downloads go through the payroll API and are recorded in the audit trail.';
+  if (!__pr6IsLive()) return __pr6PendingPanel(eyebrow, title, desc, 'Loading the document register…');
+  if (__pr6LoadFailed('documents')) {
+    return __pr6PendingPanel(eyebrow, title, desc, 'The document register could not be loaded.', true);
+  }
+
+  const esc = __pr6Esc;
+  const canUpload = can('documents.manage');
+  const all = Array.isArray(documents) ? documents : [];
+  const q = String(state.vaultSearch || '').trim().toLowerCase();
+  const cls = state.vaultClassification || 'All classifications';
+  const owner = state.vaultOwner || 'All owners';
+  const folder = state.folder || 'All documents';
+
+  const classes = Array.from(new Set(all.map((d) => d.class))).sort();
+  const owners = Array.from(new Set(all.map((d) => d.owner))).sort();
+  const base = all.filter((d) => {
+    const hay = [d.name, d.reference, d.folder, d.class, d.owner, d.periodLabel, d.run].join(' ').toLowerCase();
+    return (!q || hay.indexOf(q) >= 0) &&
+      (cls === 'All classifications' || d.class === cls) &&
+      (owner === 'All owners' || d.owner === owner);
+  });
+  const docs = base.filter((d) => folder === 'All documents' || d.folder === folder);
+
+  const opt = (v, cur) => '<option value="' + esc(v) + '"' + (v === cur ? ' selected' : '') + '>' + esc(v) + '</option>';
+  const toolbar =
+    '<section class="card control-filter-card vault-filter-card"><div class="card-body"><div class="control-filter-toolbar">' +
+    '<label class="control-filter-search"><span class="sr-only">Search document vault</span>' + icon('search') +
+    '<input id="vaultSearchInput" value="' + esc(state.vaultSearch || '') + '" placeholder="Search name, reference, category, uploader or period"></label>' +
+    '<label class="control-filter-field"><span>Classification</span><select id="vaultClassificationFilter">' + opt('All classifications', cls) + classes.map((v) => opt(v, cls)).join('') + '</select></label>' +
+    '<label class="control-filter-field"><span>Uploaded by</span><select id="vaultOwnerFilter">' + opt('All owners', owner) + owners.map((v) => opt(v, owner)).join('') + '</select></label>' +
+    '<button class="btn filter-clear" type="button" data-v6-clear-docs>' + icon('x') + 'Clear</button>' +
+    '</div></div></section>';
+
+  const folderList = Array.isArray(folders) && folders.length ? folders : ['All documents'];
+  const folderGrid = folderList.map((name) => {
+    const count = name === 'All documents' ? base.length : base.filter((d) => d.folder === name).length;
+    return '<div class="folder ' + (folder === name ? 'active' : '') + '" data-folder="' + esc(name) + '"><div class="folder-top"><div class="folder-icon">' + icon('folder') + '</div><span class="folder-match-count">' + count + '</span></div><strong>' + esc(name) + '</strong></div>';
+  }).join('');
+
+  const rows = docs.map((d) =>
+    '<tr data-document="' + esc(d.id) + '">' +
+    '<td><div class="access-user"><div class="list-icon">' + icon('file') + '</div><div><strong class="link">' + esc(d.name) + '</strong><div class="tiny muted">' + esc(d.reference) + (d.periodLabel ? ' · ' + esc(d.periodLabel) : '') + '</div></div></div></td>' +
+    '<td>' + esc(d.folder) + '</td>' +
+    '<td>' + badge(d.class) + '</td>' +
+    '<td>' + esc(d.owner) + '</td>' +
+    '<td>' + esc(d.modified) + '</td>' +
+    '<td>' + __pr6FileSize(d.sizeBytes) + '</td>' +
+    '<td><button class="btn small" data-action="download-doc" data-id="' + esc(d.id) + '" data-filename="' + esc(d.name) + '">' + icon('download') + 'Download</button></td>' +
+    '</tr>'
+  );
+
+  let body;
+  if (!all.length) {
+    body = card('Documents', 'Nothing stored yet',
+      '<div class="card-body" style="text-align:center;padding:36px 24px"><strong>No documents have been uploaded to the payroll vault.</strong>' +
+      '<p class="muted" style="margin:6px 0 0">' + (canUpload ? 'Upload a control pack, statutory return or employee record to start the register.' : 'Documents appear here once someone with upload permission adds them.') + '</p></div>');
+  } else if (!docs.length) {
+    body = '<section class="filtered-empty"><div><span class="empty-icon">' + icon('search') + '</span><strong>No documents match these filters</strong><p>Adjust the search, folder, classification or uploader.</p><button class="btn primary" type="button" data-v6-clear-docs>' + icon('x') + 'Clear document filters</button></div></section>';
+  } else {
+    body = tableCard(esc(folder), docs.length + ' of ' + all.length + (all.length === 1 ? ' document' : ' documents'),
+      ['Document', 'Category', 'Classification', 'Uploaded by', 'Uploaded', 'Size', ''], rows);
+  }
+
+  const actions = canUpload ? button('Upload document', 'upload-document', 'primary', 'upload') : '';
+  return '<div class="page">' + pageHead(eyebrow, title, desc, actions) + toolbar +
+    '<div class="folder-grid" style="margin-bottom:14px">' + folderGrid + '</div>' + body + '</div>';
+}
+
+function __pr6DocumentDrawer(id) {
+  const esc = __pr6Esc;
+  const all = Array.isArray(documents) ? documents : [];
+  const d = all.find((x) => x.id === id);
+  if (!d) {
+    toast('Document not found', 'It is not in the current register. Reload the vault and try again.', 'warn');
+    return;
+  }
+  state.activeDoc = d.id;
+  const fact = (k, v) => '<div class="fact"><span>' + k + '</span><strong>' + esc(v == null || v === '' ? '—' : v) + '</strong></div>';
+  openDrawer(
+    esc(d.name),
+    esc(d.reference) + ' · ' + esc(d.folder),
+    '<div class="profile-summary-strip">' + fact('Classification', d.class) + fact('Uploaded by', d.owner) + fact('Uploaded', d.modified) + fact('Size', __pr6FileSize(d.sizeBytes)) + '</div>' +
+    '<section class="card" style="margin-top:12px"><div class="card-body form-grid">' + fact('Pay period', d.periodLabel) + fact('Payroll run', d.run) + fact('File type', d.type) + '</div></section>' +
+    '<p class="tiny muted" style="margin-top:12px">The vault holds the file as uploaded. There is no in-browser editing or versioning, and every download is recorded in the payroll audit trail.</p>',
+    '<button class="btn primary" data-action="download-doc" data-id="' + esc(d.id) + '" data-filename="' + esc(d.name) + '">' + icon('download') + 'Download</button>'
+  );
+}
+
+function __pr6UploadModal() {
+  if (!can('documents.manage')) return deny('documents.manage');
+  const esc = __pr6Esc;
+  const categories = (Array.isArray(folders) ? folders : []).filter((f) => f !== 'All documents');
+  openModal(
+    'Upload to Document Vault',
+    'Stored as uploaded, up to 20 MB, labelled with a category and classification. Viewing and downloading require the payroll vault permissions.',
+    '<div class="form-grid">' +
+    '<div class="form-field full"><label>File</label><input type="file" id="pr6DocFile"></div>' +
+    '<div class="form-field"><label>Category</label><select id="pr6DocCategory">' + categories.map((c) => '<option>' + esc(c) + '</option>').join('') + '</select></div>' +
+    '<div class="form-field"><label>Classification</label><select id="pr6DocClassification"><option value="INTERNAL">Internal</option><option value="CONFIDENTIAL">Confidential</option><option value="RESTRICTED">Restricted</option><option value="HIGHLY_RESTRICTED">Highly restricted</option></select></div>' +
+    '<div class="form-field full"><label>Pay period (optional)</label><input id="pr6DocPeriod" placeholder="September 2026"></div>' +
+    '</div>',
+    button('Cancel', 'close-modal') + button('Upload', 'confirm-upload', 'primary', 'upload')
+  );
+}
+
+// ---------------------------------------------------------------- calendar
+
+function __pr6FmtDay(d) {
+  if (!d) return '—';
+  const t = new Date(d);
+  if (Number.isNaN(t.getTime())) return '—';
+  // Period dates are @db.Date: midnight UTC. Formatting in local time would show the
+  // previous day west of Greenwich.
+  return t.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'UTC' });
+}
+
+function __pr6CalendarPageHtml() {
+  const eyebrow = 'Payroll administration';
+  const title = 'Pay Groups and Payroll Calendar';
+  const desc = 'Pay groups and their dated periods: input cut-off, pay date and the status each period has reached.';
+  if (!__pr6IsLive()) return __pr6PendingPanel(eyebrow, title, desc, 'Loading pay groups…');
+
+  const c = __pr6PayGroups();
+  if (!c) {
+    return __pr6LoadFailed('pay-groups')
+      ? __pr6PendingPanel(eyebrow, title, desc, 'Pay groups could not be loaded.', true)
+      : __pr6PendingPanel(eyebrow, title, desc, 'Your role cannot view the pay calendar.');
+  }
+
+  const esc = __pr6Esc;
+  const canEdit = __pr6Has('payroll.calendar.manage');
+  const groups = c.groups;
+  const selectedId = groups.some((g) => g.id === state.selectedPayGroup)
+    ? state.selectedPayGroup
+    : (groups[0] ? groups[0].id : null);
+  const group = groups.find((g) => g.id === selectedId) || null;
+  const periods = group
+    ? (group.periods || []).slice().sort((a, b) => new Date(a.periodStart) - new Date(b.periodStart))
+    : [];
+
+  const today = new Date();
+  today.setUTCHours(0, 0, 0, 0);
+  const upcoming = (key) => periods
+    .map((p) => p[key]).filter(Boolean).map((d) => new Date(d))
+    .filter((d) => d >= today).sort((a, b) => a - b)[0] || null;
+  const nextCutoff = upcoming('cutoffDate');
+  const nextPay = upcoming('payDate');
+
+  // "Open periods" is double-quoted on purpose. Patch 522 guards on the single-quoted
+  // form, and the bridge is injected before the patches run, so identical text here
+  // would make 522 report skip (already) on a fresh extract without applying.
+  const kpis =
+    kpi('Active pay groups', String(c.active), c.total + ' configured in total', 'users') +
+    kpi('Next input cut-off', __pr6FmtDay(nextCutoff), group ? esc(group.name) : 'No pay group', 'calendar', 'amber') +
+    kpi('Next payment', __pr6FmtDay(nextPay), group ? esc(group.currencyCode) + ' settlement' : 'No pay group', 'bank', 'cyan') +
+    kpi('Pay periods', String(c.periods), 'Configured across all groups', 'shield', 'cyan') +
+    kpi("Open periods", String(c.openPeriods), 'Periods with status Open', 'clock', 'amber');
+
+  const cadence = (f) => { const v = String(f || ''); return v.charAt(0) + v.slice(1).toLowerCase(); };
+  const groupCards = groups.map((g) =>
+    '<article class="paygroup-card ' + (g.id === selectedId ? 'active' : '') + '" data-paygroup="' + esc(g.id) + '">' +
+    '<div class="paygroup-card-head"><strong>' + esc(g.name) + '</strong>' + badge(g.isActive ? 'Active' : 'Inactive') + '</div>' +
+    '<p>' + esc(g.code) + ' · ' + esc(g.currencyCode) + '</p>' +
+    '<div class="paygroup-meta"><span class="meta-chip">' + esc(cadence(g.frequency)) + '</span>' +
+    (g.payDayOfMonth ? '<span class="meta-chip">Pays on day ' + esc(g.payDayOfMonth) + '</span>' : '') +
+    '<span class="meta-chip">' + g.periodCount + (g.periodCount === 1 ? ' period' : ' periods') + '</span></div></article>'
+  ).join('');
+
+  const rows = periods.map((p) =>
+    '<tr><td data-label="Period"><strong>' + esc(p.periodLabel) + '</strong></td>' +
+    '<td data-label="Starts">' + __pr6FmtDay(p.periodStart) + '</td>' +
+    '<td data-label="Ends">' + __pr6FmtDay(p.periodEnd) + '</td>' +
+    '<td data-label="Input cut-off">' + __pr6FmtDay(p.cutoffDate) + '</td>' +
+    '<td data-label="Pay date">' + __pr6FmtDay(p.payDate) + '</td>' +
+    '<td data-label="Status">' + badge(cadence(p.status)) + '</td>' +
+    (canEdit ? '<td data-label="Action"><button class="btn small" data-action="pr6-edit-period" data-group-id="' + esc(group.id) + '" data-period-label="' + esc(p.periodLabel) + '">Edit</button></td>' : '') +
+    '</tr>'
+  );
+  const headers = ['Period', 'Starts', 'Ends', 'Input cut-off', 'Pay date', 'Status'].concat(canEdit ? [''] : []);
+  const addButton = canEdit && group
+    ? '<button class="btn small" data-action="pr6-edit-period" data-group-id="' + esc(group.id) + '">' + icon('plus') + 'Add period</button>'
+    : '';
+
+  let board;
+  if (!group) {
+    board = card('Pay calendar', 'No pay groups',
+      '<div class="card-body" style="text-align:center;padding:36px 24px"><strong>No pay groups have been set up.</strong><p class="muted" style="margin:6px 0 0">' +
+      (canEdit ? 'Create a pay group, then add its periods.' : 'Pay groups appear here once they are configured.') + '</p></div>');
+  } else if (!rows.length) {
+    board = card(esc(group.name) + ' calendar', 'No periods yet',
+      '<div class="card-body" style="text-align:center;padding:36px 24px"><strong>This pay group has no periods.</strong><p class="muted" style="margin:6px 0 0">' +
+      (canEdit ? 'Add the first period to set its cut-off and pay date.' : 'Periods appear here once they are configured.') + '</p></div>', addButton);
+  } else {
+    board = tableCard(esc(group.name) + ' calendar', 'Dates as stored for each period', headers, rows, addButton);
+  }
+
+  const actions = canEdit ? button('Create pay group', 'new-paygroup', 'primary', 'plus') : '';
+  return '<div class="page">' + pageHead(eyebrow, title, desc, actions) +
+    '<div class="grid kpis">' + kpis + '</div>' +
+    '<div class="calendar-layout"><aside class="paygroup-list">' + (groupCards || '<p class="muted">No pay groups.</p>') + '</aside>' +
+    '<section class="calendar-board">' + board + '</section></div></div>';
+}
+
+function __pr6OpenPeriodModal(groupId, periodLabel) {
+  if (!__pr6Has('payroll.calendar.manage')) {
+    toast('Action restricted', 'Your role cannot change the pay calendar.', 'warn');
+    return;
+  }
+  const esc = __pr6Esc;
+  const c = __pr6PayGroups();
+  const group = c && c.groups.find((g) => g.id === groupId);
+  if (!group) {
+    toast('Pay group not found', 'Reload the calendar and try again.', 'warn');
+    return;
+  }
+  const p = periodLabel ? (group.periods || []).find((x) => x.periodLabel === periodLabel) : null;
+  const iso = (d) => (d ? new Date(d).toISOString().slice(0, 10) : '');
+  const statuses = __PR6_PERIOD_STATUSES;
+  const dateField = (id, label, value) =>
+    '<div class="form-field"><label>' + label + '</label><input type="date" id="' + id + '" value="' + esc(value) + '"></div>';
+  openModal(
+    p ? 'Edit ' + esc(p.periodLabel) : 'Add a period to ' + esc(group.name),
+    // Periods are keyed by label, so the label is fixed when editing: renaming would
+    // silently create a second period rather than change this one.
+    'Saved to the pay group calendar. A period is identified by its label.',
+    '<div class="form-grid"><input type="hidden" id="pr6PeriodGroup" value="' + esc(group.id) + '">' +
+    '<div class="form-field"><label>Period label</label><input id="pr6PeriodLabel" value="' + esc(p ? p.periodLabel : '') + '" placeholder="October 2026"' + (p ? ' readonly' : '') + '></div>' +
+    '<div class="form-field"><label>Status</label><select id="pr6PeriodStatus">' +
+    statuses.map((st) => '<option value="' + st + '"' + (p && p.status === st ? ' selected' : '') + '>' + st.charAt(0) + st.slice(1).toLowerCase() + '</option>').join('') +
+    '</select></div>' +
+    dateField('pr6PeriodStart', 'Period starts', iso(p && p.periodStart)) +
+    dateField('pr6PeriodEnd', 'Period ends', iso(p && p.periodEnd)) +
+    dateField('pr6PeriodCutoff', 'Input cut-off', iso(p && p.cutoffDate)) +
+    dateField('pr6PeriodPayDate', 'Pay date', iso(p && p.payDate)) +
+    '</div>',
+    button('Cancel', 'close-modal') + button('Save period', 'save-period', 'primary', 'calendar')
+  );
+}
+
+/** Must match PERIOD_STATUSES in PayrollOperationsService. */
+const __PR6_PERIOD_STATUSES = ['PLANNED', 'OPEN', 'LOCKED', 'PAID'];
+
+document.addEventListener('click', (event) => {
+  const el = event.target && event.target.closest ? event.target.closest('[data-action="pr6-edit-period"]') : null;
+  if (!el) return;
+  event.preventDefault();
+  __pr6OpenPeriodModal(el.getAttribute('data-group-id'), el.getAttribute('data-period-label'));
+}, true);
 
 /* END_PAYROLL_LIVE_BRIDGE */

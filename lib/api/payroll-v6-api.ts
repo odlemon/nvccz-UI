@@ -395,6 +395,69 @@ export async function listPayrollPayGroups(): Promise<Record<string, any> | null
   return unwrapData(res) ?? null
 }
 
+/** Create or update one dated period on a pay group. Returns the refreshed pay-group list. */
+export async function upsertPayrollCalendarPeriod(payGroupId: string, body: Record<string, any>) {
+  const res = await apiClient.put<ApiResponse<any>>(
+    `${BASE}/pay-groups/${encodeURIComponent(payGroupId)}/periods`,
+    body,
+  )
+  return unwrapData(res)
+}
+
+// ---------------------------------------------------------------------------
+// Access register and document vault (FINDING-017)
+// ---------------------------------------------------------------------------
+
+/** Who holds payroll authority, derived from real grants. Requires payroll.access.view. */
+export async function getPayrollAccessRoster(): Promise<Record<string, any> | null> {
+  const res = await apiClient.get<ApiResponse<any>>(`${BASE}/access/roster`)
+  return unwrapData(res) ?? null
+}
+
+/** The payroll document register. Carries no storage URLs. Requires payroll.vault.view. */
+export async function listPayrollDocuments(): Promise<Record<string, any> | null> {
+  const res = await apiClient.get<ApiResponse<any>>(`${BASE}/documents`)
+  return unwrapData(res) ?? null
+}
+
+/** Upload one document as multipart field `file`. Requires payroll.vault.manage. */
+export async function uploadPayrollDocument(form: FormData) {
+  const res = await apiClient.postFormData<ApiResponse<any>>(`${BASE}/documents`, form)
+  return unwrapData(res)
+}
+
+/**
+ * The stored file, through the guarded and audited endpoint rather than a storage URL.
+ * Same token handling as downloadPayslipPdf, because apiClient parses JSON.
+ */
+export async function downloadPayrollDocument(id: string): Promise<{ blob: Blob; filename: string | null }> {
+  const base = process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:3009/api"
+  const key = (process.env.NEXT_PUBLIC_AUTH_TOKEN_KEY || "token") + "="
+  const token = typeof document !== "undefined"
+    ? (document.cookie.split("; ").find((c) => c.startsWith(key))?.split("=")[1] ?? "")
+    : ""
+  const res = await fetch(`${base}/payroll/documents/${encodeURIComponent(id)}/download`, {
+    headers: token ? { Authorization: `Bearer ${decodeURIComponent(token)}` } : {},
+  })
+  if (!res.ok) {
+    let message = `Document download failed (${res.status})`
+    try {
+      const body = await res.json()
+      if (body?.message) message = body.message
+    } catch {
+      // Not JSON; keep the status message.
+    }
+    throw new Error(message)
+  }
+  const disposition = res.headers.get("Content-Disposition") || ""
+  const marker = 'filename="'
+  const at = disposition.indexOf(marker)
+  const filename = at >= 0
+    ? disposition.slice(at + marker.length, disposition.indexOf('"', at + marker.length))
+    : null
+  return { blob: await res.blob(), filename }
+}
+
 export async function listPayrollOnboarding(): Promise<Record<string, any> | null> {
   const res = await apiClient.get<ApiResponse<any>>(`${BASE}/onboarding/candidates`)
   return unwrapData(res) ?? null

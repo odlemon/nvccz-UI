@@ -34,6 +34,9 @@ import {
   updateEmployee,
   downloadPayslipPdf,
   createPayrollPayGroup,
+  downloadPayrollDocument,
+  uploadPayrollDocument,
+  upsertPayrollCalendarPeriod,
   toastPayrollError,
 } from "@/lib/api/payroll-v6-api"
 
@@ -70,11 +73,19 @@ export function resetPayrollActionCache() {
   cachedPermissions = null
 }
 
+/** Close the runtime modal through its own close control; the runtime owns that DOM. */
+function closeRuntimeModal() {
+  document.querySelector<HTMLElement>('#modalHead [data-action="close-modal"]')?.click()
+}
+
 const REFUSAL: Record<string, string> = {
   "payroll.runs.manage": "preparing payroll runs",
   "payroll.runs.approve": "approving payroll runs",
   "payroll.runs.release": "releasing payroll and bank files",
   "payroll.employees.manage": "changing employee records",
+  "payroll.vault.view": "downloading payroll documents",
+  "payroll.vault.manage": "uploading payroll documents",
+  "payroll.calendar.manage": "changing the pay calendar",
 }
 
 async function requirePermission(p: string): Promise<PayrollActionResult | null> {
@@ -355,6 +366,90 @@ export async function handlePayrollV6Action(
         a.remove()
         URL.revokeObjectURL(url)
         return { handled: true, message: "Payslip downloaded." }
+      }
+
+
+      // ------------------------------------------------------ document vault
+      case "confirm-upload": {
+        // The runtime pushed an invented record — owner "Tariro Moyo", modified
+        // "Just now" — onto an in-memory array and toasted success. Nothing was
+        // stored anywhere (FINDING-017).
+        const denied = await requirePermission("payroll.vault.manage")
+        if (denied) return denied
+
+        const file = document.querySelector<HTMLInputElement>("#pr6DocFile")?.files?.[0]
+        if (!file) return { handled: true, error: "Choose a file to upload." }
+
+        const val = (id: string) =>
+          (document.querySelector<HTMLInputElement | HTMLSelectElement>(`#${id}`)?.value || "").trim()
+        const form = new FormData()
+        form.append("file", file)
+        form.append("category", val("pr6DocCategory"))
+        form.append("classification", val("pr6DocClassification"))
+        const period = val("pr6DocPeriod")
+        if (period) form.append("periodLabel", period)
+
+        await uploadPayrollDocument(form)
+        closeRuntimeModal()
+        return { handled: true, reload: true, message: `${file.name} uploaded to the vault.` }
+      }
+
+      case "download-doc": {
+        // Replaces a Word file the runtime generated in the browser from the fixture's
+        // `content` text. This is the stored file, and the download is audited.
+        const perms = await permissions()
+        if (!perms.has("payroll.vault.view") && !perms.has("payroll.vault.manage")) {
+          return { handled: true, error: `Your role does not have permission for ${REFUSAL["payroll.vault.view"]}.` }
+        }
+        const id = detail.dataset?.id
+        if (!id) return { handled: true, error: "No document selected." }
+
+        const { blob, filename } = await downloadPayrollDocument(id)
+        const name = detail.dataset?.filename || filename || `payroll-document-${id}`
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement("a")
+        a.href = url
+        a.download = name
+        document.body.appendChild(a)
+        a.click()
+        a.remove()
+        URL.revokeObjectURL(url)
+        return { handled: true, message: `${name} downloaded.` }
+      }
+
+      // ------------------------------------------------------- pay calendar
+      case "save-period": {
+        // The Edit control opened a schedule form pre-filled with July 2026 fixture
+        // dates and saved nothing, and "Copy prior year" toasted a copy that never
+        // happened. PUT /payroll/pay-groups/:id/periods existed all along.
+        const denied = await requirePermission("payroll.calendar.manage")
+        if (denied) return denied
+
+        const val = (id: string) =>
+          (document.querySelector<HTMLInputElement | HTMLSelectElement>(`#${id}`)?.value || "").trim()
+        const groupId = val("pr6PeriodGroup")
+        const periodLabel = val("pr6PeriodLabel")
+        const periodStart = val("pr6PeriodStart")
+        const periodEnd = val("pr6PeriodEnd")
+        const missing: string[] = []
+        if (!groupId) missing.push("pay group")
+        if (!periodLabel) missing.push("period label")
+        if (!periodStart) missing.push("period start")
+        if (!periodEnd) missing.push("period end")
+        if (missing.length) {
+          return { handled: true, error: `Cannot save the period — missing ${missing.join(", ")}.` }
+        }
+
+        await upsertPayrollCalendarPeriod(groupId, {
+          periodLabel,
+          periodStart,
+          periodEnd,
+          cutoffDate: val("pr6PeriodCutoff") || null,
+          payDate: val("pr6PeriodPayDate") || null,
+          status: val("pr6PeriodStatus") || "PLANNED",
+        })
+        closeRuntimeModal()
+        return { handled: true, reload: true, message: `${periodLabel} saved.` }
       }
 
       default:
