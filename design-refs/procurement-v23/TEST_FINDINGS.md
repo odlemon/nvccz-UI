@@ -155,6 +155,121 @@ the test machine's link to the VPS.
 
 ---
 
+## Cycle five — full UI test as every role, 11–12 September 2026 (local)
+
+**Method.** Each of ten seeded personas used the module through the browser:
+- `scripts/_uat/procurement-v23-explore.mjs` opens every page as each role and operates every tab,
+  button, row menu, select, search and modal control from a clean page. It records what each one did:
+  navigation, modal, toast, download, API call, in-place change, nothing, or a page error. Controls
+  that write through the API are listed, not clicked.
+- `procurement-v23-screens.mjs` takes full-length screenshots of all 18 pages for all 10 roles, which
+  were reviewed by eye.
+- `procurement-v23-workflows.mjs` fills in the forms and takes the decisions the 17-step actions
+  suite does not cover, and checks what must refuse.
+- Each test user starts with a session for their own account, the same one the login page issues.
+  Everything after that is clicks in the browser.
+
+### Found and fixed
+
+UI nvccz-new `8270439`, `b7b1d8a`, `db218d2`, `61c58fa`, `1c9e2b8`, `4c29f44`; API nvccz `40774bf`.
+
+| Area | What the tester saw | Fix |
+|---|---|---|
+| Vendor Registry compliance filter | Valid / Expiring / Expired / Review each said "Showing vendors with … compliance records"; all 12 vendors stayed on screen | Shows only the vendors with that tax-clearance status and says how many; choosing it again shows all |
+| Analytics headline, Remaining, Variance | "$21,772 committed against $550,000 of approved plans… 4%": 2026 orders measured against FY 2027 plans | This fiscal year's orders against this fiscal year's approved plans; says when no plan covers the year |
+| Sidebar, requester and department head | Every page offered; pages without the role's grant rendered as empty registers | Sidebar by grants; a page opened by URL says the role lacks it |
+| Requisitions, head of another department | "Awaiting my decision 4" and another department's requests offered for decision | The approver queue holds only what that approver can decide |
+| Requisitions, requester | A draft or rejected request could not be corrected or resubmitted; the edit form changed only the browser's copy and carried sample text | Edit request on drafts and rejected requests; Save draft, or Save and submit |
+| Filter bar, 19 pages | Apply said charts, KPIs and tables now used the filters; nothing changed | Registers filter by status, department and year; the toast says how many rows match and that cards are not filtered |
+| KPI cards | "Approved plan: no procurement plan is recorded yet" beside 3 approved plans; invoice, accounts payable, quotation, evaluation and analytics cards blank | Figures from the records where they answer; the others say why not |
+| Charts and analysis headlines | Empty charts beside 14 purchase orders; headlines such as "$5.12m committed against an $8.24m plan" | Charts and headlines drawn from records |
+| Document Vault | Folder tiles such as "Invoices & AP 4,102 records"; "7 files require review"; "12 active secure links" | Counts from stored files; sharing marked as not tracked |
+| Vendors, purchase orders, contracts | Every vendor under "Specialist review" for tax clearance, because the vendor record holds no country; "Document gaps: Complete" with no documents; "Automated reminders active" | An unknown country is not non-resident; "Not on file"; no reminder claim |
+| Bid Evaluation | "Tenders ready for evaluation" listed awarded tenders | Only tenders with bids and no award |
+| Command Centre | "Pending approvals" counted every pending requisition; "My approval queue" listed the latest requisitions | Both show the user's own decisions |
+| Generated documents | Letterhead of a sample company ("Matanho Holdings Limited · Company No. 12345/2024") | The company profile, else the organisation's name; the Matanho logo only on Matanho |
+| Invoices | The OCR queue "captured" sample files such as invoice_aug_001.pdf | Refused, since OCR is not connected |
+| Accounts | Payment said "the accounting entries were posted", but its journal stays PENDING and Post was hidden | A pending journal can be posted from the queue; the payment message says it awaits posting |
+| Contracts, Vendors, Plan | Signature queue tabs crashed the page; the vendor inbox crashed; Actuals vs Plan showed sample observations and crashed on a department | eSign and the inbox are refused; observations come from approved plans; the crash is guarded |
+| Activity menu, Document Vault | "Secure link copied: expires in seven days"; "Replacement request prepared", with nothing created or sent | Share copies the page's own link; replacement requests are refused |
+| Any form a role cannot complete | A Buyer could fill in the whole Create PO form before being refused | The opener checks the role's grant first |
+| Error messages | A user saw "Invalid `prisma.procurementInvoice.count()` invocation: Can't reach database server…" | The API and the page show a plain message instead of internals |
+| Plans | FY 2027 plans numbered APP-2026-### | Numbered by the plan's fiscal year |
+| Empty registers | Column headers and nothing else | "No records to show yet." |
+
+Found while fixing: on a Windows checkout the runtime patch script silently dropped bridge edits
+(CRLF line endings). After the first merge every V23 page threw `__pr23PageAllowed is not defined`.
+Fixed in `db218d2`; the script now stops if the bridge does not land.
+
+### Workflows
+
+`procurement-v23-workflows.mjs`, local, each checked through the API afterwards: **15 of 15 pass**.
+
+| Workflow | Result |
+|---|---|
+| W1 Requester saves a draft, edits it and submits it | `REQ_20260911_0034` PENDING_APPROVAL; one requisition with that title |
+| W2 Operations head rejects a requisition with a reason | `REQ_20260911_0035` REJECTED with the reason |
+| W3 Requester corrects the rejected requisition and resubmits it | `REQ_20260911_0035` PENDING_APPROVAL; an unchanged resubmission is refused by the API |
+| W4 Procurement Manager approves one receipt inspection, rejects another | `GRN_20260911_0006` APPROVED; `GRN_20260911_0002` REJECTED |
+| W5 Finance Manager approves a captured invoice | `INV_20260911_0010` APPROVED |
+| W6 Officer saves a PO as a draft then sends it; sends two drafts with Send selected | `PO_20260911_0015` DRAFT → SENT; `PO_20260911_0016`, `PO_20260911_0017` SENT |
+| W7 Procurement Manager terminates an active contract | `CTR-2026-0004` TERMINATED |
+| W8 Finance rejects a plan; its author adds a line and resubmits | `APP-2026-004` SUBMITTED with 2 lines |
+| W9 Officer uploads a new version of a vault document | v1.0 → v2.0 |
+| N1–N4 must refuse | No title: nothing saved. Plan author: not offered their own approval. Payment without proof: not paid. Buyer: refused before Create PO opens |
+
+The first run passed 11 of 15:
+- W1 and W2 were test errors: a required field was left empty, and Reject sits in the Review modal.
+- W3 depended on W2.
+- N4 was the real gap listed above.
+
+### For you to decide (unchanged)
+
+- Finance can approve an invoice whose three-way match is still awaiting receipt: W5 approved
+  `INV_20260911_0010` at AWAITING_RECEIPT. Block it, require a reason, or allow it?
+- Approval Centre "Group queue" shows the same prompts as "My approvals"; no group routing exists
+  behind it.
+- A requester and a department head hold no procurement grants, so the module's landing page (the
+  Command Centre) now tells them their role does not include it and links to Approval Centre and
+  Purchase Requisitions. Should those roles land on their own queue instead?
+
+### Still not built
+
+OCR extraction, eSignature, vendor messaging, withholding tax, fixed-asset transfers, evaluation
+committees and declarations, report schedules and download logs, and budget enforcement.
+
+### Re-crawl on the fixed build
+
+Every page operated again as all ten roles:
+
+| Role that clicked everything | Problems flagged | KPI cards without a live figure | Success messages with no API call |
+|---|---|---|---|
+| System Administrator | 38 → 16 | 46 → 23 | 16 → 9 |
+| Procurement Manager | 44 → 17 | 46 → 20 | 16 → 11 |
+
+What remains in those counts is not defect: clicking the tab that is already open, clearing a filter that
+was never applied, the refusals the openers now raise ("Your role does not have permission for recording
+invoice payments"), honest filter and export messages, and cards that now say what is not measured.
+
+Two page loads failed during the crawl. Both were the local Next dev server failing to serve a chunk
+under crawler load ("Loading chunk app/layout failed", "Invalid or unexpected token"); each page opens in
+3–12 seconds on its own, and the Audit page was re-crawled cleanly afterwards (8 controls, none flagged).
+
+Sidebars follow grants: the requester and the Operations head see Approval Centre, Purchase Requisitions
+and Configuration; the Accountant has no Plan, Tenders, Quotation Comparison, Bid Evaluation or Audit;
+the rest see what their grants allow.
+
+Checked in the browser after the last two fixes:
+- Vendor Registry compliance filter: Valid shows 8 of 12, Review 4 of 12, and choosing the same status
+  again shows all 12.
+- Analytics: "$21,772 committed in FY 2026 · 17 purchase orders this year… No approved procurement plan
+  covers FY 2026", with Remaining and Variance saying the same, because the three approved plans are FY 2027.
+- Audit & Compliance: the three blank cards say what is not measured.
+
+**Deployment:** local only so far.
+
+---
+
 ## Cycle 0 — baseline
 
 ### What the module renders before any wiring

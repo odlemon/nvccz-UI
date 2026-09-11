@@ -31,6 +31,8 @@ const PAGES = [
   ["audit", "/procurement-v23/audit"], ["settings", "/procurement-v23/settings"], ["analytics", "/procurement-v23/analytics"],
 ].filter(([id]) => !list(arg("pages")).length || list(arg("pages")).includes(id))
 const OUT = path.resolve(arg("out") || ".procurement-screens")
+// A remote run (dev over a slow link) needs longer than a local page load.
+const LOAD_MS = Number(process.env.UAT_LOAD_TIMEOUT_MS || 90000)
 fs.mkdirSync(OUT, { recursive: true })
 
 const browser = await chromium.launch({ headless: true })
@@ -42,9 +44,9 @@ for (const email of USERS) {
     const file = path.join(OUT, `${email.split("@")[0].replace(/\./g, "-")}--${id}.png`)
     try {
       await page.setViewportSize({ width: 1440, height: 900 })
-      await page.goto(staff.base + route, { waitUntil: "domcontentloaded", timeout: 90000 })
-      await page.waitForSelector(".procurement-v23-root", { timeout: 60000 })
-      await page.waitForFunction(() => Boolean(window.__pr23Live && window.__pr23Live.access), null, { timeout: 45000 }).catch(() => {})
+      await page.goto(staff.base + route, { waitUntil: "domcontentloaded", timeout: LOAD_MS })
+      await page.waitForSelector(".procurement-v23-root", { timeout: LOAD_MS })
+      await page.waitForFunction(() => Boolean(window.__pr23Live && window.__pr23Live.access), null, { timeout: LOAD_MS }).catch(() => {})
       await page.waitForTimeout(1500)
       // The tallest scrolling region decides how tall the page really is.
       const height = await page.evaluate(() => {
