@@ -39,7 +39,12 @@ export function AdminLayout({ children }: AdminLayoutProps) {
 
   return (
     <div className="min-h-screen bg-background">
-      <SharedTopbar onModuleSelect={handleModuleSelect} currentModule={currentModule} />
+      {/* Admin Management is light-only: its pages (Company Addresses, User/Role
+          Management) hardcode light-theme classes and ship no dark variant, so a dark
+          preference carried in from another module left the topbar dark above a page
+          that stayed light. hideThemeToggle both hides the toggle and forces light,
+          same as Street Rates / Fundraising / FP&A. */}
+      <SharedTopbar onModuleSelect={handleModuleSelect} currentModule={currentModule} hideThemeToggle />
 
       <div className="flex">
         <button
