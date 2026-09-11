@@ -95,15 +95,20 @@ must(!bridgeBody.includes("__PR23_LITERAL_KPIS__"), "literal KPI placeholder was
 
 const bridgeBlock = `/* BEGIN_PROCUREMENT_LIVE_BRIDGE */\n${bridgeBody}\n/* END_PROCUREMENT_LIVE_BRIDGE */\n`
 if (s.includes("/* BEGIN_PROCUREMENT_LIVE_BRIDGE */")) {
-  // Refresh in place so bridge edits propagate without a re-extract.
-  s = s.replace(/\/\* BEGIN_PROCUREMENT_LIVE_BRIDGE \*\/[\s\S]*?\/\* END_PROCUREMENT_LIVE_BRIDGE \*\/\n/, bridgeBlock)
+  // Refresh in place so bridge edits propagate without a re-extract. A Windows checkout has CRLF line
+  // endings; a pattern that required "\n" after the end marker matched nothing, so bridge edits were
+  // silently dropped while the patches calling them applied (a ReferenceError at render).
+  // A replacer function, not a replacement string: the bridge's own code contains "$$" and "$'",
+  // which a replacement string would rewrite.
+  s = s.replace(/\/\* BEGIN_PROCUREMENT_LIVE_BRIDGE \*\/[\s\S]*?\/\* END_PROCUREMENT_LIVE_BRIDGE \*\/\r?\n/, () => bridgeBlock)
+  must(s.includes(bridgeBody), "the live bridge was not refreshed in the runtime — check the BEGIN/END markers and line endings")
   console.log("  refresh         live bridge")
   applied += 1
 } else {
   // Ahead of the first page renderer: inside the runtime's scope, after state, money and kpi.
   const anchor = "function dashboardPage(){"
   must(s.includes(anchor), `bridge anchor '${anchor}' not found`)
-  s = s.replace(anchor, `${bridgeBlock}${anchor}`)
+  s = s.replace(anchor, () => `${bridgeBlock}${anchor}`)
   console.log("  patch           live bridge injected")
   applied += 1
 }

@@ -197,6 +197,9 @@ const UNCONNECTED_TERMINAL_STEPS = new Set<string>([
   "open-vendor-inbox-v6",
   "open-vendor-message-v6",
   "apply-plan-actual-filter-v6",
+  // Document Vault "Request replacement" announced a controlled request to the document's source;
+  // nothing is sent anywhere.
+  "request-source-document-v19",
 ])
 
 /**
