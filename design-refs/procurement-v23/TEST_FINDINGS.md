@@ -6,9 +6,53 @@
 | Severity | Open | Fixed locally, not deployed | Deployed and verified |
 |---|---|---|---|
 | CRITICAL | 0 | 0 | 1 |
-| HIGH | 0 | 4 | 0 |
-| MEDIUM | 0 | 2 | 0 |
-| LOW | 0 | 1 | 0 |
+| HIGH | 0 | 0 | 4 |
+| MEDIUM | 0 | 0 | 2 |
+| LOW | 0 | 0 | 1 |
+
+## Deployment — 11 September 2026
+
+Every finding below is deployed to **production** (NVCCZ) and **dev** (Arcus).
+
+| | Production | Dev |
+|---|---|---|
+| API | nvccz `321fcdc` | nvccz `321fcdc` |
+| Staff, vendor, LP portals | staff nvccz-new `9cceab1`; vendor and LP `a3da504` (no vendor or LP code changed after it) | `9cceab1` |
+| Migrations | `db:migrate:all`: 141 ok, 0 failed | `db:migrate:all`: 0 failed |
+| Rollback images | `nvccz-prod-api:pre-uat-20260911`, `nvccz-prod-api:pre-reject-20260911` | `arcus-dev-api:pre-uat-20260911` |
+
+**Environment:**
+- `VENDOR_PORTAL_BASE_URL` set on both APIs; `PUBLIC_VENDOR_PORTAL_URL` set on the production staff build.
+- The previous env files are kept as `*.bak-20260911-vendorlinks`.
+
+**Deploy blocker found and fixed.** Five Performance migrations called the seed-only
+`assertDevDatabase` guard, so `db:migrate:all` refused `nvccz_prod` and the API was not swapped.
+- Production's tables already matched dev column for column.
+- Those five were run once with the guard's own override, and the guard calls were removed from
+  the scripts (nvccz `eeb975a`).
+
+**Verified on production, read-only** (no email sent, no record written):
+- **API:** health 200, 0 restarts; staff routes 401 without a token; the invoice reject route is
+  compiled in.
+- **Grants:** procurement permissions `--check` would add 0; RFQ award backfill would change 0;
+  performance role permissions would grant 0.
+- **Vendor links:**
+  - Inside the API, the RFQ invitation and PO invoice links resolve to `https://vendor.nvccz.online/…`.
+  - The staff host forwards both paths there with the token intact (307).
+  - The vendor pages answer 200.
+  - `GET /procurement/vendor-portal/purchase-order` refuses a missing or forged token.
+- **Staff build:** carries the live V23 bridge, the invoice rejection call and the refused controls.
+  The vendor build carries the token invoice page. LP login 200.
+
+**Verified behaviourally locally, and on dev where no email results:**
+- the authorisation probe (every asserted cell matches; on dev the one mismatch is a PO create that
+  needs a vendor dev does not have);
+- the V23 actions UAT (steps 1–11);
+- the quotation integrity probe;
+- the vendor invoice link probe.
+
+A full requisition-to-invoice run was not repeated on either server. On both, mail is not
+redirected, so it would have emailed real vendor addresses.
 
 ---
 
@@ -205,7 +249,9 @@ The same probe, now asserting the policy for each persona: 11 personas × 34 end
 | Quotation accept (award) | every staff persona | Administrator, Procurement Manager |
 | Asserted cells not matching the policy | — | **0** |
 
-**Status:** FIXED LOCALLY — not deployed. Production is still open to any staff account.
+**Status:** DEPLOYED to production and dev on 11 September 2026 (nvccz `321fcdc`). Grants
+applied by `db:migrate:procurement-permissions`; `--check` on production would add 0. The policy
+probe was run locally and inside the dev API; production has no seeded test personas.
 
 **Deploy note:** the guards and grants must ship together. Run
 `npm run db:migrate:procurement-permissions` against the target database before, or with, the
@@ -261,7 +307,7 @@ Prisma errors are left alone and stay 500.
 | Public submit, empty body | 500 | **400** "vendorPortalToken is required" |
 | Public submit, forged token | 500 | **400** "Invalid vendor portal token signature" |
 
-**Status:** FIXED LOCALLY — not deployed.
+**Status:** DEPLOYED to production and dev on 11 September 2026 (nvccz `321fcdc`); see Deployment at the top.
 
 ---
 
@@ -317,7 +363,7 @@ Commit `b7e2163` on `feature/procurement-v23-live` (nvccz):
 
 The authorisation probe now carries this row, and every asserted cell matches the policy.
 
-**Status:** FIXED LOCALLY — not deployed.
+**Status:** DEPLOYED to production and dev on 11 September 2026 (nvccz `321fcdc`); see Deployment at the top.
 
 ---
 
@@ -399,8 +445,9 @@ Evidence scripts:
 - `scripts/_uat/procurement-v23-actions.mjs` checks each action through the API afterwards;
 - `scripts/_uat/procurement-v23-baseline.mjs --live=…` reports the census per page.
 
-**Status:** FIXED LOCALLY for the screens and actions listed — not deployed. The actions UAT
-verifies all ten steps through the API.
+**Status:** DEPLOYED to production and dev on 11 September 2026 (staff portal nvccz-new
+`9cceab1`). The production staff build carries the live bridge, the invoice rejection call and the
+refused controls. The actions UAT, now eleven steps, verifies every step through the API locally.
 
 Connected since, on 11 September 2026:
 - **invoice rejection** from the Approval Centre (`PUT /procurement/invoices/:id/reject`, actions UAT
@@ -491,7 +538,7 @@ nvccz `177ddd2` on `feature/procurement-v23-live`:
 The legacy `/procurement` comparison view still receives numeric `technicalScore` and
 `compositeScore`. Both now reflect the evaluation team's score.
 
-**Status:** FIXED LOCALLY — not deployed.
+**Status:** DEPLOYED to production and dev on 11 September 2026 (nvccz `321fcdc`); see Deployment at the top.
 
 ---
 
@@ -546,7 +593,7 @@ The integrity probe went from 0/3 to 3/3.
 happened. At deploy, correct them from their accepted quotation: set `status = AWARDED` and
 `awardedQuotationId`.
 
-**Status:** FIXED LOCALLY — not deployed.
+**Status:** DEPLOYED to production and dev on 11 September 2026 (nvccz `321fcdc`); see Deployment at the top.
 
 ---
 
@@ -634,7 +681,15 @@ Also checked on the servers:
 - both vendor hosts answer 200 on both paths;
 - the production API's CORS admits `https://vendor.nvccz.online`.
 
-**Status:** FIXED LOCALLY — deploying to production (API, then staff, vendor and LP portals) and then dev.
+**Status:** DEPLOYED and verified on production and dev, 11 September 2026.
+
+| | Production | Dev |
+|---|---|---|
+| RFQ invitation link, built inside the API | `https://vendor.nvccz.online/vendor-quotations/rfq-respond?…` | `https://dev.vendor.matanho.com/vendor-quotations/rfq-respond?…` |
+| PO invoice link, built inside the API | `https://vendor.nvccz.online/vendor/invoice/submit?…` | `https://dev.vendor.matanho.com/vendor/invoice/submit?…` |
+| Same paths opened on the staff host | 307 to the vendor portal, token kept | 307 to the vendor portal, token kept (was 500) |
+| Vendor pages | 200 | 200 |
+| `GET /procurement/vendor-portal/purchase-order` with a forged token | 400 | 400 |
 
 ---
 
