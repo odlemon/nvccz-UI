@@ -20,12 +20,16 @@ import {
   approveGoodsReceivedNote,
   approveProcurementInvoice,
   approveRequisition,
+  captureProcurementInvoice,
+  createGoodsReceivedNote,
   createRequisition,
+  createRfq,
   createVendor,
   readProcurementError,
   rejectGoodsReceivedNote,
   rejectQuotation,
   rejectRequisition,
+  scoreQuotation,
   sendPurchaseOrder,
   submitRequisition,
 } from "@/lib/api/procurement-v23-api"
@@ -54,7 +58,19 @@ export const LIVE_ACTIONS = [
   "register-vendor-confirm",
   "register-vendor-confirm-v6",
   "send-po-v6",
+  "create-send-tender-v13",
+  "create-send-tender-from-preview-v13",
+  "save-scores",
+  "save-bid-winner-v6",
+  "create-grn-confirm",
+  "confirm-capture-invoice-v5",
 ] as const
+
+/**
+ * Runtime controls that only open a confirmation, whose own final step is wired. They match
+ * the confirm-/save-/submit- family by name but save nothing themselves.
+ */
+const RUNTIME_OPENERS = new Set<string>(["confirm-bid-winner-v6"])
 
 /**
  * Write actions whose runtime handler only edits the in-browser demo store and toasts success.
@@ -63,16 +79,11 @@ export const LIVE_ACTIONS = [
  */
 export const NOT_YET_LIVE_ACTIONS = [
   "create-tender-confirm",
-  "create-send-tender-v13",
-  "create-send-tender-from-preview-v13",
+  // An RFQ is created when it is sent; the backend keeps no unsent drafts.
   "save-tender",
   "save-tender-v13",
-  "confirm-bid-winner-v6",
-  "save-bid-winner-v6",
   "submit-recommendation",
   "submit-quote-recommendation-v5",
-  "create-grn-confirm",
-  "confirm-capture-invoice-v5",
   "approve-invoice",
   "approve-match-v5",
   "submit-po-v6",
@@ -114,6 +125,8 @@ const UNCONNECTED_TERMINAL_STEPS = new Set<string>([
   // Vendor Registry "Run now": no reminder automation exists on the backend.
   "run-compliance-reminders-v6",
   "run-reminder-automation-v7",
+  // OCR extraction of an uploaded invoice is not connected; manual capture is.
+  "extract-invoice-v5",
 ])
 
 /**
@@ -122,6 +135,7 @@ const UNCONNECTED_TERMINAL_STEPS = new Set<string>([
  */
 export function isUnconnectedWrite(action: string): boolean {
   if ((LIVE_ACTIONS as readonly string[]).includes(action)) return false
+  if (RUNTIME_OPENERS.has(action)) return false
   return /^(confirm|save|submit)-/.test(action) || UNCONNECTED_TERMINAL_STEPS.has(action)
 }
 
@@ -350,6 +364,171 @@ export async function handleProcurementV23Action(
         }
         await sendPurchaseOrder(o.recordId)
         return { handled: true, reload: true, message: `${o.id} sent to ${o.vendor}.` }
+      }
+
+      // ------------------------------------------------------------ tender builder
+      case "create-send-tender-v13":
+      case "create-send-tender-from-preview-v13": {
+        if (!has("rfq.manage")) return refuse("sending RFQs")
+        const form = document.querySelector<HTMLFormElement>("#tenderFormV13")
+        if (!form) {
+          return { handled: true, error: "Go back to the form to send the RFQ; the preview does not carry the vendor selection." }
+        }
+        if (!form.reportValidity()) return { handled: true }
+        const fd = new FormData(form)
+        const requisitionId = String(fd.get("source") ?? "")
+        const title = String(fd.get("title") ?? "").trim()
+        const weights = ["technicalWeight", "commercialWeight", "deliveryWeight", "riskWeight"].map((k) => Number(fd.get(k) || 0))
+        const weightTotal = weights.reduce((a, b) => a + b, 0)
+        if (weightTotal !== 100) return { handled: true, error: `Evaluation weights must total 100% (currently ${weightTotal}%).` }
+        // In "all eligible" mode the runtime ticks every visible eligible vendor, so checked is the recipient list either way.
+        const vendorIds = [...form.querySelectorAll<HTMLInputElement>('input[name="vendors"]:checked')].map((x) => x.value).filter(Boolean)
+        const lines = [...form.querySelectorAll<HTMLTableRowElement>("#rfxLinesV13 tr")]
+          .map((row) => ({
+            itemName: (row.querySelector<HTMLInputElement>('[name="lineDescription"]')?.value ?? "").trim(),
+            unit: row.querySelector<HTMLSelectElement>('[name="lineUom"]')?.value || undefined,
+            quantity: Number(row.querySelector<HTMLInputElement>('[name="lineQty"]')?.value || 0),
+          }))
+          .filter((l) => l.itemName && l.quantity > 0)
+        const missing: string[] = []
+        if (!title) missing.push("a title")
+        if (!requisitionId && !lines.length) missing.push("an approved requisition or at least one line")
+        if (!vendorIds.length) missing.push("at least one eligible vendor")
+        if (missing.length) return { handled: true, error: `Cannot send the RFQ — it needs ${missing.join(", ")}.` }
+
+        const close = String(fd.get("close") ?? "")
+        // Vendors cannot quote after the closing date, so an RFQ sent with one already past is dead on arrival.
+        if (close && new Date(close).getTime() <= Date.now()) {
+          return { handled: true, error: "The closing date has already passed. Choose a future closing date and send again." }
+        }
+        const source = rows("requisitions").find((r) => r.recordId === requisitionId)
+        const commercial = weights[1]
+        const created = await createRfq({
+          purchaseRequisitionId: requisitionId || undefined,
+          title,
+          description: [fd.get("objective"), fd.get("scope")].map((v) => String(v ?? "").trim()).filter(Boolean).join("\n\n") || undefined,
+          vendorIds,
+          rfqDeadline: close ? new Date(close).toISOString() : undefined,
+          items: lines.length ? lines : undefined,
+          visibility: String(fd.get("method")) === "Open tender" ? "PUBLIC_LISTING" : "INVITED_ONLY",
+          // The backend weighs price against everything else: commercial is price, and
+          // technical, delivery and risk together are the non-price share.
+          priceWeight: commercial / 100,
+          technicalWeight: (100 - commercial) / 100,
+        })
+        closeRuntimeOverlay()
+        const count = vendorIds.length
+        return {
+          handled: true,
+          reload: true,
+          message: `${created?.rfqNumber ?? "The RFQ"} sent to ${count} vendor${count === 1 ? "" : "s"}${!lines.length && source ? `, with the lines of ${source.id}` : ""}.`,
+        }
+      }
+
+      // ------------------------------------------------------- evaluation and award
+      case "save-scores": {
+        if (!has("quotations.manage")) return refuse("scoring quotations")
+        const inputs = [...document.querySelectorAll<HTMLInputElement>("[data-score-quote]")]
+        const changed = inputs.filter((i) => i.value.trim() !== "" && i.value.trim() !== (i.dataset.scoreWas ?? ""))
+        if (!changed.length) return { handled: true, error: "Enter or change at least one technical score before saving." }
+        if (changed.some((i) => !(Number(i.value) >= 0 && Number(i.value) <= 100))) {
+          return { handled: true, error: "Technical scores must be between 0 and 100." }
+        }
+        for (const input of changed) {
+          await scoreQuotation(String(input.dataset.scoreQuote), { score: Number(input.value) })
+        }
+        const n = changed.length
+        return { handled: true, reload: true, message: `Technical score${n === 1 ? "" : "s"} saved for ${n} bid${n === 1 ? "" : "s"}.` }
+      }
+
+      case "save-bid-winner-v6": {
+        if (!has("rfq.award")) return refuse("awarding quotations")
+        const [tenderId, quotationId] = String(detail.dataset.id ?? "").split("|")
+        const quote = rows("quotationsLive").find((q) => q.recordId === quotationId)
+        if (!quote) return { handled: true, error: "Select a bidder from this tender's open quotations." }
+        if (!quote.open) return { handled: true, error: `${quote.id} is ${String(quote.status).toLowerCase()} and cannot be awarded.` }
+        const result = await acceptQuotation(quotationId, val("#awardRationaleV6") || undefined)
+        closeRuntimeOverlay()
+        const po = (result as any)?.purchaseOrder?.poNumber
+        return { handled: true, reload: true, message: `${tenderId} awarded to ${quote.vendor}${po ? `; ${po} raised` : ""}.` }
+      }
+
+      // ------------------------------------------------------------ goods received
+      case "create-grn-confirm": {
+        if (!has("receiving.manage")) return refuse("recording goods received")
+        const form = document.querySelector<HTMLFormElement>("#grnFormV23")
+        if (!form) return { handled: true, error: "Open Record GRN again; the receipt form is not on screen." }
+        if (!form.reportValidity()) return { handled: true }
+        const poId = val("#grnPoV23")
+        const po = rows("orders").find((o) => o.recordId === poId)
+        const qty = (attr: string, id: string) =>
+          Number(form.querySelector<HTMLInputElement>(`[${attr}="${CSS.escape(id)}"]`)?.value || 0)
+        const items = [...form.querySelectorAll<HTMLInputElement>("[data-grn-received]")]
+          .map((input) => {
+            const id = String(input.dataset.grnReceived)
+            return {
+              purchaseOrderItemId: id,
+              quantityReceived: Number(input.value || 0),
+              quantityAccepted: qty("data-grn-accepted", id),
+              quantityRejected: qty("data-grn-rejected", id),
+            }
+          })
+          .filter((l) => l.quantityReceived > 0)
+        if (!items.length) return { handled: true, error: "Enter a received quantity on at least one line." }
+        if (items.some((l) => Math.abs(l.quantityAccepted + l.quantityRejected - l.quantityReceived) > 1e-9)) {
+          return { handled: true, error: "On each line, accepted plus rejected must equal the quantity received." }
+        }
+        const received = val('#grnFormV23 [name="receivedDate"]')
+        const grn = await createGoodsReceivedNote({
+          purchaseOrderId: poId,
+          receivedDate: received ? new Date(received).toISOString() : undefined,
+          items,
+        })
+        closeRuntimeOverlay()
+        return {
+          handled: true,
+          reload: true,
+          message: `${grn?.grnNumber ?? "The goods received note"} recorded against ${po?.id ?? "the purchase order"} and sent for inspection approval.`,
+        }
+      }
+
+      // ----------------------------------------------------------- invoice capture
+      case "confirm-capture-invoice-v5": {
+        if (!has("intake.manage")) return refuse("capturing supplier invoices")
+        const form = document.querySelector<HTMLFormElement>("#invoiceCaptureV23")
+        if (!form) return { handled: true, error: "Open Capture invoice again; the capture form is not on screen." }
+        if (!form.reportValidity()) return { handled: true }
+        const poId = val("#invoicePoV23")
+        const po = rows("orders").find((o) => o.recordId === poId)
+        if (!po?.vendorId) return { handled: true, error: "Select the purchase order the invoice is for." }
+        const items = [...form.querySelectorAll<HTMLInputElement>("[data-inv-qty]")]
+          .map((input) => {
+            const id = String(input.dataset.invQty)
+            return {
+              itemName: input.dataset.invName ?? "",
+              quantity: Number(input.value || 0),
+              unitPrice: Number(form.querySelector<HTMLInputElement>(`[data-inv-price="${CSS.escape(id)}"]`)?.value || 0),
+            }
+          })
+          .filter((l) => l.itemName && l.quantity > 0)
+        if (!items.length) return { handled: true, error: "Enter an invoiced quantity on at least one line." }
+        if (items.some((l) => !(l.unitPrice > 0))) return { handled: true, error: "Every invoiced line needs a unit price above zero." }
+        const invoiceDate = val('#invoiceCaptureV23 [name="invoiceDate"]')
+        const dueDate = val('#invoiceCaptureV23 [name="dueDate"]')
+        const invoice = await captureProcurementInvoice({
+          purchaseOrderId: poId,
+          vendorId: String(po.vendorId),
+          invoiceDate: new Date(invoiceDate).toISOString(),
+          dueDate: dueDate ? new Date(dueDate).toISOString() : undefined,
+          currencyId: po.currencyId ?? undefined,
+          items,
+        })
+        closeRuntimeOverlay()
+        return {
+          handled: true,
+          reload: true,
+          message: `${invoice?.invoiceNumber ?? "The invoice"} captured against ${po.id} and sent to Finance for approval.`,
+        }
       }
 
       default:

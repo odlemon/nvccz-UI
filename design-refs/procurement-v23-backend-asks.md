@@ -20,12 +20,12 @@ vendored demo records or a success toast for a save that did not happen.
 | Command Centre | requisitions, RFQs, POs, GRNs, invoices, vendors (KPIs, cycle donut, attention list derived) | — |
 | Approval Centre | prompts built from real pending decisions | approve and reject: requisition, award (quotation accept), GRN; approve only: invoice |
 | Purchase Requisitions | `GET /procurement/requisitions`, `/my`, `/pending-approval` | raise and submit, save draft, approve, reject |
-| Tenders & RFx | `GET /procurement/rfq`, `GET /vendor-quotations` | — (RFx builder not yet wired) |
-| Bid Evaluation | tender list with real bid counts | — (scoring workspace not yet wired) |
+| Tenders & RFx | `GET /procurement/rfq`, `GET /vendor-quotations` | send an RFQ from an approved requisition (tender builder) |
+| Bid Evaluation | real bids and `GET /procurement/rfqs/:id/comparison-matrix` | evaluation-team technical scores; award from the award panel |
 | Vendor Registry | `GET /accounting/vendors` | register vendor (V6 form); bank details held for Finance |
 | Purchase Orders | `GET /procurement/purchase-orders` | send PO |
-| Receiving & Inspection | `GET /procurement/goods-received-notes` | — (record GRN modal not yet wired) |
-| Invoices & 3-Way Match | `GET /procurement/invoices`, real PO → GRN → invoice chain per tender | — (capture modal not yet wired) |
+| Receiving & Inspection | `GET /procurement/goods-received-notes` | record a GRN against a sent PO (received, accepted, rejected per line) |
+| Invoices & 3-Way Match | `GET /procurement/invoices`, real PO → GRN → invoice chain per tender | capture a supplier invoice against a PO (OCR upload not connected) |
 | Audit & Compliance | `GET /procurement/audit-events` *(added)* | — |
 
 **Added to the backend for V23** (nvccz, local commits):
@@ -33,7 +33,10 @@ vendored demo records or a success toast for a save that did not happen.
 - `GET /procurement/audit-events` and the `procurement.audit.view` grant;
 - staff invoice capture reachable (PROC-004);
 - 404/400/409 instead of 500 on quotation errors (PROC-003);
-- per-action procurement permissions (PROC-002).
+- per-action procurement permissions (PROC-002);
+- `PUT /vendor-quotations/:id/evaluation` for the evaluation team's technical score, with a
+  vendor's own declared score no longer counted and price scored against the lowest bid (PROC-006);
+- an accepted quotation recorded on its RFQ as the award, closing it to further quotes (PROC-007).
 
 ---
 
@@ -73,16 +76,18 @@ Priority reflects what blocks a real procure-to-pay cycle first.
   - endpoints: CRUD plus submit and approve;
   - link: a requisition may reference a plan item, so plan vs actual can be computed.
 
-### 4. Bid evaluation scores — HIGH
+### 4. Bid evaluation scores — DONE (single score per bid); per-criterion scoring remains — MEDIUM
 
-- **Screen:** the evaluation workspace (weighted technical, commercial and delivery scores per
-  bid, and a recommendation). It currently shows no scoring. Its fixture scores are suppressed.
-- **Available:** `VendorQuotation.technicalScoreJson`, `GET /procurement/rfqs/:id/comparison-matrix`,
-  and RFQ `priceWeight` / `technicalWeight`.
-- **Needed:** a write endpoint for evaluator scores per quotation and criterion. Returned
-  weighted totals should be null, not 0, when unscored.
-- **Frontend next step:** wire the comparison matrix and the award to real quotations — no
-  backend change.
+- **Done in cycle three:** `PUT /vendor-quotations/:id/evaluation` records one technical score
+  (0–100) per bid. The comparison matrix ranks on it, and the V23 workspace scores and awards
+  through it (PROC-006).
+- **Remaining:**
+  - scores per criterion and per evaluator (the V23 form asks for technical, commercial, delivery
+    and risk weights), with conflict declarations;
+  - the backend still weighs only price against one non-price share, so delivery and risk
+    weights are folded into that share when an RFQ is sent.
+- **Proposal:** an evaluation record per evaluator × quotation × criterion, with the weights
+  stored on the RFQ, and an aggregated score returned by the matrix.
 
 ### 5. Invoice rejection — MEDIUM
 

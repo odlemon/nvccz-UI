@@ -141,4 +141,188 @@ function __pr23ControlActivity() {
   return rows.map(r => `<div class="list-row" data-page="${r[0]}"><div class="list-main"><strong>${__pr23Esc(r[1])}</strong><span>${__pr23Esc(r[2])}</span></div>${status(r[3])}</div>`).join('');
 }
 
+/** True when the signed-in user holds procurement.<permission>. */
+function __pr23Can(permission) {
+  const live = __pr23Live();
+  return Boolean(live && live.access && (live.access.permissions || []).includes('procurement.' + permission));
+}
+
+// ---------------------------------------------------------------- tender builder (RFx)
+
+/** A local date `days` from today as yyyy-mm-dd, or yyyy-mm-ddThh:mm when a time is given. */
+function __pr23DateOffset(days, time) {
+  const d = new Date(Date.now() + days * 86400000);
+  const pad = n => String(n).padStart(2, '0');
+  const day = `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  return time ? `${day}T${time}` : day;
+}
+
+/** Source records a new RFQ can be raised from: approved requisitions not yet sourced. */
+function __pr23SourceOptions() {
+  const ready = (state.requisitions || []).filter(r => r.rawStatus === 'APPROVED');
+  if (!ready.length) return '<option value="">No approved requisition is awaiting sourcing</option>';
+  return ready.map(r => `<option value="${__pr23Esc(r.recordId)}">${__pr23Esc(r.id)} - ${__pr23Esc(r.title)}</option>`).join('');
+}
+
+/** Tender categories are the vendor registry's categories, so the category filter can match vendors. */
+function __pr23CategoryOptions() {
+  const categories = [...new Set((state.vendors || []).map(v => v.category).filter(c => c && c !== '—'))];
+  return (categories.length ? categories : ['Uncategorised']).map(c => `<option>${__pr23Esc(c)}</option>`).join('');
+}
+
+// ---------------------------------------------------------------- bid evaluation and award
+
+/** "Vendor (QUO_…)" for a quotation record id, so a confirmation names the bidder rather than an id. */
+function __pr23QuoteLabel(recordId) {
+  const q = (state.quotationsLive || []).find(x => x.recordId === recordId);
+  return q ? `${q.vendor} (${q.id})` : recordId;
+}
+
+/** A tender's bids: the comparison matrix when it was loaded, otherwise the quotations alone. */
+function __pr23EvaluationRows(tenderId) {
+  const ev = (state.evaluationLive || {})[tenderId];
+  if (ev && Array.isArray(ev.rows)) return ev;
+  const rows = (state.quotationsLive || []).filter(q => q.rfq === tenderId);
+  return { rows, priceWeight: null, technicalWeight: null, complete: false };
+}
+
+function __pr23EvaluationPageHtml(t) {
+  if (!t) return `<div class="page">${pageHead('Governed decisioning', 'Bid Evaluation', 'The selected tender is no longer in your register.', btn('Back to tender list', 'back-evaluations'))}</div>`;
+  const ev = __pr23EvaluationRows(t.id);
+  const rows = ev.rows;
+  const canScore = __pr23Can('quotations.manage');
+  const open = rows.filter(r => r.open);
+  const scored = rows.filter(r => r.evaluationScore != null).length;
+  const lowest = rows.reduce((m, r) => (r.amount != null && (m == null || r.amount < m.amount) ? r : m), null);
+  const top = ev.complete ? rows.reduce((m, r) => (r.weighted != null && (m == null || r.weighted > m.weighted) ? r : m), null) : null;
+  const awarded = rows.find(r => r.rawStatus === 'ACCEPTED');
+  const pct = v => (v == null ? '—' : `${Math.round(v * 100)}%`);
+  const scoreCell = r => canScore && r.open
+    ? `<input type="number" min="0" max="100" step="1" data-score-quote="${__pr23Esc(r.recordId)}" data-score-was="${r.evaluationScore == null ? '' : r.evaluationScore}" value="${r.evaluationScore == null ? '' : r.evaluationScore}" placeholder="0–100" style="width:84px">`
+    : (r.evaluationScore == null ? '<span class="muted">Not scored</span>' : `${r.evaluationScore}%`);
+  const tableRows = rows.map((r, i) => `<tr><td><strong>${i + 1}</strong></td><td><strong>${__pr23Esc(r.vendor)}</strong><br><span class="muted">${__pr23Esc(r.id)}</span></td><td>${scoreCell(r)}</td><td>${r.priceScore == null ? '—' : `${Math.round(r.priceScore)}%`}</td><td><strong>${r.weighted == null ? 'Not scored' : `${r.weighted.toFixed(1)}%`}</strong></td><td class="money">${money(r.amount)}</td><td>${status(r.status)}</td></tr>`);
+  const actions = btn('Back to tender list', 'back-evaluations') + (canScore && open.length ? btn('Save scores', 'save-scores', 'primary') : '');
+  return `<div class="page">${pageHead('Governed decisioning', `${__pr23Esc(t.id)} Bid Evaluation`, `${__pr23Esc(t.title)} · ${__pr23Esc(t.entity)} · ${rows.length} submitted bid${rows.length === 1 ? '' : 's'}`, actions)}
+ <div class="notice" style="margin-bottom:14px"><div><strong>How bids are ranked</strong><p>The technical score is the evaluation team's, entered here; a vendor's own declarations are not counted. The price score is relative to the lowest bid. The weighted score appears once every bid is scored.</p></div></div>
+ <div class="grid kpis">${kpi('Bids received', rows.length, `${open.length} open for decision`, 'vendor')}${kpi('Bids scored', `${scored} of ${rows.length}`, ev.complete ? 'Every bid has a technical score' : 'Score every bid to rank them', 'evaluate')}${kpi('Technical weighting', pct(ev.technicalWeight), 'Set on the RFQ', 'evaluate')}${kpi('Price weighting', pct(ev.priceWeight), 'Relative to the lowest bid', 'account')}${kpi('Lowest bid', lowest ? money(lowest.amount) : '—', lowest ? lowest.vendor : 'No bids yet', 'account')}${kpi(awarded ? 'Awarded to' : 'Top weighted score', awarded ? awarded.vendor : (top ? `${top.weighted.toFixed(1)}%` : '—'), awarded ? `${awarded.id} accepted` : (top ? top.vendor : 'Waiting for scores'), 'approve')}</div>
+ ${card('Quotation and bid comparison', canScore && open.length ? 'Enter a technical score from 0 to 100 for each bid, then save.' : 'Scores, prices and weighted ranking for this tender', table(['Rank', 'Vendor', 'Technical', 'Price', 'Weighted score', 'Bid total', 'Status'], tableRows.length ? tableRows : ['<tr><td colspan="7" class="muted">No quotations have been submitted for this tender.</td></tr>']))}</div>`;
+}
+
+/** Open quotations a tender can be awarded to, for the V6 award panel. */
+function __pr23AwardOptions(tenderId) {
+  if (!tenderId) return [];
+  const ev = __pr23EvaluationRows(tenderId);
+  if (ev.rows.some(r => r.rawStatus === 'ACCEPTED')) return [];
+  const open = ev.rows.filter(r => r.open);
+  const top = ev.complete ? open.reduce((m, r) => (r.weighted != null && (m == null || r.weighted > m.weighted) ? r : m), null) : null;
+  return open.map(r => ({
+    name: `${r.vendor} (${r.id})`,
+    value: r.recordId,
+    score: r.weighted == null ? null : Number(r.weighted.toFixed(1)),
+    total: r.amount,
+    recommended: Boolean(top && top.recordId === r.recordId),
+  }));
+}
+
+function __pr23AwardClosedHtml(tenderId) {
+  const awarded = tenderId ? __pr23EvaluationRows(tenderId).rows.find(r => r.rawStatus === 'ACCEPTED') : null;
+  const message = awarded
+    ? `${awarded.vendor} was awarded (${awarded.id}); its purchase order has been raised.`
+    : !__pr23Can('rfq.award')
+      ? 'Recording the winning bidder needs the award permission (Procurement Manager).'
+      : 'No open quotation is available to award.';
+  return `<section class="award-panel-v6"><div class="layer-toolbar"><div><span class="eyebrow">Final award decision</span><h3 style="margin:4px 0">${awarded ? 'Awarded' : 'No award to record'}</h3><p class="muted">${__pr23Esc(message)}</p></div></div></section>`;
+}
+
+// ---------------------------------------------------------------- goods received
+
+const __PR23_RECEIVABLE = ['SENT', 'ACKNOWLEDGED', 'APPROVED', 'PARTIALLY_RECEIVED', 'PARTIALLY_DELIVERED'];
+
+/**
+ * A compact line table for a modal. The page table() is sized for the workspace and overflows
+ * the modal body, cutting off the last column; this one fits, and scrolls if it ever cannot.
+ */
+function __pr23LinesTable(heads, rows) {
+  const th = heads.map(h => `<th style="padding:6px 8px;text-align:left;font-size:11px;letter-spacing:.04em;text-transform:uppercase;white-space:nowrap">${h}</th>`).join('');
+  const body = rows.join('').replace(/<td>/g, '<td style="padding:6px 8px;vertical-align:middle">');
+  return `<div style="overflow-x:auto;max-width:100%"><table style="width:100%;min-width:0;border-collapse:collapse;font-size:13px"><thead><tr>${th}</tr></thead><tbody>${body}</tbody></table></div>`;
+}
+
+function __pr23GrnLinesHtml(poRecordId) {
+  const o = (state.orders || []).find(x => x.recordId === poRecordId);
+  if (!o) return '<p class="muted">Select a purchase order.</p>';
+  const rows = (o.items || []).map(i => {
+    const remaining = Math.max(0, Number(i.quantity || 0) - Number(i.received || 0));
+    const id = __pr23Esc(i.id);
+    return `<tr><td><strong>${__pr23Esc(i.itemName)}</strong></td><td>${i.quantity == null ? '—' : i.quantity}</td><td>${i.received || 0}</td><td><input type="number" min="0" step="0.01" data-grn-received="${id}" value="${remaining}" style="width:64px"></td><td><input type="number" min="0" step="0.01" data-grn-accepted="${id}" value="${remaining}" style="width:64px"></td><td><input type="number" min="0" step="0.01" data-grn-rejected="${id}" value="0" style="width:64px"></td></tr>`;
+  });
+  // Short headers and narrow inputs: the modal body is narrower than the page table.
+  return __pr23LinesTable(['Item', 'Ordered', 'Before', 'Received', 'Accepted', 'Rejected'], rows);
+}
+
+/** Record GRN against a real purchase order, replacing the fixture modal. */
+function __pr23GrnModal() {
+  const open = (state.orders || []).filter(o => __PR23_RECEIVABLE.includes(String(o.rawStatus || '').toUpperCase()));
+  if (!open.length) {
+    openModal('Record goods received note', 'Receipts are recorded against a purchase order that has been sent to the vendor.', '<p class="muted">No purchase order is awaiting delivery.</p>', btn('Close', 'close-overlay'));
+    return;
+  }
+  const today = new Date().toISOString().slice(0, 10);
+  const options = open.map(o => `<option value="${__pr23Esc(o.recordId)}">${__pr23Esc(o.id)} · ${__pr23Esc(o.vendor)}</option>`).join('');
+  openModal(
+    'Record goods received note',
+    'Enter what arrived against the purchase order. On each line, accepted plus rejected must equal the quantity received.',
+    `<form id="grnFormV23" class="form-grid"><div class="field"><label>Purchase order</label><select name="po" id="grnPoV23">${options}</select></div><div class="field"><label>Received on</label><input type="date" name="receivedDate" value="${today}" required></div><div class="field full"><label>Lines</label><div id="grnLinesV23">${__pr23GrnLinesHtml(open[0].recordId)}</div></div></form>`,
+    btn('Cancel', 'close-overlay') + btn('Create GRN', 'create-grn-confirm', 'primary'),
+  );
+}
+
+// ---------------------------------------------------------------- invoice capture
+
+const __PR23_INVOICEABLE = ['SENT', 'ACKNOWLEDGED', 'APPROVED', 'PARTIALLY_RECEIVED', 'PARTIALLY_DELIVERED', 'DELIVERED'];
+
+function __pr23InvoiceLinesHtml(poRecordId) {
+  const o = (state.orders || []).find(x => x.recordId === poRecordId);
+  if (!o) return '<p class="muted">Select a purchase order.</p>';
+  const rows = (o.items || []).map(i => {
+    const qty = Number(i.received || 0) > 0 ? Number(i.received) : Number(i.quantity || 0);
+    const id = __pr23Esc(i.id);
+    return `<tr><td><strong>${__pr23Esc(i.itemName)}</strong></td><td>${i.quantity == null ? '—' : i.quantity}</td><td>${i.received || 0}</td><td><input type="number" min="0" step="0.01" data-inv-qty="${id}" data-inv-name="${__pr23Esc(i.itemName)}" value="${qty}" style="width:70px"></td><td><input type="number" min="0" step="0.01" data-inv-price="${id}" value="${i.unitPrice == null ? '' : i.unitPrice}" style="width:90px"></td></tr>`;
+  });
+  return __pr23LinesTable(['Item', 'Ordered', 'Received', 'Quantity', 'Unit price'], rows)
+    + '<p class="muted" style="margin-top:8px">VAT is applied at the active rate when the invoice is saved, and the invoice number is assigned then.</p>';
+}
+
+/** Capture a supplier invoice against a real purchase order, replacing the fixture form. */
+function __pr23InvoiceCaptureModal(tenderId) {
+  const inChain = tenderId ? new Set(__pr23MatchChain(tenderId).orders.map(o => o.recordId)) : null;
+  const open = (state.orders || []).filter(o => __PR23_INVOICEABLE.includes(String(o.rawStatus || '').toUpperCase()) && (!inChain || inChain.has(o.recordId)));
+  if (!open.length) {
+    openModal('Capture supplier invoice', 'An invoice is captured against a purchase order that has been sent to the vendor.', `<p class="muted">No purchase order is open for invoicing${tenderId ? ' on this tender' : ''}.</p>`, btn('Close', 'close-overlay'));
+    return;
+  }
+  const iso = d => d.toISOString().slice(0, 10);
+  const options = open.map(o => `<option value="${__pr23Esc(o.recordId)}">${__pr23Esc(o.id)} · ${__pr23Esc(o.vendor)}</option>`).join('');
+  openModal(
+    'Capture supplier invoice',
+    'Capture the supplier invoice against its purchase order. It goes to Finance for approval once saved.',
+    `<form id="invoiceCaptureV23" class="form-grid"><div class="field"><label>Purchase order</label><select name="po" id="invoicePoV23">${options}</select></div><div class="field"><label>Invoice date</label><input type="date" name="invoiceDate" value="${iso(new Date())}" required></div><div class="field"><label>Due date</label><input type="date" name="dueDate" value="${iso(new Date(Date.now() + 30 * 86400000))}"></div><div class="field full"><label>Invoice lines</label><div id="invoiceLinesV23">${__pr23InvoiceLinesHtml(open[0].recordId)}</div></div></form>`,
+    btn('Cancel', 'close-overlay') + btn('Capture invoice', 'confirm-capture-invoice-v5', 'primary'),
+  );
+}
+
+// Re-draw the line tables when the purchase order changes. Removed with the runtime (__pr23Sig).
+document.addEventListener('change', event => {
+  const target = event.target;
+  if (!target || !target.id) return;
+  if (target.id === 'grnPoV23') {
+    const box = document.querySelector('#grnLinesV23');
+    if (box) box.innerHTML = __pr23GrnLinesHtml(target.value);
+  }
+  if (target.id === 'invoicePoV23') {
+    const box = document.querySelector('#invoiceLinesV23');
+    if (box) box.innerHTML = __pr23InvoiceLinesHtml(target.value);
+  }
+}, __pr23Sig);
+
 /* END_PROCUREMENT_LIVE_BRIDGE */

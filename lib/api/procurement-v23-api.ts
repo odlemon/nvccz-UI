@@ -21,6 +21,7 @@
  *   GET    /vendor-quotations                             quotations received from vendors
  *   POST   /vendor-quotations/:id/accept                  the award: accepts the quotation and raises the PO
  *   POST   /vendor-quotations/:id/reject                  {rejectionReason, reviewNotes}
+ *   PUT    /vendor-quotations/:id/evaluation              {score 0-100, notes}: the evaluation team's technical score
  *   GET    /procurement/purchase-orders[/:id]
  *   POST   /procurement/purchase-orders                   {vendorId, items[{itemName, quantity, unitPrice}], ...}
  *   POST   /procurement/purchase-orders/:id/send
@@ -188,6 +189,10 @@ export async function createRfq(body: {
   expectedDeliveryDate?: string
   deliveryAddress?: string
   specialRequirements?: string
+  visibility?: "INVITED_ONLY" | "PUBLIC_LISTING"
+  /** 0-1 each; the evaluation weighting of price against everything else. */
+  priceWeight?: number
+  technicalWeight?: number
   items?: { itemName: string; description?: string; quantity: number; unit?: string }[]
 }): Promise<ProcurementRecord> {
   return unwrapData(await apiClient.post<ApiResponse<ProcurementRecord>>("/procurement/rfq", body))
@@ -197,6 +202,11 @@ export async function createRfq(body: {
 export async function acceptQuotation(id: string, reviewNotes?: string): Promise<ProcurementRecord> {
   const q = reviewNotes ? `?reviewNotes=${encodeURIComponent(reviewNotes)}` : ""
   return unwrapData(await apiClient.post<ApiResponse<ProcurementRecord>>(`/vendor-quotations/${encodeURIComponent(id)}/accept${q}`))
+}
+
+/** The evaluation team's technical score for a bid (0-100). Allowed only while the bid is open. */
+export async function scoreQuotation(id: string, body: { score: number; notes?: string }): Promise<ProcurementRecord> {
+  return unwrapData(await apiClient.put<ApiResponse<ProcurementRecord>>(`/vendor-quotations/${encodeURIComponent(id)}/evaluation`, body))
 }
 
 export async function rejectQuotation(id: string, rejectionReason: string, reviewNotes?: string): Promise<ProcurementRecord> {

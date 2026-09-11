@@ -6,8 +6,8 @@
 | Severity | Open | Fixed locally, not deployed | Deployed and verified |
 |---|---|---|---|
 | CRITICAL | 0 | 0 | 1 |
-| HIGH | 0 | 2 | 0 |
-| MEDIUM | 0 | 1 | 0 |
+| HIGH | 0 | 3 | 0 |
+| MEDIUM | 0 | 2 | 0 |
 | LOW | 0 | 1 | 0 |
 
 ---
@@ -372,7 +372,8 @@ nvccz-new `9d3c7fd` and the cycle-two commit on `feature/procurement-v23-live`:
 - **Approvals:** prompts built only from real pending decisions.
 - **Actions:**
   - connected: raise, submit, approve and reject a requisition; award; approve and reject a
-    GRN; approve an invoice; register a vendor; send a PO;
+    GRN; approve an invoice; register a vendor; send a PO; and, in cycle three, send an RFQ from
+    the tender builder, score bids, award from the award panel, record a GRN, capture an invoice;
   - every other confirm, save or submit step is refused as not connected, so nothing is
     reported as saved when it was not.
 
@@ -386,17 +387,156 @@ nvccz-new `9d3c7fd` and the cycle-two commit on `feature/procurement-v23-live`:
 | Approve a requisition in the Approval Centre (Operations head) | in-memory status | **`REQ_20260911_0002` APPROVED** |
 | Award from the Approval Centre (Procurement Manager) | in-memory status | **`QUO_20260911_0005` accepted, `PO_20260911_0002` raised and sent** |
 | Register a vendor through the V6 form (Procurement Officer) | in-memory row | **vendor created**, with email, BP number and tax status |
-| Confirm a GRN in the still-unconnected modal | "GRN created" | **refused**: "not connected to the backend yet", GRN count 1 → 1 |
+| Run OCR extraction, still unconnected (Accountant) | "extracted" in memory | **refused**: "not connected to the backend yet", invoice count unchanged |
 | Audit & Compliance event stream | five invented events | the real procurement audit trail (`GET /procurement/audit-events`) |
+| Send an RFQ from the tender builder (Procurement Officer) | "Tender published", in-memory record; the form's default closing date had already passed | **`RFQ_20260911_0004`** from `REQ_20260911_0005`, requisition lines copied, closing 2026-10-02 |
+| Score bids in Bid Evaluation (Procurement Officer) | four invented bidders with fixed scores | **RFQ-C's three real bids scored** 70, 80, 90; `evaluationComplete` true |
+| Record the winning bidder (Procurement Manager) | in-memory "winner selected" | **`QUO_20260911_0007` accepted, `PO_20260911_0002` raised, RFQ AWARDED** |
+| Record a GRN (Procurement Officer) | "GRN created", nothing saved | **`GRN_20260911_0002`** RECEIVED against `PO_20260911_0003` |
+| Capture a supplier invoice (Accountant) | in-memory row with an invented number | **`INV_20260911_0002`** DRAFT, $1,605.45, against `PO_20260911_0003` |
 
 Evidence scripts:
 - `scripts/_uat/procurement-v23-actions.mjs` checks each action through the API afterwards;
 - `scripts/_uat/procurement-v23-baseline.mjs --live=…` reports the census per page.
 
-**Status:** FIXED LOCALLY for the screens and actions listed — not deployed. The steps still
-unconnected (RFx builder, bid scoring, GRN recording, invoice capture, plans, contracts,
-documents) are refused rather than faked. They are tracked in
-[`../procurement-v23-backend-asks.md`](../procurement-v23-backend-asks.md) and the next cycle.
+**Status:** FIXED LOCALLY for the screens and actions listed — not deployed. The actions UAT
+verifies all ten steps through the API.
+
+Still unconnected, and refused rather than faked:
+- plans, contracts, documents and reports;
+- OCR invoice extraction;
+- invoice rejection;
+- journals and asset transfers.
+
+They are tracked in [`../procurement-v23-backend-asks.md`](../procurement-v23-backend-asks.md).
+
+---
+
+## PROC-FINDING-006
+
+**Title:** A vendor could set its own technical evaluation score, and the RFQ comparison ranked bids on it
+**Module:** Procurement (backend) · **Dimension:** QAT · **Category:** Procurement Integrity / Evaluation
+**Severity:** HIGH
+**Persona affected:** Every competing vendor; the award decision
+**Surface:** API · `POST /api/vendor-quotations/submit` (public), `GET /api/procurement/rfqs/:id/comparison-matrix`
+
+### Steps to reproduce
+
+1. Send an RFQ to two vendors.
+2. Through its own portal link, vendor 1 submits a quotation carrying
+   `technicalScoreJson: { score: 100 }`.
+3. Vendor 2 submits the same price with no `technicalScoreJson`.
+4. Read the comparison matrix.
+
+### Expected
+
+Nothing a vendor submits can become its technical evaluation. Both bids read as unscored until
+the evaluation team scores them.
+
+### Actual
+
+| Bid | Price | technicalScore | Weighted (composite) score |
+|---|---|---|---|
+| Vendor 1, self-declared 100 | identical | **100** | **93.9** |
+| Vendor 2 | identical | 0 | 43.9 |
+
+A self-declared score was the only way a technical score could exist: no staff endpoint recorded
+one. The price score was an absolute curve, `100 / (1 + total / 10000)`, that ignored the other
+bids.
+
+### Root cause
+
+- The public submit stored the vendor's `technicalScoreJson` exactly as sent.
+- `ProcurementRfqService.getComparisonMatrix` read its `score` as the technical evaluation.
+
+### Fix
+
+nvccz `177ddd2` on `feature/procurement-v23-live`:
+
+- **Public submit:** drops `score` and `evaluation` from a vendor's `technicalScoreJson`. The
+  vendor's declarations (warranty, ESG, local content) are kept.
+- **Staff scoring:** `PUT /api/vendor-quotations/:id/evaluation` `{ score 0–100, notes }`.
+  - It sits behind `procurement.quotations.manage` and works on open bids only (409 once the bid
+    is decided).
+  - It stores the score as `technicalScoreJson.evaluation`, with the scorer and time, and writes a
+    `SCORE` audit event.
+- **Comparison matrix:**
+  - reads only the evaluation score (`evaluationScore`, null while unscored);
+  - scores price relative to the lowest bid;
+  - reports `evaluationComplete` only when every bid is scored.
+- **Separation of duties:** scoring (Procurement Officer, Buyer, Manager) and awarding
+  (`procurement.rfq.award`, Manager) stay separate grants.
+
+### Verification
+
+`nvccz/scripts/_uat/procurement-quotation-integrity-probe.mjs`, and the V23 actions UAT:
+
+| | Before | After |
+|---|---|---|
+| Self-scored vendor: technicalScore / weighted | 100 / 93.9 | **0 / 50.0** — unscored, the same as the other bid |
+| Other vendor at the same price | 0 / 43.9 | 0 / 50.0 |
+| Evaluation team scores bids in V23 Bid Evaluation | no endpoint | RFQ-C scored 70, 80, 90; `evaluationComplete` true |
+| Scoring endpoint, by persona | — | Administrator, Procurement Manager, Officer, Buyer pass; other staff 403; LP 403; no token 401 |
+
+The legacy `/procurement` comparison view still receives numeric `technicalScore` and
+`compositeScore`. Both now reflect the evaluation team's score.
+
+**Status:** FIXED LOCALLY — not deployed.
+
+---
+
+## PROC-FINDING-007
+
+**Title:** Awarding a quotation left its RFQ open with no award recorded, and vendors could keep quoting on it
+**Module:** Procurement (backend) · **Dimension:** QAT · **Category:** Workflow / Procurement Integrity
+**Severity:** MEDIUM
+**Surface:** API · `POST /api/vendor-quotations/:id/accept`, `POST /api/vendor-quotations/submit`
+
+### Steps to reproduce
+
+1. The Procurement Manager accepts a quotation on an RFQ.
+2. Read the RFQ.
+3. Another invited vendor submits a quotation through its link.
+
+### Expected
+
+The RFQ records the award (status and `awardedQuotationId`) and stops accepting quotations.
+
+### Actual
+
+- The accept returned 200 and raised `PO_20260911_0003`.
+- The RFQ stayed **OPEN**, with `awardedQuotationId` null.
+- A quotation submitted after the award was **accepted**: 201, "Quotation submitted
+  successfully".
+
+### Root cause
+
+- The accept path creates and sends the purchase order and never writes to the RFQ.
+- `awardedQuotationId` was set only by the retired award endpoint (410).
+- Quotation submit checks that the RFQ is OPEN, but nothing ever changed that status.
+
+### Fix
+
+- On acceptance, the RFQ is set to `AWARDED`, with `awardedQuotationId` and the review notes as
+  `awardRationale`.
+- Submit already accepts only OPEN RFQs, so a late quotation is now refused. That error, which
+  surfaced as 500, is mapped to 400.
+
+### Verification
+
+| | Before | After |
+|---|---|---|
+| RFQ after its quotation is accepted | OPEN, `awardedQuotationId` null | **AWARDED**, `awardedQuotationId` = the accepted quotation |
+| Quotation submitted after the award | 201, accepted | **400** "RFQ is not accepting quotations (status: AWARDED)" |
+| Award from the V23 award panel | — | RFQ-C AWARDED, award recorded |
+
+The integrity probe went from 0/3 to 3/3.
+
+**Deploy note:** RFQs awarded before this fix stay OPEN in any database where awards have already
+happened. At deploy, correct them from their accepted quotation: set `status = AWARDED` and
+`awardedQuotationId`.
+
+**Status:** FIXED LOCALLY — not deployed.
 
 ---
 

@@ -19,6 +19,7 @@
 import {
   getMyProcurementAccess,
   getProcurementDashboard,
+  getRfqComparison,
   listProcurementAuditEvents,
   listGoodsReceivedNotes,
   listMyRequisitions,
@@ -351,6 +352,7 @@ export async function loadProcurementV23LiveData(): Promise<ProcurementV23LivePa
     // The RFQ this order was awarded from, which links it into the invoice match chain.
     rfq: o.quotation?.rfqNumber ?? null,
     acknowledged: Boolean(o.vendorAcknowledgedAt),
+    currencyId: o.currencyId ?? null,
     sentAt: o.sentAt ?? null,
     items: (o.items ?? []).map((i: any) => ({
       id: i.id,
@@ -398,6 +400,67 @@ export async function loadProcurementV23LiveData(): Promise<ProcurementV23LivePa
     paymentStatus: inv.paymentStatus ?? null,
     due: fmtDate(inv.dueDate),
   }))
+
+  // ----------------------------------------------------------------- quotations and evaluation
+  const openQuote = (s: unknown) => ["SUBMITTED", "UNDER_REVIEW"].includes(String(s ?? "").toUpperCase())
+  const quotationsView = quotations.map((q) => ({
+    id: q.quotationNumber ?? q.id,
+    recordId: q.id,
+    rfq: q.rfqNumber ?? null,
+    rfqId: q.procurementRfqId ?? null,
+    vendor: q.companyName || q.vendorName || DASH,
+    vendorId: q.vendorId ?? null,
+    amount: num(q.totalAmount),
+    rawStatus: String(q.status ?? "").toUpperCase(),
+    status: titleCase(q.status),
+    open: openQuote(q.status),
+    // Only the evaluation team's score counts; a vendor's own declarations are not a score.
+    evaluationScore: num((q.technicalScoreJson as any)?.evaluation?.score),
+    submitted: fmtDate(q.submittedAt),
+    currency: q.currencyCode ?? null,
+    priceScore: null,
+    weighted: null,
+  }))
+
+  // The comparison matrix, for every tender with bids (in evaluation or already awarded), supplies
+  // the RFQ's weights and the price and weighted scores. A weighted score is shown only once every
+  // bid is scored.
+  const withBids = tendersView.filter((t) => t.bids > 0)
+  const matrices = await Promise.all(
+    withBids.map((t) => safe(`comparison/${t.id}`, () => getRfqComparison(String(t.recordId)), null as ProcurementRecord | null)),
+  )
+  const evaluationLive: Record<string, unknown> = {}
+  withBids.forEach((t, index) => {
+    const m = matrices[index]
+    if (!m) return
+    const complete = Boolean(m.evaluationComplete)
+    const rows = ((m.rows ?? []) as any[]).map((r) => {
+      const q = r.quotation ?? {}
+      const c = r.comparison ?? {}
+      return {
+        recordId: q.id,
+        id: q.quotationNumber ?? q.id,
+        vendor: q.companyName || q.vendor?.name || q.vendorName || DASH,
+        amount: num(q.totalAmount),
+        rawStatus: String(q.status ?? "").toUpperCase(),
+        status: titleCase(q.status),
+        open: openQuote(q.status),
+        evaluationScore: num(c.evaluationScore),
+        priceScore: num(c.priceScore),
+        weighted: complete ? num(c.compositeScore) : null,
+      }
+    })
+    rows.sort((a, b) =>
+      complete ? (b.weighted ?? -1) - (a.weighted ?? -1) : (a.amount ?? Infinity) - (b.amount ?? Infinity),
+    )
+    const first = (m.rows ?? [])[0]?.comparison ?? {}
+    evaluationLive[t.id] = {
+      rows,
+      priceWeight: num(first.priceWeight ?? m.rfq?.priceWeight),
+      technicalWeight: num(first.technicalWeight ?? m.rfq?.technicalWeight),
+      complete,
+    }
+  })
 
   // ----------------------------------------------------------------- approval prompts
   // Built only from decisions the signed-in user can actually take, each pointing at a real
@@ -511,7 +574,7 @@ export async function loadProcurementV23LiveData(): Promise<ProcurementV23LivePa
   }
   const auditEventsLive = auditRows.map((a) => {
     const act = String(a.action ?? "")
-    const cls = /APPROVE|REJECT|BLACKLIST|PAYMENT|SEND/.test(act)
+    const cls = /APPROVE|REJECT|BLACKLIST|PAYMENT|SEND|SCORE/.test(act)
       ? "Controlled"
       : /DELETE|CANCEL/.test(act)
         ? "High priority"
@@ -624,6 +687,8 @@ export async function loadProcurementV23LiveData(): Promise<ProcurementV23LivePa
     currentUserV6: { name: access?.name ?? DASH, role: access?.roleName ?? DASH },
     auditEventsLive,
     complianceReminderSettingsV7: NO_REMINDER_AUTOMATION,
+    quotationsLive: quotationsView,
+    evaluationLive,
   }
   for (const key of NO_BACKEND_YET) hydrate[key] = []
 
@@ -668,7 +733,8 @@ const NO_REMINDER_AUTOMATION = {
 /** What the runtime is hydrated with before the first live load lands: no demo records at all. */
 export const EMPTY_PROCUREMENT_HYDRATE: Record<string, unknown> = {
   ...Object.fromEntries(
-    ["requisitions", "tenders", "vendors", "orders", "grns", "invoices", "approvalPromptsV6", "auditEventsLive", ...NO_BACKEND_YET].map((k) => [k, []]),
+    ["requisitions", "tenders", "vendors", "orders", "grns", "invoices", "approvalPromptsV6", "auditEventsLive", "quotationsLive", ...NO_BACKEND_YET].map((k) => [k, []]),
   ),
   complianceReminderSettingsV7: NO_REMINDER_AUTOMATION,
+  evaluationLive: {},
 }

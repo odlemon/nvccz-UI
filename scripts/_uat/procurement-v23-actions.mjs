@@ -9,7 +9,12 @@
  *   2. Procurement Manager awards RFQ-B from the Approval Centre         -> quotation ACCEPTED, PO raised
  *   3. Operations member raises a requisition through the form           -> PENDING_APPROVAL, own department
  *   4. Procurement Officer registers a vendor through the V6 form        -> vendor exists
- *   5. Procurement Officer confirms a GRN in the unconnected modal       -> refused, no GRN created
+ *   5. Accountant runs OCR extraction, which is not connected            -> refused, no invoice created
+ *   6. Procurement Officer sends an RFQ from PR-E in the tender builder  -> RFQ linked to PR-E
+ *   7. Procurement Officer scores RFQ-C's bids in Bid Evaluation         -> evaluation scores stored, complete
+ *   8. Procurement Manager awards RFQ-C from the award panel             -> chosen quotation ACCEPTED, PO raised, RFQ AWARDED
+ *   9. Procurement Officer records a GRN against PO-B (live form)        -> GRN RECEIVED
+ *  10. Accountant captures the supplier invoice for PO-B (live form)     -> invoice DRAFT
  *
  * Needs the dataset from nvccz/scripts/_uat/procurement-p2p-flow.mjs (PR-B pending approval,
  * RFQ-B with two quotations). Records made here are titled "UAT P2P" so the flow's --reset
@@ -71,6 +76,24 @@ async function toasts(page) {
 
 const suffix = (errors) => (errors.length ? ` · page errors: ${errors.join(" / ")}` : "")
 
+async function promptOnScreen(page, selector) {
+  return Boolean(await page.waitForSelector(selector, { timeout: 20000 }).catch(() => null))
+}
+
+/**
+ * When an expected Approval Centre prompt is missing, report what was there instead — the prompt
+ * ids on screen, the ids in the runtime's state, and any toast (a loader failure raises one) —
+ * so an intermittent miss leaves evidence rather than a bare timeout.
+ */
+async function explainMissingPrompt(page, selector, errors) {
+  const onScreen = await page.$$eval('[data-action="approve-prompt-v6"]', (els) => [...new Set(els.map((e) => e.dataset.id))]).catch(() => [])
+  const inState = await page
+    .evaluate(() => (window.MatanhoProcurementUI?.getSnapshot?.()?.approvalPromptsV6 || []).map((p) => p.id))
+    .catch(() => null)
+  const toast = await page.$$eval("[data-sonner-toast]", (els) => els.map((e) => e.textContent.trim()).join(" | ")).catch(() => "")
+  return `no ${selector} on screen · prompts on screen [${onScreen.join(", ")}] · in state [${inState ? inState.join(", ") : "unreadable"}] · toasts "${toast}"${suffix(errors)}`
+}
+
 // --only=4 or --only=3,4 runs just those steps (steps 1 and 2 consume PR-B and RFQ-B).
 const ONLY = (process.argv.find((a) => a.startsWith("--only="))?.slice(7) || "").split(",").map((s) => s.trim()).filter(Boolean)
 
@@ -101,7 +124,7 @@ await step("1 Operations head approves PR-B (Approval Centre)", async (open) => 
   if (!target) return record(false, label, "no pending UAT requisition — run the p2p flow with --reset")
   const { page, errors } = await open(email, "/procurement-v23/approvals")
   const control = `[data-action="approve-prompt-v6"][data-id="PR-${target.requisitionNumber}"]`
-  await page.waitForSelector(control, { timeout: 20000 })
+  if (!(await promptOnScreen(page, control))) return record(false, label, await explainMissingPrompt(page, control, errors))
   await page.click(control)
   const toast = await toasts(page)
   const after = await api(email, `/procurement/requisitions/${target.id}`)
@@ -116,7 +139,7 @@ await step("2 Procurement Manager awards RFQ-B (Approval Centre)", async (open) 
   if (!rfq) return record(false, label, "no UAT RFQ-B — run the p2p flow with --reset")
   const { page, errors } = await open(email, "/procurement-v23/approvals")
   const control = `[data-action="approve-prompt-v6"][data-id="AWARD-${rfq.rfqNumber}"]`
-  await page.waitForSelector(control, { timeout: 20000 })
+  if (!(await promptOnScreen(page, control))) return record(false, label, await explainMissingPrompt(page, control, errors))
   await page.click(control)
   const toast = await toasts(page)
   const quotes = (await api(email, "/vendor-quotations")) ?? []
@@ -192,17 +215,158 @@ await step("4 Procurement Officer registers a vendor (V6 form)", async (open) =>
 })
 
 // ------------------------------------------------------------------ 5. unconnected step is refused
-await step("5 Unconnected GRN confirm is refused, nothing saved", async (open) => {
-  const label = "5 Unconnected GRN confirm is refused, nothing saved"
+// OCR extraction of an uploaded invoice has no backend behind it (manual capture does, step 10).
+await step("5 Unconnected OCR extraction is refused, nothing saved", async (open) => {
+  const label = "5 Unconnected OCR extraction is refused, nothing saved"
+  const email = "proc.ap@nts.local"
+  const before = ((await api(email, "/procurement/invoices")) ?? []).length
+  const { page, errors } = await open(email, "/procurement-v23/invoices")
+  await page.click('[data-action="upload-invoice-v5"]')
+  await page.waitForSelector('[data-action="extract-invoice-v5"]')
+  await page.click('[data-action="extract-invoice-v5"]')
+  const toast = await toasts(page)
+  const after = ((await api(email, "/procurement/invoices")) ?? []).length
+  record(/not connected/i.test(toast) && after === before, label, `invoices ${before} -> ${after} · "${toast}"${suffix(errors)}`)
+})
+
+// ------------------------------------------------------------------ 6. tender builder
+await step("6 Procurement Officer sends an RFQ from PR-E (tender builder)", async (open) => {
+  const label = "6 Procurement Officer sends an RFQ from PR-E (tender builder)"
   const email = "proc.officer@nts.local"
-  const before = ((await api(email, "/procurement/goods-received-notes")) ?? []).length
+  const pr = ((await api(email, "/procurement/requisitions")) ?? []).find((r) => String(r.title).startsWith("UAT P2P projector lamps") && r.status === "APPROVED")
+  if (!pr) return record(false, label, "no approved PR-E — run the p2p flow with --reset")
+  const { page, errors } = await open(email, "/procurement-v23/tenders")
+  await page.click('[data-action="create-tender"]')
+  await page.waitForSelector("#tenderFormV13")
+  await page.selectOption('#tenderFormV13 [name="source"]', pr.id)
+  const title = `UAT P2P V23 builder RFQ ${RUN}`
+  await page.fill('#tenderFormV13 [name="title"]', title)
+  const inWeek = new Date(Date.now() + 7 * 86400000)
+  for (const el of await page.$$("#tenderFormV13 [required]")) {
+    const kind = await el.evaluate((n) => (n.tagName === "INPUT" ? n.type : n.tagName.toLowerCase()))
+    const empty = await el.evaluate((n) => !n.value)
+    if (!empty || kind === "checkbox" || kind === "radio" || kind === "select") continue
+    if (kind === "date") await el.fill(inWeek.toISOString().slice(0, 10))
+    else if (kind === "datetime-local") await el.fill(`${inWeek.toISOString().slice(0, 10)}T12:00`)
+    else if (kind === "number") await el.fill("1")
+    else await el.fill("UAT")
+  }
+  const recipients = await page.$$eval('#tenderFormV13 input[name="vendors"]:checked', (els) => els.length)
+  await page.click('[data-action="create-send-tender-v13"]')
+  const toast = await toasts(page)
+  const rfq = ((await api(email, "/procurement/rfq")) ?? []).find((r) => r.title === title)
+  // A closing date already past would leave vendors unable to quote.
+  const closesInFuture = Boolean(rfq?.closingAt && new Date(rfq.closingAt).getTime() > Date.now())
+  record(
+    Boolean(rfq && rfq.requisitionId === pr.id && closesInFuture),
+    label,
+    `${rfq ? `${rfq.rfqNumber} from ${pr.requisitionNumber}, ${recipients} recipient(s) ticked, closes ${String(rfq.closingAt).slice(0, 16)}` : "not created"} · "${toast}"${suffix(errors)}`,
+  )
+})
+
+// ------------------------------------------------------------------ 7. scoring
+const rfqCOf = async (email) => ((await api(email, "/procurement/rfq")) ?? []).find((r) => String(r.title).startsWith("UAT P2P RFQ filing cabinets"))
+
+await step("7 Procurement Officer scores RFQ-C bids (Bid Evaluation)", async (open) => {
+  const label = "7 Procurement Officer scores RFQ-C bids (Bid Evaluation)"
+  const email = "proc.officer@nts.local"
+  const rfq = await rfqCOf(email)
+  if (!rfq) return record(false, label, "no RFQ-C — run the p2p flow with --reset")
+  const { page, errors } = await open(email, "/procurement-v23/evaluation")
+  await page.click(`[data-action="open-evaluation"][data-id="${rfq.rfqNumber}"]`)
+  await page.waitForSelector("[data-score-quote]", { timeout: 20000 })
+  const inputs = await page.$$("[data-score-quote]")
+  const scores = [80, 70, 90]
+  for (let i = 0; i < inputs.length; i += 1) await inputs[i].fill(String(scores[i % scores.length]))
+  await page.click('[data-action="save-scores"]')
+  const toast = await toasts(page)
+  const matrix = await api(email, `/procurement/rfqs/${rfq.procurementRfqId ?? rfq.id}/comparison-matrix`)
+  const got = (matrix?.rows ?? []).map((r) => r.comparison?.evaluationScore)
+  record(
+    inputs.length > 0 && got.length === inputs.length && got.every((s) => s != null) && matrix?.evaluationComplete === true,
+    label,
+    `${inputs.length} score inputs · stored evaluation scores [${got.join(", ")}] · complete=${matrix?.evaluationComplete} · "${toast}"${suffix(errors)}`,
+  )
+})
+
+// ------------------------------------------------------------------ 8. award from the evaluation workspace
+await step("8 Procurement Manager awards RFQ-C (award panel)", async (open) => {
+  const label = "8 Procurement Manager awards RFQ-C (award panel)"
+  const email = "proc.mgr@nts.local"
+  const rfq = await rfqCOf(email)
+  if (!rfq) return record(false, label, "no RFQ-C — run the p2p flow with --reset")
+  const { page, errors } = await open(email, "/procurement-v23/evaluation")
+  await page.click(`[data-action="open-evaluation"][data-id="${rfq.rfqNumber}"]`)
+  await page.waitForSelector('.award-panel-v6 [name="awardWinnerV6"]', { timeout: 20000 })
+  const recommended = page.locator('label.award-option-v6:has-text("System recommendation") input[name="awardWinnerV6"]')
+  const choice = (await recommended.count()) ? recommended.first() : page.locator('[name="awardWinnerV6"]').first()
+  const chosenId = await choice.getAttribute("value")
+  await choice.check()
+  await page.click('[data-action="confirm-bid-winner-v6"]')
+  await page.waitForSelector('[data-action="save-bid-winner-v6"]', { timeout: 20000 })
+  await page.click('[data-action="save-bid-winner-v6"]')
+  const toast = await toasts(page)
+  const quotes = ((await api(email, "/vendor-quotations")) ?? []).filter((q) => q.procurementRfqId === (rfq.procurementRfqId ?? rfq.id))
+  const accepted = quotes.find((q) => q.status === "ACCEPTED")
+  const po = ((await api(email, "/procurement/purchase-orders")) ?? []).find((p) => accepted && p.quotationId === accepted.id)
+  const matrix = await api(email, `/procurement/rfqs/${rfq.procurementRfqId ?? rfq.id}/comparison-matrix`)
+  record(
+    Boolean(accepted && accepted.id === chosenId && po && matrix?.rfq?.status === "AWARDED" && matrix?.rfq?.awardedQuotationId === accepted.id),
+    label,
+    `chose ${chosenId} · accepted ${accepted?.quotationNumber ?? "none"} (${accepted?.companyName ?? "-"}) · ${po?.poNumber ?? "no PO"} · RFQ ${matrix?.rfq?.status}/${matrix?.rfq?.awardedQuotationId === accepted?.id ? "award recorded" : "award not recorded"} · "${toast}"${suffix(errors)}`,
+  )
+})
+
+// ------------------------------------------------------------------ 9. record a GRN
+const poBOf = async (email) => {
+  const rfqs = (await api(email, "/procurement/rfq")) ?? []
+  const rfqB = rfqs.find((r) => String(r.title).startsWith("UAT P2P RFQ meeting room screen"))
+  return ((await api(email, "/procurement/purchase-orders")) ?? []).find((p) => rfqB && p.quotation?.rfqNumber === rfqB.rfqNumber)
+}
+
+await step("9 Procurement Officer records a GRN against PO-B (live form)", async (open) => {
+  const label = "9 Procurement Officer records a GRN against PO-B (live form)"
+  const email = "proc.officer@nts.local"
+  const po = await poBOf(email)
+  if (!po) return record(false, label, "no PO for RFQ-B — step 2 must award it first")
+  const before = ((await api(email, "/procurement/goods-received-notes")) ?? []).filter((g) => g.purchaseOrderId === po.id).length
   const { page, errors } = await open(email, "/procurement-v23/goods-received")
   await page.click('[data-action="record-grn"]')
-  await page.waitForSelector('[data-action="create-grn-confirm"]')
+  await page.waitForSelector("#grnFormV23")
+  await page.selectOption("#grnPoV23", po.id)
+  await page.waitForSelector("#grnLinesV23 [data-grn-received]")
   await page.click('[data-action="create-grn-confirm"]')
   const toast = await toasts(page)
-  const after = ((await api(email, "/procurement/goods-received-notes")) ?? []).length
-  record(/not connected/i.test(toast) && after === before, label, `GRNs ${before} -> ${after} · "${toast}"${suffix(errors)}`)
+  const grns = ((await api(email, "/procurement/goods-received-notes")) ?? []).filter((g) => g.purchaseOrderId === po.id)
+  const grn = grns[0]
+  record(
+    grns.length === before + 1 && grn?.status === "RECEIVED",
+    label,
+    `${po.poNumber}: GRNs ${before} -> ${grns.length}${grn ? `, ${grn.grnNumber} ${grn.status}, ${grn.items?.length ?? 0} line(s)` : ""} · "${toast}"${suffix(errors)}`,
+  )
+})
+
+// ------------------------------------------------------------------ 10. capture an invoice
+await step("10 Accountant captures the invoice for PO-B (live form)", async (open) => {
+  const label = "10 Accountant captures the invoice for PO-B (live form)"
+  const email = "proc.ap@nts.local"
+  const po = await poBOf("proc.officer@nts.local")
+  if (!po) return record(false, label, "no PO for RFQ-B — step 2 must award it first")
+  const before = ((await api(email, "/procurement/invoices")) ?? []).filter((i) => i.purchaseOrderId === po.id).length
+  const { page, errors } = await open(email, "/procurement-v23/invoices")
+  await page.click('[data-action="capture-invoice-v5"]')
+  await page.waitForSelector("#invoiceCaptureV23")
+  await page.selectOption("#invoicePoV23", po.id)
+  await page.waitForSelector("#invoiceLinesV23 [data-inv-qty]")
+  await page.click('[data-action="confirm-capture-invoice-v5"]')
+  const toast = await toasts(page)
+  const invoices = ((await api(email, "/procurement/invoices")) ?? []).filter((i) => i.purchaseOrderId === po.id)
+  const inv = invoices[0]
+  record(
+    invoices.length === before + 1 && inv?.status === "DRAFT",
+    label,
+    `${po.poNumber}: invoices ${before} -> ${invoices.length}${inv ? `, ${inv.invoiceNumber} ${inv.status} total ${inv.totalAmount}` : ""} · "${toast}"${suffix(errors)}`,
+  )
 })
 
 const failed = results.filter((r) => !r.ok)

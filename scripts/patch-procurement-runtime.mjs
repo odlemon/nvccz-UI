@@ -201,7 +201,8 @@ s = replaceOnce(
   "'quotationNormalisationsV19','complianceReminderLogV7'];",
   "'quotationNormalisationsV19','complianceReminderLogV7','complianceReminderSettingsV7','auditEventsLive','prViewV11'];",
   "hydrate() -> audit rows, reminder schedule, requisitions tab",
-  "'auditEventsLive','prViewV11'];",
+  // Guard without the list's closing bracket: patch 14 appends to this list.
+  "'complianceReminderSettingsV7','auditEventsLive','prViewV11'",
 )
 
 // ---------------------------------------------------------------------------
@@ -387,6 +388,194 @@ s = replaceUnique(
     "${__pr23Live()?__pr23ControlActivity():",
   )
 }
+
+// ---------------------------------------------------------------------------
+// 14. hydrate() also takes the quotations and the per-tender evaluation matrices
+// ---------------------------------------------------------------------------
+s = replaceOnce(
+  s,
+  "'auditEventsLive','prViewV11'];",
+  "'auditEventsLive','prViewV11','quotationsLive','evaluationLive'];",
+  "hydrate() -> quotations and evaluation matrices",
+  "'quotationsLive','evaluationLive'];",
+)
+
+// ---------------------------------------------------------------------------
+// 15. Tender builder: real sources, vendor categories and requisition lines
+// ---------------------------------------------------------------------------
+// "Source record" offered PR-X8F2-0187 and other fixture records, the category list did not
+// include any real vendor category (so the category filter hid every vendor), and three
+// placeholder lines were pre-filled over the requisition's own.
+s = replaceUnique(
+  s,
+  "<select name=\"source\"><option>PR-X8F2-0187 - Approved requisition</option><option>PPI-0002 - Approved plan line</option><option>TN amendment / re-tender</option><option>Standalone approved requirement</option></select>",
+  "<select name=\"source\">${__pr23Live()?__pr23SourceOptions():'<option>PR-X8F2-0187 - Approved requisition</option><option>PPI-0002 - Approved plan line</option><option>TN amendment / re-tender</option><option>Standalone approved requirement</option>'}</select>",
+  "tender builder: source -> approved requisitions",
+  "<select name=\"source\">${__pr23Live()?__pr23SourceOptions()",
+)
+s = replaceUnique(
+  s,
+  "<select name=\"category\" id=\"rfxCategoryV13\"><option>Technology</option><option>Medical</option><option>Agriculture</option><option>Fleet</option><option>Facilities</option><option>Professional services</option></select>",
+  "<select name=\"category\" id=\"rfxCategoryV13\">${__pr23Live()?__pr23CategoryOptions():'<option>Technology</option><option>Medical</option><option>Agriculture</option><option>Fleet</option><option>Facilities</option><option>Professional services</option>'}</select>",
+  "tender builder: categories -> vendor registry categories",
+  "id=\"rfxCategoryV13\">${__pr23Live()?__pr23CategoryOptions()",
+)
+s = replaceUnique(
+  s,
+  "${tenderLineRowV13(1,'Core equipment / primary service deliverable')}${tenderLineRowV13(2,'Implementation, configuration and training')}${tenderLineRowV13(3,'Warranty, support and maintenance')}",
+  "${__pr23Live()?'<tr class=\"pr23-lines-from-source\"><td colspan=\"7\" class=\"muted\">Line items are copied from the selected requisition. Add a line only for a requirement with no requisition lines.</td></tr>':tenderLineRowV13(1,'Core equipment / primary service deliverable')+tenderLineRowV13(2,'Implementation, configuration and training')+tenderLineRowV13(3,'Warranty, support and maintenance')}",
+  "tender builder: placeholder lines -> requisition lines",
+  "pr23-lines-from-source",
+)
+
+// The builder pre-filled the fixture's August 2026 timetable — its closing date had already
+// passed, so an RFQ sent with the defaults could never be quoted on — plus fixture owners, a
+// 1,280,000 estimate, a cost centre, a contact address and boilerplate objective and scope text.
+// In a live session the dates run from today, the procurement owner is the signed-in user, and
+// the rest is left for the user to enter.
+for (const [find, repl, label, marker] of [
+  [
+    "<input name=\"value\" type=\"number\" min=\"0\" value=\"${Number(draft.value||1280000)}\" required>",
+    "${__pr23Live()?'<input name=\"value\" type=\"number\" min=\"0\" placeholder=\"Not stored by the backend yet\">':`<input name=\"value\" type=\"number\" min=\"0\" value=\"${Number(draft.value||1280000)}\" required>`}",
+    "tender builder: estimate -> blank",
+    "placeholder=\"Not stored by the backend yet\"",
+  ],
+  [
+    "<input name=\"costCenter\" value=\"CC-100 Group Technology\">",
+    "<input name=\"costCenter\" value=\"${__pr23Live()?'':'CC-100 Group Technology'}\">",
+    "tender builder: cost centre -> blank",
+    "name=\"costCenter\" value=\"${__pr23Live()",
+  ],
+  [
+    "<input name=\"owner\" value=\"Nyasha Moyo\">",
+    "<input name=\"owner\" value=\"${__pr23Live()?__pr23Esc(((__pr23Live()||{}).access||{}).name||''):'Nyasha Moyo'}\">",
+    "tender builder: procurement owner -> signed-in user",
+    "name=\"owner\" value=\"${__pr23Live()",
+  ],
+  [
+    "<input name=\"budgetOwner\" value=\"Tinashe Chaka\">",
+    "<input name=\"budgetOwner\" value=\"${__pr23Live()?'':'Tinashe Chaka'}\">",
+    "tender builder: budget owner -> blank",
+    "name=\"budgetOwner\" value=\"${__pr23Live()",
+  ],
+  [
+    "<input name=\"contractOwner\" value=\"Head of Technology\">",
+    "<input name=\"contractOwner\" value=\"${__pr23Live()?'':'Head of Technology'}\">",
+    "tender builder: contract owner -> blank",
+    "name=\"contractOwner\" value=\"${__pr23Live()",
+  ],
+  [
+    "<input name=\"issueDate\" type=\"date\" value=\"2026-08-03\">",
+    "<input name=\"issueDate\" type=\"date\" value=\"${__pr23Live()?__pr23DateOffset(0):'2026-08-03'}\">",
+    "tender builder: issue date -> today",
+    "name=\"issueDate\" type=\"date\" value=\"${__pr23Live()",
+  ],
+  [
+    "<input name=\"clarification\" type=\"datetime-local\" value=\"2026-08-12T12:00\">",
+    "<input name=\"clarification\" type=\"datetime-local\" value=\"${__pr23Live()?__pr23DateOffset(7,'12:00'):'2026-08-12T12:00'}\">",
+    "tender builder: clarification deadline -> today + 7",
+    "name=\"clarification\" type=\"datetime-local\" value=\"${__pr23Live()",
+  ],
+  [
+    "<input name=\"briefing\" type=\"datetime-local\" value=\"2026-08-14T10:00\">",
+    "<input name=\"briefing\" type=\"datetime-local\" value=\"${__pr23Live()?__pr23DateOffset(9,'10:00'):'2026-08-14T10:00'}\">",
+    "tender builder: briefing -> today + 9",
+    "name=\"briefing\" type=\"datetime-local\" value=\"${__pr23Live()",
+  ],
+  [
+    "<input name=\"close\" type=\"datetime-local\" value=\"2026-08-28T12:00\" required>",
+    "<input name=\"close\" type=\"datetime-local\" value=\"${__pr23Live()?__pr23DateOffset(21,'12:00'):'2026-08-28T12:00'}\" required>",
+    "tender builder: closing date -> today + 21",
+    "name=\"close\" type=\"datetime-local\" value=\"${__pr23Live()",
+  ],
+  [
+    "<label class=\"span2\">Clarification contact<input value=\"tenders@matanho.africa\">",
+    "<label class=\"span2\">Clarification contact<input value=\"${__pr23Live()?'':'tenders@matanho.africa'}\">",
+    "tender builder: clarification contact -> blank",
+    "Clarification contact<input value=\"${__pr23Live()",
+  ],
+]) {
+  s = replaceUnique(s, find, repl, label, marker)
+}
+for (const name of ["objective", "scope"]) {
+  const label = `tender builder: ${name} boilerplate -> blank`
+  const marker = `<textarea name="${name}">\${__pr23Live()?'':`
+  if (s.includes(marker)) {
+    console.log(`  skip (already)  ${label}`)
+    skipped += 1
+    continue
+  }
+  const re = new RegExp(`<textarea name="${name}">([^<\`$]*)</textarea>`, "g")
+  const found = [...s.matchAll(re)]
+  if (found.length !== 1) {
+    console.warn(`  MISS            ${label} (${found.length} occurrences, expected 1)`)
+    missed += 1
+    continue
+  }
+  s = s.replace(found[0][0], `<textarea name="${name}">\${__pr23Live()?'':\`${found[0][1]}\`}</textarea>`)
+  console.log(`  patch           ${label}`)
+  applied += 1
+}
+
+// ---------------------------------------------------------------------------
+// 16. Bid evaluation: the tender's real bids, scored by the evaluation team
+// ---------------------------------------------------------------------------
+// The workspace listed four invented bidders with invented scores for every tender.
+s = replaceUnique(
+  s,
+  " const t=state.tenders.find(x=>x.id===state.evaluationTender)||state.tenders[0];\n const vendors=['TechNova Solutions','NetShield Africa','CloudAxis Systems','DataFort Zimbabwe'];",
+  " const t=state.tenders.find(x=>x.id===state.evaluationTender)||state.tenders[0];\n if(__pr23Live())return __pr23EvaluationPageHtml(t);\n const vendors=['TechNova Solutions','NetShield Africa','CloudAxis Systems','DataFort Zimbabwe'];",
+  "bid evaluation workspace -> real bids",
+  "if(__pr23Live())return __pr23EvaluationPageHtml(t);",
+)
+
+// The V6 award panel offered the same four invented bidders; the winner was a vendor name.
+s = replaceUnique(
+  s,
+  "    const vendors=[\n      {name:'TechNova Solutions',score:91.6,total:1164800,recommended:true},",
+  "    if(__pr23Live()&&(!__pr23Can('rfq.award')||!__pr23AwardOptions(tender&&tender.id).length))return __pr23AwardClosedHtml(tender&&tender.id);\n    const vendors=__pr23Live()?__pr23AwardOptions(tender.id):[\n      {name:'TechNova Solutions',score:91.6,total:1164800,recommended:true},",
+  "award panel -> the tender's open quotations",
+  "__pr23AwardClosedHtml(tender&&tender.id)",
+)
+s = replaceUnique(
+  s,
+  "value=\"${esc(v.name)}\" ${state.bidAwardsV6[tender.id]===v.name?'checked':''}",
+  "value=\"${esc(v.value||v.name)}\" ${state.bidAwardsV6[tender.id]===v.name?'checked':''}",
+  "award panel: the choice carries the quotation id",
+  "value=\"${esc(v.value||v.name)}\"",
+)
+s = replaceUnique(
+  s,
+  "<span>${v.score}% weighted score</span>",
+  "<span>${v.score==null?'Not scored':v.score+'% weighted score'}</span>",
+  "award panel: unscored bids say so",
+  "v.score==null?'Not scored'",
+)
+s = replaceUnique(
+  s,
+  "<strong>${esc(selected.value)}</strong>",
+  "<strong>${esc(__pr23Live()?__pr23QuoteLabel(selected.value):selected.value)}</strong>",
+  "award confirmation names the bidder",
+  "__pr23QuoteLabel(selected.value)",
+)
+
+// ---------------------------------------------------------------------------
+// 17. Record GRN and Capture invoice open real forms
+// ---------------------------------------------------------------------------
+s = replaceUnique(
+  s,
+  "case 'record-grn':openModal('Record goods received note'",
+  "case 'record-grn':if(__pr23Live()){__pr23GrnModal();break;}openModal('Record goods received note'",
+  "record GRN -> live receipt form",
+  "case 'record-grn':if(__pr23Live())",
+)
+s = replaceUnique(
+  s,
+  "function invoiceIntakeModalV5(tenderId='',manual=false){",
+  "function invoiceIntakeModalV5(tenderId='',manual=false){if(__pr23Live()&&manual)return __pr23InvoiceCaptureModal(tenderId);",
+  "capture invoice -> live capture form",
+  "if(__pr23Live()&&manual)return __pr23InvoiceCaptureModal(tenderId);",
+)
 
 // ---------------------------------------------------------------------------
 console.log(`\n${applied} applied, ${skipped} already in place, ${missed} missed`)
