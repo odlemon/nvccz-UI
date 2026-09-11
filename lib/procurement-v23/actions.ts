@@ -138,7 +138,6 @@ const UNCONNECTED_TERMINAL_STEPS = new Set<string>([
   "delete-document",
   "delete-record",
   "sync-accounting",
-  "run-report-template-v5",
   "create-report-template-v5",
   "create-role-confirm",
   "esign-sign-v6",

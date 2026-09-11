@@ -561,6 +561,14 @@ await step("16 Procurement Manager creates a contract from an award and activate
   const saveToast = await toasts(page)
   const created = ((await api(email, "/procurement/contracts")) ?? []).find((c) => c.title === title)
   if (!created) return record(false, label, `no contract saved · "${saveToast}"${suffix(errors)}`)
+  // Saving reloads the register; a menu opened before that re-render lands is closed by it. Wait
+  // until the runtime holds the new contract, then let the redraw settle.
+  await page.waitForFunction(
+    (n) => (window.MatanhoProcurementUI?.getSnapshot?.()?.contractsV6 || []).some((c) => c.id === n),
+    created.contractNumber,
+    { timeout: 30000 },
+  )
+  await page.waitForTimeout(1200)
   // Row actions sit behind each row's menu button (a later runtime layer folds them into it).
   const row = page.locator("table tbody tr", { hasText: created.contractNumber })
   await row.first().waitFor()

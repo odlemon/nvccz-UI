@@ -742,6 +742,24 @@ s = replaceUnique(
   "${__pr23Live()?'':`<button class=\"btn small\" data-action=\"post-journal\"",
 )
 
+// ---------------------------------------------------------------------------
+// 21. Requisition budget notice from approved plans; Reports "Run" exports live records
+// ---------------------------------------------------------------------------
+s = replaceUnique(
+  s,
+  "<p>Remaining budget: $86,400. The request will warn or block according to the cost-centre control.</p>",
+  "${__pr23Live()?__pr23BudgetNotice():'<p>Remaining budget: $86,400. The request will warn or block according to the cost-centre control.</p>'}",
+  "requisition form: budget notice from approved plans",
+  "${__pr23Live()?__pr23BudgetNotice():",
+)
+s = replaceUnique(
+  s,
+  "'run-report-template-v5': a => {",
+  "'run-report-template-v5': a => {if(__pr23Live()){const t=getReport(a.dataset.id);__pr23ExportFile('xls',t.name);toast('Report exported',t.name+' was exported from the live procurement records.');return;}",
+  "reports: Run exports the live records",
+  "if(__pr23Live()){const t=getReport(a.dataset.id);__pr23ExportFile('xls',t.name);",
+)
+
 console.log(`\n${applied} applied, ${skipped} already in place, ${missed} missed`)
 if (missed) {
   console.error("One or more patches did not find their anchor. The runtime is NOT fully patched.")

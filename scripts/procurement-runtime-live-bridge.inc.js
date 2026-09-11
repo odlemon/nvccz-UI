@@ -487,7 +487,7 @@ function __pr23PlanModal(planId) {
   openModal(
     plan ? `Edit ${plan.id}` : 'Create annual procurement plan',
     plan ? 'Change the plan header. Lines are added with Add plan item.' : 'Create the plan with its budget and first requirements. It stays a draft until you submit it for budget approval.',
-    `<form id="planFormV23" class="form-grid"><input type="hidden" name="recordId" value="${__pr23Esc(plan ? plan.recordId : '')}"><div class="field full"><label>Plan name</label><input name="name" required value="${__pr23Esc(plan ? plan.name : '')}"></div><div class="field"><label>Department</label><input name="department" value="${__pr23Esc(plan ? plan.department || '' : (live.access && live.access.department) || '')}" placeholder="All departments"></div><div class="field"><label>Financial year</label><select name="fiscalYear">${__pr23Options(plan && plan.fiscalYear && !years.includes(plan.fiscalYear) ? [plan.fiscalYear, ...years] : years, plan ? plan.fiscalYear : years[1])}</select></div><div class="field"><label>Budget ceiling</label><input type="number" name="budget" min="1" step="0.01" required value="${plan ? plan.budget : ''}"></div><div class="field"><label>Currency</label><select name="currency">${__pr23Options(['USD', 'ZiG', 'ZAR'])}</select></div><div class="field full"><label>Planning assumptions</label><textarea name="notes">${__pr23Esc(plan ? plan.notes || '' : '')}</textarea></div>${lines}</form>`,
+    `<form id="planFormV23" class="form-grid"><input type="hidden" name="recordId" value="${__pr23Esc(plan ? plan.recordId : '')}"><div class="field full"><label>Plan name</label><input name="name" required value="${__pr23Esc(plan ? plan.name : '')}"></div><div class="field"><label>Department</label><input name="department" value="${__pr23Esc(plan ? plan.department || '' : (live.access && live.access.department) || '')}" placeholder="All departments"></div><div class="field"><label>Financial year</label><select name="fiscalYear">${__pr23Options(plan && plan.fiscalYear && !years.includes(plan.fiscalYear) ? [plan.fiscalYear, ...years] : years, plan ? plan.fiscalYear : years[0])}</select></div><div class="field"><label>Budget ceiling</label><input type="number" name="budget" min="1" step="0.01" required value="${plan ? plan.budget : ''}"></div><div class="field"><label>Currency</label><select name="currency">${__pr23Options(['USD', 'ZiG', 'ZAR'])}</select></div><div class="field full"><label>Planning assumptions</label><textarea name="notes">${__pr23Esc(plan ? plan.notes || '' : '')}</textarea></div>${lines}</form>`,
     btn('Cancel', 'close-overlay') + btn('Save draft', 'save-plan-v5') + btn(plan ? 'Save changes' : 'Create plan', 'create-plan-confirm-v5', 'primary'),
   );
 }
@@ -640,6 +640,32 @@ function __pr23PayablesTable() {
     .map(i => `<tr><td><strong class="link">${__pr23Esc(i.id)}</strong></td><td>${__pr23Esc(i.vendor)}</td><td>${__pr23Esc(i.po)}</td><td class="money">${money(i.amount || 0)}</td><td>${__pr23Esc(i.currency || '')}</td><td>${__pr23Esc(i.due)}</td><td>${status(i.status)}</td><td>${i.payable && __pr23Can('invoices.pay') ? `<button class="btn small" data-action="record-payment-v23" data-id="${__pr23Esc(i.recordId)}">Record payment</button>` : ''}</td></tr>`);
   if (!rows.length) return __pr23NoData('No invoice has been approved for payment yet.');
   return table(['Invoice', 'Vendor', 'Purchase order', 'Amount', 'Currency', 'Due', 'Status', ''], rows);
+}
+
+// ---------------------------------------------------------------- requisition budget check
+
+/**
+ * The requisition form's budget notice, from approved annual plans for the requester's department
+ * this year: plan budget less what is already ordered. With no approved plan it says so; it never
+ * blocks the request, because no budget control exists on the backend.
+ */
+function __pr23BudgetNotice() {
+  const live = __pr23Live() || {};
+  const dept = live.access && live.access.department;
+  const year = String(new Date().getFullYear());
+  // A requester usually cannot read plans, and an empty list would read as "no plan exists".
+  if (!__pr23Can('plans.view') && !__pr23Can('plans.manage') && !__pr23Can('plans.approve')) {
+    return '<p>Your department head approves this request against the approved annual plan; plan budgets are not shown to your role.</p>';
+  }
+  const plans = (state.plans || []).filter(p => String(p.rawStatus || '').toUpperCase() === 'APPROVED'
+    && (!p.department || p.department === dept) && String(p.fiscalYear || '').includes(year));
+  if (!plans.length) {
+    return `<p>No approved procurement plan covers ${__pr23Esc(dept || 'your department')} for FY ${year}, so this request is not checked against a budget.</p>`;
+  }
+  const budget = plans.reduce((t, p) => t + Number(p.budget || 0), 0);
+  const committed = plans.reduce((t, p) => t + Number(p.committed || 0), 0);
+  const label = plans.length === 1 ? __pr23Esc(plans[0].id) : `${plans.length} approved plans`;
+  return `<p>Remaining against ${label}: ${money(budget - committed)} of ${money(budget)} (${money(committed)} already ordered). The approver sees this figure; it does not block the request.</p>`;
 }
 
 // Re-draw dependent parts of the live forms when a select changes. Removed with the runtime (__pr23Sig).
