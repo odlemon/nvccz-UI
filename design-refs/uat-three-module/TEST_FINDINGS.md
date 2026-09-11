@@ -5,9 +5,9 @@
 | Severity | Open | Fixed (pending verification) | Verified |
 |---|---|---|---|
 | CRITICAL | 0 | 6 | 0 |
-| HIGH | 3 | 3 | 0 |
-| MEDIUM | 3 | 3 | 0 |
-| LOW | 0 | 0 | 0 |
+| HIGH | 3 | 5 | 0 |
+| MEDIUM | 2 | 4 | 0 |
+| LOW | 1 | 0 | 0 |
 
 ---
 
@@ -1565,16 +1565,412 @@ up.
 **Status:** OPEN — an error boundary around the LP screens, and defensive reads where a
 payload shape is assumed.
 
-### FINDING-015 — fundraising screens never report a failed load
+### FINDING-015 — WITHDRAWN (measurement error, not a product defect)
 
-**Severity:** MEDIUM · **Module:** Fundraising · **Dimension:** UI-UX · **Category:** Missing State
+**Severity:** — · **Module:** Fundraising · **Dimension:** UI-UX · **Category:** Missing State
 
-20 of 20 screens render normally with every API call returning 500 — no toast, no inline
-state. The screens show empty tables and zero totals, which are indistinguishable from a
-genuine "nothing here yet". Payroll's host raises a toast for exactly this case; the
-fundraising module has no equivalent.
+**Original claim:** *"20 of 20 screens render normally with every API call returning 500 —
+no toast, no inline state."*
 
-**Status:** OPEN.
+**That was wrong, and the fault was in my instrument.** Re-measured, every one of the 20
+fundraising screens reports the failure: **20 checks, 0 failing.** Each raises a `sonner`
+toast carrying the upstream message.
+
+Two independent defects in the sweep combined to produce the claim, and either alone was
+enough to produce it:
+
+1. **Toasts were sampled once, after the page settled.** Sonner auto-dismisses after a few
+   seconds. `/fundraising/investors` toasts at ~2s and was read at ~4s, by which time the
+   node was gone. The sweep now records toasts continuously, from an init script and a
+   `MutationObserver`, so a toast counts whenever in the window it appeared.
+2. **The error vocabulary did not contain the sweep's own message.** `saysError` listed
+   `failed`, which does not match `failure` — and the text the interception injects is
+   *"Simulated upstream failure"*. Screens that surfaced the backend message verbatim were
+   scored silent for doing precisely the right thing. The regex now matches the stem
+   `fail`.
+
+**Corroborated by hand before anything was changed:** `toastFrError` is called 128 times
+across the fundraising components, including on load paths
+(`toastFrError(err, "Could not load agreements")`); `<Toaster />` is mounted in
+`app/layout.tsx`, so it covers all three modules; `apiClient.get` throws on 500 and
+`listAgreements` awaits it without swallowing. A manual 20-second poll of
+`/fundraising/investors` caught the toast at ~2s. The code path was never missing.
+
+**One thread left hanging.** In that same manual poll, `/fundraising/agreements` produced
+no toast in 20s, yet the corrected sweep passes it. One of those two observations is
+wrong and I have not yet established which, so it is recorded here as unresolved rather
+than promoted to a finding — nothing has been reproduced.
+
+**Status:** WITHDRAWN — no fundraising defect. Kept in the log rather than deleted,
+because a withdrawn finding is evidence about the instrument, and this instrument has now
+produced three sampling errors of the same species.
+
+### FINDING-016
+
+**Title:** Twelve LP paths serve a blank page, including two links on the LP dashboard
+**Module:** LP Portal · **Dimension:** UAT · **Category:** Routing
+**Severity:** HIGH
+**Persona affected:** every LP — this is the external, investor-facing portal
+**Surface:** LP Portal · **Screen / Flow:** dashboard links, ledger deep links, superseded paths
+
+### Steps to reproduce
+
+1. Sign in to the LP portal as an LP.
+2. On the dashboard, click the **Total Commitment** KPI card (it links to
+   `/lp-portal/investments`).
+3. Also on the dashboard, click **Latest Reports → View all** (`/lp-portal/reports`).
+
+### Expected
+
+Each lands on the merged screen its route was folded into — `/lp-portal` and
+`/lp-portal/documents?category=Fund Reports` respectively. Both were written as page
+components containing a single `redirect(...)`, so the intent is unambiguous.
+
+### Actual
+
+**HTTP 200 with an empty `<main>`.** The portal chrome renders — sidebar, topbar, nav —
+and the content area is empty. No message, no spinner, no error, nothing to click. The
+URL does not change. The page is not crashed: `window.next.router` is present and the app
+is hydrated, it simply never navigates.
+
+Twelve paths behave this way:
+
+```
+/lp-portal/capital-calls      /lp-portal/messages
+/lp-portal/distributions      /lp-portal/colleagues
+/lp-portal/dealing            /lp-portal/reports
+/lp-portal/vault              /lp-portal/investments{,/commitment,/capital-account,
+/lp-portal/ledger                                     /investor-account,/holdings}
+```
+
+Four are reachable from live UI, not just by typing a URL:
+
+| Where | Control | Target |
+|---|---|---|
+| `lp-portal-dashboard-screen.tsx:238` | **Total Commitment** KPI card | `/lp-portal/investments` |
+| `lp-dashboard.tsx:134` | **Latest Reports → View all** | `/lp-portal/reports` |
+| `lp-performance-screen.tsx:918` | **View All Funds** | `/lp-portal/investments` |
+| `lp-ledger-entry-sheet.tsx:89` | call-notice document link | `/lp-portal/vault?documentId=…` |
+
+### Root cause
+
+`redirect()` called from these page components never becomes an HTTP redirect. The
+`NEXT_REDIRECT` throw is streamed into the RSC flight payload as an error and nothing acts
+on it. The response body carries the instruction verbatim while the browser sits on the
+original URL:
+
+```
+$ curl -s /lp-portal/capital-calls -H "Cookie: token=…" | grep -o 'NEXT_REDIRECT[^"]*'
+NEXT_REDIRECT;replace;/lp-portal/capital-activity?tab=calls;307;
+
+$ curl -s -o /dev/null -w '%{http_code}' /lp-portal/capital-calls -H "Cookie: token=…"
+200
+```
+
+So the server knows where the user should go, says so in the response body, and returns
+200 anyway.
+
+### Evidence
+
+Same route, API healthy, nine-second wait, measured on `<main>`:
+
+```
+API HEALTHY
+  /lp-portal                 -> /lp-portal                 main=1612  Dashboard Overview of your investments...
+  /lp-portal/capital-calls   -> /lp-portal/capital-calls    main=0
+  /lp-portal/vault           -> /lp-portal/vault            main=0
+  /lp-portal/ledger          -> /lp-portal/ledger           main=0
+  /lp-portal/messages        -> /lp-portal/messages         main=0
+```
+
+The comparison row matters: with the same session and the same API, `/lp-portal` renders
+1612 characters. These render nothing.
+
+### Fix
+
+The twelve mappings moved to `middleware.ts`, beside the `/portfolio-v11` and `/payroll-v6`
+renames this file already performs. An HTTP redirect issued from middleware is committed
+before any rendering, so it cannot be swallowed. The nine dead page components were
+deleted rather than left in place looking functional — code that reads like a working
+redirect and is not is how this survived to begin with.
+
+Incoming query is now merged over the target's defaults, which fixes a second bug the page
+components had independently: `redirect("/lp-portal/documents")` dropped the query, so
+`/lp-portal/vault?documentId=X` would have lost the very document it was opened for even
+if the redirect had worked.
+
+### Verification
+
+`scripts/_uat/lp-merged-routes-check.mjs` — asserts the destination *and* that the
+destination rendered content, since a redirect to a blank screen is not a fix:
+
+```
+13 merged paths, 0 failing
+  /lp-portal/capital-calls           -> /lp-portal/capital-activity?tab=calls   main=1352
+  /lp-portal/reports                 -> /lp-portal/documents?category=Fund%20Reports  main=1078
+  /lp-portal/investments             -> /lp-portal                             main=1532
+  /lp-portal/vault?documentId=abc123 -> /lp-portal/documents?documentId=abc123  main=520
+```
+
+### Left for the product owner
+
+`/lp-portal/investments` — the **Total Commitment** card and **View All Funds** — now
+resolves to the dashboard, because that is what the deleted compatibility page specified
+for the bare path. A "View All Funds" control that returns you to the page you are already
+on is poor, but choosing a better destination is a product decision, not a defect fix, so
+the existing mapping was preserved exactly.
+
+**Status:** FIXED — pending verification cycles.
+
+### FINDING-017
+
+**Title:** Three payroll screens present the vendored demo dataset as live records
+**Module:** Payroll · **Dimension:** QAT · **Category:** Data Integrity
+**Severity:** HIGH
+**Persona affected:** Internal Auditor and Payroll Manager most acutely; anyone reading these screens
+**Surface:** Internal App · **Screen / Flow:** Access & Segregation, Document Vault, Pay Calendar
+
+### Steps to reproduce
+
+1. Sign in to the staff portal with the API healthy — no interception, a normal day.
+2. Open `/payroll/access` and read the user roster and permission matrix.
+3. Query `GET /api/payroll/employees` and compare the names.
+
+### Expected
+
+Every value on a payroll screen comes from the database, or the screen says it has
+no data. An access-control screen in particular must not invent its own roster.
+
+### Actual
+
+`/payroll/access` lists **six people who are not employees of this deployment**, each
+with a role, a scope, an MFA state and a "last reviewed" date, above a 15-row permission
+matrix of ticks. The database holds twelve employees; none of the six shown is drawn from
+them:
+
+```
+On screen (/payroll/access)          In GET /api/payroll/employees
+  Tariro Moyo    Payroll Manager       Perf SysAdmin      Tendai Finance
+  Rudo Sibanda   Payroll Processor     Perf Executive     Rudo Hr
+  Chipo Ndlovu   HR Manager            Perf HRManager     Farai It
+  Tawanda Chirenje  Approver / CFO     Perf DeptManager   Tendai Moyo
+  Precious Ncube Internal Auditor      Perf Employee      Chipo Ndlovu
+  Kudzai Maseko  Payroll Processor     Blessing Sibanda   Tatenda Gumbo
+```
+
+All six, their roles, their MFA states and the whole matrix are string literals in
+`components/payroll-v6-mock/matanho-payroll-runtime.js` — "Tariro Moyo" appears there 20
+times. `lib/payroll-v6/live-loaders.ts` has **no source for this screen at all**: it loads
+`access?.roleName` and `access?.permissions` for the signed-in user and nothing else.
+
+**Why this one is HIGH and not cosmetic.** This is the screen that answers "who can
+approve a payroll run, and is the maker a different person from the checker". It displays
+Payroll Manager and Approver / CFO as two different named people with separate scopes —
+a tidy picture of segregation of duties. FINDING-001 established that in this deployment
+the maker role did not exist and **System Administrator held both `runs.manage` and
+`runs.approve`**. So the screen does not merely show stale data: it renders a reassuring
+fiction of precisely the control that was absent, on the screen an auditor would open to
+check it.
+
+Two further screens show vendored content, with no backing source or a partial one:
+
+| Screen | Source in live-loaders | On screen but not in any API |
+|---|---|---|
+| `/payroll/access` | none | Tariro Moyo, Precious Ncube, Kudzai Maseko, Tawanda Chirenje |
+| `/payroll/vault` | none | "June 2026 Payroll Control Pack", `DOC-001` |
+| `/payroll/calendar` | `/payroll/pay-groups` | "Jul 2026" periods, alongside the real "Monthly Staff" group |
+
+`/payroll/calendar` is the instructive one: it renders the genuine pay group **and** a
+fixture calendar of July 2026 pay dates. Live and invented data sit in the same view,
+which is the hardest case for a reader to detect.
+
+### Root cause
+
+The vendored runtime ships a complete demo dataset. The bridge overlays live data only
+onto the call sites it claims; every unclaimed site keeps rendering its fixture. Nothing
+distinguishes a claimed site from an unclaimed one on screen. Two of these three screens
+have no backend endpoint to claim in the first place.
+
+### Evidence
+
+`scripts/_uat/payroll-fixture-probe.mjs`, API healthy throughout:
+
+```
+FIXTURE  /payroll/access        (no backing source in live-loaders)
+         on screen, not in the API: Tariro Moyo, Precious Ncube, Kudzai Maseko, Tawanda Chirenje
+FIXTURE  /payroll/vault         (no backing source in live-loaders)
+         on screen, not in the API: June 2026 Payroll Control Pack, DOC-001
+live     /payroll/training      /payroll/compliance/courses
+         on screen, from the API:     Anti-Money Laundering
+FIXTURE  /payroll/calendar      /payroll/pay-groups
+         on screen, not in the API: Jul 2026
+         on screen, from the API:     Monthly Staff
+live     /payroll/components    /payroll/allowance-types
+         on screen, from the API:     Housing Allowance, Basic Salary
+unknown  /payroll/tax           /payroll/tax-rules
+         neither — markers are stale, this row proves nothing
+
+6 screens checked, 3 showing values that exist only in the vendored runtime
+```
+
+The probe judges a value on a comparison, never on presence: a marker counts only when it
+is in the runtime source **and** absent from the live API response. That distinction is
+load-bearing. "Anti-Money Laundering" is in the runtime *and* is a real course in the
+database — an earlier presence-only version of this probe reported `/payroll/training` as
+fabricated on the strength of it, which was wrong. "Chipo Ndlovu" is excluded as a marker
+for the same reason in reverse: they are a real employee, but the API carries first and
+last name in separate fields so the full name never appears contiguously in the JSON.
+
+`/payroll/tax` is reported as **unknown**, not clean: its marker no longer appears on
+screen or in the API, so the row establishes nothing either way and is not evidence.
+
+### Remediation
+
+Not a frontend patch. `/payroll/access` and `/payroll/vault` have no backend to read:
+
+1. **`/payroll/access`** — needs an endpoint returning users holding payroll roles with
+   their grants, so the roster and matrix are computed from `PAYROLL_ROLE_GRANTS` and the
+   `roles`/`users` tables. Until it exists the screen should render an explicit empty
+   state; it must not keep showing six invented auditors.
+2. **`/payroll/vault`** — needs a payroll document register endpoint.
+3. **`/payroll/calendar`** — has its source already; the fixture calendar needs to be
+   cleared and the periods rendered from `pay-groups`.
+
+**Status:** FIXED (pending verification). The missing capability was built rather than
+hidden:
+
+| Screen | Now reads | What was built |
+|---|---|---|
+| `/payroll/access` | `GET /payroll/access/roster` | `PayrollAccessRosterService`: users who hold payroll roles, with the grants their role carries, computed from `PAYROLL_ROLE_GRANTS` and the `roles`/`users` tables. Self-approval exemption is flagged, not hidden. |
+| `/payroll/vault` | `GET /payroll/documents`, `POST /payroll/documents`, `GET /payroll/documents/:id/download` | `PayrollDocument` table (`db:migrate:payroll-documents`) and `PayrollDocumentService`. Files are stored through `RemoteUploadService`; uploads, downloads and failed downloads are audited; the register never returns a storage path. |
+| `/payroll/calendar` | `/payroll/pay-groups`, `PUT /payroll/pay-groups/:id/periods` | Fixture calendar cleared; periods rendered and edited from the pay group. |
+
+The runtime's claims for all three screens live in
+`scripts/payroll-runtime-live-bridge.inc.js`, re-applied by
+`scripts/patch-payroll-runtime.mjs`; upload, download and period save route through
+`lib/payroll-v6/actions.ts`. A screen with no data now says so. Commits: backend `0e6046b`
+(nvccz), frontend `fe3edfd`.
+
+Verification, 11 September 2026, local stack:
+
+- `scripts/_uat/payroll-live-screens-check.mjs` — **48 passed, 0 failed.** Four personas
+  (System Administrator, CEO, HR Manager, Operations Manager); each screen's expected
+  controls are derived from that persona's own `/payroll/me/access`. No vendored person,
+  document or period appears for any of them. As administrator, an uploaded file downloads
+  byte-identical, and a period added then edited through the UI persists without a date
+  shift.
+- `nvccz/scripts/_uat/payroll-access-vault-probe.mjs` — **56 passed, 0 failed.** The
+  register leaks no storage path or credential field; the roster reconciles with raw role
+  grants (db-only 0, api-only 0); System Administrator holds 34/34 payroll grants and is
+  flagged self-approval exempt. The screen built to show segregation of duties now shows
+  FINDING-001's gap instead of papering over it.
+
+> **Incident, same day.** Commit `ee011f8`, an unrelated branding change, carried this
+> finding's three host action ids (`confirm-upload`, `download-doc`, `save-period`) to
+> production without the `actions.ts` handlers they route to. The host claims an action
+> before dispatching it, so on production the Vault's upload-confirm and download buttons
+> did nothing. Hotfixed on production by removing the three ids from the staff portal only
+> (`7c4138b`, branch `hotfix/payroll-vault-actions-20260911`). The complete implementation
+> is **not** on production.
+
+### FINDING-018
+
+**Title:** Every payroll screen is blank at phone width, and the responsive sweep passed it
+**Module:** Payroll · **Dimension:** UI-UX · **Category:** Responsive
+**Severity:** MEDIUM
+**Persona affected:** Anyone opening payroll on a phone
+**Surface:** Internal App · **Screen / Flow:** every `/payroll/*` screen at 760px and below
+
+### Steps to reproduce
+
+1. Open any payroll screen in a 375px-wide viewport.
+
+### Expected
+
+The screen's content, with the sidebar available as an off-canvas drawer.
+
+### Actual
+
+The top bar and nothing under it. The page does not scroll, because there is nothing to
+scroll to.
+
+### Root cause
+
+`payroll-v6-overrides.css` set `.sidebar { position: relative; height: 100% }` at every
+width. It loads after the runtime's stylesheet, so at equal specificity it beat the
+runtime's phone rule (`position: fixed`, translated off-canvas). The sidebar was moved out
+of view but still took the full height of `.app` in flow, pushing `.shell` — the whole
+screen — below the viewport, where `.app`'s `overflow: hidden` clipped it without creating
+a scroll.
+
+That is also why the X.10 responsive sweep passed payroll at 375px: "no horizontal
+scroll" and "text present in the DOM" are both true of a screen whose content has been
+clipped out of sight.
+
+### Fix
+
+The in-flow sidebar is scoped to `@media (min-width: 761px)`. Two more defects in the same
+file, with the same cause (an override applied without the breakpoint it needed), were
+corrected alongside it:
+
+- the expanded 282px sidebar was forced from 761px, overriding the runtime's own tablet
+  rail and squeezing the top bar; it now starts at 1121px;
+- stroke-drawn icons in the folder, list, empty-state and rule containers had no stroke
+  rule and rendered as solid black shapes.
+
+Committed in `fe3edfd`.
+
+### Verification
+
+`scripts/_uat/payroll-live-screens-layout.mjs` measures what is visible rather than what is
+in the DOM: at 375, 768, 1024 and 1440px each screen's heading must sit inside the viewport
+with nothing drawn over it. Widths come from `clientWidth`.
+
+On Access, Vault and Calendar: headings visible on first paint at every width (top 114–119px
+of 812), no page-level horizontal scroll, and the access register — a table at 1024px and
+up, cards below — fits its container.
+
+The run reports **33 passed, 12 failed**. All twelve failures are one check, "top bar
+controls on screen and unobstructed". A browser diagnostic separated them:
+
+| Flagged element | Widths | What it is | Verdict |
+|---|---|---|---|
+| `input#commandInput` | all four | The runtime's command palette, closed. Its ancestor `section#command` is hidden; the check only reads the element's own style. | Instrument false positive |
+| `button.tenant` | 375 | The tenant switcher inside the phone sidebar drawer, off-canvas until opened (x = −283). The check's top-band filter still includes it. | Instrument false positive |
+| host `Search here…` | 768 | `elementFromPoint` at the field's own position returns the runtime's `img#brandLogo`. | **Real — FINDING-019** |
+
+The diagnostic confirmed the `#commandInput` explanation at 768 and 375px; at 1024 and
+1440px the check flags the same element id.
+
+**Status:** FIXED (pending verification) for the blank screens. The two instrument
+corrections are not yet made in the script.
+
+### FINDING-019
+
+**Title:** At tablet width the payroll sidebar's logo is drawn over the top bar's search field
+**Module:** Payroll (probably every client-design module) · **Dimension:** UI-UX · **Category:** Layout
+**Severity:** LOW
+**Persona affected:** Tablet users
+**Surface:** Internal App · **Screen / Flow:** top bar at 768px
+
+### Actual
+
+At 768px the host top bar's search field starts at x=60. The runtime's sidebar brand
+(`img#brandLogo`), drawn from the top-left corner, covers the field's left end:
+`elementFromPoint` at the field returns the logo, so a click there lands on the logo. The
+rest of the field still works.
+
+### Suspected cause (not confirmed)
+
+Client-design runtimes draw their sidebar from y=0, over the left edge of the host top bar,
+by design — it is what makes the sidebar touch the top. At 1440px the top bar's content
+starts clear of it (the search field begins at x=324). At tablet width the top bar does not
+offset its content by the rail's width.
+
+Not checked on the other modules that share this shell (Home, Performance, Procurement V23,
+Accounting, Portfolio).
+
+**Status:** OPEN — evidenced at 768px on payroll only.
 
 ### Loading states — 28 screens show nothing at all
 
@@ -1592,7 +1988,7 @@ surviving behind live data. **Not yet a finding:** the same shape mismatch that 
 LP screens could equally leave a component holding its previous state, so these need
 per-endpoint empty payloads shaped like the real contract before the count means anything.
 
-### Four corrections to the instrument, all before reporting
+### Six corrections to the instrument
 
 1. **Faulting `/me/access` and `/lp-portal/session`.** Blanking identity is not testing a
    data state — it stripped permissions, so every payroll screen rendered the access panel
@@ -1605,3 +2001,15 @@ per-endpoint empty payloads shaped like the real contract before the count means
 4. **The empty-state row count**, added mid-run to catch fixtures, is reported as
    unresolved rather than as a finding, because (1) showed how easily a synthetic payload
    produces a misleading signal.
+5. **Sampling toasts once instead of recording them.** Sonner dismisses; a single read
+   after the page settles misses a toast that fired at ~2s. This is what produced
+   FINDING-015, now withdrawn.
+6. **Sampling the loading state at one instant.** The sweep looked 1.5s after
+   `domcontentloaded` and called a screen blank if nothing was there yet. A skeleton that
+   appears at 2.2s is a real skeleton. It now watches the whole held window.
+
+Corrections 2, 5 and 6 are the same error three times: **reading an instant and calling it
+a state.** Every one of them made the product look broken for behaving correctly. That is
+the failure mode this instrument is most prone to, and it is worth stating plainly rather
+than burying — four of the sixteen findings raised in this engagement have had to be
+re-measured, and one withdrawn outright.
