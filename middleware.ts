@@ -230,6 +230,26 @@ const routePermissions: Record<string, { module: string; subModule?: string }> =
   '/admin/roles': { module: 'admin-management', subModule: 'role-management' },
 }
 
+/**
+ * LP paths that were merged into a combined screen. Each of these used to be a
+ * page component containing nothing but `redirect(...)`; see the note at the
+ * use site for why that produced a blank page rather than a redirect.
+ */
+const LP_MERGED_SCREENS: Record<string, string> = {
+  '/lp-portal/capital-calls': '/lp-portal/capital-activity?tab=calls',
+  '/lp-portal/distributions': '/lp-portal/capital-activity?tab=distributions',
+  '/lp-portal/dealing': '/lp-portal/subscriptions-redemptions',
+  '/lp-portal/vault': '/lp-portal/documents',
+  '/lp-portal/ledger': '/lp-portal/account-activity',
+  '/lp-portal/messages': '/lp-portal/requests?tab=messages',
+  '/lp-portal/colleagues': '/lp-portal/organisation',
+  '/lp-portal/reports': '/lp-portal/documents?category=Fund%20Reports',
+  '/lp-portal/investments/commitment': '/lp-portal#capital-position',
+  '/lp-portal/investments/capital-account': '/lp-portal/account-activity?structure=private-capital',
+  '/lp-portal/investments/investor-account': '/lp-portal#open-ended-account',
+  '/lp-portal/investments/holdings': '/lp-portal/account-activity?structure=open-ended',
+}
+
 export function middleware(request: NextRequest) {
   const token = request.cookies.get(process.env.NEXT_PUBLIC_AUTH_TOKEN_KEY || 'token')
   const userProfile = request.cookies.get(process.env.NEXT_PUBLIC_AUTH_PROFILE_KEY || 'userProfile')
@@ -251,6 +271,30 @@ export function middleware(request: NextRequest) {
     const url = request.nextUrl.clone()
     url.pathname = dest
     return NextResponse.redirect(url, 308)
+  }
+
+  // Merged LP screens: keep the superseded paths working.
+  //
+  // These were page components whose whole body was `redirect(...)`. That does
+  // not work from a page here: the throw is streamed as a NEXT_REDIRECT error
+  // instead of being committed as an HTTP redirect, and nothing acts on it — so
+  // each of these paths served 200 with an empty <main>. A blank page, with the
+  // app hydrated and healthy. Two live links reached them: the LP dashboard's
+  // "Reports" link and the ledger entry sheet's call-notice deep link.
+  //
+  // Redirecting here is HTTP-level and cannot be swallowed, and it is where this
+  // file already handles /portfolio-v11 and /payroll-v6. Incoming query is
+  // merged over the target's defaults so /lp-portal/vault?documentId=X keeps the
+  // document it asked for — the page component dropped it even in principle.
+  const lpMergedTarget =
+    LP_MERGED_SCREENS[pathname] ??
+    (pathname === '/lp-portal/investments' || pathname.startsWith('/lp-portal/investments/')
+      ? '/lp-portal'
+      : undefined)
+  if (lpMergedTarget) {
+    const dest = new URL(lpMergedTarget, request.url)
+    request.nextUrl.searchParams.forEach((value, key) => dest.searchParams.set(key, value))
+    return NextResponse.redirect(dest, 307)
   }
 
   // External LP / investee / apply portals: strict route allowlist (separate deployments).
