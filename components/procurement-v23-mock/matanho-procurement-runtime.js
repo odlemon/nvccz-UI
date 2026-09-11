@@ -173,17 +173,53 @@ const state={page:(typeof initialPage==='string'&&initialPage)?initialPage:'dash
   {name:'Auditor',users:4,permissions:[0,0,0,0,0,1]}
  ]
 };
-const money=n=>new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',maximumFractionDigits:0}).format(n);
+const money=n=>(n===null||n===undefined||n===''||!Number.isFinite(Number(n)))?'\u2014':new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',maximumFractionDigits:0}).format(n);
 const status=s=>{let c=/approved|matched|ready|accepted|posted|published|prequalified|active|in use/i.test(s)?'green':/blocked|blacklisted|expired|rejected|held|variance/i.test(s)?'red':/pending|review|conditional|clarification|opening|warning|revision/i.test(s)?'amber':'blue';return `<span class="status ${c}">${s}</span>`};
 const btn=(label,action,kind='',ico='')=>`<button class="btn ${kind}" data-action="${action}">${ico?icon(ico):''}${label}</button>`;
 const pageHead=(eyebrow,title,desc,actions='')=>`<div class="page-head"><div><div class="eyebrow">${eyebrow}</div><h1>${title}</h1><p>${desc}</p></div><div class="actions">${actions}</div></div>`;
-const kpi=(label,value,sub,ico='report',page='')=>`<article class="kpi" ${page?`data-page="${page}"`:''}><div class="kpi-top"><span class="kpi-label">${label}</span><span class="kpi-icon">${icon(ico)}</span></div><div class="kpi-value">${value}</div><div class="kpi-sub">${sub}</div></article>`;
+const kpi=(label,value,sub,ico='report',page='')=>{[value,sub]=__pr23Kpi(label,value,sub);return `<article class="kpi" ${page?`data-page="${page}"`:''}><div class="kpi-top"><span class="kpi-label">${label}</span><span class="kpi-icon">${icon(ico)}</span></div><div class="kpi-value">${value}</div><div class="kpi-sub">${sub}</div></article>`};
 const card=(title,sub,body,extra='')=>`<section class="card"><div class="card-head"><div><h3>${title}</h3><p>${sub}</p></div>${extra}</div>${body}</section>`;
 const table=(heads,rows,attrs='')=>`<div class="table-wrap"><table ${attrs}><thead><tr>${heads.map(h=>`<th>${h}</th>`).join('')}</tr></thead><tbody>${rows.join('')}</tbody></table></div>`;
 const options=(vals,current)=>vals.map(v=>`<option ${v===current?'selected':''}>${v}</option>`).join('');
 const filterBar=()=>`<div class="filterbar"><select data-filter="period">${options(['FY 2026','Q3 2026','Q2 2026','YTD 2026'],state.filters.period)}</select><select data-filter="category">${options(['All categories','Technology','Medical','Agriculture','Facilities','Fleet'],state.filters.category)}</select><select data-filter="status">${options(['All statuses','Approved','Under review','Blocked'],state.filters.status)}</select><select data-filter="currency">${options(['USD','ZiG','ZAR'],state.filters.currency)}</select><button class="btn small" data-action="apply-filters">${icon('filter')}Apply</button><button class="btn small" data-action="reset-filters">Reset</button><span class="right" style="color:var(--muted);font-size:11px">Showing ${entities.find(x=>x[0]===state.entity)?.[1]||'Group Consolidated'}${state.filterApplied?' · filtered':''}</span></div>`;
 function lineChart(id){return `<div class="chart chart-click" data-chart="${id}"><svg viewBox="0 0 720 280" preserveAspectRatio="none"><g>${[40,90,140,190,240].map(y=>`<line class="gridline" x1="52" x2="700" y1="${y}" y2="${y}"/>`).join('')}<line class="axis" x1="52" y1="250" x2="700" y2="250"/><line class="axis" x1="52" y1="25" x2="52" y2="250"/>${['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'].map((m,i)=>`<text x="${55+i*57}" y="270">${m}</text>`).join('')}<text x="8" y="244">$0</text><text x="8" y="195">$2m</text><text x="8" y="145">$4m</text><text x="8" y="95">$6m</text><text x="8" y="45">$8m</text><path d="M55 220 C105 203 120 183 165 188 S235 140 280 151 S350 119 395 125 S470 88 510 104 S590 64 640 72 S682 45 700 38" class="line"/>${[[55,220],[110,201],[165,188],[220,158],[280,151],[340,126],[395,125],[455,98],[510,104],[570,76],[640,72],[700,38]].map((p,i)=>`<circle class="point" data-index="${i}" cx="${p[0]}" cy="${p[1]}" r="4"/>`).join('')}</g></svg></div>`}
 function bars(items,id){return `<div class="bars" data-chart="${id}">${items.map(([l,v])=>`<div class="bar-row" data-action="chart-drill" data-id="${id}" data-label="${l}"><span>${l}</span><div class="bar-track"><div class="bar-fill" style="width:${v}%"></div></div><b>${v}%</b></div>`).join('')}</div>`}
+/* BEGIN_PROCUREMENT_LIVE_BRIDGE */
+/**
+ * Live figures from the React host (lib/procurement-v23/live-loaders.ts): `kpis` keyed by card
+ * label and `navCounts` keyed by page id. The host sets an empty placeholder before the runtime
+ * starts, so a live session never paints a fixture figure even before the first load lands.
+ */
+function __pr23Live() {
+  return (typeof window !== 'undefined' && window.__pr23Live) || null;
+}
+
+/** "label|value" for every KPI card whose value is a literal in the vendored runtime. */
+const __PR23_LITERAL_KPIS = new Set(["AP exposure|$2,480,000","AP liability|$1,248,000","Accounting API|Online","Accounting accuracy|100%","Active contracts|86","Active tenders|8","Actual spend|$4,480,000","Approval SLA|2.4 days","Approved for sourcing|5","Approved plan|$8,240,000","Asset purchases|23","Asset transfer queue|2","Average cycle|8.4 days","Awaiting acknowledgement|1","Awaiting acknowledgement|14","Awaiting evaluation|5","Awaiting me|11","Awaiting signature|6","Bank changes|4","Blacklisted|7","Board packs|6","Board threshold items|12","Board vote items|2","Budget coverage|93.6%","Budget warnings|3","Clarifications|11","Closing this week|3","Commercial weight|35%","Committed spend|$5,120,000","Committed value|$4,270,000","Committed|$5,120,000","Committee sessions|3","Compliance reviews|3","Compliance review|31","Consolidated budget|$8,240,000","Data freshness|4 min","Declarations complete|96%","Delegations active|4","Delivery & support|20%","Department isolation|Active","Departments at risk|2","Discrepancies|7","Document retrieval|100%","Downloads this month|286","Entity isolation|Enforced","Evaluated value|$3,090,000","Events today|1,248","Exceptions|15","Forecast variance|4.8%","Forecast|$7,860,000","Funding gaps|2","Gross value|$5,120,000","Immutable records|100%","Invoice exposure|$2,480,000","Invoices captured|186","Journal queue|4","Late responses|2","Matched|102","Median approval time|1.8 days","Multi-currency|USD · ZiG · ZAR","On-time receipt|88%","Open POs|156","Open requisitions|14","Open tenders|8","Overdue deliveries|9","Pending department head|6","Pending inspection|31","Plan amendments|4","Potential savings|$486,000","Prequalified|418","Published reports|42","Qualified bids|4","Receipts today|18","Recommendations due|3","Recommendations pending|2","Recommended value|$1,280,000","Records|287","Registered vendors|482","Remaining|$3,120,000","Renewals in 90 days|0","Renewals in 90 days|12","Returned drafts|2","Scheduled deliveries|18","Secure submissions|32","Signed digitally|92%","SoD checks|100%","SoD conflicts blocked|3","SoD controls|Active","SoD rules|12","Strategic tenders|12","Submitted plans|6 of 7","Supplier obligations|94%","Supplier responses|32","Technical threshold|70%","Technical weight|45%","Third-party GRNs|4","Top score|90%","Unfunded exposure|$528,000","VAT input|$286,400","Value in market|$5,205,000","Value outstanding|$2,480,000","Variance|-4.6%","Variations pending|4","Vendor invitations|146","Vendor obligations|94%","Vendors|482","WHT payable|$26,460","WHT required|6","Within SLA|82%","Within plan|91%","ZPPB exports|12","eSign coverage|100%","eSign required|6"]);
+
+/**
+ * A KPI card's value and sub-text in a live session:
+ *  - a label the loaders can answer gets the live figure and its stated derivation;
+ *  - a card whose value is a fixture literal gets an em dash and says there is no source;
+ *  - a card the runtime computes from state (already live data) passes through untouched.
+ */
+function __pr23Kpi(label, value, sub) {
+  const live = __pr23Live();
+  if (!live) return [value, sub];
+  const known = live.kpis && live.kpis[label];
+  if (known) return [known.value, known.sub];
+  if (__PR23_LITERAL_KPIS.has(label + '|' + String(value))) return ['—', 'No live source for this figure yet'];
+  return [value, sub];
+}
+
+/** Sidebar badge for a page: the live count, or no badge at all. Never the fixture count. */
+function __pr23NavCount(pageId, fixtureCount) {
+  const live = __pr23Live();
+  if (!live) return fixtureCount;
+  const n = live.navCounts && live.navCounts[pageId];
+  return n ? String(n) : '';
+}
+/* END_PROCUREMENT_LIVE_BRIDGE */
 function dashboardPage(){
  const approvals=state.requisitions.filter(x=>/Pending|review/i.test(x.status)).length;
  return `<div class="page">${pageHead('Procurement operations','Command Centre','Enterprise-wide procurement activity, annual plan execution, sourcing, fulfilment and accounting hand-offs.',btn('New record','new-menu','primary','plus')+btn('Activity','activity-menu','','more'))}${filterBar()}
@@ -310,7 +346,7 @@ function analyticsPage(){
 }
 const pages={dashboard:dashboardPage,plan:planPage,requisitions:requisitionsPage,tenders:tendersPage,evaluation:evaluationPage,vendors:vendorsPage,contracts:contractsPage,orders:ordersPage,receiving:receivingPage,invoices:invoicesPage,accounts:accountsPage,documents:documentsPage,reports:reportsPage,approvals:approvalsPage,audit:auditPage,settings:settingsPage,analytics:analyticsPage};
 function renderNav(){
- $('#nav').innerHTML=navGroups.map(([g,items])=>`<div class="nav-group">${g}</div>${items.map(([id,l,ic,c])=>`<button class="nav-item ${state.page===id?'active':''}" data-page="${id}" title="${l}"><span class="nav-icon">${icon(ic)}</span><span class="nav-label">${l}</span>${c?`<span class="nav-count">${c}</span>`:''}</button>`).join('')}`).join('');
+ $('#nav').innerHTML=navGroups.map(([g,items])=>`<div class="nav-group">${g}</div>${items.map(([id,l,ic,c])=>`<button class="nav-item ${state.page===id?'active':''}" data-page="${id}" title="${l}"><span class="nav-icon">${icon(ic)}</span><span class="nav-label">${l}</span>${(()=>{const n=__pr23NavCount(id,c);return n?`<span class="nav-count">${n}</span>`:''})()}</button>`).join('')}`).join('');
 }
 function render(){
  renderNav();
@@ -3418,11 +3454,11 @@ window.MatanhoProcurement=Object.freeze({version:'8.0.0',navigate,render,getStat
 
   function hydrate(payload={}){
     if(typeof state==='undefined') throw new Error('The procurement state store is not available.');
-    const allowed=['entities','plans','requisitions','tenders','vendors','orders','invoices','documents','reports','approvals','notifications','roles','accessRequests'];
+    const allowed=['entities','plans','requisitions','tenders','vendors','orders','invoices','documents','reports','approvals','notifications','roles','accessRequests','planItems','grns','journals','assets','approvalPromptsV6','contractsV6','signatureEnvelopesV6','vendorMessagesV6','vendorRequestsV6','planActualsV6','departmentBudgetsV6','rbacUsersV6','vendorAuditTrailV19','quotationNormalisationsV19','complianceReminderLogV7'];
     for(const key of allowed){
       if(Object.prototype.hasOwnProperty.call(payload,key)) state[key]=structuredClone(payload[key]);
     }
-    if(payload.currentUser) state.currentUser={...(state.currentUser||{}),...structuredClone(payload.currentUser)};
+    if(payload.currentUser) state.currentUser={...(state.currentUser||{}),...structuredClone(payload.currentUser)};if(payload.currentUserV6) state.currentUserV6={...(state.currentUserV6||{}),...structuredClone(payload.currentUserV6)};
     if(payload.entity) state.entity=payload.entity;
     if(payload.year) state.year=payload.year;
     if(typeof render==='function') render();

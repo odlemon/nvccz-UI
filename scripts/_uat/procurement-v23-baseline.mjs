@@ -8,7 +8,12 @@
  * The local database holds no requisitions, purchase orders, RFQs, GRNs or invoices, so a
  * demo record id on screen cannot have come from the API.
  *
+ * Once the module is wired, the same census proves the wiring: `--live` names record numbers
+ * that exist only in the local database (from nvccz/scripts/_uat/procurement-p2p-flow.mjs), and
+ * each page reports which of them it shows, its KPI cards, and any toast it raised.
+ *
  * Run:  node scripts/_uat/procurement-v23-baseline.mjs [--user=<email>] [--out=<file.json>] [--shots=<dir>]
+ *                                                    [--live=REQ_20260911_0001,PO_20260911_0001,...]
  */
 import fs from "node:fs"
 import path from "node:path"
@@ -20,6 +25,7 @@ const arg = (name) => process.argv.find((a) => a.startsWith(`--${name}=`))?.slic
 const USER = arg("user") || "perf.sysadmin@nts.local"
 const OUT = arg("out")
 const SHOTS = arg("shots")
+const LIVE = (arg("live") || "").split(",").map((s) => s.trim()).filter(Boolean)
 if (SHOTS) fs.mkdirSync(SHOTS, { recursive: true })
 
 const PAGES = [
@@ -68,19 +74,26 @@ for (const [id, route] of PAGES) {
   await page.waitForFunction(() => (document.querySelector(".procurement-v23-root")?.innerText || "").length > 200, null, { timeout: 30000 }).catch(() => {})
   await page.waitForTimeout(1500)
 
-  const m = await page.evaluate((markers) => {
+  const m = await page.evaluate(({ markers, live }) => {
     const root = document.querySelector(".procurement-v23-root")
     const text = root?.innerText || ""
     const heading = [...(root?.querySelectorAll("h1, h2") || [])].map((h) => h.innerText.trim()).find(Boolean) || null
     const actions = [...new Set([...(root?.querySelectorAll("[data-action]") || [])].map((el) => el.dataset.action))].sort()
+    const kpis = [...(root?.querySelectorAll(".kpi") || [])].map((k) => ({
+      label: k.querySelector(".kpi-label")?.textContent?.trim() ?? "",
+      value: k.querySelector(".kpi-value")?.textContent?.trim() ?? "",
+    }))
     return {
       url: location.pathname,
       heading,
       textLength: text.length,
       demoOnScreen: markers.filter((mk) => text.includes(mk)),
+      liveOnScreen: live.filter((mk) => text.includes(mk)),
+      kpis,
+      toasts: [...document.querySelectorAll("[data-sonner-toast]")].map((t) => t.textContent.trim().slice(0, 200)),
       actions,
     }
-  }, MARKERS)
+  }, { markers: MARKERS, live: LIVE })
 
   if (!result.surface) {
     result.surface = await page.evaluate(() => {
@@ -98,9 +111,12 @@ for (const [id, route] of PAGES) {
 
   result.pages.push({ id, route, ...m, errors: [...errors] })
   if (SHOTS) await page.screenshot({ path: path.join(SHOTS, `${id}.png`) })
+  const dashes = m.kpis.filter((k) => k.value === "—").length
   console.log(
-    `${id.padEnd(13)} ${String(m.textLength).padStart(6)} chars  demo=${m.demoOnScreen.length}  actions=${m.actions.length}  errors=${errors.length}  "${(m.heading || "").slice(0, 50)}"`,
+    `${id.padEnd(13)} ${String(m.textLength).padStart(6)} chars  demo=${m.demoOnScreen.length}${LIVE.length ? `  live=${m.liveOnScreen.length}` : ""}  kpis=${m.kpis.length}(${dashes} dash)  actions=${m.actions.length}  errors=${errors.length}  "${(m.heading || "").slice(0, 44)}"`,
   )
+  if (m.demoOnScreen.length) console.log(`${"".padEnd(14)}demo: ${m.demoOnScreen.join(", ")}`)
+  if (m.toasts.length) console.log(`${"".padEnd(14)}toasts: ${m.toasts.join(" | ")}`)
 }
 
 await browser.close()
