@@ -1,0 +1,185 @@
+# Procurement V23 — backend asks
+
+**Branch:** `feature/procurement-v23-live` (nvccz and nvccz-new) · **As of:** 11 September 2026 · local only, nothing deployed
+**Findings raised along the way:** [`procurement-v23/TEST_FINDINGS.md`](procurement-v23/TEST_FINDINGS.md)
+
+This is the list of what the V23 screens need and the backend does not yet provide. Everything
+not listed here is either connected, or a view the runtime builds from data already loaded.
+
+Where a screen has no backend behind it, the live build shows an honest empty state or an em
+dash, and a write action is refused with "not connected to the backend yet". It never shows the
+vendored demo records or a success toast for a save that did not happen.
+
+---
+
+## What is connected
+
+| Screen | Reads | Writes |
+|---|---|---|
+| Access (all screens) | `GET /procurement/me/access` *(added)* | — |
+| Command Centre | requisitions, RFQs, POs, GRNs, invoices, vendors (KPIs, cycle donut, attention list derived) | — |
+| Approval Centre | prompts built from real pending decisions | approve and reject: requisition, award (quotation accept), GRN; approve only: invoice |
+| Purchase Requisitions | `GET /procurement/requisitions`, `/my`, `/pending-approval` | raise and submit, save draft, approve, reject |
+| Tenders & RFx | `GET /procurement/rfq`, `GET /vendor-quotations` | — (RFx builder not yet wired) |
+| Bid Evaluation | tender list with real bid counts | — (scoring workspace not yet wired) |
+| Vendor Registry | `GET /accounting/vendors` | register vendor (V6 form); bank details held for Finance |
+| Purchase Orders | `GET /procurement/purchase-orders` | send PO |
+| Receiving & Inspection | `GET /procurement/goods-received-notes` | — (record GRN modal not yet wired) |
+| Invoices & 3-Way Match | `GET /procurement/invoices`, real PO → GRN → invoice chain per tender | — (capture modal not yet wired) |
+| Audit & Compliance | `GET /procurement/audit-events` *(added)* | — |
+
+**Added to the backend for V23** (nvccz, local commits):
+- `GET /procurement/me/access`;
+- `GET /procurement/audit-events` and the `procurement.audit.view` grant;
+- staff invoice capture reachable (PROC-004);
+- 404/400/409 instead of 500 on quotation errors (PROC-003);
+- per-action procurement permissions (PROC-002).
+
+---
+
+## Asks
+
+Priority reflects what blocks a real procure-to-pay cycle first.
+
+### 1. Estimated value on requisition lines — HIGH
+
+- **Screen:** the requisition form collects a **unit estimate** per line. The register shows
+  **Estimate** and **Budget check** columns, and the Approval Centre shows a value.
+- **Gap:** `PurchaseRequisitionItem` has no price field. `PurchaseRequisition.totalAmount` is
+  always `0` for department requisitions, so all three show "—".
+- **Proposal:** `estimatedUnitPrice Decimal?` on `PurchaseRequisitionItem`, accepted by
+  `POST /procurement/requisitions`. `totalAmount` becomes the sum of quantity × estimate.
+- **Unblocks:** ask 2, and the value a department head approves against.
+
+### 2. Budget check against department or cost-centre budgets — HIGH
+
+- **Screen:** "Budget check" column, "Budget warnings" KPI, the form's "Live budget check"
+  notice, and department budget cards.
+- **Gap:** no budget model or check exists.
+- **Proposal:**
+  - a budget per department (or cost centre) and financial year;
+  - on submit, compare committed + pending requisitions + this request against it;
+  - return `withinBudget | warning | blocked` and the remaining amount on the requisition.
+- **Depends on:** ask 1.
+
+### 3. Annual procurement plan — HIGH
+
+- **Screens:** Annual Procurement Plan (plans, plan line items, versions, submit/approve) and
+  Analytics (plan vs committed vs actual).
+- **Gap:** no plan model.
+- **Proposal:**
+  - models: `ProcurementPlan` (entity or department, year, version, status, budget) and
+    `ProcurementPlanItem` (description, category, quarter, method, budget, status);
+  - endpoints: CRUD plus submit and approve;
+  - link: a requisition may reference a plan item, so plan vs actual can be computed.
+
+### 4. Bid evaluation scores — HIGH
+
+- **Screen:** the evaluation workspace (weighted technical, commercial and delivery scores per
+  bid, and a recommendation). It currently shows no scoring. Its fixture scores are suppressed.
+- **Available:** `VendorQuotation.technicalScoreJson`, `GET /procurement/rfqs/:id/comparison-matrix`,
+  and RFQ `priceWeight` / `technicalWeight`.
+- **Needed:** a write endpoint for evaluator scores per quotation and criterion. Returned
+  weighted totals should be null, not 0, when unscored.
+- **Frontend next step:** wire the comparison matrix and the award to real quotations — no
+  backend change.
+
+### 5. Invoice rejection — MEDIUM
+
+- **Screen:** Approval Centre → Reject on an invoice prompt.
+- **Gap:** no endpoint. The UI refuses the action with that said.
+- **Proposal:** `PUT /procurement/invoices/:id/reject` `{ rejectionReason }` behind
+  `procurement.invoices.approve`. It sets `REJECTED` and records an audit event.
+
+### 6. Three-way match result on staff-captured invoices — MEDIUM
+
+- **Screens:** Invoices & 3-Way Match ("Matched", "Exceptions", "Match variance") and the match
+  workspace panels.
+- **Gap:** `ProcurementInvoice.matchingStatus` stays `PENDING`. Suite 06 has `run-match` for
+  intakes, not for invoices captured against a PO.
+- **Proposal:** compute on capture, or on demand:
+  - invoice lines against PO lines and accepted GRN quantities, per line: quantity, unit price
+    and tax variance, with a tolerance;
+  - store the status and the variances;
+  - expose them on `GET /procurement/invoices`.
+
+### 7. Contracts and awards register — MEDIUM
+
+- **Screen:** Contracts & Awards (contract from an accepted quotation, value, term, signature
+  status, renewals, obligations).
+- **Gap:** no contract model. The accepted quotation and its PO are the only award record.
+- **Proposal:** `ProcurementContract`:
+  - fields: `quotationId`, `vendorId`, `value`, `startDate`, `endDate`, `status`, `signedAt`;
+  - create on award (optional) or manually;
+  - list endpoint.
+
+### 8. Procurement document vault — MEDIUM
+
+- **Screens:** Document Vault and the upload / preview / send actions on tenders, evaluations,
+  POs and contracts.
+- **Gap:** no procurement document register. Vendor KYC documents exist per vendor only.
+- **Proposal:** a document register (category, linked record, version, uploaded by) on the
+  existing upload service, with list, upload and download endpoints. The payroll vault is the
+  model to follow.
+
+### 9. GRN accounting hand-off (accruals, fixed-asset capitalisation) — MEDIUM
+
+- **Screen:** Accounts & Asset Transfers (journal queue, asset transfer queue).
+- **Gap:**
+  - journals are created only on invoice payment;
+  - GRN approval posts nothing;
+  - PO lines are not classified as fixed assets.
+- **Proposal:**
+  - a fixed-asset flag on PO lines;
+  - on GRN approval, an accrual journal (GRNI) and, for assets, an asset-register candidate;
+  - list endpoints for both queues.
+
+### 10. RFQ register counts — LOW
+
+- **Screen:** Tenders & RFx, "Vendor invitations" and "Clarifications" KPIs.
+- **Gap:** `GET /procurement/rfq` does not return invitation or clarification counts. Per-RFQ
+  clarifications exist.
+- **Proposal:** include `_count: { invitations, clarifications }` in the list.
+
+### 11. Vendor master fields — LOW
+
+- **Screen:** vendor register (country, default currency, rating).
+- **Gap:** no `country`. The list returns `settlementCurrencyId` without the code. `vendorRating`
+  is rarely set.
+- **Proposal:**
+  - `country` on `Vendor`;
+  - include `settlementCurrency { code }` in `GET /accounting/vendors`;
+  - a rating update endpoint, if ratings are to be kept.
+
+### 12. Tax-clearance reminder automation — LOW
+
+- **Screen:** Vendor Registry → Automated compliance reminders (cadence, thresholds, last and next run).
+- **Gap:** no scheduler. The screen says "Not configured" and "Never run".
+- **Proposal:** a scheduled job over `taxClearanceExpiryDate` / `taxRevalidationAlertDueAt`
+  (already on `Vendor`), with a settings row and a run log.
+
+### 13. Access requests and the procurement role matrix — LOW
+
+- **Screen:** Configuration & RBAC.
+- **Gap:** roles and grants are managed in Admin; procurement has no access-request workflow.
+- **Proposal:** either link the tab to Admin → Roles, or add an access-request model (request,
+  approve, expire). Decide before building.
+
+### 14. Local proof-of-payment storage — LOW (environment)
+
+- **Behaviour:** `POST /procurement/invoices/:id/payment` uploads the proof through
+  `RemoteUploadService`. With `REMOTE_UPLOAD_SERVICE_URL` empty, that is the shared VPS upload
+  service, even from a local run. Local testing therefore does not exercise payment
+  (`procurement-p2p-flow.mjs --pay` is opt-in).
+- **Proposal:** point local environments at the local mock (`http://127.0.0.1:3050/upload`).
+
+---
+
+## Test assets
+
+| Script | Repo | Proves |
+|---|---|---|
+| `scripts/_uat/procurement-authz-probe.mjs` | nvccz | who can call what, against the permission policy |
+| `scripts/_uat/procurement-p2p-flow.mjs` | nvccz | procure-to-pay through the API as the allowed personas; builds the local dataset |
+| `scripts/_uat/procurement-v23-baseline.mjs` | nvccz-new | per page, as a persona: demo records, live records, KPI cards, errors |
+| `scripts/_uat/procurement-v23-actions.mjs` | nvccz-new | connected controls used through the UI, verified through the API |

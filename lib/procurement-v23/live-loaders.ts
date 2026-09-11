@@ -19,6 +19,7 @@
 import {
   getMyProcurementAccess,
   getProcurementDashboard,
+  listProcurementAuditEvents,
   listGoodsReceivedNotes,
   listMyRequisitions,
   listProcurementInvoices,
@@ -117,6 +118,7 @@ const REQUISITION_STATUS: Record<string, string> = {
   APPROVED: "Approved",
   REJECTED: "Rejected",
   RFQ_SENT: "Sourcing: RFQ sent",
+  CONVERTED_TO_PO: "Converted to PO",
   CANCELLED: "Cancelled",
 }
 
@@ -160,7 +162,8 @@ function matchLabel(v: unknown): string {
 function vendorStatus(v: ProcurementRecord): string {
   if (v.isBlacklisted) return "Blacklisted"
   const tax = String(v.taxComplianceStatus ?? "").toUpperCase()
-  if (tax === "COMPLIANT" || tax === "VALID") return "Prequalified"
+  // ACTIVE is what the backend sets when a valid ITF263 expiry is on file.
+  if (tax === "ACTIVE" || tax === "COMPLIANT" || tax === "VALID") return "Prequalified"
   if (tax === "EXPIRED" || tax === "EXPIRING" || tax === "EXPIRING_SOON") return "Conditional"
   return "Compliance review"
 }
@@ -212,6 +215,7 @@ export async function loadProcurementV23LiveData(): Promise<ProcurementV23LivePa
     invoices,
     vendors,
     dashboard,
+    auditRows,
   ] = await Promise.all([
     // Every department for the desk; a department head sees their own department.
     has("requisitions.view") || isDeptApprover
@@ -229,6 +233,7 @@ export async function loadProcurementV23LiveData(): Promise<ProcurementV23LivePa
     has("invoices.view") ? safe("invoices", listProcurementInvoices, [] as ProcurementRecord[]) : Promise.resolve([] as ProcurementRecord[]),
     has("vendors.view") ? safe("vendors", listVendors, [] as ProcurementRecord[]) : Promise.resolve([] as ProcurementRecord[]),
     has("dashboard.view") ? safe("dashboard", getProcurementDashboard, null) : Promise.resolve(null),
+    has("audit.view") ? safe("audit-events", listProcurementAuditEvents, [] as ProcurementRecord[]) : Promise.resolve([] as ProcurementRecord[]),
   ])
 
   // One register of requisitions: the full list where the role has it, plus the caller's own
@@ -343,6 +348,9 @@ export async function loadProcurementV23LiveData(): Promise<ProcurementV23LivePa
     currency: o.currency?.code ?? null,
     requisition: o.requisition?.requisitionNumber ?? null,
     quotation: o.quotation?.quotationNumber ?? null,
+    // The RFQ this order was awarded from, which links it into the invoice match chain.
+    rfq: o.quotation?.rfqNumber ?? null,
+    acknowledged: Boolean(o.vendorAcknowledgedAt),
     sentAt: o.sentAt ?? null,
     items: (o.items ?? []).map((i: any) => ({
       id: i.id,
@@ -413,7 +421,7 @@ export async function loadProcurementV23LiveData(): Promise<ProcurementV23LivePa
   for (const r of pendingReqs) {
     prompts.push(
       prompt({
-        id: `REQ:${r.id}`,
+        id: `PR-${r.requisitionNumber ?? r.id}`,
         kind: "requisition",
         targetId: r.id,
         type: "Purchase requisition",
@@ -435,7 +443,7 @@ export async function loadProcurementV23LiveData(): Promise<ProcurementV23LivePa
       const lowest = [...bids].sort((a, b) => (num(a.totalAmount) ?? Infinity) - (num(b.totalAmount) ?? Infinity))[0]
       prompts.push(
         prompt({
-          id: `QUO:${lowest.id}`,
+          id: `AWARD-${t.rfqNumber ?? t.id}`,
           kind: "award",
           targetId: lowest.id,
           type: "Tender award",
@@ -455,7 +463,7 @@ export async function loadProcurementV23LiveData(): Promise<ProcurementV23LivePa
     for (const g of grns.filter((x) => String(x.status).toUpperCase() === "RECEIVED")) {
       prompts.push(
         prompt({
-          id: `GRN:${g.id}`,
+          id: `RECEIPT-${g.grnNumber ?? g.id}`,
           kind: "grn",
           targetId: g.id,
           type: "Goods receipt",
@@ -474,7 +482,7 @@ export async function loadProcurementV23LiveData(): Promise<ProcurementV23LivePa
     for (const inv of invoices.filter((x) => ["DRAFT", "PENDING", "PENDING_APPROVAL"].includes(String(x.status).toUpperCase()))) {
       prompts.push(
         prompt({
-          id: `INV:${inv.id}`,
+          id: `INVOICE-${inv.invoiceNumber ?? inv.id}`,
           kind: "invoice",
           targetId: inv.id,
           type: "Invoice",
@@ -488,6 +496,40 @@ export async function loadProcurementV23LiveData(): Promise<ProcurementV23LivePa
       )
     }
   }
+
+  // ----------------------------------------------------------------- audit trail
+  // The audit page renders tuples: [id, event, record, actor, time, class].
+  const AUDIT_ENTITY: Record<string, string> = {
+    PurchaseRequisition: "requisition",
+    ProcurementRfq: "RFQ",
+    RFQ: "RFQ",
+    VendorQuotation: "quotation",
+    PurchaseOrder: "purchase order",
+    GoodsReceivedNote: "goods receipt",
+    ProcurementInvoice: "invoice",
+    Vendor: "vendor",
+  }
+  const auditEventsLive = auditRows.map((a) => {
+    const act = String(a.action ?? "")
+    const cls = /APPROVE|REJECT|BLACKLIST|PAYMENT|SEND/.test(act)
+      ? "Controlled"
+      : /DELETE|CANCEL/.test(act)
+        ? "High priority"
+        : /CREATE|UPDATE|SUBMIT/.test(act)
+          ? "Workflow"
+          : "System"
+    const when = a.occurredAt
+      ? new Date(a.occurredAt).toLocaleString("en-GB", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: false })
+      : DASH
+    return [
+      `AUD-${String(a.id).slice(-8).toUpperCase()}`,
+      `${titleCase(act)} ${AUDIT_ENTITY[a.entityType] ?? titleCase(a.entityType)}`,
+      a.entityLabel ?? a.entityId ?? DASH,
+      a.actorName ?? "System",
+      when,
+      cls,
+    ]
+  })
 
   // ----------------------------------------------------------------- KPI figures
   // Keyed by card label. Where the backend can answer, the figure is computed here and the
@@ -522,7 +564,15 @@ export async function loadProcurementV23LiveData(): Promise<ProcurementV23LivePa
     "Returned drafts": { value: reqStatus("DRAFT") + reqStatus("REJECTED"), sub: "Drafts and rejected requests" },
     "Median approval time": medianDays === null
       ? unknown("No requisition has been approved yet")
-      : { value: `${medianDays < 1 ? medianDays.toFixed(2) : medianDays.toFixed(1)} days`, sub: `Across ${approvedDurations.length} approved` },
+      : {
+          value:
+            medianDays < 1 / 24
+              ? `${Math.max(1, Math.round(medianDays * 1440))} min`
+              : medianDays < 1
+                ? `${(medianDays * 24).toFixed(1)} hours`
+                : `${medianDays.toFixed(1)} days`,
+          sub: `Submission to approval, across ${approvedDurations.length} approved`,
+        },
     "Department isolation": { value: "Enforced", sub: "Department heads see their own department" },
     // Tenders
     "Active tenders": { value: openRfqs.length, sub: "Published or in evaluation" },
@@ -550,6 +600,17 @@ export async function loadProcurementV23LiveData(): Promise<ProcurementV23LivePa
     Prequalified: { value: vendorsView.filter((v) => v.status === "Prequalified").length, sub: "Valid tax clearance on file" },
     "Compliance review": { value: vendorsView.filter((v) => v.status === "Compliance review").length, sub: "Tax clearance not yet verified" },
     Blacklisted: { value: vendorsView.filter((v) => v.isBlacklisted).length, sub: "Excluded from invitations" },
+    // Audit
+    "Events today": has("audit.view")
+      ? {
+          value: auditRows.filter((a) => new Date(a.occurredAt).toDateString() === today).length,
+          sub: auditRows.length >= 200 ? "Within the latest 200 procurement events" : "Procurement events recorded today",
+        }
+      : unknown("The audit trail is not visible to your role"),
+    // Both are enforced by the API: separate grants for award, approval and payment, and a
+    // staff-only gate that refuses external portal accounts.
+    "SoD controls": { value: "Enforced", sub: "Award, approval and payment are separate grants" },
+    "Entity isolation": { value: "Enforced", sub: "External portal accounts are refused" },
   }
 
   const hydrate: Record<string, unknown> = {
@@ -561,6 +622,8 @@ export async function loadProcurementV23LiveData(): Promise<ProcurementV23LivePa
     invoices: invoicesView,
     approvalPromptsV6: prompts,
     currentUserV6: { name: access?.name ?? DASH, role: access?.roleName ?? DASH },
+    auditEventsLive,
+    complianceReminderSettingsV7: NO_REMINDER_AUTOMATION,
   }
   for (const key of NO_BACKEND_YET) hydrate[key] = []
 
@@ -588,7 +651,24 @@ export async function loadProcurementV23LiveData(): Promise<ProcurementV23LivePa
   }
 }
 
+/**
+ * The vendor page shows a reminder schedule with a last and next run. No reminder automation
+ * exists on the backend, so it says so rather than showing the fixture's runs.
+ */
+const NO_REMINDER_AUTOMATION = {
+  enabled: false,
+  cadence: "Not configured",
+  thresholds: DASH,
+  vendorChannel: DASH,
+  internalRecipients: DASH,
+  lastRun: "Never run",
+  nextRun: "Not scheduled",
+}
+
 /** What the runtime is hydrated with before the first live load lands: no demo records at all. */
-export const EMPTY_PROCUREMENT_HYDRATE: Record<string, unknown> = Object.fromEntries(
-  ["requisitions", "tenders", "vendors", "orders", "grns", "invoices", "approvalPromptsV6", ...NO_BACKEND_YET].map((k) => [k, []]),
-)
+export const EMPTY_PROCUREMENT_HYDRATE: Record<string, unknown> = {
+  ...Object.fromEntries(
+    ["requisitions", "tenders", "vendors", "orders", "grns", "invoices", "approvalPromptsV6", "auditEventsLive", ...NO_BACKEND_YET].map((k) => [k, []]),
+  ),
+  complianceReminderSettingsV7: NO_REMINDER_AUTOMATION,
+}

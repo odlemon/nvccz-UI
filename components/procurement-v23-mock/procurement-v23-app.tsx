@@ -16,6 +16,7 @@ import {
 } from "@/lib/procurement-v23/live-loaders"
 import {
   handleProcurementV23Action,
+  isUnconnectedWrite,
   LIVE_ACTIONS,
   NOT_YET_LIVE_ACTIONS,
 } from "@/lib/procurement-v23/actions"
@@ -58,6 +59,7 @@ export function ProcurementV23App() {
       void loadProcurementV23LiveData()
         .then((payload) => {
           if (disposed) return
+          const firstLoad = liveRef.current === null
           liveRef.current = payload
           // Read by the runtime bridge (__pr23Kpi, __pr23NavCount) on the render hydrate triggers.
           ;(window as unknown as { __pr23Live?: unknown }).__pr23Live = {
@@ -65,7 +67,16 @@ export function ProcurementV23App() {
             navCounts: payload.navCounts,
             access: payload.access,
           }
-          runtimeUi()?.hydrate?.(payload.hydrate)
+          // The requisitions page opens on the approver queue only for someone who approves
+          // requisitions. The runtime decided it from its demo user's role; after the first load
+          // the user's own tab choice is kept.
+          const approvesRequisitions =
+            payload.access?.departmentRole === "HEAD" || payload.access?.departmentRole === "DEPUTY"
+          runtimeUi()?.hydrate?.(
+            firstLoad
+              ? { ...payload.hydrate, prViewV11: approvesRequisitions ? "approver" : "requester" }
+              : payload.hydrate,
+          )
 
           // A 403 is expected on a register the role cannot see; anything else is a failure
           // worth saying out loud rather than rendering a quietly empty page.
@@ -90,7 +101,7 @@ export function ProcurementV23App() {
       const control = (event.target as Element | null)?.closest?.("[data-action]") as HTMLElement | null
       if (!control) return
       const action = control.dataset.action || ""
-      if (!API_ACTIONS.has(action)) return
+      if (!API_ACTIONS.has(action) && !isUnconnectedWrite(action)) return
       event.preventDefault()
       event.stopImmediatePropagation()
       if (busyRef.current) return

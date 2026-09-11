@@ -40,6 +40,7 @@
  *   POST   /accounting/vendors/:id/blacklist              {blacklistReason}
  *   POST   /accounting/vendors/:id/unblacklist
  *   GET    /procurement-approval-configs
+ *   GET    /procurement/audit-events                      procurement audit trail, newest first (procurement.audit.view)
  *
  * Authorisation: every route is staff-only, and most carry a procurement.* permission
  * (nvccz src/config/procurementPermissions.ts). A 403 means the role lacks the grant, not that
@@ -324,6 +325,13 @@ export async function unblacklistVendor(id: string): Promise<ProcurementRecord> 
 // ---------------------------------------------------------------------------
 
 export const listApprovalConfigs = () => list("/procurement-approval-configs")
+
+// ---------------------------------------------------------------------------
+// Audit
+// ---------------------------------------------------------------------------
+
+/** Newest first: {id, occurredAt, action, entityType, entityId, entityLabel, actorName}. */
+export const listProcurementAuditEvents = () => list("/procurement/audit-events?limit=200")
 
 // ---------------------------------------------------------------------------
 // Files

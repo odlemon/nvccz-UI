@@ -91,6 +91,40 @@ export const NOT_YET_LIVE_ACTIONS = [
   "send-invitations",
 ] as const
 
+/**
+ * Terminal steps that only change the runtime's in-browser store and toast success, beyond the
+ * confirm-/save-/submit- family. Openers (buttons that only show a form) are not listed: the form
+ * is harmless, and its own confirm step is refused.
+ */
+const UNCONNECTED_TERMINAL_STEPS = new Set<string>([
+  ...NOT_YET_LIVE_ACTIONS,
+  "approve-access-v5",
+  "approve-esign",
+  "approve-match-v5",
+  "approve-pr",
+  "approve-record",
+  "delete-document",
+  "delete-record",
+  "sync-accounting",
+  "run-report-template-v5",
+  "create-report-template-v5",
+  "create-role-confirm",
+  "esign-sign-v6",
+  "esign-remind-v6",
+  // Vendor Registry "Run now": no reminder automation exists on the backend.
+  "run-compliance-reminders-v6",
+  "run-reminder-automation-v7",
+])
+
+/**
+ * True for an action that would record something the backend never receives. In a live session
+ * these are refused with that said, rather than letting the runtime report a save that did not happen.
+ */
+export function isUnconnectedWrite(action: string): boolean {
+  if ((LIVE_ACTIONS as readonly string[]).includes(action)) return false
+  return /^(confirm|save|submit)-/.test(action) || UNCONNECTED_TERMINAL_STEPS.has(action)
+}
+
 function val(selector: string): string {
   const el = document.querySelector<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>(selector)
   return (el?.value ?? "").trim()
@@ -125,7 +159,7 @@ export async function handleProcurementV23Action(
   const rows = (key: string) => ((live?.hydrate?.[key] as any[]) ?? [])
   const byDisplayId = (key: string, id?: string) => rows(key).find((r) => r.id === id || r.recordId === id)
 
-  if ((NOT_YET_LIVE_ACTIONS as readonly string[]).includes(action)) {
+  if (isUnconnectedWrite(action)) {
     return {
       handled: true,
       error: "This step is not connected to the backend yet, so nothing was saved.",
@@ -270,7 +304,14 @@ export async function handleProcurementV23Action(
       // ------------------------------------------------------------------ vendors
       case "register-vendor-confirm":
       case "register-vendor-confirm-v6": {
-        const formId = action === "register-vendor-confirm-v6" ? "#vendorRegisterFormV6" : "#vendorForm"
+        // The V6 register button opens #vendorFormV6; older layers used #vendorRegisterFormV6, and
+        // the base page #vendorForm. Read whichever is on screen, as the runtime's own handler does.
+        const formId =
+          action === "register-vendor-confirm-v6"
+            ? document.querySelector("#vendorFormV6")
+              ? "#vendorFormV6"
+              : "#vendorRegisterFormV6"
+            : "#vendorForm"
         const form = document.querySelector<HTMLFormElement>(formId)
         if (form && !form.reportValidity()) return { handled: true }
         const name = val(`${formId} [name="name"]`) || val(`${formId} [name="legalName"]`)
@@ -290,10 +331,11 @@ export async function handleProcurementV23Action(
         // Bank details are held back on purpose: they are owned by finance
         // (procurement.vendors.banks.manage) and are the field a payment-redirection fraud changes.
         const bankTyped = val(`${formId} [name="accountNumber"]`) || val(`${formId} [name="bank"]`)
+        const cleared = String(created?.taxComplianceStatus ?? "").toUpperCase() === "ACTIVE"
         return {
           handled: true,
           reload: true,
-          message: `${created?.name ?? name} registered and placed in compliance review.${bankTyped ? " Bank details were not saved here; Finance records them." : ""}`,
+          message: `${created?.name ?? name} registered${cleared ? " with a valid tax clearance" : " and placed in compliance review"}.${bankTyped ? " Bank details were not saved here; Finance records them." : ""}`,
         }
       }
 

@@ -6,7 +6,7 @@
 | Severity | Open | Fixed locally, not deployed | Deployed and verified |
 |---|---|---|---|
 | CRITICAL | 0 | 0 | 1 |
-| HIGH | 0 | 1 | 0 |
+| HIGH | 0 | 2 | 0 |
 | MEDIUM | 0 | 1 | 0 |
 | LOW | 0 | 1 | 0 |
 
@@ -318,6 +318,85 @@ Commit `b7e2163` on `feature/procurement-v23-live` (nvccz):
 The authorisation probe now carries this row, and every asserted cell matches the policy.
 
 **Status:** FIXED LOCALLY — not deployed.
+
+---
+
+## PROC-FINDING-005
+
+**Title:** Procurement V23 showed the vendored demo dataset as the organisation's records, and its forms confirmed saves that were never made
+**Module:** Procurement V23 (frontend) · **Dimension:** QAT · **Category:** Data Integrity / Functional
+**Severity:** HIGH
+**Persona affected:** Everyone who uses the module
+**Surface:** UI · `/procurement-v23/*`
+
+### Steps to reproduce
+
+1. Sign in as any staff persona, with no procurement records in the database.
+2. Open any V23 page.
+3. Raise a requisition, record a GRN, or approve anything.
+
+### Expected
+
+The organisation's own records, or an honest empty state. A save either reaches the API or is
+refused with the reason.
+
+### Actual
+
+- **Demo data shown as real (reproduced):** `procurement-v23-baseline.mjs` found:
+  - 16 of 17 pages showing demo records — `PR-X8F2-0187`, `TN-2026-014`, `TechNova Solutions`,
+    `PO-2026-0584` — while the database held no requisition, RFQ, PO, GRN or invoice;
+  - 113 KPI cards carrying fixture literals, such as "Vendors 482" and "Open tenders 8";
+  - sidebar badges, the cycle donut ("287 active records"), the spend trend and the category
+    bars, all fixed.
+- **Saves that never happened (from the runtime source):** the handlers do not call the API.
+  - `submitPR` adds a row to the in-browser store and toasts "Approval routing was created and
+    the department head was notified".
+  - `create-grn-confirm` toasts "GRN created".
+  - `approve-prompt-v6` flips the prompt's status in memory.
+
+  Before the fix, the host routed no action anywhere, so none of these could have reached the
+  API. This part was established from the code, not reproduced in a browser.
+
+### Root cause
+
+`components/procurement-v23-mock/procurement-v23-app.tsx` mounted the vendored runtime and
+nothing else: no loaders, no hydrate, no action routing.
+
+### Fix
+
+nvccz-new `9d3c7fd` and the cycle-two commit on `feature/procurement-v23-live`:
+
+- **Data:** live loaders by grant, and every demo-bearing store hydrated from the API or emptied.
+- **Figures:** KPI literals become live figures or an em dash; fixture charts become empty
+  states; the donuts, invoice-match chains and attention list are derived from records.
+- **Approvals:** prompts built only from real pending decisions.
+- **Actions:**
+  - connected: raise, submit, approve and reject a requisition; award; approve and reject a
+    GRN; approve an invoice; register a vendor; send a PO;
+  - every other confirm, save or submit step is refused as not connected, so nothing is
+    reported as saved when it was not.
+
+### Verification
+
+| | Before | After |
+|---|---|---|
+| Pages showing demo records (System Administrator, Procurement Officer, Operations head, Operations member) | 16 / 17 | **0 / 17** |
+| Page or console errors | 0 | 0 |
+| Raise a requisition through the form (Operations member) | in-memory row only | **`REQ_20260911_0004` PENDING_APPROVAL**, Operations, read back from the API |
+| Approve a requisition in the Approval Centre (Operations head) | in-memory status | **`REQ_20260911_0002` APPROVED** |
+| Award from the Approval Centre (Procurement Manager) | in-memory status | **`QUO_20260911_0005` accepted, `PO_20260911_0002` raised and sent** |
+| Register a vendor through the V6 form (Procurement Officer) | in-memory row | **vendor created**, with email, BP number and tax status |
+| Confirm a GRN in the still-unconnected modal | "GRN created" | **refused**: "not connected to the backend yet", GRN count 1 → 1 |
+| Audit & Compliance event stream | five invented events | the real procurement audit trail (`GET /procurement/audit-events`) |
+
+Evidence scripts:
+- `scripts/_uat/procurement-v23-actions.mjs` checks each action through the API afterwards;
+- `scripts/_uat/procurement-v23-baseline.mjs --live=…` reports the census per page.
+
+**Status:** FIXED LOCALLY for the screens and actions listed — not deployed. The steps still
+unconnected (RFx builder, bid scoring, GRN recording, invoice capture, plans, contracts,
+documents) are refused rather than faked. They are tracked in
+[`../procurement-v23-backend-asks.md`](../procurement-v23-backend-asks.md) and the next cycle.
 
 ---
 
