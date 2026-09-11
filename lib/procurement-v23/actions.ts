@@ -155,6 +155,17 @@ const UNCONNECTED_TERMINAL_STEPS = new Set<string>([
   "run-ocr",
   "scan-delivery",
   "upload-document",
+  // A second sweep, of the runtime's switch-case handlers: each toasts a finished outcome, some
+  // with invented figures ("OCR confidence 94.2%", "three dormant assignments"), and saves nothing.
+  "vendor-save-draft",
+  "vendor-submit-bid",
+  "extract-invoice",
+  "flag-invoice",
+  "email-po",
+  "new-folder",
+  "access-review",
+  "archive-record",
+  "validate-plan-v5",
 ])
 
 /**
