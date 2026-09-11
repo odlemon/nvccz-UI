@@ -1049,6 +1049,10 @@ export async function loadProcurementV23LiveData(): Promise<ProcurementV23LivePa
     "Board packs": unknown("Board packs are not stored"),
     "Downloads this month": unknown("Report downloads are not logged"),
     "Data freshness": { value: "Live", sub: "Registers load from the API when the page opens" },
+    // Audit & Compliance: nothing measures these yet, and "no live source" said too little.
+    "Accounting accuracy": unknown("Journal accuracy is not measured in procurement"),
+    "Document retrieval": unknown("Vault retrieval is not measured"),
+    "Immutable records": unknown("Record immutability is not attested yet"),
   }
 
   const hydrate: Record<string, unknown> = {

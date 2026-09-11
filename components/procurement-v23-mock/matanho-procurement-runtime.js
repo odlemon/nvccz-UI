@@ -1146,6 +1146,30 @@ function __pr23PlanObservationsHtml() {
   return `<div class="card-body list">${rows.map(([p, text, level]) => `<div class="list-row"><div class="list-main"><strong>${__pr23Esc(p.id)} · ${__pr23Esc(p.name)}</strong><span>${__pr23Esc(text)}</span></div>${status(level)}</div>`).join('')}</div>`;
 }
 
+/**
+ * Vendor Registry compliance filter: shows only the vendors whose tax clearance has the chosen status,
+ * and says how many. It only announced "Showing vendors with expired compliance records" and filtered
+ * nothing. Clicking the same status again shows every vendor.
+ */
+function __pr23VendorComplianceFilter(id) {
+  const want = String(id || '');
+  const rows = [...document.querySelectorAll('#workspace table tbody tr')].filter(r => r.querySelector('.vendor-doc-chip-v6'));
+  if (!rows.length) return toast('Nothing to filter', 'No vendor is in the registry yet.');
+  const clearing = state.__pr23VendorFilter === want;
+  state.__pr23VendorFilter = clearing ? null : want;
+  let shown = 0;
+  for (const row of rows) {
+    const chip = (row.querySelector('.vendor-doc-chip-v6').textContent || '').trim();
+    const match = want === 'Review' ? !['Valid', 'Expiring', 'Expired'].includes(chip) : chip === want;
+    const keep = clearing || match;
+    row.style.display = keep ? '' : 'none';
+    if (keep) shown += 1;
+  }
+  if (clearing) return toast('Compliance filter cleared', `Showing all ${rows.length} vendors.`);
+  const what = want === 'Review' ? 'tax clearance that needs review' : `${want.toLowerCase()} tax clearance`;
+  return toast('Compliance filter applied', `${shown} of ${rows.length} vendors have ${what}. Choose it again to show all.`);
+}
+
 /** Share: the page's own address, copied. No expiring or special link exists, so none is claimed. */
 function __pr23CopyPageLink() {
   const href = location.href;
@@ -2866,7 +2890,7 @@ window.MatanhoProcurement=Object.freeze({version:'8.0.0',navigate,render,getStat
     'vendor-upload-doc-v6':a=>documentUploadModalV6('Vendor Submissions'),
     'send-vendor-reminder-v6':a=>{requestVendorDocsModalV6(a.dataset.id)},
     'preview-tax-clause-v6':a=>{const v=state.vendors.find(x=>x.id===a.dataset.id);const r=taxRuleV6(v);previewDocV6({id:`TAX-${v.id}`,name:`${v.name} Purchase Tax and Compliance Clause`,version:'Current rule',status:r.status,owner:'Finance and Procurement',content:`<h1>Purchase Tax and Compliance Clause</h1><p><strong>Vendor:</strong> ${esc(v.name)}</p><p><strong>Tax clearance status:</strong> ${esc(r.status)}</p><h2>Purchase Order Clause</h2><p>${esc(r.poClause)}</p><h2>Contract Clause</h2><p>${esc(r.contractClause)}</p><h2>Control</h2><p>The tax treatment is recalculated at purchase, invoice and payment review. Automated reminders do not override statutory deductions or approval controls.</p>`})},
-    'vendor-compliance-filter-v6':a=>toast('Compliance filter applied',`Showing vendors with ${a.dataset.id.toLowerCase()} compliance records.`),
+    'vendor-compliance-filter-v6':a=>{if(__pr23Live())return __pr23VendorComplianceFilter(a.dataset.id);toast('Compliance filter applied',`Showing vendors with ${a.dataset.id.toLowerCase()} compliance records.`)},
 
     'open-plan-actual-v6':()=>{state.planViewV6='actuals';render()},
     'back-plan-v6':()=>{state.planViewV6='standard';render()},

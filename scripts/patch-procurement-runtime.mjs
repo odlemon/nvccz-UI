@@ -1055,6 +1055,15 @@ s = replaceUnique(
   s = replaceUnique(s, find, repl, "actuals vs plan: management observations from approved plans", "__pr23PlanObservationsHtml()")
 }
 
+// Vendor Registry compliance filter announced a filter and filtered nothing.
+s = replaceUnique(
+  s,
+  "'vendor-compliance-filter-v6':a=>toast('Compliance filter applied',`Showing vendors with ${a.dataset.id.toLowerCase()} compliance records.`),",
+  "'vendor-compliance-filter-v6':a=>{if(__pr23Live())return __pr23VendorComplianceFilter(a.dataset.id);toast('Compliance filter applied',`Showing vendors with ${a.dataset.id.toLowerCase()} compliance records.`)},",
+  "vendor registry: the compliance filter filters and says how many match",
+  "return __pr23VendorComplianceFilter(a.dataset.id);",
+)
+
 // Opening a department budget with none recorded crashed the page ("reading 'department'").
 s = replaceUnique(
   s,
