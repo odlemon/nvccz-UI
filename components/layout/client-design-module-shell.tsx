@@ -8,6 +8,7 @@ import { ArcusAppSwitcherProvider } from "./arcus-app-switcher-provider"
 import { SharedTopbar } from "./shared-topbar"
 import { getModuleByPath } from "@/lib/config/modules"
 import { useClientDesignAuthBridge } from "@/lib/client-design-mock/auth-bridge"
+import { useBrandLogoOverride } from "@/lib/client-design-mock/brand-logo-override"
 import "@/components/layout/arcus-header-overrides.css"
 
 interface ClientDesignModuleShellProps {
@@ -37,6 +38,7 @@ export function ClientDesignModuleShell({
   hideThemeToggle = false,
 }: ClientDesignModuleShellProps) {
   useClientDesignAuthBridge()
+  useBrandLogoOverride()
   const [currentModule, setCurrentModule] = useState(defaultModuleId)
   const pathname = usePathname()
 

@@ -4,6 +4,7 @@ import { usePathname } from "next/navigation"
 import Link from "next/link"
 import { cn } from "@/lib/utils"
 import { getModuleById } from "@/lib/config/modules"
+import { ORG_LOGO_PATH, ORG_NAME } from "@/lib/branding"
 
 interface AdminSidebarProps {
   /** Mobile drawer state — ignored at md+ where the sidebar is always visible. */
@@ -35,11 +36,19 @@ export function AdminSidebar({ mobileOpen = false, onMobileClose }: AdminSidebar
       )}
       <aside
         className={cn(
-          "w-64 bg-white border-r border-border h-[calc(100vh-5rem)] overflow-y-auto z-30",
-          "fixed top-20 left-0 transition-transform duration-200 md:sticky md:translate-x-0",
+          "w-64 bg-white border-r border-border overflow-y-auto z-30",
+          "fixed top-20 left-0 h-[calc(100vh-5rem)] transition-transform duration-200",
+          "md:sticky md:top-0 md:left-auto md:h-screen md:translate-x-0",
           mobileOpen ? "translate-x-0" : "-translate-x-full",
         )}
       >
+        <div className="flex h-20 shrink-0 items-center border-b border-border px-4">
+          <img
+            src={ORG_LOGO_PATH}
+            alt={ORG_NAME}
+            className="h-9 w-auto max-w-[150px] object-contain object-left"
+          />
+        </div>
         <div className="p-4 space-y-4">
           {/* Module Header */}
           <div className="flex items-center gap-3 p-3 rounded-lg bg-gradient-to-r from-purple-50 to-purple-100">

@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { getModuleById } from "@/lib/config/modules"
 import { useRolePermissions } from "@/lib/hooks/useRolePermissions"
+import { ORG_LOGO_PATH, ORG_NAME } from "@/lib/branding"
 
 export function StreetRatesSidebar() {
   const pathname = usePathname()
@@ -47,7 +48,14 @@ export function StreetRatesSidebar() {
   }, [module.subModules, hasSubModuleAccess, isLoading])
 
   return (
-    <aside className="w-64 bg-white border-r border-border h-[calc(100vh-5rem)] overflow-y-auto sticky top-20 z-10">
+    <aside className="w-64 bg-white border-r border-border h-screen overflow-y-auto sticky top-0 z-10">
+      <div className="flex h-20 shrink-0 items-center border-b border-border px-4">
+        <img
+          src={ORG_LOGO_PATH}
+          alt={ORG_NAME}
+          className="h-9 w-auto max-w-[150px] object-contain object-left"
+        />
+      </div>
       <div className="p-4 space-y-4">
         <div className="flex items-center gap-3 p-3 rounded-lg bg-gradient-to-r from-amber-50 to-amber-100">
           <div

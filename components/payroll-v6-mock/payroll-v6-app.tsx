@@ -57,6 +57,12 @@ const API_ACTIONS = new Set([
   // Pay group creation: the control opened a modal with no fields.
   "save-paygroup",
   "terminate-employee",
+  // Document vault: a real upload and the stored file, not an in-memory record and a
+  // Word file generated in the browser (FINDING-017).
+  "confirm-upload",
+  "download-doc",
+  // Pay calendar: periods persist through PUT /payroll/pay-groups/:id/periods.
+  "save-period",
 ])
 
 /** Hand a generated file to the browser. */
@@ -108,9 +114,14 @@ export function PayrollV6App() {
           ;(window as any).MatanhoUI?.hydrate?.(payload)
 
           // Surface loader failures instead of rendering a quietly empty page.
-          // A 403 is expected for screens the current role cannot see, so it is
-          // reported as a permission notice rather than an error.
-          const hard = payload.errors.filter((e) => e.status !== 403)
+          // A 403 is expected for screens the current role cannot see. A 404 from
+          // the "employee/*" self-service sources means this account (e.g. an
+          // admin/system login) has no linked payroll employee record, which is
+          // just as expected -- every signed-in user gets a My Pay page attempt,
+          // not every user is an employee. Both are notices, not failures.
+          const hard = payload.errors.filter(
+            (e) => e.status !== 403 && !(e.status === 404 && e.source.startsWith("employee/")),
+          )
           if (hard.length) {
             toast.error(
               hard.length === 1

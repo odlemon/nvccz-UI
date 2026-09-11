@@ -39,13 +39,9 @@ export function AdminLayout({ children }: AdminLayoutProps) {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Admin Management is light-only: its pages (Company Addresses, User/Role
-          Management) hardcode light-theme classes and ship no dark variant, so a dark
-          preference carried in from another module left the topbar dark above a page
-          that stayed light. hideThemeToggle both hides the toggle and forces light,
-          same as Street Rates / Fundraising / FP&A. */}
-      <SharedTopbar onModuleSelect={handleModuleSelect} currentModule={currentModule} hideThemeToggle />
-
+      {/* Sidebar first, topbar inside the right-hand column, so the sidebar runs
+          the full height of the viewport and touches the top the way Portfolio's
+          does. Matches Events / FP&A / Fundraising. */}
       <div className="flex">
         <button
           type="button"
@@ -57,9 +53,17 @@ export function AdminLayout({ children }: AdminLayoutProps) {
           Menu
         </button>
         <AdminSidebar mobileOpen={mobileSidebarOpen} onMobileClose={() => setMobileSidebarOpen(false)} />
-        <main className="flex-1 overflow-auto pt-12 md:pt-0">
-          {children}
-        </main>
+        <div className="flex min-w-0 flex-1 flex-col">
+          {/* Admin Management is light-only: its pages (Company Addresses, User/Role
+              Management) hardcode light-theme classes and ship no dark variant, so a dark
+              preference carried in from another module left the topbar dark above a page
+              that stayed light. hideThemeToggle both hides the toggle and forces light,
+              same as Street Rates / Fundraising / FP&A. */}
+          <SharedTopbar onModuleSelect={handleModuleSelect} currentModule={currentModule} hideThemeToggle />
+          <main className="flex-1 overflow-auto pt-12 md:pt-0">
+            {children}
+          </main>
+        </div>
       </div>
     </div>
   )

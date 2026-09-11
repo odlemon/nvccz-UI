@@ -8,8 +8,10 @@ import { ClientDesignAppSwitcher } from "./client-design-app-switcher"
 import { ArcusAppSwitcherProvider } from "./arcus-app-switcher-provider"
 import { FundraisingKycApp } from "@/components/fundraising-kyc-mock/fundraising-kyc-app"
 import { MODULE_CONFIG, getModuleByPath } from "@/lib/config/modules"
+import { useBrandLogoOverride } from "@/lib/client-design-mock/brand-logo-override"
 
 export function FundraisingKycLayout({ children }: { children: React.ReactNode }) {
+  useBrandLogoOverride()
   const [currentModule, setCurrentModule] = useState("fundraising-kyc")
   const pathname = usePathname()
 

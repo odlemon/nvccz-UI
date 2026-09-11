@@ -28,10 +28,15 @@ export function StreetRatesLayout({ children }: StreetRatesLayoutProps) {
 
   return (
     <div className="min-h-screen bg-background" data-module="street-rates">
-      <SharedTopbar onModuleSelect={handleModuleSelect} currentModule={currentModule} hideThemeToggle />
+      {/* Sidebar first, topbar inside the right-hand column, so the sidebar runs
+          the full height of the viewport and touches the top the way Portfolio's
+          does. Matches Events / FP&A / Fundraising. */}
       <div className="flex">
         <StreetRatesSidebar />
-        <main className="flex-1 overflow-auto">{children}</main>
+        <div className="flex min-w-0 flex-1 flex-col">
+          <SharedTopbar onModuleSelect={handleModuleSelect} currentModule={currentModule} hideThemeToggle />
+          <main className="flex-1 overflow-auto">{children}</main>
+        </div>
       </div>
     </div>
   )
