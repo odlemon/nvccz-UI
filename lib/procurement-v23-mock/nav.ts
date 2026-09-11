@@ -5,6 +5,9 @@ export const PR23_PAGE_TO_PATH: Record<string, string> = {
   'approvals': '/procurement-v23/approvals',
   'requisitions': '/procurement-v23/requisitions',
   'tenders': '/procurement-v23/tenders',
+  // A later runtime layer adds "Quotation Comparison" to the sidebar. Without its own path the
+  // host routed it to /procurement-v23, and the page flipped straight back to the dashboard.
+  'quotations': '/procurement-v23/quotations',
   'evaluation': '/procurement-v23/evaluation',
   'vendors': '/procurement-v23/vendors',
   'contracts': '/procurement-v23/contracts',
@@ -39,6 +42,7 @@ export const PR23_NAV_PAGES = [
   { id: 'pr23-approvals', page: 'approvals', path: '/procurement-v23/approvals', name: 'Approval Centre' },
   { id: 'pr23-requisitions', page: 'requisitions', path: '/procurement-v23/requisitions', name: 'Purchase Requisitions' },
   { id: 'pr23-tenders', page: 'tenders', path: '/procurement-v23/tenders', name: 'Tenders & RFx' },
+  { id: 'pr23-quotations', page: 'quotations', path: '/procurement-v23/quotations', name: 'Quotation Comparison' },
   { id: 'pr23-evaluation', page: 'evaluation', path: '/procurement-v23/evaluation', name: 'Bid Evaluation' },
   { id: 'pr23-vendors', page: 'vendors', path: '/procurement-v23/vendors', name: 'Vendor Registry' },
   { id: 'pr23-contracts', page: 'contracts', path: '/procurement-v23/contracts', name: 'Contracts & Awards' },

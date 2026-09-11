@@ -34,6 +34,7 @@ const PAGES = [
   ["approvals", "/procurement-v23/approvals"],
   ["requisitions", "/procurement-v23/requisitions"],
   ["tenders", "/procurement-v23/tenders"],
+  ["quotations", "/procurement-v23/quotations"],
   ["evaluation", "/procurement-v23/evaluation"],
   ["vendors", "/procurement-v23/vendors"],
   ["contracts", "/procurement-v23/contracts"],

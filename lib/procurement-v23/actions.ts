@@ -64,6 +64,7 @@ export const LIVE_ACTIONS = [
   "save-bid-winner-v6",
   "create-grn-confirm",
   "confirm-capture-invoice-v5",
+  "pr-to-rfq",
 ] as const
 
 /**
@@ -127,6 +128,32 @@ const UNCONNECTED_TERMINAL_STEPS = new Set<string>([
   "run-reminder-automation-v7",
   // OCR extraction of an uploaded invoice is not connected; manual capture is.
   "extract-invoice-v5",
+  // Found by a static sweep of the runtime's handlers: each edits the in-browser store or
+  // announces success, and none has a backend behind it yet.
+  "apply-signature-v6",
+  "send-esign",
+  "send-esign-envelope-v6",
+  "esign-decline-v6",
+  "esign-reminder-v6",
+  "capitalise-asset",
+  "duplicate-role-v6",
+  "add-sod-rule-v6",
+  "run-user-sod-v6",
+  "import-idp-groups-v6",
+  "toggle-permission",
+  "toggle-rbac-v5",
+  "toggle-rbac-v6",
+  "resolve-vendor-message-v6",
+  "send-vendor-doc-request-v6",
+  "send-vendor-message-v6",
+  "send-vendor-link",
+  "create-contract",
+  "create-match-exception-v5",
+  "create-po",
+  "import-plan",
+  "run-ocr",
+  "scan-delivery",
+  "upload-document",
 ])
 
 /**
@@ -367,6 +394,16 @@ export async function handleProcurementV23Action(
       }
 
       // ------------------------------------------------------------ tender builder
+      case "pr-to-rfq": {
+        // The runtime toasted "RFQ draft created" and created nothing. Open the real tender
+        // builder instead, whose sources are the approved requisitions awaiting sourcing.
+        if (!has("rfq.manage")) return refuse("raising RFQs")
+        closeRuntimeOverlay()
+        const ui = (window as unknown as { MatanhoProcurementUI?: { createTender?: () => void } }).MatanhoProcurementUI
+        requestAnimationFrame(() => ui?.createTender?.())
+        return { handled: true }
+      }
+
       case "create-send-tender-v13":
       case "create-send-tender-from-preview-v13": {
         if (!has("rfq.manage")) return refuse("sending RFQs")

@@ -184,7 +184,6 @@ const NO_BACKEND_YET = [
   "notifications",
   "approvals",
   "accessRequests",
-  "contractsV6",
   "signatureEnvelopesV6",
   "vendorMessagesV6",
   "vendorRequestsV6",
@@ -448,6 +447,16 @@ export async function loadProcurementV23LiveData(): Promise<ProcurementV23LivePa
         evaluationScore: num(c.evaluationScore),
         priceScore: num(c.priceScore),
         weighted: complete ? num(c.compositeScore) : null,
+        deliveryTime: q.deliveryTime ?? null,
+        paymentTerms: q.paymentTerms ?? null,
+        reviewedAt: q.reviewedAt ?? null,
+        // Line totals are quantity × unit price as quoted, excluding VAT.
+        items: ((q.items ?? []) as any[]).map((i) => ({
+          itemName: i.itemName,
+          quantity: num(i.quantity),
+          unitPrice: num(i.unitPrice),
+          lineTotal: (num(i.quantity) ?? 0) * (num(i.unitPrice) ?? 0),
+        })),
       }
     })
     rows.sort((a, b) =>
@@ -461,6 +470,33 @@ export async function loadProcurementV23LiveData(): Promise<ProcurementV23LivePa
       complete,
     }
   })
+
+  // ----------------------------------------------------------------- contracts & awards
+  // The backend has no contract record; the award is the accepted quotation and its purchase
+  // order. The register lists those awards and says so, rather than inventing contract terms:
+  // there is no end date, so the expiry column shows a dash.
+  const tenderByNumber = new Map(tendersView.map((t) => [t.id, t]))
+  const poByQuotation = new Map(orders.filter((o) => o.quotationId).map((o) => [o.quotationId, o]))
+  const contractsView = quotations
+    .filter((q) => String(q.status).toUpperCase() === "ACCEPTED")
+    .map((q) => {
+      const tender = q.rfqNumber ? tenderByNumber.get(q.rfqNumber) : undefined
+      const po = poByQuotation.get(q.id)
+      return {
+        id: po?.poNumber ?? q.quotationNumber ?? q.id,
+        recordId: q.id,
+        tender: q.rfqNumber ?? DASH,
+        title: tender?.title ?? DASH,
+        vendor: q.companyName || q.vendorName || DASH,
+        entity: tender?.entity ?? DASH,
+        value: num(q.totalAmount),
+        start: q.reviewedAt ? String(q.reviewedAt).slice(0, 10) : DASH,
+        end: DASH,
+        status: "Awarded",
+        quotation: q.quotationNumber ?? null,
+      }
+    })
+    .sort((a, b) => String(b.start).localeCompare(String(a.start)))
 
   // ----------------------------------------------------------------- approval prompts
   // Built only from decisions the signed-in user can actually take, each pointing at a real
@@ -689,6 +725,7 @@ export async function loadProcurementV23LiveData(): Promise<ProcurementV23LivePa
     complianceReminderSettingsV7: NO_REMINDER_AUTOMATION,
     quotationsLive: quotationsView,
     evaluationLive,
+    contractsV6: contractsView,
   }
   for (const key of NO_BACKEND_YET) hydrate[key] = []
 

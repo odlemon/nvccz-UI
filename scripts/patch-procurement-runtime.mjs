@@ -560,6 +560,55 @@ s = replaceUnique(
 )
 
 // ---------------------------------------------------------------------------
+// 16b. Quotation Comparison: the tender's real quotations, not a fixture dataset
+// ---------------------------------------------------------------------------
+// The workspace drew every tender from quotationDatasetV7 — the same four invented vendors,
+// prices and line items — and the register marked the second row "1 compliance review" by index.
+s = replaceUnique(
+  s,
+  "function quotationWorkspaceV7(id){",
+  "function quotationWorkspaceV7(id){if(__pr23Live())return __pr23QuotationWorkspaceHtml(id);",
+  "quotation comparison workspace -> real quotations",
+  "if(__pr23Live())return __pr23QuotationWorkspaceHtml(id);",
+)
+s = replaceUnique(
+  s,
+  "<span class=\"vendor-doc-chip-v6 ${i===0?'valid':i===1?'expiring':'valid'}\">${i===1?'1 compliance review':'Ready'}</span>",
+  "${__pr23Live()?__pr23QuotationChip(t.id):`<span class=\"vendor-doc-chip-v6 ${i===0?'valid':i===1?'expiring':'valid'}\">${i===1?'1 compliance review':'Ready'}</span>`}",
+  "quotation register chip -> awarded or scored count",
+  "${__pr23Live()?__pr23QuotationChip(t.id)",
+)
+
+// ---------------------------------------------------------------------------
+// 16c. Notifications drawer and Configuration & RBAC
+// ---------------------------------------------------------------------------
+s = replaceUnique(
+  s,
+  "case 'notifications':openDrawer('Notifications','Workflow, compliance and system events',",
+  "case 'notifications':if(__pr23Live()){openDrawer('Notifications','Workflow, compliance and system events',__pr23NotificationsHtml());break;}openDrawer('Notifications','Workflow, compliance and system events',",
+  "notifications drawer -> live counts",
+  "__pr23NotificationsHtml());break;}",
+)
+{
+  const label = "settings page -> real permissions, managed in Admin"
+  const marker = "if(__pr23Live())return __pr23SettingsPageHtml();"
+  if (s.includes(marker)) {
+    console.log(`  skip (already)  ${label}`)
+    skipped += 1
+  } else {
+    const found = [...s.matchAll(/function settingsPageV6 *\(\) *\{/g)]
+    if (found.length !== 1) {
+      console.warn(`  MISS            ${label} (${found.length} occurrences, expected 1)`)
+      missed += 1
+    } else {
+      s = s.replace(found[0][0], `${found[0][0]}${marker}`)
+      console.log(`  patch           ${label}`)
+      applied += 1
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
 // 17. Record GRN and Capture invoice open real forms
 // ---------------------------------------------------------------------------
 s = replaceUnique(

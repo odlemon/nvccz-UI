@@ -407,6 +407,80 @@ function __pr23AwardClosedHtml(tenderId) {
   return `<section class="award-panel-v6"><div class="layer-toolbar"><div><span class="eyebrow">Final award decision</span><h3 style="margin:4px 0">${awarded ? 'Awarded' : 'No award to record'}</h3><p class="muted">${__pr23Esc(message)}</p></div></div></section>`;
 }
 
+// ---------------------------------------------------------------- quotation comparison
+
+/** Status chip for a tender in the comparison register: awarded, or how many bids are scored. */
+function __pr23QuotationChip(tenderId) {
+  const rows = __pr23EvaluationRows(tenderId).rows;
+  if (rows.some(r => r.rawStatus === 'ACCEPTED')) return '<span class="vendor-doc-chip-v6 valid">Awarded</span>';
+  const scored = rows.filter(r => r.evaluationScore != null).length;
+  return `<span class="vendor-doc-chip-v6 ${rows.length && scored === rows.length ? 'valid' : 'expiring'}">${scored} of ${rows.length} scored</span>`;
+}
+
+/** The tender's real quotations side by side: totals, terms, scores and quoted line prices. */
+function __pr23QuotationWorkspaceHtml(id) {
+  const back = `<div class="breadcrumbs"><button data-action="back-quotation-list-v5">Quotation Comparison</button><i>›</i><span>${__pr23Esc(id)}</span></div>`;
+  const t = (state.tenders || []).find(x => x.id === id);
+  if (!t) return `<div class="page">${back}${pageHead('Tender-specific comparison', 'Tender not found', 'This tender is no longer in your register.', '')}</div>`;
+  const rows = __pr23EvaluationRows(t.id).rows;
+  const extreme = (vals, pick) => { const nums = vals.filter(v => v != null); return nums.length > 1 ? pick(...nums) : null; };
+  const shade = (v, vals, higherIsBetter) => {
+    if (v == null) return '';
+    if (v === extreme(vals, higherIsBetter ? Math.max : Math.min)) return 'quote-best-v7';
+    if (v === extreme(vals, higherIsBetter ? Math.min : Math.max)) return 'quote-worst-v7';
+    return '';
+  };
+  const pct = v => (v == null ? '—' : `${Math.round(v)}%`);
+  const totals = rows.map(r => r.amount), techs = rows.map(r => r.evaluationScore), prices = rows.map(r => r.priceScore), weights = rows.map(r => r.weighted);
+  const quoteRows = rows.map(r => `<tr><td><strong>${__pr23Esc(r.vendor)}</strong><br><span class="muted">${__pr23Esc(r.id)}</span></td><td class="${shade(r.amount, totals, false)}">${money(r.amount)}</td><td>${__pr23Esc(r.deliveryTime || '—')}</td><td>${__pr23Esc(r.paymentTerms || '—')}</td><td class="${shade(r.evaluationScore, techs, true)}">${pct(r.evaluationScore)}</td><td class="${shade(r.priceScore, prices, true)}">${pct(r.priceScore)}</td><td class="${shade(r.weighted, weights, true)}"><strong>${r.weighted == null ? 'Not scored' : `${r.weighted.toFixed(1)}%`}</strong></td><td>${status(r.status)}</td></tr>`);
+  const names = [...new Set(rows.flatMap(r => (r.items || []).map(i => i.itemName)))];
+  const lineRows = names.map(name => {
+    const amounts = rows.map(r => ((r.items || []).find(i => i.itemName === name) || {}).lineTotal ?? null);
+    const quantity = (rows.flatMap(r => r.items || []).find(i => i.itemName === name) || {}).quantity;
+    return `<tr><td><strong>${__pr23Esc(name)}</strong></td><td>${quantity == null ? '—' : quantity}</td>${amounts.map(a => `<td class="${shade(a, amounts, false)}">${money(a)}</td>`).join('')}</tr>`;
+  });
+  const actions = `<button class="btn primary" data-action="open-evaluation" data-id="${__pr23Esc(t.id)}">Open bid evaluation</button>`;
+  return `<div class="page">${back}${pageHead('Tender-specific comparison', __pr23Esc(t.title), `${__pr23Esc(t.id)} · ${__pr23Esc(t.entity)} · ${rows.length} supplier response${rows.length === 1 ? '' : 's'}`, actions)}
+ <div class="comparison-colour-key-v7"><span><i class="best"></i>Best result for this line or measure</span><span><i class="worst"></i>Weakest result</span><em>Scores come from Bid Evaluation; shading is advisory and the award is the authorised user's decision.</em></div>
+ ${card('Quotation comparison', 'Totals include VAT as quoted; line prices below exclude it', table(['Vendor', 'Total', 'Delivery', 'Payment terms', 'Technical', 'Price', 'Weighted', 'Status'], quoteRows.length ? quoteRows : ['<tr><td colspan="8" class="muted">No quotations have been submitted for this tender.</td></tr>']))}
+ <div style="height:14px"></div>
+ ${card('Line-item comparison', 'Quantity × unit price as quoted by each vendor', table(['Item', 'Quantity', ...rows.map(r => __pr23Esc(r.vendor))], lineRows.length ? lineRows : [`<tr><td colspan="${2 + rows.length}" class="muted">No line items were quoted.</td></tr>`]))}</div>`;
+}
+
+// ---------------------------------------------------------------- notifications and settings
+
+/** Notifications drawer: what actually needs attention, counted from the records. */
+function __pr23NotificationsHtml() {
+  const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
+  const prompts = (state.approvalPromptsV6 || []).filter(a => a.status !== 'Approved' && a.status !== 'Rejected').length;
+  const inspection = (state.grns || []).filter(g => g.rawStatus === 'RECEIVED').length;
+  const invoices = (state.invoices || []).filter(i => i.status === 'Pending approval').length;
+  const noClearance = (state.vendors || []).filter(v => !v.taxExpiry).length;
+  const rows = [];
+  if (prompts) rows.push(['approvals', `${plural(prompts, 'approval')} awaiting you`, 'Requisitions, awards, receipts and invoices', 'Pending']);
+  if (inspection) rows.push(['receiving', `${plural(inspection, 'receipt')} awaiting inspection`, 'Goods received notes', 'Pending']);
+  if (invoices) rows.push(['invoices', `${plural(invoices, 'invoice')} awaiting approval`, 'Captured supplier invoices', 'Pending']);
+  if (noClearance) rows.push(['vendors', `${plural(noClearance, 'vendor')} without tax clearance`, 'No ITF263 expiry on file', 'Review']);
+  if (!rows.length) return '<div class="list"><div class="list-row"><div class="list-main"><strong>No notifications</strong><span>Nothing needs your attention</span></div></div></div>';
+  return `<div class="list">${rows.map(r => `<div class="list-row" data-page="${r[0]}"><div class="list-main"><strong>${__pr23Esc(r[1])}</strong><span>${__pr23Esc(r[2])}</span></div>${status(r[3])}</div>`).join('')}</div>`;
+}
+
+/**
+ * Configuration & RBAC. Roles and permissions are managed centrally in Admin; this page showed
+ * an invented role matrix whose toggles saved nothing. It now shows the signed-in role's real
+ * procurement permissions and where to change them.
+ */
+function __pr23SettingsPageHtml() {
+  const access = (__pr23Live() || {}).access || {};
+  const grants = (access.permissions || []).map(p => String(p).replace('procurement.', ''));
+  const rows = grants.map(g => `<tr><td><strong>${__pr23Esc(g)}</strong></td><td>${status('Granted')}</td></tr>`);
+  const dept = access.department ? `${access.department}${access.departmentRole ? ` · ${access.departmentRole}` : ''}` : 'No department';
+  return `<div class="page">${pageHead('Configuration', 'Configuration, RBAC and Access', 'Procurement roles, permissions and user assignments are managed centrally in Admin, so one change applies across every module.', '<a class="btn primary" href="/admin">Open Admin</a>')}
+ <div class="notice" style="margin-bottom:14px"><div><strong>Managed in Admin → Roles</strong><p>Each procurement action has its own permission, for example procurement.orders.manage to raise purchase orders or procurement.rfq.award to award a tender. Grant or remove them on a role in Admin; the change applies the next time the module loads.</p></div></div>
+ <div class="grid kpis">${kpi('Your role', __pr23Esc(access.roleName || '—'), __pr23Esc(dept), 'settings')}${kpi('Procurement permissions', grants.length, 'Granted to your role', 'approve')}</div>
+ ${card('Your procurement permissions', 'What your role can do in this module', table(['Permission', 'Status'], rows.length ? rows : ['<tr><td colspan="2" class="muted">Your role holds no procurement permissions. You can still raise and track your own requisitions.</td></tr>']))}</div>`;
+}
+
 // ---------------------------------------------------------------- goods received
 
 const __PR23_RECEIVABLE = ['SENT', 'ACKNOWLEDGED', 'APPROVED', 'PARTIALLY_RECEIVED', 'PARTIALLY_DELIVERED'];
@@ -703,7 +777,7 @@ document.addEventListener('click',e=>{
   case 'close-overlay':closeOverlay();break;
   case 'search':openModal('Search Matanho procurement','Search across the current entity and your access scope.',`<div class="field"><label>Search</label><input id="globalSearch" autofocus placeholder="Plan, PR, tender, vendor, PO, invoice or document UID"></div><div class="list" style="margin-top:12px"><div class="list-row" data-page="tenders"><div class="list-main"><strong>TN-2026-014</strong><span>Group Enterprise Network & Cybersecurity Services</span></div></div><div class="list-row" data-page="vendors"><div class="list-main"><strong>TechNova Solutions</strong><span>Prequalified technology vendor</span></div></div><div class="list-row" data-page="documents"><div class="list-main"><strong>DOC-00184</strong><span>FY 2026 Consolidated Procurement Plan</span></div></div></div>`,btn('Search','perform-search','primary'));break;
   case 'apps-launcher':openDrawer('Matanho applications','Move between authorised workspaces without expanding the navigation rail',`<div class="apps-grid-v8"><button class="app-tile-v8" data-page="dashboard"><span>${icon('dashboard')}</span><strong>Procurement</strong><small>Plans, sourcing and P2P</small></button><button class="app-tile-v8" data-page="approvals"><span>${icon('approve')}</span><strong>Approvals</strong><small>Prompts and decisions</small></button><button class="app-tile-v8" data-page="vendors"><span>${icon('vendor')}</span><strong>Vendors</strong><small>Registry and compliance</small></button><button class="app-tile-v8" data-page="accounts"><span>${icon('account')}</span><strong>Accounting</strong><small>AP and asset transfers</small></button><button class="app-tile-v8" data-page="documents"><span>${icon('document')}</span><strong>Documents</strong><small>Controlled vault</small></button><button class="app-tile-v8" data-page="reports"><span>${icon('report')}</span><strong>Reports</strong><small>Analytics and exports</small></button><button class="app-tile-v8" data-page="settings"><span>${icon('settings')}</span><strong>Administration</strong><small>RBAC and controls</small></button></div>`);break;
-  case 'notifications':openDrawer('Notifications','Workflow, compliance and system events',`<div class="list"><div class="list-row" data-page="approvals"><div class="list-main"><strong>11 approvals require attention</strong><span>Two are due within four hours</span></div>${status('High')}</div><div class="list-row" data-page="vendors"><div class="list-main"><strong>31 vendor compliance reviews</strong><span>ITF263 and company records</span></div>${status('Review')}</div><div class="list-row" data-page="accounts"><div class="list-main"><strong>2 asset transfers pending</strong><span>Accepted GRNs require classification</span></div>${status('Pending')}</div></div>`);break;
+  case 'notifications':if(__pr23Live()){openDrawer('Notifications','Workflow, compliance and system events',__pr23NotificationsHtml());break;}openDrawer('Notifications','Workflow, compliance and system events',`<div class="list"><div class="list-row" data-page="approvals"><div class="list-main"><strong>11 approvals require attention</strong><span>Two are due within four hours</span></div>${status('High')}</div><div class="list-row" data-page="vendors"><div class="list-main"><strong>31 vendor compliance reviews</strong><span>ITF263 and company records</span></div>${status('Review')}</div><div class="list-row" data-page="accounts"><div class="list-main"><strong>2 asset transfers pending</strong><span>Accepted GRNs require classification</span></div>${status('Pending')}</div></div>`);break;
   case 'activity-menu':case 'plan-activity':case 'tender-activity':case 'record-activity':activityMenu(a,id||'Current workspace');break;
   case 'apply-filters':$$('[data-filter]').forEach(x=>state.filters[x.dataset.filter]=x.value);state.filterApplied=true;render();toast('Dashboard filters applied','Charts, KPIs and tables now use the selected period, category, status and currency.');break;
   case 'reset-filters':state.filters={period:'FY 2026',category:'All categories',status:'All statuses',currency:'USD'};state.filterApplied=false;render();toast('Filters reset','Showing the full authorised population.');break;
@@ -1779,7 +1853,7 @@ window.MatanhoProcurement=Object.freeze({version:'8.0.0',navigate,render,getStat
     return `<div class="page">${pageHead('Decision workflow','Approval Centre','Approvers receive prompts in notifications and this dedicated workspace. RBAC, delegated authority, SoD and eSignature are validated before every decision.',actionV6('Approval matrix','approval-matrix')+actionV6('New eSignature','esign-new-v6','','primary','signature'))}<div class="grid kpis">${kpi('Awaiting me',pending.length,'Across plan, award, PO, vendor and contract','approve')}${kpi('Due today',pending.filter(a=>/Today/i.test(a.due)).length,'Executive action required','audit')}${kpi('CEO prompts',pending.filter(a=>a.role==='CEO').length,'Strategic awards and contracts','vendor')}${kpi('CFO prompts',pending.filter(a=>a.role==='CFO').length,'Budget, PO and payment authority','account')}${kpi('eSign pending',state.signatureEnvelopesV6.filter(e=>/Awaiting/i.test(e.status)).length,'Authenticated signatures','signature')}${kpi('SoD checks','100%','Validated before decision','settings')}</div><section class="card">${tabbar}<div class="settings-pane">${content}</div></section></div>`;
   }
 
-  function settingsPageV6(){
+  function settingsPageV6(){if(__pr23Live())return __pr23SettingsPageHtml();
     const tabs=[['roles','Roles and permissions'],['users','Users and assignments'],['requests','Access requests'],['approvers','Approver authority'],['sod','SoD and policies'],['integrations','Integrations']];
     const tabbar=`<div class="settings-tabs-v5">${tabs.map(([id,label])=>`<button class="tab ${state.settingsTabV6===id?'active':''}" data-action="settings-tab-v6" data-id="${id}">${label}${id==='requests'?` <span class="nav-count" style="display:inline-grid">${state.accessRequests.filter(r=>r.status==='Pending').length}</span>`:''}</button>`).join('')}</div>`;
     let content='';
@@ -2466,11 +2540,11 @@ window.MatanhoProcurement=Object.freeze({version:'8.0.0',navigate,render,getStat
 
   function quotationSelectionPageV7(){
     const candidates=state.tenders.filter(t=>t.bids>0);
-    const rows=candidates.map((t,i)=>`<tr data-action="select-quotation-tender-v5" data-id="${esc(t.id)}" data-quote-row-v7 data-stage="${esc(t.stage)}" data-entity="${esc(t.entity)}" data-search="${esc((t.id+' '+t.title+' '+t.entity+' '+t.category+' '+t.owner).toLowerCase())}"><td><strong class="link">${esc(t.id)}</strong><br><span class="muted">${esc(t.title)}</span></td><td>${esc(t.entity)}</td><td>${esc(t.category)}</td><td>${esc(t.method)}</td><td class="money">${money(t.value)}</td><td><strong>${t.bids}</strong><br><span class="muted">supplier responses</span></td><td>${status(t.stage)}</td><td>${esc(t.close)}</td><td>${esc(t.owner)}</td><td><span class="vendor-doc-chip-v6 ${i===0?'valid':i===1?'expiring':'valid'}">${i===1?'1 compliance review':'Ready'}</span></td><td>${smallAction('Open comparison','select-quotation-tender-v5',t.id,'arrow')}</td></tr>`);
+    const rows=candidates.map((t,i)=>`<tr data-action="select-quotation-tender-v5" data-id="${esc(t.id)}" data-quote-row-v7 data-stage="${esc(t.stage)}" data-entity="${esc(t.entity)}" data-search="${esc((t.id+' '+t.title+' '+t.entity+' '+t.category+' '+t.owner).toLowerCase())}"><td><strong class="link">${esc(t.id)}</strong><br><span class="muted">${esc(t.title)}</span></td><td>${esc(t.entity)}</td><td>${esc(t.category)}</td><td>${esc(t.method)}</td><td class="money">${money(t.value)}</td><td><strong>${t.bids}</strong><br><span class="muted">supplier responses</span></td><td>${status(t.stage)}</td><td>${esc(t.close)}</td><td>${esc(t.owner)}</td><td>${__pr23Live()?__pr23QuotationChip(t.id):`<span class="vendor-doc-chip-v6 ${i===0?'valid':i===1?'expiring':'valid'}">${i===1?'1 compliance review':'Ready'}</span>`}</td><td>${smallAction('Open comparison','select-quotation-tender-v5',t.id,'arrow')}</td></tr>`);
     return `<div class="page">${pageHead('Commercial analysis','Quotation Comparison','Select a tender or RFQ from the register. The detailed comparison opens only after a sourcing event is selected.',actionButton('Create RFQ','create-tender','','primary','plus')+actionButton('Import quotations','import-quotations-v5','','','plus'))}${filterBar()}<div class="grid kpis">${kpi('Events with quotations',candidates.length,'Ready for review','tender')}${kpi('Supplier responses',candidates.reduce((n,t)=>n+t.bids,0),'Structured portal submissions','vendor')}${kpi('Compliance reviews','3','Before comparison or award','audit')}${kpi('Technical threshold','70%','Default configurable minimum','evaluate')}${kpi('Potential savings',money(486000),'Against internal estimates','account')}${kpi('Recommendations due','3','Within the next 5 days','approve')}</div>${card('Tender and RFQ register','Click any line to open its tender-specific quotation comparison, scoring metrics and line-item analysis.',`<div class="table-tools quotation-list-tools-v7"><input id="quotationSearchV7" placeholder="Search tender, entity, category or owner"><select id="quotationStageV7"><option>All stages</option>${[...new Set(candidates.map(t=>t.stage))].map(x=>`<option>${esc(x)}</option>`).join('')}</select><select id="quotationEntityV7"><option>All entities</option>${[...new Set(candidates.map(t=>t.entity))].map(x=>`<option>${esc(x)}</option>`).join('')}</select><span class="muted">${candidates.length} sourcing events</span></div>${table(['Tender / RFQ','Entity','Category','Method','Estimate','Responses','Stage','Closing','Owner','Readiness',''],rows)}`)}</div>`;
   }
 
-  function quotationWorkspaceV7(id){
+  function quotationWorkspaceV7(id){if(__pr23Live())return __pr23QuotationWorkspaceHtml(id);
     const {t,vendors}=quotationDatasetV7(id);
     const values={price:vendors.map(v=>v.price),delivery:vendors.map(v=>v.delivery),terms:vendors.map(v=>v.terms),warranty:vendors.map(v=>v.warranty),tech:vendors.map(v=>v.tech),commercial:vendors.map(v=>v.commercial),score:vendors.map(v=>v.score)};
     const quoteRows=vendors.map(v=>`<tr><td><strong>${esc(v.name)}</strong></td><td class="${shadeClassV7(v.price,values.price,false)}">${money(v.price)}</td><td class="${shadeClassV7(v.delivery,values.delivery,false)}">${v.delivery} weeks</td><td class="${shadeClassV7(v.terms,values.terms,true)}">${v.terms} days</td><td class="${shadeClassV7(v.warranty,values.warranty,true)}">${v.warranty} months</td><td class="${shadeClassV7(v.tech,values.tech,true)}">${v.tech}%</td><td class="${shadeClassV7(v.commercial,values.commercial,true)}">${v.commercial}%</td><td class="${shadeClassV7(v.score,values.score,true)}"><strong>${v.score}%</strong></td><td><div class="actions">${smallAction('Preview','preview-vendor-bid-v5',`${t.id}|${v.name}`,'eye')}</div></td></tr>`);

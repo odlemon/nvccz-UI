@@ -234,6 +234,80 @@ function __pr23AwardClosedHtml(tenderId) {
   return `<section class="award-panel-v6"><div class="layer-toolbar"><div><span class="eyebrow">Final award decision</span><h3 style="margin:4px 0">${awarded ? 'Awarded' : 'No award to record'}</h3><p class="muted">${__pr23Esc(message)}</p></div></div></section>`;
 }
 
+// ---------------------------------------------------------------- quotation comparison
+
+/** Status chip for a tender in the comparison register: awarded, or how many bids are scored. */
+function __pr23QuotationChip(tenderId) {
+  const rows = __pr23EvaluationRows(tenderId).rows;
+  if (rows.some(r => r.rawStatus === 'ACCEPTED')) return '<span class="vendor-doc-chip-v6 valid">Awarded</span>';
+  const scored = rows.filter(r => r.evaluationScore != null).length;
+  return `<span class="vendor-doc-chip-v6 ${rows.length && scored === rows.length ? 'valid' : 'expiring'}">${scored} of ${rows.length} scored</span>`;
+}
+
+/** The tender's real quotations side by side: totals, terms, scores and quoted line prices. */
+function __pr23QuotationWorkspaceHtml(id) {
+  const back = `<div class="breadcrumbs"><button data-action="back-quotation-list-v5">Quotation Comparison</button><i>›</i><span>${__pr23Esc(id)}</span></div>`;
+  const t = (state.tenders || []).find(x => x.id === id);
+  if (!t) return `<div class="page">${back}${pageHead('Tender-specific comparison', 'Tender not found', 'This tender is no longer in your register.', '')}</div>`;
+  const rows = __pr23EvaluationRows(t.id).rows;
+  const extreme = (vals, pick) => { const nums = vals.filter(v => v != null); return nums.length > 1 ? pick(...nums) : null; };
+  const shade = (v, vals, higherIsBetter) => {
+    if (v == null) return '';
+    if (v === extreme(vals, higherIsBetter ? Math.max : Math.min)) return 'quote-best-v7';
+    if (v === extreme(vals, higherIsBetter ? Math.min : Math.max)) return 'quote-worst-v7';
+    return '';
+  };
+  const pct = v => (v == null ? '—' : `${Math.round(v)}%`);
+  const totals = rows.map(r => r.amount), techs = rows.map(r => r.evaluationScore), prices = rows.map(r => r.priceScore), weights = rows.map(r => r.weighted);
+  const quoteRows = rows.map(r => `<tr><td><strong>${__pr23Esc(r.vendor)}</strong><br><span class="muted">${__pr23Esc(r.id)}</span></td><td class="${shade(r.amount, totals, false)}">${money(r.amount)}</td><td>${__pr23Esc(r.deliveryTime || '—')}</td><td>${__pr23Esc(r.paymentTerms || '—')}</td><td class="${shade(r.evaluationScore, techs, true)}">${pct(r.evaluationScore)}</td><td class="${shade(r.priceScore, prices, true)}">${pct(r.priceScore)}</td><td class="${shade(r.weighted, weights, true)}"><strong>${r.weighted == null ? 'Not scored' : `${r.weighted.toFixed(1)}%`}</strong></td><td>${status(r.status)}</td></tr>`);
+  const names = [...new Set(rows.flatMap(r => (r.items || []).map(i => i.itemName)))];
+  const lineRows = names.map(name => {
+    const amounts = rows.map(r => ((r.items || []).find(i => i.itemName === name) || {}).lineTotal ?? null);
+    const quantity = (rows.flatMap(r => r.items || []).find(i => i.itemName === name) || {}).quantity;
+    return `<tr><td><strong>${__pr23Esc(name)}</strong></td><td>${quantity == null ? '—' : quantity}</td>${amounts.map(a => `<td class="${shade(a, amounts, false)}">${money(a)}</td>`).join('')}</tr>`;
+  });
+  const actions = `<button class="btn primary" data-action="open-evaluation" data-id="${__pr23Esc(t.id)}">Open bid evaluation</button>`;
+  return `<div class="page">${back}${pageHead('Tender-specific comparison', __pr23Esc(t.title), `${__pr23Esc(t.id)} · ${__pr23Esc(t.entity)} · ${rows.length} supplier response${rows.length === 1 ? '' : 's'}`, actions)}
+ <div class="comparison-colour-key-v7"><span><i class="best"></i>Best result for this line or measure</span><span><i class="worst"></i>Weakest result</span><em>Scores come from Bid Evaluation; shading is advisory and the award is the authorised user's decision.</em></div>
+ ${card('Quotation comparison', 'Totals include VAT as quoted; line prices below exclude it', table(['Vendor', 'Total', 'Delivery', 'Payment terms', 'Technical', 'Price', 'Weighted', 'Status'], quoteRows.length ? quoteRows : ['<tr><td colspan="8" class="muted">No quotations have been submitted for this tender.</td></tr>']))}
+ <div style="height:14px"></div>
+ ${card('Line-item comparison', 'Quantity × unit price as quoted by each vendor', table(['Item', 'Quantity', ...rows.map(r => __pr23Esc(r.vendor))], lineRows.length ? lineRows : [`<tr><td colspan="${2 + rows.length}" class="muted">No line items were quoted.</td></tr>`]))}</div>`;
+}
+
+// ---------------------------------------------------------------- notifications and settings
+
+/** Notifications drawer: what actually needs attention, counted from the records. */
+function __pr23NotificationsHtml() {
+  const plural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
+  const prompts = (state.approvalPromptsV6 || []).filter(a => a.status !== 'Approved' && a.status !== 'Rejected').length;
+  const inspection = (state.grns || []).filter(g => g.rawStatus === 'RECEIVED').length;
+  const invoices = (state.invoices || []).filter(i => i.status === 'Pending approval').length;
+  const noClearance = (state.vendors || []).filter(v => !v.taxExpiry).length;
+  const rows = [];
+  if (prompts) rows.push(['approvals', `${plural(prompts, 'approval')} awaiting you`, 'Requisitions, awards, receipts and invoices', 'Pending']);
+  if (inspection) rows.push(['receiving', `${plural(inspection, 'receipt')} awaiting inspection`, 'Goods received notes', 'Pending']);
+  if (invoices) rows.push(['invoices', `${plural(invoices, 'invoice')} awaiting approval`, 'Captured supplier invoices', 'Pending']);
+  if (noClearance) rows.push(['vendors', `${plural(noClearance, 'vendor')} without tax clearance`, 'No ITF263 expiry on file', 'Review']);
+  if (!rows.length) return '<div class="list"><div class="list-row"><div class="list-main"><strong>No notifications</strong><span>Nothing needs your attention</span></div></div></div>';
+  return `<div class="list">${rows.map(r => `<div class="list-row" data-page="${r[0]}"><div class="list-main"><strong>${__pr23Esc(r[1])}</strong><span>${__pr23Esc(r[2])}</span></div>${status(r[3])}</div>`).join('')}</div>`;
+}
+
+/**
+ * Configuration & RBAC. Roles and permissions are managed centrally in Admin; this page showed
+ * an invented role matrix whose toggles saved nothing. It now shows the signed-in role's real
+ * procurement permissions and where to change them.
+ */
+function __pr23SettingsPageHtml() {
+  const access = (__pr23Live() || {}).access || {};
+  const grants = (access.permissions || []).map(p => String(p).replace('procurement.', ''));
+  const rows = grants.map(g => `<tr><td><strong>${__pr23Esc(g)}</strong></td><td>${status('Granted')}</td></tr>`);
+  const dept = access.department ? `${access.department}${access.departmentRole ? ` · ${access.departmentRole}` : ''}` : 'No department';
+  return `<div class="page">${pageHead('Configuration', 'Configuration, RBAC and Access', 'Procurement roles, permissions and user assignments are managed centrally in Admin, so one change applies across every module.', '<a class="btn primary" href="/admin">Open Admin</a>')}
+ <div class="notice" style="margin-bottom:14px"><div><strong>Managed in Admin → Roles</strong><p>Each procurement action has its own permission, for example procurement.orders.manage to raise purchase orders or procurement.rfq.award to award a tender. Grant or remove them on a role in Admin; the change applies the next time the module loads.</p></div></div>
+ <div class="grid kpis">${kpi('Your role', __pr23Esc(access.roleName || '—'), __pr23Esc(dept), 'settings')}${kpi('Procurement permissions', grants.length, 'Granted to your role', 'approve')}</div>
+ ${card('Your procurement permissions', 'What your role can do in this module', table(['Permission', 'Status'], rows.length ? rows : ['<tr><td colspan="2" class="muted">Your role holds no procurement permissions. You can still raise and track your own requisitions.</td></tr>']))}</div>`;
+}
+
 // ---------------------------------------------------------------- goods received
 
 const __PR23_RECEIVABLE = ['SENT', 'ACKNOWLEDGED', 'APPROVED', 'PARTIALLY_RECEIVED', 'PARTIALLY_DELIVERED'];
