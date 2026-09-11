@@ -51,8 +51,107 @@ Every finding below is deployed to **production** (NVCCZ) and **dev** (Arcus).
 - the quotation integrity probe;
 - the vendor invoice link probe.
 
-A full requisition-to-invoice run was not repeated on either server. On both, mail is not
-redirected, so it would have emailed real vendor addresses.
+A full requisition-to-invoice run was not repeated on production: mail there is not redirected, so
+it would have emailed real vendor addresses. On dev it was run in cycle four with all mail blocked.
+
+---
+
+## Cycle four — gap closure, 11 September 2026 (dev only)
+
+The controls that cycle three still refused, and the screens that still showed fixture data, were
+connected to the backend.
+
+**Deployed to dev only.** Production still runs the builds in the table above.
+
+| | Dev |
+|---|---|
+| API | nvccz `d83bea1` |
+| Staff portal | nvccz-new `5eab544` (later commits change only the UAT script) |
+| Migrations | `db:migrate:all`: 142 ok, 0 failed; adds `procurement_documents`, `procurement_contracts`, `procurement_plans`, `procurement_plan_items` |
+| Rollback image | `arcus-dev-api:pre-uat-20260911` |
+
+### What was connected
+
+| Screen | Control | Backend |
+|---|---|---|
+| Invoices, Accounts | Record payment | `GET /cashbook/banks`, `POST /procurement/invoices/:id/payment`; posts the expense journal |
+| Invoices | three-way match column | `ProcurementInvoiceMatchService`: MATCHED, DISCREPANCY, AWAITING_RECEIPT or NO_PO, per-line flags; runs on capture and on every GRN change; `POST /procurement/invoices/:id/match` |
+| Purchase Orders | Create PO (save draft, or save and send), Send selected | `POST /procurement/purchase-orders`, only from an APPROVED requisition, once |
+| Requisitions | unit estimate, budget notice | line estimates stored and totalled, never copied onto an RFQ; the notice reads approved plans |
+| Annual Plan | create, edit, add line, submit; approve or reject in the Approval Centre | `/procurement/plans`; the author cannot decide, and a rejection needs a reason |
+| Contracts & Awards | create from an award or standalone, edit a draft, activate, terminate | `/procurement/contracts`; one live contract per award; expired by date |
+| Document Vault | upload, upload a new version | `/procurement/documents` on the shared upload service |
+| Accounts | payables tab, journal queue, bank file export | live invoices; the export lists unpaid approved invoices only |
+| Reports Vault | Run, PDF, Excel, CSV | exports the live records the report is named for |
+
+- **New grants:** `procurement.plans.view|manage|approve`, `procurement.contracts.view|manage`,
+  `procurement.documents.view|manage`.
+- **Seed:** creates the department head, Finance Manager and Internal Auditor personas when a
+  database lacks them, and never changes existing ones.
+
+### Verification
+
+**Local**, `scripts/_uat/procurement-v23-actions.mjs`: 17 steps through the real screens, each
+checked through the API afterwards.
+- 16/17 in one run. Step 16 timed out opening the contract row menu; the script now waits for the
+  reloaded register, and step 16 then passed on its own.
+- The new steps:
+
+| Step | Result |
+|---|---|
+| 12 Officer raises and sends a PO from an approved requisition | `REQ_20260911_0029`, estimate prefilled → `PO_20260911_0014` SENT, requisition CONVERTED_TO_PO |
+| 13 Accountant records payment of an approved invoice | `INV_20260911_0008` USD 2,702.70 → PAID, journal posted |
+| 14 Manager creates an annual plan with a line | `APP-2026-003` DRAFT, 1 line, planned 42,000 |
+| 15 Author submits, Finance Manager approves | `APP-2026-003` → APPROVED |
+| 16 Manager creates a contract from an award and activates it | passed on rerun |
+| 17 Officer files a document in the vault | v1.0, under review, in Tenders & Bids |
+
+**Dev**, with the mail guard on (all mail blocked; 56 emails blocked during the API run):
+- API health 200, 0 restarts. Grants `--check` would add 0; RFQ award backfill would change 0.
+- Authorisation probe: every cell matches the policy except a valid PO create, which read 400
+  because dev had no usable vendor at the time.
+- Procure-to-pay through the API: requisition, RFQ to 3 vendors, award, PO, GRN, invoice, approval.
+- Production build of the staff portal, fresh page loads as five roles on eight V23 screens: all
+  render, with no page errors.
+- Accounts: 1 live payable and no fixture payment batches. The bank export lists
+  `INV_20260911_0001`, USD 2,702.70, Approved.
+- Requisition form as the Procurement Officer: "No approved procurement plan covers Procurement for
+  FY 2026, so this request is not checked against a budget."
+- The 17-step UI suite against the dev build, each step checked through the dev API: **all 17
+  pass.**
+  - The first full run passed 15. Steps 1 and 15 failed when the test machine's connection dropped
+    ("fetch failed"), not on the server.
+  - The script now retries reads over a dropped connection. Steps 1, 14 and 15 were rerun: 3/3.
+  - No page errors on any step. The mail guard was turned off after each run.
+
+| Step | Dev result |
+|---|---|
+| 1 Operations head approves PR-B | `REQ_20260911_0002` → APPROVED (rerun) |
+| 2 Manager awards RFQ-B | `QUO_20260911_0005` accepted, `PO_20260911_0002` SENT |
+| 3 Operations member raises a requisition | `REQ_20260911_0007` PENDING_APPROVAL, Operations |
+| 4 Officer registers a vendor | created, tax clearance ACTIVE |
+| 5 OCR extraction is refused | invoices 1 → 1, nothing saved |
+| 6 Officer sends an RFQ from PR-E | `RFQ_20260911_0004` from `REQ_20260911_0005`, 1 vendor |
+| 7 Officer scores RFQ-C bids | scores 70, 80, 90 stored, evaluation complete |
+| 8 Manager awards RFQ-C | `QUO_20260911_0007` accepted, `PO_20260911_0003`, RFQ AWARDED |
+| 9 Officer records a GRN against PO-B | `GRN_20260911_0002` RECEIVED |
+| 10 Accountant captures the invoice for PO-B | `INV_20260911_0002` DRAFT, USD 1,605.45 |
+| 11 Finance Manager rejects the invoice | `INV_20260911_0002` REJECTED with the reason |
+| 12 Officer raises and sends a PO from an approved requisition | `REQ_20260911_0008`, estimate prefilled → `PO_20260911_0004` SENT, USD 831.60 |
+| 13 Accountant records payment | `INV_20260911_0001` USD 2,702.70 PAID, journal posted |
+| 14 Manager creates a plan with a line | `APP-2026-002` DRAFT, 1 line, planned 42,000 (rerun; the first run's `APP-2026-001` stays a draft) |
+| 15 Author submits, Finance Manager approves | `APP-2026-002` submitted, then APPROVED (rerun) |
+| 16 Manager creates a contract from an award and activates it | `CTR-2026-0001` ACTIVE, USD 1,362.90, UAT P2P Stationery World |
+| 17 Officer files a document in the vault | v1.0 under review in Tenders & Bids |
+
+Page loads on dev took 78–130 s from the test machine. The server answers in 0.06 s; the delay is
+the test machine's link to the VPS.
+
+### Still not built
+
+- OCR invoice extraction, eSignature, vendor messaging and document requests;
+- asset capitalisation and transfers, GRN accruals;
+- budget enforcement (the notice warns and does not block), per-criterion bid scoring, plan import.
 
 ---
 
@@ -453,17 +552,14 @@ Connected since, on 11 September 2026:
 - **invoice rejection** from the Approval Centre (`PUT /procurement/invoices/:id/reject`, actions UAT
   step 11);
 - nine more controls that announced invented outcomes are now refused: vendor bid draft and submit,
-  OCR extract, flag invoice, email PO, new folder, access review, archive record, plan validation.
+  OCR extract, flag invoice, email PO, new folder, access review, archive record, plan validation;
+- in cycle four: invoice payment, direct purchase orders, send selected, annual plans, contracts,
+  the document vault, exports of live records, and the payables and journal tabs (see Cycle four).
 
 Still unconnected, and refused rather than faked:
-- plans, contracts, documents and reports;
 - OCR invoice extraction;
-- journals and asset transfers.
-
-Not on any V23 screen:
-- **paying an invoice.** The API has `POST /procurement/invoices/:id/payment`, which needs a proof
-  of payment file and, for a bank payment, a bank account. No V23 control calls it, and production
-  has no bank accounts set up.
+- eSignature, vendor messaging and document requests;
+- asset capitalisation and transfers, and GRN accruals.
 
 They are tracked in [`../procurement-v23-backend-asks.md`](../procurement-v23-backend-asks.md).
 
