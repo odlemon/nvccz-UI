@@ -18,6 +18,7 @@ import {
   handleProcurementV23Action,
   isUnconnectedWrite,
   LIVE_ACTIONS,
+  refusedOpener,
   NOT_YET_LIVE_ACTIONS,
 } from "@/lib/procurement-v23/actions"
 import "@/components/procurement-v23-mock/procurement-v23.css"
@@ -116,6 +117,13 @@ export function ProcurementV23App() {
       const control = (event.target as Element | null)?.closest?.("[data-action]") as HTMLElement | null
       if (!control) return
       const action = control.dataset.action || ""
+      const refusal = refusedOpener(action, liveRef.current)
+      if (refusal) {
+        event.preventDefault()
+        event.stopImmediatePropagation()
+        toast.error(refusal)
+        return
+      }
       if (!API_ACTIONS.has(action) && !isUnconnectedWrite(action)) return
       event.preventDefault()
       event.stopImmediatePropagation()

@@ -212,6 +212,33 @@ export function isUnconnectedWrite(action: string): boolean {
   return /^(confirm|save|submit)-/.test(action) || UNCONNECTED_TERMINAL_STEPS.has(action)
 }
 
+/**
+ * Buttons that open a form the role could never complete. Refused before the form opens, so nobody
+ * fills in a purchase order only to be told at the end that their role cannot raise one.
+ * Capture invoice is not listed: its grant is decided by the intake route, and the API says so.
+ */
+const OPENER_GRANTS: Record<string, { grants: string[]; what: string }> = {
+  "create-po-v6": { grants: ["orders.manage"], what: "raising purchase orders" },
+  "create-tender": { grants: ["rfq.manage"], what: "creating tenders and RFQs" },
+  "record-grn": { grants: ["receiving.manage"], what: "recording goods receipts" },
+  "record-payment-v23": { grants: ["invoices.pay"], what: "recording invoice payments" },
+  "create-plan-v5": { grants: ["plans.manage"], what: "creating procurement plans" },
+  "add-plan-item": { grants: ["plans.manage"], what: "changing procurement plans" },
+  "create-contract-v6": { grants: ["contracts.manage"], what: "creating contracts" },
+  "upload-document-v5": { grants: ["documents.manage"], what: "filing documents in the vault" },
+  "upload-document-v6": { grants: ["documents.manage"], what: "filing documents in the vault" },
+  "register-vendor-v6": { grants: ["vendors.manage"], what: "registering vendors" },
+}
+
+/** The refusal to show for an opener the signed-in role cannot complete, or null to let it open. */
+export function refusedOpener(action: string, live: ProcurementV23LivePayload | null): string | null {
+  const rule = OPENER_GRANTS[action]
+  const access = live?.access
+  if (!rule || !access || access.isPrivileged) return null
+  const perms = new Set(access.permissions ?? [])
+  return rule.grants.some((g) => perms.has(`procurement.${g}`)) ? null : `Your role does not have permission for ${rule.what}.`
+}
+
 function val(selector: string): string {
   const el = document.querySelector<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>(selector)
   return (el?.value ?? "").trim()
