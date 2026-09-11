@@ -1,6 +1,6 @@
 # Procurement V23 — backend asks
 
-**Branch:** `feature/procurement-v23-live` (nvccz and nvccz-new) · **As of:** 11 September 2026 · local only, nothing deployed
+**Branch:** `feature/procurement-v23-live` (nvccz and nvccz-new) · **As of:** 11 September 2026 (evening) · deployed to dev; production has the earlier cycles only
 **Findings raised along the way:** [`procurement-v23/TEST_FINDINGS.md`](procurement-v23/TEST_FINDINGS.md)
 
 This is the list of what the V23 screens need and the backend does not yet provide. Everything
@@ -19,14 +19,19 @@ vendored demo records or a success toast for a save that did not happen.
 | Access (all screens) | `GET /procurement/me/access` *(added)* | — |
 | Command Centre | requisitions, RFQs, POs, GRNs, invoices, vendors (KPIs, cycle donut, attention list derived) | — |
 | Approval Centre | prompts built from real pending decisions | approve and reject: requisition, award (quotation accept), GRN, invoice |
-| Purchase Requisitions | `GET /procurement/requisitions`, `/my`, `/pending-approval` | raise and submit, save draft, approve, reject |
+| Purchase Requisitions | `GET /procurement/requisitions`, `/my`, `/pending-approval` | raise and submit with the unit estimate, save draft, approve, reject; the form's budget notice comes from approved plans |
 | Tenders & RFx | `GET /procurement/rfq`, `GET /vendor-quotations` | send an RFQ from an approved requisition (tender builder) |
 | Bid Evaluation | real bids and `GET /procurement/rfqs/:id/comparison-matrix` | evaluation-team technical scores; award from the award panel |
 | Vendor Registry | `GET /accounting/vendors` | register vendor (V6 form); bank details held for Finance |
-| Purchase Orders | `GET /procurement/purchase-orders` | send PO |
+| Purchase Orders | `GET /procurement/purchase-orders` | create from an approved requisition (save draft, or save and send), send, send selected |
 | Receiving & Inspection | `GET /procurement/goods-received-notes` | record a GRN against a sent PO (received, accepted, rejected per line) |
-| Invoices & 3-Way Match | `GET /procurement/invoices`, real PO → GRN → invoice chain per tender | capture a supplier invoice against a PO (OCR upload not connected) |
+| Invoices & 3-Way Match | `GET /procurement/invoices` with the three-way match result, real PO → GRN → invoice chain per tender | capture a supplier invoice against a PO; record payment of an approved invoice (`GET /cashbook/banks`, `POST /procurement/invoices/:id/payment`); OCR upload not connected |
 | Audit & Compliance | `GET /procurement/audit-events` *(added)* | — |
+| Annual Procurement Plan | `GET /procurement/plans` *(added)* | create and edit a plan, add lines, submit; approve or reject in the Approval Centre (not by the author) |
+| Contracts & Awards | `GET /procurement/contracts` *(added)*, plus awards without a contract | create from an award or standalone, edit a draft, activate, terminate; eSignature not connected |
+| Document Vault | `GET /procurement/documents` *(added)* | upload files to a folder, upload a new version; send and eSign not connected |
+| Accounts & Asset Transfers | payables and payment journals from `GET /procurement/invoices` | record payment; bank file export of unpaid approved invoices; asset capitalisation not connected |
+| Reports Vault | every register above | Run and PDF/Excel/CSV exports of the live records a report is named for |
 
 **Added to the backend for V23** (nvccz, local commits):
 - `GET /procurement/me/access`;
@@ -43,6 +48,13 @@ vendored demo records or a success toast for a save that did not happen.
   - vendors can invoice a PO after its goods are received;
   - `VENDOR_PORTAL_BASE_URL` set on both servers, so RFQ invitations and PO emails link to the
     vendor portal, not the staff host.
+- invoice rejection, `PUT /procurement/invoices/:id/reject` (ask 5);
+- the three-way match, `ProcurementInvoiceMatchService`, run on capture and on every GRN change, plus
+  `POST /procurement/invoices/:id/match` (ask 6);
+- requisition line estimates stored and totalled, never copied onto an RFQ (ask 1);
+- a direct PO only from an APPROVED requisition, once;
+- registers for plans, contracts and documents with their own grants, `procurement.plans.*`,
+  `procurement.contracts.*`, `procurement.documents.*` (asks 3, 7, 8).
 
 ---
 
@@ -50,7 +62,9 @@ vendored demo records or a success toast for a save that did not happen.
 
 Priority reflects what blocks a real procure-to-pay cycle first.
 
-### 1. Estimated value on requisition lines — HIGH
+### 1. Estimated value on requisition lines — DONE
+
+- **Built:** line `unitPrice` is the requester's estimate; `totalAmount` is the sum. `prItemsToNormalizedRfqLines` drops prices so no estimate reaches a vendor.
 
 - **Screen:** the requisition form collects a **unit estimate** per line. The register shows
   **Estimate** and **Budget check** columns, and the Approval Centre shows a value.
@@ -60,7 +74,9 @@ Priority reflects what blocks a real procure-to-pay cycle first.
   `POST /procurement/requisitions`. `totalAmount` becomes the sum of quantity × estimate.
 - **Unblocks:** ask 2, and the value a department head approves against.
 
-### 2. Budget check against department or cost-centre budgets — HIGH
+### 2. Budget check against department or cost-centre budgets — PARTIAL
+
+- **Built:** the requisition form shows the approved plan budget left for the department this year. Nothing is enforced; a budget control with warn/block is still to decide.
 
 - **Screen:** "Budget check" column, "Budget warnings" KPI, the form's "Live budget check"
   notice, and department budget cards.
@@ -71,7 +87,9 @@ Priority reflects what blocks a real procure-to-pay cycle first.
   - return `withinBudget | warning | blocked` and the remaining amount on the requisition.
 - **Depends on:** ask 1.
 
-### 3. Annual procurement plan — HIGH
+### 3. Annual procurement plan — DONE
+
+- **Built:** `procurement_plans`, `procurement_plan_items`; create, edit, lines, submit, approve/reject with SoD. Linking requisitions to plan lines (plan vs actual per line) is not built; committed spend is derived per department and year.
 
 - **Screens:** Annual Procurement Plan (plans, plan line items, versions, submit/approve) and
   Analytics (plan vs committed vs actual).
@@ -106,7 +124,9 @@ Priority reflects what blocks a real procure-to-pay cycle first.
     event. Nothing is posted.
 - **Verified:** actions UAT step 11 and the authorisation probe row.
 
-### 6. Three-way match result on staff-captured invoices — MEDIUM
+### 6. Three-way match result on staff-captured invoices — DONE
+
+- **Built:** MATCHED, DISCREPANCY, AWAITING_RECEIPT or NO_PO, with per-line flags in `aiDiscrepancies`.
 
 - **Screens:** Invoices & 3-Way Match ("Matched", "Exceptions", "Match variance") and the match
   workspace panels.
@@ -118,7 +138,9 @@ Priority reflects what blocks a real procure-to-pay cycle first.
   - store the status and the variances;
   - expose them on `GET /procurement/invoices`.
 
-### 7. Contracts and awards register — MEDIUM
+### 7. Contracts and awards register — DONE
+
+- **Built:** `procurement_contracts`; one live contract per award; draft, active, terminated, and expired by date.
 
 - **Screen:** Contracts & Awards (contract from an accepted quotation, value, term, signature
   status, renewals, obligations).
@@ -128,7 +150,9 @@ Priority reflects what blocks a real procure-to-pay cycle first.
   - create on award (optional) or manually;
   - list endpoint.
 
-### 8. Procurement document vault — MEDIUM
+### 8. Procurement document vault — DONE
+
+- **Built:** `procurement_documents` on the shared upload service; folders, versions, review status.
 
 - **Screens:** Document Vault and the upload / preview / send actions on tenders, evaluations,
   POs and contracts.
@@ -137,7 +161,9 @@ Priority reflects what blocks a real procure-to-pay cycle first.
   existing upload service, with list, upload and download endpoints. The payroll vault is the
   model to follow.
 
-### 9. GRN accounting hand-off (accruals, fixed-asset capitalisation) — MEDIUM
+### 9. GRN accounting hand-off (accruals, fixed-asset capitalisation) — PARTIAL
+
+- **Built:** the journal queue lists the expense journals that invoice payment posts. GRN accruals and asset capitalisation are still not built.
 
 - **Screen:** Accounts & Asset Transfers (journal queue, asset transfer queue).
 - **Gap:**
