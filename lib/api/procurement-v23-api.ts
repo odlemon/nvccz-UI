@@ -319,6 +319,77 @@ export async function matchProcurementInvoice(id: string): Promise<ProcurementRe
 /** GET /cashbook/banks — the bank and cash accounts a payment can be made from (Accounting owns them). */
 export const listBanks = () => list("/cashbook/banks")
 
+// ---------------------------------------------------------------------------
+// Registers: document vault, contracts, annual plans (nvccz src/routes/procurementRegistersRoutes.ts)
+// ---------------------------------------------------------------------------
+
+export const listProcurementDocuments = () => list("/procurement/documents")
+
+export async function uploadProcurementDocuments(form: FormData): Promise<ProcurementRecord[]> {
+  return unwrapData(await apiClient.postFormData<ApiResponse<ProcurementRecord[]>>("/procurement/documents", form))
+}
+
+export async function uploadProcurementDocumentVersion(id: string, form: FormData): Promise<ProcurementRecord> {
+  return unwrapData(await apiClient.postFormData<ApiResponse<ProcurementRecord>>(`/procurement/documents/${encodeURIComponent(id)}/version`, form))
+}
+
+export async function setProcurementDocumentStatus(id: string, status: "under_review" | "approved" | "archived"): Promise<ProcurementRecord> {
+  return unwrapData(await apiClient.patch<ApiResponse<ProcurementRecord>>(`/procurement/documents/${encodeURIComponent(id)}/status`, { status }))
+}
+
+export const listProcurementContracts = () => list("/procurement/contracts")
+
+export type ContractInput = {
+  title?: string
+  vendorId?: string
+  quotationId?: string
+  value?: number
+  currencyCode?: string
+  startDate?: string
+  endDate?: string
+  paymentTerms?: string
+  scope?: string
+}
+
+export async function createProcurementContract(body: ContractInput): Promise<ProcurementRecord> {
+  return unwrapData(await apiClient.post<ApiResponse<ProcurementRecord>>("/procurement/contracts", body))
+}
+
+export async function updateProcurementContract(id: string, body: ContractInput): Promise<ProcurementRecord> {
+  return unwrapData(await apiClient.put<ApiResponse<ProcurementRecord>>(`/procurement/contracts/${encodeURIComponent(id)}`, body))
+}
+
+export async function setProcurementContractStatus(id: string, next: "activate" | "terminate"): Promise<ProcurementRecord> {
+  return unwrapData(await apiClient.post<ApiResponse<ProcurementRecord>>(`/procurement/contracts/${encodeURIComponent(id)}/${next}`))
+}
+
+export const listProcurementPlans = () => list("/procurement/plans")
+
+export type PlanInput = { name?: string; department?: string; fiscalYear?: string; budget?: number; currencyCode?: string; notes?: string }
+export type PlanItemInput = { description: string; category?: string; quarter?: string; method?: string; estimatedValue?: number; department?: string }
+
+export async function createProcurementPlan(body: PlanInput): Promise<ProcurementRecord> {
+  return unwrapData(await apiClient.post<ApiResponse<ProcurementRecord>>("/procurement/plans", body))
+}
+
+export async function updateProcurementPlan(id: string, body: PlanInput): Promise<ProcurementRecord> {
+  return unwrapData(await apiClient.put<ApiResponse<ProcurementRecord>>(`/procurement/plans/${encodeURIComponent(id)}`, body))
+}
+
+export async function addProcurementPlanItem(id: string, body: PlanItemInput): Promise<ProcurementRecord> {
+  return unwrapData(await apiClient.post<ApiResponse<ProcurementRecord>>(`/procurement/plans/${encodeURIComponent(id)}/items`, body))
+}
+
+export async function submitProcurementPlan(id: string): Promise<ProcurementRecord> {
+  return unwrapData(await apiClient.post<ApiResponse<ProcurementRecord>>(`/procurement/plans/${encodeURIComponent(id)}/submit`))
+}
+
+export async function decideProcurementPlan(id: string, decision: "approve" | "reject", reason?: string): Promise<ProcurementRecord> {
+  return unwrapData(
+    await apiClient.post<ApiResponse<ProcurementRecord>>(`/procurement/plans/${encodeURIComponent(id)}/${decision}`, reason ? { reason } : {}),
+  )
+}
+
 export async function payProcurementInvoice(id: string, form: FormData): Promise<ProcurementRecord> {
   return unwrapData(await apiClient.postFormData<ApiResponse<ProcurementRecord>>(`/procurement/invoices/${encodeURIComponent(id)}/payment`, form))
 }

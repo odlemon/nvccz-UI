@@ -30,6 +30,9 @@ import {
   listRequisitionsAwaitingMyApproval,
   listRfqs,
   listBanks,
+  listProcurementContracts,
+  listProcurementDocuments,
+  listProcurementPlans,
   listVendors,
   type ProcurementAccess,
   type ProcurementRecord,
@@ -183,11 +186,8 @@ function vendorStatus(v: ProcurementRecord): string {
 
 /** Collections with no backend behind them yet. Emptied so the demo records never show. */
 const NO_BACKEND_YET = [
-  "plans",
-  "planItems",
   "journals",
   "assets",
-  "documents",
   "reports",
   "notifications",
   "approvals",
@@ -225,6 +225,9 @@ export async function loadProcurementV23LiveData(): Promise<ProcurementV23LivePa
     dashboard,
     auditRows,
     bankRows,
+    documentRows,
+    contractRows,
+    planRows,
   ] = await Promise.all([
     // Every department for the desk; a department head sees their own department.
     has("requisitions.view") || isDeptApprover
@@ -245,6 +248,15 @@ export async function loadProcurementV23LiveData(): Promise<ProcurementV23LivePa
     has("audit.view") ? safe("audit-events", listProcurementAuditEvents, [] as ProcurementRecord[]) : Promise.resolve([] as ProcurementRecord[]),
     // Payment needs an account to pay from; only the role that pays reads them.
     has("invoices.pay") ? safe("cashbook/banks", listBanks, [] as ProcurementRecord[]) : Promise.resolve([] as ProcurementRecord[]),
+    has("documents.view") || has("documents.manage")
+      ? safe("procurement/documents", listProcurementDocuments, [] as ProcurementRecord[])
+      : Promise.resolve([] as ProcurementRecord[]),
+    has("contracts.view") || has("contracts.manage")
+      ? safe("procurement/contracts", listProcurementContracts, [] as ProcurementRecord[])
+      : Promise.resolve([] as ProcurementRecord[]),
+    has("plans.view") || has("plans.manage") || has("plans.approve")
+      ? safe("procurement/plans", listProcurementPlans, [] as ProcurementRecord[])
+      : Promise.resolve([] as ProcurementRecord[]),
   ])
 
   // One register of requisitions: the full list where the role has it, plus the caller's own
@@ -492,31 +504,135 @@ export async function loadProcurementV23LiveData(): Promise<ProcurementV23LivePa
   })
 
   // ----------------------------------------------------------------- contracts & awards
-  // The backend has no contract record; the award is the accepted quotation and its purchase
-  // order. The register lists those awards and says so, rather than inventing contract terms:
-  // there is no end date, so the expiry column shows a dash.
+  // Contracts from the register (GET /procurement/contracts), followed by awards (accepted
+  // quotations) that have no contract yet, which say "Awarded" and carry no invented terms.
   const tenderByNumber = new Map(tendersView.map((t) => [t.id, t]))
   const poByQuotation = new Map(orders.filter((o) => o.quotationId).map((o) => [o.quotationId, o]))
-  const contractsView = quotations
-    .filter((q) => String(q.status).toUpperCase() === "ACCEPTED")
-    .map((q) => {
-      const tender = q.rfqNumber ? tenderByNumber.get(q.rfqNumber) : undefined
-      const po = poByQuotation.get(q.id)
+  const CONTRACT_STATUS: Record<string, string> = { DRAFT: "Draft", ACTIVE: "Active", EXPIRED: "Expired", TERMINATED: "Terminated" }
+  const contracted = new Set(contractRows.filter((c) => c.quotationId && c.status !== "TERMINATED").map((c) => c.quotationId))
+  const contractsView = [
+    ...contractRows.map((c) => {
+      const tender = c.rfqNumber ? tenderByNumber.get(c.rfqNumber) : undefined
       return {
-        id: po?.poNumber ?? q.quotationNumber ?? q.id,
-        recordId: q.id,
-        tender: q.rfqNumber ?? DASH,
-        title: tender?.title ?? DASH,
-        vendor: q.companyName || q.vendorName || DASH,
+        id: c.contractNumber ?? c.id,
+        recordId: c.id,
+        kind: "contract",
+        tender: c.rfqNumber ?? DASH,
+        title: c.title ?? DASH,
+        vendor: c.vendorName ?? DASH,
+        vendorId: c.vendorId ?? null,
         entity: tender?.entity ?? DASH,
-        value: num(q.totalAmount),
-        start: q.reviewedAt ? String(q.reviewedAt).slice(0, 10) : DASH,
-        end: DASH,
-        status: "Awarded",
-        quotation: q.quotationNumber ?? null,
+        value: num(c.value) ?? 0,
+        currency: c.currencyCode ?? null,
+        start: c.startDate ? String(c.startDate).slice(0, 10) : DASH,
+        end: c.endDate ? String(c.endDate).slice(0, 10) : DASH,
+        status: CONTRACT_STATUS[String(c.effectiveStatus ?? c.status).toUpperCase()] ?? titleCase(c.status),
+        rawStatus: c.status,
+        quotationId: c.quotationId ?? null,
+        paymentTerms: c.paymentTerms ?? null,
+        scope: c.scope ?? null,
       }
-    })
-    .sort((a, b) => String(b.start).localeCompare(String(a.start)))
+    }),
+    ...quotations
+      .filter((q) => String(q.status).toUpperCase() === "ACCEPTED" && !contracted.has(q.id))
+      .map((q) => {
+        const tender = q.rfqNumber ? tenderByNumber.get(q.rfqNumber) : undefined
+        const po = poByQuotation.get(q.id)
+        return {
+          id: po?.poNumber ?? q.quotationNumber ?? q.id,
+          recordId: q.id,
+          kind: "award",
+          tender: q.rfqNumber ?? DASH,
+          title: tender?.title ?? DASH,
+          vendor: q.companyName || q.vendorName || DASH,
+          vendorId: q.vendorId ?? null,
+          entity: tender?.entity ?? DASH,
+          value: num(q.totalAmount) ?? 0,
+          currency: q.currencyCode ?? null,
+          start: q.reviewedAt ? String(q.reviewedAt).slice(0, 10) : DASH,
+          end: DASH,
+          status: "Awarded",
+          rawStatus: "AWARDED",
+          quotationId: q.id,
+          quotation: q.quotationNumber ?? null,
+        }
+      }),
+  ]
+
+  // ----------------------------------------------------------------- annual plans
+  const PLAN_STATUS: Record<string, string> = { DRAFT: "Draft", SUBMITTED: "Under review", APPROVED: "Approved", REJECTED: "Rejected" }
+  const yearOf = (fy: unknown) => Number(String(fy ?? "").match(/(\d{4})/)?.[1] ?? 0)
+  const plansView = planRows.map((p) => {
+    const year = yearOf(p.fiscalYear)
+    // Derived: purchase orders (not cancelled) raised in the plan's year for its department.
+    const committed = liveOrders
+      .filter(
+        (o) =>
+          (!year || new Date(o.orderDate ?? o.createdAt).getFullYear() === year) &&
+          (!p.department || departmentOfRequisition(o.requisitionId) === p.department),
+      )
+      .reduce((t, o) => t + (num(o.totalAmount) ?? 0), 0)
+    return {
+      id: p.planNumber ?? p.id,
+      recordId: p.id,
+      name: p.name ?? DASH,
+      entity: p.department ?? "All departments",
+      department: p.department ?? null,
+      fiscalYear: p.fiscalYear ?? null,
+      budget: num(p.budget) ?? 0,
+      planned: num(p.plannedValue) ?? 0,
+      committed,
+      status: PLAN_STATUS[String(p.status).toUpperCase()] ?? titleCase(p.status),
+      rawStatus: p.status,
+      version: `v${p.version ?? 1}.0`,
+      owner: DASH,
+      createdById: p.createdById ?? null,
+      notes: p.notes ?? null,
+      rejectionReason: p.rejectionReason ?? null,
+    }
+  })
+  const planItemsView = planRows.flatMap((p) =>
+    (p.items ?? []).map((i: any, idx: number) => ({
+      id: `${p.planNumber ?? p.id}-L${idx + 1}`,
+      recordId: i.id,
+      planRecordId: p.id,
+      plan: p.planNumber ?? p.id,
+      description: i.description ?? DASH,
+      entity: i.department ?? p.department ?? "All departments",
+      category: i.category ?? DASH,
+      quarter: i.quarter ?? DASH,
+      method: i.method ?? DASH,
+      budget: num(i.estimatedValue) ?? 0,
+      status: titleCase(i.status),
+    })),
+  )
+
+  // ----------------------------------------------------------------- document vault
+  const DOCUMENT_STATUS: Record<string, string> = { UNDER_REVIEW: "Under review", APPROVED: "Approved", ARCHIVED: "Archived" }
+  const esc = (v: unknown) =>
+    String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c] as string)
+  const documentsView = documentRows.map((d) => ({
+    id: `DOC-${String(d.id).slice(-6).toUpperCase()}`,
+    recordId: d.id,
+    name: d.name ?? DASH,
+    type: d.documentType ?? "Supporting document",
+    version: d.version ?? "v1.0",
+    owner: d.uploadedByName ?? DASH,
+    status: DOCUMENT_STATUS[String(d.status).toUpperCase()] ?? titleCase(d.status),
+    rawStatus: d.status,
+    date: fmtDate(d.createdAt),
+    folder: d.folder ?? "General",
+    relatedRecord: d.relatedRecord ?? null,
+    classification: d.classification ?? null,
+    fileUrl: d.fileUrl ?? null,
+    // The runtime's preview renders `content`; a stored file has no rendered body, so link to it.
+    content:
+      `<h1>${esc(d.name ?? "Document")}</h1>` +
+      `<p><strong>Folder:</strong> ${esc(d.folder ?? "General")} · <strong>Version:</strong> ${esc(d.version ?? "v1.0")}</p>` +
+      (d.relatedRecord ? `<p><strong>Related record:</strong> ${esc(d.relatedRecord)}</p>` : "") +
+      (d.description ? `<p>${esc(d.description)}</p>` : "") +
+      `<p><a href="${esc(d.fileUrl ?? "#")}" target="_blank" rel="noopener">Open the stored file</a> (${esc(d.mimeType ?? "file")}, ${Math.max(1, Math.round((Number(d.fileSizeBytes) || 0) / 1024))} KB)</p>`,
+  }))
 
   // ----------------------------------------------------------------- approval prompts
   // Built only from decisions the signed-in user can actually take, each pointing at a real
@@ -611,6 +727,26 @@ export async function loadProcurementV23LiveData(): Promise<ProcurementV23LivePa
           amount: num(inv.totalAmount),
           role: "Finance Manager",
           reason: `Against ${inv.purchaseOrder?.poNumber ?? "no purchase order"}; three-way match ${matchLabel(inv.matchingStatus).toLowerCase()}.`,
+        }),
+      )
+    }
+  }
+
+  if (has("plans.approve")) {
+    // The plan's author cannot decide it (the API refuses), so it is not offered to them.
+    for (const p of plansView.filter((x) => x.rawStatus === "SUBMITTED" && x.createdById !== access?.userId)) {
+      prompts.push(
+        prompt({
+          id: `PLAN-${p.id}`,
+          kind: "plan",
+          targetId: p.recordId,
+          type: "Procurement plan",
+          record: p.id,
+          title: `Approve ${p.name}`,
+          entity: p.entity,
+          amount: p.budget,
+          role: "Finance Manager",
+          reason: `${p.fiscalYear ?? ""} plan: ${planItemsView.filter((i) => i.planRecordId === p.recordId).length} line(s) planned at ${money(p.planned)} against a budget of ${money(p.budget)}.`,
         }),
       )
     }
@@ -730,6 +866,39 @@ export async function loadProcurementV23LiveData(): Promise<ProcurementV23LivePa
     // staff-only gate that refuses external portal accounts.
     "SoD controls": { value: "Enforced", sub: "Award, approval and payment are separate grants" },
     "Entity isolation": { value: "Enforced", sub: "External portal accounts are refused" },
+    // Annual plans
+    "Consolidated budget": {
+      value: money(plansView.filter((p) => p.rawStatus !== "REJECTED").reduce((t, p) => t + p.budget, 0)),
+      sub: `${plansView.length} plan${plansView.length === 1 ? "" : "s"} on record`,
+    },
+    "Submitted plans": {
+      value: `${plansView.filter((p) => ["SUBMITTED", "APPROVED"].includes(String(p.rawStatus))).length} of ${plansView.length}`,
+      sub: "Submitted or approved",
+    },
+    "Budget coverage": (() => {
+      const budget = plansView.reduce((t, p) => t + p.budget, 0)
+      const planned = plansView.reduce((t, p) => t + p.planned, 0)
+      return budget > 0
+        ? { value: `${Math.round((planned / budget) * 1000) / 10}%`, sub: "Planned lines against plan budgets" }
+        : unknown("No plan has a budget yet")
+    })(),
+    "Strategic tenders": unknown("Tenders are not linked to plan lines"),
+    "Plan amendments": {
+      value: plansView.reduce((t, p) => t + Math.max(0, Number(String(p.version).replace(/[^0-9.]/g, "")) - 1), 0),
+      sub: "Resubmissions after rejection",
+    },
+    "Unfunded exposure": {
+      value: money(plansView.reduce((t, p) => t + Math.max(0, p.planned - p.budget), 0)),
+      sub: "Planned beyond each plan budget",
+    },
+    // Contracts
+    "Renewals in 90 days": {
+      value: contractsView.filter(
+        (c) => c.kind === "contract" && c.rawStatus === "ACTIVE" && c.end !== DASH && new Date(c.end).getTime() - Date.now() < 90 * 864e5,
+      ).length,
+      sub: "Active contracts ending within 90 days",
+    },
+    "Vendor obligations": unknown("Obligations are not tracked on contracts yet"),
   }
 
   const hydrate: Record<string, unknown> = {
@@ -746,6 +915,9 @@ export async function loadProcurementV23LiveData(): Promise<ProcurementV23LivePa
     quotationsLive: quotationsView,
     evaluationLive,
     contractsV6: contractsView,
+    plans: plansView,
+    planItems: planItemsView,
+    documents: documentsView,
   }
   for (const key of NO_BACKEND_YET) hydrate[key] = []
 
@@ -793,7 +965,7 @@ const NO_REMINDER_AUTOMATION = {
 /** What the runtime is hydrated with before the first live load lands: no demo records at all. */
 export const EMPTY_PROCUREMENT_HYDRATE: Record<string, unknown> = {
   ...Object.fromEntries(
-    ["requisitions", "tenders", "vendors", "orders", "grns", "invoices", "approvalPromptsV6", "auditEventsLive", "quotationsLive", ...NO_BACKEND_YET].map((k) => [k, []]),
+    ["requisitions", "tenders", "vendors", "orders", "grns", "invoices", "approvalPromptsV6", "auditEventsLive", "quotationsLive", "plans", "planItems", "documents", ...NO_BACKEND_YET].map((k) => [k, []]),
   ),
   complianceReminderSettingsV7: NO_REMINDER_AUTOMATION,
   evaluationLive: {},

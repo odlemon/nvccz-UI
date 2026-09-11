@@ -462,6 +462,96 @@ function __pr23PaymentModal(preselectId) {
   );
 }
 
+// ---------------------------------------------------------------- annual procurement plans
+
+const __PR23_PLAN_CATEGORIES = ['Technology', 'Office supplies', 'Furniture', 'Facilities', 'Fleet', 'Medical', 'Agriculture', 'Professional services'];
+const __PR23_PLAN_METHODS = ['Open tender', 'Restricted tender', 'RFQ', 'Framework', 'Direct procurement'];
+const __pr23Options = (list, selected) => list.map(x => `<option ${x === selected ? 'selected' : ''}>${__pr23Esc(x)}</option>`).join('');
+const __pr23PlanEditable = p => ['DRAFT', 'REJECTED'].includes(String((p && p.rawStatus) || '').toUpperCase());
+
+function __pr23PlanLineRows(count) {
+  return Array.from({ length: count }, () => `<tr data-plan-line><td><input data-plan-desc placeholder="Requirement" style="min-width:180px"></td><td><select data-plan-cat>${__pr23Options(__PR23_PLAN_CATEGORIES)}</select></td><td><select data-plan-q>${__pr23Options(['Q1', 'Q2', 'Q3', 'Q4'])}</select></td><td><select data-plan-method>${__pr23Options(__PR23_PLAN_METHODS)}</select></td><td><input type="number" min="0" step="0.01" data-plan-value placeholder="0" style="width:110px"></td></tr>`).join('');
+}
+
+/** Create or edit an annual procurement plan, replacing the fixture plan form. */
+function __pr23PlanModal(planId) {
+  const plan = planId ? (state.plans || []).find(x => x.id === planId || x.recordId === planId) : null;
+  if (plan && !__pr23PlanEditable(plan)) {
+    openModal(plan.id, `${plan.name} · ${plan.status}`, `<p class="muted">A plan that is ${__pr23Esc(String(plan.status).toLowerCase())} is not edited. A rejected plan reopens for changes and is resubmitted as a new version.</p>`, btn('Close', 'close-overlay'));
+    return;
+  }
+  const live = __pr23Live() || {};
+  const year = new Date().getFullYear();
+  const years = [`FY ${year}`, `FY ${year + 1}`];
+  const lines = plan ? '' : `<div class="field full"><label>Plan lines (optional; add more later with Add plan item)</label>${__pr23LinesTable(['Requirement', 'Category', 'Quarter', 'Method', 'Estimated value'], [__pr23PlanLineRows(4)])}</div>`;
+  openModal(
+    plan ? `Edit ${plan.id}` : 'Create annual procurement plan',
+    plan ? 'Change the plan header. Lines are added with Add plan item.' : 'Create the plan with its budget and first requirements. It stays a draft until you submit it for budget approval.',
+    `<form id="planFormV23" class="form-grid"><input type="hidden" name="recordId" value="${__pr23Esc(plan ? plan.recordId : '')}"><div class="field full"><label>Plan name</label><input name="name" required value="${__pr23Esc(plan ? plan.name : '')}"></div><div class="field"><label>Department</label><input name="department" value="${__pr23Esc(plan ? plan.department || '' : (live.access && live.access.department) || '')}" placeholder="All departments"></div><div class="field"><label>Financial year</label><select name="fiscalYear">${__pr23Options(plan && plan.fiscalYear && !years.includes(plan.fiscalYear) ? [plan.fiscalYear, ...years] : years, plan ? plan.fiscalYear : years[1])}</select></div><div class="field"><label>Budget ceiling</label><input type="number" name="budget" min="1" step="0.01" required value="${plan ? plan.budget : ''}"></div><div class="field"><label>Currency</label><select name="currency">${__pr23Options(['USD', 'ZiG', 'ZAR'])}</select></div><div class="field full"><label>Planning assumptions</label><textarea name="notes">${__pr23Esc(plan ? plan.notes || '' : '')}</textarea></div>${lines}</form>`,
+    btn('Cancel', 'close-overlay') + btn('Save draft', 'save-plan-v5') + btn(plan ? 'Save changes' : 'Create plan', 'create-plan-confirm-v5', 'primary'),
+  );
+}
+
+/** Add a line to a draft or rejected plan. */
+function __pr23PlanItemModal() {
+  const plans = (state.plans || []).filter(__pr23PlanEditable);
+  if (!plans.length) {
+    openModal('Add procurement plan item', 'Lines are added to a draft plan, or to a rejected plan being corrected.', '<p class="muted">No plan is open for changes. Create a plan first.</p>', btn('Close', 'close-overlay'));
+    return;
+  }
+  const current = state.planDetail && plans.find(p => p.id === state.planDetail);
+  const planOptions = plans.map(p => `<option value="${__pr23Esc(p.recordId)}" ${current && current.recordId === p.recordId ? 'selected' : ''}>${__pr23Esc(p.id)} · ${__pr23Esc(p.name)}</option>`).join('');
+  openModal(
+    'Add procurement plan item',
+    'The estimated value counts against the plan budget when the plan is submitted.',
+    `<form id="planItemFormV23" class="form-grid"><div class="field full"><label>Plan</label><select name="plan" required>${planOptions}</select></div><div class="field full"><label>Requirement</label><input name="description" required></div><div class="field"><label>Category</label><select name="category">${__pr23Options(__PR23_PLAN_CATEGORIES)}</select></div><div class="field"><label>Quarter</label><select name="quarter">${__pr23Options(['Q1', 'Q2', 'Q3', 'Q4'])}</select></div><div class="field"><label>Sourcing method</label><select name="method">${__pr23Options(__PR23_PLAN_METHODS)}</select></div><div class="field"><label>Estimated value</label><input type="number" name="estimatedValue" min="0" step="0.01" required></div><div class="field"><label>Department</label><input name="department" placeholder="The plan's department"></div></form>`,
+    btn('Cancel', 'close-overlay') + btn('Save item', 'save-plan-item', 'primary'),
+  );
+}
+
+/** The plan workspace's progress strip, from the plan's real status. */
+function __pr23PlanStrip(p) {
+  const s = String(p.rawStatus || '').toUpperCase();
+  const lines = (state.planItems || []).filter(i => i.planRecordId === p.recordId).length;
+  const step = (label, detail, cls) => `<div class="workflow-step ${cls}"><strong>${label}</strong><span>${__pr23Esc(detail)}</span></div>`;
+  const decided = s === 'APPROVED' || s === 'REJECTED';
+  return `<div class="workflow-strip">${step('1. Draft', `${lines} line${lines === 1 ? '' : 's'} planned`, s === 'DRAFT' ? 'current' : 'done')}${step('2. Budget approval', s === 'DRAFT' ? 'Not yet submitted' : s === 'SUBMITTED' ? 'Awaiting a budget approver' : 'Decided', s === 'SUBMITTED' ? 'current' : decided ? 'done' : '')}${step(s === 'REJECTED' ? '3. Returned' : '3. Approved baseline', s === 'REJECTED' ? p.rejectionReason || 'Returned for changes' : s === 'APPROVED' ? 'Plan approved' : 'Pending', decided ? 'current' : '')}</div>`;
+}
+
+// ---------------------------------------------------------------- contracts
+
+/** Create a contract from an award (or standalone), edit a draft, or view an issued contract. */
+function __pr23ContractModal(id) {
+  const c = id ? (state.contractsV6 || []).find(x => x.id === id || x.recordId === id) : null;
+  const money2 = n => Number(n || 0).toFixed(2);
+  if (c && c.kind === 'contract' && String(c.rawStatus).toUpperCase() !== 'DRAFT') {
+    const terminate = String(c.rawStatus).toUpperCase() === 'ACTIVE' && __pr23Can('contracts.manage')
+      ? `<button class="btn" data-action="terminate-contract-v23" data-id="${__pr23Esc(c.recordId)}">Terminate</button>` : '';
+    openModal(c.id, `${c.title} · ${c.status}`, `<div class="form-grid"><div class="field"><label>Vendor</label><input value="${__pr23Esc(c.vendor)}" readonly></div><div class="field"><label>Value</label><input value="${__pr23Esc(c.currency || '')} ${money2(c.value)}" readonly></div><div class="field"><label>Start</label><input value="${__pr23Esc(c.start)}" readonly></div><div class="field"><label>End</label><input value="${__pr23Esc(c.end)}" readonly></div><div class="field full"><label>Payment terms</label><textarea readonly>${__pr23Esc(c.paymentTerms || '')}</textarea></div><div class="field full"><label>Scope</label><textarea readonly>${__pr23Esc(c.scope || '')}</textarea></div></div>`, btn('Close', 'close-overlay') + terminate);
+    return;
+  }
+  if (!__pr23Can('contracts.manage')) {
+    openModal('Contracts', 'Creating a contract is a procurement desk step.', '<p class="muted">Your role can view contracts but not create or change them.</p>', btn('Close', 'close-overlay'));
+    return;
+  }
+  const draft = c && c.kind === 'contract' ? c : null;
+  const awards = (state.contractsV6 || []).filter(x => x.kind === 'award');
+  const chosenAward = c && c.kind === 'award' ? c : draft && draft.quotationId ? awards.find(a => a.quotationId === draft.quotationId) : null;
+  const awardOptions = awards.map(a => `<option value="${__pr23Esc(a.quotationId)}" data-value="${money2(a.value)}" data-vendor="${__pr23Esc(a.vendorId || '')}" data-title="${__pr23Esc(a.title)}" ${chosenAward && chosenAward.quotationId === a.quotationId ? 'selected' : ''}>${__pr23Esc(a.tender)} · ${__pr23Esc(a.vendor)} · ${money2(a.value)}</option>`).join('');
+  const vendors = (state.vendors || []).filter(v => !v.isBlacklisted);
+  const vendorOptions = vendors.map(v => `<option value="${__pr23Esc(v.recordId)}" ${draft && draft.vendorId === v.recordId ? 'selected' : ''}>${__pr23Esc(v.name)}</option>`).join('');
+  const start = draft && draft.start !== '—' ? draft.start : __pr23DateOffset(7);
+  const end = draft && draft.end !== '—' ? draft.end : __pr23DateOffset(372);
+  const source = chosenAward || (!draft && awards[0]) || null;
+  const activate = draft ? `<button class="btn" data-action="activate-contract-v23" data-id="${__pr23Esc(draft.recordId)}">Activate</button>` : '';
+  openModal(
+    draft ? `Edit ${draft.id}` : 'Create purchase contract',
+    'A contract follows an award, or stands alone for a direct engagement. It is saved as a draft and becomes active when activated.',
+    `<form id="contractFormV23" class="form-grid"><input type="hidden" name="recordId" value="${__pr23Esc(draft ? draft.recordId : '')}"><div class="field full"><label>Award</label><select name="quotation" id="contractSourceV23" ${draft ? 'disabled' : ''}>${awardOptions}<option value="" ${!source ? 'selected' : ''}>No award (standalone contract)</option></select></div><div class="field full"><label>Vendor (standalone only)</label><select name="vendor" ${draft ? 'disabled' : ''}>${vendorOptions}</select></div><div class="field full"><label>Contract title</label><input name="title" required value="${__pr23Esc(draft ? draft.title : source ? `Supply agreement · ${source.title}` : '')}"></div><div class="field"><label>Contract value</label><input type="number" name="value" min="0" step="0.01" required value="${draft ? money2(draft.value) : source ? money2(source.value) : ''}"></div><div class="field"><label>Currency</label><select name="currency">${__pr23Options(['USD', 'ZiG', 'ZAR'], draft ? draft.currency : 'USD')}</select></div><div class="field"><label>Start date</label><input type="date" name="start" value="${__pr23Esc(start)}" required></div><div class="field"><label>End date</label><input type="date" name="end" value="${__pr23Esc(end)}" required></div><div class="field full"><label>Payment terms</label><textarea name="paymentTerms">${__pr23Esc(draft ? draft.paymentTerms || '' : 'Payment within thirty (30) days of an approved invoice matched to the purchase order and goods received note.')}</textarea></div><div class="field full"><label>Scope and deliverables</label><textarea name="scope">${__pr23Esc(draft ? draft.scope || '' : '')}</textarea></div></form>`,
+    btn('Cancel', 'close-overlay') + activate + btn(draft ? 'Save changes' : 'Save draft', 'save-contract-v6', 'primary'),
+  );
+}
+
 // Re-draw dependent parts of the live forms when a select changes. Removed with the runtime (__pr23Sig).
 document.addEventListener('change', event => {
   const target = event.target;
@@ -477,6 +567,14 @@ document.addEventListener('change', event => {
   if (target.id === 'poSourceV23') {
     const box = document.querySelector('#poLinesV23');
     if (box) box.innerHTML = __pr23PoLinesHtml(target.value);
+  }
+  if (target.id === 'contractSourceV23') {
+    const option = target.selectedOptions && target.selectedOptions[0];
+    const form = document.querySelector('#contractFormV23');
+    if (form && option && option.value) {
+      if (option.dataset.value) form.elements.value.value = option.dataset.value;
+      if (option.dataset.title && !form.elements.title.value) form.elements.title.value = `Supply agreement · ${option.dataset.title}`;
+    }
   }
   if (target.id === 'paymentInvoiceV23') {
     const amount = document.querySelector('#paymentAmountV23');

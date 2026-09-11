@@ -17,6 +17,16 @@
  */
 import {
   acceptQuotation,
+  addProcurementPlanItem,
+  createProcurementContract,
+  createProcurementPlan,
+  decideProcurementPlan,
+  setProcurementContractStatus,
+  submitProcurementPlan,
+  updateProcurementContract,
+  updateProcurementPlan,
+  uploadProcurementDocumentVersion,
+  uploadProcurementDocuments,
   approveGoodsReceivedNote,
   approveProcurementInvoice,
   approveRequisition,
@@ -72,6 +82,16 @@ export const LIVE_ACTIONS = [
   "submit-po-v6",
   "confirm-record-payment-v23",
   "confirm-send-selected-po-v11",
+  "save-plan-v5",
+  "create-plan-confirm-v5",
+  "save-plan-item",
+  "submit-plan",
+  "save-contract-v6",
+  "activate-contract-v23",
+  "terminate-contract-v23",
+  "confirm-upload-document-v5",
+  "confirm-upload-document-v6",
+  "confirm-upload-version-v11",
 ] as const
 
 /**
@@ -96,11 +116,7 @@ export const NOT_YET_LIVE_ACTIONS = [
   "approve-match-v5",
   "save-pr-v11",
   "create-plan-confirm",
-  "create-plan-confirm-v5",
-  "submit-plan",
-  "save-plan-item",
   "save-plan-line-v6",
-  "save-contract-v6",
   "save-and-esign-contract-v6",
   "post-journal",
   "confirm-asset-transfer",
@@ -151,7 +167,6 @@ const UNCONNECTED_TERMINAL_STEPS = new Set<string>([
   "send-vendor-doc-request-v6",
   "send-vendor-message-v6",
   "send-vendor-link",
-  "create-contract",
   "create-match-exception-v5",
   "import-plan",
   "run-ocr",
@@ -321,6 +336,10 @@ export async function handleProcurementV23Action(
             if (!has("invoices.approve")) return refuse("approving invoices")
             await approveProcurementInvoice(p.targetId, true)
             break
+          case "plan":
+            if (!has("plans.approve")) return refuse("approving procurement plans")
+            await decideProcurementPlan(p.targetId, "approve")
+            break
           default:
             return { handled: true, error: "This approval type is not connected to the backend yet." }
         }
@@ -330,6 +349,7 @@ export async function handleProcurementV23Action(
           award: `${p.record} awarded; the purchase order has been raised.`,
           grn: `${p.record} accepted on inspection.`,
           invoice: `${p.record} approved for payment.`,
+          plan: `${p.record} approved as the plan baseline.`,
         }
         return { handled: true, reload: true, message: done[p.kind] }
       }
@@ -358,6 +378,10 @@ export async function handleProcurementV23Action(
           case "invoice":
             if (!has("invoices.approve")) return refuse("rejecting invoices")
             await rejectProcurementInvoice(p.targetId, withDecision)
+            break
+          case "plan":
+            if (!has("plans.approve")) return refuse("rejecting procurement plans")
+            await decideProcurementPlan(p.targetId, "reject", withDecision)
             break
           default:
             return { handled: true, error: "This approval type is not connected to the backend yet." }
@@ -678,6 +702,169 @@ export async function handleProcurementV23Action(
           reload: true,
           message: `${invoice?.invoiceNumber ?? "The invoice"} captured against ${po.id} and sent to Finance for approval.`,
         }
+      }
+
+      // ---------------------------------------------------------------- annual plans
+      case "save-plan-v5":
+      case "create-plan-confirm-v5": {
+        if (!has("plans.manage")) return refuse("creating or changing procurement plans")
+        const form = document.querySelector<HTMLFormElement>("#planFormV23")
+        if (!form) return { handled: true, error: "Open the plan form again; it is not on screen." }
+        if (!form.reportValidity()) return { handled: true }
+        const recordId = val('#planFormV23 [name="recordId"]')
+        const body = {
+          name: val('#planFormV23 [name="name"]'),
+          department: val('#planFormV23 [name="department"]') || undefined,
+          fiscalYear: val('#planFormV23 [name="fiscalYear"]') || undefined,
+          budget: Number(val('#planFormV23 [name="budget"]') || 0),
+          currencyCode: val('#planFormV23 [name="currency"]') || undefined,
+          notes: val('#planFormV23 [name="notes"]') || undefined,
+        }
+        if (!(body.budget > 0)) return { handled: true, error: "The plan needs a budget ceiling above zero." }
+        const lines = [...form.querySelectorAll<HTMLTableRowElement>("[data-plan-line]")]
+          .map((row) => ({
+            description: (row.querySelector<HTMLInputElement>("[data-plan-desc]")?.value ?? "").trim(),
+            category: row.querySelector<HTMLSelectElement>("[data-plan-cat]")?.value || undefined,
+            quarter: row.querySelector<HTMLSelectElement>("[data-plan-q]")?.value || undefined,
+            method: row.querySelector<HTMLSelectElement>("[data-plan-method]")?.value || undefined,
+            estimatedValue: Number(row.querySelector<HTMLInputElement>("[data-plan-value]")?.value || 0),
+          }))
+          .filter((l) => l.description)
+        const plan = recordId ? await updateProcurementPlan(recordId, body) : await createProcurementPlan(body)
+        for (const line of lines) await addProcurementPlanItem(plan.id, line)
+        closeRuntimeOverlay()
+        const count = lines.length
+        return {
+          handled: true,
+          reload: true,
+          message: `${plan.planNumber} ${recordId ? "updated" : "created as a draft"}${count ? ` with ${count} line${count === 1 ? "" : "s"}` : ""}. Submit it for budget approval when it is complete.`,
+        }
+      }
+
+      case "save-plan-item": {
+        if (!has("plans.manage")) return refuse("changing procurement plans")
+        const form = document.querySelector<HTMLFormElement>("#planItemFormV23")
+        if (!form) return { handled: true, error: "Open Add plan item again; the form is not on screen." }
+        if (!form.reportValidity()) return { handled: true }
+        const plan = await addProcurementPlanItem(val('#planItemFormV23 [name="plan"]'), {
+          description: val('#planItemFormV23 [name="description"]'),
+          category: val('#planItemFormV23 [name="category"]') || undefined,
+          quarter: val('#planItemFormV23 [name="quarter"]') || undefined,
+          method: val('#planItemFormV23 [name="method"]') || undefined,
+          estimatedValue: Number(val('#planItemFormV23 [name="estimatedValue"]') || 0),
+          department: val('#planItemFormV23 [name="department"]') || undefined,
+        })
+        closeRuntimeOverlay()
+        const fmt = (n: unknown) => Number(n ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+        return { handled: true, reload: true, message: `Line added to ${plan.planNumber}: ${fmt(plan.plannedValue)} planned against a budget of ${fmt(plan.budget)}.` }
+      }
+
+      case "submit-plan": {
+        if (!has("plans.manage")) return refuse("submitting procurement plans")
+        const ui = (window as unknown as { MatanhoProcurementUI?: { getSnapshot?: () => Record<string, unknown> } }).MatanhoProcurementUI
+        const openId = String(ui?.getSnapshot?.()?.planDetail ?? "")
+        const editable = rows("plans").filter((p) => ["DRAFT", "REJECTED"].includes(String(p.rawStatus)))
+        const plan = openId ? rows("plans").find((p) => p.id === openId) : editable.length === 1 ? editable[0] : undefined
+        if (!plan) {
+          return {
+            handled: true,
+            error: editable.length ? "Open the plan you want to submit, then submit it from its workspace." : "No draft plan is waiting to be submitted.",
+          }
+        }
+        if (!["DRAFT", "REJECTED"].includes(String(plan.rawStatus))) {
+          return { handled: true, error: `${plan.id} is ${String(plan.status).toLowerCase()} and cannot be submitted again.` }
+        }
+        const out = await submitProcurementPlan(plan.recordId)
+        return { handled: true, reload: true, message: `${out.planNumber} submitted for budget approval.` }
+      }
+
+      // ---------------------------------------------------------------- contracts
+      case "save-contract-v6": {
+        if (!has("contracts.manage")) return refuse("creating contracts")
+        const form = document.querySelector<HTMLFormElement>("#contractFormV23")
+        if (!form) return { handled: true, error: "Open the contract form again; it is not on screen." }
+        if (!form.reportValidity()) return { handled: true }
+        const recordId = val('#contractFormV23 [name="recordId"]')
+        const quotationId = val('#contractFormV23 [name="quotation"]')
+        const body = {
+          title: val('#contractFormV23 [name="title"]'),
+          value: Number(val('#contractFormV23 [name="value"]') || 0),
+          currencyCode: val('#contractFormV23 [name="currency"]') || undefined,
+          startDate: val('#contractFormV23 [name="start"]') || undefined,
+          endDate: val('#contractFormV23 [name="end"]') || undefined,
+          paymentTerms: val('#contractFormV23 [name="paymentTerms"]') || undefined,
+          scope: val('#contractFormV23 [name="scope"]') || undefined,
+        }
+        const saved = recordId
+          ? await updateProcurementContract(recordId, body)
+          : await createProcurementContract({ ...body, ...(quotationId ? { quotationId } : { vendorId: val('#contractFormV23 [name="vendor"]') }) })
+        closeRuntimeOverlay()
+        return {
+          handled: true,
+          reload: true,
+          message: `${saved.contractNumber} ${recordId ? "saved" : "created as a draft"} for ${saved.vendorName ?? "the vendor"}. Activate it once it is signed.`,
+        }
+      }
+
+      case "activate-contract-v23":
+      case "terminate-contract-v23": {
+        if (!has("contracts.manage")) return refuse("changing contracts")
+        const id = String(detail.dataset.id ?? "")
+        if (!rows("contractsV6").some((x) => x.recordId === id)) {
+          return { handled: true, error: "That contract is no longer in the register. Refresh and try again." }
+        }
+        const activating = action === "activate-contract-v23"
+        const out = await setProcurementContractStatus(id, activating ? "activate" : "terminate")
+        closeRuntimeOverlay()
+        return { handled: true, reload: true, message: `${out.contractNumber} ${activating ? "is now active" : "was terminated"}.` }
+      }
+
+      // ---------------------------------------------------------------- document vault
+      case "confirm-upload-document-v5":
+      case "confirm-upload-document-v6": {
+        if (!has("documents.manage")) return refuse("uploading documents")
+        const formId = action === "confirm-upload-document-v5" ? "#uploadDocumentFormV5" : "#documentUploadFormV6"
+        const form = document.querySelector<HTMLFormElement>(formId)
+        if (!form) return { handled: true, error: "Open Upload document again; the form is not on screen." }
+        if (!form.reportValidity()) return { handled: true }
+        const files = [...(form.querySelector<HTMLInputElement>('[name="files"]')?.files ?? [])]
+        if (!files.length) return { handled: true, error: "Attach at least one file." }
+        const field = (n: string) => val(`${formId} [name="${n}"]`)
+        const fd = new FormData()
+        for (const f of files) fd.append("files", f)
+        const folder = field("folder") || "General"
+        fd.append("folder", folder)
+        const extra: Record<string, string> = {
+          name: field("name"),
+          documentType: field("type"),
+          relatedRecord: field("record"),
+          classification: field("classification"),
+          source: field("source"),
+          description: field("description"),
+        }
+        for (const [k, v] of Object.entries(extra)) if (v) fd.append(k, v)
+        const created = await uploadProcurementDocuments(fd)
+        closeRuntimeOverlay()
+        const n = Array.isArray(created) ? created.length : files.length
+        return { handled: true, reload: true, message: `${n} document${n === 1 ? "" : "s"} filed in ${folder} for review.` }
+      }
+
+      case "confirm-upload-version-v11": {
+        if (!has("documents.manage")) return refuse("uploading document versions")
+        const form = document.querySelector<HTMLFormElement>("#uploadVersionFormV11")
+        if (!form) return { handled: true, error: "Open Upload version again; the form is not on screen." }
+        if (!form.reportValidity()) return { handled: true }
+        const doc = byDisplayId("documents", detail.dataset.id)
+        if (!doc) {
+          return { handled: true, error: "Only a stored vault document takes a new version; templates and generated records have no stored file." }
+        }
+        const file = form.querySelector<HTMLInputElement>('[name="file"]')?.files?.[0]
+        if (!file) return { handled: true, error: "Attach the new version's file." }
+        const fd = new FormData()
+        fd.append("file", file)
+        const out = await uploadProcurementDocumentVersion(doc.recordId, fd)
+        closeRuntimeOverlay()
+        return { handled: true, reload: true, message: `${doc.name} is now ${out.version}, awaiting review.` }
       }
 
       // ------------------------------------------------------------ invoice payment

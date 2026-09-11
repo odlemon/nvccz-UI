@@ -497,6 +497,107 @@ await step("13 Accountant records payment of an approved invoice (Record payment
   )
 })
 
+// ------------------------------------------------------------------ 14. annual plan
+await step("14 Procurement Manager creates an annual plan with a line (plan form)", async (open) => {
+  const label = "14 Procurement Manager creates an annual plan with a line (plan form)"
+  const email = "proc.mgr@nts.local"
+  const name = `UAT P2P plan ${RUN}`
+  const { page, errors } = await open(email, "/procurement-v23/plan")
+  await page.click('[data-action="create-plan-v5"]')
+  await page.waitForSelector("#planFormV23")
+  await page.fill('#planFormV23 [name="name"]', name)
+  await page.fill('#planFormV23 [name="department"]', "Operations")
+  await page.fill('#planFormV23 [name="budget"]', "150000")
+  await page.fill("#planFormV23 [data-plan-line] [data-plan-desc] >> nth=0", "UAT P2P laptops refresh")
+  await page.fill("#planFormV23 [data-plan-line] [data-plan-value] >> nth=0", "42000")
+  await page.click('[data-action="create-plan-confirm-v5"]')
+  const toast = await toasts(page)
+  const plan = ((await api(email, "/procurement/plans")) ?? []).find((p) => p.name === name)
+  record(
+    plan?.status === "DRAFT" && plan.items?.length === 1 && Number(plan.budget) === 150000,
+    label,
+    `${plan ? `${plan.planNumber} ${plan.status}, ${plan.items?.length} line(s), planned ${plan.plannedValue}` : "no plan"} · "${toast}"${suffix(errors)}`,
+  )
+})
+
+// ------------------------------------------------------------------ 15. submit and approve the plan
+await step("15 Plan submitted by its author, approved by the Finance Manager (Approval Centre)", async (open) => {
+  const label = "15 Plan submitted by its author, approved by the Finance Manager (Approval Centre)"
+  const author = "proc.mgr@nts.local"
+  const finance = "payroll.finmgr@nts.local"
+  const plan = ((await api(author, "/procurement/plans")) ?? []).find((p) => p.name === `UAT P2P plan ${RUN}`)
+  if (!plan) return record(false, label, "no plan from step 14")
+  {
+    const { page, errors } = await open(author, "/procurement-v23/plan")
+    await page.click(`[data-action="open-plan-detail-v5"][data-id="${plan.planNumber}"] >> nth=0`)
+    await page.waitForSelector('[data-action="submit-plan"]')
+    await page.click('[data-action="submit-plan"] >> nth=0')
+    const toast = await toasts(page)
+    const submitted = ((await api(author, "/procurement/plans")) ?? []).find((p) => p.id === plan.id)
+    if (submitted?.status !== "SUBMITTED") return record(false, label, `submit -> ${submitted?.status} · "${toast}"${suffix(errors)}`)
+  }
+  const { page, errors } = await open(finance, "/procurement-v23/approvals")
+  const control = `[data-action="approve-prompt-v6"][data-id="PLAN-${plan.planNumber}"]`
+  if (!(await promptOnScreen(page, control))) return record(false, label, await explainMissingPrompt(page, control, errors))
+  await page.click(control)
+  const toast = await toasts(page)
+  const after = ((await api(finance, "/procurement/plans")) ?? []).find((p) => p.id === plan.id)
+  record(after?.status === "APPROVED", label, `${plan.planNumber} -> ${after?.status} · "${toast}"${suffix(errors)}`)
+})
+
+// ------------------------------------------------------------------ 16. contract from an award
+await step("16 Procurement Manager creates a contract from an award and activates it", async (open) => {
+  const label = "16 Procurement Manager creates a contract from an award and activates it"
+  const email = "proc.mgr@nts.local"
+  const title = `UAT P2P supply agreement ${RUN}`
+  const { page, errors } = await open(email, "/procurement-v23/contracts")
+  await page.click('[data-action="create-contract-v6"]')
+  await page.waitForSelector("#contractFormV23")
+  const awards = await page.$$eval("#contractSourceV23 option", (os) => os.map((o) => o.value).filter(Boolean))
+  if (!awards.length) return record(false, label, `no uncontracted award to contract${suffix(errors)}`)
+  await page.selectOption("#contractSourceV23", awards[0])
+  await page.fill('#contractFormV23 [name="title"]', title)
+  await page.click('[data-action="save-contract-v6"]')
+  const saveToast = await toasts(page)
+  const created = ((await api(email, "/procurement/contracts")) ?? []).find((c) => c.title === title)
+  if (!created) return record(false, label, `no contract saved · "${saveToast}"${suffix(errors)}`)
+  // Row actions sit behind each row's menu button (a later runtime layer folds them into it).
+  const row = page.locator("table tbody tr", { hasText: created.contractNumber })
+  await row.first().waitFor()
+  await row.first().locator('[data-action="row-actions-v16"]').click()
+  await page.click(`[data-action="edit-contract-v6"][data-id="${created.contractNumber}"]`)
+  await page.waitForSelector(`[data-action="activate-contract-v23"][data-id="${created.id}"]`)
+  await page.click(`[data-action="activate-contract-v23"][data-id="${created.id}"]`)
+  const toast = await toasts(page)
+  const after = ((await api(email, "/procurement/contracts")) ?? []).find((c) => c.id === created.id)
+  record(
+    after?.status === "ACTIVE" && after.quotationId === awards[0],
+    label,
+    `${created.contractNumber} ${after?.status}, value ${after?.value}, vendor ${after?.vendorName} · "${toast}"${suffix(errors)}`,
+  )
+})
+
+// ------------------------------------------------------------------ 17. document vault upload
+await step("17 Procurement Officer files a document in the vault (Upload document form)", async (open) => {
+  const label = "17 Procurement Officer files a document in the vault (Upload document form)"
+  const email = "proc.officer@nts.local"
+  const name = `UAT P2P tender pack ${RUN}`
+  const { page, errors } = await open(email, "/procurement-v23/documents")
+  await page.click('[data-action="upload-document-v5"] >> nth=0')
+  await page.waitForSelector("#uploadDocumentFormV5")
+  await page.setInputFiles('#uploadDocumentFormV5 [name="files"]', { name: "uat-tender-pack.pdf", mimeType: "application/pdf", buffer: Buffer.from("%PDF-1.4\n%%EOF\n") })
+  await page.fill('#uploadDocumentFormV5 [name="name"]', name)
+  await page.selectOption('#uploadDocumentFormV5 [name="folder"]', "Tenders & Bids")
+  await page.click('[data-action="confirm-upload-document-v5"]')
+  const toast = await toasts(page)
+  const doc = ((await api(email, "/procurement/documents")) ?? []).find((d) => d.name === name)
+  record(
+    Boolean(doc && doc.folder === "Tenders & Bids" && doc.fileUrl),
+    label,
+    `${doc ? `${doc.name} ${doc.version} ${doc.status} in ${doc.folder}` : "no document"} · "${toast}"${suffix(errors)}`,
+  )
+})
+
 const failed = results.filter((r) => !r.ok)
 console.log(`\n=== RESULT === ${results.length - failed.length}/${results.length} verified through the API`)
 process.exit(failed.length ? 1 : 0)

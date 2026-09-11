@@ -671,6 +671,52 @@ s = replaceUnique(
   "'record-payment-v23': a => __pr23PaymentModal(",
 )
 
+// ---------------------------------------------------------------------------
+// 19. Plans and contracts open real forms; the plan workspace shows its own lines
+// ---------------------------------------------------------------------------
+s = replaceUnique(
+  s,
+  "function densePlanModal(planId=''){",
+  "function densePlanModal(planId=''){if(__pr23Live())return __pr23PlanModal(planId);",
+  "create / edit plan -> live plan form",
+  "if(__pr23Live())return __pr23PlanModal(planId);",
+)
+s = replaceUnique(
+  s,
+  "function addPlanItemModal(){",
+  "function addPlanItemModal(){if(__pr23Live())return __pr23PlanItemModal();",
+  "add plan item -> live plan line form",
+  "if(__pr23Live())return __pr23PlanItemModal();",
+)
+s = replaceUnique(
+  s,
+  "const items=state.planItems.filter((x,i)=>x.entity===p.entity||p.entity==='Group Consolidated'||i<3);",
+  "const items=__pr23Live()?state.planItems.filter(x=>x.planRecordId===p.recordId):state.planItems.filter((x,i)=>x.entity===p.entity||p.entity==='Group Consolidated'||i<3);",
+  "plan workspace -> its own lines",
+  "state.planItems.filter(x=>x.planRecordId===p.recordId)",
+)
+s = replaceUnique(
+  s,
+  '<div class="workflow-strip"><div class="workflow-step done"><strong>1. Demand collection</strong><span>Completed by 7 entities</span></div><div class="workflow-step done"><strong>2. Budget validation</strong><span>93.6% funded</span></div><div class="workflow-step current"><strong>3. Procurement review</strong><span>4 items need action</span></div><div class="workflow-step"><strong>4. CFO review</strong><span>Pending</span></div><div class="workflow-step"><strong>5. Committee approval</strong><span>Pending</span></div><div class="workflow-step"><strong>6. Baseline issued</strong><span>Not started</span></div></div>',
+  '${__pr23Live()?__pr23PlanStrip(p):\'<div class="workflow-strip"><div class="workflow-step done"><strong>1. Demand collection</strong><span>Completed by 7 entities</span></div><div class="workflow-step done"><strong>2. Budget validation</strong><span>93.6% funded</span></div><div class="workflow-step current"><strong>3. Procurement review</strong><span>4 items need action</span></div><div class="workflow-step"><strong>4. CFO review</strong><span>Pending</span></div><div class="workflow-step"><strong>5. Committee approval</strong><span>Pending</span></div><div class="workflow-step"><strong>6. Baseline issued</strong><span>Not started</span></div></div>\'}',
+  "plan workspace -> real progress strip",
+  "${__pr23Live()?__pr23PlanStrip(p):",
+)
+s = replaceUnique(
+  s,
+  "function contractModalV6(existingId=''){",
+  "function contractModalV6(existingId=''){if(__pr23Live())return __pr23ContractModal(existingId);",
+  "create / edit contract -> live contract form",
+  "if(__pr23Live())return __pr23ContractModal(existingId);",
+)
+s = replaceUnique(
+  s,
+  "function contractModalV6(id=''){",
+  "function contractModalV6(id=''){if(__pr23Live())return __pr23ContractModal(id);",
+  "create / edit contract (later layer) -> live contract form",
+  "if(__pr23Live())return __pr23ContractModal(id);",
+)
+
 console.log(`\n${applied} applied, ${skipped} already in place, ${missed} missed`)
 if (missed) {
   console.error("One or more patches did not find their anchor. The runtime is NOT fully patched.")
