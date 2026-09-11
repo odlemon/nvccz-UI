@@ -66,6 +66,8 @@ export function ProcurementV23App() {
             kpis: payload.kpis,
             navCounts: payload.navCounts,
             access: payload.access,
+            // The accounts a payment can be made from, for the bridge's Record payment form.
+            banks: payload.banks ?? [],
           }
           // The requisitions page opens on the approver queue only for someone who approves
           // requisitions. The runtime decided it from its demo user's role; after the first load

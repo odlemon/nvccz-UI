@@ -558,7 +558,84 @@ function __pr23InvoiceCaptureModal(tenderId) {
   );
 }
 
-// Re-draw the line tables when the purchase order changes. Removed with the runtime (__pr23Sig).
+// ---------------------------------------------------------------- direct purchase order
+
+/** Approved requisitions, which a purchase order may be raised from directly (without an RFQ). */
+function __pr23PoSources() {
+  return (state.requisitions || []).filter(r => String(r.rawStatus || '').toUpperCase() === 'APPROVED');
+}
+
+function __pr23PoLinesHtml(reqRecordId) {
+  const r = (state.requisitions || []).find(x => x.recordId === reqRecordId);
+  if (!r) return '<p class="muted">Select the approved requisition.</p>';
+  const lines = r.items && r.items.length ? r.items : [{ itemName: r.title, quantity: 1, unit: 'Each', unitPrice: null }];
+  const rows = lines.map((i, idx) => `<tr data-po-line="${idx}"><td><input data-po-name value="${__pr23Esc(i.itemName)}" required style="min-width:170px"></td><td><input data-po-unit value="${__pr23Esc(i.unit || 'Each')}" style="width:70px"></td><td><input type="number" min="0.01" step="0.01" data-po-qty value="${i.quantity == null ? 1 : i.quantity}" required style="width:70px"></td><td><input type="number" min="0.01" step="0.01" data-po-price value="${i.unitPrice ? i.unitPrice : ''}" required style="width:100px"></td></tr>`);
+  return __pr23LinesTable(['Item', 'Unit', 'Quantity', 'Unit price'], rows)
+    + '<p class="muted" style="margin-top:8px">Unit prices start from the requester\'s estimate where one was given. VAT is added at the active rate and the PO number is assigned when the order is saved.</p>';
+}
+
+/** Raise a purchase order from an approved requisition, replacing the fixture form. */
+function __pr23PoModal(existingId) {
+  if (existingId) {
+    openModal(`Purchase order ${existingId}`, 'A saved purchase order is not edited in place.', '<p class="muted">Send or preview it from the register. A change to an order already sent is agreed with the vendor and raised as a new order.</p>', btn('Close', 'close-overlay'));
+    return;
+  }
+  const sources = __pr23PoSources();
+  const vendors = (state.vendors || []).filter(v => !v.isBlacklisted);
+  const reason = !sources.length
+    ? 'No approved requisition is waiting to be ordered. A requisition is approved by its department head first.'
+    : !vendors.length ? 'No vendor is registered yet. Register the vendor in Vendor Registry first.' : '';
+  if (reason) {
+    openModal('Create purchase order', 'A purchase order is raised from an approved requisition.', `<p class="muted">${__pr23Esc(reason)}</p>`, btn('Close', 'close-overlay'));
+    return;
+  }
+  const sourceOptions = sources.map(r => `<option value="${__pr23Esc(r.recordId)}">${__pr23Esc(r.id)} · ${__pr23Esc(r.title)} · ${__pr23Esc(r.department || '')}</option>`).join('');
+  // A PO is sent by email, so a vendor without one is flagged before anyone tries to send to it.
+  const vendorOptions = vendors.map(v => `<option value="${__pr23Esc(v.recordId)}">${__pr23Esc(v.name)}${v.status && v.status !== 'Prequalified' ? ' · ' + __pr23Esc(v.status) : ''}${String(v.email || '').includes('@') ? '' : ' · no email'}</option>`).join('');
+  openModal(
+    'Create purchase order',
+    'Raise an order directly from an approved requisition, without an RFQ. Save it as a draft, or save and send it to the vendor.',
+    `<form id="poFormV23" class="form-grid"><div class="field full"><label>Approved requisition</label><select name="requisition" id="poSourceV23" required>${sourceOptions}</select></div><div class="field"><label>Vendor</label><select name="vendor" required>${vendorOptions}</select></div><div class="field"><label>Expected delivery</label><input type="date" name="delivery" value="${__pr23DateOffset(14)}"></div><div class="field"><label>Payment terms</label><input name="paymentTerms" value="Net 30"></div><div class="field"><label>Delivery address</label><input name="shippingAddress"></div><div class="field full"><label>Order lines</label><div id="poLinesV23">${__pr23PoLinesHtml(sources[0].recordId)}</div></div></form>`,
+    btn('Cancel', 'close-overlay') + btn('Save draft', 'save-po-v6') + btn('Save and send to vendor', 'submit-po-v6', 'primary'),
+  );
+}
+
+// ---------------------------------------------------------------- invoice payment
+
+/** Invoices Finance has approved that are not yet paid (the loader decides; see live-loaders). */
+function __pr23Payable() {
+  return (state.invoices || []).filter(i => i.payable);
+}
+
+/** Record the payment of an approved invoice, with its proof of payment. */
+function __pr23PaymentModal(preselectId) {
+  if (!__pr23Can('invoices.pay')) {
+    openModal('Record payment', 'Paying an invoice is an accounts payable step.', '<p class="muted">Your role cannot record payments. Accounts payable records them once Finance has approved the invoice.</p>', btn('Close', 'close-overlay'));
+    return;
+  }
+  const payable = __pr23Payable();
+  if (!payable.length) {
+    openModal('Record payment', 'Only an invoice Finance has approved can be paid.', '<p class="muted">No approved invoice is awaiting payment.</p>', btn('Close', 'close-overlay'));
+    return;
+  }
+  const banks = (__pr23Live() || {}).banks || [];
+  const chosen = payable.find(i => i.recordId === preselectId || i.id === preselectId) || payable[0];
+  const amountOf = i => Number(i.outstanding == null ? i.amount || 0 : i.outstanding).toFixed(2);
+  const invoiceOptions = payable.map(i => `<option value="${__pr23Esc(i.recordId)}" data-amount="${amountOf(i)}" ${i === chosen ? 'selected' : ''}>${__pr23Esc(i.id)} · ${__pr23Esc(i.vendor)} · ${__pr23Esc(i.currency || '')} ${amountOf(i)}</option>`).join('');
+  const bankOptions = banks.map(b => `<option value="${__pr23Esc(b.id)}">${__pr23Esc(b.name)}${b.accountNumber ? ' · ' + __pr23Esc(b.accountNumber) : ''}</option>`).join('');
+  const today = new Date().toISOString().slice(0, 10);
+  const noBank = banks.length
+    ? ''
+    : '<div class="field full"><div class="notice"><div><strong>No bank or cash account is set up</strong><p>Accounting adds one under Cashbook before a payment can be recorded.</p></div></div></div>';
+  openModal(
+    'Record payment',
+    'Record the full payment of an approved invoice, with its proof of payment. The accounting entries are posted when it is saved.',
+    `<form id="paymentFormV23" class="form-grid"><div class="field full"><label>Invoice</label><select name="invoice" id="paymentInvoiceV23" required>${invoiceOptions}</select></div><div class="field"><label>Amount</label><input name="amount" id="paymentAmountV23" value="${amountOf(chosen)}" readonly></div><div class="field"><label>Payment date</label><input type="date" name="paymentDate" value="${today}" max="${today}" required></div><div class="field"><label>Method</label><select name="method"><option value="BANK">Bank transfer</option><option value="CASH">Cash</option></select></div><div class="field"><label>Paid from</label><select name="bank" ${banks.length ? 'required' : ''}>${bankOptions || '<option value="">No account available</option>'}</select></div><div class="field"><label>Payment reference</label><input name="reference" placeholder="Bank transaction reference"></div><div class="field"><label>Proof of payment</label><input type="file" name="proof" accept=".pdf,.png,.jpg,.jpeg,.gif,.webp" required></div><div class="field full"><label>Notes</label><textarea name="notes"></textarea></div>${noBank}</form>`,
+    btn('Cancel', 'close-overlay') + btn('Record payment', 'confirm-record-payment-v23', 'primary'),
+  );
+}
+
+// Re-draw dependent parts of the live forms when a select changes. Removed with the runtime (__pr23Sig).
 document.addEventListener('change', event => {
   const target = event.target;
   if (!target || !target.id) return;
@@ -569,6 +646,15 @@ document.addEventListener('change', event => {
   if (target.id === 'invoicePoV23') {
     const box = document.querySelector('#invoiceLinesV23');
     if (box) box.innerHTML = __pr23InvoiceLinesHtml(target.value);
+  }
+  if (target.id === 'poSourceV23') {
+    const box = document.querySelector('#poLinesV23');
+    if (box) box.innerHTML = __pr23PoLinesHtml(target.value);
+  }
+  if (target.id === 'paymentInvoiceV23') {
+    const amount = document.querySelector('#paymentAmountV23');
+    const option = target.selectedOptions && target.selectedOptions[0];
+    if (amount && option) amount.value = option.dataset.amount || '';
   }
 }, __pr23Sig);
 /* END_PROCUREMENT_LIVE_BRIDGE */
@@ -1193,7 +1279,7 @@ window.MatanhoProcurement=Object.freeze({version:'8.0.0',navigate,render,getStat
 
   function matchSelectionPageV5(){
     const candidates=state.tenders.filter(t=>t.bids>0 || /Award|Evaluation|opening/i.test(t.stage));
-    return `<div class="page">${pageHead('Invoice automation','Invoices & 3-Way Match','Choose the actual tender or sourcing event first. The system will then show the linked purchase orders, goods received notes, invoices and match exceptions for that event.',actionButton('Upload invoice','upload-invoice-v5','','primary','plus')+actionButton('Capture invoice','capture-invoice-v5','','','invoice')+actionButton('Process OCR queue','run-ocr-v5'))}${filterBar()}
+    return `<div class="page">${pageHead('Invoice automation','Invoices & 3-Way Match','Choose the actual tender or sourcing event first. The system will then show the linked purchase orders, goods received notes, invoices and match exceptions for that event.',actionButton('Upload invoice','upload-invoice-v5','','primary','plus')+actionButton('Capture invoice','capture-invoice-v5','','','invoice')+actionButton('Record payment','record-payment-v23','','','account')+actionButton('Process OCR queue','run-ocr-v5'))}${filterBar()}
       <div class="grid kpis">${kpi('Invoices captured','186','OCR confidence 93.7%','invoice')}${kpi('Matched','102','Ready for approval or AP','approve')}${kpi('Exceptions','15','Price, quantity or missing GRN','audit')}${kpi('WHT required','6','30% where ITF263 missing','account')}${kpi('VAT input',money(286400),'Extracted for tax accounting','account')}${kpi('Invoice exposure',money(2480000),'Approved and pending','account')}</div>
       ${card('Select a tender or procurement source','Each match workspace is isolated to the selected tender, its award, purchase order, GRN and invoice chain.',`<div class="source-card-grid card-body">${candidates.map((t,i)=>`<button class="source-card" data-action="select-match-tender-v5" data-id="${t.id}"><div class="source-top">${(()=>{const c=__pr23Live()?__pr23MatchChain(t.id):null;return c?`<span class="status ${c.tone}">${c.label}</span>`:`<span class="status ${i===0?'green':'amber'}">${i===0?'Invoice received':'Awaiting invoice'}</span>`})()}<span class="muted">${t.id}</span></div><h3>${esc(t.title)}</h3><p>${esc(t.entity)} · ${esc(t.method)}</p><div class="source-meta"><div><span>Linked POs</span><strong>${__pr23Live()?__pr23MatchChain(t.id).orders.length:i+1}</strong></div><div><span>GRNs</span><strong>${__pr23Live()?__pr23MatchChain(t.id).grns.length:(i===0?1:0)}</strong></div><div><span>Invoices</span><strong>${__pr23Live()?__pr23MatchChain(t.id).invoices.length:(i===0?2:1)}</strong></div></div></button>`).join('')}</div>`)}</div>`;
   }
@@ -1205,7 +1291,7 @@ window.MatanhoProcurement=Object.freeze({version:'8.0.0',navigate,render,getStat
     const inv=__chain?(__chain.invoices[0]||{id:'—',amount:null,tax:'—',match:'No invoice'}):(state.invoices.find(i=>i.po===po.id)||state.invoices[0]);
     const rows=(__chain?__chain.invoices:state.invoices).map(i=>`<tr data-record="invoice" data-id="${i.id}"><td><strong class="link">${i.id}</strong><span class="row-tools-inline">${smallAction('Preview','preview-invoice-v5',i.id,'eye')}</span></td><td>${esc(i.vendor)}</td><td>${esc(i.po)}</td><td class="money">${money(i.amount)}</td><td>${status(i.match)}</td><td>${esc(i.tax)}</td><td>${status(i.status)}</td><td>${smallAction('Open match','open-match-detail-v5',i.id,'arrow')}</td></tr>`);
     return `<div class="page"><div class="breadcrumbs"><button data-action="back-match-list-v5">Invoices & 3-Way Match</button><i>›</i><span>${t.id}</span><i>›</i><strong>${esc(t.title)}</strong></div>
-      ${pageHead('Tender-specific P2P chain',t.title,`${t.id} · ${t.entity} · source-to-payment document chain`,actionButton('Upload invoice','upload-invoice-v5',t.id,'primary','plus')+actionButton('Capture invoice','capture-invoice-v5',t.id,'','invoice')+actionButton('Run OCR','run-ocr-v5',t.id)+actionButton('Activity','activity-menu',t.id,'','more'))}
+      ${pageHead('Tender-specific P2P chain',t.title,`${t.id} · ${t.entity} · source-to-payment document chain`,actionButton('Upload invoice','upload-invoice-v5',t.id,'primary','plus')+actionButton('Capture invoice','capture-invoice-v5',t.id,'','invoice')+actionButton('Record payment','record-payment-v23',t.id,'','account')+actionButton('Run OCR','run-ocr-v5',t.id)+actionButton('Activity','activity-menu',t.id,'','more'))}
       <div class="workflow-strip"><div class="workflow-step done"><strong>Tender</strong><span>${t.id}</span></div><div class="workflow-step done"><strong>Award</strong><span>Approved supplier</span></div><div class="workflow-step done"><strong>Purchase order</strong><span>${po.id}</span></div><div class="workflow-step done"><strong>Goods receipt</strong><span>${grn.id}</span></div><div class="workflow-step current"><strong>Invoice & match</strong><span>${inv.id}</span></div><div class="workflow-step"><strong>Accounts payable</strong><span>${/Matched/.test(inv.match)?'Ready':'Exception held'}</span></div></div>
       <div class="match-triptych" style="margin-bottom:14px">
         <section class="match-panel"><div class="match-head"><strong>Purchase Order</strong>${status('Controlled')}</div><div class="match-body"><div class="match-lines"><div class="match-line"><span>PO number</span><strong>${po.id}</strong></div><div class="match-line"><span>Vendor</span><strong>${esc(po.vendor)}</strong></div><div class="match-line"><span>Order value</span><strong>${money(po.amount)}</strong></div><div class="match-line"><span>Delivery date</span><strong>${esc(po.delivery)}</strong></div></div><div class="actions" style="margin-top:12px">${smallAction('Preview','preview-document',po.id,'eye')}${smallAction('Edit','edit-record-v5',po.id)}</div></div></section>
@@ -1448,7 +1534,7 @@ window.MatanhoProcurement=Object.freeze({version:'8.0.0',navigate,render,getStat
     'back-match-list-v5': () => {state.matchTender=null;render()},
     'upload-invoice-v5': a => invoiceIntakeModalV5(a.dataset.id||state.matchTender||'',false),
     'upload-invoice': a => invoiceIntakeModalV5(a.dataset.id||state.matchTender||'',false),
-    'capture-invoice-v5': a => invoiceIntakeModalV5(a.dataset.id||state.matchTender||'',true),
+    'capture-invoice-v5': a => invoiceIntakeModalV5(a.dataset.id||state.matchTender||'',true), 'record-payment-v23': a => __pr23PaymentModal(a.dataset.id||''),
     'extract-invoice-v5': () => {
       const f=$('#invoiceFormV5'); if(!f?.reportValidity())return; const d=new FormData(f); const tender=d.get('tender');
       const newInv={id:'INV-'+String(98500+state.invoices.length),vendor:d.get('vendor')||'Selected vendor',po:String(d.get('po')||state.orders[0].id).split(' · ')[0],amount:126400,match:'Pending validation',tax:'VAT 15%',status:'OCR extracted'};
@@ -1897,7 +1983,7 @@ window.MatanhoProcurement=Object.freeze({version:'8.0.0',navigate,render,getStat
     return `<div class="page">${pageHead('Awards and obligations','Contracts & Awards','Create contracts from the user-approved award decision, apply vendor compliance and tax clauses, route eSignatures and monitor obligations.',actionV6('Create contract','create-contract','','primary','plus')+actionV6('Signature queue','signature-queue','','','signature'))}${filterBar()}<div class="grid kpis">${kpi('Active contracts',state.contractsV6.filter(c=>c.status==='Active').length,'Current register','contract')}${kpi('Awaiting signature',state.contractsV6.filter(c=>/signature/i.test(c.status)).length,'Internal and external signers','signature')}${kpi('Compliance reviews',state.contractsV6.filter(c=>taxRuleV6(c.vendor).status!=='Valid').length,'Tax or company documents','audit')}${kpi('Contract value',money(state.contractsV6.reduce((n,c)=>n+c.value,0)),'Controlled portfolio','account')}${kpi('Renewals in 90 days','0','Reminder schedule configured','document')}${kpi('Vendor obligations','94%','On-time compliance','vendor')}</div>${card('Contract register','The final winner is selected by the authorised user; contracts then follow delegated approval and eSignature.',table(['Contract','Description','Vendor','Entity','Value','Tax clearance','Tax clause','Expiry','Status','Actions'],rows))}</div>`;
   }
 
-  function poModalV6(existingId=''){
+  function poModalV6(existingId=''){if(__pr23Live())return __pr23PoModal(existingId);
     const existing=state.orders.find(o=>o.id===existingId)||{};
     const awarded=state.tenders.filter(t=>/Evaluation|Award|opening/i.test(t.stage));
     const vendorOptions=state.vendors.filter(v=>v.status!=='Blacklisted').map(v=>`<option ${v.name===existing.vendor?'selected':''}>${esc(v.name)}</option>`).join('');
@@ -2000,7 +2086,7 @@ window.MatanhoProcurement=Object.freeze({version:'8.0.0',navigate,render,getStat
     openV6Modal('Upload document or vendor submission',`${folder} | Versioned, searchable and auditable`, `<form id="documentUploadFormV6"><div class="dense-form-grid">${formField('Document title','<input name="name" required>')}${formField('Folder',`<select name="folder"><option>${esc(folder)}</option><option>Annual Plans</option><option>Tender Packs</option><option>Contracts</option><option>Vendor Submissions</option><option>Compliance Evidence</option></select>`)}${formField('Document type','<select name="type"><option>Vendor compliance document</option><option>Company profile</option><option>Tax clearance ITF263</option><option>Procurement document</option><option>Report evidence</option></select>')}${formField('Related record','<input name="record" placeholder="Vendor, tender, PO, contract or plan ID">')}${formField('Files','<input name="files" type="file" multiple required accept=".pdf,.doc,.docx,.xlsx,.xls,.csv,.png,.jpg">','span2')}${formField('Source','<select name="source"><option>Internal upload</option><option>Vendor portal</option><option>Email intake</option><option>System generated</option></select>')}${formField('Access classification','<select name="classification"><option>Confidential</option><option>Internal</option><option>Vendor shared</option><option>Board restricted</option></select>')}${formField('Description','<textarea name="description">Document received for review and attachment to the relevant procurement record.</textarea>','full')}</div></form>`,actionV6('Upload and index','confirm-upload-document-v6','','primary','upload'),'xl');
   }
 
-  function poModalV6(id=''){
+  function poModalV6(id=''){if(__pr23Live())return __pr23PoModal(id);
     const o=state.orders.find(x=>x.id===id)||{id:'',vendor:state.vendors[0].name,entity:'Matanho Holdings',amount:0,delivery:'30 Sep 2026',status:'Draft',asset:false};
     const v=state.vendors.find(x=>x.name===o.vendor)||state.vendors[0];const rule=taxRuleV6(v);
     openV6Modal(id?'Edit Purchase Order':'Create Purchase Order',id||'Generate from an approved award or requisition', `<form id="poFormV6" class="dense-form"><input type="hidden" name="id" value="${esc(o.id)}"><section class="form-section"><div class="dense-form-grid">${formField('Source record','<select name="source"><option>TN-2026-014 · Approved award</option><option>PR-9K4M2Q · Approved requisition</option><option>Framework call-off</option></select>')}${formField('Entity',`<select name="entity">${entities.slice(1).map(x=>`<option ${x[1]===o.entity?'selected':''}>${x[1]}</option>`).join('')}</select>`)}${formField('Vendor',`<select name="vendor" id="poVendorV6">${state.vendors.filter(x=>x.status!=='Blacklisted').map(x=>`<option ${x.name===o.vendor?'selected':''}>${esc(x.name)}</option>`).join('')}</select>`)}${formField('Currency','<select name="currency"><option>USD</option><option>ZiG</option><option>ZAR</option></select>')}${formField('PO value',`<input name="amount" type="number" value="${safeNumV6(o.amount)}" required>`)}${formField('Delivery date',`<input name="delivery" type="date" value="2026-09-30">`)}${formField('Classification','<select name="classification"><option>Goods and services</option><option selected>Fixed asset</option><option>Inventory</option><option>Professional service</option></select>')}${formField('Cost centre','<select name="costCenter"><option>CC-100 Technology</option><option>CC-230 Farm Operations</option><option>CC-310 Clinical Services</option></select>')}</div></section><section class="form-section"><div class="form-section-head"><div><h3>Line items</h3><p>Quantities, taxes and accounting classification.</p></div>${smallAction('Add row','add-po-row-v6')}</div><div class="table-wrap"><table><thead><tr><th>Description</th><th>UOM</th><th>Qty</th><th>Unit price</th><th>VAT</th><th>Total</th><th></th></tr></thead><tbody id="poLinesV6"><tr><td><input value="Approved procurement item"></td><td><select><option>Each</option><option>Set</option><option>Month</option></select></td><td><input type="number" value="1"></td><td><input type="number" value="${safeNumV6(o.amount)}"></td><td><select><option>15%</option><option>Zero rated</option><option>Exempt</option></select></td><td>${money(o.amount||0)}</td><td>${smallAction('Remove','remove-po-row-v6')}</td></tr></tbody></table></div></section><section class="form-section"><div class="grid two"><div id="poTaxRuleV6">${taxRuleCardV6(v)}</div><div class="tax-rule-v6"><h4>Purchase control</h4><p>The PO includes the vendor compliance status, applicable tax clause, approval evidence, delivery terms, payment terms and unique document UID.</p><p><strong>Accounting:</strong> Encumbrance only until receipt and invoice recognition.</p></div></div></section></form>`,actionV6('Preview PO','preview-po-form-v6',id,'','eye')+actionV6('Save draft','save-po-v6',id)+actionV6('Submit for approval','submit-po-v6',id,'primary','approve'),'full');

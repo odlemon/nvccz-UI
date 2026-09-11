@@ -29,6 +29,7 @@ import {
   listRequisitions,
   listRequisitionsAwaitingMyApproval,
   listRfqs,
+  listBanks,
   listVendors,
   type ProcurementAccess,
   type ProcurementRecord,
@@ -37,6 +38,8 @@ import {
 export type LoaderError = { source: string; message: string; status?: number }
 
 export type LiveKpi = { value: string | number; sub: string }
+
+export type LiveBank = { id: string; name: string; accountNumber: string | null; currencyId: string | null }
 
 export type ProcurementV23LivePayload = {
   ready: boolean
@@ -50,6 +53,8 @@ export type ProcurementV23LivePayload = {
   kpis: Record<string, LiveKpi>
   /** Sidebar badge counts keyed by page id; null renders no badge. */
   navCounts: Record<string, number | null>
+  /** Bank and cash accounts a payment can be made from; empty without procurement.invoices.pay. */
+  banks?: LiveBank[]
   errors: LoaderError[]
 }
 
@@ -152,11 +157,14 @@ function invoiceStatus(inv: ProcurementRecord): string {
   return titleCase(s)
 }
 
+/** ProcurementInvoice.matchingStatus, set by the backend three-way match (ProcurementInvoiceMatchService). */
 function matchLabel(v: unknown): string {
   const s = String(v ?? "").toUpperCase()
   if (s === "MATCHED") return "Matched"
   if (s === "PENDING" || !s) return "Match pending"
-  if (s.includes("MISMATCH") || s.includes("VARIANCE") || s.includes("EXCEPTION")) return "Match variance"
+  if (s === "AWAITING_RECEIPT") return "Awaiting receipt"
+  if (s === "NO_PO") return "No purchase order"
+  if (s === "DISCREPANCY" || s.includes("MISMATCH") || s.includes("VARIANCE") || s.includes("EXCEPTION")) return "Match variance"
   return titleCase(s)
 }
 
@@ -216,6 +224,7 @@ export async function loadProcurementV23LiveData(): Promise<ProcurementV23LivePa
     vendors,
     dashboard,
     auditRows,
+    bankRows,
   ] = await Promise.all([
     // Every department for the desk; a department head sees their own department.
     has("requisitions.view") || isDeptApprover
@@ -234,6 +243,8 @@ export async function loadProcurementV23LiveData(): Promise<ProcurementV23LivePa
     has("vendors.view") ? safe("vendors", listVendors, [] as ProcurementRecord[]) : Promise.resolve([] as ProcurementRecord[]),
     has("dashboard.view") ? safe("dashboard", getProcurementDashboard, null) : Promise.resolve(null),
     has("audit.view") ? safe("audit-events", listProcurementAuditEvents, [] as ProcurementRecord[]) : Promise.resolve([] as ProcurementRecord[]),
+    // Payment needs an account to pay from; only the role that pays reads them.
+    has("invoices.pay") ? safe("cashbook/banks", listBanks, [] as ProcurementRecord[]) : Promise.resolve([] as ProcurementRecord[]),
   ])
 
   // One register of requisitions: the full list where the role has it, plus the caller's own
@@ -266,7 +277,7 @@ export async function loadProcurementV23LiveData(): Promise<ProcurementV23LivePa
     entity: r.department ?? DASH,
     type: r.portfolioCompanyId ? "Investee" : "Internal",
     category: r.sourcingCategory ? titleCase(r.sourcingCategory) : DASH,
-    // Requisition lines carry no price, so 0 means "not priced", not "free".
+    // Line estimates are the requester's own; 0 means "not estimated", not "free".
     amount: num(r.totalAmount) || null,
     // No budget check exists on the backend; nothing is asserted either way.
     budget: DASH,
@@ -276,7 +287,7 @@ export async function loadProcurementV23LiveData(): Promise<ProcurementV23LivePa
     department: r.department ?? null,
     priority: r.priority ?? null,
     requestedById: r.requestedById ?? null,
-    items: (r.items ?? []).map((i: any) => ({ itemName: i.itemName, quantity: num(i.quantity), unit: i.unit ?? null })),
+    items: (r.items ?? []).map((i: any) => ({ itemName: i.itemName, quantity: num(i.quantity), unit: i.unit ?? null, unitPrice: num(i.unitPrice) || null })),
   }))
 
   // ----------------------------------------------------------------- tenders (RFQs)
@@ -398,6 +409,15 @@ export async function loadProcurementV23LiveData(): Promise<ProcurementV23LivePa
     rawStatus: inv.status,
     paymentStatus: inv.paymentStatus ?? null,
     due: fmtDate(inv.dueDate),
+    vendorId: inv.vendorId ?? null,
+    currency: inv.currency?.code ?? null,
+    // Full payment of a Finance-approved invoice. The backend does not yet record how much of a
+    // part-paid invoice is outstanding, so a part-paid invoice is not offered for another payment.
+    payable:
+      String(inv.status).toUpperCase() === "APPROVED" &&
+      !["PAID", "PARTIALLY_PAID"].includes(String(inv.paymentStatus ?? "").toUpperCase()),
+    outstanding: num(inv.totalAmount),
+    matchFlags: Array.isArray(inv.aiDiscrepancies?.flags) ? inv.aiDiscrepancies.flags : [],
   }))
 
   // ----------------------------------------------------------------- quotations and evaluation
@@ -749,6 +769,9 @@ export async function loadProcurementV23LiveData(): Promise<ProcurementV23LivePa
     hydrate,
     kpis,
     navCounts,
+    banks: bankRows
+      .filter((b) => b.isActive !== false)
+      .map((b) => ({ id: String(b.id), name: String(b.name ?? b.id), accountNumber: b.accountNumber ?? null, currencyId: b.currencyId ?? null })),
     errors: [...errors],
   }
 }

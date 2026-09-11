@@ -153,7 +153,8 @@ export async function createRequisition(body: {
   priority?: string
   justification?: string
   sourcingCategory?: string
-  items: { itemName: string; description?: string; quantity: number; unit?: string }[]
+  /** unitPrice is the requester's estimate; the backend keeps it internal and never copies it onto an RFQ. */
+  items: { itemName: string; description?: string; quantity: number; unit?: string; unitPrice?: number }[]
 }): Promise<ProcurementRecord> {
   return unwrapData(await apiClient.post<ApiResponse<ProcurementRecord>>("/procurement/requisitions", body))
 }
@@ -309,6 +310,14 @@ export async function rejectProcurementInvoice(id: string, rejectionReason: stri
     }),
   )
 }
+
+/** POST /procurement/invoices/:id/match — re-run the three-way match (invoice vs PO vs accepted receipts). */
+export async function matchProcurementInvoice(id: string): Promise<ProcurementRecord> {
+  return unwrapData(await apiClient.post<ApiResponse<ProcurementRecord>>(`/procurement/invoices/${encodeURIComponent(id)}/match`))
+}
+
+/** GET /cashbook/banks — the bank and cash accounts a payment can be made from (Accounting owns them). */
+export const listBanks = () => list("/cashbook/banks")
 
 export async function payProcurementInvoice(id: string, form: FormData): Promise<ProcurementRecord> {
   return unwrapData(await apiClient.postFormData<ApiResponse<ProcurementRecord>>(`/procurement/invoices/${encodeURIComponent(id)}/payment`, form))

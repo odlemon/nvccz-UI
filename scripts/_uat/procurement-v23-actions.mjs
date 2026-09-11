@@ -16,6 +16,8 @@
  *   9. Procurement Officer records a GRN against PO-B (live form)        -> GRN RECEIVED
  *  10. Accountant captures the supplier invoice for PO-B (live form)     -> invoice DRAFT
  *  11. Finance Manager rejects a DRAFT invoice from the Approval Centre -> invoice REJECTED, reason stored
+ *  12. Procurement Officer raises a PO from an approved requisition     -> PO SENT, requisition CONVERTED_TO_PO
+ *  13. Accountant records payment of an approved invoice               -> invoice PAID, journal posted
  *
  * Needs the dataset from nvccz/scripts/_uat/procurement-p2p-flow.mjs (PR-B pending approval,
  * RFQ-B with two quotations). Records made here are titled "UAT P2P" so the flow's --reset
@@ -393,6 +395,105 @@ await step("11 Finance Manager rejects an invoice (Approval Centre)", async (ope
     after?.status === "REJECTED" && (!("rejectionReason" in (after ?? {})) || reason.includes(String(RUN))),
     label,
     `${target.invoiceNumber} -> ${after?.status}${reason ? `, reason "${reason.slice(0, 60)}"` : ""} · "${toast}"${suffix(errors)}`,
+  )
+})
+
+/** Any method, for arranging a step's starting state through the API (not for verifying the UI). */
+async function apiCall(email, method, path, body) {
+  await api(email, "/procurement/me/access")
+  const res = await fetch(`${API}${path}`, {
+    method,
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${tokens[email]}` },
+    body: body ? JSON.stringify(body) : undefined,
+  })
+  const json = await res.json().catch(() => ({}))
+  return { status: res.status, data: json?.data, message: json?.message }
+}
+
+// ------------------------------------------------------------------ 12. direct purchase order
+await step("12 Procurement Officer raises and sends a PO from an approved requisition (Create PO form)", async (open) => {
+  const label = "12 Procurement Officer raises and sends a PO from an approved requisition (Create PO form)"
+  const requester = "proc.requester@nts.local"
+  const officer = "proc.officer@nts.local"
+  // Arrange: an approved requisition with an estimate, raised and approved through the API.
+  const access = await api(requester, "/procurement/me/access")
+  const made = await apiCall(requester, "POST", "/procurement/requisitions", {
+    title: `UAT P2P V23 direct PO ${RUN}`,
+    department: access?.department,
+    priority: "MEDIUM",
+    items: [{ itemName: "UAT P2P office chairs", quantity: 6, unit: "Each", unitPrice: 120 }],
+  })
+  if (made.status !== 201) return record(false, label, `could not arrange a requisition: ${made.status} ${made.message}`)
+  await apiCall(requester, "PUT", `/procurement/requisitions/${made.data.id}/submit`)
+  const approved = await apiCall("perf.deptmgr@nts.local", "PUT", `/procurement/requisitions/${made.data.id}/approve`, {})
+  if (approved.data?.status !== "APPROVED") return record(false, label, `could not approve ${made.data.requisitionNumber}: ${approved.status} ${approved.message}`)
+
+  const { page, errors } = await open(officer, "/procurement-v23/purchase-orders")
+  await page.click('[data-action="create-po-v6"]')
+  await page.waitForSelector("#poFormV23")
+  await page.selectOption("#poSourceV23", made.data.id)
+  // A PO is sent by email, so pick a vendor that has one.
+  const vendors = (await api(officer, "/accounting/vendors")) ?? []
+  const mailable = (Array.isArray(vendors) ? vendors : vendors.vendors ?? []).find((v) => !v.isBlacklisted && String(v.email ?? "").includes("@"))
+  if (!mailable) return record(false, label, "no vendor with an email address to send to")
+  await page.selectOption('#poFormV23 [name="vendor"]', mailable.id)
+  await page.waitForSelector("#poLinesV23 [data-po-price]")
+  const prefilled = await page.inputValue("#poLinesV23 [data-po-price]")
+  await page.click('[data-action="submit-po-v6"]')
+  const toast = await toasts(page)
+  const po = ((await api(officer, "/procurement/purchase-orders")) ?? []).find((p) => p.requisitionId === made.data.id)
+  const req = await api(officer, `/procurement/requisitions/${made.data.id}`)
+  record(
+    po?.status === "SENT" && req?.status === "CONVERTED_TO_PO" && Number(prefilled) === 120,
+    label,
+    `${made.data.requisitionNumber} (estimate prefilled ${prefilled}) -> ${po ? `${po.poNumber} ${po.status} total ${po.totalAmount}` : "no PO"}, requisition ${req?.status} · "${toast}"${suffix(errors)}`,
+  )
+})
+
+// ------------------------------------------------------------------ 13. pay an invoice
+await step("13 Accountant records payment of an approved invoice (Record payment form)", async (open) => {
+  const label = "13 Accountant records payment of an approved invoice (Record payment form)"
+  const ap = "proc.ap@nts.local"
+  const finance = "payroll.finmgr@nts.local"
+  let invoices = (await api(ap, "/procurement/invoices")) ?? []
+  let target = invoices.find((i) => i.status === "APPROVED" && !["PAID", "PARTIALLY_PAID"].includes(i.paymentStatus))
+  if (!target) {
+    // Arrange: accounts payable captures an invoice against a dispatched PO if none is waiting,
+    // then Finance approves it, so there is one to pay.
+    let draft = invoices.find((i) => i.status === "DRAFT")
+    if (!draft) {
+      const orders = (await api(ap, "/procurement/purchase-orders")) ?? []
+      const po = orders.find((o) => ["SENT", "ACKNOWLEDGED", "PARTIALLY_DELIVERED", "DELIVERED"].includes(o.status) && (o.items ?? []).length)
+      if (!po) return record(false, label, "no dispatched PO to invoice — run the p2p flow first")
+      const captured = await apiCall(ap, "POST", "/procurement/invoices", {
+        purchaseOrderId: po.id,
+        vendorId: po.vendorId,
+        invoiceDate: new Date().toISOString(),
+        dueDate: new Date(Date.now() + 30 * 864e5).toISOString(),
+        currencyId: po.currencyId ?? undefined,
+        items: po.items.map((i) => ({ itemName: i.itemName, quantity: Number(i.quantity), unitPrice: Number(i.unitPrice), unit: i.unit ?? undefined })),
+      })
+      if (captured.status !== 201) return record(false, label, `could not capture an invoice on ${po.poNumber}: ${captured.status} ${captured.message}`)
+      draft = captured.data
+    }
+    const ok = await apiCall(finance, "PUT", `/procurement/invoices/${draft.id}/approve`, { isTaxable: true })
+    if (ok.status !== 200) return record(false, label, `could not approve ${draft.invoiceNumber}: ${ok.status} ${ok.message}`)
+    target = { ...draft, status: "APPROVED" }
+  }
+  const { page, errors } = await open(ap, "/procurement-v23/invoices")
+  await page.click('[data-action="record-payment-v23"]')
+  await page.waitForSelector("#paymentFormV23")
+  await page.selectOption("#paymentInvoiceV23", target.id)
+  const amount = await page.inputValue("#paymentAmountV23")
+  await page.fill('#paymentFormV23 [name="reference"]', `UAT-V23-PAY-${RUN}`)
+  await page.setInputFiles('#paymentFormV23 [name="proof"]', { name: "uat-proof.pdf", mimeType: "application/pdf", buffer: Buffer.from("%PDF-1.4\n%%EOF\n") })
+  await page.click('[data-action="confirm-record-payment-v23"]')
+  const toast = await toasts(page)
+  const after = ((await api(ap, "/procurement/invoices")) ?? []).find((i) => i.id === target.id)
+  record(
+    after?.paymentStatus === "PAID" && Number(amount) === Number(target.totalAmount),
+    label,
+    `${target.invoiceNumber} amount ${amount} -> payment ${after?.paymentStatus}, journal ${after?.journalEntry?.referenceNumber ?? "none"} · "${toast}"${suffix(errors)}`,
   )
 })
 

@@ -22,9 +22,11 @@ import {
   approveRequisition,
   captureProcurementInvoice,
   createGoodsReceivedNote,
+  createPurchaseOrder,
   createRequisition,
   createRfq,
   createVendor,
+  payProcurementInvoice,
   readProcurementError,
   rejectGoodsReceivedNote,
   rejectProcurementInvoice,
@@ -66,6 +68,10 @@ export const LIVE_ACTIONS = [
   "create-grn-confirm",
   "confirm-capture-invoice-v5",
   "pr-to-rfq",
+  "save-po-v6",
+  "submit-po-v6",
+  "confirm-record-payment-v23",
+  "confirm-send-selected-po-v11",
 ] as const
 
 /**
@@ -88,9 +94,6 @@ export const NOT_YET_LIVE_ACTIONS = [
   "submit-quote-recommendation-v5",
   "approve-invoice",
   "approve-match-v5",
-  "submit-po-v6",
-  "save-po-v6",
-  "confirm-send-selected-po-v11",
   "save-pr-v11",
   "create-plan-confirm",
   "create-plan-confirm-v5",
@@ -150,7 +153,6 @@ const UNCONNECTED_TERMINAL_STEPS = new Set<string>([
   "send-vendor-link",
   "create-contract",
   "create-match-exception-v5",
-  "create-po",
   "import-plan",
   "run-ocr",
   "scan-delivery",
@@ -252,7 +254,15 @@ export async function handleProcurementV23Action(
           priority: "MEDIUM",
           justification: val('#prForm [name="motivation"]') || undefined,
           sourcingCategory: val('#prForm [name="category"]') || undefined,
-          items: [{ itemName, quantity, unit: val('#prForm [name="uom"]') || undefined }],
+          items: [
+            {
+              itemName,
+              quantity,
+              unit: val('#prForm [name="uom"]') || undefined,
+              // The requester's unit estimate; it stays internal and is never copied onto an RFQ.
+              unitPrice: Number(val('#prForm [name="price"]')) > 0 ? Number(val('#prForm [name="price"]')) : undefined,
+            },
+          ],
         })
         const number = created?.requisitionNumber ?? "The requisition"
         if (action === "save-pr") {
@@ -405,6 +415,94 @@ export async function handleProcurementV23Action(
         }
         await sendPurchaseOrder(o.recordId)
         return { handled: true, reload: true, message: `${o.id} sent to ${o.vendor}.` }
+      }
+
+      case "confirm-send-selected-po-v11": {
+        if (!has("orders.send")) return refuse("sending purchase orders")
+        // The runtime lists the selection in the confirmation it opened.
+        const ids = [...document.querySelectorAll<HTMLElement>(".selected-po-list-v11 span")]
+          .map((e) => (e.textContent ?? "").trim())
+          .filter(Boolean)
+        if (!ids.length) return { handled: true, error: "Select one or more purchase orders first." }
+        const sent: string[] = []
+        const skipped: string[] = []
+        const failed: string[] = []
+        for (const id of ids) {
+          const o = byDisplayId("orders", id)
+          const raw = String(o?.rawStatus ?? "").toUpperCase()
+          if (!o || (raw !== "DRAFT" && raw !== "APPROVED")) {
+            skipped.push(o ? `${id} (${o.status})` : id)
+            continue
+          }
+          try {
+            await sendPurchaseOrder(o.recordId)
+            sent.push(id)
+          } catch (err) {
+            failed.push(`${id}: ${errorText(err, "not sent")}`)
+          }
+        }
+        closeRuntimeOverlay()
+        const summary = [
+          sent.length ? `Sent ${sent.join(", ")}.` : "",
+          skipped.length ? `Already dispatched, not sent again: ${skipped.join(", ")}.` : "",
+          failed.length ? `Not sent: ${failed.join("; ")}.` : "",
+        ]
+          .filter(Boolean)
+          .join(" ")
+        return sent.length ? { handled: true, reload: true, message: summary } : { handled: true, reload: true, error: summary }
+      }
+
+      // ---------------------------------------------------------- direct purchase order
+      case "save-po-v6":
+      case "submit-po-v6": {
+        if (!has("orders.manage")) return refuse("raising purchase orders")
+        const form = document.querySelector<HTMLFormElement>("#poFormV23")
+        if (!form) return { handled: true, error: "Open Create PO again; the purchase order form is not on screen." }
+        if (!form.reportValidity()) return { handled: true }
+        const requisitionId = val('#poFormV23 [name="requisition"]')
+        const vendorId = val('#poFormV23 [name="vendor"]')
+        const vendor = rows("vendors").find((v) => v.recordId === vendorId)
+        const source = rows("requisitions").find((r) => r.recordId === requisitionId)
+        const items = [...form.querySelectorAll<HTMLTableRowElement>("[data-po-line]")]
+          .map((row) => ({
+            itemName: (row.querySelector<HTMLInputElement>("[data-po-name]")?.value ?? "").trim(),
+            unit: (row.querySelector<HTMLInputElement>("[data-po-unit]")?.value ?? "").trim() || undefined,
+            quantity: Number(row.querySelector<HTMLInputElement>("[data-po-qty]")?.value || 0),
+            unitPrice: Number(row.querySelector<HTMLInputElement>("[data-po-price]")?.value || 0),
+          }))
+          .filter((l) => l.itemName)
+        if (!source) return { handled: true, error: "Select the approved requisition this order is raised from." }
+        if (!vendor) return { handled: true, error: "Select the vendor." }
+        if (!items.length) return { handled: true, error: "The order needs at least one line." }
+        if (items.some((l) => !(l.quantity > 0) || !(l.unitPrice > 0))) {
+          return { handled: true, error: "Every line needs a quantity and a unit price above zero." }
+        }
+        // A PO is sent by email; refuse before creating anything rather than leave a draft behind an error.
+        if (action === "submit-po-v6" && !String(vendor.email ?? "").includes("@")) {
+          return {
+            handled: true,
+            error: `${vendor.name} has no email address on file, so the order cannot be sent. Save it as a draft, or add the vendor's email in Vendor Registry first.`,
+          }
+        }
+        const delivery = val('#poFormV23 [name="delivery"]')
+        const po = await createPurchaseOrder({
+          requisitionId,
+          vendorId,
+          expectedDeliveryDate: delivery ? new Date(delivery).toISOString() : undefined,
+          paymentTerms: val('#poFormV23 [name="paymentTerms"]') || undefined,
+          shippingAddress: val('#poFormV23 [name="shippingAddress"]') || undefined,
+          items,
+        })
+        const number = po?.poNumber ?? "The purchase order"
+        closeRuntimeOverlay()
+        if (action === "save-po-v6") {
+          return { handled: true, reload: true, message: `${number} saved as a draft for ${vendor.name}, from ${source.id}. Send it from the register when it is ready.` }
+        }
+        if (!has("orders.send")) {
+          return { handled: true, reload: true, message: `${number} saved as a draft. Your role cannot send purchase orders, so the procurement desk sends it.` }
+        }
+        await sendPurchaseOrder(po.id)
+        return { handled: true, reload: true, message: `${number} raised from ${source.id} and sent to ${vendor.name}.` }
       }
 
       // ------------------------------------------------------------ tender builder
@@ -580,6 +678,38 @@ export async function handleProcurementV23Action(
           reload: true,
           message: `${invoice?.invoiceNumber ?? "The invoice"} captured against ${po.id} and sent to Finance for approval.`,
         }
+      }
+
+      // ------------------------------------------------------------ invoice payment
+      case "confirm-record-payment-v23": {
+        if (!has("invoices.pay")) return refuse("paying invoices")
+        const form = document.querySelector<HTMLFormElement>("#paymentFormV23")
+        if (!form) return { handled: true, error: "Open Record payment again; the payment form is not on screen." }
+        if (!form.reportValidity()) return { handled: true }
+        const invoiceId = val("#paymentInvoiceV23")
+        const inv = rows("invoices").find((i) => i.recordId === invoiceId)
+        if (!inv?.payable) return { handled: true, error: "That invoice is no longer awaiting payment. Refresh and try again." }
+        const proof = form.querySelector<HTMLInputElement>('[name="proof"]')?.files?.[0]
+        if (!proof) return { handled: true, error: "Attach the proof of payment." }
+        const method = val('#paymentFormV23 [name="method"]') || "BANK"
+        const bankId = val('#paymentFormV23 [name="bank"]')
+        if (!bankId) {
+          return { handled: true, error: "Choose the account the payment was made from. If none is listed, Accounting must add one in Cashbook first." }
+        }
+        const paymentDate = val('#paymentFormV23 [name="paymentDate"]')
+        const fd = new FormData()
+        fd.append("proofOfPayment", proof)
+        fd.append("paymentAmount", String(inv.outstanding ?? inv.amount))
+        fd.append("paymentDate", new Date(paymentDate).toISOString())
+        fd.append("paymentMethod", method)
+        fd.append("bankAccountId", bankId)
+        const reference = val('#paymentFormV23 [name="reference"]')
+        if (reference) fd.append("paymentReference", reference)
+        const notes = val('#paymentFormV23 [name="notes"]')
+        if (notes) fd.append("notes", notes)
+        await payProcurementInvoice(invoiceId, fd)
+        closeRuntimeOverlay()
+        return { handled: true, reload: true, message: `${inv.id} paid to ${inv.vendor}; the accounting entries were posted.` }
       }
 
       default:

@@ -627,6 +627,50 @@ s = replaceUnique(
 )
 
 // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// 18. Create PO and Record payment open real forms
+// ---------------------------------------------------------------------------
+// Create PO opened a fixture form (awarded tenders from the demo store, a "Network security
+// appliances" line at 284,500) whose save and submit only edited the in-browser store. And no
+// V23 screen offered payment at all, so procure-to-pay stopped at an approved invoice.
+s = replaceUnique(
+  s,
+  "function poModalV6(existingId=''){",
+  "function poModalV6(existingId=''){if(__pr23Live())return __pr23PoModal(existingId);",
+  "create PO -> live purchase order form",
+  "if(__pr23Live())return __pr23PoModal(existingId);",
+)
+// A later layer redeclares poModalV6(id='') with its own fixture form, and that declaration is the
+// one Create PO actually reaches (found by clicking it: "Generate from an approved award or requisition").
+s = replaceUnique(
+  s,
+  "function poModalV6(id=''){",
+  "function poModalV6(id=''){if(__pr23Live())return __pr23PoModal(id);",
+  "create PO (later layer) -> live purchase order form",
+  "if(__pr23Live())return __pr23PoModal(id);",
+)
+s = replaceUnique(
+  s,
+  "actionButton('Capture invoice','capture-invoice-v5','','','invoice')",
+  "actionButton('Capture invoice','capture-invoice-v5','','','invoice')+actionButton('Record payment','record-payment-v23','','','account')",
+  "invoices list: Record payment button",
+  "actionButton('Record payment','record-payment-v23','','','account')",
+)
+s = replaceUnique(
+  s,
+  "actionButton('Capture invoice','capture-invoice-v5',t.id,'','invoice')",
+  "actionButton('Capture invoice','capture-invoice-v5',t.id,'','invoice')+actionButton('Record payment','record-payment-v23',t.id,'','account')",
+  "tender match chain: Record payment button",
+  "actionButton('Record payment','record-payment-v23',t.id,'','account')",
+)
+s = replaceUnique(
+  s,
+  "'capture-invoice-v5': a => invoiceIntakeModalV5(a.dataset.id||state.matchTender||'',true),",
+  "'capture-invoice-v5': a => invoiceIntakeModalV5(a.dataset.id||state.matchTender||'',true), 'record-payment-v23': a => __pr23PaymentModal(a.dataset.id||''),",
+  "record payment -> live payment form",
+  "'record-payment-v23': a => __pr23PaymentModal(",
+)
+
 console.log(`\n${applied} applied, ${skipped} already in place, ${missed} missed`)
 if (missed) {
   console.error("One or more patches did not find their anchor. The runtime is NOT fully patched.")

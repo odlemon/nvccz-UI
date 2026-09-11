@@ -385,7 +385,84 @@ function __pr23InvoiceCaptureModal(tenderId) {
   );
 }
 
-// Re-draw the line tables when the purchase order changes. Removed with the runtime (__pr23Sig).
+// ---------------------------------------------------------------- direct purchase order
+
+/** Approved requisitions, which a purchase order may be raised from directly (without an RFQ). */
+function __pr23PoSources() {
+  return (state.requisitions || []).filter(r => String(r.rawStatus || '').toUpperCase() === 'APPROVED');
+}
+
+function __pr23PoLinesHtml(reqRecordId) {
+  const r = (state.requisitions || []).find(x => x.recordId === reqRecordId);
+  if (!r) return '<p class="muted">Select the approved requisition.</p>';
+  const lines = r.items && r.items.length ? r.items : [{ itemName: r.title, quantity: 1, unit: 'Each', unitPrice: null }];
+  const rows = lines.map((i, idx) => `<tr data-po-line="${idx}"><td><input data-po-name value="${__pr23Esc(i.itemName)}" required style="min-width:170px"></td><td><input data-po-unit value="${__pr23Esc(i.unit || 'Each')}" style="width:70px"></td><td><input type="number" min="0.01" step="0.01" data-po-qty value="${i.quantity == null ? 1 : i.quantity}" required style="width:70px"></td><td><input type="number" min="0.01" step="0.01" data-po-price value="${i.unitPrice ? i.unitPrice : ''}" required style="width:100px"></td></tr>`);
+  return __pr23LinesTable(['Item', 'Unit', 'Quantity', 'Unit price'], rows)
+    + '<p class="muted" style="margin-top:8px">Unit prices start from the requester\'s estimate where one was given. VAT is added at the active rate and the PO number is assigned when the order is saved.</p>';
+}
+
+/** Raise a purchase order from an approved requisition, replacing the fixture form. */
+function __pr23PoModal(existingId) {
+  if (existingId) {
+    openModal(`Purchase order ${existingId}`, 'A saved purchase order is not edited in place.', '<p class="muted">Send or preview it from the register. A change to an order already sent is agreed with the vendor and raised as a new order.</p>', btn('Close', 'close-overlay'));
+    return;
+  }
+  const sources = __pr23PoSources();
+  const vendors = (state.vendors || []).filter(v => !v.isBlacklisted);
+  const reason = !sources.length
+    ? 'No approved requisition is waiting to be ordered. A requisition is approved by its department head first.'
+    : !vendors.length ? 'No vendor is registered yet. Register the vendor in Vendor Registry first.' : '';
+  if (reason) {
+    openModal('Create purchase order', 'A purchase order is raised from an approved requisition.', `<p class="muted">${__pr23Esc(reason)}</p>`, btn('Close', 'close-overlay'));
+    return;
+  }
+  const sourceOptions = sources.map(r => `<option value="${__pr23Esc(r.recordId)}">${__pr23Esc(r.id)} · ${__pr23Esc(r.title)} · ${__pr23Esc(r.department || '')}</option>`).join('');
+  // A PO is sent by email, so a vendor without one is flagged before anyone tries to send to it.
+  const vendorOptions = vendors.map(v => `<option value="${__pr23Esc(v.recordId)}">${__pr23Esc(v.name)}${v.status && v.status !== 'Prequalified' ? ' · ' + __pr23Esc(v.status) : ''}${String(v.email || '').includes('@') ? '' : ' · no email'}</option>`).join('');
+  openModal(
+    'Create purchase order',
+    'Raise an order directly from an approved requisition, without an RFQ. Save it as a draft, or save and send it to the vendor.',
+    `<form id="poFormV23" class="form-grid"><div class="field full"><label>Approved requisition</label><select name="requisition" id="poSourceV23" required>${sourceOptions}</select></div><div class="field"><label>Vendor</label><select name="vendor" required>${vendorOptions}</select></div><div class="field"><label>Expected delivery</label><input type="date" name="delivery" value="${__pr23DateOffset(14)}"></div><div class="field"><label>Payment terms</label><input name="paymentTerms" value="Net 30"></div><div class="field"><label>Delivery address</label><input name="shippingAddress"></div><div class="field full"><label>Order lines</label><div id="poLinesV23">${__pr23PoLinesHtml(sources[0].recordId)}</div></div></form>`,
+    btn('Cancel', 'close-overlay') + btn('Save draft', 'save-po-v6') + btn('Save and send to vendor', 'submit-po-v6', 'primary'),
+  );
+}
+
+// ---------------------------------------------------------------- invoice payment
+
+/** Invoices Finance has approved that are not yet paid (the loader decides; see live-loaders). */
+function __pr23Payable() {
+  return (state.invoices || []).filter(i => i.payable);
+}
+
+/** Record the payment of an approved invoice, with its proof of payment. */
+function __pr23PaymentModal(preselectId) {
+  if (!__pr23Can('invoices.pay')) {
+    openModal('Record payment', 'Paying an invoice is an accounts payable step.', '<p class="muted">Your role cannot record payments. Accounts payable records them once Finance has approved the invoice.</p>', btn('Close', 'close-overlay'));
+    return;
+  }
+  const payable = __pr23Payable();
+  if (!payable.length) {
+    openModal('Record payment', 'Only an invoice Finance has approved can be paid.', '<p class="muted">No approved invoice is awaiting payment.</p>', btn('Close', 'close-overlay'));
+    return;
+  }
+  const banks = (__pr23Live() || {}).banks || [];
+  const chosen = payable.find(i => i.recordId === preselectId || i.id === preselectId) || payable[0];
+  const amountOf = i => Number(i.outstanding == null ? i.amount || 0 : i.outstanding).toFixed(2);
+  const invoiceOptions = payable.map(i => `<option value="${__pr23Esc(i.recordId)}" data-amount="${amountOf(i)}" ${i === chosen ? 'selected' : ''}>${__pr23Esc(i.id)} · ${__pr23Esc(i.vendor)} · ${__pr23Esc(i.currency || '')} ${amountOf(i)}</option>`).join('');
+  const bankOptions = banks.map(b => `<option value="${__pr23Esc(b.id)}">${__pr23Esc(b.name)}${b.accountNumber ? ' · ' + __pr23Esc(b.accountNumber) : ''}</option>`).join('');
+  const today = new Date().toISOString().slice(0, 10);
+  const noBank = banks.length
+    ? ''
+    : '<div class="field full"><div class="notice"><div><strong>No bank or cash account is set up</strong><p>Accounting adds one under Cashbook before a payment can be recorded.</p></div></div></div>';
+  openModal(
+    'Record payment',
+    'Record the full payment of an approved invoice, with its proof of payment. The accounting entries are posted when it is saved.',
+    `<form id="paymentFormV23" class="form-grid"><div class="field full"><label>Invoice</label><select name="invoice" id="paymentInvoiceV23" required>${invoiceOptions}</select></div><div class="field"><label>Amount</label><input name="amount" id="paymentAmountV23" value="${amountOf(chosen)}" readonly></div><div class="field"><label>Payment date</label><input type="date" name="paymentDate" value="${today}" max="${today}" required></div><div class="field"><label>Method</label><select name="method"><option value="BANK">Bank transfer</option><option value="CASH">Cash</option></select></div><div class="field"><label>Paid from</label><select name="bank" ${banks.length ? 'required' : ''}>${bankOptions || '<option value="">No account available</option>'}</select></div><div class="field"><label>Payment reference</label><input name="reference" placeholder="Bank transaction reference"></div><div class="field"><label>Proof of payment</label><input type="file" name="proof" accept=".pdf,.png,.jpg,.jpeg,.gif,.webp" required></div><div class="field full"><label>Notes</label><textarea name="notes"></textarea></div>${noBank}</form>`,
+    btn('Cancel', 'close-overlay') + btn('Record payment', 'confirm-record-payment-v23', 'primary'),
+  );
+}
+
+// Re-draw dependent parts of the live forms when a select changes. Removed with the runtime (__pr23Sig).
 document.addEventListener('change', event => {
   const target = event.target;
   if (!target || !target.id) return;
@@ -396,6 +473,15 @@ document.addEventListener('change', event => {
   if (target.id === 'invoicePoV23') {
     const box = document.querySelector('#invoiceLinesV23');
     if (box) box.innerHTML = __pr23InvoiceLinesHtml(target.value);
+  }
+  if (target.id === 'poSourceV23') {
+    const box = document.querySelector('#poLinesV23');
+    if (box) box.innerHTML = __pr23PoLinesHtml(target.value);
+  }
+  if (target.id === 'paymentInvoiceV23') {
+    const amount = document.querySelector('#paymentAmountV23');
+    const option = target.selectedOptions && target.selectedOptions[0];
+    if (amount && option) amount.value = option.dataset.amount || '';
   }
 }, __pr23Sig);
 
