@@ -1083,11 +1083,15 @@ function __pr23AnalysisHero(kind) {
   const committed = orders.reduce((t, o) => t + (Number(o.amount) || 0), 0);
   const hero = (h2, p, v) => `<div class="analysis-hero"><div><h2>${__pr23Esc(h2)}</h2><p>${__pr23Esc(p)}</p></div><div class="analysis-value">${__pr23Esc(v)}</div></div>`;
   if (kind === 'spend') {
-    const plans = (state.plans || []).filter(p => String(p.rawStatus || '').toUpperCase() === 'APPROVED');
+    // One fiscal year only: orders of one year against another year's plan mean nothing.
+    const year = new Date().getFullYear();
+    const plans = (state.plans || []).filter(p => String(p.rawStatus || '').toUpperCase() === 'APPROVED' && String(p.fiscalYear || '').includes(String(year)));
     const budget = plans.reduce((t, p) => t + (Number(p.budget) || 0), 0);
-    if (!budget) return hero(`${money(committed)} committed`, `${orders.length} purchase order${orders.length === 1 ? '' : 's'}, not cancelled. No approved procurement plan has a budget to measure commitments against.`, '—');
-    const pct = Math.round((committed / budget) * 1000) / 10;
-    return hero(`${money(committed)} committed against ${money(budget)} of approved plans`, `Commitments are ${pct}% of ${plans.length} approved plan budget${plans.length === 1 ? '' : 's'}, counting purchase orders that are not cancelled.`, `${pct}%`);
+    const yearOrders = orders.filter(o => { const d = new Date(o.orderDate || ''); return !Number.isNaN(d.getTime()) && d.getFullYear() === year; });
+    const yearCommitted = yearOrders.reduce((t, o) => t + (Number(o.amount) || 0), 0);
+    if (!budget) return hero(`${money(yearCommitted)} committed in FY ${year}`, `${yearOrders.length} purchase order${yearOrders.length === 1 ? '' : 's'} this year, not cancelled. No approved procurement plan covers FY ${year}, so there is no budget to measure them against.`, '—');
+    const pct = Math.round((yearCommitted / budget) * 1000) / 10;
+    return hero(`${money(yearCommitted)} committed against ${money(budget)} of FY ${year} approved plans`, `Commitments are ${pct}% of ${plans.length} approved plan budget${plans.length === 1 ? '' : 's'} for FY ${year}, counting purchase orders that are not cancelled.`, `${pct}%`);
   }
   if (kind === 'category') {
     const m = new Map();

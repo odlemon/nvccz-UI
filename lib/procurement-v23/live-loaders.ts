@@ -856,6 +856,14 @@ export async function loadProcurementV23LiveData(): Promise<ProcurementV23LivePa
   const paidTotal = sum(paidInvoices, (i) => i.totalAmount)
   const approvedPlans = plansView.filter((p) => p.rawStatus === "APPROVED")
   const approvedBudget = approvedPlans.reduce((t, p) => t + p.budget, 0)
+  // Remaining and variance compare one fiscal year's orders with that year's approved plans; orders of
+  // one year against another year's plan mean nothing.
+  const thisYear = new Date().getFullYear()
+  const yearBudget = approvedPlans.filter((p) => yearOf(p.fiscalYear) === thisYear).reduce((t, p) => t + p.budget, 0)
+  const yearCommitted = sum(
+    liveOrders.filter((o) => new Date(o.orderDate ?? o.createdAt).getFullYear() === thisYear),
+    (o) => o.totalAmount,
+  )
   // Savings on an award: the highest submitted bid less the accepted one, for each awarded RFQ.
   const savings = [...quotesByRfq.values()].reduce((t, all) => {
     const bids = all.filter((q) => String(q.status).toUpperCase() !== "DRAFT")
@@ -1015,12 +1023,12 @@ export async function loadProcurementV23LiveData(): Promise<ProcurementV23LivePa
     },
     Committed: { value: money(committed), sub: `${liveOrders.length} purchase order${liveOrders.length === 1 ? "" : "s"}, not cancelled` },
     "Actual spend": { value: money(paidTotal), sub: `${paidInvoices.length} paid invoice${paidInvoices.length === 1 ? "" : "s"}` },
-    Remaining: approvedBudget > 0
-      ? { value: money(approvedBudget - committed), sub: "Approved plan budgets less commitments" }
-      : unknown("No approved plan budget to measure against"),
-    Variance: approvedBudget > 0
-      ? { value: `${Math.round((committed / approvedBudget) * 1000) / 10}%`, sub: "Commitments as a share of approved plan budgets" }
-      : unknown("No approved plan budget to measure against"),
+    Remaining: yearBudget > 0
+      ? { value: money(yearBudget - yearCommitted), sub: `FY ${thisYear} approved plan budgets less FY ${thisYear} commitments` }
+      : unknown(`No approved plan covers FY ${thisYear}`),
+    Variance: yearBudget > 0
+      ? { value: `${Math.round((yearCommitted / yearBudget) * 1000) / 10}%`, sub: `FY ${thisYear} commitments as a share of its approved plan budgets` }
+      : unknown(`No approved plan covers FY ${thisYear}`),
     Forecast: unknown("Spend forecasting is not available"),
     "Technical threshold": unknown("No scoring threshold is configured for RFQs"),
     "Potential savings": { value: money(savings), sub: "Accepted quotation against the highest bid, across awarded RFQs" },
