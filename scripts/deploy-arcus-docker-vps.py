@@ -80,9 +80,20 @@ def make_tarball(root: Path, arc_prefix: str, out_path: Path) -> str:
 
 def env_blob(kind: str, mysql_root: str, mysql_pass: str, jwt: str) -> str:
     if kind == "dev":
-        ui = "https://dev.arcus.co.zw"
-        api = "https://dev-api.arcus.co.zw"
+        # arcus.co.zw -> matanho.com: confirmed live 2026-09-11 (dev.matanho.com and
+        # dev-api.matanho.com/health both 200; the .co.zw hosts no longer resolve to
+        # anything at all -- 000, no TLS/routing). deploy-arcus-dev-selective.py already
+        # used the matanho.com scheme; this script, which is what actually bakes
+        # FRONTEND_URL/BASE_URL into the API container on a full redeploy, did not, so a
+        # user-credentials email's login link pointed at a dead host. See CreateUser in
+        # nvccz's UserController -> UserService.sendCredentialsEmail.
+        ui = "https://dev.matanho.com"
+        api = "https://dev-api.matanho.com"
     else:
+        # demo.arcus.co.zw / demo-api.arcus.co.zw are ALSO unreachable (000), but unlike
+        # dev no matanho.com equivalent answered either -- demo may be decommissioned or
+        # on a domain not yet identified. Left as-is rather than guessing; confirm the
+        # real host before deploying "demo" for real.
         ui = "https://demo.arcus.co.zw"
         api = "https://demo-api.arcus.co.zw"
     return f"""MYSQL_ROOT_PASSWORD={mysql_root}
