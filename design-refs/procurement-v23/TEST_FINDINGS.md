@@ -6,7 +6,7 @@
 | Severity | Open | Fixed locally, not deployed | Deployed and verified |
 |---|---|---|---|
 | CRITICAL | 0 | 0 | 1 |
-| HIGH | 0 | 3 | 0 |
+| HIGH | 0 | 4 | 0 |
 | MEDIUM | 0 | 2 | 0 |
 | LOW | 0 | 1 | 0 |
 
@@ -537,6 +537,94 @@ happened. At deploy, correct them from their accepted quotation: set `status = A
 `awardedQuotationId`.
 
 **Status:** FIXED LOCALLY — not deployed.
+
+---
+
+## PROC-FINDING-008
+
+**Title:** Vendors could not act on either procurement email: the RFQ invitation link failed, and the PO invoice link led nowhere
+**Module:** Procurement (backend and frontend) · **Dimension:** QAT · **Category:** Functional / Integration
+**Severity:** HIGH
+**Persona affected:** Every invited or contracted vendor; the invoice leg of procure-to-pay
+**Surface:** Email links · `/vendor-quotations/rfq-respond`, `/procurement/vendor-invoice` · API `POST /api/procurement/invoices`
+
+### Steps to reproduce
+
+Probed on the servers on 11 September 2026 with dummy tokens, so no email was sent:
+
+1. Build the RFQ invitation link the API would email: `FRONTEND_URL` + `/vendor-quotations/rfq-respond?token=…&rfqNumber=…`.
+2. Open it on dev (`dev.matanho.com`) and on production (`nvfnvvcz.my.matanho.com`).
+3. Do the same for the PO email's invoice link, `FRONTEND_URL` + `/procurement/vendor-invoice?token=…`.
+4. With a valid token, submit a vendor invoice against a PO whose goods have been received.
+
+### Expected
+
+Both links open the vendor page with the token intact. A vendor can invoice a delivered order.
+
+### Actual
+
+| Link | Dev | Production |
+|---|---|---|
+| RFQ invitation | **500** | **307 to the staff login** |
+| PO invoice | 307 to the staff login | 307 to the staff login |
+
+- On dev, the staff log showed `ERR_INVALID_URL`, input `-quotations/rfq-respond`.
+- `/procurement/vendor-invoice` has no page in the frontend at all.
+- The page that does exist, `/vendor/invoice/submit`, demanded quotation, RFQ and email query
+  parameters that the PO email never sends. It also crashed on submit (missing `Loader2` import).
+- With a valid token, a vendor invoice against a DELIVERED PO was refused: "Purchase order is not
+  open for vendor invoices (status: DELIVERED)". Recording the GRN moves a PO to DELIVERED, so the
+  normal order of events — goods arrive, then the invoice — could never finish.
+
+### Root cause
+
+- **No vendor host in the API's link settings.** Neither API had `VENDOR_PORTAL_BASE_URL` set, so
+  links were built on `FRONTEND_URL`, the staff host. Production staff has no vendor redirect, so
+  its login guard caught the path.
+- **Blank portal URLs in production builds.** `lib/portal/config.ts` read the portal URLs through
+  `process.env[key]`. Next does not inline a computed key, so every external portal URL was blank.
+- **Broken redirect on dev staff.** Dev staff does redirect vendor paths, but it built
+  `'' + suffix`. The prefix regex matched `vendor` before `vendor-quotations`, and it dropped the
+  query string (and with it the token).
+- **Wrong default path.** `vendorPoInvoiceEmailLinks.ts` defaulted to a path with no page.
+- **Status gate too narrow.** `canVendorSubmitProcurementInvoice` excluded
+  PARTIALLY_DELIVERED and DELIVERED.
+
+### Fix
+
+- **nvccz `cf23bb3`:**
+  - the invoice link defaults to `/vendor/invoice/submit`;
+  - new public `GET /api/procurement/vendor-portal/purchase-order?token=`, scoped to the PO and
+    vendor in the signed token;
+  - delivered POs accept vendor invoices (BILLED still closes them);
+  - `scripts/_uat/procurement-vendor-invoice-link-probe.mjs`.
+- **nvccz-new `a3da504`:**
+  - literal `NEXT_PUBLIC_*` reads;
+  - the vendor redirect forwards the whole path and query, and only to an absolute URL;
+  - vendor token pages open on the staff host when no vendor portal is configured;
+  - `/vendor/invoice/submit` rebuilt around the token: loads the order, prefills lines at the
+    received quantities, shows the server's VAT and any earlier invoices, and takes an optional PDF.
+- **Environment (backups `*.bak-20260911-vendorlinks`):**
+  - production `VENDOR_PORTAL_BASE_URL` and `PUBLIC_VENDOR_PORTAL_URL` = `https://vendor.nvccz.online`;
+  - dev `VENDOR_PORTAL_BASE_URL` = `https://dev.vendor.matanho.com`.
+
+### Verification
+
+Local, `procurement-vendor-invoice-link-probe.mjs` and a browser on the vendor portal build:
+
+| | Before | After |
+|---|---|---|
+| Token resolves the PO (`PO_20260911_0002`, DELIVERED) | no endpoint | **200**, lines numeric, VAT 15.5%, no internal ids |
+| Token for another vendor / RFQ token / expired token | — | **404 / 400 / 400** |
+| Vendor invoice on a DELIVERED PO | 400 "not open for vendor invoices" | **201** `INV_20260911_0003` |
+| Invoice page opened from the token | "Invalid Invoice Submission" (missing params) | order shown, line prefilled at the received quantity, total matches the PO (USD 1,605.45) |
+| Submit through the page | crash on submit | **`INV_20260911_0004`**, confirmation with our reference |
+
+Also checked on the servers:
+- both vendor hosts answer 200 on both paths;
+- the production API's CORS admits `https://vendor.nvccz.online`.
+
+**Status:** FIXED LOCALLY — deploying to production (API, then staff, vendor and LP portals) and then dev.
 
 ---
 

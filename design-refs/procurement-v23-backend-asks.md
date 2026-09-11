@@ -36,7 +36,13 @@ vendored demo records or a success toast for a save that did not happen.
 - per-action procurement permissions (PROC-002);
 - `PUT /vendor-quotations/:id/evaluation` for the evaluation team's technical score, with a
   vendor's own declared score no longer counted and price scored against the lowest bid (PROC-006);
-- an accepted quotation recorded on its RFQ as the award, closing it to further quotes (PROC-007).
+- an accepted quotation recorded on its RFQ as the award, closing it to further quotes (PROC-007);
+- vendor email links that work (PROC-008):
+  - public `GET /procurement/vendor-portal/purchase-order?token=` behind the PO email's invoice
+    link, which now opens `/vendor/invoice/submit`;
+  - vendors can invoice a PO after its goods are received;
+  - `VENDOR_PORTAL_BASE_URL` set on both servers, so RFQ invitations and PO emails link to the
+    vendor portal, not the staff host.
 
 ---
 
