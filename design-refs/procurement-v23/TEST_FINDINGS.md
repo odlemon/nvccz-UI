@@ -402,11 +402,21 @@ Evidence scripts:
 **Status:** FIXED LOCALLY for the screens and actions listed — not deployed. The actions UAT
 verifies all ten steps through the API.
 
+Connected since, on 11 September 2026:
+- **invoice rejection** from the Approval Centre (`PUT /procurement/invoices/:id/reject`, actions UAT
+  step 11);
+- nine more controls that announced invented outcomes are now refused: vendor bid draft and submit,
+  OCR extract, flag invoice, email PO, new folder, access review, archive record, plan validation.
+
 Still unconnected, and refused rather than faked:
 - plans, contracts, documents and reports;
 - OCR invoice extraction;
-- invoice rejection;
 - journals and asset transfers.
+
+Not on any V23 screen:
+- **paying an invoice.** The API has `POST /procurement/invoices/:id/payment`, which needs a proof
+  of payment file and, for a bank payment, a bank account. No V23 control calls it, and production
+  has no bank accounts set up.
 
 They are tracked in [`../procurement-v23-backend-asks.md`](../procurement-v23-backend-asks.md).
 
