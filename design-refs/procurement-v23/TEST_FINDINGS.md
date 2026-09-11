@@ -266,7 +266,30 @@ Checked in the browser after the last two fixes:
   covers FY 2026", with Remaining and Variance saying the same, because the three approved plans are FY 2027.
 - Audit & Compliance: the three blank cards say what is not measured.
 
-**Deployment:** local only so far.
+### Deployed to dev and confirmed there
+
+12 September 2026 · API nvccz `40774bf`, staff portal nvccz-new `4c29f44`.
+
+| | Dev |
+|---|---|
+| API | built, `db:migrate:all` exit 0, health 200 |
+| Staff portal | rebuilt and swapped (stamp 20260912-001122) |
+| Mail | blocked for every test run and restored afterwards; 58 messages blocked while the data was rebuilt |
+
+- **Actions suite, 17 steps:** 11/17 on the first pass. Steps 1, 2, 6, 7, 8 and 9 failed only because the
+  previous dev run had consumed the procure-to-pay dataset — a requisition to approve, an un-awarded RFQ,
+  an approved requisition to source. After `dev_p2p_flow.py` rebuilt it, those steps and step 10 were
+  rerun: **7/7**.
+- **Workflows:** 14/15, then W4b on rerun: **15/15**. W4b had failed because W4a consumed the only goods
+  receipt awaiting inspection; the test now arranges its own, and rejected `GRN_20260911_0005` on dev.
+- **Screens:** 54 full-length pages for the Procurement Manager, the requester and the Accountant, none
+  failed. The manager's Command Centre shows Approved plan $450,000 across 3 approved plans, Committed
+  spend $8,374 from 8 purchase orders, AP exposure $832, Pending approvals 0 with "Nothing awaits your
+  decision", a monthly spend line drawn from records, and Spend by category at Operations 100%. The
+  requester's sidebar carries only Approval Centre, Purchase Requisitions and Configuration & RBAC.
+
+**Production:** unchanged. It still runs the cycle-three build (API `321fcdc`, staff `9cceab1`); nothing
+from cycle four or cycle five is deployed there.
 
 ---
 

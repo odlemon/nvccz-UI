@@ -205,9 +205,23 @@ await step("W3 Requester corrects a rejected requisition and resubmits it", asyn
 for (const decision of ["approve", "reject"]) {
   await step(`W4${decision === "approve" ? "a" : "b"} Procurement Manager ${decision}s a goods receipt inspection`, async (open, label) => {
     const email = "proc.mgr@nts.local"
-    const pending = list(await api(email, "/procurement/goods-received-notes")).filter((g) => String(g.status).toUpperCase() === "RECEIVED")
-    const grn = decision === "approve" ? pending[0] : pending[1] ?? pending[0]
-    if (!grn) return record(false, label, "no goods receipt awaiting inspection")
+    const officer = "proc.officer@nts.local"
+    let pending = list(await api(email, "/procurement/goods-received-notes")).filter((g) => String(g.status).toUpperCase() === "RECEIVED")
+    if (!pending.length) {
+      // Each inspection consumes a receipt, so arrange one rather than depend on what an earlier run left.
+      const po = list(await api(officer, "/procurement/purchase-orders")).find(
+        (o) => ["SENT", "ACKNOWLEDGED", "PARTIALLY_DELIVERED"].includes(String(o.status).toUpperCase()) && (o.items ?? []).length,
+      )
+      if (!po) return record(false, label, "no dispatched purchase order to receive against")
+      const made = await apiCall(officer, "POST", "/procurement/goods-received-notes", {
+        purchaseOrderId: po.id,
+        receivedDate: new Date().toISOString(),
+        items: po.items.map((i) => ({ purchaseOrderItemId: i.id, quantityReceived: Number(i.quantity), quantityAccepted: Number(i.quantity), quantityRejected: 0 })),
+      })
+      if (made.status !== 201) return record(false, label, `could not arrange a goods receipt: ${made.status} ${made.message}`)
+      pending = [made.data]
+    }
+    const grn = pending[0]
     const { page, errors } = await open(email, "/procurement-v23/approvals")
     const id = `RECEIPT-${grn.grnNumber}`
     if (decision === "approve") {
