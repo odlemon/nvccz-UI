@@ -55,9 +55,28 @@ async function api(email, path) {
   return body?.data
 }
 
+/**
+ * Every step opens a fresh browser, which re-downloads the ~1.2 MB (compressed) V23 bundle. Over a
+ * slow link to dev that is 60-120 s per page, so immutable /_next/static files are kept in memory
+ * for the run and served to later browsers. UAT_CACHE_STATIC=0 turns it off.
+ */
+const STATIC_CACHE = new Map()
+async function serveStatic(route) {
+  const url = route.request().url()
+  const hit = STATIC_CACHE.get(url)
+  if (hit) return route.fulfill({ status: 200, headers: hit.headers, body: hit.body })
+  const res = await route.fetch()
+  const body = await res.body()
+  // The body arrives decoded, so the transfer headers no longer describe it.
+  const headers = Object.fromEntries(Object.entries(res.headers()).filter(([k]) => !/^(content-encoding|content-length|transfer-encoding)$/i.test(k)))
+  if (res.status() === 200) STATIC_CACHE.set(url, { headers, body })
+  return route.fulfill({ status: res.status(), headers, body })
+}
+
 async function session(email, route) {
   const browser = await chromium.launch({ headless: true })
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 } })
+  if (process.env.UAT_CACHE_STATIC !== "0") await context.route(/\/_next\/static\//, serveStatic)
   await seedAuth(context, staff.base, email, staff.portal)
   const page = await context.newPage()
   // A remote run (dev over the internet, often while the VPS builds) needs more than the local
