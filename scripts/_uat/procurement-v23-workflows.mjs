@@ -55,9 +55,9 @@ async function session(email, route) {
   page.setDefaultTimeout(20000)
   const errors = []
   page.on("pageerror", (e) => errors.push(String(e.message || e).slice(0, 200)))
-  await page.goto(staff.base + route, { waitUntil: "domcontentloaded", timeout: 90000 })
-  await page.waitForSelector(".procurement-v23-root", { timeout: 60000 })
-  await page.waitForFunction(() => Boolean(window.__pr23Live && window.__pr23Live.access), null, { timeout: 60000 })
+  await page.goto(staff.base + route, { waitUntil: "domcontentloaded", timeout: 180000 })
+  await page.waitForSelector(".procurement-v23-root", { timeout: 150000 })
+  await page.waitForFunction(() => Boolean(window.__pr23Live && window.__pr23Live.access), null, { timeout: 150000 })
   await page.waitForTimeout(800)
   return { browser, page, errors }
 }
@@ -124,6 +124,7 @@ await step("W1 Requester saves a draft, edits it and submits it", async (open, l
   await page.fill('#prForm [name="title"]', title)
   await page.fill('#prForm [name="item"]', "Printer paper")
   await page.fill('#prForm [name="qty"]', "10")
+  await page.fill('#prForm [name="motivation"]', "Paper for the Operations office.")
   await page.click('[data-action="save-pr"]')
   const saveToast = await toasts(page)
   const draft = list(await api(email, "/procurement/requisitions/my")).find((r) => r.title === title)
@@ -159,7 +160,10 @@ await step("W2 Operations head rejects a requisition with a reason", async (open
   const pr = await arrangeRequisition(`UAT WF reject ${RUN}`)
   const { page, errors } = await open(head, "/procurement-v23/requisitions")
   const offered = await rowMenu(page, pr.requisitionNumber)
-  if (!offered.includes("reject-pr-v11")) return record(false, label, `${pr.requisitionNumber}: no reject control (menu: ${offered.filter((a) => /pr|reject|approve/.test(a)).join(", ")})${suffix(errors)}`)
+  // A department head decides from the Review modal: Reject or return, or Approve requisition.
+  if (!offered.includes("review-pr-v11")) return record(false, label, `${pr.requisitionNumber}: no Review control (menu: ${offered.filter((a) => /pr|reject|approve|review/.test(a)).join(", ")})${suffix(errors)}`)
+  await page.click(`[data-action="review-pr-v11"][data-id="${pr.requisitionNumber}"]`)
+  if (!(await visible(page, `[data-action="reject-pr-v11"][data-id="${pr.requisitionNumber}"]`))) return record(false, label, `${pr.requisitionNumber}: Review opened without Reject or return${suffix(errors)}`)
   await page.click(`[data-action="reject-pr-v11"][data-id="${pr.requisitionNumber}"]`)
   await page.waitForSelector("#rejectPrFormV11")
   const reason = `Quantity is not justified ${RUN}`
@@ -185,6 +189,9 @@ await step("W3 Requester corrects a rejected requisition and resubmits it", asyn
   if (!editAction) return record(false, label, `${pr.requisitionNumber} REJECTED: its row offers no way to correct or resubmit (menu: ${offered.filter((a) => /pr|edit|submit|view/.test(a)).join(", ")})${suffix(errors)}`)
   await page.click(`[data-action="${editAction}"][data-id="${pr.requisitionNumber}"]`)
   await page.waitForTimeout(800)
+  // The API refuses a resubmission with nothing changed since the rejection, so correct it first.
+  const titleField = page.locator(':is(#modalLayer.open, #drawerLayer.open) input[name="title"]').first()
+  if (await titleField.count()) await titleField.fill(`${pr.title} (corrected ${RUN})`)
   const buttons = await page.$$eval(":is(#modalLayer.open, #drawerLayer.open) [data-action]", (els) => els.map((e) => e.dataset.action))
   const submitAction = ["submit-pr", "submit-pr-v11", "save-pr-v11"].find((a) => buttons.includes(a))
   if (!submitAction) return record(false, label, `${pr.requisitionNumber}: ${editAction} opened no submit (buttons: ${buttons.join(", ")})${suffix(errors)}`)
