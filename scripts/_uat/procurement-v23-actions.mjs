@@ -40,17 +40,32 @@ function record(ok, step, detail) {
   console.log(`${ok ? "  PASS" : "  FAIL"}  ${step.padEnd(52)} ${detail}`)
 }
 
+/**
+ * fetch that retries a dropped connection (not an HTTP error). Only for reads and sign-in: a write
+ * that dropped may still have landed, so writes are never retried.
+ */
+async function fetchRetry(url, options, attempts = 4) {
+  for (let i = 1; ; i++) {
+    try {
+      return await fetch(url, options)
+    } catch (error) {
+      if (i >= attempts) throw error
+      await new Promise((r) => setTimeout(r, 3000 * i))
+    }
+  }
+}
+
 const tokens = {}
 async function api(email, path) {
   if (!tokens[email]) {
-    const r = await fetch(`${API}/auth/login`, {
+    const r = await fetchRetry(`${API}/auth/login`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, password: PASSWORD, portal: "staff" }),
     }).then((x) => x.json())
     tokens[email] = r.token || r?.data?.token
   }
-  const res = await fetch(`${API}${path}`, { headers: { Authorization: `Bearer ${tokens[email]}` } })
+  const res = await fetchRetry(`${API}${path}`, { headers: { Authorization: `Bearer ${tokens[email]}` } })
   const body = await res.json().catch(() => ({}))
   return body?.data
 }
