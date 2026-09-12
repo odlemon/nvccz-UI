@@ -303,6 +303,9 @@ try {
     await page.waitForSelector("#tenderFormV13")
     await page.selectOption('#tenderFormV13 [name="source"]', ctx.approvedReq.id)
     await page.fill('#tenderFormV13 [name="title"]', title)
+    // An RFQ to a shortlist, as the walkthrough describes. "Open tender" (the builder's first option) is a public
+    // listing whose bid prices stay sealed until the closing date.
+    await page.selectOption('#tenderFormV13 [name="method"]', "Request for Quotation (RFQ)")
     const inWeek = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10)
     for (const el of await page.$$("#tenderFormV13 [required]")) {
       const kind = await el.evaluate((n) => (n.tagName === "INPUT" ? n.type : n.tagName.toLowerCase()))

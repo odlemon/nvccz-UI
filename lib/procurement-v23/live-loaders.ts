@@ -587,7 +587,9 @@ export async function loadProcurementV23LiveData(): Promise<ProcurementV23LivePa
           vendor: q.companyName || q.vendorName || DASH,
           vendorId: q.vendorId ?? null,
           entity: tender?.entity ?? DASH,
-          value: num(q.totalAmount) ?? 0,
+          // The quotations list withholds prices on a sealed RFQ, so an award there has no total of its own;
+          // its purchase order carries the awarded value. Without this a contract raised from it saved 0.
+          value: num(q.totalAmount) ?? num(po?.totalAmount) ?? 0,
           currency: q.currencyCode ?? null,
           start: q.reviewedAt ? String(q.reviewedAt).slice(0, 10) : DASH,
           end: DASH,
