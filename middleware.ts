@@ -1,38 +1,49 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
-import { ROLE_PERMISSIONS_MAP, type RoleCode } from '@/lib/config/role-permissions'
+import {
+  type RoleCode,
+  hasModuleAccess as sharedHasModuleAccess,
+  hasSubModuleAccess as sharedHasSubModuleAccess,
+} from '@/lib/config/role-permissions'
+import {
+  PORTAL_ID,
+  LP_PORTAL_EXTERNAL_URL,
+  INVESTEE_PORTAL_EXTERNAL_URL,
+  APPLY_PORTAL_EXTERNAL_URL,
+  VENDOR_PORTAL_EXTERNAL_URL,
+  EVENTS_PORTAL_EXTERNAL_URL,
+  isPathAllowedForPortal,
+  portalHomePath,
+  isAuthRoute,
+  isStaffPublicPassThrough,
+  shouldRedirectFundingApplicationToApplyPortal,
+  shouldRedirectVendorToPortal,
+  shouldRedirectEventsToPortal,
+} from '@/lib/portal/config'
 
-// Helper function to check if role has access to a module
+// These used to be standalone re-implementations of the two helpers in
+// `lib/config/role-permissions.ts`, reading ROLE_PERMISSIONS_MAP directly. They drifted:
+// the shared versions know about module-id aliases (performance-v22 → performance-management)
+// and the client-design bypasses, these did not. That never showed up because every
+// client-design port sits in STAFF_PUBLIC_PASS_THROUGH, so this permission loop never ran
+// for any of them. Removing `/performance` from that list on 8 Sep 2026 made it the first
+// one to actually reach here — and it 403'd every role, including HR_MGR, because
+// `performance-v22` is not a key in ROLE_PERMISSIONS_MAP.
+//
+// Now delegating, so there is one implementation. The OPS_MGR short-circuit below is
+// preserved verbatim rather than removed: it is pre-existing behaviour affecting every other
+// module, and changing it is out of scope here. It is almost certainly a copy-paste error
+// (the comment says "Admin role" but OPS_MGR is Operations Manager) — flagged, not fixed.
 function hasModuleAccess(roleCode: RoleCode | null, moduleId: string): boolean {
   if (!roleCode) return false
-
-  // Admin role has access to everything
   if (roleCode === 'OPS_MGR') return true
-
-  const permissions = ROLE_PERMISSIONS_MAP[roleCode]
-  if (!permissions) return false
-
-  const modulePermission = permissions.modules.find(m => m.moduleId === moduleId)
-  return modulePermission ? modulePermission.access !== 'none' : false
+  return sharedHasModuleAccess(roleCode, moduleId)
 }
 
-// Helper function to check sub-module access
 function hasSubModuleAccess(roleCode: RoleCode | null, moduleId: string, subModuleId: string): boolean {
   if (!roleCode) return false
-
-  // Admin role has access to everything
   if (roleCode === 'OPS_MGR') return true
-
-  const permissions = ROLE_PERMISSIONS_MAP[roleCode]
-  if (!permissions) return false
-
-  const modulePermission = permissions.modules.find(m => m.moduleId === moduleId)
-  if (!modulePermission || modulePermission.access === 'none') return false
-
-  if (!modulePermission.subModules) return true // If no submodules defined, allow access to module
-
-  const subModuleAccess = modulePermission.subModules[subModuleId]
-  return subModuleAccess ? subModuleAccess !== 'none' : false
+  return sharedHasSubModuleAccess(roleCode, moduleId, subModuleId)
 }
 
 // Map routes to modules and sub-modules
@@ -50,35 +61,121 @@ const routePermissions: Record<string, { module: string; subModule?: string }> =
   '/procurement/approvals': { module: 'procurement', subModule: 'my-approvals' },
   '/procurement/approval-configs': { module: 'procurement', subModule: 'approval-configurations' },
 
-  // Performance Management routes
-  '/performance': { module: 'performance-management', subModule: 'performance-dashboard' },
-  '/performance/departments': { module: 'performance-management', subModule: 'departments-management' },
-  '/performance/kpis': { module: 'performance-management', subModule: 'kpi-management' },
-  '/performance/goals': { module: 'performance-management', subModule: 'goals-management' },
-  '/performance/tasks': { module: 'performance-management', subModule: 'taskManagement' },
-  '/performance/user-scorecards': { module: 'performance-management', subModule: 'userScorecard' },
-  '/performance/department-scorecards': { module: 'performance-management', subModule: 'departmentScorecard' },
-  '/performance/ceo-scorecards': { module: 'performance-management', subModule: 'performance-dashboard' },
-  '/performance/board-scorecards': { module: 'performance-management', subModule: 'performance-dashboard' },
-  '/performance/org-bsc': { module: 'performance-management', subModule: 'performance-dashboard' },
+  // Procurement V23 client design port
+  '/procurement-v23': { module: 'procurement-v23', subModule: 'pr23-dashboard' },
+  '/procurement-v23/plan': { module: 'procurement-v23', subModule: 'pr23-plan' },
+  '/procurement-v23/approvals': { module: 'procurement-v23', subModule: 'pr23-approvals' },
+  '/procurement-v23/requisitions': { module: 'procurement-v23', subModule: 'pr23-requisitions' },
+  '/procurement-v23/tenders': { module: 'procurement-v23', subModule: 'pr23-tenders' },
+  '/procurement-v23/evaluation': { module: 'procurement-v23', subModule: 'pr23-evaluation' },
+  '/procurement-v23/vendors': { module: 'procurement-v23', subModule: 'pr23-vendors' },
+  '/procurement-v23/contracts': { module: 'procurement-v23', subModule: 'pr23-contracts' },
+  '/procurement-v23/purchase-orders': { module: 'procurement-v23', subModule: 'pr23-orders' },
+  '/procurement-v23/goods-received': { module: 'procurement-v23', subModule: 'pr23-receiving' },
+  '/procurement-v23/invoices': { module: 'procurement-v23', subModule: 'pr23-invoices' },
+  '/procurement-v23/accounts': { module: 'procurement-v23', subModule: 'pr23-accounts' },
+  '/procurement-v23/documents': { module: 'procurement-v23', subModule: 'pr23-documents' },
+  '/procurement-v23/reports': { module: 'procurement-v23', subModule: 'pr23-reports' },
+  '/procurement-v23/audit': { module: 'procurement-v23', subModule: 'pr23-audit' },
+  '/procurement-v23/settings': { module: 'procurement-v23', subModule: 'pr23-settings' },
 
-  // Payroll routes
-  '/payroll': { module: 'payroll', subModule: 'payroll-dashboard' },
-  '/payroll/employees': { module: 'payroll', subModule: 'payroll-employees' },
-  '/payroll/payroll-runs': { module: 'payroll', subModule: 'payroll-runs' },
-  '/payroll/payslips': { module: 'payroll', subModule: 'payroll-payslips' },
+  // Accounting (client V52 design port, served at /accounting)
+  '/accounting': { module: 'accounting-v52', subModule: 'ac52-overview' },
+  '/accounting/approvals': { module: 'accounting-v52', subModule: 'ac52-approvals' },
+  '/accounting/close': { module: 'accounting-v52', subModule: 'ac52-close' },
+  '/accounting/general-ledger': { module: 'accounting-v52', subModule: 'ac52-ledger' },
+  '/accounting/journals': { module: 'accounting-v52', subModule: 'ac52-journals' },
+  '/accounting/cash-book': { module: 'accounting-v52', subModule: 'ac52-cash' },
+  '/accounting/bank-reconciliation': { module: 'accounting-v52', subModule: 'ac52-recon' },
+  '/accounting/payables': { module: 'accounting-v52', subModule: 'ac52-payables' },
+  '/accounting/receivables': { module: 'accounting-v52', subModule: 'ac52-receivables' },
+  '/accounting/expenses': { module: 'accounting-v52', subModule: 'ac52-expenses' },
+  '/accounting/inventory': { module: 'accounting-v52', subModule: 'ac52-inventory' },
+  '/accounting/assets': { module: 'accounting-v52', subModule: 'ac52-assets' },
+  '/accounting/short-term-investments': { module: 'accounting-v52', subModule: 'ac52-investments' },
+  '/accounting/reports': { module: 'accounting-v52', subModule: 'ac52-reports' },
+  '/accounting/tax': { module: 'accounting-v52', subModule: 'ac52-compliance' },
+  '/accounting/fx-revaluation': { module: 'accounting-v52', subModule: 'ac52-fx' },
+  '/accounting/consolidation': { module: 'accounting-v52', subModule: 'ac52-consolidation' },
+  '/accounting/chart-governance': { module: 'accounting-v52', subModule: 'ac52-coa' },
+  '/accounting/vault': { module: 'accounting-v52', subModule: 'ac52-vault' },
+  '/accounting/audit': { module: 'accounting-v52', subModule: 'ac52-audit' },
+  '/accounting/access': { module: 'accounting-v52', subModule: 'ac52-access' },
+  '/accounting/integrations': { module: 'accounting-v52', subModule: 'ac52-integrations' },
+  '/accounting/settings': { module: 'accounting-v52', subModule: 'ac52-settings' },
 
-  // Accounting routes
-  '/accounting': { module: 'accounting', subModule: 'accounting-dashboard' },
-  '/accounting/general-ledger': { module: 'accounting', subModule: 'general-ledger' },
-  '/accounting/cash-book': { module: 'accounting', subModule: 'cash-book' },
-  '/accounting/invoices': { module: 'accounting', subModule: 'invoices' },
-  '/accounting/expenses': { module: 'accounting', subModule: 'expenses' },
+  // Performance Management (Matanho V22 — canonical /performance)
+  '/performance': { module: 'performance-v22', subModule: 'pm22-dashboard' },
+  '/performance/strategy': { module: 'performance-v22', subModule: 'pm22-strategy' },
+  '/performance/scorecards': { module: 'performance-v22', subModule: 'pm22-scorecards' },
+  '/performance/objectives': { module: 'performance-v22', subModule: 'pm22-objectives' },
+  '/performance/tasks': { module: 'performance-v22', subModule: 'pm22-tasks' },
+  '/performance/reviews': { module: 'performance-v22', subModule: 'pm22-reviews' },
+  '/performance/corrective': { module: 'performance-v22', subModule: 'pm22-corrective' },
+  '/performance/reports': { module: 'performance-v22', subModule: 'pm22-reports' },
+  '/performance/vault': { module: 'performance-v22', subModule: 'pm22-vault' },
+  '/performance/alerts': { module: 'performance-v22', subModule: 'pm22-alerts' },
+  '/performance/access': { module: 'performance-v22', subModule: 'pm22-access' },
+  '/performance/departments': { module: 'performance-v22', subModule: 'pm22-dashboard' },
+  '/performance/integrations': { module: 'performance-v22', subModule: 'pm22-dashboard' },
+  '/performance/kpi-analytics': { module: 'performance-v22', subModule: 'pm22-objectives' },
+  '/performance/kpi-management': { module: 'performance-v22', subModule: 'pm22-objectives' },
+  '/performance/timesheets': { module: 'performance-v22', subModule: 'pm22-tasks' },
+  '/performance/settings': { module: 'performance-v22', subModule: 'pm22-access' },
+  '/performance/performance-reports': { module: 'performance-v22', subModule: 'pm22-reports' },
+  '/performance/themes': { module: 'performance-v22', subModule: 'pm22-strategy' },
+  '/performance/risks': { module: 'performance-v22', subModule: 'pm22-strategy' },
+  '/performance/contracts': { module: 'performance-v22', subModule: 'pm22-dashboard' },
+  '/performance/bsc-pillars': { module: 'performance-v22', subModule: 'pm22-scorecards' },
 
-  // Portfolio Management routes
-  '/portfolio': { module: 'portfolio-management' },
-  '/portfolio/funds': { module: 'portfolio-management', subModule: 'funds' },
-  '/portfolio/companies': { module: 'portfolio-management', subModule: 'companies' },
+  // Legacy Arcus performance app
+  '/performance-legacy': { module: 'performance-management', subModule: 'performance-dashboard' },
+  '/performance-legacy/departments': { module: 'performance-management', subModule: 'departments-management' },
+  '/performance-legacy/kpis': { module: 'performance-management', subModule: 'kpi-management' },
+  '/performance-legacy/goals': { module: 'performance-management', subModule: 'goals-management' },
+  '/performance-legacy/tasks': { module: 'performance-management', subModule: 'taskManagement' },
+
+  // Payroll -- legacy, frozen (moved to /payroll-legacy so the V6 port can serve
+  // /payroll). The V6 module is deliberately absent from this map: it enforces
+  // page access inside the runtime against its own payroll.* grants
+  // (__pr6DeniedPageHtml), and gating it here on the legacy module's grants
+  // would refuse people the V6 permissions do admit.
+  '/payroll-legacy': { module: 'payroll', subModule: 'payroll-dashboard' },
+  '/payroll-legacy/employees': { module: 'payroll', subModule: 'payroll-employees' },
+  '/payroll-legacy/payroll-runs': { module: 'payroll', subModule: 'payroll-runs' },
+  '/payroll-legacy/payslips': { module: 'payroll', subModule: 'payroll-payslips' },
+
+  // Accounting — legacy, frozen (moved to /accounting-legacy)
+  '/accounting-legacy': { module: 'accounting', subModule: 'accounting-dashboard' },
+  '/accounting-legacy/general-ledger': { module: 'accounting', subModule: 'general-ledger' },
+  '/accounting-legacy/cash-book': { module: 'accounting', subModule: 'cash-book' },
+  '/accounting-legacy/invoices': { module: 'accounting', subModule: 'invoices' },
+  '/accounting-legacy/expenses': { module: 'accounting', subModule: 'expenses' },
+
+  // Portfolio (client V25 — formerly portfolio-v11)
+  '/portfolio': { module: 'portfolio', subModule: 'pv11-dashboard' },
+  '/portfolio/deals': { module: 'portfolio', subModule: 'pv11-deals' },
+  '/portfolio/funds': { module: 'portfolio', subModule: 'pv11-funds' },
+  '/portfolio/capital-calls': { module: 'portfolio', subModule: 'pv11-capital-calls' },
+  '/portfolio/companies': { module: 'portfolio', subModule: 'pv11-companies' },
+  '/portfolio/cash-accounts': { module: 'portfolio', subModule: 'pv11-cash-accounts' },
+  '/portfolio/cash-overview': { module: 'portfolio', subModule: 'pv11-cash-accounts' },
+  '/portfolio/cash-ledger': { module: 'portfolio', subModule: 'pv11-cash-accounts' },
+  '/portfolio/cash-reservations': { module: 'portfolio', subModule: 'pv11-cash-accounts' },
+  '/portfolio/statement-imports': { module: 'portfolio', subModule: 'pv11-cash-accounts' },
+  '/portfolio/reconciliations': { module: 'portfolio', subModule: 'pv11-cash-accounts' },
+  '/portfolio/exceptions': { module: 'portfolio', subModule: 'pv11-cash-accounts' },
+  '/portfolio/period-close': { module: 'portfolio', subModule: 'pv11-cash-accounts' },
+  '/portfolio/reporting': { module: 'portfolio', subModule: 'pv11-reporting' },
+  '/portfolio/fund-performance': { module: 'portfolio', subModule: 'pv11-reporting' },
+  '/portfolio/lps': { module: 'portfolio', subModule: 'pv11-lps' },
+  '/portfolio/documents': { module: 'portfolio', subModule: 'pv11-documents' },
+  '/portfolio/reports-vault': { module: 'portfolio', subModule: 'pv11-documents' },
+  '/portfolio/e-signatures': { module: 'portfolio', subModule: 'pv11-documents' },
+  '/portfolio/mailer-lists': { module: 'portfolio', subModule: 'pv11-documents' },
+  '/portfolio/settings': { module: 'portfolio', subModule: 'pv11-settings' },
+  '/portfolio/analytics': { module: 'portfolio', subModule: 'pv11-dashboard' },
+  '/portfolio/applicant-portal': { module: 'portfolio', subModule: 'pv11-deals' },
 
   // Application Portal routes
   '/application-portal': { module: 'application-portal' },
@@ -133,45 +230,179 @@ const routePermissions: Record<string, { module: string; subModule?: string }> =
   '/admin/roles': { module: 'admin-management', subModule: 'role-management' },
 }
 
+/**
+ * LP paths that were merged into a combined screen. Each of these used to be a
+ * page component containing nothing but `redirect(...)`; see the note at the
+ * use site for why that produced a blank page rather than a redirect.
+ */
+const LP_MERGED_SCREENS: Record<string, string> = {
+  '/lp-portal/capital-calls': '/lp-portal/capital-activity?tab=calls',
+  '/lp-portal/distributions': '/lp-portal/capital-activity?tab=distributions',
+  '/lp-portal/dealing': '/lp-portal/subscriptions-redemptions',
+  '/lp-portal/vault': '/lp-portal/documents',
+  '/lp-portal/ledger': '/lp-portal/account-activity',
+  '/lp-portal/messages': '/lp-portal/requests?tab=messages',
+  '/lp-portal/colleagues': '/lp-portal/organisation',
+  '/lp-portal/reports': '/lp-portal/documents?category=Fund%20Reports',
+  '/lp-portal/investments/commitment': '/lp-portal#capital-position',
+  '/lp-portal/investments/capital-account': '/lp-portal/account-activity?structure=private-capital',
+  '/lp-portal/investments/investor-account': '/lp-portal#open-ended-account',
+  '/lp-portal/investments/holdings': '/lp-portal/account-activity?structure=open-ended',
+}
+
 export function middleware(request: NextRequest) {
   const token = request.cookies.get(process.env.NEXT_PUBLIC_AUTH_TOKEN_KEY || 'token')
   const userProfile = request.cookies.get(process.env.NEXT_PUBLIC_AUTH_PROFILE_KEY || 'userProfile')
 
   const { pathname } = request.nextUrl
 
-  // Legacy /performance → current Performance Management (V22)
-  if (
-    pathname === "/performance" ||
-    (pathname.startsWith("/performance/") && !pathname.startsWith("/performance-v22"))
-  ) {
-    return NextResponse.redirect(new URL("/performance-v22", request.url))
+  // Permanent rename: /portfolio-v11 → /portfolio
+  if (pathname === '/portfolio-v11' || pathname.startsWith('/portfolio-v11/')) {
+    const dest = pathname.replace(/^\/portfolio-v11/, '/portfolio') || '/portfolio'
+    const url = request.nextUrl.clone()
+    url.pathname = dest
+    return NextResponse.redirect(url, 308)
   }
 
-  // Pass-through routes: always render regardless of auth state.
-  // These are public-facing pages reached via shared links (RSVP tokens,
-  // vendor quotation submissions, public tenders, KYC token forms, etc.)
-  // Logged-in users opening these links must NOT be bounced to /admin.
-  const passThroughRoutes = [
-    '/permissions-matrix',
-    '/events/rsvp',           // /events/rsvp/[token] — invitee RSVP page
-    '/events/public',         // /events/public/[id] — public event details
-    '/vendor/quotation/submit', // legacy vendor quotation form
-    '/vendor/invoice/submit',   // legacy vendor invoice form
-    '/vendor-quote',          // /vendor-quote/[rfqNumber]/[requisitionId] — quote submission via shared link
-    '/vendor-portal',         // vendor portal incl. /kyc/[token], /rfq/[rfqNumber], /register
-    '/public-tenders',        // public tender browsing
-    '/applications/form',     // public application form
-    '/vendor-quotations',     // vendor quotation submission routes
-    '/home-v3',               // Home Version 3 mock — public preview (no API / no login)
-    '/portfolio-v11',         // Portfolio V11 client design — public preview
-    '/payroll-v6',            // Payroll HR V6 client design — public preview
-    '/performance-v22',       // Performance Management V22.1 client design — public preview
-    '/fundraising-kyc',       // Investor KYC onboarding client design — public preview
-    '/investee-portal-v8',    // Investee Portal V8 client design — public preview
-    '/broker-instruction',    // Broker magic-link reply to trade instruction (no login)
-    '/[token]'
-  ]
-  if (passThroughRoutes.some((route) => pathname.startsWith(route))) {
+  // Permanent rename: /payroll-v6 → /payroll. The frozen legacy payroll module
+  // moved to /payroll-legacy to free the name, as accounting and performance did.
+  if (pathname === '/payroll-v6' || pathname.startsWith('/payroll-v6/')) {
+    const dest = pathname.replace(/^\/payroll-v6/, '/payroll') || '/payroll'
+    const url = request.nextUrl.clone()
+    url.pathname = dest
+    return NextResponse.redirect(url, 308)
+  }
+
+  // Merged LP screens: keep the superseded paths working.
+  //
+  // These were page components whose whole body was `redirect(...)`. That does
+  // not work from a page here: the throw is streamed as a NEXT_REDIRECT error
+  // instead of being committed as an HTTP redirect, and nothing acts on it — so
+  // each of these paths served 200 with an empty <main>. A blank page, with the
+  // app hydrated and healthy. Two live links reached them: the LP dashboard's
+  // "Reports" link and the ledger entry sheet's call-notice deep link.
+  //
+  // Redirecting here is HTTP-level and cannot be swallowed, and it is where this
+  // file already handles /portfolio-v11 and /payroll-v6. Incoming query is
+  // merged over the target's defaults so /lp-portal/vault?documentId=X keeps the
+  // document it asked for — the page component dropped it even in principle.
+  const lpMergedTarget =
+    LP_MERGED_SCREENS[pathname] ??
+    (pathname === '/lp-portal/investments' || pathname.startsWith('/lp-portal/investments/')
+      ? '/lp-portal'
+      : undefined)
+  if (lpMergedTarget) {
+    const dest = new URL(lpMergedTarget, request.url)
+    request.nextUrl.searchParams.forEach((value, key) => dest.searchParams.set(key, value))
+    return NextResponse.redirect(dest, 307)
+  }
+
+  // External LP / investee / apply portals: strict route allowlist (separate deployments).
+  if (PORTAL_ID === 'lp' || PORTAL_ID === 'investee') {
+    if (pathname === '/') {
+      const dest = token ? portalHomePath(PORTAL_ID) : '/login'
+      return NextResponse.redirect(new URL(dest, request.url))
+    }
+    if (!isPathAllowedForPortal(pathname, PORTAL_ID)) {
+      return NextResponse.redirect(new URL(portalHomePath(PORTAL_ID), request.url))
+    }
+  }
+
+  // Apply portal: public funding form only — no auth, no staff chrome.
+  if (PORTAL_ID === 'apply') {
+    if (pathname === '/' || pathname === '') {
+      return NextResponse.redirect(new URL('/funding-application', request.url))
+    }
+    if (!isPathAllowedForPortal(pathname, PORTAL_ID)) {
+      return NextResponse.redirect(new URL('/funding-application', request.url))
+    }
+    return NextResponse.next()
+  }
+
+  // Vendor portal: public vendor workflows - no auth, no staff chrome.
+  if (PORTAL_ID === 'vendor') {
+    if (!isPathAllowedForPortal(pathname, PORTAL_ID)) {
+      return NextResponse.redirect(new URL('/vendor-portal', request.url))
+    }
+    return NextResponse.next()
+  }
+
+  // Events portal: public events workflows - no auth, no staff chrome.
+  if (PORTAL_ID === 'events') {
+    if (!isPathAllowedForPortal(pathname, PORTAL_ID)) {
+      return NextResponse.redirect(new URL('/events/public', request.url))
+    }
+    return NextResponse.next()
+  }
+
+  // Staff portal: send external portal paths to their dedicated domains.
+  if (PORTAL_ID === 'staff') {
+    if (pathname === '/' && token) {
+      return NextResponse.redirect(new URL(portalHomePath(PORTAL_ID), request.url))
+    }
+    if (pathname.startsWith('/lp-portal')) {
+      const suffix = pathname.replace(/^\/lp-portal/, '') || ''
+      return NextResponse.redirect(`${LP_PORTAL_EXTERNAL_URL}${suffix}`)
+    }
+    if (pathname.startsWith('/application-portal') || pathname.startsWith('/investee-portal-v8')) {
+      const suffix = pathname.startsWith('/investee-portal-v8')
+        ? pathname.replace(/^\/investee-portal-v8/, '')
+        : pathname.replace(/^\/application-portal/, '')
+      const base = INVESTEE_PORTAL_EXTERNAL_URL.replace(/\/$/, '')
+      return NextResponse.redirect(`${base}/investee-portal-v8${suffix}`)
+    }
+    if (
+      shouldRedirectVendorToPortal() &&
+      /^https?:\/\//i.test(VENDOR_PORTAL_EXTERNAL_URL) &&
+      (pathname.startsWith('/vendor-portal') || pathname.startsWith('/vendor/') || pathname.startsWith('/vendor-quotations') || pathname.startsWith('/public-tenders'))
+    ) {
+      // The vendor build serves these same paths (VENDOR_PREFIXES), so forward the whole path and
+      // the query. Stripping the prefix turned /vendor-quotations/rfq-respond into
+      // "-quotations/rfq-respond" (the alternation matched `vendor` first) and dropped the signed
+      // token that RFQ invitation and PO invoice emails carry.
+      const base = VENDOR_PORTAL_EXTERNAL_URL.replace(/\/$/, '')
+      return NextResponse.redirect(`${base}${pathname}${request.nextUrl.search}`)
+    }
+    if (
+      shouldRedirectEventsToPortal() &&
+      (pathname.startsWith('/events/rsvp') || pathname.startsWith('/events/public') || pathname.startsWith('/events/feedback'))
+    ) {
+      const suffix = pathname.replace(/^\/events/, '') || ''
+      return NextResponse.redirect(`${EVENTS_PORTAL_EXTERNAL_URL}/events${suffix}`)
+    }
+
+    if (
+      shouldRedirectFundingApplicationToApplyPortal() &&
+      (pathname === '/funding-application' || pathname.startsWith('/funding-application/'))
+    ) {
+      const suffix = pathname.replace(/^\/funding-application/, '') || ''
+      return NextResponse.redirect(
+        `${APPLY_PORTAL_EXTERNAL_URL.replace(/\/$/, '')}/funding-application${suffix}`,
+      )
+    }
+  }
+
+  // Investee deployment: legacy application-portal → V8 UI
+  if (PORTAL_ID === 'investee' && pathname.startsWith('/application-portal')) {
+    const suffix = pathname.replace(/^\/application-portal/, '') || ''
+    return NextResponse.redirect(new URL(`/investee-portal-v8${suffix}`, request.url))
+  }
+
+
+  // Legacy /performance-v22 → canonical /performance (Matanho UI)
+  if (pathname === "/performance-v22" || pathname.startsWith("/performance-v22/")) {
+    const suffix = pathname.replace(/^\/performance-v22/, "") || ""
+    return NextResponse.redirect(new URL(`/performance${suffix}`, request.url))
+  }
+
+  // Legacy /home-v3 → /home
+  if (pathname === "/home-v3" || pathname.startsWith("/home-v3/")) {
+    const suffix = pathname.replace(/^\/home-v3/, "") || ""
+    return NextResponse.redirect(new URL(`/home${suffix}`, request.url))
+  }
+
+  // Pass-through routes (staff portal only — public/token pages stay on staff domain).
+  if (PORTAL_ID === 'staff' && isStaffPublicPassThrough(pathname)) {
     return NextResponse.next()
   }
 
@@ -193,15 +424,65 @@ export function middleware(request: NextRequest) {
       const profile = JSON.parse(decodeURIComponent(userProfile.value))
       const roleName = profile.role?.name?.toLowerCase()
 
-      // Redirect applicants to their portal, everyone else to admin
-      if (roleName === 'applicant') {
-        return NextResponse.redirect(new URL('/application-portal', request.url))
+      if (PORTAL_ID === 'lp') {
+        return NextResponse.redirect(new URL('/lp-portal', request.url))
+      }
+      if (PORTAL_ID === 'investee' || roleName === 'applicant') {
+        return NextResponse.redirect(new URL('/investee-portal-v8', request.url))
       }
 
-      return NextResponse.redirect(new URL('/admin', request.url))
+      return NextResponse.redirect(new URL(portalHomePath(PORTAL_ID), request.url))
     } catch (error) {
       console.error('Error parsing user profile:', error)
     }
+  }
+
+  // A password we issued must be replaced before anything else is reachable. An invited investor
+  // signs in with a temporary password emailed to them; until they choose their own, every route
+  // except the set-password screen itself bounces back to it. Enforced here rather than only on
+  // the login redirect, so typing a URL cannot walk around the requirement.
+  if (token && !isAuthRoute(pathname) && pathname !== '/set-password') {
+    const userCookie = request.cookies.get(process.env.NEXT_PUBLIC_AUTH_USER_KEY || 'user')
+    if (userCookie?.value) {
+      try {
+        const parsed = JSON.parse(decodeURIComponent(userCookie.value))
+        if (parsed?.mustChangePassword === true) {
+          return NextResponse.redirect(new URL('/set-password', request.url))
+        }
+      } catch {
+        // An unparseable cookie is handled by the existing profile checks below; it is not this
+        // guard's business to sign anyone out.
+      }
+    }
+  }
+
+  // LP / investee portals: require auth; investee also rejects non-applicant cookies at the edge.
+  if (PORTAL_ID === 'lp' || PORTAL_ID === 'investee') {
+    if (!token && !isAuthRoute(pathname)) {
+      const loginUrl = new URL('/login', request.url)
+      loginUrl.searchParams.set('from', pathname)
+      return NextResponse.redirect(loginUrl)
+    }
+
+    if (PORTAL_ID === 'investee' && token && userProfile && !isAuthRoute(pathname)) {
+      try {
+        const profile = JSON.parse(decodeURIComponent(userProfile.value))
+        const roleName = String(profile.role?.name || profile.roleCode || '').toLowerCase()
+        if (roleName !== 'applicant' && profile.roleCode?.toLowerCase() !== 'applicant') {
+          const loginUrl = new URL('/login', request.url)
+          loginUrl.searchParams.set('from', pathname)
+          const res = NextResponse.redirect(loginUrl)
+          res.cookies.delete(process.env.NEXT_PUBLIC_AUTH_TOKEN_KEY || 'token')
+          res.cookies.delete(process.env.NEXT_PUBLIC_AUTH_USER_KEY || 'user')
+          res.cookies.delete(process.env.NEXT_PUBLIC_AUTH_PROFILE_KEY || 'userProfile')
+          return res
+        }
+      } catch {
+        /* fall through — client will resolve session */
+      }
+    }
+
+    return NextResponse.next()
   }
 
   // If accessing protected route without auth, redirect to login
@@ -220,7 +501,7 @@ export function middleware(request: NextRequest) {
 
       // Skip permission checks if already on an error page or accessing homepage
       const isErrorRedirect = request.nextUrl.searchParams.has('error')
-      const isHomePage = pathname === '/admin' || pathname === '/'
+      const isHomePage = pathname === '/admin' || pathname === '/' || pathname === '/home'
 
       // Applicants can only access application portal
       if (roleName === 'applicant') {

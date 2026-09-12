@@ -8,8 +8,10 @@ import { ClientDesignAppSwitcher } from "./client-design-app-switcher"
 import { ArcusAppSwitcherProvider } from "./arcus-app-switcher-provider"
 import { FundraisingKycApp } from "@/components/fundraising-kyc-mock/fundraising-kyc-app"
 import { MODULE_CONFIG, getModuleByPath } from "@/lib/config/modules"
+import { useBrandLogoOverride } from "@/lib/client-design-mock/brand-logo-override"
 
 export function FundraisingKycLayout({ children }: { children: React.ReactNode }) {
+  useBrandLogoOverride()
   const [currentModule, setCurrentModule] = useState("fundraising-kyc")
   const pathname = usePathname()
 
@@ -37,8 +39,8 @@ export function FundraisingKycLayout({ children }: { children: React.ReactNode }
 
   return (
     <ArcusAppSwitcherProvider currentModule={currentModule}>
-      <div className="flex h-dvh flex-col overflow-hidden bg-[#f4f7f6]">
-        <SharedTopbar onModuleSelect={handleModuleSelect} currentModule={currentModule} />
+      <div className="flex h-dvh flex-col overflow-hidden bg-[#f4f7f6]" data-module="fundraising-kyc">
+        <SharedTopbar onModuleSelect={handleModuleSelect} currentModule={currentModule} hideThemeToggle />
         <div className="min-h-0 flex-1 overflow-hidden">
           <Suspense fallback={<div className="p-8 text-sm text-[#64748B]">Loading Investor KYC…</div>}>
             <FundraisingKycApp />

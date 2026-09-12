@@ -45,10 +45,10 @@ export function CellStateBadge({
   return (
     <span
       className={cn(
-        "inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium",
+        "inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] font-medium",
         (s === "INPUT" || s === "OVERRIDE") && "bg-[#eff6ff] text-[#1d4ed8]",
-        (s === "CALCULATED" || s === "PENDING_CALCULATION") && "bg-[#f1f5f9] text-[#475569]",
-        (s === "ACTUAL" || s === "IMPORTED" || s === "LOCKED") && "bg-[#f8fafc] text-[#64748b]",
+        (s === "CALCULATED" || s === "PENDING_CALCULATION") && "bg-[#f1f5f9] text-[#111111]",
+        (s === "ACTUAL" || s === "IMPORTED" || s === "LOCKED") && "bg-[#f8fafc] text-[#111111]",
         s === "ERROR" && "bg-[#fef2f2] text-[#b91c1c]",
         className,
       )}

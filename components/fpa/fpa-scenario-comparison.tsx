@@ -46,7 +46,7 @@ const TONE_COLORS = {
   best: { border: "border-[#12b76a]/30", bg: "bg-[#edfcf2]", text: "text-[#087443]", dot: "#12b76a" },
   base: { border: "border-[#3538cd]/30", bg: "bg-[#eef4ff]", text: "text-[#3538cd]", dot: "#3b82f6" },
   downside: { border: "border-[#f04438]/30", bg: "bg-[#fef3f2]", text: "text-[#b42318]", dot: "#f04438" },
-  generic: { border: "border-[#667085]/30", bg: "bg-[#f8fafc]", text: "text-[#344054]", dot: "#667085" },
+  generic: { border: "border-[#667085]/30", bg: "bg-[#f8fafc]", text: "text-[#111111]", dot: "#667085" },
 }
 
 function getToneStyle(name: string) {
@@ -585,16 +585,16 @@ export function FpaScenarioComparison() {
       <div className="bg-white border-b border-[#e4e7ec] w-full">
         <div className="px-4 sm:px-5 pt-4 pb-3 flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h1 className="text-[18px] font-semibold text-[#101828]">Scenarios</h1>
-            <p className="text-[12px] text-[#667085] mt-0.5">
+            <h1 className="text-[18px] font-semibold text-[#000000]">Scenarios</h1>
+            <p className="text-[12px] text-[#111111] mt-0.5">
               Stage 4 · Create Best / Downside from Base, compare metrics, promote forecast (SRD §38–40)
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <label className="flex items-center gap-1.5 text-[11px] text-[#667085]">
+            <label className="flex items-center gap-1.5 text-[11px] text-[#111111]">
               Model
               <select
-                className="h-9 rounded-full border border-[#d0d5dd] bg-white px-3 text-xs font-semibold text-[#101828]"
+                className="h-9 rounded-full border border-[#d0d5dd] bg-white px-3 text-xs font-semibold text-[#000000]"
                 value={selectedModelId || ""}
                 onChange={(e) => {
                   const id = e.target.value || null
@@ -640,7 +640,7 @@ export function FpaScenarioComparison() {
 
       <div className="p-4 sm:p-5 space-y-4 w-full flex-1">
         {!selectedModelId ? (
-          <p className="text-sm text-[#667085]">
+          <p className="text-sm text-[#111111]">
             Select a model above (or open this page from a planning worksheet) to load live scenarios.
           </p>
         ) : null}
@@ -661,10 +661,10 @@ export function FpaScenarioComparison() {
             {/* Scenarios Cards list with inheritances */}
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <h3 className="text-[14px] font-semibold text-[#101828]">Available Planning Scenarios</h3>
-                <span className="text-[11px] text-[#667085] inline-flex items-center gap-2">
+                <h3 className="text-[14px] font-semibold text-[#000000]">Available Planning Scenarios</h3>
+                <span className="text-[11px] text-[#111111] inline-flex items-center gap-2">
                   {compareLoading ? (
-                    <span className="inline-flex items-center gap-1 text-[#667085]">
+                    <span className="inline-flex items-center gap-1 text-[#111111]">
                       <Loader2 className="size-3 animate-spin" /> Comparing…
                     </span>
                   ) : null}
@@ -672,7 +672,7 @@ export function FpaScenarioComparison() {
                 </span>
               </div>
               {!list.length ? (
-                <div className="rounded-xl border border-dashed border-[#d0d5dd] bg-white px-4 py-10 text-center text-[13px] text-[#667085]">
+                <div className="rounded-xl border border-dashed border-[#d0d5dd] bg-white px-4 py-10 text-center text-[13px] text-[#111111]">
                   No scenarios on this model yet. Create Best / Downside from Base to start Stage 4.
                 </div>
               ) : null}
@@ -696,22 +696,22 @@ export function FpaScenarioComparison() {
                     >
                       <div>
                         <div className="flex items-start justify-between gap-1.5">
-                          <h4 className="text-[13px] font-bold text-[#101828] truncate">{s.name}</h4>
+                          <h4 className="text-[13px] font-bold text-[#000000] truncate">{s.name}</h4>
                           <span
                             className={cn(
-                              "text-[8.5px] uppercase tracking-wider font-bold px-1.5 py-0.5 rounded-full shrink-0",
-                              on ? "bg-white/80" : "bg-[#f2f4f7] text-[#667085]",
+                              "text-[11px] uppercase tracking-wider font-bold px-1.5 py-0.5 rounded-full shrink-0",
+                              on ? "bg-white/80" : "bg-[#f2f4f7] text-[#111111]",
                             )}
                             style={{ color: on ? tone.text : undefined }}
                           >
                             {s.scenarioType || "Draft"}
                           </span>
                         </div>
-                        <p className="text-[10px] text-[#667085] mt-1.5">
+                        <p className="text-[11px] text-[#111111] mt-1.5">
                           Inherits: <span className="font-semibold">{scenarioInheritsLabel(s, list)}</span>
                         </p>
                         {s.status ? (
-                          <p className="text-[10px] text-[#98a2b3] mt-0.5">Status: {s.status}</p>
+                          <p className="text-[11px] text-[#141414] mt-0.5">Status: {s.status}</p>
                         ) : null}
                       </div>
 
@@ -721,7 +721,7 @@ export function FpaScenarioComparison() {
                           type="button"
                           disabled={busy}
                           onClick={() => void duplicateScenario(s.id)}
-                          className="text-[10.5px] font-semibold text-[#2563eb] hover:underline inline-flex items-center gap-0.5 disabled:opacity-50"
+                          className="text-[11px] font-semibold text-[#2563eb] hover:underline inline-flex items-center gap-0.5 disabled:opacity-50"
                         >
                           {busy ? <Loader2 className="w-2.5 h-2.5 animate-spin" /> : <Copy className="w-2.5 h-2.5" />}{" "}
                           Duplicate
@@ -729,7 +729,7 @@ export function FpaScenarioComparison() {
                         {worksheetHref ? (
                           <a
                             href={worksheetHref}
-                            className="text-[10.5px] font-semibold text-[#667085] hover:underline"
+                            className="text-[11px] font-semibold text-[#111111] hover:underline"
                           >
                             Open plan
                           </a>
@@ -739,7 +739,7 @@ export function FpaScenarioComparison() {
                             type="button"
                             disabled={busy}
                             onClick={() => void promoteScenario(s.id)}
-                            className="text-[10.5px] font-semibold text-[#2563eb] hover:underline inline-flex items-center gap-0.5 disabled:opacity-50"
+                            className="text-[11px] font-semibold text-[#2563eb] hover:underline inline-flex items-center gap-0.5 disabled:opacity-50"
                           >
                             <ArrowUpRight className="w-2.5 h-2.5" /> Promote
                           </button>
@@ -749,7 +749,7 @@ export function FpaScenarioComparison() {
                             type="button"
                             disabled={busy}
                             onClick={() => void archiveScenario(s.id)}
-                            className="text-[10.5px] font-semibold text-[#b42318] hover:underline disabled:opacity-50"
+                            className="text-[11px] font-semibold text-[#b42318] hover:underline disabled:opacity-50"
                           >
                             Archive
                           </button>
@@ -765,24 +765,24 @@ export function FpaScenarioComparison() {
             <section className="rounded-xl border border-[#eaecf0] bg-white shadow-sm overflow-hidden">
               <div className="px-5 py-3.5 border-b border-[#eaecf0] flex flex-wrap items-center justify-between gap-3 bg-white">
                 <div>
-                  <h2 className="text-[15px] font-semibold text-[#101828]">Metric Side-by-Side Analysis</h2>
-                  <p className="text-[12px] text-[#667085] mt-0.5">Variance compared to anchor scenario: <span className="font-semibold">{list.find(x => x.id === anchorId)?.name || "Anchor"}</span></p>
+                  <h2 className="text-[15px] font-semibold text-[#000000]">Metric Side-by-Side Analysis</h2>
+                  <p className="text-[12px] text-[#111111] mt-0.5">Variance compared to anchor scenario: <span className="font-semibold">{list.find(x => x.id === anchorId)?.name || "Anchor"}</span></p>
                 </div>
                 <div className="flex items-center gap-3 shrink-0">
                   {/* Search Metrics */}
                   <div className="relative">
-                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[#98a2b3]" />
+                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[#141414]" />
                     <input
                       type="text"
                       placeholder="Search metrics..."
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      className="h-8 w-44 rounded-lg border border-[#d0d5dd] pl-8 pr-3 text-xs text-[#101828] placeholder:text-[#98a2b3] focus:outline-none focus:ring-1 focus:ring-[#2563eb]"
+                      className="h-8 w-44 rounded-lg border border-[#d0d5dd] pl-8 pr-3 text-xs text-[#000000] placeholder:text-[#141414] focus:outline-none focus:ring-1 focus:ring-[#2563eb]"
                     />
                   </div>
 
                   {/* Anchor Selector */}
-                  <div className="flex items-center gap-1.5 text-xs text-[#344054]">
+                  <div className="flex items-center gap-1.5 text-xs text-[#111111]">
                     <span>Anchor:</span>
                     <select
                       className="h-8 rounded-lg border border-[#d0d5dd] px-2 text-xs font-semibold bg-white cursor-pointer"
@@ -804,7 +804,7 @@ export function FpaScenarioComparison() {
                       onClick={() => setMetricUnit("%")}
                       className={cn(
                         "px-2.5 py-0.5 text-[11px] font-semibold rounded-md transition-colors",
-                        metricUnit === "%" ? "bg-white text-[#101828] shadow-sm" : "text-[#667085]",
+                        metricUnit === "%" ? "bg-white text-[#000000] shadow-sm" : "text-[#111111]",
                       )}
                     >
                       %
@@ -814,7 +814,7 @@ export function FpaScenarioComparison() {
                       onClick={() => setMetricUnit("$")}
                       className={cn(
                         "px-2.5 py-0.5 text-[11px] font-semibold rounded-md transition-colors",
-                        metricUnit === "$" ? "bg-white text-[#101828] shadow-sm" : "text-[#667085]",
+                        metricUnit === "$" ? "bg-white text-[#000000] shadow-sm" : "text-[#111111]",
                       )}
                     >
                       $
@@ -826,7 +826,7 @@ export function FpaScenarioComparison() {
               <div className="overflow-x-auto">
                 <table className="w-full border-collapse text-[13px] min-w-[800px]">
                   <thead>
-                    <tr className="border-b border-[#eaecf0] bg-[#f9fafb] text-[#475467]">
+                    <tr className="border-b border-[#eaecf0] bg-[#f9fafb] text-[#111111]">
                       <th className="text-left px-5 py-2 font-semibold w-1/4">Metric</th>
                       {list.filter(s => selectedIds.includes(s.id)).map((s) => (
                         <th key={s.id} className="px-4 py-2 text-right font-semibold whitespace-nowrap">
@@ -840,7 +840,7 @@ export function FpaScenarioComparison() {
                   <tbody className="divide-y divide-[#eaecf0]">
                     {filteredRows.map((row) => (
                       <tr key={row.code} className="hover:bg-[#f9fafb]/55 transition-colors">
-                        <td className="px-5 py-2 font-medium text-[#101828]">{row.label}</td>
+                        <td className="px-5 py-2 font-medium text-[#000000]">{row.label}</td>
                         {list.filter(s => selectedIds.includes(s.id)).map((s) => {
                           const val = row.byScenario[s.id]
                           const anchorVal = row.byScenario[anchorId || ""]
@@ -857,15 +857,15 @@ export function FpaScenarioComparison() {
                           }
 
                           return (
-                            <td key={s.id} className="px-4 py-2 text-right tabular-nums text-[#344054]">
+                            <td key={s.id} className="px-4 py-2 text-right tabular-nums text-[#111111]">
                               {displayVal}
                             </td>
                           )
                         })}
-                        <td className="px-4 py-2 text-right tabular-nums font-semibold text-[#101828]">
+                        <td className="px-4 py-2 text-right tabular-nums font-semibold text-[#000000]">
                           {row.varianceAbs == null ? "—" : row.isPct ? `${row.varianceAbs >= 0 ? "+" : ""}${row.varianceAbs.toFixed(1)} pp` : formatMetric(row.varianceAbs, { pct: row.isPct, count: row.isCount })}
                         </td>
-                        <td className="px-4 py-2 text-right tabular-nums font-semibold text-[#101828]">
+                        <td className="px-4 py-2 text-right tabular-nums font-semibold text-[#000000]">
                           {row.variancePct == null ? "—" : `${row.variancePct >= 0 ? "+" : ""}${row.variancePct.toFixed(1)}%`}
                         </td>
                       </tr>
@@ -881,8 +881,8 @@ export function FpaScenarioComparison() {
               <section className="xl:col-span-5 rounded-xl border border-[#eaecf0] bg-white p-4 shadow-sm flex flex-col justify-between">
                 <div className="flex items-center justify-between mb-4">
                   <div>
-                    <h3 className="text-[14px] font-semibold text-[#101828]">Waterfall Bridge Variance</h3>
-                    <p className="text-[11px] text-[#667085] mt-0.5">
+                    <h3 className="text-[14px] font-semibold text-[#000000]">Waterfall Bridge Variance</h3>
+                    <p className="text-[11px] text-[#111111] mt-0.5">
                       {list.find((x) => x.id === anchorId)?.name || "Anchor"} →{" "}
                       {list.find((x) => x.id === selectedIds.find((id) => id !== anchorId))?.name ||
                         "Comparison"}
@@ -892,9 +892,9 @@ export function FpaScenarioComparison() {
                     type="button"
                     onClick={openWaterfallConfig}
                     disabled={!waterfallBars.length}
-                    className="h-7 inline-flex items-center gap-1 rounded-full border border-[#d0d5dd] px-2.5 text-[11px] font-medium text-[#344054] hover:bg-[#f9fafb] disabled:opacity-40"
+                    className="h-7 inline-flex items-center gap-1 rounded-full border border-[#d0d5dd] px-2.5 text-[11px] font-medium text-[#111111] hover:bg-[#f9fafb] disabled:opacity-40"
                   >
-                    <Sliders className="w-3 h-3 text-[#475467]" />
+                    <Sliders className="w-3 h-3 text-[#111111]" />
                     Configure
                   </button>
                 </div>
@@ -907,14 +907,14 @@ export function FpaScenarioComparison() {
               {/* Assumptions ranges tracks */}
               <section className="xl:col-span-7 rounded-xl border border-[#eaecf0] bg-white p-4 shadow-sm flex flex-col justify-between">
                 <div className="mb-4">
-                  <h3 className="text-[14px] font-semibold text-[#101828]">Scenario Assumptions Ranges</h3>
-                  <p className="text-[11px] text-[#667085] mt-0.5">Visual representation of growth drivers across selected scenarios</p>
+                  <h3 className="text-[14px] font-semibold text-[#000000]">Scenario Assumptions Ranges</h3>
+                  <p className="text-[11px] text-[#111111] mt-0.5">Visual representation of growth drivers across selected scenarios</p>
                 </div>
 
                 <div className="flex-1 overflow-x-auto">
                   <table className="w-full text-[11px] border-collapse min-w-[500px]">
                     <thead>
-                      <tr className="text-left text-[#667085] border-b border-[#eaecf0] bg-white">
+                      <tr className="text-left text-[#111111] border-b border-[#eaecf0] bg-white">
                         <th className="py-2 pr-3 font-semibold w-1/4">Driver</th>
                         {list.filter(s => selectedIds.includes(s.id)).map((s) => (
                           <th key={s.id} className="py-2 px-1 font-semibold text-center w-16">
@@ -940,7 +940,7 @@ export function FpaScenarioComparison() {
 
                         return (
                           <tr key={row.name} className="hover:bg-[#f9fafb] transition-colors">
-                            <td className="py-2.5 pr-3 font-medium text-[#344054] text-[12px]">
+                            <td className="py-2.5 pr-3 font-medium text-[#111111] text-[12px]">
                               {row.name}
                             </td>
                             {list.filter(s => selectedIds.includes(s.id)).map((s) => {
@@ -956,7 +956,7 @@ export function FpaScenarioComparison() {
 
                               return (
                                 <td key={s.id} className="py-2 px-0 relative w-16">
-                                  <div className="text-[11px] font-semibold text-[#101828] text-center mb-1.5 tabular-nums">
+                                  <div className="text-[11px] font-semibold text-[#000000] text-center mb-1.5 tabular-nums">
                                     {valStr}
                                   </div>
                                   <div className="h-[2px] bg-[#eaecf0] w-full relative">
@@ -981,7 +981,7 @@ export function FpaScenarioComparison() {
                         <tr>
                           <td
                             colSpan={Math.max(1, selectedIds.length) + 1}
-                            className="py-8 text-center text-[12px] text-[#94a3b8]"
+                            className="py-8 text-center text-[12px] text-[#141414]"
                           >
                             Assumptions appear when compare returns `assumptions[]` (enriched Stage 4
                             contract).
@@ -998,17 +998,17 @@ export function FpaScenarioComparison() {
             <section className={`${R} border border-[#e4e7ec] bg-white p-4 shadow-sm w-full`}>
               <div className="flex items-center justify-between mb-3">
                 <div>
-                  <h3 className="text-[14px] font-semibold text-[#101828]">Sensitivity Drivers</h3>
-                  <p className="text-[11px] text-[#667085] mt-0.5">EBITDA impact at low / base / high assumption bands</p>
+                  <h3 className="text-[14px] font-semibold text-[#000000]">Sensitivity Drivers</h3>
+                  <p className="text-[11px] text-[#111111] mt-0.5">EBITDA impact at low / base / high assumption bands</p>
                 </div>
-                <button type="button" onClick={() => toast.message("Sensitivity matrix", { description: "Driver shocks applied to Base Case revenue model" })} className="text-[#98a2b3] hover:text-[#667085]">
+                <button type="button" onClick={() => toast.message("Sensitivity matrix", { description: "Driver shocks applied to Base Case revenue model" })} className="text-[#141414] hover:text-[#111111]">
                   <Info className="size-4" />
                 </button>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm min-w-[560px]">
                   <thead>
-                    <tr className="border-b border-[#e4e7ec] text-left text-xs text-[#667085] bg-[#f9fafb]">
+                    <tr className="border-b border-[#e4e7ec] text-left text-xs text-[#111111] bg-[#f9fafb]">
                       <th className="px-4 py-3 font-medium">Driver</th>
                       <th className="px-4 py-3 font-medium text-right">Low</th>
                       <th className="px-4 py-3 font-medium text-right">Base</th>
@@ -1026,15 +1026,15 @@ export function FpaScenarioComparison() {
                           })
                         }
                       >
-                        <td className="px-4 py-3 font-medium text-[#101828]">{row.driverName}</td>
+                        <td className="px-4 py-3 font-medium text-[#000000]">{row.driverName}</td>
                         <td className="px-4 py-3 text-right tabular-nums text-[#f04438]">{row.low}</td>
-                        <td className="px-4 py-3 text-right tabular-nums text-[#667085]">{row.base}</td>
+                        <td className="px-4 py-3 text-right tabular-nums text-[#111111]">{row.base}</td>
                         <td className="px-4 py-3 text-right tabular-nums text-[#12b76a]">{row.high}</td>
                       </tr>
                     ))}
                     {!sensitivityRows.length ? (
                       <tr>
-                        <td colSpan={4} className="px-4 py-6 text-center text-[12px] text-[#94a3b8]">
+                        <td colSpan={4} className="px-4 py-6 text-center text-[12px] text-[#141414]">
                           Sensitivity rows appear when the compare API returns them.
                         </td>
                       </tr>
@@ -1045,7 +1045,7 @@ export function FpaScenarioComparison() {
             </section>
           </>
         ) : loading ? (
-          <div className="flex items-center gap-2 py-12 text-[#64748b]">
+          <div className="flex items-center gap-2 py-12 text-[#111111]">
             <Loader2 className="w-5 h-5 animate-spin" /> Loading scenarios…
           </div>
         ) : null}
@@ -1055,24 +1055,24 @@ export function FpaScenarioComparison() {
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
         <DialogContent className="sm:max-w-md max-h-[85vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="text-[16px] font-semibold text-[#101828]">
+            <DialogTitle className="text-[16px] font-semibold text-[#000000]">
               New planning scenario
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-1.5">
-              <label className="text-[12px] font-medium text-[#344054]">Name</label>
+              <label className="text-[12px] font-medium text-[#111111]">Name</label>
               <input
-                className="h-10 w-full rounded-lg border border-[#d0d5dd] px-3 text-sm text-[#101828]"
+                className="h-10 w-full rounded-lg border border-[#d0d5dd] px-3 text-sm text-[#000000]"
                 placeholder="e.g. Downside Case"
                 value={createName}
                 onChange={(e) => setCreateName(e.target.value)}
               />
             </div>
             <div className="space-y-1.5">
-              <label className="text-[12px] font-medium text-[#344054]">Type</label>
+              <label className="text-[12px] font-medium text-[#111111]">Type</label>
               <select
-                className="h-10 w-full rounded-lg border border-[#d0d5dd] px-3 text-sm font-medium text-[#101828] bg-white"
+                className="h-10 w-full rounded-lg border border-[#d0d5dd] px-3 text-sm font-medium text-[#000000] bg-white"
                 value={createType}
                 onChange={(e) => setCreateType(e.target.value)}
               >
@@ -1084,16 +1084,16 @@ export function FpaScenarioComparison() {
               </select>
             </div>
             <div className="space-y-1.5">
-              <label className="text-[12px] font-medium text-[#344054]">Description (optional)</label>
+              <label className="text-[12px] font-medium text-[#111111]">Description (optional)</label>
               <textarea
-                className="min-h-[72px] w-full rounded-lg border border-[#d0d5dd] px-3 py-2 text-sm text-[#101828]"
+                className="min-h-[72px] w-full rounded-lg border border-[#d0d5dd] px-3 py-2 text-sm text-[#000000]"
                 placeholder="What diverges from Base?"
                 value={createDescription}
                 onChange={(e) => setCreateDescription(e.target.value)}
               />
             </div>
             <div className="space-y-2">
-              <p className="text-[12px] font-medium text-[#344054]">Seed</p>
+              <p className="text-[12px] font-medium text-[#111111]">Seed</p>
               <label className="flex items-start gap-2 rounded-lg border border-[#eaecf0] p-3 cursor-pointer hover:bg-[#f9fafb]">
                 <input
                   type="radio"
@@ -1101,9 +1101,9 @@ export function FpaScenarioComparison() {
                   checked={seedMode === "copy_base"}
                   onChange={() => setSeedMode("copy_base")}
                 />
-                <span className="text-[12px] text-[#344054]">
+                <span className="text-[12px] text-[#111111]">
                   <span className="font-semibold">Copy from Base</span>
-                  <span className="block text-[#667085] mt-0.5">
+                  <span className="block text-[#111111] mt-0.5">
                     Preferred (SRD §38) — inherit cells/drivers, then override on the worksheet.
                     {findBaseScenario(list)
                       ? ` Source: ${findBaseScenario(list)!.name}.`
@@ -1118,9 +1118,9 @@ export function FpaScenarioComparison() {
                   checked={seedMode === "empty"}
                   onChange={() => setSeedMode("empty")}
                 />
-                <span className="text-[12px] text-[#344054]">
+                <span className="text-[12px] text-[#111111]">
                   <span className="font-semibold">Empty shell</span>
-                  <span className="block text-[#667085] mt-0.5">
+                  <span className="block text-[#111111] mt-0.5">
                     Creates metadata only (no cell copy). Use if Base copy is unavailable.
                   </span>
                 </span>
@@ -1155,7 +1155,7 @@ export function FpaScenarioComparison() {
       <Dialog open={isWaterfallModalOpen} onOpenChange={setIsWaterfallModalOpen}>
         <DialogContent className="sm:max-w-md max-h-[85vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="text-[16px] font-semibold text-[#101828]">
+            <DialogTitle className="text-[16px] font-semibold text-[#000000]">
               Configure Bridge Values (USD M)
             </DialogTitle>
           </DialogHeader>
@@ -1164,10 +1164,10 @@ export function FpaScenarioComparison() {
               const isReadOnly = idx === 0 || idx === tempWaterfallBars.length - 1
               return (
                 <div key={bar.label} className="flex items-center justify-between gap-4">
-                  <span className="text-[13px] font-semibold text-[#344054] inline-flex items-center gap-1.5">
+                  <span className="text-[13px] font-semibold text-[#111111] inline-flex items-center gap-1.5">
                     {bar.label}
                     {isReadOnly && (
-                      <span className="text-[9px] bg-[#f2f4f7] text-[#667085] px-1.5 py-0.5 rounded-full font-bold uppercase">
+                      <span className="text-[11px] bg-[#f2f4f7] text-[#111111] px-1.5 py-0.5 rounded-full font-bold uppercase">
                         {idx === 0 ? "Start" : "Result"}
                       </span>
                     )}
@@ -1183,7 +1183,7 @@ export function FpaScenarioComparison() {
                         prev.map((b, i) => (i === idx ? { ...b, value: nextVal } : b)),
                       )
                     }}
-                    className="h-9 w-24 rounded-lg border border-[#d0d5dd] px-3 text-[13px] text-[#101828] text-right focus:outline-none focus:ring-2 focus:ring-[#2563eb]/20 disabled:bg-[#f9fafb] disabled:text-[#98a2b3]"
+                    className="h-9 w-24 rounded-lg border border-[#d0d5dd] px-3 text-[13px] text-[#000000] text-right focus:outline-none focus:ring-2 focus:ring-[#2563eb]/20 disabled:bg-[#f9fafb] disabled:text-[#141414]"
                   />
                 </div>
               )
@@ -1193,7 +1193,7 @@ export function FpaScenarioComparison() {
             <button
               type="button"
               onClick={() => setIsWaterfallModalOpen(false)}
-              className="h-9 rounded-full border border-[#d0d5dd] px-4 text-[13px] font-semibold text-[#344054] hover:bg-[#f9fafb]"
+              className="h-9 rounded-full border border-[#d0d5dd] px-4 text-[13px] font-semibold text-[#111111] hover:bg-[#f9fafb]"
             >
               Cancel
             </button>
@@ -1232,7 +1232,7 @@ function WaterfallChart({ bars }: { bars: Array<{ label: string; value: number; 
   // (Without this guard, bars[0].value throws and the error boundary blanks the page.)
   if (!bars.length) {
     return (
-      <p className="text-[12px] text-[#94a3b8] text-center px-4">
+      <p className="text-[12px] text-[#141414] text-center px-4">
         Waterfall data will appear when the compare API returns a bridge for this selection.
       </p>
     )
@@ -1315,7 +1315,7 @@ function WaterfallChart({ bars }: { bars: Array<{ label: string; value: number; 
               x={margin.left - 6}
               y={y + 3.5}
               textAnchor="end"
-              className="fill-[#667085] text-[9px] font-medium"
+              className="fill-[#667085] text-[11px] font-medium"
             >
               {tick}
             </text>
@@ -1323,7 +1323,7 @@ function WaterfallChart({ bars }: { bars: Array<{ label: string; value: number; 
         )
       })}
 
-      <text x={5} y={12} className="fill-[#667085] text-[9px] font-semibold">
+      <text x={5} y={12} className="fill-[#667085] text-[11px] font-semibold">
         USD M
       </text>
 
@@ -1365,7 +1365,7 @@ function WaterfallChart({ bars }: { bars: Array<{ label: string; value: number; 
               x={bar.x + barWidth / 2}
               y={labelY}
               textAnchor="middle"
-              className={cn("text-[9px] tabular-nums", labelColor)}
+              className={cn("text-[11px] tabular-nums", labelColor)}
             >
               {bar.displayValue}
             </text>
@@ -1373,7 +1373,7 @@ function WaterfallChart({ bars }: { bars: Array<{ label: string; value: number; 
               x={bar.x + barWidth / 2}
               y={h - 6}
               textAnchor="middle"
-              className="fill-[#667085] text-[8.5px] font-medium"
+              className="fill-[#667085] text-[11px] font-medium"
             >
               {bar.label}
             </text>

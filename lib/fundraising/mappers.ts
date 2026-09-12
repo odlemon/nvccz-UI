@@ -2,7 +2,7 @@
  * Map API records → existing Fundraising UI view models (no redesign).
  */
 import { asNumber } from '@/lib/api/fundraising-api'
-import type { InvestorOrg, KycStatus } from '@/components/fundraising/investors-mock-data'
+import type { InvestorOrg, KycStatus } from '@/components/fundraising/investors-presentation'
 
 const TYPE_LABEL: Record<string, InvestorOrg['type']> = {
   PENSION_FUND: 'Pension Fund',
@@ -415,8 +415,11 @@ export function mapDataRoomCard(raw: Record<string, any>, campaignName?: string)
     name: raw.name || 'Data Room',
     campaign: campaignName || raw.campaign?.name || raw.campaignName || '—',
     status: status === 'ACTIVE' ? 'Active' : status === 'EXPIRED' ? 'Expired' : status === 'REVOKED' ? 'Revoked' : 'Draft',
-    investorsInvited: access.length,
-    documents: documents.length || asNumber(raw.documentCount),
+    // The list endpoint returns counts under `_count` and no nested arrays; the detail
+    // endpoint returns the arrays themselves. Read whichever the payload actually carries
+    // rather than assuming one shape — reading only the arrays left these tiles on zero.
+    investorsInvited: access.length || asNumber(raw._count?.access),
+    documents: documents.length || asNumber(raw.documentCount ?? raw._count?.documents),
     views7d: asNumber(raw.views7d),
     downloads7d: asNumber(raw.downloads7d),
     expiresOn: raw.expiresOn ? fmtDate(raw.expiresOn) : '—',
@@ -1020,12 +1023,31 @@ export function titleCase(value: unknown): string {
 }
 
 /** Best-effort extraction of a row array from an analytics/report payload of unknown shape. */
+const ROW_CONTAINER_KEYS = [
+  'items', 'rows', 'stages', 'funnel', 'bySource', 'sources',
+  'byStage', 'byOwner', 'byCountry', 'data',
+]
+
 export function toRowsArray(data: unknown): Record<string, any>[] {
   if (Array.isArray(data)) return data
   if (data && typeof data === 'object') {
     const obj = data as Record<string, any>
-    for (const key of ['items', 'rows', 'stages', 'bySource', 'sources', 'byStage', 'byOwner', 'data']) {
+    for (const key of ROW_CONTAINER_KEYS) {
       if (Array.isArray(obj[key])) return obj[key]
+    }
+    // The fundraising analytics endpoints return their rows as an object keyed by code —
+    // `{ funnel: { SIGNED: { count, amount } } }`, `{ bySource: { DIRECT: {…} } }`,
+    // `{ byOwner: { <userId>: {…} } }`. Without this branch the function fell through to
+    // "top-level scalars" below and produced a single junk row reading
+    // `Campaignid | cmttz…`, which is exactly what the Forecasts tables were showing.
+    for (const key of ROW_CONTAINER_KEYS) {
+      const container = obj[key]
+      if (container && typeof container === 'object' && !Array.isArray(container)) {
+        const entries = Object.entries(container as Record<string, any>)
+        if (entries.length && entries.every(([, v]) => v && typeof v === 'object')) {
+          return entries.map(([code, metrics]) => ({ code, ...(metrics as Record<string, any>) }))
+        }
+      }
     }
     const entries = Object.entries(obj).filter(([, v]) => v != null && typeof v !== 'object')
     if (entries.length) return entries.map(([k, v]) => ({ label: titleCase(k), value: v }))

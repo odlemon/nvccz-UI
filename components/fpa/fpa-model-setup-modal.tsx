@@ -31,9 +31,9 @@ import {
 } from "@/components/fpa/setup/setup-types"
 
 const FIELD =
-  "mt-1 w-full h-9 rounded-full border border-[#e2e8f0] px-3 text-sm text-[#0f172a] bg-white"
+  "mt-1 w-full h-9 rounded-full border border-[#e2e8f0] px-3 text-sm text-[#000000] bg-white"
 const FIELD_AREA =
-  "mt-1 w-full rounded-xl border border-[#e2e8f0] px-3 py-2 text-sm text-[#0f172a] bg-white min-h-[72px]"
+  "mt-1 w-full rounded-xl border border-[#e2e8f0] px-3 py-2 text-sm text-[#000000] bg-white min-h-[72px]"
 
 const DEFAULT_LINE_PACK: SetupDraft["lineItems"] = [
   { code: "REVENUE", name: "Revenue", lineItemType: "REVENUE", category: "REVENUE" },
@@ -558,10 +558,10 @@ export function FpaModelSetupModal({ open, onClose }: Props) {
       >
         <div className="flex items-start justify-between gap-3 px-4 sm:px-5 py-3 border-b border-[#e2e8f0] shrink-0">
           <div>
-            <h2 id="fpa-setup-title" className="text-sm font-semibold text-[#0f172a]">
+            <h2 id="fpa-setup-title" className="text-sm font-semibold text-[#000000]">
               New planning model
             </h2>
-            <p className="text-[11px] text-[#64748b] mt-0.5">
+            <p className="text-[11px] text-[#111111] mt-0.5">
               Step {idx + 1} of {SETUP_STEPS.length}
               {draft.modelId
                 ? " · Model created — fix issues then re-validate"
@@ -575,7 +575,7 @@ export function FpaModelSetupModal({ open, onClose }: Props) {
               onClose()
               reset()
             }}
-            className="text-[#94a3b8] hover:text-[#475569]"
+            className="text-[#141414] hover:text-[#111111]"
             aria-label="Close"
           >
             <X className="w-4 h-4" />
@@ -598,15 +598,15 @@ export function FpaModelSetupModal({ open, onClose }: Props) {
                         "w-full flex items-center gap-2 rounded-full px-2.5 py-1.5 text-left text-[11px]",
                         active && "bg-[#eff6ff] text-[#2563eb] font-medium",
                         done && !active && "text-[#16a34a]",
-                        !active && !done && "text-[#64748b] hover:bg-white",
+                        !active && !done && "text-[#111111] hover:bg-white",
                       )}
                     >
                       <span
                         className={cn(
-                          "h-5 w-5 rounded-full flex items-center justify-center text-[10px] shrink-0 border",
+                          "h-5 w-5 rounded-full flex items-center justify-center text-[11px] shrink-0 border",
                           active && "bg-[#2563eb] text-white border-[#2563eb]",
                           done && !active && "bg-[#dcfce7] text-[#16a34a] border-[#bbf7d0]",
-                          !active && !done && "border-[#e2e8f0] text-[#94a3b8]",
+                          !active && !done && "border-[#e2e8f0] text-[#141414]",
                         )}
                       >
                         {done ? <Check className="w-3 h-3" /> : s.short}
@@ -620,10 +620,10 @@ export function FpaModelSetupModal({ open, onClose }: Props) {
           </aside>
 
           <div className="flex-1 min-w-0 overflow-y-auto p-4 sm:p-5">
-            <h3 className="text-sm font-semibold text-[#0f172a] mb-3">{SETUP_STEPS[idx]?.label}</h3>
+            <h3 className="text-sm font-semibold text-[#000000] mb-3">{SETUP_STEPS[idx]?.label}</h3>
 
             {bootLoading && (
-              <div className="mb-3 flex items-center gap-2 text-xs text-[#64748b]">
+              <div className="mb-3 flex items-center gap-2 text-xs text-[#111111]">
                 <Loader2 className="w-3.5 h-3.5 animate-spin" />
                 Loading entities, departments, currencies…
               </div>
@@ -676,7 +676,7 @@ export function FpaModelSetupModal({ open, onClose }: Props) {
                     )}
                   >
                     <p className="text-xs font-semibold">{t.v.replace(/_/g, " ")}</p>
-                    <p className="text-[11px] text-[#64748b] mt-1">{t.d}</p>
+                    <p className="text-[11px] text-[#111111] mt-1">{t.d}</p>
                   </button>
                 ))}
               </div>
@@ -716,19 +716,19 @@ export function FpaModelSetupModal({ open, onClose }: Props) {
 
             {step === "entities" && (
               <div className="space-y-4">
-                <p className="text-[11px] text-[#64748b]">
+                <p className="text-[11px] text-[#111111]">
                   Bound on create via <span className="font-mono">entityIds</span> /{" "}
                   <span className="font-mono">departmentIds</span>. Select at least one.
                 </p>
 
                 <div>
                   <div className="flex items-center justify-between mb-1.5">
-                    <p className="text-xs font-medium text-[#0f172a]">Entities</p>
-                    <span className="text-[11px] text-[#64748b]">{draft.entityIds.length} selected</span>
+                    <p className="text-xs font-medium text-[#000000]">Entities</p>
+                    <span className="text-[11px] text-[#111111]">{draft.entityIds.length} selected</span>
                   </div>
                   <div className="space-y-1.5 max-h-40 overflow-auto">
                     {entities.length === 0 ? (
-                      <p className="text-xs text-[#94a3b8]">
+                      <p className="text-xs text-[#141414]">
                         No forecast entities found. Create entities under forecast-entities first.
                       </p>
                     ) : (
@@ -753,7 +753,7 @@ export function FpaModelSetupModal({ open, onClose }: Props) {
                             )}
                           >
                             <span className="font-medium">{e.name}</span>
-                            <span className="text-[#94a3b8] ml-2">
+                            <span className="text-[#141414] ml-2">
                               {e.type}
                               {(e.baseCurrency || e.base_currency) &&
                                 ` · ${e.baseCurrency || e.base_currency}`}
@@ -767,13 +767,13 @@ export function FpaModelSetupModal({ open, onClose }: Props) {
 
                 <div>
                   <div className="flex items-center justify-between mb-1.5">
-                    <p className="text-xs font-medium text-[#0f172a]">Departments</p>
-                    <span className="text-[11px] text-[#64748b]">{draft.departmentIds.length} selected</span>
+                    <p className="text-xs font-medium text-[#000000]">Departments</p>
+                    <span className="text-[11px] text-[#111111]">{draft.departmentIds.length} selected</span>
                   </div>
                   {deptError ? (
                     <p className="text-xs text-[#b91c1c]">{deptError}</p>
                   ) : departments.length === 0 ? (
-                    <p className="text-xs text-[#94a3b8]">
+                    <p className="text-xs text-[#141414]">
                       No active departments from GET /departments.
                     </p>
                   ) : (
@@ -810,7 +810,7 @@ export function FpaModelSetupModal({ open, onClose }: Props) {
 
             {step === "coa" && (
               <div className="space-y-2">
-                <p className="text-[11px] text-[#64748b]">
+                <p className="text-[11px] text-[#111111]">
                   Accounts from the first selected entity&apos;s chart of accounts. Optional — skip if
                   not ready.
                 </p>
@@ -839,17 +839,17 @@ export function FpaModelSetupModal({ open, onClose }: Props) {
                   </Field>
                 )}
                 {!draft.entityIds[0] ? (
-                  <p className="text-xs text-[#94a3b8]">Select an entity in the previous step first.</p>
+                  <p className="text-xs text-[#141414]">Select an entity in the previous step first.</p>
                 ) : coaLoading ? (
-                  <div className="flex items-center gap-2 text-xs text-[#64748b] py-6 justify-center">
+                  <div className="flex items-center gap-2 text-xs text-[#111111] py-6 justify-center">
                     <Loader2 className="w-4 h-4 animate-spin" /> Loading accounts…
                   </div>
                 ) : coaRows.length === 0 ? (
-                  <p className="text-xs text-[#94a3b8]">No accounts on this entity.</p>
+                  <p className="text-xs text-[#141414]">No accounts on this entity.</p>
                 ) : (
                   <>
                     <div className="flex items-center justify-between">
-                      <span className="text-[11px] text-[#64748b]">
+                      <span className="text-[11px] text-[#111111]">
                         {draft.accountIds.length} of {coaRows.length} selected
                       </span>
                       <button
@@ -904,11 +904,11 @@ export function FpaModelSetupModal({ open, onClose }: Props) {
 
             {step === "dimensions" && (
               <div className="space-y-3">
-                <p className="text-[11px] text-[#64748b]">
+                <p className="text-[11px] text-[#111111]">
                   From GET /v1/fpa/dimensions. Toggle a dimension, then pick members.
                 </p>
                 {dimensionOptions.length === 0 ? (
-                  <p className="text-xs text-[#94a3b8]">
+                  <p className="text-xs text-[#141414]">
                     Dimension catalog empty. Backend seeds REGION / PRODUCT / CHANNEL on first GET —
                     retry, or skip for now.
                   </p>
@@ -932,7 +932,7 @@ export function FpaModelSetupModal({ open, onClose }: Props) {
                               d.members.map((m) => m.id || m.code).filter(Boolean),
                             )
                           }
-                          className="flex items-center gap-2 text-xs font-medium text-[#0f172a]"
+                          className="flex items-center gap-2 text-xs font-medium text-[#000000]"
                         >
                           <span
                             className={cn(
@@ -943,7 +943,7 @@ export function FpaModelSetupModal({ open, onClose }: Props) {
                             {on && <Check className="w-3 h-3" />}
                           </span>
                           {d.label}
-                          <span className="font-mono text-[#94a3b8] font-normal">{d.key}</span>
+                          <span className="font-mono text-[#141414] font-normal">{d.key}</span>
                         </button>
                         {on && d.members.length > 0 && (
                           <div className="flex flex-wrap gap-1.5 mt-2 pl-6">
@@ -969,7 +969,7 @@ export function FpaModelSetupModal({ open, onClose }: Props) {
                           </div>
                         )}
                         {on && d.members.length === 0 && (
-                          <p className="text-[11px] text-[#94a3b8] mt-2 pl-6">
+                          <p className="text-[11px] text-[#141414] mt-2 pl-6">
                             No members yet — dimension key will still be sent.
                           </p>
                         )}
@@ -1015,7 +1015,7 @@ export function FpaModelSetupModal({ open, onClose }: Props) {
                 {draft.baselineMode === "PRIOR_FORECAST" && (
                   <Field label="Source model / version">
                     {priorModels.length === 0 ? (
-                      <p className="mt-1 text-xs text-[#94a3b8]">
+                      <p className="mt-1 text-xs text-[#141414]">
                         No existing models with a default version. Create one with NONE first, or use
                         another baseline mode.
                       </p>
@@ -1043,7 +1043,7 @@ export function FpaModelSetupModal({ open, onClose }: Props) {
                   </Field>
                 )}
                 {draft.baselineMode === "ACTUALS_SYNC" && (
-                  <p className="text-[11px] text-[#64748b]">
+                  <p className="text-[11px] text-[#111111]">
                     After create, the API runs GL actuals sync (may return rowCount 0 if no actuals).
                   </p>
                 )}
@@ -1078,7 +1078,7 @@ export function FpaModelSetupModal({ open, onClose }: Props) {
 
             {step === "validate" && (
               <div className="space-y-3">
-                <p className="text-[11px] text-[#64748b]">
+                <p className="text-[11px] text-[#111111]">
                   {draft.modelId
                     ? "Apply your fixes, then re-validate. Opening requires validation.passed."
                     : "Create posts the full draft to POST /models/setup in one transaction. Preflight failure creates nothing."}
@@ -1112,8 +1112,8 @@ export function FpaModelSetupModal({ open, onClose }: Props) {
                             <AlertTriangle className="w-3.5 h-3.5 text-[#dc2626] shrink-0 mt-0.5" />
                           )}
                           <div>
-                            <p className="font-medium text-[#0f172a]">{c.label}</p>
-                            {c.detail && <p className="text-[#64748b]">{c.detail}</p>}
+                            <p className="font-medium text-[#000000]">{c.label}</p>
+                            {c.detail && <p className="text-[#111111]">{c.detail}</p>}
                           </div>
                         </li>
                       ))}
@@ -1130,7 +1130,7 @@ export function FpaModelSetupModal({ open, onClose }: Props) {
             type="button"
             disabled={busy || idx === 0}
             onClick={onBack}
-            className="h-9 inline-flex items-center gap-1 rounded-full border border-[#e2e8f0] px-3 text-xs text-[#475569] disabled:opacity-40"
+            className="h-9 inline-flex items-center gap-1 rounded-full border border-[#e2e8f0] px-3 text-xs text-[#111111] disabled:opacity-40"
           >
             <ChevronLeft className="w-3.5 h-3.5" />
             Back
@@ -1142,7 +1142,7 @@ export function FpaModelSetupModal({ open, onClose }: Props) {
               type="button"
               disabled={busy}
               onClick={onSkip}
-              className="h-9 rounded-full border border-[#e2e8f0] px-3 text-xs text-[#64748b]"
+              className="h-9 rounded-full border border-[#e2e8f0] px-3 text-xs text-[#111111]"
             >
               Skip
             </button>
@@ -1155,7 +1155,7 @@ export function FpaModelSetupModal({ open, onClose }: Props) {
               onClose()
               reset()
             }}
-            className="h-9 rounded-full border border-[#e2e8f0] px-4 text-xs text-[#475569] disabled:opacity-50"
+            className="h-9 rounded-full border border-[#e2e8f0] px-4 text-xs text-[#111111] disabled:opacity-50"
           >
             Cancel
           </button>
@@ -1177,7 +1177,7 @@ export function FpaModelSetupModal({ open, onClose }: Props) {
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <label className="block text-xs text-[#64748b]">
+    <label className="block text-xs text-[#111111]">
       {label}
       {children}
     </label>
@@ -1201,26 +1201,26 @@ function SummaryDraft({
     .join(", ")
   return (
     <dl className="rounded-xl border border-[#e2e8f0] bg-[#f8fafc] px-3 py-2 text-[11px] grid grid-cols-2 gap-x-3 gap-y-1.5">
-      <dt className="text-[#64748b]">Name</dt>
-      <dd className="text-[#0f172a] font-medium truncate">{draft.name || "—"}</dd>
-      <dt className="text-[#64748b]">Type / currency</dt>
-      <dd className="text-[#0f172a]">
+      <dt className="text-[#111111]">Name</dt>
+      <dd className="text-[#000000] font-medium truncate">{draft.name || "—"}</dd>
+      <dt className="text-[#111111]">Type / currency</dt>
+      <dd className="text-[#000000]">
         {draft.modelType} · {draft.baseCurrency}
       </dd>
-      <dt className="text-[#64748b]">Horizon</dt>
-      <dd className="text-[#0f172a]">
+      <dt className="text-[#111111]">Horizon</dt>
+      <dd className="text-[#000000]">
         {draft.startPeriod} → {draft.endPeriod} ({draft.timeGranularity})
       </dd>
-      <dt className="text-[#64748b]">Scope</dt>
-      <dd className="text-[#0f172a] truncate">
+      <dt className="text-[#111111]">Scope</dt>
+      <dd className="text-[#000000] truncate">
         {[entNames, deptNames].filter(Boolean).join(" · ") || "—"}
       </dd>
-      <dt className="text-[#64748b]">Accounts / dims</dt>
-      <dd className="text-[#0f172a]">
+      <dt className="text-[#111111]">Accounts / dims</dt>
+      <dd className="text-[#000000]">
         {draft.accountIds.length} accounts · {draft.dimensions.length} dimensions
       </dd>
-      <dt className="text-[#64748b]">Lines / drivers</dt>
-      <dd className="text-[#0f172a]">
+      <dt className="text-[#111111]">Lines / drivers</dt>
+      <dd className="text-[#000000]">
         {draft.lineItems.length || "default"} lines · {draft.drivers.length} drivers
         {draft.workflowName ? ` · workflow` : ""}
       </dd>
@@ -1265,7 +1265,7 @@ function LineItemsEditor({
   return (
     <div className="space-y-2">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-[11px] text-[#64748b]">
+        <p className="text-[11px] text-[#111111]">
           Leave empty to use the API default pack, or seed / add your own.
         </p>
         <button
@@ -1310,9 +1310,9 @@ function LineItemsEditor({
       <ul className="text-xs divide-y divide-[#f1f5f9] border border-[#e2e8f0] rounded-xl overflow-hidden">
         {items.map((li) => (
           <li key={li.code} className="flex gap-2 px-3 py-2 items-center">
-            <span className="font-mono text-[#64748b]">{li.code}</span>
+            <span className="font-mono text-[#111111]">{li.code}</span>
             <span className="flex-1">{li.name}</span>
-            <span className="text-[#94a3b8]">{li.lineItemType}</span>
+            <span className="text-[#141414]">{li.lineItemType}</span>
             <button
               type="button"
               className="text-[#dc2626]"
@@ -1323,7 +1323,7 @@ function LineItemsEditor({
           </li>
         ))}
         {items.length === 0 && (
-          <li className="px-3 py-4 text-[#94a3b8]">None — API default pack will be used</li>
+          <li className="px-3 py-4 text-[#141414]">None — API default pack will be used</li>
         )}
       </ul>
     </div>
@@ -1341,14 +1341,14 @@ function FormulasEditor({
 }) {
   if (!lineItems.length) {
     return (
-      <p className="text-xs text-[#94a3b8]">
+      <p className="text-xs text-[#141414]">
         Add or load line items first. Example: LINE(&apos;REVENUE&apos;) - LINE(&apos;COGS&apos;)
       </p>
     )
   }
   return (
     <div className="space-y-2">
-      <p className="text-[11px] text-[#64748b]">
+      <p className="text-[11px] text-[#111111]">
         Use LINE(&apos;CODE&apos;) references. Only CALC rows usually need formulas.
       </p>
       {lineItems.map((li) => {
@@ -1402,7 +1402,7 @@ function DriversEditor({
   }
   return (
     <div className="space-y-2">
-      <p className="text-[11px] text-[#64748b]">Optional planning drivers (e.g. GROWTH = 1.05).</p>
+      <p className="text-[11px] text-[#111111]">Optional planning drivers (e.g. GROWTH = 1.05).</p>
       <div className="flex flex-wrap gap-2 items-end">
         <Field label="Code">
           <input className={`${FIELD} w-24`} value={code} onChange={(e) => setCode(e.target.value)} />
@@ -1432,7 +1432,7 @@ function DriversEditor({
             </button>
           </li>
         ))}
-        {drivers.length === 0 && <li className="px-3 py-3 text-[#94a3b8]">None (optional)</li>}
+        {drivers.length === 0 && <li className="px-3 py-3 text-[#141414]">None (optional)</li>}
       </ul>
     </div>
   )
@@ -1452,7 +1452,7 @@ function WorkflowEditor({
   const [taskTitle, setTaskTitle] = useState("")
   return (
     <div className="space-y-3">
-      <p className="text-[11px] text-[#64748b]">
+      <p className="text-[11px] text-[#111111]">
         Optional. Workflow is created only if a name is set.
       </p>
       <Field label="Planning cycle name">
@@ -1500,7 +1500,7 @@ function WorkflowEditor({
               </li>
             ))}
             {tasks.length === 0 && (
-              <li className="px-3 py-3 text-[#94a3b8]">No tasks — default “Finance input” will be sent</li>
+              <li className="px-3 py-3 text-[#141414]">No tasks — default “Finance input” will be sent</li>
             )}
           </ul>
         </>

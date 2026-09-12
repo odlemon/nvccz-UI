@@ -112,6 +112,11 @@ export function AppSwitcherDropdown({
                     data-active={isActive ? "true" : "false"}
                     onClick={() => {
                       onModuleSelect(module.id)
+                      onClose()
+                      if (module.externalPortalUrl) {
+                        window.open(module.externalPortalUrl, '_blank', 'noopener,noreferrer')
+                        return
+                      }
                       window.location.href = module.path
                     }}
                     className="group relative p-3 sm:p-4 cursor-pointer transition-all duration-200"

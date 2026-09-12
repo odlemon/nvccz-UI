@@ -115,7 +115,7 @@ function InvestorCard({
     >
       <div className="flex items-start gap-2.5">
         <span
-          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[6px] text-[10px] font-bold"
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[6px] text-[11px] font-bold"
           style={{ backgroundColor: investor.logoBg, color: investor.logoText }}
         >
           {investor.logoLabel}
@@ -123,8 +123,8 @@ function InvestorCard({
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0">
-              <p className="truncate text-[12px] font-semibold text-[#0f172a]">{investor.name}</p>
-              <p className="mt-0.5 text-[10px] text-[#94a3b8]">Lead: {investor.lead}</p>
+              <p className="truncate text-[12px] font-semibold text-[#000000]">{investor.name}</p>
+              <p className="mt-0.5 text-[11px] text-[#141414]">Lead: {investor.lead}</p>
             </div>
             <span className={cn("shrink-0 text-[12px] font-bold tabular-nums", completionTone(investor.completion))}>
               {investor.completion}%
@@ -135,18 +135,18 @@ function InvestorCard({
           </div>
           <div className="mt-2.5 grid grid-cols-3 gap-1 border-t border-[#f1f5f9] pt-2">
             <div>
-              <p className="text-[9px] uppercase tracking-wide text-[#94a3b8]">Open</p>
-              <p className="text-[12px] font-semibold tabular-nums text-[#0f172a]">{investor.open}</p>
+              <p className="text-[11px] uppercase tracking-wide text-[#141414]">Open</p>
+              <p className="text-[12px] font-semibold tabular-nums text-[#000000]">{investor.open}</p>
             </div>
             <div>
-              <p className="text-[9px] uppercase tracking-wide text-[#94a3b8]">Overdue</p>
-              <p className={cn("text-[12px] font-semibold tabular-nums", investor.overdue > 0 ? "text-[#dc2626]" : "text-[#0f172a]")}>
+              <p className="text-[11px] uppercase tracking-wide text-[#141414]">Overdue</p>
+              <p className={cn("text-[12px] font-semibold tabular-nums", investor.overdue > 0 ? "text-[#dc2626]" : "text-[#000000]")}>
                 {investor.overdue}
               </p>
             </div>
             <div>
-              <p className="text-[9px] uppercase tracking-wide text-[#94a3b8]">Days in DD</p>
-              <p className="text-[12px] font-semibold tabular-nums text-[#0f172a]">{investor.daysInDd}</p>
+              <p className="text-[11px] uppercase tracking-wide text-[#141414]">Days in DD</p>
+              <p className="text-[12px] font-semibold tabular-nums text-[#000000]">{investor.daysInDd}</p>
             </div>
           </div>
         </div>
@@ -208,6 +208,15 @@ export function FundraisingDueDiligence() {
   useEffect(() => {
     loadCases()
   }, [])
+
+  // Select the first case once the list arrives. Without this the screen opens with no case
+  // selected, so the Due Diligence Matrix renders an empty table with no explanation even
+  // when every case has items — it looked broken rather than unselected.
+  useEffect(() => {
+    if (selectedId || rawCases.length === 0) return
+    void selectCase(String(rawCases[0].id))
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rawCases, selectedId])
 
   useEffect(() => {
     if (!addCaseOpen) return
@@ -367,7 +376,7 @@ export function FundraisingDueDiligence() {
       />
 
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-        <h1 className="text-xl font-bold tracking-tight text-[#0f172a] md:text-[22px]">
+        <h1 className="text-xl font-bold tracking-tight text-[#000000] md:text-[22px]">
           Due Diligence
         </h1>
         <div className="flex flex-wrap items-center gap-2">
@@ -404,8 +413,8 @@ export function FundraisingDueDiligence() {
             >
               <kpi.icon className="h-4 w-4" strokeWidth={1.75} />
             </span>
-            <p className="mt-2.5 text-[11px] font-medium leading-snug text-[#64748b]">{kpi.label}</p>
-            <p className="mt-1.5 text-[22px] font-bold leading-none tabular-nums text-[#0f172a]">{kpi.value}</p>
+            <p className="mt-2.5 text-[11px] font-medium leading-snug text-[#111111]">{kpi.label}</p>
+            <p className="mt-1.5 text-[22px] font-bold leading-none tabular-nums text-[#000000]">{kpi.value}</p>
           </div>
         ))}
       </div>
@@ -425,15 +434,15 @@ export function FundraisingDueDiligence() {
           </section>
         </div>
       ) : investorCards.length === 0 ? (
-        <div className="mt-5 rounded-[10px] border border-[#e2e8f0] bg-white p-10 text-center text-[13px] text-[#94a3b8]">
+        <div className="mt-5 rounded-[10px] border border-[#e2e8f0] bg-white p-10 text-center text-[13px] text-[#141414]">
           No DDQ cases yet. Create one to start tracking due diligence for an investor.
         </div>
       ) : (
         <div className="mt-5 grid grid-cols-1 gap-4 xl:grid-cols-[260px_minmax(0,1fr)]">
           <aside className={cn(CARD, "flex flex-col overflow-hidden")}>
             <div className="flex items-center gap-2 border-b border-[#f1f5f9] px-3 py-3">
-              <h2 className="text-[13px] font-semibold text-[#0f172a]">Active Investors in DD</h2>
-              <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-[4px] bg-[#f1f5f9] px-1.5 text-[11px] font-semibold text-[#64748b]">
+              <h2 className="text-[13px] font-semibold text-[#000000]">Active Investors in DD</h2>
+              <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-[4px] bg-[#f1f5f9] px-1.5 text-[11px] font-semibold text-[#111111]">
                 {investorCards.length}
               </span>
             </div>
@@ -447,10 +456,10 @@ export function FundraisingDueDiligence() {
           <section className={cn(CARD, "flex min-w-0 flex-col overflow-hidden")}>
             <div className="flex flex-col gap-2 border-b border-[#f1f5f9] px-3 py-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-center gap-1.5">
-                <h2 className="text-[13px] font-semibold text-[#0f172a]">Due Diligence Matrix</h2>
+                <h2 className="text-[13px] font-semibold text-[#000000]">Due Diligence Matrix</h2>
                 <button
                   type="button"
-                  className="rounded-full p-1 text-[#94a3b8] hover:bg-[#f1f5f9] hover:text-[#64748b]"
+                  className="rounded-full p-1 text-[#141414] hover:bg-[#f1f5f9] hover:text-[#111111]"
                   title="Item status by category for the selected case"
                 >
                   <Info className="h-3.5 w-3.5" />
@@ -475,29 +484,29 @@ export function FundraisingDueDiligence() {
                   disabled={exporting !== null}
                   onClick={() => handleExport("matrix")}
                 >
-                  {exporting === "matrix" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5 text-[#64748b]" />}
+                  {exporting === "matrix" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5 text-[#111111]" />}
                   <span className="sr-only">Export matrix</span>
                 </Button>
               </div>
             </div>
 
             {!selected ? (
-              <p className="px-4 py-16 text-center text-[12px] text-[#94a3b8]">
+              <p className="px-4 py-16 text-center text-[12px] text-[#141414]">
                 Select a case to view its due diligence matrix.
               </p>
             ) : loadingDetail ? (
               <table className="w-full"><tbody><FrTableSkeleton columns={5} rows={7} /></tbody></table>
             ) : matrixGrouped.length === 0 ? (
-              <p className="px-4 py-16 text-center text-[12px] text-[#94a3b8]">
+              <p className="px-4 py-16 text-center text-[12px] text-[#141414]">
                 No items on this case yet.
               </p>
             ) : (
               <>
               <div className="grid gap-2 border-b border-[#f1f5f9] bg-[#fafafa] px-3 py-3 sm:grid-cols-4">
-                <div><p className="text-[9px] text-[#94a3b8]">Investor / case</p><p className="text-[11px] font-medium text-[#0f172a]">{selected.name}</p></div>
-                <div><p className="text-[9px] text-[#94a3b8]">Owner</p><p className="text-[11px] font-medium text-[#0f172a]">{selected.lead}</p></div>
-                <div><p className="text-[9px] text-[#94a3b8]">Progress</p><p className="text-[11px] font-medium text-[#0f172a]">{selected.completion}%</p></div>
-                <select className="h-8 rounded-full border border-[#e2e8f0] bg-white px-3 text-[10px]" value={String(selectedCase?.status || "NOT_STARTED")} onChange={(e) => updateCaseStatus(e.target.value)}>
+                <div><p className="text-[11px] text-[#141414]">Investor / case</p><p className="text-[11px] font-medium text-[#000000]">{selected.name}</p></div>
+                <div><p className="text-[11px] text-[#141414]">Owner</p><p className="text-[11px] font-medium text-[#000000]">{selected.lead}</p></div>
+                <div><p className="text-[11px] text-[#141414]">Progress</p><p className="text-[11px] font-medium text-[#000000]">{selected.completion}%</p></div>
+                <select className="h-8 rounded-full border border-[#e2e8f0] bg-white px-3 text-[11px]" value={String(selectedCase?.status || "NOT_STARTED")} onChange={(e) => updateCaseStatus(e.target.value)}>
                   <option value="NOT_STARTED">Not started</option>
                   <option value="IN_PROGRESS">In progress</option>
                   <option value="INTERNAL_REVIEW">Internal review</option>
@@ -510,11 +519,11 @@ export function FundraisingDueDiligence() {
                 <table className="w-full min-w-[640px] border-collapse text-left">
                   <thead>
                     <tr className="border-b border-[#f1f5f9] bg-[#fafafa]">
-                      <th className="px-3 py-2 text-[11px] font-semibold text-[#94a3b8]">Category</th>
-                      <th className="px-3 py-2 text-[11px] font-semibold text-[#94a3b8]">Item</th>
-                      <th className="px-3 py-2 text-[11px] font-semibold text-[#94a3b8]">Status ({selected.name})</th>
-                      <th className="px-3 py-2 text-[11px] font-semibold text-[#94a3b8]">Last Updated</th>
-                      <th className="px-3 py-2 text-[11px] font-semibold text-[#94a3b8]">Evidence</th>
+                      <th className="px-3 py-2 text-[11px] font-semibold text-[#141414]">Category</th>
+                      <th className="px-3 py-2 text-[11px] font-semibold text-[#141414]">Item</th>
+                      <th className="px-3 py-2 text-[11px] font-semibold text-[#141414]">Status ({selected.name})</th>
+                      <th className="px-3 py-2 text-[11px] font-semibold text-[#141414]">Last Updated</th>
+                      <th className="px-3 py-2 text-[11px] font-semibold text-[#141414]">Evidence</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -523,12 +532,12 @@ export function FundraisingDueDiligence() {
                         <tr key={row.id} className="border-b border-[#f1f5f9] last:border-b-0 hover:bg-[#f8fafc]">
                           {index === 0 ? (
                             <td rowSpan={items.length} className="align-top border-r border-[#f1f5f9] px-3 py-2.5">
-                              <span className="text-[11px] font-semibold text-[#0f172a]">{category}</span>
+                              <span className="text-[11px] font-semibold text-[#000000]">{category}</span>
                             </td>
                           ) : null}
-                          <td className="px-3 py-2 text-[12px] text-[#0f172a]">{row.document}</td>
+                          <td className="px-3 py-2 text-[12px] text-[#000000]">{row.document}</td>
                           <td className="px-3 py-2"><StatusPill status={row.status} /></td>
-                          <td className="whitespace-nowrap px-3 py-2 text-[11px] text-[#64748b]">{row.lastUpdated}</td>
+                          <td className="whitespace-nowrap px-3 py-2 text-[11px] text-[#111111]">{row.lastUpdated}</td>
                           <td className="px-3 py-2">
                             {(() => {
                               const evidence = evidenceMeta(row.raw)
@@ -538,13 +547,13 @@ export function FundraisingDueDiligence() {
                                     href={evidence.url}
                                     target="_blank"
                                     rel="noreferrer"
-                                    className="mb-1 block max-w-[180px] truncate text-[10px] font-medium text-[#2563eb] hover:underline"
+                                    className="mb-1 block max-w-[180px] truncate text-[11px] font-medium text-[#2563eb] hover:underline"
                                     title={evidence.fileName}
                                   >
                                     {evidence.fileName}
                                   </a>
                                 ) : (
-                                  <span className="mb-1 block max-w-[180px] truncate text-[10px] text-[#475569]" title={evidence.fileName}>
+                                  <span className="mb-1 block max-w-[180px] truncate text-[11px] text-[#111111]" title={evidence.fileName}>
                                     {evidence.fileName}
                                   </span>
                                 )
@@ -554,7 +563,7 @@ export function FundraisingDueDiligence() {
                               type="button"
                               disabled={uploadingItemId === row.id}
                               onClick={() => triggerEvidenceUpload(row.id)}
-                              className="inline-flex items-center gap-1 rounded-full border border-[#e2e8f0] px-2 py-1 text-[10px] font-medium text-[#64748b] hover:bg-[#f1f5f9] disabled:opacity-50"
+                              className="inline-flex items-center gap-1 rounded-full border border-[#e2e8f0] px-2 py-1 text-[11px] font-medium text-[#111111] hover:bg-[#f1f5f9] disabled:opacity-50"
                             >
                               {uploadingItemId === row.id ? (
                                 <Loader2 className="h-3 w-3 animate-spin" />

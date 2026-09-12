@@ -1,5 +1,17 @@
 # Fundraising — Gap Analysis (requirements recheck)
 
+> ## Reconciled 9 Sep 2026 (`feature/fundraising-live`)
+>
+> **The four cross-tab guardrails below (G1–G4) are all closed**, verified in code and — for
+> G2 and G4 — exercised through the UI in Trip D of `scripts/fundraising-e2e-roundtrips.mjs`.
+> Several per-tab items marked partial are closed too: the Investors create wizard now carries
+> every SRD field this file lists as missing, and the Campaigns and Investors exports marked
+> "backend-pending" both produce a CSV.
+>
+> See `fundraising-test-plan.md` §6.2 for the evidence. Treat that file as current for status;
+> this one is kept for the requirement cross-reference it contains.
+
+
 **Captured:** 2026-07-17
 **Method:** Full cross-reference of all 20 tabs against `fundraising-srd.md` + per-tab `fundraising-*-stages.md` + guardrails in `fundraising-frontend.md` + the live contract in `fundraising-frontend-api.md`, vs the actual implementation (`components/fundraising/*`, `lib/api/fundraising-api.ts`, `lib/fundraising/mappers.ts`, `fundraising-create-wizards.tsx`).
 

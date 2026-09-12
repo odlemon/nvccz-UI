@@ -41,7 +41,7 @@ function fmtDateTime(iso?: string | null) {
 const BTN_PRIMARY =
   "h-9 inline-flex items-center gap-1.5 rounded-full bg-[#2563eb] px-4 text-xs font-medium text-white hover:bg-[#1d4ed8]"
 const BTN_GHOST =
-  "h-8 inline-flex items-center gap-1 rounded-full border border-[#e2e8f0] bg-white px-3 text-[11px] font-medium text-[#0f172a] hover:bg-[#f8fafc]"
+  "h-8 inline-flex items-center gap-1 rounded-full border border-[#e2e8f0] bg-white px-3 text-[11px] font-medium text-[#000000] hover:bg-[#f8fafc]"
 
 function worksheetHrefFor(cycle: FpaModelPlanningCycle): string {
   const qs = new URLSearchParams()
@@ -115,13 +115,13 @@ export function FpaPlanningCyclesList() {
         )}
 
         {loading && cycles.length === 0 ? (
-          <div className="flex items-center justify-center py-20 text-[#64748b] gap-2">
+          <div className="flex items-center justify-center py-20 text-[#111111] gap-2">
             <Loader2 className="w-5 h-5 animate-spin" /> Loading planning cycles…
           </div>
         ) : cycles.length === 0 ? (
           <div className="rounded-xl border border-dashed border-[#cbd5e1] bg-white p-10 text-center max-w-lg mx-auto shadow-sm">
-            <p className="text-sm font-medium text-[#0f172a]">No planning cycles yet</p>
-            <p className="text-xs text-[#64748b] mt-2 leading-relaxed">
+            <p className="text-sm font-medium text-[#000000]">No planning cycles yet</p>
+            <p className="text-xs text-[#111111] mt-2 leading-relaxed">
               Create a planning cycle to start collecting budgets and driver assumptions from department owners.
             </p>
             <button type="button" onClick={() => setCreateOpen(true)} className={cn(BTN_PRIMARY, "mt-4")}>
@@ -133,7 +133,7 @@ export function FpaPlanningCyclesList() {
             <div className="overflow-x-auto">
               <table className="w-full text-sm min-w-[960px]">
                 <thead>
-                  <tr className="bg-[#f8fafc] text-left text-[11px] uppercase tracking-wide text-[#64748b] border-b border-[#e2e8f0]">
+                  <tr className="bg-[#f8fafc] text-left text-[11px] uppercase tracking-wide text-[#111111] border-b border-[#e2e8f0]">
                     <th className="px-4 py-3 font-medium">Name</th>
                     <th className="px-4 py-3 font-medium">Status</th>
                     <th className="px-4 py-3 font-medium">Type</th>
@@ -155,7 +155,7 @@ export function FpaPlanningCyclesList() {
                       onClick={() => openCycle(c)}
                     >
                       <td className="px-4 py-3.5">
-                        <span className="font-medium text-[#0f172a]">{c.cycle_name}</span>
+                        <span className="font-medium text-[#000000]">{c.cycle_name}</span>
                       </td>
                       <td className="px-4 py-3.5">
                         <FpaStatusBadge tone={statusTone(c.status)}>
@@ -163,21 +163,21 @@ export function FpaPlanningCyclesList() {
                         </FpaStatusBadge>
                       </td>
                       <td className="px-4 py-3.5">
-                        <span className="inline-flex rounded-full border border-[#e2e8f0] bg-[#f8fafc] px-2.5 py-0.5 text-[11px] font-medium text-[#475569]">
+                        <span className="inline-flex rounded-full border border-[#e2e8f0] bg-[#f8fafc] px-2.5 py-0.5 text-[11px] font-medium text-[#111111]">
                           {c.planningType}
                         </span>
                       </td>
-                      <td className="px-4 py-3.5 text-[#475569] tabular-nums">FY{c.financialYear}</td>
-                      <td className="px-4 py-3.5 text-[#475569] whitespace-nowrap text-[13px]">
+                      <td className="px-4 py-3.5 text-[#111111] tabular-nums">FY{c.financialYear}</td>
+                      <td className="px-4 py-3.5 text-[#111111] whitespace-nowrap text-[13px]">
                         {c.planningHorizon ?? "—"}
                       </td>
-                      <td className="px-4 py-3.5 text-[#64748b] whitespace-nowrap text-[13px]">
+                      <td className="px-4 py-3.5 text-[#111111] whitespace-nowrap text-[13px]">
                         {fmtDateTime(c.updatedAt)}
                       </td>
                       <td className="px-4 py-3.5 text-right" onClick={(e) => e.stopPropagation()}>
                         <Link href={worksheetHrefFor(c)} className={BTN_GHOST}>
                           Open
-                          <ArrowUpRight className="w-3 h-3 text-[#94a3b8]" />
+                          <ArrowUpRight className="w-3 h-3 text-[#141414]" />
                         </Link>
                       </td>
                     </tr>

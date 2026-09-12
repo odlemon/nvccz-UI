@@ -60,9 +60,9 @@ import {
 } from "@/components/ui/select"
 
 const FIELD =
-  "mt-1 w-full h-9 rounded-full border border-[#e2e8f0] px-3 text-sm text-[#0f172a] bg-white"
+  "mt-1 w-full h-9 rounded-full border border-[#e2e8f0] px-3 text-sm text-[#000000] bg-white"
 const SELECT_TRIGGER =
-  "mt-1 w-full h-9 rounded-full border border-[#e2e8f0] bg-white px-3 text-sm text-[#0f172a] shadow-none focus:ring-2 focus:ring-[#2563eb]/30"
+  "mt-1 w-full h-9 rounded-full border border-[#e2e8f0] bg-white px-3 text-sm text-[#000000] shadow-none focus:ring-2 focus:ring-[#2563eb]/30"
 
 function humanDeptName(
   departmentId?: string | null,
@@ -358,8 +358,8 @@ export function FpaBudgetCycles() {
 
       <div className="p-4 sm:p-5 space-y-4">
         <section className="rounded-md border border-[#e2e8f0] bg-white px-4 py-3">
-          <p className="text-xs text-[#64748b]">
-            <span className="font-semibold text-[#0f172a]">Purpose. </span>
+          <p className="text-xs text-[#111111]">
+            <span className="font-semibold text-[#000000]">Purpose. </span>
             {BUDGET_PURPOSE}
           </p>
         </section>
@@ -369,7 +369,7 @@ export function FpaBudgetCycles() {
             type="button"
             disabled={loading}
             onClick={() => void refresh()}
-            className="h-8 inline-flex items-center gap-1 rounded-full border border-[#e2e8f0] bg-white px-3 text-xs text-[#475569]"
+            className="h-8 inline-flex items-center gap-1 rounded-full border border-[#e2e8f0] bg-white px-3 text-xs text-[#111111]"
           >
             <RefreshCw className={cn("w-3.5 h-3.5", loading && "animate-spin")} />
             Refresh
@@ -394,10 +394,10 @@ export function FpaBudgetCycles() {
           <div className="space-y-3">
             {!selectedModelId ? (
               <div className="rounded-md border border-dashed border-[#cbd5e1] bg-white p-10 text-center">
-                <p className="text-sm font-medium text-[#0f172a]">
+                <p className="text-sm font-medium text-[#000000]">
                   {loadingModels || !bootstrapped ? "Loading models…" : "Pick a model to list cycles"}
                 </p>
-                <p className="text-xs text-[#64748b] mt-1">
+                <p className="text-xs text-[#111111] mt-1">
                   {loadingModels || !bootstrapped
                     ? "Setting up your FP&A model context."
                     : "Open Models and select a working model, or use New budget cycle to choose one."}
@@ -415,16 +415,16 @@ export function FpaBudgetCycles() {
             ) : loadError && visibleCycles.length === 0 ? (
               <div className="rounded-md border border-[#fecaca] bg-white p-10 text-center">
                 <p className="text-sm font-medium text-[#991b1b]">Budget cycles could not be loaded</p>
-                <p className="mt-1 text-xs text-[#64748b]">Retry to restore the canonical budget-cycle list.</p>
+                <p className="mt-1 text-xs text-[#111111]">Retry to restore the canonical budget-cycle list.</p>
               </div>
             ) : loading && visibleCycles.length === 0 ? (
-              <div className="flex items-center justify-center gap-2 py-16 text-[#64748b] text-sm">
+              <div className="flex items-center justify-center gap-2 py-16 text-[#111111] text-sm">
                 <Loader2 className="w-4 h-4 animate-spin" /> Loading cycles…
               </div>
             ) : visibleCycles.length === 0 ? (
               <div className="rounded-md border border-dashed border-[#cbd5e1] bg-white p-10 text-center">
-                <p className="text-sm font-medium text-[#0f172a]">No budget cycles for you</p>
-                <p className="text-xs text-[#64748b] mt-1 max-w-md mx-auto">
+                <p className="text-sm font-medium text-[#000000]">No budget cycles for you</p>
+                <p className="text-xs text-[#111111] mt-1 max-w-md mx-auto">
                   {canSeeAllCycles
                     ? "Create a cycle, assign department owners and users, then run the review path."
                     : "You only see cycles where you are assigned as a department owner. Ask FP&A if you expected a cycle here."}
@@ -461,8 +461,8 @@ export function FpaBudgetCycles() {
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
-                      <h2 className="text-sm font-semibold text-[#0f172a] truncate">{c.name}</h2>
-                      <p className="text-[11px] text-[#64748b] mt-1">
+                      <h2 className="text-sm font-semibold text-[#000000] truncate">{c.name}</h2>
+                      <p className="text-[11px] text-[#111111] mt-1">
                         FY{c.fiscalYear} · Stage {formatStageLabel(c.currentStage)}
                         {c.owners?.length
                           ? ` · ${c.owners.length} owner${c.owners.length === 1 ? "" : "s"}`
@@ -689,7 +689,7 @@ function CycleDetailPanel({
 
   if (!cycle) {
     return (
-      <aside className="rounded-md border border-[#e2e8f0] bg-white p-5 text-sm text-[#94a3b8]">
+      <aside className="rounded-md border border-[#e2e8f0] bg-white p-5 text-sm text-[#141414]">
         Select a cycle to see what to do next.
       </aside>
     )
@@ -895,14 +895,14 @@ function CycleDetailPanel({
   const primaryClass =
     "h-10 w-full inline-flex items-center justify-center gap-1.5 rounded-full bg-[#2563eb] text-white text-sm font-medium disabled:opacity-50"
   const secondaryClass =
-    "h-9 w-full inline-flex items-center justify-center gap-1 rounded-full border border-[#e2e8f0] bg-white text-xs font-medium text-[#0f172a] disabled:opacity-50"
+    "h-9 w-full inline-flex items-center justify-center gap-1 rounded-full border border-[#e2e8f0] bg-white text-xs font-medium text-[#000000] disabled:opacity-50"
 
   return (
     <aside className="rounded-md border border-[#e2e8f0] bg-white p-4 sm:p-5 space-y-4 h-fit xl:sticky xl:top-16">
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <h2 className="text-sm font-semibold text-[#0f172a] truncate">{cycle.name}</h2>
-          <p className="text-[11px] text-[#64748b] mt-1">
+          <h2 className="text-sm font-semibold text-[#000000] truncate">{cycle.name}</h2>
+          <p className="text-[11px] text-[#111111] mt-1">
             FY{cycle.fiscalYear} · {formatStageLabel(cycle.currentStage)}
             {workspaceLoading ? " · Loading workspace…" : ""}
           </p>
@@ -915,7 +915,7 @@ function CycleDetailPanel({
             type="button"
             disabled={anyBusy}
             onClick={() => void onRefresh()}
-            className="h-7 w-7 inline-flex items-center justify-center rounded-full text-[#94a3b8] hover:bg-[#f8fafc] disabled:opacity-50"
+            className="h-7 w-7 inline-flex items-center justify-center rounded-full text-[#141414] hover:bg-[#f8fafc] disabled:opacity-50"
             aria-label="Refresh"
             title="Refresh"
           >
@@ -925,11 +925,11 @@ function CycleDetailPanel({
       </div>
 
       <div className="rounded-xl border border-[#e2e8f0] bg-[#f8fafc] px-3.5 py-3">
-        <p className="text-[10px] font-semibold uppercase tracking-wide text-[#94a3b8]">
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-[#141414]">
           What to do next
         </p>
-        <p className="text-sm font-semibold text-[#0f172a] mt-1">{next.title}</p>
-        <p className="text-[12px] text-[#64748b] mt-0.5 leading-relaxed">{next.body}</p>
+        <p className="text-sm font-semibold text-[#000000] mt-1">{next.title}</p>
+        <p className="text-[12px] text-[#111111] mt-0.5 leading-relaxed">{next.body}</p>
       </div>
 
       {validationPassed !== null && (
@@ -962,20 +962,20 @@ function CycleDetailPanel({
       {/* Owner workspace summary */}
       <div className="grid grid-cols-2 gap-2">
         <div className="rounded-md border border-[#e2e8f0] bg-[#f8fafc] px-2.5 py-2">
-          <p className="text-[10px] font-medium text-[#94a3b8]">Budget progress</p>
-          <p className="text-sm font-semibold text-[#0f172a] mt-0.5 tabular-nums">
+          <p className="text-[11px] font-medium text-[#141414]">Budget progress</p>
+          <p className="text-sm font-semibold text-[#000000] mt-0.5 tabular-nums">
             {ownerProgressPct}%
           </p>
-          <p className="text-[10px] text-[#64748b]">
+          <p className="text-[11px] text-[#111111]">
             {completedTaskCount}/{ownersList.length || completedTaskCount + openTaskCount} submitted
           </p>
         </div>
         <div className="rounded-md border border-[#e2e8f0] bg-[#f8fafc] px-2.5 py-2">
-          <p className="text-[10px] font-medium text-[#94a3b8]">Submission due</p>
-          <p className="text-sm font-semibold text-[#0f172a] mt-0.5">
+          <p className="text-[11px] font-medium text-[#141414]">Submission due</p>
+          <p className="text-sm font-semibold text-[#000000] mt-0.5">
             {dueIso ? String(dueIso).slice(0, 10) : "Due date pending"}
           </p>
-          <p className="text-[10px] text-[#64748b]">
+          <p className="text-[11px] text-[#111111]">
             {daysRemaining == null
               ? "—"
               : daysRemaining < 0
@@ -984,18 +984,18 @@ function CycleDetailPanel({
           </p>
         </div>
         <div className="rounded-md border border-[#e2e8f0] bg-[#f8fafc] px-2.5 py-2">
-          <p className="text-[10px] font-medium text-[#94a3b8]">Open tasks</p>
-          <p className="text-sm font-semibold text-[#0f172a] mt-0.5 tabular-nums">
+          <p className="text-[11px] font-medium text-[#141414]">Open tasks</p>
+          <p className="text-sm font-semibold text-[#000000] mt-0.5 tabular-nums">
             {openTaskCount}
           </p>
-          <p className="text-[10px] text-[#64748b]">{completedTaskCount} completed</p>
+          <p className="text-[11px] text-[#111111]">{completedTaskCount} completed</p>
         </div>
         <div className="rounded-md border border-[#e2e8f0] bg-[#f8fafc] px-2.5 py-2">
-          <p className="text-[10px] font-medium text-[#94a3b8]">Validation issues</p>
-          <p className="text-sm font-semibold text-[#0f172a] mt-0.5 tabular-nums">
+          <p className="text-[11px] font-medium text-[#141414]">Validation issues</p>
+          <p className="text-sm font-semibold text-[#000000] mt-0.5 tabular-nums">
             {validationIssueCount}
           </p>
-          <p className="text-[10px] text-[#64748b]">
+          <p className="text-[11px] text-[#111111]">
             {validationNeedsAttention
               ? "Needs attention"
               : validationPassed
@@ -1007,17 +1007,17 @@ function CycleDetailPanel({
 
       {planningAreas.length > 0 && (
         <div>
-          <p className="text-[11px] font-medium text-[#0f172a] mb-1.5">Planning areas</p>
+          <p className="text-[11px] font-medium text-[#000000] mb-1.5">Planning areas</p>
           <ul className="space-y-1">
             {planningAreas.map((a) => (
               <li
                 key={a.id}
                 className="text-[11px] flex justify-between gap-2 rounded-md px-2.5 py-1.5 bg-[#f8fafc]"
               >
-                <span className="text-[#0f172a]">
+                <span className="text-[#000000]">
                   {a.label}
                   {a.detail ? (
-                    <span className="text-[#94a3b8]"> · {a.detail}</span>
+                    <span className="text-[#141414]"> · {a.detail}</span>
                   ) : null}
                 </span>
                 <span
@@ -1025,7 +1025,7 @@ function CycleDetailPanel({
                     "font-medium shrink-0",
                     a.status === "Complete" && "text-[#166534]",
                     a.status === "In Progress" && "text-[#2563eb]",
-                    a.status === "Not Started" && "text-[#94a3b8]",
+                    a.status === "Not Started" && "text-[#141414]",
                   )}
                 >
                   {a.status}
@@ -1038,7 +1038,7 @@ function CycleDetailPanel({
 
       {showOwnerSubmit && ownerSubmitBlocked && (
         <div className="rounded-md border border-[#fde68a] bg-[#fffbeb] px-3 py-2 text-[11px] text-[#92400e]">
-          <p className="font-semibold text-[#0f172a]">
+          <p className="font-semibold text-[#000000]">
             Submit blocked — {submitUnmet.length}{" "}
             {submitUnmet.length === 1 ? "requirement unmet" : "requirements unmet"}:
           </p>
@@ -1160,11 +1160,11 @@ function CycleDetailPanel({
 
         {(showOwnerSubmit || showSubmitFpa) && (
           <div className="space-y-1.5">
-            <label className="text-[11px] font-medium text-[#0f172a]">
+            <label className="text-[11px] font-medium text-[#000000]">
               {showOwnerSubmit ? "Change notes" : "Comment"}
             </label>
             <textarea
-              className="w-full min-h-[64px] rounded-xl border border-[#e2e8f0] px-3 py-2 text-xs text-[#0f172a] placeholder:text-[#94a3b8]"
+              className="w-full min-h-[64px] rounded-xl border border-[#e2e8f0] px-3 py-2 text-xs text-[#000000] placeholder:text-[#141414]"
               placeholder={
                 showOwnerSubmit
                   ? "What changed vs prior year / baseline? (saved on submit)"
@@ -1359,8 +1359,8 @@ function CycleDetailPanel({
           cycle.versionId &&
           (canLockVersion || canApproveBudget || canAssignTasks) && (
             <div className="space-y-2 rounded-xl border border-[#e2e8f0] p-3">
-              <p className="text-[11px] font-medium text-[#0f172a]">Request reopen</p>
-              <p className="text-[10px] text-[#64748b] leading-relaxed">
+              <p className="text-[11px] font-medium text-[#000000]">Request reopen</p>
+              <p className="text-[11px] text-[#111111] leading-relaxed">
                 Creates a new DRAFT working copy — the locked version stays locked.
               </p>
               <textarea
@@ -1408,7 +1408,7 @@ function CycleDetailPanel({
 
       {showPrep && (
         <details className="rounded-xl border border-[#e2e8f0] px-3 py-2">
-          <summary className="text-[11px] font-medium text-[#64748b] cursor-pointer select-none">
+          <summary className="text-[11px] font-medium text-[#111111] cursor-pointer select-none">
             Prep data (optional)
           </summary>
           <div className="mt-2 flex flex-col gap-2">
@@ -1456,7 +1456,7 @@ function CycleDetailPanel({
 
       {registerRows.length > 0 && (
         <div>
-          <p className="text-[11px] font-medium text-[#0f172a] mb-1.5">
+          <p className="text-[11px] font-medium text-[#000000] mb-1.5">
             Department budget register
           </p>
           <ul className="space-y-1">
@@ -1465,13 +1465,13 @@ function CycleDetailPanel({
                 key={r.key}
                 className="text-[11px] flex justify-between gap-2 rounded-md px-2.5 py-1.5 bg-[#f8fafc]"
               >
-                <span className="min-w-0 truncate text-[#0f172a]">{r.label}</span>
+                <span className="min-w-0 truncate text-[#000000]">{r.label}</span>
                 {"badge" in r && r.badge ? (
                   <FpaStatusBadge tone={statusTone(String(r.status || "pending"))}>
                     {r.status || "Pending"}
                   </FpaStatusBadge>
                 ) : (
-                  <span className="shrink-0 tabular-nums text-[#475569]">{r.right}</span>
+                  <span className="shrink-0 tabular-nums text-[#111111]">{r.right}</span>
                 )}
               </li>
             ))}
@@ -1516,7 +1516,7 @@ function ActionBtn({
         fullWidth ? "h-10 w-full text-sm" : "h-8",
         primary && "bg-[#2563eb] text-white",
         danger && "border border-[#fecaca] text-[#b91c1c] bg-[#fef2f2]",
-        !primary && !danger && "border border-[#e2e8f0] text-[#0f172a] bg-white",
+        !primary && !danger && "border border-[#e2e8f0] text-[#000000] bg-white",
       )}
     >
       {busy && <Loader2 className="w-3 h-3 animate-spin" />}
@@ -1607,7 +1607,7 @@ function PillSelect({
       </SelectTrigger>
       <SelectContent className="rounded-xl border-[#e2e8f0]">
         {options.length === 0 ? (
-          <div className="px-3 py-2 text-xs text-[#94a3b8]">{emptyLabel || "No options"}</div>
+          <div className="px-3 py-2 text-xs text-[#141414]">{emptyLabel || "No options"}</div>
         ) : (
           options.map((o) => (
             <SelectItem key={o.value} value={o.value} className="rounded-lg text-sm">
@@ -2138,7 +2138,7 @@ export function CreateBudgetCycleModal({
     }
   }
 
-  const fieldHint = "text-[10px] text-[#94a3b8]"
+  const fieldHint = "text-[11px] text-[#141414]"
   const currentLabel = CREATE_CYCLE_STEPS[stepIdx]?.label ?? ""
   const isLast = step === "validate"
 
@@ -2152,10 +2152,10 @@ export function CreateBudgetCycleModal({
       >
         <div className="flex items-start justify-between gap-3 px-4 sm:px-5 py-3 border-b border-[#e2e8f0] shrink-0">
           <div>
-            <h2 id="create-cycle-title" className="text-sm font-semibold text-[#0f172a]">
+            <h2 id="create-cycle-title" className="text-sm font-semibold text-[#000000]">
               Create planning cycle
             </h2>
-            <p className="text-[11px] text-[#64748b] mt-0.5">
+            <p className="text-[11px] text-[#111111] mt-0.5">
               Step {stepIdx + 1} of {CREATE_CYCLE_STEPS.length} · {currentLabel}
               {draftCycleId ? " · Draft saved" : " · Opens as DRAFT until you validate"}
             </p>
@@ -2164,7 +2164,7 @@ export function CreateBudgetCycleModal({
             type="button"
             disabled={busy}
             onClick={onClose}
-            className="text-[#94a3b8] hover:text-[#475569]"
+            className="text-[#141414] hover:text-[#111111]"
             aria-label="Close"
           >
             <X className="w-4 h-4" />
@@ -2187,15 +2187,15 @@ export function CreateBudgetCycleModal({
                         "w-full flex items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-[11px]",
                         active && "bg-[#eff6ff] text-[#2563eb] font-medium",
                         done && !active && "text-[#16a34a]",
-                        !active && !done && "text-[#64748b] hover:bg-white",
+                        !active && !done && "text-[#111111] hover:bg-white",
                       )}
                     >
                       <span
                         className={cn(
-                          "h-5 w-5 rounded-full flex items-center justify-center text-[10px] shrink-0 border",
+                          "h-5 w-5 rounded-full flex items-center justify-center text-[11px] shrink-0 border",
                           active && "bg-[#2563eb] text-white border-[#2563eb]",
                           done && !active && "bg-[#dcfce7] text-[#16a34a] border-[#bbf7d0]",
-                          !active && !done && "border-[#e2e8f0] text-[#94a3b8]",
+                          !active && !done && "border-[#e2e8f0] text-[#141414]",
                         )}
                       >
                         {done ? <Check className="w-3 h-3" /> : s.short}
@@ -2217,12 +2217,12 @@ export function CreateBudgetCycleModal({
                   disabled={busy}
                   onClick={() => goToStep(s.id)}
                   className={cn(
-                    "h-7 shrink-0 rounded-full border px-2.5 text-[10px]",
+                    "h-7 shrink-0 rounded-full border px-2.5 text-[11px]",
                     s.id === step
                       ? "border-[#2563eb] bg-[#eff6ff] text-[#2563eb] font-medium"
                       : i < stepIdx
                         ? "border-[#bbf7d0] bg-[#f0fdf4] text-[#16a34a]"
-                        : "border-[#e2e8f0] text-[#64748b]",
+                        : "border-[#e2e8f0] text-[#111111]",
                   )}
                 >
                   {s.short}. {s.label}
@@ -2230,11 +2230,11 @@ export function CreateBudgetCycleModal({
               ))}
             </div>
 
-            <h3 className="text-sm font-semibold text-[#0f172a]">{currentLabel}</h3>
+            <h3 className="text-sm font-semibold text-[#000000]">{currentLabel}</h3>
 
             {setupErrors.length > 0 && (
               <div className="rounded-md border border-[#fecaca] bg-[#fef2f2] px-3 py-2.5 text-[12px] text-[#7f1d1d]">
-                <p className="font-semibold text-[#0f172a]">
+                <p className="font-semibold text-[#000000]">
                   {isLast
                     ? `Planning cycle cannot be opened. ${setupErrors.length} requirement${
                         setupErrors.length === 1 ? "" : "s"
@@ -2253,7 +2253,7 @@ export function CreateBudgetCycleModal({
 
             {step === "type" && (
               <div className="space-y-3">
-                <div className="block text-xs text-[#64748b]">
+                <div className="block text-xs text-[#111111]">
                   Planning type
                   <PillSelect
                     value={cycleType}
@@ -2268,7 +2268,7 @@ export function CreateBudgetCycleModal({
                   </p>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div className="block text-xs text-[#64748b] sm:col-span-2">
+                  <div className="block text-xs text-[#111111] sm:col-span-2">
                     Source model
                     <PillSelect
                       value={modelId}
@@ -2281,7 +2281,7 @@ export function CreateBudgetCycleModal({
                       }))}
                     />
                   </div>
-                  <label className="block text-xs text-[#64748b]">
+                  <label className="block text-xs text-[#111111]">
                     Cycle name
                     <input
                       className={FIELD}
@@ -2289,7 +2289,7 @@ export function CreateBudgetCycleModal({
                       onChange={(e) => setName(e.target.value)}
                     />
                   </label>
-                  <label className="block text-xs text-[#64748b]">
+                  <label className="block text-xs text-[#111111]">
                     Financial year
                     <input
                       className={FIELD}
@@ -2310,12 +2310,12 @@ export function CreateBudgetCycleModal({
 
             {step === "horizon" && (
               <div className="space-y-3">
-                <p className="text-[11px] text-[#64748b]">
+                <p className="text-[11px] text-[#111111]">
                   Set the planning window, actuals cut-off, forecast start, and optional submission
                   deadline for owners.
                 </p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <label className="block text-xs text-[#64748b]">
+                  <label className="block text-xs text-[#111111]">
                     Planning start
                     <input
                       className={FIELD}
@@ -2324,7 +2324,7 @@ export function CreateBudgetCycleModal({
                       onChange={(e) => setStartDate(e.target.value)}
                     />
                   </label>
-                  <label className="block text-xs text-[#64748b]">
+                  <label className="block text-xs text-[#111111]">
                     Planning end
                     <input
                       className={FIELD}
@@ -2333,7 +2333,7 @@ export function CreateBudgetCycleModal({
                       onChange={(e) => setEndDate(e.target.value)}
                     />
                   </label>
-                  <label className="block text-xs text-[#64748b]">
+                  <label className="block text-xs text-[#111111]">
                     Actuals cut-off
                     <input
                       className={FIELD}
@@ -2342,7 +2342,7 @@ export function CreateBudgetCycleModal({
                       onChange={(e) => setActualsCutoffDate(e.target.value)}
                     />
                   </label>
-                  <label className="block text-xs text-[#64748b]">
+                  <label className="block text-xs text-[#111111]">
                     Forecast start period
                     <input
                       className={FIELD}
@@ -2351,7 +2351,7 @@ export function CreateBudgetCycleModal({
                       onChange={(e) => setForecastStartPeriod(e.target.value)}
                     />
                   </label>
-                  <label className="block text-xs text-[#64748b] sm:col-span-2">
+                  <label className="block text-xs text-[#111111] sm:col-span-2">
                     Submission deadline (optional)
                     <input
                       className={FIELD}
@@ -2372,7 +2372,7 @@ export function CreateBudgetCycleModal({
                   when opened with cycleId.
                 </p>
                 {lookupsLoading && (
-                  <span className="text-[11px] text-[#64748b] inline-flex items-center gap-1">
+                  <span className="text-[11px] text-[#111111] inline-flex items-center gap-1">
                     <Loader2 className="w-3 h-3 animate-spin" /> Loading departments & users…
                   </span>
                 )}
@@ -2390,7 +2390,7 @@ export function CreateBudgetCycleModal({
                 )}
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_1fr_1fr_auto] gap-2 items-end">
-                  <div className="block text-xs text-[#64748b]">
+                  <div className="block text-xs text-[#111111]">
                     Department
                     <PillSelect
                       value={selectedDeptId}
@@ -2403,7 +2403,7 @@ export function CreateBudgetCycleModal({
                       options={departments.map((d) => ({ value: d.id, label: d.name }))}
                     />
                   </div>
-                  <div className="block text-xs text-[#64748b]">
+                  <div className="block text-xs text-[#111111]">
                     Budget owner
                     <PillSelect
                       value={selectedAssigneeId}
@@ -2417,7 +2417,7 @@ export function CreateBudgetCycleModal({
                       }))}
                     />
                   </div>
-                  <div className="block text-xs text-[#64748b]">
+                  <div className="block text-xs text-[#111111]">
                     Owner due date
                     <input
                       type="date"
@@ -2426,7 +2426,7 @@ export function CreateBudgetCycleModal({
                       onChange={(e) => setOwnerDraftDueDate(e.target.value)}
                     />
                   </div>
-                  <div className="block text-xs text-[#64748b]">
+                  <div className="block text-xs text-[#111111]">
                     Owner baseline
                     <PillSelect
                       value={ownerDraftBaselineMethod}
@@ -2448,7 +2448,7 @@ export function CreateBudgetCycleModal({
                 </div>
 
                 {owners.length === 0 ? (
-                  <p className="text-[11px] text-[#94a3b8]">
+                  <p className="text-[11px] text-[#141414]">
                     Select a department and owner, then Add. Every department needs an assignee.
                   </p>
                 ) : (
@@ -2459,7 +2459,7 @@ export function CreateBudgetCycleModal({
                         className="rounded-md border border-[#f1f5f9] px-3 py-2 space-y-1.5"
                       >
                         <div className="flex items-center justify-between gap-2">
-                          <span className="text-xs font-medium text-[#0f172a]">
+                          <span className="text-xs font-medium text-[#000000]">
                             {o.departmentName}
                           </span>
                           <button
@@ -2475,7 +2475,7 @@ export function CreateBudgetCycleModal({
                           </button>
                         </div>
                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                          <div className="block text-[11px] text-[#64748b]">
+                          <div className="block text-[11px] text-[#111111]">
                             Assigned user
                             <PillSelect
                               value={o.assigneeId}
@@ -2497,7 +2497,7 @@ export function CreateBudgetCycleModal({
                               options={users.map((u) => ({ value: u.id, label: userLabel(u) }))}
                             />
                           </div>
-                          <div className="block text-[11px] text-[#64748b]">
+                          <div className="block text-[11px] text-[#111111]">
                             Due date
                             <input
                               type="date"
@@ -2514,7 +2514,7 @@ export function CreateBudgetCycleModal({
                               }
                             />
                           </div>
-                          <div className="block text-[11px] text-[#64748b]">
+                          <div className="block text-[11px] text-[#111111]">
                             Baseline method
                             <PillSelect
                               value={o.baselineMethod || baselineMode}
@@ -2541,7 +2541,7 @@ export function CreateBudgetCycleModal({
                 )}
 
                 <div>
-                  <p className="text-xs text-[#64748b] mb-1.5">Planning areas (input categories)</p>
+                  <p className="text-xs text-[#111111] mb-1.5">Planning areas (input categories)</p>
                   <div className="flex flex-wrap gap-1.5">
                     {BUDGET_INPUT_CATEGORIES.map((c) => {
                       const on = categories.includes(c.id)
@@ -2574,7 +2574,7 @@ export function CreateBudgetCycleModal({
             {step === "baseline" && (
               <div className="space-y-3">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div className="block text-xs text-[#64748b]">
+                  <div className="block text-xs text-[#111111]">
                     Base scenario
                     <PillSelect
                       value={scenarioId}
@@ -2588,7 +2588,7 @@ export function CreateBudgetCycleModal({
                       }))}
                     />
                   </div>
-                  <div className="block text-xs text-[#64748b]">
+                  <div className="block text-xs text-[#111111]">
                     Base / working version
                     <PillSelect
                       value={verId}
@@ -2601,7 +2601,7 @@ export function CreateBudgetCycleModal({
                   </div>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div className="block text-xs text-[#64748b]">
+                  <div className="block text-xs text-[#111111]">
                     Cycle baseline method
                     <PillSelect
                       value={baselineMode}
@@ -2616,7 +2616,7 @@ export function CreateBudgetCycleModal({
                       Applied on open when Load baseline is checked (owners can override).
                     </span>
                   </div>
-                  <div className="block text-xs text-[#64748b]">
+                  <div className="block text-xs text-[#111111]">
                     Approval workflow
                     <PillSelect
                       value={workflowTemplateId}
@@ -2634,7 +2634,7 @@ export function CreateBudgetCycleModal({
                   </div>
                 </div>
                 <div className="space-y-2 rounded-md border border-[#e2e8f0] bg-[#f8fafc] p-3">
-                  <label className="flex items-start gap-2 text-xs text-[#0f172a]">
+                  <label className="flex items-start gap-2 text-xs text-[#000000]">
                     <input
                       type="checkbox"
                       className="mt-0.5"
@@ -2643,12 +2643,12 @@ export function CreateBudgetCycleModal({
                     />
                     <span>
                       <span className="font-medium">Load prior-year actuals on open</span>
-                      <span className="block text-[11px] text-[#64748b] mt-0.5 font-normal">
+                      <span className="block text-[11px] text-[#111111] mt-0.5 font-normal">
                         Pull last year’s figures as reference before owners enter the new plan.
                       </span>
                     </span>
                   </label>
-                  <label className="flex items-start gap-2 text-xs text-[#0f172a]">
+                  <label className="flex items-start gap-2 text-xs text-[#000000]">
                     <input
                       type="checkbox"
                       className="mt-0.5"
@@ -2657,7 +2657,7 @@ export function CreateBudgetCycleModal({
                     />
                     <span>
                       <span className="font-medium">Load baseline assumptions on open</span>
-                      <span className="block text-[11px] text-[#64748b] mt-0.5 font-normal">
+                      <span className="block text-[11px] text-[#111111] mt-0.5 font-normal">
                         Seed the working version so owners are not starting from a blank sheet.
                       </span>
                     </span>
@@ -2668,55 +2668,55 @@ export function CreateBudgetCycleModal({
 
             {step === "validate" && (
               <div className="space-y-3">
-                <p className="text-[11px] text-[#64748b] leading-relaxed">
-                  Saves as <span className="font-medium text-[#0f172a]">DRAFT</span>, runs{" "}
-                  <span className="font-medium text-[#0f172a]">validate-setup</span> (full error
-                  list), then <span className="font-medium text-[#0f172a]">open</span> to notify
+                <p className="text-[11px] text-[#111111] leading-relaxed">
+                  Saves as <span className="font-medium text-[#000000]">DRAFT</span>, runs{" "}
+                  <span className="font-medium text-[#000000]">validate-setup</span> (full error
+                  list), then <span className="font-medium text-[#000000]">open</span> to notify
                   owners and set status OPEN_FOR_INPUT.
                 </p>
                 <dl className="rounded-md border border-[#e2e8f0] bg-[#f8fafc] divide-y divide-[#e2e8f0] text-[12px]">
                   <div className="flex justify-between gap-3 px-3 py-2">
-                    <dt className="text-[#64748b]">Type</dt>
-                    <dd className="font-medium text-[#0f172a] text-right">
+                    <dt className="text-[#111111]">Type</dt>
+                    <dd className="font-medium text-[#000000] text-right">
                       {PLANNING_CYCLE_TYPES.find((t) => t.id === cycleType)?.label || cycleType}
                     </dd>
                   </div>
                   <div className="flex justify-between gap-3 px-3 py-2">
-                    <dt className="text-[#64748b]">Model</dt>
-                    <dd className="font-medium text-[#0f172a] text-right truncate max-w-[60%]">
+                    <dt className="text-[#111111]">Model</dt>
+                    <dd className="font-medium text-[#000000] text-right truncate max-w-[60%]">
                       {models.find((m) => m.id === modelId)?.name || "—"}
                     </dd>
                   </div>
                   <div className="flex justify-between gap-3 px-3 py-2">
-                    <dt className="text-[#64748b]">Cycle</dt>
-                    <dd className="font-medium text-[#0f172a] text-right">{name || "—"}</dd>
+                    <dt className="text-[#111111]">Cycle</dt>
+                    <dd className="font-medium text-[#000000] text-right">{name || "—"}</dd>
                   </div>
                   <div className="flex justify-between gap-3 px-3 py-2">
-                    <dt className="text-[#64748b]">Horizon</dt>
-                    <dd className="font-medium text-[#0f172a] text-right">
+                    <dt className="text-[#111111]">Horizon</dt>
+                    <dd className="font-medium text-[#000000] text-right">
                       {startDate} → {endDate}
                     </dd>
                   </div>
                   <div className="flex justify-between gap-3 px-3 py-2">
-                    <dt className="text-[#64748b]">Owners</dt>
-                    <dd className="font-medium text-[#0f172a] text-right">
+                    <dt className="text-[#111111]">Owners</dt>
+                    <dd className="font-medium text-[#000000] text-right">
                       {owners.length} department{owners.length === 1 ? "" : "s"}
                     </dd>
                   </div>
                   <div className="flex justify-between gap-3 px-3 py-2">
-                    <dt className="text-[#64748b]">Planning areas</dt>
-                    <dd className="font-medium text-[#0f172a] text-right">{categories.length}</dd>
+                    <dt className="text-[#111111]">Planning areas</dt>
+                    <dd className="font-medium text-[#000000] text-right">{categories.length}</dd>
                   </div>
                   <div className="flex justify-between gap-3 px-3 py-2">
-                    <dt className="text-[#64748b]">Baseline method</dt>
-                    <dd className="font-medium text-[#0f172a] text-right">
+                    <dt className="text-[#111111]">Baseline method</dt>
+                    <dd className="font-medium text-[#000000] text-right">
                       {BUDGET_BASELINE_METHODS.find((m) => m.id === baselineMode)?.label ||
                         baselineMode}
                     </dd>
                   </div>
                   <div className="flex justify-between gap-3 px-3 py-2">
-                    <dt className="text-[#64748b]">Load on open</dt>
-                    <dd className="font-medium text-[#0f172a] text-right">
+                    <dt className="text-[#111111]">Load on open</dt>
+                    <dd className="font-medium text-[#000000] text-right">
                       {[loadActuals && "Actuals", loadBaseline && "Baseline"]
                         .filter(Boolean)
                         .join(", ") || "None"}
@@ -2724,10 +2724,10 @@ export function CreateBudgetCycleModal({
                   </div>
                 </dl>
                 {owners.length > 0 && (
-                  <ul className="text-[11px] text-[#475569] space-y-1">
+                  <ul className="text-[11px] text-[#111111] space-y-1">
                     {owners.map((o) => (
                       <li key={o.departmentId}>
-                        <span className="font-medium text-[#0f172a]">{o.departmentName}</span>
+                        <span className="font-medium text-[#000000]">{o.departmentName}</span>
                         {" · "}
                         {o.assigneeName}
                         {o.dueDate ? ` · due ${o.dueDate}` : ""}
@@ -2751,7 +2751,7 @@ export function CreateBudgetCycleModal({
             type="button"
             disabled={busy}
             onClick={onClose}
-            className="h-9 rounded-full border border-[#e2e8f0] px-4 text-xs text-[#475569]"
+            className="h-9 rounded-full border border-[#e2e8f0] px-4 text-xs text-[#111111]"
           >
             Cancel
           </button>
@@ -2760,7 +2760,7 @@ export function CreateBudgetCycleModal({
               type="button"
               disabled={busy || stepIdx === 0}
               onClick={onBack}
-              className="h-9 inline-flex items-center gap-1 rounded-full border border-[#e2e8f0] px-3 text-xs text-[#475569] disabled:opacity-50"
+              className="h-9 inline-flex items-center gap-1 rounded-full border border-[#e2e8f0] px-3 text-xs text-[#111111] disabled:opacity-50"
             >
               <ChevronLeft className="w-3.5 h-3.5" />
               Back
@@ -2771,7 +2771,7 @@ export function CreateBudgetCycleModal({
                   type="button"
                   disabled={busy || !modelId}
                   onClick={() => void saveDraft()}
-                  className="h-9 inline-flex items-center gap-1.5 rounded-full border border-[#e2e8f0] px-3 text-xs font-medium text-[#0f172a] disabled:opacity-50"
+                  className="h-9 inline-flex items-center gap-1.5 rounded-full border border-[#e2e8f0] px-3 text-xs font-medium text-[#000000] disabled:opacity-50"
                 >
                   {busy && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
                   Save draft

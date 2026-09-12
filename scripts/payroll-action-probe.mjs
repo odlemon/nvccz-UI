@@ -1,0 +1,285 @@
+/**
+ * Payroll V6 — click a control in the real UI and report what actually happened.
+ *
+ * The dumper proves a screen renders; the tracer proves its numbers are real.
+ * Neither proves a BUTTON does anything. This clicks a `[data-action]` control
+ * as a given role and reports the API calls it produced and the toast it
+ * raised, which is what separates a live control from a silent no-op.
+ *
+ * USAGE
+ *   node scripts/payroll-action-probe.mjs --role=sysadmin --page=runs --action=create-run
+ *   node scripts/payroll-action-probe.mjs --role=hr --page=approvals --action=approve-payroll
+ *
+ * A control that is legitimately view-state produces no API call and no toast —
+ * that is a pass, reported as VIEW-STATE. A control that produces neither and
+ * claims to save is the defect this exists to catch.
+ *
+ * PROBING A WRITE WRITES. `save-paygroup` creates a pay group, which
+ * scripts/_uat/clean-payroll-probes.js in the backend repo removes;
+ * `save-employee` overwrites a field on a REAL employee and a PUT has no undo,
+ * so read the current value first and put it back afterwards. Leaving probe
+ * values in the data the probe verifies is a defect this project has already
+ * had to clean up once, in fundraising.
+ */
+import { chromium } from "playwright"
+
+const ROLES = {
+  sysadmin: "perf.sysadmin@nts.local",
+  exec: "perf.exec@nts.local",
+  hr: "perf.hr@nts.local",
+  deptmgr: "perf.deptmgr@nts.local",
+  employee: "perf.employee@nts.local",
+}
+const PASSWORD = "admin123"
+
+const PAGES = {
+  overview: "/payroll",
+  employees: "/payroll/employees",
+  runs: "/payroll/runs",
+  approvals: "/payroll/approvals",
+  close: "/payroll/close",
+  inputs: "/payroll/inputs",
+  mypay: "/payroll/mypay",
+  components: "/payroll/components",
+  tax: "/payroll/tax",
+  leave: "/payroll/leave",
+  // The probe covered half the module; a control on a page it did not know could not be
+  // exercised at all, which is how a silent no-op stayed invisible.
+  onboarding: "/payroll/onboarding",
+  exceptions: "/payroll/exceptions",
+  calendar: "/payroll/calendar",
+  training: "/payroll/training",
+  vendors: "/payroll/vendors",
+  vault: "/payroll/vault",
+  reports: "/payroll/reports",
+  audit: "/payroll/audit",
+  access: "/payroll/access",
+  settings: "/payroll/settings",
+}
+
+const arg = (n, d) => {
+  const h = process.argv.find((a) => a.startsWith(`--${n}=`))
+  return h ? h.slice(n.length + 3) : d
+}
+
+const BASE = arg("base", process.env.PAYROLL_BASE || "http://localhost:3001")
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:3009/api"
+const ROLE = arg("role", "sysadmin")
+const PAGE = arg("page", "runs")
+const ACTION = arg("action", "")
+const FIELD = arg("field", "") // e.g. runPeriod=July 2031
+
+if (!ROLES[ROLE] || !PAGES[PAGE] || !ACTION) {
+  console.error("usage: --role=<role> --page=<page> --action=<data-action id> [--field=id=value]")
+  process.exit(1)
+}
+
+const browser = await chromium.launch({ headless: true })
+const context = await browser.newContext({ viewport: { width: 1600, height: 1100 } })
+
+const login = await (
+  await fetch(`${API_BASE}/auth/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email: ROLES[ROLE], password: PASSWORD }),
+  })
+).json()
+if (!login.token) {
+  console.error(`login failed for ${ROLES[ROLE]}`)
+  process.exit(1)
+}
+const user = login.user || {}
+const slim = {
+  id: user.id,
+  firstName: user.firstName,
+  lastName: user.lastName,
+  email: user.email,
+  roleCode: user.roleCode,
+  roleName: user.roleName ?? null,
+}
+const { hostname } = new URL(BASE)
+const common = { domain: hostname, path: "/", httpOnly: false, secure: false, sameSite: "Lax" }
+await context.addCookies([
+  { name: "token", value: login.token, ...common },
+  { name: "user", value: encodeURIComponent(JSON.stringify(user)), ...common },
+  { name: "userProfile", value: encodeURIComponent(JSON.stringify(slim)), ...common },
+])
+
+const page = await context.newPage()
+page.setDefaultTimeout(60000)
+
+await page.goto(BASE + PAGES[PAGE], { waitUntil: "domcontentloaded" })
+await page.waitForSelector("#content", { timeout: 60000 })
+// Let the loaders resolve and hydrate before touching anything.
+await page.waitForTimeout(5000)
+
+// Only traffic caused by the click counts, so start recording now.
+const calls = []
+page.on("response", async (r) => {
+  const url = r.url()
+  if (!url.includes("/api/payroll")) return
+  const req = r.request()
+  calls.push(`${req.method()} ${r.status()} ${url.replace(/^https?:\/\/[^/]+/, "").split("?")[0]}`)
+})
+
+// Export actions produce a file rather than a request or a toast. Without
+// this they score as silent no-ops, which is the wrong answer for a control
+// that did exactly what it promised.
+const downloads = []
+const downloadBodies = []
+page.on("download", async (d) => {
+  downloads.push(d.suggestedFilename())
+  try {
+    const stream = await d.createReadStream()
+    if (stream) {
+      const chunks = []
+      for await (const c of stream) chunks.push(c)
+      downloadBodies.push(Buffer.concat(chunks).toString("utf8").slice(0, 400))
+    }
+  } catch (_) {}
+})
+
+/**
+ * Overlay state. Modals and drawers live in the shell, OUTSIDE #content, so
+ * comparing #content length alone scores "open a dialog" as a silent no-op --
+ * a false negative that would have condemned working controls.
+ */
+const overlayState = () =>
+  page.evaluate(() => ({
+    modal: (document.querySelector("#modal") || {}).className || "",
+    drawer: (document.querySelector("#drawer") || {}).className || "",
+    modalLen: ((document.querySelector("#modalBody") || {}).innerText || "").length,
+    drawerLen: ((document.querySelector("#drawerBody") || {}).innerText || "").length,
+  }))
+
+const overlayBefore = await overlayState()
+const before = await page.evaluate(() => document.querySelector("#content").innerText.length)
+
+// Some actions live behind a modal opened by another control (e.g. create-run
+// is inside the "New run" dialog), so open it if the action is not on screen.
+// Some actions only exist inside a modal. The modal markup lives in the shell
+// and is present-but-hidden even when closed, so searching first would find an
+// unclickable copy and the click would look like a silent no-op. Open the
+// dialog first whenever one is known, then take the VISIBLE element.
+// A value may be a single action id or a list of steps clicked in order. A step
+// beginning with "[" is a raw selector, for controls that are not [data-action]
+// at all: the employee drawer opens from a table row carrying [data-employee],
+// and the Edit employee button only exists once that drawer is open.
+const OPENERS = {
+  "create-run": "new-run",
+  "save-run": "new-run",
+  "record-decision": "approval-decision",
+  "complete-onboarding": "new-employee",
+  "save-onboarding": "new-employee",
+  "confirm-upload": "upload-document",
+  "confirm-create-document": "create-document",
+  "save-paygroup": "new-paygroup",
+  "save-employee": ["[data-employee]", "edit-employee"],
+}
+const opener = OPENERS[ACTION]
+let modalOpened = null
+if (opener) {
+  for (const step of Array.isArray(opener) ? opener : [opener]) {
+    const selector = step.startsWith("[") ? step : `[data-action="${step}"]`
+    const o = await page.$(selector)
+    if (!o) {
+      console.log(`OPENER      ${selector} not found — later steps skipped`)
+      break
+    }
+    await o.click({ force: true })
+    await page.waitForTimeout(2500)
+  }
+  modalOpened = await page.evaluate(() => {
+    const m = document.querySelector("#modal")
+    return m ? m.className : null
+  })
+}
+let found = await page.$(`[data-action="${ACTION}"]:visible`)
+if (!found) found = await page.$(`[data-action="${ACTION}"]`)
+
+if (!found) {
+  console.log(`ACTION      ${ACTION}`)
+  console.log(`ROLE        ${ROLE}`)
+  console.log(`PAGE        ${PAGE}`)
+  console.log(`RESULT      NOT PRESENT — no [data-action="${ACTION}"] on this screen for this role`)
+  await browser.close()
+  process.exit(0)
+}
+
+// --field may be repeated, or given once as "a=1;b=2", so a form with several
+// required inputs can be filled in one run.
+const fieldSpecs = process.argv
+  .filter((a) => a.startsWith("--field="))
+  .flatMap((a) => a.slice("--field=".length).split(";"))
+  .map((f) => f.trim())
+  .filter(Boolean)
+
+for (const spec of fieldSpecs) {
+  const [id, ...rest] = spec.split("=")
+  const value = rest.join("=")
+  const ok = await page.evaluate((id) => !!document.querySelector(`#${id}`), id)
+  console.log(`FIELD       #${id} present: ${ok}`)
+  await page.evaluate(
+    ([id, value]) => {
+      const el = document.querySelector(`#${id}`)
+      if (el) {
+        el.value = value
+        el.dispatchEvent(new Event("input", { bubbles: true }))
+        el.dispatchEvent(new Event("change", { bubbles: true }))
+      }
+    },
+    [id, value],
+  )
+}
+
+// force: the modal backdrop overlays the dialog's own buttons, so a plain
+// click waits on actionability and never lands -- which reads as a silent
+// no-op and is exactly the false negative this script must not produce.
+await found.click({ force: true })
+// Give the request and the toast time to land.
+await page.waitForTimeout(5000)
+
+const toasts = await page.evaluate(() => {
+  const seen = new Set()
+  for (const t of document.querySelectorAll("[data-sonner-toast], .toast, .toast-stack > *")) {
+    const txt = (t.innerText || "").replace(/\s+/g, " ").trim()
+    if (txt) seen.add(txt)
+  }
+  return Array.from(seen)
+})
+const after = await page.evaluate(() => document.querySelector("#content").innerText.length)
+const overlayAfter = await overlayState()
+const overlayChanged =
+  overlayBefore.modal !== overlayAfter.modal ||
+  overlayBefore.drawer !== overlayAfter.drawer ||
+  overlayBefore.modalLen !== overlayAfter.modalLen ||
+  overlayBefore.drawerLen !== overlayAfter.drawerLen
+
+const apiCalls = calls.filter((c) => !c.startsWith("GET 200 /api/payroll/me/access"))
+
+console.log(`ACTION      ${ACTION}`)
+console.log(`ROLE        ${ROLE} (${ROLES[ROLE]})`)
+console.log(`PAGE        ${PAGE}`)
+console.log(`API CALLS   ${apiCalls.length}`)
+for (const c of apiCalls) console.log(`  ${c}`)
+console.log(`TOASTS      ${toasts.length}`)
+for (const t of toasts) console.log(`  ${t}`)
+console.log(`CONTENT     ${before} -> ${after} chars`)
+console.log(`OVERLAY     modal "${overlayBefore.modal}"->"${overlayAfter.modal}" body ${overlayBefore.modalLen}->${overlayAfter.modalLen}`)
+console.log(`DOWNLOADS   ${downloads.length}`)
+for (const d of downloads) console.log(`  ${d}`)
+for (const b of downloadBodies) console.log(`  --- first 400 chars ---
+${b}`)
+if (opener) console.log(`MODAL       opened via "${opener}" -> ${modalOpened ?? "(no #modal)"}`)
+
+const writes = apiCalls.filter((c) => !c.startsWith("GET"))
+let verdict
+if (writes.length) verdict = "LIVE — reached a write endpoint"
+else if (downloads.length) verdict = `EXPORT — produced ${downloads.join(", ")}`
+else if (toasts.length) verdict = "REFUSED / MESSAGED — no write, but the UI said so"
+else if (after !== before) verdict = "VIEW-STATE — changed the screen, no API call"
+else if (overlayChanged) verdict = "VIEW-STATE — opened a dialog, no API call"
+else verdict = "SILENT NO-OP — no API call, no message, no visible change"
+console.log(`VERDICT     ${verdict}`)
+
+await browser.close()

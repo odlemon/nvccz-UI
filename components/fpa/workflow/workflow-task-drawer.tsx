@@ -88,8 +88,8 @@ export function WorkflowTaskDetailPanel({
   if (!task) {
     return (
       <aside className="h-full min-h-[420px] xl:min-h-0 flex-1 rounded-xl border border-[#e2e8f0] bg-white p-5 flex flex-col items-center justify-center text-center shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
-        <p className="text-[13px] font-medium text-[#475569]">No task selected</p>
-        <p className="text-[11px] text-[#94a3b8] mt-1.5 max-w-[200px] leading-relaxed">
+        <p className="text-[13px] font-medium text-[#111111]">No task selected</p>
+        <p className="text-[11px] text-[#141414] mt-1.5 max-w-[200px] leading-relaxed">
           Select a row in Workflow Tasks to review budget details, notes, and actions.
         </p>
       </aside>
@@ -113,12 +113,12 @@ export function WorkflowTaskDetailPanel({
     <aside className="h-full max-h-full min-h-[420px] xl:min-h-0 flex-1 rounded-xl border border-[#e2e8f0] bg-white flex flex-col overflow-hidden shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
       <div className="flex items-start justify-between gap-2 px-4 py-3.5 border-b border-[#e2e8f0] shrink-0">
         <div className="min-w-0">
-          <h2 className="text-[14px] font-semibold text-[#0f172a] leading-snug">{task.title}</h2>
+          <h2 className="text-[14px] font-semibold text-[#000000] leading-snug">{task.title}</h2>
           <div className="flex flex-wrap items-center gap-2 mt-1.5">
             <FpaStatusBadge tone={taskStatusTone(task.status)}>
               {String(task.status).replace(/_/g, " ")}
             </FpaStatusBadge>
-            <p className="text-[10px] text-[#94a3b8]">
+            <p className="text-[11px] text-[#141414]">
               {task.submittedOn
                 ? `Submitted ${formatDateTime(task.submittedOn)}`
                 : `Due ${formatShortDate(task.dueDate)}`}
@@ -128,7 +128,7 @@ export function WorkflowTaskDetailPanel({
         <button
           type="button"
           onClick={onClose}
-          className="text-[#94a3b8] hover:text-[#64748b] p-1 rounded-lg hover:bg-[#f8fafc]"
+          className="text-[#141414] hover:text-[#111111] p-1 rounded-lg hover:bg-[#f8fafc]"
           aria-label="Close"
         >
           <X className="w-4 h-4" />
@@ -137,15 +137,15 @@ export function WorkflowTaskDetailPanel({
 
       {controls.banner ? (
         <div className="mx-4 mt-3 flex items-start gap-2 rounded-lg border border-[#e2e8f0] bg-[#f8fafc] px-3 py-2.5 shrink-0">
-          <Lock className="w-3.5 h-3.5 text-[#64748b] mt-0.5 shrink-0" />
-          <p className="text-[11px] text-[#475569] leading-relaxed">{controls.banner}</p>
+          <Lock className="w-3.5 h-3.5 text-[#111111] mt-0.5 shrink-0" />
+          <p className="text-[11px] text-[#111111] leading-relaxed">{controls.banner}</p>
         </div>
       ) : null}
 
       <div className="fpa-thin-scroll flex-1 min-h-0 overflow-y-auto p-4 space-y-4 text-sm">
         <section>
           <div className="flex items-center justify-between mb-2">
-            <h3 className="text-[12px] font-semibold text-[#0f172a]">Budget Summary</h3>
+            <h3 className="text-[12px] font-semibold text-[#000000]">Budget Summary</h3>
             {worksheetHref ? (
               <Link
                 href={worksheetHref}
@@ -156,8 +156,8 @@ export function WorkflowTaskDetailPanel({
             ) : null}
           </div>
           <div className="fpa-thin-scroll rounded-lg border border-[#e2e8f0] max-h-48 overflow-y-auto">
-            <table className="w-full text-[10px]">
-              <thead className="bg-[#f8fafc] text-[#64748b]">
+            <table className="w-full text-[11px]">
+              <thead className="bg-[#f8fafc] text-[#111111]">
                 <tr>
                   <th className="text-left px-2 py-1.5 font-medium">Metric</th>
                   <th className="text-right px-2 py-1.5 font-medium">Prior FY</th>
@@ -178,11 +178,11 @@ export function WorkflowTaskDetailPanel({
                           : null
                     return (
                       <tr key={line.label} className="border-t border-[#f1f5f9]">
-                        <td className="px-2 py-1.5 text-[#0f172a]">{line.label}</td>
-                        <td className="px-2 py-1.5 text-right tabular-nums text-[#475569]">
+                        <td className="px-2 py-1.5 text-[#000000]">{line.label}</td>
+                        <td className="px-2 py-1.5 text-right tabular-nums text-[#111111]">
                           {formatMoney(prior, summary.currency || "USD")}
                         </td>
-                        <td className="px-2 py-1.5 text-right tabular-nums text-[#0f172a]">
+                        <td className="px-2 py-1.5 text-right tabular-nums text-[#000000]">
                           {formatMoney(request, summary.currency || "USD")}
                         </td>
                         <td
@@ -190,7 +190,7 @@ export function WorkflowTaskDetailPanel({
                             "px-2 py-1.5 text-right tabular-nums font-medium",
                             pct != null && pct > 0 && "text-[#dc2626]",
                             pct != null && pct < 0 && "text-[#16a34a]",
-                            pct == null && "text-[#94a3b8]",
+                            pct == null && "text-[#141414]",
                           )}
                         >
                           {pct == null
@@ -202,11 +202,11 @@ export function WorkflowTaskDetailPanel({
                   })
                 ) : summary && (summary.priorFy != null || summary.request != null) ? (
                   <tr className="border-t border-[#f1f5f9]">
-                    <td className="px-2 py-1.5 text-[#0f172a]">Total</td>
-                    <td className="px-2 py-1.5 text-right tabular-nums text-[#475569]">
+                    <td className="px-2 py-1.5 text-[#000000]">Total</td>
+                    <td className="px-2 py-1.5 text-right tabular-nums text-[#111111]">
                       {formatMoney(summary.priorFy, summary.currency || "USD")}
                     </td>
-                    <td className="px-2 py-1.5 text-right tabular-nums text-[#0f172a]">
+                    <td className="px-2 py-1.5 text-right tabular-nums text-[#000000]">
                       {formatMoney(summary.request, summary.currency || "USD")}
                     </td>
                     <td
@@ -225,7 +225,7 @@ export function WorkflowTaskDetailPanel({
                   <tr>
                     <td
                       colSpan={4}
-                      className="px-2 py-5 text-center text-[#94a3b8] text-[11px] leading-relaxed"
+                      className="px-2 py-5 text-center text-[#141414] text-[11px] leading-relaxed"
                     >
                       No budget summary available for this task yet.
                     </td>
@@ -237,13 +237,13 @@ export function WorkflowTaskDetailPanel({
         </section>
 
         <section>
-          <h3 className="text-[12px] font-semibold text-[#0f172a] mb-1.5">Change Notes</h3>
+          <h3 className="text-[12px] font-semibold text-[#000000] mb-1.5">Change Notes</h3>
           {task.changeNotes || summary?.changeNotes ? (
-            <p className="text-[11px] text-[#475569] rounded-lg border border-[#e2e8f0] px-3 py-3 leading-relaxed">
+            <p className="text-[11px] text-[#111111] rounded-lg border border-[#e2e8f0] px-3 py-3 leading-relaxed">
               {task.changeNotes || summary?.changeNotes}
             </p>
           ) : (
-            <p className="text-[11px] text-[#94a3b8] rounded-lg border border-dashed border-[#e2e8f0] px-3 py-3 leading-relaxed">
+            <p className="text-[11px] text-[#141414] rounded-lg border border-dashed border-[#e2e8f0] px-3 py-3 leading-relaxed">
               No change notes on this task yet.
             </p>
           )}
@@ -251,9 +251,9 @@ export function WorkflowTaskDetailPanel({
 
         <section>
           <div className="flex items-center justify-between mb-1.5">
-            <h3 className="text-[12px] font-semibold text-[#0f172a]">
+            <h3 className="text-[12px] font-semibold text-[#000000]">
               Attachments{" "}
-              <span className="font-normal text-[#94a3b8]">
+              <span className="font-normal text-[#141414]">
                 · {attachments?.length || 0} files
               </span>
             </h3>
@@ -273,7 +273,7 @@ export function WorkflowTaskDetailPanel({
             ) : null}
           </div>
           {!attachments || attachments.length === 0 ? (
-            <p className="text-[11px] text-[#94a3b8]">No attachments yet.</p>
+            <p className="text-[11px] text-[#141414]">No attachments yet.</p>
           ) : (
             <ul className="space-y-2">
               {attachments.map((a) => (
@@ -282,10 +282,10 @@ export function WorkflowTaskDetailPanel({
                   className="flex items-center justify-between gap-2 rounded-lg border border-[#e2e8f0] px-2.5 py-2"
                 >
                   <div className="min-w-0">
-                    <p className="text-[11px] font-medium text-[#0f172a] truncate">
+                    <p className="text-[11px] font-medium text-[#000000] truncate">
                       {a.fileName || a.name || "File"}
                     </p>
-                    <p className="text-[10px] text-[#94a3b8]">
+                    <p className="text-[11px] text-[#141414]">
                       {a.size != null || a.fileSize != null
                         ? `${Math.round(((a.size ?? a.fileSize) as number) / 1024)} KB`
                         : "—"}
@@ -322,24 +322,24 @@ export function WorkflowTaskDetailPanel({
         </section>
 
         <section>
-          <h3 className="text-[12px] font-semibold text-[#0f172a] mb-2">History</h3>
+          <h3 className="text-[12px] font-semibold text-[#000000] mb-2">History</h3>
           <ul className="space-y-3 border-l-2 border-[#e2e8f0] pl-3 ml-1">
             <li className="relative">
               <span className="absolute -left-[19px] top-1 h-2.5 w-2.5 rounded-full bg-[#2563eb] ring-2 ring-white" />
-              <p className="text-[11px] text-[#0f172a] font-medium">
+              <p className="text-[11px] text-[#000000] font-medium">
                 Current status: {String(task.status).replace(/_/g, " ")}
               </p>
-              <p className="text-[10px] text-[#94a3b8] mt-0.5">
+              <p className="text-[11px] text-[#141414] mt-0.5">
                 {task.departmentName || "Department"} · {task.assigneeName || "Unassigned"}
               </p>
             </li>
             {task.submittedOn ? (
               <li className="relative">
                 <span className="absolute -left-[19px] top-1 h-2.5 w-2.5 rounded-full bg-[#cbd5e1] ring-2 ring-white" />
-                <p className="text-[11px] text-[#0f172a]">
+                <p className="text-[11px] text-[#000000]">
                   Submitted by {task.assigneeName || "owner"}
                 </p>
-                <p className="text-[10px] text-[#94a3b8] mt-0.5">
+                <p className="text-[11px] text-[#141414] mt-0.5">
                   {formatDateTime(task.submittedOn)}
                 </p>
               </li>
@@ -347,34 +347,34 @@ export function WorkflowTaskDetailPanel({
             {task.reviewerName ? (
               <li className="relative">
                 <span className="absolute -left-[19px] top-1 h-2.5 w-2.5 rounded-full bg-[#cbd5e1] ring-2 ring-white" />
-                <p className="text-[11px] text-[#0f172a]">Assigned to {task.reviewerName}</p>
+                <p className="text-[11px] text-[#000000]">Assigned to {task.reviewerName}</p>
               </li>
             ) : null}
           </ul>
         </section>
 
         <section>
-          <h3 className="text-[12px] font-semibold text-[#0f172a] mb-1.5">Task comments</h3>
+          <h3 className="text-[12px] font-semibold text-[#000000] mb-1.5">Task comments</h3>
           <div className="fpa-thin-scroll space-y-2.5 mb-2 max-h-36 overflow-y-auto">
             {(taskComments || []).length === 0 ? (
-              <p className="text-[11px] text-[#94a3b8]">No task comments yet.</p>
+              <p className="text-[11px] text-[#141414]">No task comments yet.</p>
             ) : (
               (taskComments || []).map((c) => (
                 <div key={c.id} className="rounded-lg border border-[#e2e8f0] px-2.5 py-2">
                   <div className="flex items-center justify-between gap-2">
-                    <p className="text-[11px] font-semibold text-[#0f172a] truncate">
+                    <p className="text-[11px] font-semibold text-[#000000] truncate">
                       {c.authorName || "User"}
                     </p>
                     {String(c.visibility || "").toUpperCase() === "INTERNAL" ? (
-                      <span className="text-[9px] font-medium uppercase tracking-wide text-[#7c3aed] bg-[#f5f3ff] px-1.5 py-0.5 rounded">
+                      <span className="text-[11px] font-medium uppercase tracking-wide text-[#7c3aed] bg-[#f5f3ff] px-1.5 py-0.5 rounded">
                         Internal
                       </span>
                     ) : null}
                   </div>
-                  <p className="text-[10px] text-[#94a3b8]">
+                  <p className="text-[11px] text-[#141414]">
                     {c.createdAt ? formatDateTime(c.createdAt) : "—"}
                   </p>
-                  <p className="text-[11px] text-[#475569] mt-1 leading-relaxed">{c.body}</p>
+                  <p className="text-[11px] text-[#111111] mt-1 leading-relaxed">{c.body}</p>
                 </div>
               ))
             )}
@@ -401,13 +401,13 @@ export function WorkflowTaskDetailPanel({
                       onTaskCommentVisibility(e.target.value as "ALL" | "INTERNAL")
                     }
                     disabled={busy || !controls.commentEnabled}
-                    className="h-7 rounded-md border border-[#e2e8f0] px-2 text-[10px] text-[#475569]"
+                    className="h-7 rounded-md border border-[#e2e8f0] px-2 text-[11px] text-[#111111]"
                   >
                     <option value="ALL">Visible to all</option>
                     <option value="INTERNAL">Internal (FP&A/CFO)</option>
                   </select>
                 ) : (
-                  <span className="text-[10px] text-[#94a3b8]">Visibility: All</span>
+                  <span className="text-[11px] text-[#141414]">Visibility: All</span>
                 )}
                 <button
                   type="button"
@@ -431,11 +431,11 @@ export function WorkflowTaskDetailPanel({
 
         <section className="space-y-2">
           <div>
-            <p className="text-[11px] text-[#64748b] mb-1">Action comment</p>
+            <p className="text-[11px] text-[#111111] mb-1">Action comment</p>
             <textarea
               className={cn(
                 "w-full rounded-lg border border-[#e2e8f0] px-3 py-2 text-[11px]",
-                !controls.commentEnabled && "bg-[#f8fafc] text-[#94a3b8] cursor-not-allowed",
+                !controls.commentEnabled && "bg-[#f8fafc] text-[#141414] cursor-not-allowed",
               )}
               rows={2}
               value={comment}
@@ -452,7 +452,7 @@ export function WorkflowTaskDetailPanel({
           </div>
           {canReassign || controls.reassignEnabled ? (
             <div>
-              <p className="text-[11px] text-[#64748b] mb-1">Reassign to</p>
+              <p className="text-[11px] text-[#111111] mb-1">Reassign to</p>
               <select
                 value={reassignUserId}
                 onChange={(e) => onReassignUserId(e.target.value)}
@@ -460,7 +460,7 @@ export function WorkflowTaskDetailPanel({
                 title={controls.reassignTitle}
                 className={cn(
                   "w-full h-8 rounded-lg border border-[#e2e8f0] px-2.5 text-[11px]",
-                  !controls.reassignEnabled && "bg-[#f8fafc] text-[#94a3b8] cursor-not-allowed",
+                  !controls.reassignEnabled && "bg-[#f8fafc] text-[#141414] cursor-not-allowed",
                 )}
               >
                 <option value="">Select user…</option>
@@ -471,7 +471,7 @@ export function WorkflowTaskDetailPanel({
                 ))}
               </select>
               {users.length === 0 ? (
-                <p className="text-[10px] text-[#94a3b8] mt-1">No users loaded — refresh the page.</p>
+                <p className="text-[11px] text-[#141414] mt-1">No users loaded — refresh the page.</p>
               ) : null}
             </div>
           ) : null}
@@ -524,7 +524,7 @@ export function WorkflowTaskDetailPanel({
                 : controls.reassignTitle
             }
             onClick={onReassign}
-            className="h-9 rounded-lg border border-[#e2e8f0] bg-white text-[11px] font-medium text-[#475569] inline-flex items-center justify-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-[#f8fafc] disabled:hover:bg-white"
+            className="h-9 rounded-lg border border-[#e2e8f0] bg-white text-[11px] font-medium text-[#111111] inline-flex items-center justify-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-[#f8fafc] disabled:hover:bg-white"
           >
             {busyAction === "reassign" ? (
               <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -535,7 +535,7 @@ export function WorkflowTaskDetailPanel({
           </button>
           <button
             type="button"
-            className="h-9 w-9 rounded-lg border border-[#e2e8f0] text-[#64748b] inline-flex items-center justify-center hover:bg-[#f8fafc]"
+            className="h-9 w-9 rounded-lg border border-[#e2e8f0] text-[#111111] inline-flex items-center justify-center hover:bg-[#f8fafc]"
             aria-label="More"
           >
             <MoreHorizontal className="w-4 h-4" />

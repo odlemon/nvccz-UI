@@ -1,5 +1,32 @@
 /* Portfolio V11: expanded sidebar, full-viewport shell. */
 
+/* Always hide Matanho HTML topbar when Arcus SharedTopbar is present.
+   Must beat client CSS and arcus-header-overrides `.portfolio-v11-root #topbar`
+   (ID specificity) which force display:flex !important. */
+[data-arcus-shell] .portfolio-v11-root .topbar,
+[data-arcus-shell] .portfolio-v11-root header.topbar,
+[data-arcus-shell] .portfolio-v11-root #topbar,
+[data-arcus-shell] .portfolio-v11-root .app-shell > .topbar,
+[data-arcus-shell] .portfolio-v11-root .app-shell > #topbar {
+  display: none !important;
+  height: 0 !important;
+  min-height: 0 !important;
+  max-height: 0 !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  overflow: hidden !important;
+  border: 0 !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+/*
+ * SharedTopbar lives OUTSIDE .portfolio-v11-root (ClientDesignModuleShell).
+ * Match Performance: nav rail is position:fixed to the viewport (top:0 / 100dvh)
+ * so it sits flush under the matanho brand with no white gap above the logo.
+ * Workspace stays absolute inside the flex-1 host (below SharedTopbar) so page
+ * controls are not hidden under the Arcus bar.
+ */
 .portfolio-v11-root {
   position: relative;
   height: 100%;
@@ -8,23 +35,502 @@
 }
 
 .portfolio-v11-root .app-shell {
+  position: relative;
   height: 100%;
   min-height: 0;
+  overflow: hidden;
 }
 
-.portfolio-v11-root .sidebar {
-  position: fixed;
-  top: 0;
-  right: auto;
-  bottom: 0;
-  left: 0;
-  height: 100dvh;
+/* Full-viewport rail — same pattern as performance-v22-overrides */
+@media (min-width: 981px) {
+  [data-arcus-shell] .portfolio-v11-root .sidebar,
+  [data-arcus-shell] .portfolio-v11-root #sidebar {
+    position: fixed !important;
+    inset: 0 auto 0 0 !important;
+    width: var(--sidebar) !important;
+    height: 100dvh !important;
+    max-height: 100dvh !important;
+    z-index: 50 !important;
+  }
+
+  /* Must beat the rule above — otherwise collapsed stays at expanded --sidebar width */
+  [data-arcus-shell] .portfolio-v11-root .app-shell.sidebar-collapsed .sidebar,
+  [data-arcus-shell] .portfolio-v11-root .app-shell.sidebar-collapsed #sidebar,
+  [data-arcus-shell] .portfolio-v11-root.sidebar-collapsed .sidebar,
+  [data-arcus-shell] .portfolio-v11-root.sidebar-collapsed #sidebar {
+    width: var(--sidebar-collapsed-width, 56px) !important;
+  }
 }
 
-.portfolio-v11-root .workspace {
+[data-arcus-shell] .portfolio-v11-root .workspace,
+[data-arcus-shell] .portfolio-v11-root #workspace {
+  position: absolute !important;
+  top: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  left: var(--sidebar) !important;
+  height: auto !important;
+  max-height: none !important;
+  inset: 0 0 0 var(--sidebar) !important;
   min-height: 0;
+  overflow: auto !important;
+}
+
+[data-arcus-shell] .portfolio-v11-root .app-shell.sidebar-collapsed .workspace,
+[data-arcus-shell] .portfolio-v11-root .app-shell.sidebar-collapsed #workspace,
+[data-arcus-shell] .portfolio-v11-root.sidebar-collapsed .workspace,
+[data-arcus-shell] .portfolio-v11-root.sidebar-collapsed #workspace {
+  left: var(--sidebar-collapsed-width, 56px) !important;
+  inset: 0 0 0 var(--sidebar-collapsed-width, 56px) !important;
+}
+
+@media (max-width: 980px) {
+  [data-arcus-shell] .portfolio-v11-root .workspace,
+  [data-arcus-shell] .portfolio-v11-root #workspace,
+  [data-arcus-shell] .portfolio-v11-root .app-shell.sidebar-collapsed .workspace,
+  [data-arcus-shell] .portfolio-v11-root .app-shell.sidebar-collapsed #workspace {
+    left: 0 !important;
+    inset: 0 !important;
+  }
+}
+
+/*
+ * V25 faithful header / filter controls (exact design port).
+ * Do NOT force Arcus rounded-full pills on Portfolio module actions —
+ * v25 uses moderate 6–8px radii, charcoal primary, white secondary.
+ * Source: design-refs/portfolio-v25 “…v25.html” HD action-control block.
+ */
+.portfolio-v11-root {
+  --control-border: #d5dbe5;
+  --control-border-strong: #c2cad6;
+  --control-highlight: rgba(255, 255, 255, 0.78);
+  --control-shadow: 0 1px 2px rgba(15, 23, 42, 0.055);
+  --control-shadow-hover: 0 2px 5px rgba(15, 23, 42, 0.075);
+}
+
+html.dark .portfolio-v11-root,
+.dark .portfolio-v11-root,
+.portfolio-v11-root[data-theme="dark"] {
+  --control-border: #3b465a;
+  --control-border-strong: #4c5970;
+  --control-highlight: rgba(255, 255, 255, 0.04);
+  --control-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+  --control-shadow-hover: 0 2px 5px rgba(0, 0, 0, 0.19);
+}
+
+.portfolio-v11-root .button,
+.portfolio-v11-root label.button,
+.portfolio-v11-root .page-actions .button,
+.portfolio-v11-root .table-tools .button,
+.portfolio-v11-root .workspace-filter-bar .button {
+  min-height: 35px !important;
+  padding: 0 13px !important;
+  gap: 7px !important;
+  border: 1px solid var(--control-border) !important;
+  border-radius: 7px !important;
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--surface) 98%, #fff),
+    color-mix(in srgb, var(--surface) 93%, var(--surface-soft))
+  ) !important;
+  color: var(--ink-2) !important;
+  box-shadow: inset 0 1px 0 var(--control-highlight), var(--control-shadow) !important;
+  font-size: 10.4px !important;
+  font-weight: 590 !important;
+  letter-spacing: 0.002em !important;
+}
+
+.portfolio-v11-root .button:hover,
+.portfolio-v11-root label.button:hover {
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--surface) 96%, #fff),
+    color-mix(in srgb, var(--surface-soft) 82%, var(--surface))
+  ) !important;
+  border-color: var(--control-border-strong) !important;
+  box-shadow: inset 0 1px 0 var(--control-highlight), var(--control-shadow-hover) !important;
+  transform: translateY(-0.5px);
+  filter: none !important;
+}
+
+.portfolio-v11-root .button.primary,
+.portfolio-v11-root label.button.primary {
+  background: linear-gradient(180deg, #435168 0%, #344258 100%) !important;
+  border-color: #2f3c50 !important;
+  color: #fff !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.14), 0 1px 2px rgba(15, 23, 42, 0.13) !important;
+}
+
+.portfolio-v11-root .button.primary:hover,
+.portfolio-v11-root label.button.primary:hover {
+  background: linear-gradient(180deg, #4a5a73 0%, #394a62 100%) !important;
+  border-color: #33445b !important;
+  color: #fff !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.17), 0 2px 4px rgba(15, 23, 42, 0.14) !important;
+  filter: none !important;
+}
+
+.portfolio-v11-root .button.primary:active,
+.portfolio-v11-root label.button.primary:active {
+  background: #303d51 !important;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.2) !important;
+}
+
+.portfolio-v11-root .button.ghost {
+  background: transparent !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+}
+
+.portfolio-v11-root .button.ghost:hover {
+  background: var(--surface-soft) !important;
+  border-color: var(--control-border) !important;
+  box-shadow: none !important;
+}
+
+.portfolio-v11-root .button.success {
+  background: linear-gradient(180deg, #1f8069, #176a57) !important;
+  border-color: #176451 !important;
+  color: #fff !important;
+}
+
+.portfolio-v11-root .button.danger,
+.portfolio-v11-root .button.warning {
+  background: var(--surface) !important;
+  box-shadow: var(--control-shadow) !important;
+}
+
+.portfolio-v11-root .button.compact {
+  min-height: 30px !important;
+  padding: 0 10px !important;
+  border-radius: 6px !important;
+  font-size: 10px !important;
+}
+
+.portfolio-v11-root .button.icon-only {
+  width: 31px !important;
+  min-width: 31px !important;
+  padding: 0 !important;
+}
+
+.portfolio-v11-root .button svg {
+  width: 13.5px !important;
+  height: 13.5px !important;
+  stroke-width: 1.7;
+}
+
+/* Status chips stay full pills (mint/emerald success etc.) */
+.portfolio-v11-root .status-pill,
+.portfolio-v11-root .page-actions .status-pill,
+.portfolio-v11-root .page-header .status-pill {
+  border-radius: 999px !important;
+}
+
+.portfolio-v11-root .status-pill.success {
+  color: var(--emerald) !important;
+  background: var(--emerald-soft) !important;
+}
+
+/* Filter selects / page-header selects — moderate radius, not pills */
+.portfolio-v11-root .page-actions select,
+.portfolio-v11-root .workspace-filter-bar select,
+.portfolio-v11-root .workspace-filter select,
+.portfolio-v11-root .table-tools select,
+.portfolio-v11-root .page-header select {
+  border-radius: 8px !important;
+  border: 1px solid var(--control-border, var(--line)) !important;
+  background: var(--surface) !important;
+  color: var(--ink) !important;
+  min-height: 34px !important;
 }
 
 .portfolio-v11-root .toast-stack {
   z-index: 200;
+}
+
+/* Live API action busy state on buttons */
+.portfolio-v11-root .button.is-loading {
+  position: relative;
+  pointer-events: none;
+  opacity: 0.78;
+}
+.portfolio-v11-root .button.is-loading > span:first-of-type {
+  opacity: 0.85;
+}
+.portfolio-v11-root .button.is-loading::after {
+  content: "";
+  width: 12px;
+  height: 12px;
+  margin-left: 6px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  display: inline-block;
+  vertical-align: middle;
+  animation: pv11-spin 0.7s linear infinite;
+}
+@keyframes pv11-spin {
+  to { transform: rotate(360deg); }
+}
+.portfolio-v11-root.is-action-busy .button.primary,
+.portfolio-v11-root.is-action-busy .modal-footer .button:not([data-action="close-modal"]) {
+  pointer-events: none;
+  opacity: 0.7;
+}
+.portfolio-v11-root .pv11-action-busy-banner {
+  position: absolute;
+  left: 50%;
+  bottom: 18px;
+  transform: translateX(-50%);
+  z-index: 180;
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: #eff6ff;
+  color: #1d4ed8;
+  border: 1px solid rgba(37, 99, 235, 0.2);
+  font-size: 11px;
+  font-weight: 600;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.08);
+  pointer-events: none;
+}
+
+/* Live hydrate skeletons — never flash Matanho seed as “real” data */
+.portfolio-v11-root .pv11-skeleton {
+  border-radius: 12px;
+  background: linear-gradient(90deg, #eef2f7 0%, #f8fafc 45%, #eef2f7 90%);
+  background-size: 200% 100%;
+  animation: pv11-shimmer 1.2s ease-in-out infinite;
+}
+.portfolio-v11-root .pv11-skeleton-card {
+  border: 1px solid rgba(15, 23, 42, 0.06);
+  border-radius: 16px;
+}
+.portfolio-v11-root.is-hydrating .workspace,
+.portfolio-v11-root.is-host-loading .workspace,
+.portfolio-v11-root.is-page-loading .workspace {
+  min-height: 60vh;
+}
+@keyframes pv11-shimmer {
+  0% { background-position: 100% 0; }
+  100% { background-position: -100% 0; }
+}
+
+/* Locked deal pipeline tabs */
+.portfolio-v11-root .tab.is-locked {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.portfolio-v11-root .tab.is-locked:hover {
+  color: inherit;
+}
+.portfolio-v11-root.is-hydrating .page-header h1::after,
+.portfolio-v11-root.is-page-loading .page-header h1::after {
+  content: " · Loading";
+  font-weight: 500;
+  font-size: 0.65em;
+  color: var(--muted, #8190aa);
+}
+.portfolio-v11-root .modal-rail-step.done b {
+  background: var(--emerald, #0a9e73);
+  color: #fff;
+}
+
+/*
+ * Modal / wizard dark rails — arcus-header-overrides forces
+ * `.portfolio-v11-root strong, b { color:#000 !important }`, which paints
+ * "WIZARD" and inactive step labels black on navy. Restore light rail text
+ * for all wizard / approval / operations / compose / inspector modals.
+ */
+.portfolio-v11-root .modal-rail {
+  color: #e8edfa !important;
+  background: linear-gradient(165deg, #0c1427, #131f39) !important;
+}
+.portfolio-v11-root .modal-rail > strong {
+  color: #f1f5ff !important;
+}
+.portfolio-v11-root .modal-rail-step {
+  color: #d5deef !important;
+}
+.portfolio-v11-root .modal-rail-step b {
+  color: #e8edfa !important;
+  background: rgba(255, 255, 255, 0.1) !important;
+}
+.portfolio-v11-root .modal-rail-step.active {
+  color: #ffffff !important;
+  background: rgba(255, 255, 255, 0.1) !important;
+}
+.portfolio-v11-root .modal-rail-step.active b {
+  color: #ffffff !important;
+  background: var(--brand, #2563eb) !important;
+}
+.portfolio-v11-root .modal-rail-step.done {
+  color: #e0e8f8 !important;
+}
+.portfolio-v11-root .modal-rail-step.done b {
+  color: #ffffff !important;
+  background: var(--emerald, #0a9e73) !important;
+}
+.portfolio-v11-root .modal-rail-step:hover {
+  color: #ffffff !important;
+  background: rgba(255, 255, 255, 0.12) !important;
+}
+.portfolio-v11-root .modal-rail-icon {
+  color: #ffffff !important;
+}
+
+/*
+ * Collapsed sidebar — Portfolio v25 white rail + Matanho mark tile.
+ * - Arcus shell was forcing expanded --sidebar width while collapsed
+ * - Lone padded monogram PNG looked broken; use brand-monogram tile
+ * - Dense icon rail: hide scrollbar + tighten group spacing
+ */
+.portfolio-v11-root .brand-logo-full {
+  filter: none !important;
+  opacity: 0.92 !important;
+}
+
+.portfolio-v11-root[data-theme="dark"] .brand-logo-full {
+  filter: brightness(0) invert(1) !important;
+  opacity: 0.92 !important;
+}
+
+html.dark .portfolio-v11-root:not([data-theme="dark"]) .brand-logo-full,
+.dark .portfolio-v11-root:not([data-theme="dark"]) .brand-logo-full {
+  filter: none !important;
+  opacity: 0.92 !important;
+}
+
+.portfolio-v11-root .brand-logo-collapsed.brand-monogram {
+  display: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 11px;
+  place-items: center;
+  font-family: inherit;
+  font-size: 22px;
+  font-weight: 650;
+  letter-spacing: -0.06em;
+  line-height: 1;
+  text-transform: lowercase;
+  color: #fff;
+  background: linear-gradient(145deg, #72a3e8 0%, #4d80c8 52%, #0eb18a 130%);
+  box-shadow:
+    0 10px 22px rgba(37, 99, 235, 0.22),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  filter: none !important;
+  opacity: 1 !important;
+  user-select: none;
+}
+
+/* Beat V13 `display:block !important` on collapsed logo so the mark tile can grid */
+.portfolio-v11-root .sidebar-collapsed .brand-logo-collapsed.brand-monogram {
+  display: grid !important;
+}
+
+.portfolio-v11-root[data-theme="dark"] .brand-logo-collapsed.brand-monogram {
+  box-shadow:
+    0 10px 22px rgba(0, 0, 0, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.22);
+}
+
+.portfolio-v11-root .sidebar-collapsed .brand-row {
+  height: 56px !important;
+  min-height: 56px !important;
+  padding: 0 !important;
+  justify-content: center !important;
+}
+
+.portfolio-v11-root .sidebar-collapsed .brand-image-button {
+  width: var(--sidebar-collapsed-width, 56px) !important;
+  height: 100% !important;
+  display: grid !important;
+  place-items: center !important;
+  padding: 0 !important;
+}
+
+.portfolio-v11-root .sidebar-collapsed .brand-logo-collapsed.brand-monogram {
+  width: 38px !important;
+  height: 38px !important;
+  font-size: 21px !important;
+}
+
+/* Icon rail: no visible scrollbar; still scrollable if needed */
+.portfolio-v11-root .nav-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+.portfolio-v11-root .nav-scroll:hover {
+  scrollbar-color: color-mix(in srgb, var(--sidebar-text, #667087) 35%, transparent) transparent;
+}
+.portfolio-v11-root .nav-scroll::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+.portfolio-v11-root .nav-scroll:hover::-webkit-scrollbar {
+  width: 4px;
+}
+.portfolio-v11-root .nav-scroll::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 999px;
+}
+.portfolio-v11-root .nav-scroll:hover::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--sidebar-text, #667087) 35%, transparent);
+}
+
+.portfolio-v11-root .sidebar-collapsed .nav-scroll {
+  padding: 4px 4px 8px !important;
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
+.portfolio-v11-root .sidebar-collapsed .nav-scroll::-webkit-scrollbar {
+  width: 0 !important;
+  height: 0 !important;
+  display: none !important;
+}
+
+/* Collapse group chrome so ~20 icons fit without a rail scrollbar */
+.portfolio-v11-root .sidebar-collapsed .nav-group {
+  margin-top: 4px !important;
+}
+.portfolio-v11-root .sidebar-collapsed .nav-group:first-child {
+  margin-top: 2px !important;
+}
+.portfolio-v11-root .sidebar-collapsed .nav-group-label {
+  display: none !important;
+  height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+}
+.portfolio-v11-root .sidebar-collapsed .nav-item {
+  width: 44px !important;
+  min-height: 34px !important;
+  margin-inline: auto !important;
+  margin-top: 0 !important;
+  justify-content: center !important;
+  padding: 6px 0 !important;
+  border-radius: 9px !important;
+}
+.portfolio-v11-root .sidebar-collapsed .nav-item + .nav-item {
+  margin-top: 1px !important;
+}
+.portfolio-v11-root .sidebar-collapsed .nav-item svg {
+  width: 16px !important;
+  height: 16px !important;
+  flex: 0 0 16px !important;
+}
+.portfolio-v11-root .sidebar-collapsed .nav-badge {
+  display: none !important;
+}
+
+.portfolio-v11-root .sidebar-collapsed .sidebar-foot {
+  padding: 6px 5px max(8px, env(safe-area-inset-bottom)) !important;
+}
+.portfolio-v11-root .sidebar-collapsed .sidebar-collapse-bottom {
+  width: 44px !important;
+  min-height: 36px !important;
+  margin-inline: auto !important;
+  justify-content: center !important;
+  padding: 0 !important;
+  border-radius: 9px !important;
 }

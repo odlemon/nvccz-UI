@@ -27,11 +27,15 @@ export function FundraisingLayout({ children }: FundraisingLayoutProps) {
   }
 
   return (
-    <div className="min-h-screen bg-[#f1f5f9]">
-      <SharedTopbar onModuleSelect={handleModuleSelect} currentModule={currentModule} />
+    <div className="min-h-screen bg-[#f1f5f9]" data-module="fundraising">
+      {/* Sidebar first, topbar inside the right-hand column, so the sidebar
+          runs full height and touches the top like Portfolio's. */}
       <div className="flex">
         <FundraisingSidebar />
-        <main className="flex-1 overflow-auto min-h-[calc(100vh-5rem)] bg-[#f8fafc]">{children}</main>
+        <div className="flex min-w-0 flex-1 flex-col">
+          <SharedTopbar onModuleSelect={handleModuleSelect} currentModule={currentModule} hideThemeToggle />
+          <main className="flex-1 overflow-auto min-h-[calc(100vh-5rem)] bg-[#f8fafc]">{children}</main>
+        </div>
       </div>
     </div>
   )

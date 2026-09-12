@@ -167,7 +167,7 @@ const REF_Y_TICKS = [0, 25, 50, 75, 100, 125, 150] as const
 /** Shared ~8px radius across the planning worksheet (matches design). */
 const R = "rounded-lg"
 const PILL_TRIGGER =
-  `h-7 min-w-0 w-auto ${R} border-[#d0d5dd] bg-white px-2.5 py-0 text-[11px] font-medium text-[#344054] shadow-none focus-visible:ring-1 focus-visible:ring-[#93c5fd]`
+  `h-7 min-w-0 w-auto ${R} border-[#d0d5dd] bg-white px-2.5 py-0 text-[11px] font-medium text-[#111111] shadow-none focus-visible:ring-1 focus-visible:ring-[#93c5fd]`
 
 function shortPeriodLabel(iso?: string | null): string | null {
   if (!iso) return null
@@ -282,13 +282,13 @@ export function PlanningWorkspaceChrome({
     <div className="space-y-3">
       {/* Header toolbar — Model Version · Planning Cycle · Scenarios · Compare · Actions */}
       <div className="flex flex-wrap items-end gap-x-3 gap-y-3">
-        <label className="text-[11px] font-medium text-[#667085]">
+        <label className="text-[11px] font-medium text-[#111111]">
           Model Version
           <div className="relative mt-1">
             <Select value={versionId || undefined} onValueChange={onVersionChange}>
               <SelectTrigger
                 className={cn(
-                  "h-10 min-w-[200px] rounded-full border-[#d0d5dd] bg-white pl-3 text-[13px] font-semibold text-[#101828] shadow-none",
+                  "h-10 min-w-[200px] rounded-full border-[#d0d5dd] bg-white pl-3 text-[13px] font-semibold text-[#000000] shadow-none",
                   versionIsLatest ? "pr-20" : "pr-9",
                 )}
               >
@@ -303,7 +303,7 @@ export function PlanningWorkspaceChrome({
               </SelectContent>
             </Select>
             {versionIsLatest ? (
-              <span className="pointer-events-none absolute right-8 top-1/2 -translate-y-1/2 rounded-full bg-[#dcfae6] px-1.5 py-0.5 text-[9px] font-semibold text-[#079455]">
+              <span className="pointer-events-none absolute right-8 top-1/2 -translate-y-1/2 rounded-full bg-[#dcfae6] px-1.5 py-0.5 text-[11px] font-semibold text-[#079455]">
                 Latest
               </span>
             ) : null}
@@ -312,7 +312,7 @@ export function PlanningWorkspaceChrome({
 
         <div className="hidden sm:block w-px h-10 mb-0.5 bg-[#e4e7ec]" aria-hidden />
 
-        <label className="text-[11px] font-medium text-[#667085]">
+        <label className="text-[11px] font-medium text-[#111111]">
           Planning Cycle
           {cycleOptions.length ? (
             <Select
@@ -323,7 +323,7 @@ export function PlanningWorkspaceChrome({
               }}
             >
               <SelectTrigger
-                className="mt-1 h-10 min-w-[180px] rounded-full border-[#d0d5dd] bg-white px-3 text-[13px] font-semibold text-[#101828] shadow-none"
+                className="mt-1 h-10 min-w-[180px] rounded-full border-[#d0d5dd] bg-white px-3 text-[13px] font-semibold text-[#000000] shadow-none"
               >
                 <SelectValue placeholder="Select cycle" />
               </SelectTrigger>
@@ -337,14 +337,14 @@ export function PlanningWorkspaceChrome({
             </Select>
           ) : activeCycleLabel ? (
             <div
-              className="mt-1 flex h-10 min-w-[180px] items-center rounded-full border border-[#d0d5dd] bg-white px-3 text-[13px] font-semibold text-[#101828]"
+              className="mt-1 flex h-10 min-w-[180px] items-center rounded-full border border-[#d0d5dd] bg-white px-3 text-[13px] font-semibold text-[#000000]"
               title={activeCycleLabel}
             >
               <span className="truncate">{activeCycleLabel}</span>
             </div>
           ) : (
             <div
-              className="mt-1 flex h-10 min-w-[180px] items-center rounded-full border border-dashed border-[#d0d5dd] px-3 text-[12px] text-[#667085]"
+              className="mt-1 flex h-10 min-w-[180px] items-center rounded-full border border-dashed border-[#d0d5dd] px-3 text-[12px] text-[#111111]"
             >
               No cycle selected
             </div>
@@ -352,16 +352,16 @@ export function PlanningWorkspaceChrome({
         </label>
 
         {inCompare && scenarioTabs.length ? (
-          <label className="text-[11px] font-medium text-[#667085]">
+          <label className="text-[11px] font-medium text-[#111111]">
             Scenarios
             <DropdownMenu open={scenariosMenuOpen} onOpenChange={setScenariosMenuOpen}>
               <DropdownMenuTrigger asChild>
                 <button
                   type="button"
-                  className="mt-1 h-10 min-w-[140px] inline-flex items-center justify-between gap-2 rounded-full border border-[#d0d5dd] bg-white px-3 text-[13px] font-semibold text-[#101828]"
+                  className="mt-1 h-10 min-w-[140px] inline-flex items-center justify-between gap-2 rounded-full border border-[#d0d5dd] bg-white px-3 text-[13px] font-semibold text-[#000000]"
                 >
                   <span>{selectedCompareIds.length} selected</span>
-                  <ChevronDown className="size-4 text-[#667085]" />
+                  <ChevronDown className="size-4 text-[#111111]" />
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="start" className={`w-56 ${R}`}>
@@ -402,7 +402,7 @@ export function PlanningWorkspaceChrome({
                       i > 0 && "border-l border-[#e4e7ec]",
                       active
                         ? "bg-[#eff8ff] text-[#1570ef]"
-                        : "bg-white text-[#344054] hover:bg-[#f9fafb]",
+                        : "bg-white text-[#111111] hover:bg-[#f9fafb]",
                     )}
                   >
                     {s.name}
@@ -413,7 +413,7 @@ export function PlanningWorkspaceChrome({
                 )
               })
             ) : (
-              <span className="px-3.5 self-center text-[12px] text-[#98a2b3]">
+              <span className="px-3.5 self-center text-[12px] text-[#141414]">
                 No scenarios yet
               </span>
             )}
@@ -428,7 +428,7 @@ export function PlanningWorkspaceChrome({
               "h-10 inline-flex items-center gap-1.5 rounded-full px-3.5 text-[13px] font-semibold border",
               inCompare
                 ? "bg-[#eff8ff] text-[#1570ef] border-[#b2ddff] hover:bg-[#eff8ff]"
-                : "border-[#d0d5dd] bg-white text-[#344054] hover:bg-[#f9fafb]",
+                : "border-[#d0d5dd] bg-white text-[#111111] hover:bg-[#f9fafb]",
             )}
           >
             <GitCompare
@@ -465,7 +465,7 @@ export function PlanningWorkspaceChrome({
                 >
                   <button
                     type="button"
-                    className="w-full px-3 py-2 text-left text-[12px] hover:bg-[#f9fafb] text-[#101828]"
+                    className="w-full px-3 py-2 text-left text-[12px] hover:bg-[#f9fafb] text-[#000000]"
                     onClick={() => {
                       onWorkspaceViewChange?.("planning")
                       setActionsOpen(false)
@@ -475,7 +475,7 @@ export function PlanningWorkspaceChrome({
                   </button>
                   <button
                     type="button"
-                    className="w-full px-3 py-2 text-left text-[12px] hover:bg-[#f9fafb] text-[#101828]"
+                    className="w-full px-3 py-2 text-left text-[12px] hover:bg-[#f9fafb] text-[#000000]"
                     onClick={() => {
                       onWorkspaceViewChange?.("compare")
                       setActionsOpen(false)
@@ -486,41 +486,41 @@ export function PlanningWorkspaceChrome({
                   <div className="my-1 border-t border-[#f2f4f7]" />
                   <button
                     type="button"
-                    className="w-full px-3 py-2 text-left text-[12px] hover:bg-[#f9fafb] inline-flex items-center gap-2 text-[#101828]"
+                    className="w-full px-3 py-2 text-left text-[12px] hover:bg-[#f9fafb] inline-flex items-center gap-2 text-[#000000]"
                     onClick={() => {
                       void navigator.clipboard.writeText(window.location.href)
                       toast.success("Link copied")
                       setActionsOpen(false)
                     }}
                   >
-                    <Copy className="size-3.5 text-[#667085]" /> Copy link
+                    <Copy className="size-3.5 text-[#111111]" /> Copy link
                   </button>
                   <button
                     type="button"
-                    className="w-full px-3 py-2 text-left text-[12px] hover:bg-[#f9fafb] inline-flex items-center gap-2 text-[#101828]"
+                    className="w-full px-3 py-2 text-left text-[12px] hover:bg-[#f9fafb] inline-flex items-center gap-2 text-[#000000]"
                     onClick={() => {
                       onRefresh()
                       setActionsOpen(false)
                     }}
                   >
-                    <RefreshCw className="size-3.5 text-[#667085]" /> Refresh calc
+                    <RefreshCw className="size-3.5 text-[#111111]" /> Refresh calc
                   </button>
                   <button
                     type="button"
-                    className="w-full px-3 py-2 text-left text-[12px] hover:bg-[#f9fafb] inline-flex items-center gap-2 text-[#101828]"
+                    className="w-full px-3 py-2 text-left text-[12px] hover:bg-[#f9fafb] inline-flex items-center gap-2 text-[#000000]"
                     onClick={() => {
                       setActionsOpen(false)
                       void onExport()
                     }}
                   >
-                    <Download className="size-3.5 text-[#667085]" /> Export grid CSV
+                    <Download className="size-3.5 text-[#111111]" /> Export grid CSV
                   </button>
                   <Link
                     href={scenariosHref}
-                    className="w-full px-3 py-2 text-left text-[12px] hover:bg-[#f9fafb] inline-flex items-center gap-2 text-[#101828]"
+                    className="w-full px-3 py-2 text-left text-[12px] hover:bg-[#f9fafb] inline-flex items-center gap-2 text-[#000000]"
                     onClick={() => setActionsOpen(false)}
                   >
-                    <Sparkles className="size-3.5 text-[#667085]" /> Open full scenarios page
+                    <Sparkles className="size-3.5 text-[#111111]" /> Open full scenarios page
                   </Link>
                 </div>
               </>
@@ -531,12 +531,12 @@ export function PlanningWorkspaceChrome({
 
       {(actualsCutoffLabel || forecastStartLabel) && (
         <div className="flex flex-wrap items-center gap-2 rounded-lg border border-[#e4e7ec] bg-white px-3 py-2 text-[12px]">
-          <Lock className="size-3.5 text-[#667085] shrink-0" />
-          <span className="font-medium text-[#344054]">Actual vs forecast</span>
+          <Lock className="size-3.5 text-[#111111] shrink-0" />
+          <span className="font-medium text-[#111111]">Actual vs forecast</span>
           {actualsCutoffLabel ? (
-            <span className="inline-flex items-center gap-1 rounded-full bg-[#f2f4f7] px-2.5 py-0.5 text-[11px] font-medium text-[#475467]">
-              Actuals through <strong className="text-[#101828]">{actualsCutoffLabel}</strong>
-              <span className="text-[#98a2b3]">· read-only</span>
+            <span className="inline-flex items-center gap-1 rounded-full bg-[#f2f4f7] px-2.5 py-0.5 text-[11px] font-medium text-[#111111]">
+              Actuals through <strong className="text-[#000000]">{actualsCutoffLabel}</strong>
+              <span className="text-[#141414]">· read-only</span>
             </span>
           ) : null}
           {forecastStartLabel ? (
@@ -545,7 +545,7 @@ export function PlanningWorkspaceChrome({
               <span className="text-[#53b1fd]">· editable inputs</span>
             </span>
           ) : actualsCutoffLabel ? (
-            <span className="text-[11px] text-[#667085]">
+            <span className="text-[11px] text-[#111111]">
               Months after cutoff are forecast (editable inputs).
             </span>
           ) : null}
@@ -608,16 +608,16 @@ export function PlanningWorkspaceKpiStrip({
         {displayKpis.length ? (
           displayKpis.map((k) => <KpiCard key={k.label} kpi={k} />)
         ) : (
-          <p className="col-span-full py-8 text-center text-[12px] text-[#98a2b3]">
+          <p className="col-span-full py-8 text-center text-[12px] text-[#141414]">
             No KPI data available for this selection.
           </p>
         )}
       </div>
       {showFooter ? (
-        <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-[12px] text-[#98a2b3]">
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-[12px] text-[#141414]">
           <span>All values in {currency}</span>
           <div className="inline-flex items-center gap-2">
-            <label className="inline-flex items-center gap-1.5 text-[#667085]">
+            <label className="inline-flex items-center gap-1.5 text-[#111111]">
               View by
               <Select
                 value={viewByList.find((o) => o.label === localViewBy)?.id || viewByList[0]?.id}
@@ -629,7 +629,7 @@ export function PlanningWorkspaceKpiStrip({
                 }}
               >
                 <SelectTrigger
-                  className={`h-8 min-w-[130px] w-auto ${R} border-[#d0d5dd] bg-white px-2.5 text-[12px] font-medium text-[#344054] shadow-none`}
+                  className={`h-8 min-w-[130px] w-auto ${R} border-[#d0d5dd] bg-white px-2.5 text-[12px] font-medium text-[#111111] shadow-none`}
                 >
                   <SelectValue />
                 </SelectTrigger>
@@ -644,7 +644,7 @@ export function PlanningWorkspaceKpiStrip({
             </label>
             <button
               type="button"
-              className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-[#d0d5dd] bg-white text-[#667085] hover:bg-[#f9fafb]"
+              className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-[#d0d5dd] bg-white text-[#111111] hover:bg-[#f9fafb]"
               onClick={onRefresh}
               aria-label="Refresh KPIs"
             >
@@ -653,7 +653,7 @@ export function PlanningWorkspaceKpiStrip({
           </div>
         </div>
       ) : (
-        <p className="mt-2.5 text-[11px] text-[#98a2b3]">All values in {currency}</p>
+        <p className="mt-2.5 text-[11px] text-[#141414]">All values in {currency}</p>
       )}
     </div>
   )
@@ -731,7 +731,7 @@ function KpiCard({ kpi }: { kpi: PlanningKpi }) {
       ? "text-[#f04438]"
       : kpi.deltaTone === "up"
         ? "text-[#12b76a]"
-        : "text-[#667085]"
+        : "text-[#111111]"
   const showSpark = theme.showSpark && kpi.spark && kpi.spark.length > 1
 
   const deltaParts = (() => {
@@ -752,10 +752,10 @@ function KpiCard({ kpi }: { kpi: PlanningKpi }) {
         >
           <Icon className="size-4" strokeWidth={2} />
         </span>
-        <p className="text-[12px] font-semibold text-[#475467]">{kpi.label}</p>
+        <p className="text-[12px] font-semibold text-[#111111]">{kpi.label}</p>
       </div>
 
-      <p className="mt-2.5 text-[22px] font-semibold text-[#101828] tabular-nums leading-none tracking-tight">
+      <p className="mt-2.5 text-[22px] font-semibold text-[#000000] tabular-nums leading-none tracking-tight">
         {kpi.value}
       </p>
 
@@ -766,7 +766,7 @@ function KpiCard({ kpi }: { kpi: PlanningKpi }) {
           <span>{deltaParts.text}</span>
         </p>
       ) : (
-        <p className="mt-1.5 text-[12px] text-[#98a2b3]">—</p>
+        <p className="mt-1.5 text-[12px] text-[#141414]">—</p>
       )}
 
       <div className="mt-auto pt-2">
@@ -1071,8 +1071,8 @@ function TrendChartCard({ points }: { points: PlanningTrendPoint[] }) {
   if (!points.length) {
     return (
       <section className="rounded-lg border border-[#e4e7ec] bg-white p-4 shadow-[0_1px_2px_rgba(16,24,40,0.05)] flex flex-col h-[300px] max-h-[300px] overflow-hidden">
-        <h3 className="text-[14px] font-semibold text-[#101828]">Revenue vs Expense Trend</h3>
-        <p className="mt-8 text-[12px] text-[#98a2b3] text-center">
+        <h3 className="text-[14px] font-semibold text-[#000000]">Revenue vs Expense Trend</h3>
+        <p className="mt-8 text-[12px] text-[#141414] text-center">
           Trend will appear when the planning grid has period values.
         </p>
       </section>
@@ -1081,8 +1081,8 @@ function TrendChartCard({ points }: { points: PlanningTrendPoint[] }) {
 
   return (
     <section className="rounded-lg border border-[#e4e7ec] bg-white p-4 shadow-[0_1px_2px_rgba(16,24,40,0.05)] flex flex-col h-[300px] max-h-[300px] overflow-hidden">
-      <h3 className="text-[14px] font-semibold text-[#101828] shrink-0">Revenue vs Expense Trend</h3>
-      <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-[#667085] shrink-0">
+      <h3 className="text-[14px] font-semibold text-[#000000] shrink-0">Revenue vs Expense Trend</h3>
+      <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-[#111111] shrink-0">
         <LegendDot color={REV_COLOR} label="Revenue (Actual)" />
         <LegendDot color={REV_COLOR} label="Revenue (Plan)" dashed />
         <LegendDot color={OPEX_COLOR} label="Opex (Actual)" />
@@ -1251,7 +1251,7 @@ function TrendChartCard({ points }: { points: PlanningTrendPoint[] }) {
       </svg>
 
       <div className="mt-auto flex flex-wrap items-center gap-x-3 gap-y-1.5 pt-2.5 border-t border-[#eaecf0] shrink-0">
-        <label className="inline-flex items-center gap-1.5 text-[12px] text-[#667085]">
+        <label className="inline-flex items-center gap-1.5 text-[12px] text-[#111111]">
           Actuals through
           <Select value={actualsThrough} onValueChange={setActualsThrough}>
             <SelectTrigger className={PILL_TRIGGER} size="sm">
@@ -1267,7 +1267,7 @@ function TrendChartCard({ points }: { points: PlanningTrendPoint[] }) {
           </Select>
         </label>
 
-        <label className="inline-flex items-center gap-1.5 text-[12px] text-[#667085]">
+        <label className="inline-flex items-center gap-1.5 text-[12px] text-[#111111]">
           Frequency
           <Select
             value={frequency}
@@ -1295,8 +1295,8 @@ function TrendChartCard({ points }: { points: PlanningTrendPoint[] }) {
               </button>
             </PopoverTrigger>
             <PopoverContent align="end" className="w-56 p-3 space-y-2">
-              <p className="text-[12px] font-semibold text-[#0f172a]">Chart series</p>
-              <label className="flex items-center gap-2 text-[12px] text-[#475569]">
+              <p className="text-[12px] font-semibold text-[#000000]">Chart series</p>
+              <label className="flex items-center gap-2 text-[12px] text-[#111111]">
                 <input
                   type="checkbox"
                   checked={showRevenue}
@@ -1305,7 +1305,7 @@ function TrendChartCard({ points }: { points: PlanningTrendPoint[] }) {
                 />
                 Show Revenue
               </label>
-              <label className="flex items-center gap-2 text-[12px] text-[#475569]">
+              <label className="flex items-center gap-2 text-[12px] text-[#111111]">
                 <input
                   type="checkbox"
                   checked={showOpex}
@@ -1314,7 +1314,7 @@ function TrendChartCard({ points }: { points: PlanningTrendPoint[] }) {
                 />
                 Show Opex
               </label>
-              <label className="flex items-center gap-2 text-[12px] text-[#475569]">
+              <label className="flex items-center gap-2 text-[12px] text-[#111111]">
                 <input
                   type="checkbox"
                   checked={showArea}
@@ -1331,7 +1331,7 @@ function TrendChartCard({ points }: { points: PlanningTrendPoint[] }) {
               <button
                 type="button"
                 aria-label="More chart actions"
-                className="h-7 w-7 inline-flex items-center justify-center rounded-full border border-[#d0d5dd] bg-white text-[#667085] hover:bg-[#f8fafc]"
+                className="h-7 w-7 inline-flex items-center justify-center rounded-full border border-[#d0d5dd] bg-white text-[#111111] hover:bg-[#f8fafc]"
               >
                 <MoreHorizontal className="size-4" />
               </button>
@@ -1550,19 +1550,19 @@ function DriverAssumptionsCard({
 
   const cell = "border border-[#e4e7ec] px-2.5 py-1.5"
   const changeColor = (tone: "up" | "down" | "neutral") =>
-    tone === "down" ? "text-[#f04438]" : tone === "up" ? "text-[#12b76a]" : "text-[#98a2b3]"
+    tone === "down" ? "text-[#f04438]" : tone === "up" ? "text-[#12b76a]" : "text-[#141414]"
 
   return (
     <section className="rounded-lg border border-[#e4e7ec] bg-white p-3 shadow-[0_1px_2px_rgba(16,24,40,0.05)] flex flex-col h-[300px] max-h-[300px] overflow-hidden">
       <div className="flex items-center justify-between gap-2 shrink-0 mb-2">
-        <h3 className="text-[14px] font-semibold text-[#101828]">Driver Assumptions</h3>
+        <h3 className="text-[14px] font-semibold text-[#000000]">Driver Assumptions</h3>
         {editing ? (
           <div className="inline-flex items-center gap-2">
             <button
               type="button"
               onClick={cancelEdit}
               disabled={saving}
-              className="h-7 rounded-full border border-[#d0d5dd] bg-white px-2 text-[11px] font-medium text-[#667085] hover:bg-[#f9fafb]"
+              className="h-7 rounded-full border border-[#d0d5dd] bg-white px-2 text-[11px] font-medium text-[#111111] hover:bg-[#f9fafb]"
             >
               Cancel
             </button>
@@ -1599,7 +1599,7 @@ function DriverAssumptionsCard({
 
       <div className="flex-1 min-h-0 overflow-auto rounded-lg border border-[#e4e7ec]">
         {!displayRows.length ? (
-          <p className="text-[12px] text-[#98a2b3] py-6 text-center px-2">
+          <p className="text-[12px] text-[#141414] py-6 text-center px-2">
             No drivers on this model yet.{" "}
             <Link
               href="/forecasting/drivers"
@@ -1613,7 +1613,7 @@ function DriverAssumptionsCard({
         ) : (
           <table className="w-full text-[11px] border-collapse">
             <thead className="sticky top-0 z-[1]">
-              <tr className="bg-[#f9fafb] text-[#101828]">
+              <tr className="bg-[#f9fafb] text-[#000000]">
                 <th className={cn(cell, "text-left font-semibold bg-[#f9fafb]")}>Driver</th>
                 <th
                   className={cn(
@@ -1637,8 +1637,8 @@ function DriverAssumptionsCard({
             <tbody>
               {displayRows.map((d) => (
                 <tr key={d.id} className="bg-white hover:bg-[#f9fafb] transition-colors">
-                  <td className={cn(cell, "font-medium text-[#101828]")}>{d.name}</td>
-                  <td className={cn(cell, "text-center tabular-nums text-[#475467]")}>
+                  <td className={cn(cell, "font-medium text-[#000000]")}>{d.name}</td>
+                  <td className={cn(cell, "text-center tabular-nums text-[#111111]")}>
                     {formatDriverDisplay(d.prior, d.name, d.unit)}
                   </td>
                   <td
@@ -1657,18 +1657,18 @@ function DriverAssumptionsCard({
                           if (e.key === "Enter") void commitAll()
                           if (e.key === "Escape") cancelEdit()
                         }}
-                        className="h-7 w-[5.25rem] mx-auto block rounded border border-[#84caff] bg-white px-1.5 text-center tabular-nums text-[#101828] outline-none focus:ring-2 focus:ring-[#b2ddff]"
+                        className="h-7 w-[5.25rem] mx-auto block rounded border border-[#84caff] bg-white px-1.5 text-center tabular-nums text-[#000000] outline-none focus:ring-2 focus:ring-[#b2ddff]"
                         aria-label={`${d.name} plan value`}
                       />
                     ) : (
-                      <span className="tabular-nums text-[#101828]">
+                      <span className="tabular-nums text-[#000000]">
                         {formatDriverDisplay(d.planValue, d.name, d.unit)}
                       </span>
                     )}
                   </td>
                   <td className={cn(cell, "text-center")}>
                     {d.direction === "flat" ? (
-                      <span className="text-[#98a2b3]">—</span>
+                      <span className="text-[#141414]">—</span>
                     ) : (
                       <span
                         className={cn(
@@ -1695,7 +1695,7 @@ function DriverAssumptionsCard({
         )}
       </div>
 
-      <p className="mt-2 shrink-0 text-[11px] text-[#98a2b3]">pp = percentage points</p>
+      <p className="mt-2 shrink-0 text-[11px] text-[#141414]">pp = percentage points</p>
     </section>
   )
 }
@@ -1711,8 +1711,8 @@ function workflowConnectorClass(
 
 function workflowStepTitleClass(status: PlanningWorkflowStep["status"]) {
   if (status === "active") return "text-[#7c3aed]"
-  if (status === "done") return "text-[#101828]"
-  return "text-[#667085]"
+  if (status === "done") return "text-[#000000]"
+  return "text-[#111111]"
 }
 
 function workflowStatusBadge(status: PlanningWorkflowStep["status"]) {
@@ -1728,7 +1728,7 @@ function workflowStatusBadge(status: PlanningWorkflowStep["status"]) {
     }
   return {
     label: "Pending",
-    className: "bg-[#f9fafb] text-[#667085] border-[#e4e7ec]",
+    className: "bg-[#f9fafb] text-[#111111] border-[#e4e7ec]",
   }
 }
 
@@ -1740,7 +1740,7 @@ function WorkflowStatusBar({ steps }: { steps: PlanningWorkflowStep[] }) {
   return (
     <section className="rounded-lg border border-[#e4e7ec] bg-white px-4 py-4 shadow-[0_1px_2px_rgba(16,24,40,0.05)]">
       <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
-        <h3 className="text-[14px] font-semibold text-[#101828]">Workflow Status</h3>
+        <h3 className="text-[14px] font-semibold text-[#000000]">Workflow Status</h3>
         {steps.length ? (
           <button
             type="button"
@@ -1754,7 +1754,7 @@ function WorkflowStatusBar({ steps }: { steps: PlanningWorkflowStep[] }) {
 
       {!steps.length ? (
         <div className="flex flex-wrap items-center justify-center gap-3 py-4 text-center">
-          <p className="text-[12px] text-[#98a2b3]">
+          <p className="text-[12px] text-[#141414]">
             No planning cycle selected. Open a cycle from Model Planning to track Draft → Approved.
           </p>
           <Link
@@ -1787,7 +1787,7 @@ function WorkflowStatusBar({ steps }: { steps: PlanningWorkflowStep[] }) {
                     step.status === "done" && "bg-[#2e90fa] text-white",
                     step.status === "active" && "bg-[#7c3aed] text-white",
                     step.status === "pending" &&
-                      "bg-white text-[#667085] border-2 border-[#d0d5dd]",
+                      "bg-white text-[#111111] border-2 border-[#d0d5dd]",
                   )}
                 >
                   {step.status === "done" ? (
@@ -1806,9 +1806,9 @@ function WorkflowStatusBar({ steps }: { steps: PlanningWorkflowStep[] }) {
                   >
                     {step.label}
                   </p>
-                  <p className="text-[12px] text-[#667085] mt-1 leading-snug">{step.actor}</p>
+                  <p className="text-[12px] text-[#111111] mt-1 leading-snug">{step.actor}</p>
                   {step.when ? (
-                    <p className="text-[12px] text-[#98a2b3] mt-0.5 leading-snug">{step.when}</p>
+                    <p className="text-[12px] text-[#141414] mt-0.5 leading-snug">{step.when}</p>
                   ) : null}
                 </div>
               </li>
@@ -1820,8 +1820,8 @@ function WorkflowStatusBar({ steps }: { steps: PlanningWorkflowStep[] }) {
       <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>
         <DialogContent className="sm:max-w-xl p-0 gap-0 overflow-hidden">
           <DialogHeader className="px-5 pt-5 pb-3 border-b border-[#e4e7ec]">
-            <DialogTitle className="text-[16px] text-[#101828]">Workflow details</DialogTitle>
-            <DialogDescription className="text-[13px] text-[#667085]">
+            <DialogTitle className="text-[16px] text-[#000000]">Workflow details</DialogTitle>
+            <DialogDescription className="text-[13px] text-[#111111]">
               {activeStep
                 ? `Currently at ${activeStep.label} · ${doneCount} of ${steps.length} stages complete`
                 : doneCount === steps.length
@@ -1844,7 +1844,7 @@ function WorkflowStatusBar({ steps }: { steps: PlanningWorkflowStep[] }) {
                       step.status === "done" && "bg-[#2e90fa] text-white",
                       step.status === "active" && "bg-[#7c3aed] text-white",
                       step.status === "pending" &&
-                        "bg-white text-[#667085] border-2 border-[#d0d5dd]",
+                        "bg-white text-[#111111] border-2 border-[#d0d5dd]",
                     )}
                   >
                     {step.status === "done" ? (
@@ -1874,12 +1874,12 @@ function WorkflowStatusBar({ steps }: { steps: PlanningWorkflowStep[] }) {
                     </div>
                     <dl className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1.5 text-[12px]">
                       <div>
-                        <dt className="text-[#98a2b3]">Owner / team</dt>
-                        <dd className="text-[#344054] font-medium">{step.actor || "—"}</dd>
+                        <dt className="text-[#141414]">Owner / team</dt>
+                        <dd className="text-[#111111] font-medium">{step.actor || "—"}</dd>
                       </div>
                       <div>
-                        <dt className="text-[#98a2b3]">Date</dt>
-                        <dd className="text-[#344054] font-medium">{step.when || "—"}</dd>
+                        <dt className="text-[#141414]">Date</dt>
+                        <dd className="text-[#111111] font-medium">{step.when || "—"}</dd>
                       </div>
                     </dl>
                   </div>
@@ -1891,7 +1891,7 @@ function WorkflowStatusBar({ steps }: { steps: PlanningWorkflowStep[] }) {
           <DialogFooter className="px-5 py-3 border-t border-[#e4e7ec] bg-[#f9fafb] sm:justify-between gap-2">
             <Link
               href="/forecasting/workflow"
-              className="h-9 inline-flex items-center justify-center rounded-full border border-[#d0d5dd] bg-white px-3 text-[12px] font-medium text-[#344054] hover:bg-white"
+              className="h-9 inline-flex items-center justify-center rounded-full border border-[#d0d5dd] bg-white px-3 text-[12px] font-medium text-[#111111] hover:bg-white"
               onClick={() => setDetailsOpen(false)}
             >
               Open workflow board

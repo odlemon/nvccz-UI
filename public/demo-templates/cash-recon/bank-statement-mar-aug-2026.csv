@@ -1,0 +1,11 @@
+value_date,trade_date,amount,debit_credit,reference,counterparty,description
+2026-03-20,2026-03-20,250000.00,Credit,Q1 capital call — Arcus Listed,CBZ Custody,Q1 capital call — Arcus Listed
+2026-04-02,2026-04-02,18500.00,Debit,Equity settlement — INN buy,CBZ Custody,Equity settlement — INN buy
+2026-04-15,2026-04-15,4200.00,Debit,Custody fee Q1 2026,CBZ Custody,Custody fee Q1 2026
+2026-05-08,2026-05-08,75000.00,Credit,Dividend receipt — Delta Corp,CBZ Custody,Dividend receipt — Delta Corp
+2026-05-22,2026-05-22,31250.50,Debit,Equity settlement — ECOAZ buy,CBZ Custody,Equity settlement — ECOAZ buy
+2026-06-10,2026-06-10,1550.00,Debit,Wire transfer charges,CBZ Bank,Wire transfer charges
+2026-07-01,2026-07-01,9800.00,Credit,Coupon income — ZG bond,CBZ Custody,Coupon income — ZG bond
+2026-07-14,2026-07-14,50000.00,Debit,Investor distribution July,CBZ Bank,Investor distribution July
+2026-08-05,2026-08-05,41000.00,Credit,Share class A subscription,CBZ Bank,Share class A subscription
+2026-08-12,2026-08-12,85.00,Debit,SMS notification fee,CBZ Bank,SMS / account notification fee

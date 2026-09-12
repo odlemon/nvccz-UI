@@ -1,18 +1,18 @@
 /** Client route id → Next.js path for Home Version 3 */
 export const HV3_ROUTE_TO_PATH: Record<string, string> = {
-  home: "/home-v3",
-  "daily-cover": "/home-v3/cover",
-  news: "/home-v3/news",
-  newsletters: "/home-v3/newsletters",
-  forums: "/home-v3/forums",
-  calendar: "/home-v3/calendar",
-  "my-work": "/home-v3/work",
-  performance: "/home-v3/performance",
-  people: "/home-v3/people",
-  "my-profile": "/home-v3/profile",
-  services: "/home-v3/services",
-  apps: "/home-v3/apps",
-  "matanho-ai": "/home-v3/search",
+  home: "/home",
+  "daily-cover": "/home/cover",
+  news: "/home/news",
+  newsletters: "/home/newsletters",
+  forums: "/home/forums",
+  calendar: "/home/calendar",
+  "my-work": "/home/work",
+  performance: "/home/performance",
+  people: "/home/people",
+  "my-profile": "/home/profile",
+  services: "/home/services",
+  apps: "/home/apps",
+  "matanho-ai": "/home/search",
 }
 
 export const HV3_PATH_TO_ROUTE: Record<string, string> = Object.fromEntries(
@@ -41,22 +41,22 @@ export function parseHv3Location(pathname: string): Hv3LocationState {
     newsletterMode: "library",
   }
 
-  if (pathname === "/home-v3" || pathname === "/home-v3/") {
+  if (pathname === "/home" || pathname === "/home/") {
     return { ...base, route: "home" }
   }
 
-  const newsArticle = pathname.match(/^\/home-v3\/news\/(\d+)\/?$/)
+  const newsArticle = pathname.match(/^\/home\/news\/(\d+)\/?$/)
   if (newsArticle) {
     return { ...base, route: "news", selectedNews: Number(newsArticle[1]) }
   }
-  if (pathname === "/home-v3/news" || pathname.startsWith("/home-v3/news/")) {
+  if (pathname === "/home/news" || pathname.startsWith("/home/news/")) {
     return { ...base, route: "news" }
   }
 
-  if (pathname === "/home-v3/newsletters/editor") {
+  if (pathname === "/home/newsletters/editor") {
     return { ...base, route: "newsletters", newsletterMode: "editor" }
   }
-  const newsletter = pathname.match(/^\/home-v3\/newsletters\/(\d+)\/?$/)
+  const newsletter = pathname.match(/^\/home\/newsletters\/(\d+)\/?$/)
   if (newsletter) {
     return {
       ...base,
@@ -65,15 +65,15 @@ export function parseHv3Location(pathname: string): Hv3LocationState {
       newsletterMode: "reader",
     }
   }
-  if (pathname.startsWith("/home-v3/newsletters")) {
+  if (pathname.startsWith("/home/newsletters")) {
     return { ...base, route: "newsletters", newsletterMode: "library" }
   }
 
-  const forum = pathname.match(/^\/home-v3\/forums\/(\d+)\/?$/)
+  const forum = pathname.match(/^\/home\/forums\/(\d+)\/?$/)
   if (forum) {
     return { ...base, route: "forums", forumThread: Number(forum[1]) }
   }
-  if (pathname.startsWith("/home-v3/forums")) {
+  if (pathname.startsWith("/home/forums")) {
     return { ...base, route: "forums" }
   }
 
@@ -94,18 +94,18 @@ export function buildHv3Path(input: {
 }): string {
   const { route } = input
   if (route === "news" && input.selectedNews != null) {
-    return `/home-v3/news/${input.selectedNews}`
+    return `/home/news/${input.selectedNews}`
   }
   if (route === "forums" && input.forumThread != null) {
-    return `/home-v3/forums/${input.forumThread}`
+    return `/home/forums/${input.forumThread}`
   }
   if (route === "newsletters") {
-    if (input.newsletterMode === "editor") return "/home-v3/newsletters/editor"
+    if (input.newsletterMode === "editor") return "/home/newsletters/editor"
     if (input.selectedNewsletter != null && input.newsletterMode === "reader") {
-      return `/home-v3/newsletters/${input.selectedNewsletter}`
+      return `/home/newsletters/${input.selectedNewsletter}`
     }
   }
-  return HV3_ROUTE_TO_PATH[route] || "/home-v3"
+  return HV3_ROUTE_TO_PATH[route] || "/home"
 }
 
 export type Hv3SubModule = {
@@ -116,17 +116,17 @@ export type Hv3SubModule = {
 }
 
 export const HV3_SUBMODULES: Hv3SubModule[] = [
-  { id: "hv3-home", route: "home", path: "/home-v3", name: "Home" },
-  { id: "hv3-cover", route: "daily-cover", path: "/home-v3/cover", name: "Daily Cover" },
-  { id: "hv3-news", route: "news", path: "/home-v3/news", name: "News" },
-  { id: "hv3-newsletters", route: "newsletters", path: "/home-v3/newsletters", name: "Newsletters" },
-  { id: "hv3-forums", route: "forums", path: "/home-v3/forums", name: "Forums" },
-  { id: "hv3-calendar", route: "calendar", path: "/home-v3/calendar", name: "Calendar" },
-  { id: "hv3-work", route: "my-work", path: "/home-v3/work", name: "My Work" },
-  { id: "hv3-performance", route: "performance", path: "/home-v3/performance", name: "Performance" },
-  { id: "hv3-people", route: "people", path: "/home-v3/people", name: "People" },
-  { id: "hv3-profile", route: "my-profile", path: "/home-v3/profile", name: "My Profile" },
-  { id: "hv3-services", route: "services", path: "/home-v3/services", name: "Services" },
-  { id: "hv3-apps", route: "apps", path: "/home-v3/apps", name: "Apps" },
-  { id: "hv3-search", route: "matanho-ai", path: "/home-v3/search", name: "Matanho AI" },
+  { id: "hv3-home", route: "home", path: "/home", name: "Home" },
+  { id: "hv3-cover", route: "daily-cover", path: "/home/cover", name: "Daily Cover" },
+  { id: "hv3-news", route: "news", path: "/home/news", name: "News" },
+  { id: "hv3-newsletters", route: "newsletters", path: "/home/newsletters", name: "Newsletters" },
+  { id: "hv3-forums", route: "forums", path: "/home/forums", name: "Forums" },
+  { id: "hv3-calendar", route: "calendar", path: "/home/calendar", name: "Calendar" },
+  { id: "hv3-work", route: "my-work", path: "/home/work", name: "My Work" },
+  { id: "hv3-performance", route: "performance", path: "/home/performance", name: "Performance" },
+  { id: "hv3-people", route: "people", path: "/home/people", name: "People" },
+  { id: "hv3-profile", route: "my-profile", path: "/home/profile", name: "My Profile" },
+  { id: "hv3-services", route: "services", path: "/home/services", name: "Services" },
+  { id: "hv3-apps", route: "apps", path: "/home/apps", name: "Apps" },
+  { id: "hv3-search", route: "matanho-ai", path: "/home/search", name: "Matanho AI" },
 ]

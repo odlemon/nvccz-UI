@@ -52,7 +52,7 @@ function sigStatusClass(s: string) {
   if (u === "COMPLETED") return "bg-[#dcfce7] text-[#15803d]"
   if (u === "SENT" || u === "PARTIALLY SIGNED" || u === "PARTIALLY_SIGNED") return "bg-[#dbeafe] text-[#1d4ed8]"
   if (u === "EXPIRED" || u === "VOIDED" || u === "VOID") return "bg-[#fee2e2] text-[#dc2626]"
-  return "bg-[#f1f5f9] text-[#64748b]"
+  return "bg-[#f1f5f9] text-[#111111]"
 }
 
 function typeBadge(type: string) {
@@ -63,9 +63,9 @@ function typeBadge(type: string) {
     "Side Letter": "bg-[#ffedd5] text-[#c2410c]",
     IMA: "bg-[#dbeafe] text-[#1d4ed8]",
     "Term Sheet": "bg-[#fef3c7] text-[#b45309]",
-    "Fee Schedule": "bg-[#f1f5f9] text-[#475569]",
+    "Fee Schedule": "bg-[#f1f5f9] text-[#111111]",
   }
-  return map[type] ?? "bg-[#f1f5f9] text-[#64748b]"
+  return map[type] ?? "bg-[#f1f5f9] text-[#111111]"
 }
 
 const SIG_INK = ["#1e3a5f", "#0f766e", "#7c2d12", "#1d4ed8", "#4c1d95"] as const
@@ -107,7 +107,7 @@ function SignatureMark({
             {name.split(" ")[0]} {name.split(" ").slice(-1)[0]?.[0]}.
           </p>
           <div className="mt-1 h-px w-full bg-[#94a3b8]/60" />
-          <p className="mt-1.5 flex items-center gap-1 text-[10px] font-medium text-[#15803d]">
+          <p className="mt-1.5 flex items-center gap-1 text-[11px] font-medium text-[#15803d]">
             <CheckCircle2 className="h-3 w-3" />
             Signed{signedAt ? ` · ${signedAt}` : ""}
           </p>
@@ -115,9 +115,9 @@ function SignatureMark({
       ) : (
         <>
           <div className="flex h-8 items-end border-b border-dashed border-[#94a3b8]/70 pb-1">
-            <span className="text-[11px] italic text-[#94a3b8]">Awaiting signature…</span>
+            <span className="text-[11px] italic text-[#141414]">Awaiting signature…</span>
           </div>
-          <p className="mt-1.5 flex items-center gap-1 text-[10px] font-medium text-[#c2410c]">
+          <p className="mt-1.5 flex items-center gap-1 text-[11px] font-medium text-[#c2410c]">
             <Clock className="h-3 w-3" /> Pending
           </p>
         </>
@@ -309,8 +309,8 @@ export function FundraisingAgreements() {
       />
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-xl font-bold text-[#0f172a] md:text-[22px]">Agreements & Signatures</h1>
-          <p className="mt-1 text-[12px] text-[#64748b]">
+          <h1 className="text-xl font-bold text-[#000000] md:text-[22px]">Agreements & Signatures</h1>
+          <p className="mt-1 text-[12px] text-[#111111]">
             Versioned e-sign packets — each signature is bound to a document version
           </p>
         </div>
@@ -348,8 +348,8 @@ export function FundraisingAgreements() {
               <k.icon className="h-4 w-4" />
             </span>
             <div>
-              <p className="text-[11px] text-[#64748b]">{k.label}</p>
-              <p className="text-xl font-bold tabular-nums text-[#0f172a]">{k.value}</p>
+              <p className="text-[11px] text-[#111111]">{k.label}</p>
+              <p className="text-xl font-bold tabular-nums text-[#000000]">{k.value}</p>
             </div>
           </div>
         ))}
@@ -379,7 +379,7 @@ export function FundraisingAgreements() {
           </div>
         </div>
       ) : items.length === 0 ? (
-        <div className="mt-5 rounded-[10px] border border-[#e2e8f0] bg-white p-10 text-center text-[13px] text-[#94a3b8]">
+        <div className="mt-5 rounded-[10px] border border-[#e2e8f0] bg-white p-10 text-center text-[13px] text-[#141414]">
           No agreements yet. Create one to start an e-sign packet.
         </div>
       ) : (
@@ -393,7 +393,7 @@ export function FundraisingAgreements() {
                   "rounded-full border-b-2 px-3 pb-2.5 pt-1 text-[12px] font-medium",
                   tab === "agreements"
                     ? "border-transparent bg-gradient-to-r from-blue-600 to-cyan-600 bg-[length:100%_2px] bg-bottom bg-no-repeat text-[#2563eb]"
-                    : "border-transparent text-[#94a3b8]",
+                    : "border-transparent text-[#141414]",
                 )}
               >
                 Agreements ({items.length})
@@ -405,14 +405,14 @@ export function FundraisingAgreements() {
                   "rounded-full border-b-2 px-3 pb-2.5 pt-1 text-[12px] font-medium",
                   tab === "signatures"
                     ? "border-transparent bg-gradient-to-r from-blue-600 to-cyan-600 bg-[length:100%_2px] bg-bottom bg-no-repeat text-[#2563eb]"
-                    : "border-transparent text-[#94a3b8]",
+                    : "border-transparent text-[#141414]",
                 )}
               >
                 Signature requests ({signatureQueue.length})
               </button>
             </div>
             {list.length === 0 ? (
-              <p className="px-4 py-12 text-center text-[12px] text-[#94a3b8]">
+              <p className="px-4 py-12 text-center text-[12px] text-[#141414]">
                 No {tab === "agreements" ? "agreements" : "open signature requests"} to show.
               </p>
             ) : (
@@ -433,15 +433,15 @@ export function FundraisingAgreements() {
                     >
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-2">
-                          <p className="truncate text-[13px] font-semibold text-[#0f172a]">{a.name}</p>
-                          <span className={cn("rounded-[4px] px-1.5 py-0.5 text-[10px] font-semibold", typeBadge(a.type))}>
+                          <p className="truncate text-[13px] font-semibold text-[#000000]">{a.name}</p>
+                          <span className={cn("rounded-[4px] px-1.5 py-0.5 text-[11px] font-semibold", typeBadge(a.type))}>
                             {a.type}
                           </span>
-                          <span className={cn("rounded-[4px] px-1.5 py-0.5 text-[10px] font-semibold", sigStatusClass(a.status))}>
+                          <span className={cn("rounded-[4px] px-1.5 py-0.5 text-[11px] font-semibold", sigStatusClass(a.status))}>
                             {a.status}
                           </span>
                         </div>
-                        <p className="mt-0.5 text-[11px] text-[#64748b]">
+                        <p className="mt-0.5 text-[11px] text-[#111111]">
                           {a.investor} · {a.campaign} · {a.version}
                         </p>
                       </div>
@@ -452,7 +452,7 @@ export function FundraisingAgreements() {
                             style={{ width: `${pct}%` }}
                           />
                         </div>
-                        <span className="text-[11px] tabular-nums text-[#64748b]">
+                        <span className="text-[11px] tabular-nums text-[#111111]">
                           {total ? `${signed}/${total}` : "—"}
                         </span>
                       </div>
@@ -471,29 +471,29 @@ export function FundraisingAgreements() {
                     <FileSignature className="h-4 w-4" />
                   </span>
                   <div className="min-w-0">
-                    <h2 className="text-[13px] font-semibold text-[#0f172a]">{selected.name}</h2>
-                    <p className="text-[11px] text-[#64748b]">
+                    <h2 className="text-[13px] font-semibold text-[#000000]">{selected.name}</h2>
+                    <p className="text-[11px] text-[#111111]">
                       {selected.type} · {selected.version} · Owner {selected.owner}
                     </p>
                   </div>
                 </div>
-                <p className="mt-2 text-[12px] text-[#334155]">{selected.investor}</p>
+                <p className="mt-2 text-[12px] text-[#111111]">{selected.investor}</p>
                 <div className="mt-2 flex flex-wrap gap-2">
-                  <span className={cn("rounded-[4px] px-1.5 py-0.5 text-[10px] font-semibold", sigStatusClass(selected.status))}>
+                  <span className={cn("rounded-[4px] px-1.5 py-0.5 text-[11px] font-semibold", sigStatusClass(selected.status))}>
                     {selected.status}
                   </span>
                   {selected.sentDate ? (
-                    <span className="text-[10px] text-[#64748b]">Sent {selected.sentDate}</span>
+                    <span className="text-[11px] text-[#111111]">Sent {selected.sentDate}</span>
                   ) : null}
                   {selected.expiry ? (
-                    <span className="text-[10px] text-[#b45309]">Expires {selected.expiry}</span>
+                    <span className="text-[11px] text-[#b45309]">Expires {selected.expiry}</span>
                   ) : null}
                 </div>
               </div>
 
               <div className="space-y-3 p-4">
                 <div className="flex items-center justify-between">
-                  <p className="text-[11px] font-semibold text-[#0f172a]">Signature pad</p>
+                  <p className="text-[11px] font-semibold text-[#000000]">Signature pad</p>
                   <div className="flex items-center gap-3">
                     <button
                       type="button"
@@ -516,8 +516,8 @@ export function FundraisingAgreements() {
 
                 {selected.signatories.length === 0 ? (
                   <div className="rounded-[8px] border border-dashed border-[#cbd5e1] bg-[#f8fafc] px-4 py-8 text-center">
-                    <PenLine className="mx-auto h-6 w-6 text-[#94a3b8]" />
-                    <p className="mt-2 text-[12px] text-[#64748b]">No signatories yet</p>
+                    <PenLine className="mx-auto h-6 w-6 text-[#141414]" />
+                    <p className="mt-2 text-[12px] text-[#111111]">No signatories yet</p>
                     <Button
                       variant="gradient-info"
                       className="mt-3 rounded-full h-8 px-4 text-[11px]"
@@ -532,15 +532,15 @@ export function FundraisingAgreements() {
                       <li key={s.id}>
                         <div className="mb-1.5 flex items-center justify-between gap-2">
                           <div>
-                            <p className="text-[12px] font-medium text-[#0f172a]">{s.name}</p>
-                            <p className="text-[10px] text-[#94a3b8]">{s.role}</p>
+                            <p className="text-[12px] font-medium text-[#000000]">{s.name}</p>
+                            <p className="text-[11px] text-[#141414]">{s.role}</p>
                           </div>
                           {s.status === "Pending" ? (
                             <button
                               type="button"
                               disabled={signingId === s.id}
                               onClick={() => markSigned(s.id)}
-                              className="rounded-full border border-[#e2e8f0] px-2.5 py-1 text-[10px] font-medium text-[#2563eb] hover:bg-[#eff6ff] disabled:opacity-50"
+                              className="rounded-full border border-[#e2e8f0] px-2.5 py-1 text-[11px] font-medium text-[#2563eb] hover:bg-[#eff6ff] disabled:opacity-50"
                             >
                               {signingId === s.id ? "Signing…" : "Mark signed"}
                             </button>
@@ -678,10 +678,10 @@ export function FundraisingAgreements() {
                 <input type="date" className={frInputClass} value={sigForm.expiresAt} onChange={(e) => setSigForm((f) => ({ ...f, expiresAt: e.target.value }))} />
               </FrField>
             </div>
-            <p className="text-[9px] text-[#94a3b8]">Provider certificate, decline flow and signed-copy download are pending backend e-sign integration.</p>
+            <p className="text-[11px] text-[#141414]">Provider certificate, decline flow and signed-copy download are pending backend e-sign integration.</p>
           </div>
           <div>
-            <p className="mb-2 text-[11px] font-medium text-[#64748b]">Signature preview</p>
+            <p className="mb-2 text-[11px] font-medium text-[#111111]">Signature preview</p>
             <SignatureMark name={sigForm.fullName || "Signatory"} signed={false} />
           </div>
         </div>

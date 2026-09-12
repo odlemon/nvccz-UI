@@ -21,6 +21,8 @@ export interface ChartOfAccount {
   isActive: boolean
   createdAt: string
   updatedAt: string
+  /** Present on the live API response despite being absent from earlier versions of this interface. */
+  naturalBalance?: 'DEBIT' | 'CREDIT'
 }
 
 export interface CreateChartOfAccountRequest {
@@ -39,8 +41,10 @@ class ChartOfAccountsApiService {
     accountType?: string
     isActive?: boolean
     parentId?: string
-  }): Promise<AccountingResponse<ChartOfAccount[]>> {
-    const response = await apiClient.get('/accounting/chart-of-accounts', { params })
+  }): Promise<ChartOfAccount[]> {
+    // apiClient.get() returns the raw {success,message,data,timestamp} envelope —
+    // unwrap it here so callers get the array the signature promises.
+    const response = await apiClient.get<AccountingResponse<ChartOfAccount[]>>('/accounting/chart-of-accounts', { params })
     return response.data
   }
 

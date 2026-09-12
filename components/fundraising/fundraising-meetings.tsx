@@ -110,7 +110,7 @@ function meetingStatusClass(s: FrMeeting["status"]): string {
     case "No show":
       return "bg-[#ffedd5] text-[#c2410c]"
     default:
-      return "bg-[#f1f5f9] text-[#64748b]"
+      return "bg-[#f1f5f9] text-[#111111]"
   }
 }
 
@@ -126,9 +126,9 @@ function frTaskStatusClass(status: FrTaskStatusValue): string {
     case "WAITING_ON_INTERNAL_TEAM":
       return "bg-[#ffedd5] text-[#c2410c]"
     case "CANCELLED":
-      return "bg-[#f1f5f9] text-[#64748b]"
+      return "bg-[#f1f5f9] text-[#111111]"
     default:
-      return "bg-[#f1f5f9] text-[#64748b]"
+      return "bg-[#f1f5f9] text-[#111111]"
   }
 }
 
@@ -160,7 +160,7 @@ function AvatarStack({ names, max = 4 }: { names: string[]; max?: number }) {
           key={`${n}-${i}`}
           title={n}
           className={cn(
-            "flex h-7 w-7 items-center justify-center rounded-full border-2 border-white bg-gradient-to-br text-[9px] font-bold text-white shadow-sm",
+            "flex h-7 w-7 items-center justify-center rounded-full border-2 border-white bg-gradient-to-br text-[11px] font-bold text-white shadow-sm",
             avatarColor(n),
             i > 0 && "-ml-2",
           )}
@@ -169,7 +169,7 @@ function AvatarStack({ names, max = 4 }: { names: string[]; max?: number }) {
         </span>
       ))}
       {rest > 0 ? (
-        <span className="-ml-2 flex h-7 w-7 items-center justify-center rounded-full border-2 border-white bg-[#e2e8f0] text-[9px] font-bold text-[#475569]">
+        <span className="-ml-2 flex h-7 w-7 items-center justify-center rounded-full border-2 border-white bg-[#e2e8f0] text-[11px] font-bold text-[#111111]">
           +{rest}
         </span>
       ) : null}
@@ -247,24 +247,24 @@ function TaskKanbanCard({
       )}
     >
       <div className="flex items-start justify-between gap-2">
-        <p className="text-[12px] font-semibold leading-snug text-[#0f172a]">{task.title}</p>
+        <p className="text-[12px] font-semibold leading-snug text-[#000000]">{task.title}</p>
         <span
           className={cn(
-            "shrink-0 rounded-[4px] px-1.5 py-0.5 text-[9px] font-semibold",
+            "shrink-0 rounded-[4px] px-1.5 py-0.5 text-[11px] font-semibold",
             priorityClass(task.priority),
           )}
         >
           {task.priority}
         </span>
       </div>
-      <p className="mt-1 text-[10px] text-[#64748b]">
+      <p className="mt-1 text-[11px] text-[#111111]">
         {task.related} · {task.campaign}
       </p>
       <div className="mt-2.5 flex items-center justify-between gap-2">
-        <span className="text-[10px] text-[#94a3b8]">Due {task.dueDate}</span>
+        <span className="text-[11px] text-[#141414]">Due {task.dueDate}</span>
         <span
           className={cn(
-            "flex h-6 w-6 items-center justify-center rounded-full bg-gradient-to-br text-[8px] font-bold text-white",
+            "flex h-6 w-6 items-center justify-center rounded-full bg-gradient-to-br text-[11px] font-bold text-white",
             avatarColor(owner),
           )}
           title={owner}
@@ -281,7 +281,7 @@ function TaskKanbanCard({
             disabled={moving}
             onPointerDown={(event) => event.stopPropagation()}
             onClick={() => onMove(task.id, column.id)}
-            className="rounded-full border border-[#e2e8f0] px-2 py-0.5 text-[9px] font-medium text-[#64748b] hover:bg-[#f8fafc] disabled:opacity-50"
+            className="rounded-full border border-[#e2e8f0] px-2 py-0.5 text-[11px] font-medium text-[#111111] hover:bg-[#f8fafc] disabled:opacity-50"
           >
             → {column.label}
           </button>
@@ -289,7 +289,7 @@ function TaskKanbanCard({
       </div>
       <span
         className={cn(
-          "mt-2 inline-flex rounded-[4px] px-1.5 py-0.5 text-[9px] font-semibold",
+          "mt-2 inline-flex rounded-[4px] px-1.5 py-0.5 text-[11px] font-semibold",
           frTaskStatusClass(task.status),
         )}
       >
@@ -318,8 +318,8 @@ function TaskKanbanColumn({
     <div className="flex w-[260px] shrink-0 flex-col rounded-[10px] border border-[#e2e8f0] bg-[#f1f5f9]/80">
       <div className="flex items-center gap-2 px-3 py-2.5">
         <span className="h-2 w-2 rounded-full" style={{ backgroundColor: column.color }} />
-        <h3 className="text-[12px] font-semibold text-[#0f172a]">{column.label}</h3>
-        <span className="ml-auto rounded-full bg-white px-1.5 text-[10px] font-semibold tabular-nums text-[#64748b]">
+        <h3 className="text-[12px] font-semibold text-[#000000]">{column.label}</h3>
+        <span className="ml-auto rounded-full bg-white px-1.5 text-[11px] font-semibold tabular-nums text-[#111111]">
           {cards.length}
         </span>
       </div>
@@ -341,13 +341,13 @@ function TaskKanbanColumn({
           ))}
         </SortableContext>
         {cards.length === 0 ? (
-          <p className="px-1 py-6 text-center text-[11px] text-[#94a3b8]">Drop tasks here</p>
+          <p className="px-1 py-6 text-center text-[11px] text-[#141414]">Drop tasks here</p>
         ) : null}
       </div>
       <button
         type="button"
         onClick={onAdd}
-        className="m-2 flex h-8 items-center justify-center gap-1 rounded-full text-[11px] font-medium text-[#64748b] hover:bg-white"
+        className="m-2 flex h-8 items-center justify-center gap-1 rounded-full text-[11px] font-medium text-[#111111] hover:bg-white"
       >
         <Plus className="h-3.5 w-3.5" /> Add card
       </button>
@@ -422,21 +422,21 @@ function MiniCalendar({
       <div className="mb-2 flex items-center justify-between">
         <button
           type="button"
-          className="rounded-full p-1 text-[#64748b] hover:bg-[#f1f5f9]"
+          className="rounded-full p-1 text-[#111111] hover:bg-[#f1f5f9]"
           onClick={() => setCursor(new Date(year, month - 1, 1))}
         >
           <ChevronLeft className="h-4 w-4" />
         </button>
-        <p className="text-[12px] font-semibold text-[#0f172a]">{monthLabel}</p>
+        <p className="text-[12px] font-semibold text-[#000000]">{monthLabel}</p>
         <button
           type="button"
-          className="rounded-full p-1 text-[#64748b] hover:bg-[#f1f5f9]"
+          className="rounded-full p-1 text-[#111111] hover:bg-[#f1f5f9]"
           onClick={() => setCursor(new Date(year, month + 1, 1))}
         >
           <ChevronRight className="h-4 w-4" />
         </button>
       </div>
-      <div className="mb-1 grid grid-cols-7 gap-0.5 text-center text-[10px] font-medium text-[#94a3b8]">
+      <div className="mb-1 grid grid-cols-7 gap-0.5 text-center text-[11px] font-medium text-[#141414]">
         {["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"].map((d) => (
           <span key={d}>{d}</span>
         ))}
@@ -457,7 +457,7 @@ function MiniCalendar({
                 "flex h-8 items-center justify-center rounded-full text-[11px] font-medium transition-colors",
                 isSel
                   ? "bg-gradient-to-r from-blue-600 to-cyan-600 text-white shadow-sm"
-                  : "text-[#334155] hover:bg-[#eff6ff]",
+                  : "text-[#111111] hover:bg-[#eff6ff]",
               )}
             >
               {day}
@@ -542,7 +542,7 @@ function MeetingsCalendarView({
                       onSelectMeeting(meeting)
                     }}
                     className={cn(
-                      "block w-full rounded-full px-2 py-1 text-left text-[10px] font-medium",
+                      "block w-full rounded-full px-2 py-1 text-left text-[11px] font-medium",
                       meeting.status === "Completed"
                         ? "border border-blue-200 bg-blue-100 text-blue-800"
                         : meeting.status === "Cancelled"
@@ -963,10 +963,10 @@ export function FundraisingMeetings() {
     <div className="h-full overflow-y-auto bg-[#f8fafc] p-4 md:p-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-xl font-bold tracking-tight text-[#0f172a] md:text-[22px]">
+          <h1 className="text-xl font-bold tracking-tight text-[#000000] md:text-[22px]">
             Meetings & Tasks
           </h1>
-          <p className="mt-1 text-[12px] text-[#64748b]">
+          <p className="mt-1 text-[12px] text-[#111111]">
             Schedule meeting records, capture agendas and record outcomes and follow-up actions
           </p>
         </div>
@@ -997,8 +997,8 @@ export function FundraisingMeetings() {
           { label: "Done", value: tasks.filter((t) => t.status === "COMPLETED").length },
         ].map((k) => (
           <div key={k.label} className={cn(CARD, "p-3.5")}>
-            <p className="text-[11px] text-[#64748b]">{k.label}</p>
-            <p className="mt-1 text-xl font-bold tabular-nums text-[#0f172a]">{k.value}</p>
+            <p className="text-[11px] text-[#111111]">{k.label}</p>
+            <p className="mt-1 text-xl font-bold tabular-nums text-[#000000]">{k.value}</p>
           </div>
         ))}
       </div>
@@ -1012,7 +1012,7 @@ export function FundraisingMeetings() {
               "rounded-full px-4 py-1.5 text-[12px] font-medium transition-colors",
               tab === "meetings"
                 ? "bg-gradient-to-r from-blue-600 to-cyan-600 text-white shadow-sm"
-                : "text-[#64748b] hover:text-[#334155]",
+                : "text-[#111111] hover:text-[#111111]",
             )}
           >
             Meetings
@@ -1024,7 +1024,7 @@ export function FundraisingMeetings() {
               "rounded-full px-4 py-1.5 text-[12px] font-medium transition-colors",
               tab === "tasks"
                 ? "bg-gradient-to-r from-blue-600 to-cyan-600 text-white shadow-sm"
-                : "text-[#64748b] hover:text-[#334155]",
+                : "text-[#111111] hover:text-[#111111]",
             )}
           >
             Tasks board
@@ -1036,7 +1036,7 @@ export function FundraisingMeetings() {
               <Button
                 type="button"
                 variant={meetingView === "list" ? "gradient-info" : "ghost"}
-                className="h-7 rounded-full px-3 text-[10px]"
+                className="h-7 rounded-full px-3 text-[11px]"
                 onClick={() => setMeetingView("list")}
               >
                 <List className="h-3.5 w-3.5" /> List
@@ -1044,7 +1044,7 @@ export function FundraisingMeetings() {
               <Button
                 type="button"
                 variant={meetingView === "calendar" ? "gradient-info" : "ghost"}
-                className="h-7 rounded-full px-3 text-[10px]"
+                className="h-7 rounded-full px-3 text-[11px]"
                 onClick={() => setMeetingView("calendar")}
               >
                 <CalendarDays className="h-3.5 w-3.5" /> Calendar
@@ -1052,7 +1052,7 @@ export function FundraisingMeetings() {
             </div>
           ) : null}
           <div className="relative sm:w-[260px]">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#94a3b8]" />
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#141414]" />
           <Input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -1076,7 +1076,7 @@ export function FundraisingMeetings() {
             }}
           />
         ) : filteredMeetings.length === 0 ? (
-          <div className="mt-4 rounded-[10px] border border-[#e2e8f0] bg-white p-10 text-center text-[13px] text-[#94a3b8]">
+          <div className="mt-4 rounded-[10px] border border-[#e2e8f0] bg-white p-10 text-center text-[13px] text-[#141414]">
             No meetings scheduled yet. Use “Schedule Meeting” to add one.
           </div>
         ) : (
@@ -1088,37 +1088,37 @@ export function FundraisingMeetings() {
               >
                 <div className="border-b border-[#f1f5f9] bg-[#fafafa] px-4 pt-3 pb-3">
                   <div className="flex items-start justify-between gap-2">
-                    <span className="inline-flex items-center gap-1 rounded-full border border-[#e2e8f0] bg-white px-2 py-0.5 text-[10px] font-semibold text-[#475569]">
+                    <span className="inline-flex items-center gap-1 rounded-full border border-[#e2e8f0] bg-white px-2 py-0.5 text-[11px] font-semibold text-[#111111]">
                       <MeetingTypeIcon type={m.type} />
                       {m.type}
                     </span>
                     <span
                       className={cn(
-                        "rounded-[4px] px-1.5 py-0.5 text-[10px] font-semibold",
+                        "rounded-[4px] px-1.5 py-0.5 text-[11px] font-semibold",
                         meetingStatusClass(m.status),
                       )}
                     >
                       {m.status}
                     </span>
                   </div>
-                  <h3 className="mt-2 line-clamp-2 text-[14px] font-semibold leading-snug text-[#0f172a]">
+                  <h3 className="mt-2 line-clamp-2 text-[14px] font-semibold leading-snug text-[#000000]">
                     {m.title}
                   </h3>
                 </div>
 
                 <div className="space-y-3 p-4">
-                  <div className="flex items-center gap-2 text-[12px] text-[#334155]">
+                  <div className="flex items-center gap-2 text-[12px] text-[#111111]">
                     <CalendarDays className="h-3.5 w-3.5 text-[#2563eb]" />
                     <span>
                       {m.date} · <span className="font-medium">{m.time}</span>
                     </span>
                   </div>
-                  <p className="text-[11px] text-[#64748b]">
+                  <p className="text-[11px] text-[#111111]">
                     {m.investor}
-                    <span className="text-[#94a3b8]"> · {m.campaign}</span>
+                    <span className="text-[#141414]"> · {m.campaign}</span>
                   </p>
                   {m.relatedOpportunity ? (
-                    <p className="text-[10px] text-[#94a3b8]">{m.relatedOpportunity}</p>
+                    <p className="text-[11px] text-[#141414]">{m.relatedOpportunity}</p>
                   ) : null}
 
                   <div className="flex items-center justify-between gap-2 border-t border-[#f1f5f9] pt-3">
@@ -1280,16 +1280,16 @@ export function FundraisingMeetings() {
               </FrField>
 
               <div>
-                <p className="mb-1.5 text-[11px] font-medium text-[#64748b]">Attendees</p>
+                <p className="mb-1.5 text-[11px] font-medium text-[#111111]">Attendees</p>
                 <div className="mb-2 flex flex-wrap gap-1.5">
                   {attendees.map((a) => (
                     <span
                       key={a}
-                      className="inline-flex items-center gap-1.5 rounded-full border border-[#e2e8f0] bg-[#f8fafc] py-0.5 pl-0.5 pr-2 text-[11px] text-[#0f172a]"
+                      className="inline-flex items-center gap-1.5 rounded-full border border-[#e2e8f0] bg-[#f8fafc] py-0.5 pl-0.5 pr-2 text-[11px] text-[#000000]"
                     >
                       <span
                         className={cn(
-                          "flex h-5 w-5 items-center justify-center rounded-full bg-gradient-to-br text-[8px] font-bold text-white",
+                          "flex h-5 w-5 items-center justify-center rounded-full bg-gradient-to-br text-[11px] font-bold text-white",
                           avatarColor(a),
                         )}
                       >
@@ -1298,7 +1298,7 @@ export function FundraisingMeetings() {
                       {a}
                       <button
                         type="button"
-                        className="ml-0.5 rounded-full p-0.5 text-[#94a3b8] hover:text-[#64748b]"
+                        className="ml-0.5 rounded-full p-0.5 text-[#141414] hover:text-[#111111]"
                         onClick={() => removeAttendee(a)}
                       >
                         <X className="h-3 w-3" />
@@ -1307,7 +1307,7 @@ export function FundraisingMeetings() {
                   ))}
                 </div>
                 <div className="relative">
-                  <Users className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#94a3b8]" />
+                  <Users className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#141414]" />
                   <input
                     className={cn(frInputClass, "pl-8")}
                     placeholder="Type a name or email and press Enter…"
@@ -1467,9 +1467,9 @@ export function FundraisingMeetings() {
         {selectedMeeting ? (
           <div className="space-y-4">
             <div className="overflow-hidden rounded-[10px] border border-[#e2e8f0] bg-[#f8fafc] p-5">
-              <p className="text-[12px] text-[#64748b]">{selectedMeeting.investor}</p>
-              <p className="mt-1 text-[15px] font-semibold text-[#0f172a]">{selectedMeeting.title}</p>
-              <p className="mt-2 text-[11px] text-[#64748b]">
+              <p className="text-[12px] text-[#111111]">{selectedMeeting.investor}</p>
+              <p className="mt-1 text-[15px] font-semibold text-[#000000]">{selectedMeeting.title}</p>
+              <p className="mt-2 text-[11px] text-[#111111]">
                 {selectedMeeting.campaign}
                 {selectedMeeting.relatedOpportunity
                   ? ` · ${selectedMeeting.relatedOpportunity}`
@@ -1477,25 +1477,25 @@ export function FundraisingMeetings() {
               </p>
             </div>
             <div>
-              <p className="mb-2 text-[11px] font-semibold text-[#0f172a]">Agenda / planned discussion</p>
-              <p className="whitespace-pre-wrap rounded-[8px] border border-[#e2e8f0] bg-white p-3 text-[12px] leading-relaxed text-[#475569]">
+              <p className="mb-2 text-[11px] font-semibold text-[#000000]">Agenda / planned discussion</p>
+              <p className="whitespace-pre-wrap rounded-[8px] border border-[#e2e8f0] bg-white p-3 text-[12px] leading-relaxed text-[#111111]">
                 {selectedMeeting.agenda || "No agenda recorded."}
               </p>
             </div>
             {selectedMeeting.status === "Completed" ? (
               <div className="space-y-3 border-t border-[#f1f5f9] pt-4">
                 <div>
-                  <p className="text-[11px] font-semibold text-[#0f172a]">Outcome summary</p>
-                  <p className="mt-1 whitespace-pre-wrap text-[12px] text-[#475569]">{selectedMeeting.outcomeSummary || "—"}</p>
+                  <p className="text-[11px] font-semibold text-[#000000]">Outcome summary</p>
+                  <p className="mt-1 whitespace-pre-wrap text-[12px] text-[#111111]">{selectedMeeting.outcomeSummary || "—"}</p>
                 </div>
                 <div>
-                  <p className="text-[11px] font-semibold text-[#0f172a]">Discussion notes</p>
-                  <p className="mt-1 whitespace-pre-wrap text-[12px] text-[#475569]">{selectedMeeting.discussionNotes || "—"}</p>
+                  <p className="text-[11px] font-semibold text-[#000000]">Discussion notes</p>
+                  <p className="mt-1 whitespace-pre-wrap text-[12px] text-[#111111]">{selectedMeeting.discussionNotes || "—"}</p>
                 </div>
                 {selectedMeeting.decisions.length ? (
                   <div>
-                    <p className="text-[11px] font-semibold text-[#0f172a]">Decisions</p>
-                    <ul className="mt-1 list-disc space-y-1 pl-4 text-[12px] text-[#475569]">
+                    <p className="text-[11px] font-semibold text-[#000000]">Decisions</p>
+                    <ul className="mt-1 list-disc space-y-1 pl-4 text-[12px] text-[#111111]">
                       {selectedMeeting.decisions.map((decision: Record<string, any> | string, index: number) => {
                         const text = typeof decision === "string" ? decision : decision.text || decision.title || "Decision"
                         return <li key={`${text}-${index}`}>{text}</li>
@@ -1505,8 +1505,8 @@ export function FundraisingMeetings() {
                 ) : null}
                 {selectedMeeting.actionItems.length ? (
                   <div>
-                    <p className="text-[11px] font-semibold text-[#0f172a]">Action items</p>
-                    <ul className="mt-1 list-disc space-y-1 pl-4 text-[12px] text-[#475569]">
+                    <p className="text-[11px] font-semibold text-[#000000]">Action items</p>
+                    <ul className="mt-1 list-disc space-y-1 pl-4 text-[12px] text-[#111111]">
                       {selectedMeeting.actionItems.map((item: Record<string, any> | string, index: number) => (
                         <li key={String(typeof item === "string" ? item : item.id ?? index)}>
                           {typeof item === "string" ? item : item.title || item.description}
@@ -1518,13 +1518,13 @@ export function FundraisingMeetings() {
               </div>
             ) : null}
             <div>
-              <p className="mb-2 text-[11px] font-semibold text-[#0f172a]">Participants</p>
+              <p className="mb-2 text-[11px] font-semibold text-[#000000]">Participants</p>
               <ul className="space-y-2">
                 {selectedMeeting.attendees.map((a) => (
-                  <li key={a} className="flex items-center gap-2 text-[12px] text-[#334155]">
+                  <li key={a} className="flex items-center gap-2 text-[12px] text-[#111111]">
                     <span
                       className={cn(
-                        "flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br text-[10px] font-bold text-white",
+                        "flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br text-[11px] font-bold text-white",
                         avatarColor(a),
                       )}
                     >
@@ -1532,7 +1532,7 @@ export function FundraisingMeetings() {
                     </span>
                     {a}
                     {a === selectedMeeting.owner ? (
-                      <span className="rounded-full bg-[#eff6ff] px-2 py-0.5 text-[9px] font-semibold text-blue-700">
+                      <span className="rounded-full bg-[#eff6ff] px-2 py-0.5 text-[11px] font-semibold text-blue-700">
                         Organizer
                       </span>
                     ) : null}

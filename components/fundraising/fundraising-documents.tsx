@@ -55,7 +55,7 @@ function docStatusClass(s: string) {
   const u = s.toUpperCase()
   if (u.includes("APPROV") || u.includes("COMPLETE") || u.includes("SIGNED") || u.includes("ACTIVE")) return "bg-[#dcfce7] text-[#15803d]"
   if (u.includes("REVIEW") || u.includes("SENT") || u.includes("PENDING")) return "bg-[#ffedd5] text-[#c2410c]"
-  if (u.includes("SUPERSEDE") || u.includes("VOID")) return "bg-[#f1f5f9] text-[#64748b]"
+  if (u.includes("SUPERSEDE") || u.includes("VOID")) return "bg-[#f1f5f9] text-[#111111]"
   return "bg-[#e0f2fe] text-[#0369a1]"
 }
 
@@ -135,6 +135,16 @@ export function FundraisingDocuments() {
   useEffect(() => {
     if (!selected?.id) {
       setDocumentDetail(null)
+      return
+    }
+    // The unified index merges in data-room documents ("dr-…") and agreement artefacts
+    // ("agr-…") as virtual rows. GET /documents/:id rejects those by design — they are only
+    // reachable through their source API until registered via POST /documents. Requesting
+    // one anyway produced a 400 and a console error on every visit to this screen, so show
+    // what the list already gave us instead of asking for a detail that cannot exist.
+    if (/^(dr|agr)-/.test(selected.id)) {
+      setDocumentDetail(null)
+      setDetailLoading(false)
       return
     }
     let cancelled = false
@@ -252,8 +262,8 @@ export function FundraisingDocuments() {
     <div className="h-full overflow-y-auto bg-[#f8fafc] p-4 md:p-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-xl font-bold text-[#0f172a] md:text-[22px]">Documents</h1>
-          <p className="mt-1 text-[12px] text-[#64748b]">
+          <h1 className="text-xl font-bold text-[#000000] md:text-[22px]">Documents</h1>
+          <p className="mt-1 text-[12px] text-[#111111]">
             Unified fundraising document library — browse by folder, keep confidential packs off email
           </p>
         </div>
@@ -285,10 +295,10 @@ export function FundraisingDocuments() {
             onClick={k.onClick}
             className={cn(CARD, "rounded-full p-3.5 text-left", k.onClick && "hover:bg-[#fafafa]")}
           >
-            <p className="text-[11px] text-[#64748b]">{k.label}</p>
-            <p className="mt-1 text-xl font-bold tabular-nums text-[#0f172a]">{k.value}</p>
+            <p className="text-[11px] text-[#111111]">{k.label}</p>
+            <p className="mt-1 text-xl font-bold tabular-nums text-[#000000]">{k.value}</p>
             {k.onClick ? (
-              <p className="mt-1 text-[10px] font-medium text-[#2563eb]">View all &gt;</p>
+              <p className="mt-1 text-[11px] font-medium text-[#2563eb]">View all &gt;</p>
             ) : null}
           </button>
         ))}
@@ -318,14 +328,14 @@ export function FundraisingDocuments() {
           </div>
         </div>
       ) : docs.length === 0 ? (
-        <div className="mt-5 rounded-[10px] border border-[#e2e8f0] bg-white p-10 text-center text-[13px] text-[#94a3b8]">
+        <div className="mt-5 rounded-[10px] border border-[#e2e8f0] bg-white p-10 text-center text-[13px] text-[#141414]">
           No documents yet. Use “Upload Document” to add one.
         </div>
       ) : (
         <>
           <div className="mt-5">
             <div className="mb-2 flex items-center justify-between">
-              <h2 className="text-[13px] font-semibold text-[#0f172a]">Folders</h2>
+              <h2 className="text-[13px] font-semibold text-[#000000]">Folders</h2>
               {folder !== "all" ? (
                 <button
                   type="button"
@@ -359,8 +369,8 @@ export function FundraisingDocuments() {
                         <Folder className={cn("h-5 w-5", t.icon)} />
                       )}
                     </span>
-                    <span className="text-[12px] font-semibold leading-snug text-[#0f172a]">{cat}</span>
-                    <span className="text-[10px] text-[#64748b]">
+                    <span className="text-[12px] font-semibold leading-snug text-[#000000]">{cat}</span>
+                    <span className="text-[11px] text-[#111111]">
                       {count} file{count === 1 ? "" : "s"}
                     </span>
                   </button>
@@ -376,22 +386,22 @@ export function FundraisingDocuments() {
                   <button
                     type="button"
                     onClick={() => setFolder("all")}
-                    className="rounded-full px-2 py-1 font-semibold text-[#64748b] hover:bg-[#eff6ff] hover:text-[#2563eb]"
+                    className="rounded-full px-2 py-1 font-semibold text-[#111111] hover:bg-[#eff6ff] hover:text-[#2563eb]"
                   >
                     Library
                   </button>
                   {folder !== "all" ? (
                     <>
-                      <ChevronRight className="h-3.5 w-3.5 shrink-0 text-[#94a3b8]" />
-                      <span className="truncate font-semibold text-[#0f172a]">{folder}</span>
+                      <ChevronRight className="h-3.5 w-3.5 shrink-0 text-[#141414]" />
+                      <span className="truncate font-semibold text-[#000000]">{folder}</span>
                     </>
                   ) : null}
-                  <span className="ml-1 rounded-[4px] bg-[#f1f5f9] px-1.5 text-[11px] font-semibold text-[#64748b]">
+                  <span className="ml-1 rounded-[4px] bg-[#f1f5f9] px-1.5 text-[11px] font-semibold text-[#111111]">
                     {filtered.length}
                   </span>
                 </div>
                 <div className="relative sm:w-[220px]">
-                  <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#94a3b8]" />
+                  <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#141414]" />
                   <Input
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
@@ -402,7 +412,7 @@ export function FundraisingDocuments() {
               </div>
 
               {filtered.length === 0 ? (
-                <p className="px-4 py-12 text-center text-[12px] text-[#94a3b8]">
+                <p className="px-4 py-12 text-center text-[12px] text-[#141414]">
                   No documents in this folder.
                 </p>
               ) : (
@@ -424,25 +434,25 @@ export function FundraisingDocuments() {
                           </span>
                           <div className="min-w-0 flex-1">
                             <div className="flex flex-wrap items-center gap-2">
-                              <p className="truncate text-[12px] font-semibold text-[#0f172a]">{d.name}</p>
+                              <p className="truncate text-[12px] font-semibold text-[#000000]">{d.name}</p>
                               {d.confidential ? (
-                                <span className="rounded-[4px] bg-[#ffedd5] px-1.5 py-0.5 text-[9px] font-semibold text-[#c2410c]">
+                                <span className="rounded-[4px] bg-[#ffedd5] px-1.5 py-0.5 text-[11px] font-semibold text-[#c2410c]">
                                   Confidential
                                 </span>
                               ) : null}
                               <span
                                 className={cn(
-                                  "rounded-[4px] px-1.5 py-0.5 text-[9px] font-semibold",
+                                  "rounded-[4px] px-1.5 py-0.5 text-[11px] font-semibold",
                                   docStatusClass(d.status),
                                 )}
                               >
                                 {d.status}
                               </span>
                             </div>
-                            <p className="mt-0.5 text-[11px] text-[#64748b]">
+                            <p className="mt-0.5 text-[11px] text-[#111111]">
                               {d.category} · {d.campaign} · {d.version}
                             </p>
-                            <p className="mt-0.5 text-[10px] text-[#94a3b8]">
+                            <p className="mt-0.5 text-[11px] text-[#141414]">
                               {d.room} · {d.owner} · {d.updated}
                             </p>
                           </div>
@@ -467,8 +477,8 @@ export function FundraisingDocuments() {
                       <Folder className={cn("h-4 w-4", tone(selected.category).icon)} />
                     </span>
                     <div className="min-w-0">
-                      <h2 className="text-[13px] font-semibold text-[#0f172a]">{selected.name}</h2>
-                      <p className="mt-0.5 text-[11px] text-[#64748b]">
+                      <h2 className="text-[13px] font-semibold text-[#000000]">{selected.name}</h2>
+                      <p className="mt-0.5 text-[11px] text-[#111111]">
                         {selected.category} · {selected.campaign} · {selected.version}
                       </p>
                     </div>
@@ -477,10 +487,10 @@ export function FundraisingDocuments() {
                 <div className="space-y-3 p-4">
                   <div className="space-y-2 text-[12px]">
                     <div className="flex justify-between">
-                      <span className="text-[#94a3b8]">Status</span>
+                      <span className="text-[#141414]">Status</span>
                       <span
                         className={cn(
-                          "rounded-[4px] px-1.5 py-0.5 text-[10px] font-semibold",
+                          "rounded-[4px] px-1.5 py-0.5 text-[11px] font-semibold",
                           docStatusClass(selected.status),
                         )}
                       >
@@ -488,19 +498,19 @@ export function FundraisingDocuments() {
                       </span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-[#94a3b8]">Owner</span>
-                      <span className="font-medium text-[#0f172a]">{selected.owner}</span>
+                      <span className="text-[#141414]">Owner</span>
+                      <span className="font-medium text-[#000000]">{selected.owner}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-[#94a3b8]">Updated</span>
-                      <span className="text-[#0f172a]">{selected.updated}</span>
+                      <span className="text-[#141414]">Updated</span>
+                      <span className="text-[#000000]">{selected.updated}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-[#94a3b8]">Source</span>
-                      <span className="font-medium text-[#0f172a]">{selected.room}</span>
+                      <span className="text-[#141414]">Source</span>
+                      <span className="font-medium text-[#000000]">{selected.room}</span>
                     </div>
                     <div className="flex justify-between">
-                      <span className="text-[#94a3b8]">Folder</span>
+                      <span className="text-[#141414]">Folder</span>
                       <button
                         type="button"
                         className="rounded-full px-2 py-1 font-medium text-[#2563eb] hover:bg-[#eff6ff]"
@@ -535,22 +545,22 @@ export function FundraisingDocuments() {
                     <option value="SUPERSEDED">Superseded</option>
                   </select>
                   <div className="border-t border-[#f1f5f9] pt-3">
-                    <p className="text-[11px] font-semibold text-[#0f172a]">Version history</p>
+                    <p className="text-[11px] font-semibold text-[#000000]">Version history</p>
                     {detailLoading ? (
-                      <p className="mt-2 text-[10px] text-[#94a3b8]">Loading versions…</p>
+                      <p className="mt-2 text-[11px] text-[#141414]">Loading versions…</p>
                     ) : !Array.isArray(documentDetail?.versions) || documentDetail.versions.length === 0 ? (
-                      <p className="mt-2 text-[10px] text-[#94a3b8]">No version history returned.</p>
+                      <p className="mt-2 text-[11px] text-[#141414]">No version history returned.</p>
                     ) : (
                       <ul className="mt-2 space-y-2">
                         {documentDetail.versions.map((version: Record<string, any>, index: number) => (
-                          <li key={String(version.id ?? version.versionNumber ?? index)} className="rounded-[6px] bg-[#f8fafc] p-2 text-[10px]">
-                            <p className="font-medium text-[#0f172a]">v{version.versionNumber ?? index + 1} · {version.fileName || "Document"}</p>
-                            <p className="mt-0.5 text-[#94a3b8]">{version.uploadedAt ? new Date(version.uploadedAt).toLocaleString() : "—"}</p>
+                          <li key={String(version.id ?? version.versionNumber ?? index)} className="rounded-[6px] bg-[#f8fafc] p-2 text-[11px]">
+                            <p className="font-medium text-[#000000]">v{version.versionNumber ?? index + 1} · {version.fileName || "Document"}</p>
+                            <p className="mt-0.5 text-[#141414]">{version.uploadedAt ? new Date(version.uploadedAt).toLocaleString() : "—"}</p>
                           </li>
                         ))}
                       </ul>
                     )}
-                    <p className="mt-2 text-[9px] text-[#b45309]">Uploading a replacement may invalidate signatures bound to an older version.</p>
+                    <p className="mt-2 text-[11px] text-[#b45309]">Uploading a replacement may invalidate signatures bound to an older version.</p>
                   </div>
                 </div>
               </aside>
@@ -664,11 +674,11 @@ function FrUploadDialog({
           </FrField>
         </div>
         <label className="flex items-center justify-between gap-3 rounded-[6px] border border-[#e2e8f0] bg-white px-3 py-2.5">
-          <span className="text-[12px] font-medium text-[#0f172a]">Confidential</span>
+          <span className="text-[12px] font-medium text-[#000000]">Confidential</span>
           <Switch checked={confidential} onCheckedChange={onConfidentialChange} />
         </label>
         <FrField label="File">
-          <label className="flex cursor-pointer items-center justify-center gap-2 rounded-[8px] border border-dashed border-[#cbd5e1] bg-[#f8fafc] px-4 py-6 text-[12px] text-[#64748b] hover:bg-[#f1f5f9]">
+          <label className="flex cursor-pointer items-center justify-center gap-2 rounded-[8px] border border-dashed border-[#cbd5e1] bg-[#f8fafc] px-4 py-6 text-[12px] text-[#111111] hover:bg-[#f1f5f9]">
             <UploadCloud className="h-4 w-4" />
             {file ? file.name : "Choose a file to upload"}
             <input

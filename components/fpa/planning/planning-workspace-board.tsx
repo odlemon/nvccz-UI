@@ -314,7 +314,7 @@ export function PlanningWorkspaceBoard({ modelId }: Props) {
         actions={
           <Link
             href="/forecasting/models?catalog=1"
-            className="h-9 inline-flex items-center rounded-full border border-[#e2e8f0] bg-white px-3 text-xs font-medium text-[#475569] hover:bg-[#f8fafc]"
+            className="h-9 inline-flex items-center rounded-full border border-[#e2e8f0] bg-white px-3 text-xs font-medium text-[#111111] hover:bg-[#f8fafc]"
           >
             All models
           </Link>
@@ -325,30 +325,30 @@ export function PlanningWorkspaceBoard({ modelId }: Props) {
         {/* Version · Cycle · Scenarios · Actions */}
         <section className="rounded-lg border border-[#e2e8f0] bg-white px-4 py-3 shadow-sm">
           <div className="flex flex-wrap items-center gap-3">
-            <label className="text-[11px] text-[#64748b] inline-flex items-center gap-2">
+            <label className="text-[11px] text-[#111111] inline-flex items-center gap-2">
               <span className="font-medium">Model Version</span>
               <span className="relative inline-flex items-center">
                 <select
                   value={version}
                   onChange={(e) => setVersion(e.target.value)}
-                  className="h-9 appearance-none rounded-full border border-[#e2e8f0] bg-white pl-3 pr-16 text-[13px] font-medium text-[#0f172a] focus:outline-none focus:ring-2 focus:ring-[#2563eb]/20"
+                  className="h-9 appearance-none rounded-full border border-[#e2e8f0] bg-white pl-3 pr-16 text-[13px] font-medium text-[#000000] focus:outline-none focus:ring-2 focus:ring-[#2563eb]/20"
                 >
                   <option>v3.2 Working</option>
                   <option>v3.1 Published</option>
                   <option>v3.0 Locked</option>
                 </select>
-                <span className="pointer-events-none absolute right-2 rounded-full bg-[#dcfce7] px-1.5 py-0.5 text-[9px] font-semibold text-[#15803d]">
+                <span className="pointer-events-none absolute right-2 rounded-full bg-[#dcfce7] px-1.5 py-0.5 text-[11px] font-semibold text-[#15803d]">
                   Latest
                 </span>
               </span>
             </label>
 
-            <label className="text-[11px] text-[#64748b] inline-flex items-center gap-2">
+            <label className="text-[11px] text-[#111111] inline-flex items-center gap-2">
               <span className="font-medium">Planning Cycle</span>
               <select
                 value={cycle}
                 onChange={(e) => setCycle(e.target.value)}
-                className="h-9 rounded-full border border-[#e2e8f0] bg-white px-3 text-[13px] font-medium text-[#0f172a] focus:outline-none focus:ring-2 focus:ring-[#2563eb]/20"
+                className="h-9 rounded-full border border-[#e2e8f0] bg-white px-3 text-[13px] font-medium text-[#000000] focus:outline-none focus:ring-2 focus:ring-[#2563eb]/20"
               >
                 <option>FY2026 Budget</option>
                 <option>FY2026 Q3 Rolling Forecast</option>
@@ -368,7 +368,7 @@ export function PlanningWorkspaceBoard({ modelId }: Props) {
                     "h-9 px-3.5 text-[13px] font-medium border-b-2 -mb-px transition-colors",
                     scenario === s
                       ? "border-[#2563eb] text-[#2563eb]"
-                      : "border-transparent text-[#64748b] hover:text-[#0f172a]",
+                      : "border-transparent text-[#111111] hover:text-[#000000]",
                   )}
                 >
                   {s}
@@ -379,7 +379,7 @@ export function PlanningWorkspaceBoard({ modelId }: Props) {
             <div className="flex items-center gap-2 pb-1">
               <Link
                 href={compareHref}
-                className="h-9 inline-flex items-center gap-1.5 rounded-full border border-[#e2e8f0] bg-white px-3.5 text-[12px] font-medium text-[#475569] hover:bg-[#f8fafc]"
+                className="h-9 inline-flex items-center gap-1.5 rounded-full border border-[#e2e8f0] bg-white px-3.5 text-[12px] font-medium text-[#111111] hover:bg-[#f8fafc]"
               >
                 <Sparkles className="w-3.5 h-3.5 text-[#2563eb]" />
                 Compare
@@ -406,7 +406,7 @@ export function PlanningWorkspaceBoard({ modelId }: Props) {
                         <button
                           key={a}
                           type="button"
-                          className="w-full px-3 py-2 text-left text-[12px] text-[#0f172a] hover:bg-[#f8fafc]"
+                          className="w-full px-3 py-2 text-left text-[12px] text-[#000000] hover:bg-[#f8fafc]"
                           onClick={() => {
                             toast.message(a)
                             setActionsOpen(false)
@@ -431,10 +431,10 @@ export function PlanningWorkspaceBoard({ modelId }: Props) {
                 key={k.label}
                 className="rounded-lg border border-[#e2e8f0] bg-[#fafbfc] px-3 py-2.5 min-h-[96px]"
               >
-                <p className="text-[11px] font-medium text-[#64748b]">{k.label}</p>
+                <p className="text-[11px] font-medium text-[#111111]">{k.label}</p>
                 <div className="mt-1 flex items-start justify-between gap-2">
                   <div>
-                    <p className="text-[20px] font-semibold text-[#0f172a] tabular-nums leading-none">
+                    <p className="text-[20px] font-semibold text-[#000000] tabular-nums leading-none">
                       {k.value}
                     </p>
                     <p
@@ -451,12 +451,12 @@ export function PlanningWorkspaceBoard({ modelId }: Props) {
               </div>
             ))}
           </div>
-          <div className="mt-2.5 flex flex-wrap items-center justify-between gap-2 text-[11px] text-[#94a3b8]">
+          <div className="mt-2.5 flex flex-wrap items-center justify-between gap-2 text-[11px] text-[#141414]">
             <span>All values in USD</span>
             <div className="inline-flex items-center gap-2">
-              <label className="inline-flex items-center gap-1.5 text-[#64748b]">
+              <label className="inline-flex items-center gap-1.5 text-[#111111]">
                 View by
-                <select className="h-8 rounded-full border border-[#e2e8f0] bg-white px-2.5 text-[11px] font-medium text-[#0f172a]">
+                <select className="h-8 rounded-full border border-[#e2e8f0] bg-white px-2.5 text-[11px] font-medium text-[#000000]">
                   <option>Total Company</option>
                   <option>By Department</option>
                   <option>By Region</option>
@@ -464,7 +464,7 @@ export function PlanningWorkspaceBoard({ modelId }: Props) {
               </label>
               <button
                 type="button"
-                className="h-8 w-8 inline-flex items-center justify-center rounded-full border border-[#e2e8f0] text-[#64748b] hover:bg-[#f8fafc]"
+                className="h-8 w-8 inline-flex items-center justify-center rounded-full border border-[#e2e8f0] text-[#111111] hover:bg-[#f8fafc]"
                 onClick={() => toast.success("KPIs refreshed")}
                 aria-label="Refresh"
               >
@@ -561,14 +561,14 @@ function PlanningGrid({
   return (
     <section className="rounded-lg border border-[#e2e8f0] bg-white shadow-sm overflow-hidden">
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#e2e8f0] px-4 py-2.5">
-        <h2 className="text-[14px] font-semibold text-[#0f172a]">Planning Grid</h2>
+        <h2 className="text-[14px] font-semibold text-[#000000]">Planning Grid</h2>
         <div className="inline-flex items-center gap-1.5">
           <ToolBtn label="%" icon={<Percent className="w-3.5 h-3.5" />} />
           <ToolBtn label="Auto-fit" />
           <ToolBtn label="Columns" icon={<Columns3 className="w-3.5 h-3.5" />} />
           <button
             type="button"
-            className="h-8 w-8 inline-flex items-center justify-center rounded-full border border-[#e2e8f0] text-[#64748b] hover:bg-[#f8fafc]"
+            className="h-8 w-8 inline-flex items-center justify-center rounded-full border border-[#e2e8f0] text-[#111111] hover:bg-[#f8fafc]"
             aria-label="More"
           >
             <MoreHorizontal className="w-4 h-4" />
@@ -579,7 +579,7 @@ function PlanningGrid({
       <div className="overflow-x-auto">
         <table className="w-full min-w-[980px] text-left border-collapse">
           <thead>
-            <tr className="bg-[#f8fafc] text-[11px] text-[#64748b] border-b border-[#e2e8f0]">
+            <tr className="bg-[#f8fafc] text-[11px] text-[#111111] border-b border-[#e2e8f0]">
               <th className="sticky left-0 z-10 bg-[#f8fafc] px-3 py-2.5 font-medium min-w-[200px] border-r border-[#e2e8f0]">
                 Department
               </th>
@@ -588,7 +588,7 @@ function PlanningGrid({
                   {m}
                 </th>
               ))}
-              <th className="px-3 py-2.5 font-semibold text-right text-[#0f172a] whitespace-nowrap">
+              <th className="px-3 py-2.5 font-semibold text-right text-[#000000] whitespace-nowrap">
                 FY2026 Total
               </th>
             </tr>
@@ -621,7 +621,7 @@ function PlanningGrid({
                       {hasKids ? (
                         <button
                           type="button"
-                          className="h-5 w-5 inline-flex items-center justify-center text-[#94a3b8] hover:text-[#64748b]"
+                          className="h-5 w-5 inline-flex items-center justify-center text-[#141414] hover:text-[#111111]"
                           onClick={(e) => {
                             e.stopPropagation()
                             onToggle(row.id)
@@ -637,7 +637,7 @@ function PlanningGrid({
                       ) : (
                         <span className="w-5" />
                       )}
-                      <span className="truncate text-[#0f172a]">{row.name}</span>
+                      <span className="truncate text-[#000000]">{row.name}</span>
                     </div>
                   </td>
                   {row.values.map((v, i) => {
@@ -646,7 +646,7 @@ function PlanningGrid({
                       <td
                         key={i}
                         className={cn(
-                          "px-1.5 py-1 text-right tabular-nums text-[#0f172a] whitespace-nowrap",
+                          "px-1.5 py-1 text-right tabular-nums text-[#000000] whitespace-nowrap",
                           editable && "cursor-text",
                         )}
                         onDoubleClick={(e) => {
@@ -691,7 +691,7 @@ function PlanningGrid({
                       </td>
                     )
                   })}
-                  <td className="px-3 py-2 text-right tabular-nums font-semibold text-[#0f172a] whitespace-nowrap">
+                  <td className="px-3 py-2 text-right tabular-nums font-semibold text-[#000000] whitespace-nowrap">
                     {fmt(row.fy)}
                   </td>
                 </tr>
@@ -700,7 +700,7 @@ function PlanningGrid({
           </tbody>
         </table>
       </div>
-      <p className="border-t border-[#f1f5f9] px-4 py-2 text-[11px] text-[#94a3b8]">
+      <p className="border-t border-[#f1f5f9] px-4 py-2 text-[11px] text-[#141414]">
         Double-click a department month cell to edit. Total Company and FY totals recalculate automatically.
       </p>
     </section>
@@ -712,7 +712,7 @@ function ToolBtn({ label, icon }: { label: string; icon?: React.ReactNode }) {
     <button
       type="button"
       onClick={() => toast.message(label)}
-      className="h-8 inline-flex items-center gap-1.5 rounded-full border border-[#e2e8f0] bg-white px-2.5 text-[11px] font-medium text-[#475569] hover:bg-[#f8fafc]"
+      className="h-8 inline-flex items-center gap-1.5 rounded-full border border-[#e2e8f0] bg-white px-2.5 text-[11px] font-medium text-[#111111] hover:bg-[#f8fafc]"
     >
       {icon}
       {label}
@@ -763,7 +763,7 @@ function TrendCard() {
   return (
     <section className="rounded-lg border border-[#e2e8f0] bg-white p-3 shadow-sm flex flex-col min-h-[280px]">
       <div className="flex items-center justify-between gap-2 mb-1">
-        <h3 className="text-[13px] font-semibold text-[#0f172a]">Revenue vs Expense Trend</h3>
+        <h3 className="text-[13px] font-semibold text-[#000000]">Revenue vs Expense Trend</h3>
         <div className="inline-flex items-center gap-2">
           <button
             type="button"
@@ -772,10 +772,10 @@ function TrendCard() {
           >
             Edit Chart
           </button>
-          <MoreHorizontal className="w-4 h-4 text-[#94a3b8]" />
+          <MoreHorizontal className="w-4 h-4 text-[#141414]" />
         </div>
       </div>
-      <div className="flex flex-wrap gap-3 text-[10px] text-[#64748b] mb-1">
+      <div className="flex flex-wrap gap-3 text-[11px] text-[#111111] mb-1">
         <Legend color="#2563eb" label="Revenue (Actual)" />
         <Legend color="#2563eb" label="Revenue (Plan)" dashed />
         <Legend color="#7c3aed" label="Opex (Actual)" />
@@ -817,10 +817,10 @@ function TrendCard() {
           </text>
         ))}
       </svg>
-      <div className="flex flex-wrap items-center gap-3 pt-2 border-t border-[#f1f5f9] text-[10px] text-[#64748b]">
+      <div className="flex flex-wrap items-center gap-3 pt-2 border-t border-[#f1f5f9] text-[11px] text-[#111111]">
         <label className="inline-flex items-center gap-1">
           Actuals through
-          <select className="h-7 rounded-full border border-[#e2e8f0] px-2 text-[10px] font-medium text-[#0f172a]">
+          <select className="h-7 rounded-full border border-[#e2e8f0] px-2 text-[11px] font-medium text-[#000000]">
             <option>May</option>
             <option>Apr</option>
             <option>Jun</option>
@@ -828,7 +828,7 @@ function TrendCard() {
         </label>
         <label className="inline-flex items-center gap-1">
           Frequency
-          <select className="h-7 rounded-full border border-[#e2e8f0] px-2 text-[10px] font-medium text-[#0f172a]">
+          <select className="h-7 rounded-full border border-[#e2e8f0] px-2 text-[11px] font-medium text-[#000000]">
             <option>Monthly</option>
             <option>Quarterly</option>
           </select>
@@ -886,7 +886,7 @@ function DriversCard() {
   return (
     <section className="rounded-lg border border-[#e2e8f0] bg-white p-3 shadow-sm flex flex-col min-h-[280px]">
       <div className="flex items-center justify-between mb-2">
-        <h3 className="text-[13px] font-semibold text-[#0f172a]">Driver Assumptions</h3>
+        <h3 className="text-[13px] font-semibold text-[#000000]">Driver Assumptions</h3>
         <Link
           href="/forecasting/drivers"
           className="text-[11px] font-medium text-[#2563eb] hover:underline"
@@ -896,7 +896,7 @@ function DriversCard() {
       </div>
       <table className="w-full text-[11px] flex-1">
         <thead>
-          <tr className="text-left text-[#94a3b8] border-b border-[#e2e8f0]">
+          <tr className="text-left text-[#141414] border-b border-[#e2e8f0]">
             <th className="py-1.5 pr-2 font-medium">Driver</th>
             <th className="py-1.5 pr-2 font-medium text-right">FY2025 Actual</th>
             <th className="py-1.5 pr-2 font-medium text-right">FY2026 Plan</th>
@@ -906,10 +906,10 @@ function DriversCard() {
         <tbody>
           {drivers.map((d) => (
             <tr key={d.name} className="border-b border-[#f1f5f9]">
-              <td className="py-2.5 pr-2 font-medium text-[#0f172a]">{d.name}</td>
-              <td className="py-2.5 pr-2 text-right tabular-nums text-[#64748b]">{d.prior}</td>
+              <td className="py-2.5 pr-2 font-medium text-[#000000]">{d.name}</td>
+              <td className="py-2.5 pr-2 text-right tabular-nums text-[#111111]">{d.prior}</td>
               <td
-                className="py-2.5 pr-2 text-right tabular-nums font-medium text-[#0f172a] cursor-text"
+                className="py-2.5 pr-2 text-right tabular-nums font-medium text-[#000000] cursor-text"
                 title="Double-click to edit"
                 onDoubleClick={() => {
                   setEditing(d.name)
@@ -946,7 +946,7 @@ function DriversCard() {
           ))}
         </tbody>
       </table>
-      <p className="text-[10px] text-[#94a3b8] mt-2">
+      <p className="text-[11px] text-[#141414] mt-2">
         Double-click FY2026 Plan to edit · pp = percentage points
       </p>
     </section>
@@ -992,7 +992,7 @@ function CollabSidebar({
               "flex-1 h-10 text-[12px] font-medium border-b-2 -mb-px",
               tab === t.id
                 ? "border-[#2563eb] text-[#2563eb]"
-                : "border-transparent text-[#64748b] hover:text-[#0f172a]",
+                : "border-transparent text-[#111111] hover:text-[#000000]",
             )}
           >
             {t.label}
@@ -1009,12 +1009,12 @@ function CollabSidebar({
                 onChange={(e) => onDraft(e.target.value)}
                 placeholder="Add a comment…"
                 rows={3}
-                className="w-full resize-none bg-transparent text-[12px] text-[#0f172a] placeholder:text-[#94a3b8] focus:outline-none"
+                className="w-full resize-none bg-transparent text-[12px] text-[#000000] placeholder:text-[#141414] focus:outline-none"
               />
               <div className="flex items-center justify-between mt-1">
                 <button
                   type="button"
-                  className="h-7 w-7 inline-flex items-center justify-center rounded-full text-[#94a3b8] hover:bg-white"
+                  className="h-7 w-7 inline-flex items-center justify-center rounded-full text-[#141414] hover:bg-white"
                   aria-label="Attach"
                   onClick={() => toast.message("Attachments coming soon")}
                 >
@@ -1051,7 +1051,7 @@ function CollabSidebar({
               <article key={c.id} className="flex gap-2.5">
                 <span
                   className={cn(
-                    "h-8 w-8 shrink-0 rounded-full text-[10px] font-semibold inline-flex items-center justify-center",
+                    "h-8 w-8 shrink-0 rounded-full text-[11px] font-semibold inline-flex items-center justify-center",
                     c.tone,
                   )}
                 >
@@ -1059,11 +1059,11 @@ function CollabSidebar({
                 </span>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-baseline gap-2">
-                    <p className="text-[12px] font-semibold text-[#0f172a] truncate">{c.author}</p>
-                    <span className="text-[10px] text-[#94a3b8] shrink-0">{c.when}</span>
+                    <p className="text-[12px] font-semibold text-[#000000] truncate">{c.author}</p>
+                    <span className="text-[11px] text-[#141414] shrink-0">{c.when}</span>
                   </div>
-                  <p className="text-[12px] text-[#475569] mt-0.5 leading-relaxed">{c.body}</p>
-                  <div className="mt-1.5 flex items-center gap-3 text-[11px] text-[#64748b]">
+                  <p className="text-[12px] text-[#111111] mt-0.5 leading-relaxed">{c.body}</p>
+                  <div className="mt-1.5 flex items-center gap-3 text-[11px] text-[#111111]">
                     <button
                       type="button"
                       className="hover:text-[#2563eb]"
@@ -1099,7 +1099,7 @@ function CollabSidebar({
         {tab === "tasks" && (
           <div className="space-y-2">
             <div className="flex items-center justify-between mb-1">
-              <p className="text-[12px] font-semibold text-[#0f172a]">Tasks</p>
+              <p className="text-[12px] font-semibold text-[#000000]">Tasks</p>
               <button
                 type="button"
                 className="text-[11px] font-medium text-[#2563eb]"
@@ -1126,14 +1126,14 @@ function CollabSidebar({
                     ) : null}
                     <span
                       className={cn(
-                        "text-[12px] font-medium text-[#0f172a]",
-                        taskDone[t.id] && "line-through text-[#94a3b8]",
+                        "text-[12px] font-medium text-[#000000]",
+                        taskDone[t.id] && "line-through text-[#141414]",
                       )}
                     >
                       {t.title}
                     </span>
                   </span>
-                  <span className="block text-[11px] text-[#64748b] mt-0.5">{t.assignee}</span>
+                  <span className="block text-[11px] text-[#111111] mt-0.5">{t.assignee}</span>
                   <span className="block text-[11px] font-medium text-[#dc2626] mt-0.5">
                     Due {t.due}
                   </span>
@@ -1152,8 +1152,8 @@ function CollabSidebar({
               { when: "May 11", text: "Budget 2026 scenario copied from Base Case" },
             ].map((a) => (
               <li key={a.when + a.text} className="flex gap-3">
-                <span className="text-[10px] text-[#94a3b8] w-16 shrink-0">{a.when}</span>
-                <span className="text-[#475569]">{a.text}</span>
+                <span className="text-[11px] text-[#141414] w-16 shrink-0">{a.when}</span>
+                <span className="text-[#111111]">{a.text}</span>
               </li>
             ))}
           </ul>
@@ -1167,7 +1167,7 @@ function WorkflowBar() {
   return (
     <section className="rounded-lg border border-[#e2e8f0] bg-white px-4 py-3.5 shadow-sm">
       <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
-        <h3 className="text-[13px] font-semibold text-[#0f172a]">Workflow Status</h3>
+        <h3 className="text-[13px] font-semibold text-[#000000]">Workflow Status</h3>
         <Link
           href="/forecasting/workflow"
           className="text-[11px] font-medium text-[#2563eb] hover:underline"
@@ -1193,14 +1193,14 @@ function WorkflowBar() {
                   step.status === "done" && "bg-[#2563eb] text-white",
                   step.status === "active" && "bg-[#7c3aed] text-white",
                   step.status === "pending" &&
-                    "bg-[#f1f5f9] text-[#94a3b8] border border-[#e2e8f0]",
+                    "bg-[#f1f5f9] text-[#141414] border border-[#e2e8f0]",
                 )}
               >
                 {step.status === "done" ? <Check className="w-3.5 h-3.5" /> : i + 1}
               </span>
               <div className="min-w-0 sm:mt-2">
-                <p className="text-[12px] font-semibold text-[#0f172a]">{step.label}</p>
-                <p className="text-[11px] text-[#64748b] mt-0.5 leading-snug">{step.detail}</p>
+                <p className="text-[12px] font-semibold text-[#000000]">{step.label}</p>
+                <p className="text-[11px] text-[#111111] mt-0.5 leading-snug">{step.detail}</p>
               </div>
             </li>
           )

@@ -17,6 +17,7 @@ import {
   ChevronsRight,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { ORG_LOGO_PATH, ORG_NAME } from '@/lib/branding'
 
 const STORAGE_KEY = 'investments-v2-sidebar-collapsed'
 
@@ -184,6 +185,20 @@ export function InvestmentsV2Sidebar() {
         collapsed ? 'w-[62px]' : 'w-[206px]',
       )}
     >
+      <div
+        className={cn(
+          'flex h-14 shrink-0 items-center border-b border-sidebar-border',
+          collapsed ? 'justify-center px-0' : 'px-3',
+        )}
+      >
+        <div className="flex items-center justify-center rounded-md bg-white p-1">
+          <img
+            src={ORG_LOGO_PATH}
+            alt={ORG_NAME}
+            className={cn('object-contain', collapsed ? 'h-6 w-6 object-center' : 'h-6 w-auto max-w-[150px] object-left')}
+          />
+        </div>
+      </div>
       <nav className="iv2-sidebar-scroll flex-1 space-y-0.5 overflow-y-auto px-2 py-2">
         {navItems.map((item) => {
           const Icon = item.icon

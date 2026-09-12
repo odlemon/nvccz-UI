@@ -28,7 +28,9 @@ import {
   fetchSetupSettings,
   updateSetupSettings,
   createBroker,
+  updateBroker,
   createCustodian,
+  updateCustodian,
   createCommission,
   createMarket,
   createSetupCurrency,
@@ -37,14 +39,14 @@ import {
 } from '@/lib/store/slices/investmentOpsSlice'
 
 export const cardClass = 'overflow-hidden rounded-[24px] border border-white/[0.05] bg-[linear-gradient(112deg,#172231_0%,#101a29_55%,#0c1522_100%)] shadow-[0_18px_45px_rgba(0,0,0,.18)]'
-export const fieldClass = 'h-9 w-full rounded-full border border-white/10 bg-[#0b1421] px-3 text-[11px] text-white outline-none transition placeholder:text-[#526176] focus:border-[#2f87fa] focus:ring-2 focus:ring-[#2f87fa]/20'
-export const buttonClass = 'inline-flex h-9 items-center justify-center gap-2 rounded-full bg-white px-5 text-[11px] font-semibold text-[#111722] transition hover:bg-[#edf2f8] disabled:opacity-50'
-export const secondaryButtonClass = 'inline-flex h-9 items-center justify-center gap-2 rounded-full border border-white/10 bg-white/[0.03] px-5 text-[11px] font-medium text-[#b8c3d2] transition hover:bg-white/[0.08] hover:text-white'
+export const fieldClass = 'h-9 w-full rounded-full border border-white/10 bg-[#0b1421] px-3 iv2-text-label text-white outline-none transition placeholder:text-[#526176] focus:border-[#2f87fa] focus:ring-2 focus:ring-[#2f87fa]/20'
+export const buttonClass = 'inline-flex h-9 items-center justify-center gap-2 rounded-full bg-white px-5 iv2-text-label font-semibold text-[#111722] transition hover:bg-[#edf2f8] disabled:opacity-50'
+export const secondaryButtonClass = 'inline-flex h-9 items-center justify-center gap-2 rounded-full border border-white/10 bg-white/[0.03] px-5 iv2-text-label font-medium text-[#b8c3d2] transition hover:bg-white/[0.08] hover:text-white'
 
 export function SetupHeader({ title, description, action }: { title: string; description: string; action?: ReactNode }) {
   return (
     <div className="flex flex-col gap-3 border-b border-white/[0.07] px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-      <div><h1 className="text-[15px] font-semibold text-white">{title}</h1><p className="mt-1 text-[10px] text-[#718095]">{description}</p></div>
+      <div><h1 className="text-[15px] font-semibold text-white">{title}</h1><p className="mt-1 iv2-text-label text-[#718095]">{description}</p></div>
       {action}
     </div>
   )
@@ -65,14 +67,14 @@ export function SetupSelect({ value, options, onChange, label }: { value: string
   const [open, setOpen] = useState(false)
   return (
     <div className="relative">
-      {label && <span className="mb-1.5 block text-[9px] uppercase tracking-[.12em] text-[#718095]">{label}</span>}
+      {label && <span className="mb-1.5 block iv2-text-micro uppercase tracking-[.12em] text-[#718095]">{label}</span>}
       <button type="button" onClick={() => setOpen(!open)} className={cn(fieldClass, 'flex items-center justify-between text-left')}>
         <span className="truncate">{value}</span><ChevronDown className="h-3.5 w-3.5 text-[#718095]" />
       </button>
       {open && <><button aria-label="Close options" className="fixed inset-0 z-40 cursor-default" onClick={() => setOpen(false)} />
         <div className="absolute z-50 mt-1 max-h-52 w-full overflow-y-auto rounded-2xl border border-white/10 bg-[#111b29] p-1.5 shadow-2xl">
           {options.map(option => <button key={option} type="button" onClick={() => { onChange(option); setOpen(false) }}
-            className={cn('flex w-full items-center justify-between rounded-full px-3 py-2 text-left text-[11px] hover:bg-white/[0.07]', option === value ? 'text-[#69a9ff]' : 'text-[#bdc7d5]')}>
+            className={cn('flex w-full items-center justify-between rounded-full px-3 py-2 text-left iv2-text-label hover:bg-white/[0.07]', option === value ? 'text-[#69a9ff]' : 'text-[#bdc7d5]')}>
             {option}{option === value && <Check className="h-3.5 w-3.5" />}
           </button>)}
         </div></>}
@@ -93,7 +95,7 @@ export function SetupModal({ title, description, children, onClose, onSubmit, su
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4 dark:bg-black/75" onMouseDown={onClose}>
       <div role="dialog" aria-modal="true" onMouseDown={e => e.stopPropagation()} className="w-full max-w-lg rounded-[24px] border border-white/10 bg-[#111b29] p-5 shadow-[0_28px_90px_rgba(0,0,0,.65)]">
-        <div className="mb-5 flex items-start justify-between"><div><h2 className="text-sm font-semibold text-white">{title}</h2>{description && <p className="mt-1 text-[10px] text-[#76859a]">{description}</p>}</div>
+        <div className="mb-5 flex items-start justify-between"><div><h2 className="text-sm font-semibold text-white">{title}</h2>{description && <p className="mt-1 iv2-text-label text-[#76859a]">{description}</p>}</div>
           <button type="button" onClick={onClose} className="rounded-full p-2 text-[#8391a4] hover:bg-white/10 hover:text-white"><X className="h-4 w-4" /></button>
         </div>
         {children}
@@ -112,6 +114,56 @@ const referenceData: Record<string, { columns: string[]; rows: string[][] }> = {
   Currencies: { columns: ['Code', 'Currency', 'Symbol', 'Decimals', 'Default', 'Status'], rows: [] },
   Issuer: { columns: ['Code', 'Legal name', 'Country', 'Sector', 'Status'], rows: [] },
   Markets: { columns: ['Code', 'Market', 'Country', 'Exchange', 'Status'], rows: [] },
+}
+
+function formatSetupSettingValue(value: unknown): string {
+  if (value == null) return '—'
+  if (typeof value === 'boolean') return value ? 'Enabled' : 'Disabled'
+  if (typeof value === 'number' || typeof value === 'string') return String(value)
+  if (Array.isArray(value)) {
+    if (value.length === 0) return '—'
+    if (value.every((item) => typeof item === 'string' || typeof item === 'number')) {
+      return value.join(', ')
+    }
+    const preview = value.slice(0, 3).map((item) => {
+      if (item && typeof item === 'object') {
+        const rec = item as Record<string, unknown>
+        return String(rec.name ?? rec.code ?? rec.label ?? rec.id ?? 'item')
+      }
+      return String(item)
+    })
+    return value.length > 3 ? `${preview.join(', ')} (+${value.length - 3} more)` : preview.join(', ')
+  }
+  if (typeof value === 'object') {
+    const obj = value as Record<string, unknown>
+    if ('enabled' in obj) return obj.enabled ? 'Enabled' : 'Disabled'
+    if ('method' in obj) return String(obj.method)
+    if ('items' in obj && Array.isArray(obj.items)) {
+      return formatSetupSettingValue(obj.items)
+    }
+    if ('version' in obj && Object.keys(obj).length <= 2) {
+      return 'version' in obj && Object.keys(obj).length === 1 ? String(obj.version) : formatSetupSettingValue(obj)
+    }
+    try {
+      const compact = JSON.stringify(value)
+      return compact.length > 96 ? `${compact.slice(0, 93)}…` : compact
+    } catch {
+      return '—'
+    }
+  }
+  return String(value)
+}
+
+function settingsEditSeedValue(value: unknown): string {
+  if (value == null) return ''
+  if (typeof value === 'object') {
+    try {
+      return JSON.stringify(value, null, 2)
+    } catch {
+      return String(value)
+    }
+  }
+  return String(value)
 }
 
 function mappingLabel(row: SetupCorporateActionMapping) {
@@ -172,6 +224,7 @@ export function ModuleSetupWorkspace({ orderSetupContent }: { orderSetupContent:
   const [editing, setEditing] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [modal, setModal] = useState<'reference' | 'type' | 'subcategory' | 'corporate' | 'tag' | null>(null)
+  const [editingStakeholder, setEditingStakeholder] = useState<{ id: string; profileType: 'BROKER' | 'CUSTODIAN' } | null>(null)
   const [referenceKind, setReferenceKind] = useState<'coupon' | 'icon' | null>(null)
   const [draft, setDraft] = useState({ code: '', name: '', extra: '' })
   const [category, setCategory] = useState('')
@@ -317,6 +370,7 @@ export function ModuleSetupWorkspace({ orderSetupContent }: { orderSetupContent:
       b.contactEmail || '—',
       b.deliveryMode || '—',
       b.isActive === false ? 'Inactive' : 'Active',
+      b.id,
     ])
     const custodianRows = custodians.map((c) => [
       c.name || c.id || '—',
@@ -324,9 +378,29 @@ export function ModuleSetupWorkspace({ orderSetupContent }: { orderSetupContent:
       c.contactEmail || '—',
       c.deliveryMode || '—',
       c.isActive === false ? 'Inactive' : 'Active',
+      c.id,
     ])
     return [...brokerRows, ...custodianRows]
   }, [brokers, custodians])
+
+  const openEditStakeholder = (id: string, profileType: string) => {
+    const row =
+      profileType.toUpperCase() === 'CUSTODIAN'
+        ? custodians.find((c) => c.id === id)
+        : brokers.find((b) => b.id === id)
+    if (!row) return
+    setEditingStakeholder({
+      id: row.id,
+      profileType: profileType.toUpperCase() === 'CUSTODIAN' ? 'CUSTODIAN' : 'BROKER',
+    })
+    setDraft({
+      code: row.contactEmail || '',
+      name: row.name || '',
+      extra: profileType.toUpperCase() === 'CUSTODIAN' ? 'CUSTODIAN' : 'BROKER',
+    })
+    setReferenceKind(null)
+    setModal('reference')
+  }
 
   const liveCommissionRows = useMemo(() => {
     const nameOf = (id: string) =>
@@ -406,12 +480,13 @@ export function ModuleSetupWorkspace({ orderSetupContent }: { orderSetupContent:
           rows.push([label, obj.enabled ? 'Enabled' : 'Disabled'])
         } else if ('method' in obj) {
           rows.push([label, String(obj.method)])
+        } else if ('items' in obj || 'version' in obj) {
+          for (const [subKey, subVal] of Object.entries(obj)) {
+            rows.push([`${label} · ${subKey.replace(/_/g, ' ')}`, formatSetupSettingValue(subVal)])
+          }
         } else {
           for (const [subKey, subVal] of Object.entries(obj)) {
-            rows.push([
-              `${label} · ${subKey.replace(/_/g, ' ')}`,
-              subVal == null ? '—' : String(subVal),
-            ])
+            rows.push([`${label} · ${subKey.replace(/_/g, ' ')}`, formatSetupSettingValue(subVal)])
           }
         }
       } else {
@@ -443,8 +518,15 @@ export function ModuleSetupWorkspace({ orderSetupContent }: { orderSetupContent:
                 ? liveMarketRows
                 : []
   const filtered = useMemo(
-    () => liveRows.filter((row) => row.join(' ').toLowerCase().includes(search.toLowerCase())),
-    [liveRows, search],
+    () =>
+      liveRows.filter((row) =>
+        row
+          .slice(0, activeTab === 'Broker/Counterparties' ? 5 : undefined)
+          .join(' ')
+          .toLowerCase()
+          .includes(search.toLowerCase()),
+      ),
+    [liveRows, search, activeTab],
   )
   const liveTabLoading =
     (activeTab === 'Broker/Counterparties' && (brokersLoading || custodiansLoading)) ||
@@ -529,9 +611,18 @@ export function ModuleSetupWorkspace({ orderSetupContent }: { orderSetupContent:
             setCorpEdits(seed)
           } else if (key === 'settings') {
             const seed: Record<string, string> = {}
-            settingsRows.forEach(([label, value]) => {
-              seed[label] = value
-            })
+            if (setupSettings) {
+              for (const [apiKey, value] of Object.entries(setupSettings)) {
+                const label = apiKey.replace(/_/g, ' ')
+                if (value != null && typeof value === 'object' && !('enabled' in value) && !('method' in value)) {
+                  for (const [subKey, subVal] of Object.entries(value as Record<string, unknown>)) {
+                    seed[`${label} · ${subKey.replace(/_/g, ' ')}`] = settingsEditSeedValue(subVal)
+                  }
+                } else {
+                  seed[label] = settingsEditSeedValue(value)
+                }
+              }
+            }
             setSettingsEdits(seed)
           }
           setEditing(key)
@@ -546,15 +637,15 @@ export function ModuleSetupWorkspace({ orderSetupContent }: { orderSetupContent:
     <div className="flex h-full flex-col overflow-hidden bg-[#05090f]">
       <SetupHeader title="Investment Setup" description="Module-wide reference data, pricing and instrument configuration" />
       <div className="flex shrink-0 overflow-x-auto border-b border-white/[0.08]">
-        {tabs.map(tab => <button key={tab} type="button" onClick={() => { setActiveTab(tab); setSearch('') }} className={cn('shrink-0 rounded-full px-4 py-3 text-[11px] font-medium transition focus:outline-none focus-visible:bg-white/[0.08]', activeTab === tab ? 'bg-white/[0.05] text-white' : 'text-[#64748b] hover:bg-white/[0.03] hover:text-[#a9b5c5]')}>{tab}</button>)}
+        {tabs.map(tab => <button key={tab} type="button" onClick={() => { setActiveTab(tab); setSearch('') }} className={cn('shrink-0 rounded-full px-4 py-3 iv2-text-label font-medium transition focus:outline-none focus-visible:bg-muted', activeTab === tab ? 'bg-muted text-foreground' : 'text-muted-foreground hover:bg-muted/70 hover:text-foreground')}>{tab}</button>)}
       </div>
       <div className="flex-1 overflow-y-auto px-3 pb-6 pt-4 sm:px-5">
-        {setupLoadError && <div className="mb-4 rounded-2xl border border-rose-400/20 bg-rose-400/[.08] px-4 py-3 text-[11px] text-rose-200">{setupLoadError}</div>}
+        {setupLoadError && <div className="mb-4 rounded-2xl border border-rose-400/20 bg-rose-400/[.08] px-4 py-3 iv2-text-label text-rose-200">{setupLoadError}</div>}
         {activeTab === 'Order Setup' && orderSetupContent}
 
         {activeTab === 'Setup' && <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
           <SetupCard title="Price API">
-            <div className="space-y-2.5 p-5 text-[11px] text-[#8290a4]">
+            <div className="space-y-2.5 p-5 iv2-text-label text-[#8290a4]">
               {priceSourcesLoading ? (
                 <OpsListSkeleton rows={3} />
               ) : priceSources.length === 0 ? (
@@ -574,7 +665,7 @@ export function ModuleSetupWorkspace({ orderSetupContent }: { orderSetupContent:
               {setupSettingsLoading ? (
                 <OpsListSkeleton rows={5} />
               ) : settingsRows.length === 0 ? (
-                <p className="text-[11px] text-[#8290a4]">No settings payload returned (or API returned an empty stub list). See Phase 5 notes in design-refs/investments-v2-backend-asks.md.</p>
+                <p className="iv2-text-label text-[#8290a4]">No settings payload returned (or API returned an empty stub list). See Phase 5 notes in design-refs/investments-v2-backend-asks.md.</p>
               ) : (
                 settingsRows.map(([l, v]) => (
                   <EditableRow
@@ -598,7 +689,7 @@ export function ModuleSetupWorkspace({ orderSetupContent }: { orderSetupContent:
               {setupRefLoading ? (
                 <OpsListSkeleton rows={4} />
               ) : corporateMappings.length === 0 ? (
-                <p className="text-[11px] text-[#8290a4]">No corporate action mappings returned by the API.</p>
+                <p className="iv2-text-label text-[#8290a4]">No corporate action mappings returned by the API.</p>
               ) : (
                 corporateMappings.map((row) => editing === 'corporate'
                   ? (
@@ -623,7 +714,7 @@ export function ModuleSetupWorkspace({ orderSetupContent }: { orderSetupContent:
               {setupRefLoading ? (
                 <OpsListSkeleton rows={5} />
               ) : setupTags.length === 0 ? (
-                <p className="text-[11px] text-[#8290a4]">No tags returned by the API.</p>
+                <p className="iv2-text-label text-[#8290a4]">No tags returned by the API.</p>
               ) : (
                 setupTags.map((row) => (
                   <EditableRow
@@ -641,7 +732,7 @@ export function ModuleSetupWorkspace({ orderSetupContent }: { orderSetupContent:
             {setupRefLoading ? (
               <OpsTableSkeleton rows={5} cols={3} className="px-5 py-4" />
             ) : couponTableRows.length === 0 ? (
-              <p className="p-5 text-[11px] text-[#8290a4]">No coupon frequencies returned by the API.</p>
+              <p className="p-5 iv2-text-label text-[#8290a4]">No coupon frequencies returned by the API.</p>
             ) : (
               <DenseTable columns={['Frequency', 'Bloomberg', 'ID']} rows={couponTableRows} />
             )}
@@ -650,11 +741,11 @@ export function ModuleSetupWorkspace({ orderSetupContent }: { orderSetupContent:
             {setupRefLoading ? (
               <OpsTableSkeleton rows={5} cols={3} className="px-5 py-4" />
             ) : setupIcons.length === 0 ? (
-              <p className="p-5 text-[11px] text-[#8290a4]">No icons returned by the API.</p>
+              <p className="p-5 iv2-text-label text-[#8290a4]">No icons returned by the API.</p>
             ) : (
-              <div className="overflow-x-auto"><table className="w-full"><thead><tr>{['Name', 'Icon'].map(h => <th key={h} className="bg-white/[.035] px-5 py-2.5 text-left text-[9px] font-normal text-[#738095]">{h}</th>)}</tr></thead><tbody>{setupIcons.map((row) => {
+              <div className="overflow-x-auto"><table className="w-full"><thead><tr>{['Name', 'Icon'].map(h => <th key={h} className="bg-white/[.035] px-5 py-2.5 text-left iv2-text-micro font-normal text-[#738095]">{h}</th>)}</tr></thead><tbody>{setupIcons.map((row) => {
                 const name = String(row.name ?? row.label ?? row.code ?? '—')
-                return <tr key={String(row.id ?? name)} className="border-b border-[#243044] last:border-0"><td className="px-5 py-3 text-[11px] text-[#e2e8f0]">{name}</td><td className="px-5 py-3 text-[#dce4ee]"><StatusIcon name={name} /></td></tr>
+                return <tr key={String(row.id ?? name)} className="border-b border-[#243044] last:border-0"><td className="px-5 py-3 iv2-text-label text-[#e2e8f0]">{name}</td><td className="px-5 py-3 text-[#dce4ee]"><StatusIcon name={name} /></td></tr>
               })}</tbody></table></div>
             )}
           </SetupCard>
@@ -664,19 +755,62 @@ export function ModuleSetupWorkspace({ orderSetupContent }: { orderSetupContent:
           <div className="flex flex-col gap-3 border-b border-white/[.07] p-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h2 className="text-[12px] font-medium text-white">{activeTab}</h2>
-              <p className="mt-1 text-[9px] text-[#718095]">
+              <p className="mt-1 iv2-text-micro text-[#718095]">
                 {LIVE_REFERENCE_TABS.has(activeTab) ? `${filtered.length} records from API` : `${filtered.length} configured records · not wired to API yet`}
               </p>
             </div>
-            <div className="flex gap-2"><div className="relative flex-1 sm:w-60"><Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-[#627086]" /><input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search records…" className={cn(fieldClass, 'pl-9')} /></div><button className={buttonClass} onClick={() => { setDraft({ code: '', name: '', extra: activeTab === 'Broker/Counterparties' ? 'BROKER' : '' }); setReferenceKind(null); setModal('reference') }}><Plus className="h-3.5 w-3.5" /> Add</button></div>
+            <div className="flex gap-2"><div className="relative flex-1 sm:w-60"><Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-[#627086]" /><input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search records…" className={cn(fieldClass, 'pl-9')} /></div><button className={buttonClass} onClick={() => { setEditingStakeholder(null); setDraft({ code: '', name: '', extra: activeTab === 'Broker/Counterparties' ? 'BROKER' : '' }); setReferenceKind(null); setModal('reference') }}><Plus className="h-3.5 w-3.5" /> Add</button></div>
           </div>
           {liveTabLoading ? (
             <OpsTableSkeleton rows={8} cols={data?.columns.length ?? 5} className="px-5 py-6" />
           ) : filtered.length === 0 ? (
-            <div className="px-5 py-10 text-center text-[11px] text-[#8290a4]">
+            <div className="px-5 py-10 text-center iv2-text-label text-[#8290a4]">
               {LIVE_REFERENCE_TABS.has(activeTab)
                 ? 'No records returned by the API (or response was an empty/id-only stub).'
                 : 'No local records. This tab is not wired to a list endpoint in Phase 5.'}
+            </div>
+          ) : activeTab === 'Broker/Counterparties' ? (
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[680px] border-collapse">
+                <thead className="bg-white/[.035]">
+                  <tr>
+                    {data.columns.map((column) => (
+                      <th key={column} className="px-4 py-2.5 text-left iv2-text-micro font-normal text-[#738095] first:pl-5 last:pr-5">{column}</th>
+                    ))}
+                    <th className="w-16 px-4 py-2.5 text-right iv2-text-micro font-normal text-[#738095]">Edit</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtered.map((row, i) => {
+                    const [name, type, contact, delivery, status, id] = row
+                    return (
+                      <tr key={`${id}-${i}`} className="border-b border-[#243044] transition last:border-0 hover:bg-[#2f87fa]/[.05]">
+                        <td className="whitespace-nowrap px-4 py-3.5 iv2-text-caption font-medium text-[#e2e8f0] first:pl-5">{name}</td>
+                        <td className="whitespace-nowrap px-4 py-3.5 iv2-text-caption text-[#91a0b5]">{type}</td>
+                        <td className="whitespace-nowrap px-4 py-3.5 iv2-text-caption text-[#91a0b5]">{contact}</td>
+                        <td className="whitespace-nowrap px-4 py-3.5 iv2-text-caption text-[#91a0b5]">{delivery}</td>
+                        <td className="whitespace-nowrap px-4 py-3.5 iv2-text-caption text-[#91a0b5]">
+                          {status === 'Active' ? (
+                            <span className="rounded-full border border-[#3e7e33] bg-[#183722] px-3 py-0.5 iv2-text-micro text-[#65cf55]">Active</span>
+                          ) : (
+                            status
+                          )}
+                        </td>
+                        <td className="px-4 py-3.5 text-right">
+                          <button
+                            type="button"
+                            title="Edit broker / custodian"
+                            onClick={() => openEditStakeholder(id, type)}
+                            className="rounded-full p-2 text-[#73aef6] hover:bg-white/10 hover:text-white"
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                          </button>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
             </div>
           ) : (
             <DenseTable columns={data.columns} rows={filtered} />
@@ -684,17 +818,17 @@ export function ModuleSetupWorkspace({ orderSetupContent }: { orderSetupContent:
         </section>}
 
         {activeTab === 'Instrument Types' && <div>
-          <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-[13px] font-semibold text-white">Instrument Type</h2><p className="mt-1 text-[9px] text-[#718095]">Classification and market-data mapping · loaded from setup/instrument-types</p></div><div className="flex gap-2"><button type="button" className={buttonClass} onClick={() => { setDraft({ code: '', name: '', extra: '' }); setModal('type') }}>New Type</button><button type="button" className={secondaryButtonClass} onClick={() => { setDraft({ code: '', name: '', extra: category || '' }); setModal('subcategory') }}>New Sub Category</button></div></div>
+          <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-[13px] font-semibold text-white">Instrument Type</h2><p className="mt-1 iv2-text-micro text-[#718095]">Classification and market-data mapping · loaded from setup/instrument-types</p></div><div className="flex gap-2"><button type="button" className={buttonClass} onClick={() => { setDraft({ code: '', name: '', extra: '' }); setModal('type') }}>New Type</button><button type="button" className={secondaryButtonClass} onClick={() => { setDraft({ code: '', name: '', extra: category || '' }); setModal('subcategory') }}>New Sub Category</button></div></div>
           {instrumentTypesLoading ? (
             <OpsTablePanelSkeleton rows={8} cols={8} showToolbar={false} className="mt-6 border-0 bg-transparent" />
           ) : categories.length === 0 ? (
-            <div className="mt-6 rounded-2xl border border-white/[.06] bg-white/[.02] px-5 py-10 text-center text-[11px] text-[#8290a4]">No instrument types returned by the API.</div>
+            <div className="mt-6 rounded-2xl border border-white/[.06] bg-white/[.02] px-5 py-10 text-center iv2-text-label text-[#8290a4]">No instrument types returned by the API.</div>
           ) : (
             <>
-              <div className="mt-3 flex gap-2 overflow-x-auto border-b border-white/[.08] pb-4">{categories.map(item => <button key={item} type="button" onClick={() => setCategory(item)} className={cn('h-8 shrink-0 rounded-full px-4 text-[11px] font-medium transition', item === category ? 'bg-[#2f87fa] text-white shadow-[0_8px_24px_rgba(47,135,250,.24)]' : 'border border-white/[.04] bg-[#192536] text-[#d6dde7] hover:bg-[#26364d]')}>{item}</button>)}</div>
+              <div className="mt-3 flex gap-2 overflow-x-auto border-b border-white/[.08] pb-4">{categories.map(item => <button key={item} type="button" onClick={() => setCategory(item)} className={cn('h-8 shrink-0 rounded-full px-4 iv2-text-label font-medium transition', item === category ? 'bg-[#2f87fa] text-white shadow-[0_8px_24px_rgba(47,135,250,.24)]' : 'border border-white/[.04] bg-[#192536] text-[#d6dde7] hover:bg-[#26364d]')}>{item}</button>)}</div>
               <section className={cn(cardClass, 'mt-4')}><header className="flex h-[52px] items-center px-5"><h3 className="text-[12px] font-medium text-white">Instruments · {category}</h3></header>
                 {instrumentTableRows.length === 0 ? (
-                  <div className="px-5 py-10 text-center text-[11px] text-[#8290a4]">No instrument types in this category.</div>
+                  <div className="px-5 py-10 text-center iv2-text-label text-[#8290a4]">No instrument types in this category.</div>
                 ) : (
                   <DenseTable columns={['Code', 'Name', 'Title', 'Item', 'Fields', 'Status', 'API Filter I', 'API Filter II']} rows={instrumentTableRows} />
                 )}
@@ -702,7 +836,7 @@ export function ModuleSetupWorkspace({ orderSetupContent }: { orderSetupContent:
               <section className={cn(cardClass, 'mt-4')}>
                 <header className="flex h-[52px] items-center px-5"><h3 className="text-[12px] font-medium text-white">Subcategories</h3></header>
                 {subcategories.length === 0 ? (
-                  <div className="px-5 py-8 text-center text-[11px] text-[#8290a4]">No subcategories returned. Create one with New Sub Category.</div>
+                  <div className="px-5 py-8 text-center iv2-text-label text-[#8290a4]">No subcategories returned. Create one with New Sub Category.</div>
                 ) : (
                   <DenseTable
                     columns={['Code', 'Name', 'Type', 'Status', 'ID']}
@@ -725,16 +859,20 @@ export function ModuleSetupWorkspace({ orderSetupContent }: { orderSetupContent:
           : modal === 'subcategory' ? 'New Sub Category'
             : modal === 'corporate' ? 'New Corporate Action Mapping'
               : modal === 'tag' ? 'New Tag'
-                : `Add ${referenceKind === 'coupon' ? 'Coupon Frequency' : referenceKind === 'icon' ? 'Icon' : activeTab}`
+                : editingStakeholder
+                  ? `Edit ${editingStakeholder.profileType === 'CUSTODIAN' ? 'Custodian' : 'Broker'}`
+                  : `Add ${referenceKind === 'coupon' ? 'Coupon Frequency' : referenceKind === 'icon' ? 'Icon' : activeTab}`
       } description={
         modal === 'type' || modal === 'corporate' || modal === 'tag' || modal === 'subcategory'
           ? 'Creates a record via the Investment Ops setup API.'
+          : editingStakeholder
+            ? 'Update name and contact email used for send-to-broker instructions.'
           : LIVE_REFERENCE_TABS.has(activeTab) && !referenceKind
               ? 'Creates a record via the Investment Ops API.'
               : referenceKind === 'coupon' || referenceKind === 'icon'
                 ? 'Creates a record via the Investment Ops setup API.'
                 : 'Creates a record via the Investment Ops API when this tab is enabled for writes.'
-      } onClose={() => setModal(null)} onSubmit={async () => {
+      } onClose={() => { setModal(null); setEditingStakeholder(null) }} onSubmit={async () => {
         const code = draft.code.trim(), name = draft.name.trim(), extra = draft.extra.trim()
         if (!name && modal !== 'corporate' && activeTab !== 'Commissions' && modal !== 'tag') return
         if (modal === 'type') {
@@ -861,18 +999,33 @@ export function ModuleSetupWorkspace({ orderSetupContent }: { orderSetupContent:
         }
         if (modal === 'reference' && activeTab === 'Broker/Counterparties') {
           try {
-            const email = code.includes('@') ? code : `${code || 'ops'}@example.com`
-            if (extra.toUpperCase() === 'CUSTODIAN') {
+            const email = code.includes('@') ? code : code ? `${code}@example.com` : ''
+            if (!email) {
+              setSetupLoadError('Contact email is required (needed for Send to broker).')
+              return
+            }
+            if (editingStakeholder) {
+              const payload = { name, contactEmail: email }
+              if (editingStakeholder.profileType === 'CUSTODIAN') {
+                await dispatch(updateCustodian({ id: editingStakeholder.id, data: payload })).unwrap()
+                dispatch(fetchCustodians())
+              } else {
+                await dispatch(updateBroker({ id: editingStakeholder.id, data: payload })).unwrap()
+                dispatch(fetchBrokers())
+              }
+            } else if (extra.toUpperCase() === 'CUSTODIAN') {
               await dispatch(createCustodian({ name, contactEmail: email })).unwrap()
               dispatch(fetchCustodians())
             } else {
               await dispatch(createBroker({ name, contactEmail: email })).unwrap()
               dispatch(fetchBrokers())
             }
-          } catch {
-            setSetupLoadError('Failed to create broker/custodian.')
+            setEditingStakeholder(null)
+            setModal(null)
+            setDraft({ code: '', name: '', extra: '' })
+          } catch (e) {
+            setSetupLoadError(e instanceof Error ? e.message : 'Failed to save broker/custodian.')
           }
-          setModal(null)
           return
         }
         if (modal === 'reference' && activeTab === 'Currencies') {
@@ -932,10 +1085,10 @@ export function ModuleSetupWorkspace({ orderSetupContent }: { orderSetupContent:
           return
         }
         setModal(null)
-      }} submitLabel={createSaving ? 'Creating…' : 'Create'} submitDisabled={createSaving}>
+      }} submitLabel={createSaving ? (editingStakeholder ? 'Saving…' : 'Creating…') : editingStakeholder ? 'Save' : 'Create'} submitDisabled={createSaving}>
         <div className="grid gap-4 sm:grid-cols-2">
           <label>
-            <span className="mb-1.5 block text-[10px] text-[#8b99ad]">
+            <span className="mb-1.5 block iv2-text-label text-[#8b99ad]">
               {modal === 'type' ? 'Type code' : modal === 'subcategory' ? 'Instrument type' : modal === 'corporate' ? 'Code' : modal === 'tag' ? 'Tag code' : activeTab === 'Broker/Counterparties' ? 'Contact email' : activeTab === 'Commissions' ? 'Stakeholder profile id' : 'Code'}
             </span>
             {modal === 'type' ? (
@@ -963,12 +1116,12 @@ export function ModuleSetupWorkspace({ orderSetupContent }: { orderSetupContent:
             )}
           </label>
           <label>
-            <span className="mb-1.5 block text-[10px] text-[#8b99ad]">{activeTab === 'Commissions' ? 'Rate (bps)' : modal === 'corporate' || modal === 'tag' ? 'Display name' : 'Name'}</span>
+            <span className="mb-1.5 block iv2-text-label text-[#8b99ad]">{activeTab === 'Commissions' ? 'Rate (bps)' : modal === 'corporate' || modal === 'tag' ? 'Display name' : 'Name'}</span>
             <input value={draft.name} onChange={e => setDraft(v => ({ ...v, name: e.target.value }))} className={fieldClass} placeholder={activeTab === 'Commissions' ? '25' : modal === 'corporate' ? 'Cash dividend' : modal === 'tag' ? 'Core holding' : 'Display name'} />
           </label>
           {(modal === 'corporate' || ((activeTab === 'Broker/Counterparties' || activeTab === 'Countries' || activeTab === 'Markets' || activeTab === 'Issuer' || activeTab === 'Currencies') && !referenceKind)) && (
             <label className="sm:col-span-2">
-              <span className="mb-1.5 block text-[10px] text-[#8b99ad]">
+              <span className="mb-1.5 block iv2-text-label text-[#8b99ad]">
                 {modal === 'corporate'
                   ? 'External code (optional)'
                   : activeTab === 'Broker/Counterparties'
@@ -980,6 +1133,7 @@ export function ModuleSetupWorkspace({ orderSetupContent }: { orderSetupContent:
               {activeTab === 'Broker/Counterparties' && modal === 'reference' ? (
                 <select
                   value={draft.extra === 'CUSTODIAN' ? 'CUSTODIAN' : 'BROKER'}
+                  disabled={!!editingStakeholder}
                   onChange={(e) => setDraft((v) => ({ ...v, extra: e.target.value }))}
                   className={fieldClass}
                   aria-label="Counterparty type"
@@ -1015,7 +1169,7 @@ function EditableRow({
   onChange?: (value: string) => void
 }) {
   return (
-    <div className="grid grid-cols-[minmax(0,1fr)_8px_minmax(70px,1fr)] items-center gap-2 text-[10.5px]">
+    <div className="grid grid-cols-[minmax(0,1fr)_8px_minmax(70px,1fr)] items-center gap-2 iv2-text-caption">
       <span className="truncate text-[#778397]">{label}</span>
       <span className="text-[#778397]">:</span>
       {edit ? (
@@ -1028,7 +1182,7 @@ function EditableRow({
 }
 
 export function DenseTable({ columns, rows, editable = false }: { columns: string[]; rows: string[][]; editable?: boolean }) {
-  return <div className="overflow-x-auto"><table className="w-full min-w-[680px] border-collapse"><thead className="bg-white/[.035]"><tr>{columns.map(column => <th key={column} className="px-4 py-2.5 text-left text-[9px] font-normal text-[#738095] first:pl-5 last:pr-5">{column}</th>)}{editable && <th className="w-10" />}</tr></thead><tbody>{rows.map((row, i) => <tr key={`${row[0]}-${i}`} className="border-b border-[#243044] transition last:border-0 hover:bg-[#2f87fa]/[.05]">{row.map((cell, j) => <td key={j} className={cn('whitespace-nowrap px-4 py-3.5 text-[10.5px] first:pl-5 last:pr-5', j === 0 ? 'font-medium text-[#e2e8f0]' : 'text-[#91a0b5]')}>{cell === 'Active' ? <span className="rounded-full border border-[#3e7e33] bg-[#183722] px-3 py-0.5 text-[9px] text-[#65cf55]">Active</span> : cell}</td>)}{editable && <td><button className="rounded-full p-2 text-[#718095] hover:bg-white/10 hover:text-white"><Pencil className="h-3 w-3" /></button></td>}</tr>)}</tbody></table></div>
+  return <div className="overflow-x-auto"><table className="w-full min-w-[680px] border-collapse"><thead className="bg-white/[.035]"><tr>{columns.map(column => <th key={column} className="px-4 py-2.5 text-left iv2-text-micro font-normal text-[#738095] first:pl-5 last:pr-5">{column}</th>)}{editable && <th className="w-10" />}</tr></thead><tbody>{rows.map((row, i) => <tr key={`${row[0]}-${i}`} className="border-b border-[#243044] transition last:border-0 hover:bg-[#2f87fa]/[.05]">{row.map((cell, j) => <td key={j} className={cn('whitespace-nowrap px-4 py-3.5 iv2-text-caption first:pl-5 last:pr-5', j === 0 ? 'font-medium text-[#e2e8f0]' : 'text-[#91a0b5]')}>{cell === 'Active' ? <span className="rounded-full border border-[#3e7e33] bg-[#183722] px-3 py-0.5 iv2-text-micro text-[#65cf55]">Active</span> : cell}</td>)}{editable && <td><button className="rounded-full p-2 text-[#718095] hover:bg-white/10 hover:text-white"><Pencil className="h-3 w-3" /></button></td>}</tr>)}</tbody></table></div>
 }
 
 export function DragHandle() {

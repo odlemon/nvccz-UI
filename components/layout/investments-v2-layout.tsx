@@ -47,15 +47,18 @@ export function InvestmentsV2Layout({ children }: InvestmentsV2LayoutProps) {
 
   return (
     <InvestmentsThemeProvider>
-      <div className="flex h-dvh flex-col overflow-hidden bg-background">
-        <SharedTopbar
-          onModuleSelect={handleModuleSelect}
-          currentModule={currentModule}
-          moduleActions={<ThemeToggle />}
-        />
-
-        <div className="flex min-h-0 flex-1 overflow-hidden">
-          <InvestmentsV2Sidebar />
+      {/* Sidebar first, topbar inside the right-hand column, so the sidebar runs
+          the full height of the viewport and touches the top the way Portfolio's
+          does. Matches Events / FP&A / Fundraising. */}
+      <div className="flex h-dvh overflow-hidden bg-background">
+        <InvestmentsV2Sidebar />
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+          <SharedTopbar
+            onModuleSelect={handleModuleSelect}
+            currentModule={currentModule}
+            moduleActions={<ThemeToggle />}
+            hideThemeToggle
+          />
           <main className="min-h-0 min-w-0 flex-1 overflow-y-auto bg-background">{children}</main>
         </div>
       </div>

@@ -16,6 +16,8 @@ declare global {
 
 const HEADER_SWITCHER_SELECTOR = [
   "[data-action='module-switcher']",
+  "[data-action='apps-launcher']",
+  "[data-action='toggle-module-menu-v2']",
   "[data-arcus-modules]",
   "#appLauncher",
   ".app-launcher",

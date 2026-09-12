@@ -260,7 +260,16 @@ export function mapServiceRequestRow(req: LpServiceRequest) {
     fund: req.fundName,
     fundId: req.fundId,
     subject: req.subject,
-    submittedBy: req.submittedBy ?? "You",
+    // The API returns `submittedBy` as `{ id, email, name }`, not a string — the declared type
+    // said string and the mock supplied one, so this passed the object straight through to the
+    // table cell and React threw "Objects are not valid as a React child", blanking the whole
+    // Requests screen for any LP that actually has a request on file. Both shapes accepted.
+    submittedBy:
+      typeof req.submittedBy === "string"
+        ? req.submittedBy
+        : (req.submittedBy as { name?: string; email?: string } | null | undefined)?.name ??
+          (req.submittedBy as { name?: string; email?: string } | null | undefined)?.email ??
+          "You",
     lastUpdated: formatDate(req.updatedAt, "datetime"),
     status: mapRequestStatus(req.status),
     priority: mapRequestPriority(req.priority),
@@ -286,7 +295,10 @@ export function mapMessageThreadRow(thread: LpMessageThreadSummary) {
     relatedId: thread.relatedId,
     preview: thread.lastMessagePreview,
     updated: formatDate(thread.lastMessageAt, "datetime"),
-    unread: thread.unreadCount,
+    // The API returns unreadCount as a STRING ("0"/"1"), and the screen sums these with
+    // `sum + (c.unread ?? 0)` — string concatenation, so a single thread rendered the badge
+    // and tab as "00" rather than "0". Coerced at the boundary so the view model is numeric.
+    unread: Number(thread.unreadCount ?? 0) || 0,
     linkedLabel: `${thread.relatedType} ${thread.relatedId}`,
     participants: [] as Array<{ name: string; initials: string; color: string }>,
     messages: [] as Array<{

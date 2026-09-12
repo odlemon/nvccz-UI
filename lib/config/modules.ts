@@ -67,6 +67,7 @@ import {
 } from "lucide-react"
 import { IconType } from "react-icons"
 import { IoPeopleOutline, IoReceiptOutline, IoStatsChartOutline } from "react-icons/io5"
+import { INVESTEE_PORTAL_EXTERNAL_URL, LP_PORTAL_EXTERNAL_URL } from '@/lib/portal/config'
 
 export interface SubModuleConfig {
   id: string
@@ -97,6 +98,8 @@ export interface ModuleConfig {
   minLevel?: number // Add this
   /** When true, hidden from App Switcher (replaced by a client design module). */
   hiddenFromSwitcher?: boolean
+  /** Dedicated portal URL — staff switcher opens in a new tab instead of in-app route. */
+  externalPortalUrl?: string
 }
 
 /**
@@ -108,6 +111,8 @@ export const SUPERSEDED_MODULE_IDS = new Set([
   "portfolio-management",
   "payroll",
   "accounting",
+  "accounting-v2",
+  "procurement",
   "performance-management",
 ])
 
@@ -319,17 +324,17 @@ export const MODULE_CONFIG: ModuleConfig[] = [
     description: "Payroll management",
     icon: CiDollar,
     color: "oklch(0.54 0.1 280)",
-    path: "/payroll",
+    path: "/payroll-legacy",
     hiddenFromSwitcher: true,
     subModules: [
-      { id: "payroll-dashboard", name: "Dashboard", path: "/payroll", icon: CiGrid41, description: "Payroll dashboard" },
-      { id: "payroll-employees", name: "Employees", path: "/payroll/employees", icon: CiViewList, description: "Employees" },
-      { id: "payroll-runs", name: "Pay Runs", path: "/payroll/runs", icon: CiCalendar, description: "Pay runs" },
-      { id: "payroll-payslips", name: "Payslips", path: "/payroll/payslips", icon: CiFileOn, description: "Search payslips" },
-      { id: "payroll-tax-rules", name: "Tax Rules", path: "/payroll/tax-rules", icon: CiDollar, description: "Tax rules management" },
-      { id: "payroll-allowance-types", name: "Allowance Types", path: "/payroll/allowance-types", icon: CiViewTable, description: "Allowance types" },
-      { id: "payroll-deduction-types", name: "Deduction Types", path: "/payroll/deduction-types", icon: CiViewTable, description: "Deduction types" },
-      { id: "payroll-bank-templates", name: "Bank Templates", path: "/payroll/bank-templates", icon: CiViewTable, description: "Bank file templates" }
+      { id: "payroll-dashboard", name: "Dashboard", path: "/payroll-legacy", icon: CiGrid41, description: "Payroll dashboard" },
+      { id: "payroll-employees", name: "Employees", path: "/payroll-legacy/employees", icon: CiViewList, description: "Employees" },
+      { id: "payroll-runs", name: "Pay Runs", path: "/payroll-legacy/runs", icon: CiCalendar, description: "Pay runs" },
+      { id: "payroll-payslips", name: "Payslips", path: "/payroll-legacy/payslips", icon: CiFileOn, description: "Search payslips" },
+      { id: "payroll-tax-rules", name: "Tax Rules", path: "/payroll-legacy/tax-rules", icon: CiDollar, description: "Tax rules management" },
+      { id: "payroll-allowance-types", name: "Allowance Types", path: "/payroll-legacy/allowance-types", icon: CiViewTable, description: "Allowance types" },
+      { id: "payroll-deduction-types", name: "Deduction Types", path: "/payroll-legacy/deduction-types", icon: CiViewTable, description: "Deduction types" },
+      { id: "payroll-bank-templates", name: "Bank Templates", path: "/payroll-legacy/bank-templates", icon: CiViewTable, description: "Bank file templates" }
     ]
   },
   {
@@ -338,19 +343,78 @@ export const MODULE_CONFIG: ModuleConfig[] = [
     description: "Payroll, tax, leave, vault and employee self-service",
     icon: CiDollar,
     color: "oklch(0.52 0.14 255)",
-    path: "/payroll-v6",
+    path: "/payroll",
     subModules: [
-      { id: "pr6-overview", name: "Command Centre", path: "/payroll-v6", icon: CiGrid41, description: "Command Centre" },
-      { id: "pr6-employees", name: "Employees", path: "/payroll-v6/employees", icon: CiViewList, description: "Employees" },
-      { id: "pr6-runs", name: "Payroll Runs", path: "/payroll-v6/runs", icon: CiCalendar, description: "Payroll runs" },
-      { id: "pr6-approvals", name: "Approvals", path: "/payroll-v6/approvals", icon: CiFileOn, description: "Maker-checker review" },
-      { id: "pr6-tax", name: "Tax & Statutory", path: "/payroll-v6/tax", icon: CiDollar, description: "Tax & statutory rules" },
-      { id: "pr6-leave", name: "Leave & Benefits", path: "/payroll-v6/leave", icon: HeartHandshake, description: "Leave & benefits" },
-      { id: "pr6-vault", name: "Document Vault", path: "/payroll-v6/vault", icon: CiFileOn, description: "Document vault" },
-      { id: "pr6-reports", name: "Reports", path: "/payroll-v6/reports", icon: CiViewTable, description: "Compliance reports" },
-      { id: "pr6-settings", name: "Settings", path: "/payroll-v6/settings", icon: CiSettings, description: "Settings & integrations" },
-      { id: "pr6-mypay", name: "My Pay", path: "/payroll-v6/mypay", icon: CiWallet, description: "My Pay" },
+      { id: "pr6-overview", name: "Command Centre", path: "/payroll", icon: CiGrid41, description: "Command Centre" },
+      { id: "pr6-employees", name: "Employees", path: "/payroll/employees", icon: CiViewList, description: "Employees" },
+      { id: "pr6-runs", name: "Payroll Runs", path: "/payroll/runs", icon: CiCalendar, description: "Payroll runs" },
+      { id: "pr6-approvals", name: "Approvals", path: "/payroll/approvals", icon: CiFileOn, description: "Maker-checker review" },
+      { id: "pr6-tax", name: "Tax & Statutory", path: "/payroll/tax", icon: CiDollar, description: "Tax & statutory rules" },
+      { id: "pr6-leave", name: "Leave & Benefits", path: "/payroll/leave", icon: HeartHandshake, description: "Leave & benefits" },
+      { id: "pr6-vault", name: "Document Vault", path: "/payroll/vault", icon: CiFileOn, description: "Document vault" },
+      { id: "pr6-reports", name: "Reports", path: "/payroll/reports", icon: CiViewTable, description: "Compliance reports" },
+      { id: "pr6-settings", name: "Settings", path: "/payroll/settings", icon: CiSettings, description: "Settings & integrations" },
+      { id: "pr6-mypay", name: "My Pay", path: "/payroll/mypay", icon: CiWallet, description: "My Pay" },
     ]
+  },
+  {
+    id: "procurement-v23",
+    name: "Procurement",
+    description: "Procurement & tender management — client V23 faithful port",
+    icon: CiViewList,
+    color: "oklch(0.56 0.10 220)",
+    path: "/procurement-v23",
+    subModules: [
+      { id: "pr23-dashboard", name: "Command Centre", path: "/procurement-v23", icon: CiGrid41, description: "Command Centre" },
+      { id: "pr23-plan", name: "Annual Procurement Plan", path: "/procurement-v23/plan", icon: CiCalendar, description: "Annual procurement plan" },
+      { id: "pr23-approvals", name: "Approval Centre", path: "/procurement-v23/approvals", icon: CiFileOn, description: "Approval centre" },
+      { id: "pr23-requisitions", name: "Purchase Requisitions", path: "/procurement-v23/requisitions", icon: CiFileOn, description: "Purchase requisitions" },
+      { id: "pr23-tenders", name: "Tenders & RFx", path: "/procurement-v23/tenders", icon: CiShop, description: "Tenders and RFx" },
+      { id: "pr23-evaluation", name: "Bid Evaluation", path: "/procurement-v23/evaluation", icon: CiViewTimeline, description: "Bid evaluation" },
+      { id: "pr23-vendors", name: "Vendor Registry", path: "/procurement-v23/vendors", icon: CiUser, description: "Vendor registry" },
+      { id: "pr23-contracts", name: "Contracts & Awards", path: "/procurement-v23/contracts", icon: CiFileOn, description: "Contracts and awards" },
+      { id: "pr23-orders", name: "Purchase Orders", path: "/procurement-v23/purchase-orders", icon: CiShop, description: "Purchase orders" },
+      { id: "pr23-receiving", name: "Receiving & Inspection", path: "/procurement-v23/goods-received", icon: CiViewTimeline, description: "Goods received" },
+      { id: "pr23-invoices", name: "Invoices & 3-Way Match", path: "/procurement-v23/invoices", icon: CiWallet, description: "Invoices and matching" },
+      { id: "pr23-accounts", name: "Accounts & Asset Transfers", path: "/procurement-v23/accounts", icon: CiMoneyCheck1, description: "Accounts and transfers" },
+      { id: "pr23-documents", name: "Document Vault", path: "/procurement-v23/documents", icon: CiFileOn, description: "Document vault" },
+      { id: "pr23-reports", name: "Reports Vault", path: "/procurement-v23/reports", icon: CiViewTable, description: "Reports vault" },
+      { id: "pr23-audit", name: "Audit & Compliance", path: "/procurement-v23/audit", icon: CiViewBoard, description: "Audit and compliance" },
+      { id: "pr23-settings", name: "Configuration & RBAC", path: "/procurement-v23/settings", icon: CiSettings, description: "Settings and RBAC" },
+    ],
+  },
+  {
+    id: "accounting-v52",
+    name: "Accounting",
+    description: "Accounting operating system — client V52 faithful port",
+    icon: CiDollar,
+    color: "oklch(0.55 0.14 255)",
+    path: "/accounting",
+    subModules: [
+      { id: "ac52-overview", name: "Command Centre", path: "/accounting", icon: CiGrid41, description: "Accounting Command Centre" },
+      { id: "ac52-approvals", name: "Approval Queue", path: "/accounting/approvals", icon: CiFileOn, description: "Approval queue" },
+      { id: "ac52-close", name: "Period Close", path: "/accounting/close", icon: CiCalendar, description: "Period close" },
+      { id: "ac52-ledger", name: "General Ledger", path: "/accounting/general-ledger", icon: CiFileOn, description: "General ledger" },
+      { id: "ac52-journals", name: "Journal Entries", path: "/accounting/journals", icon: CiFileOn, description: "Journal entries" },
+      { id: "ac52-cash", name: "Cash & Liquidity", path: "/accounting/cash-book", icon: CiMoneyCheck1, description: "Cash book" },
+      { id: "ac52-recon", name: "Bank Reconciliation", path: "/accounting/bank-reconciliation", icon: CiViewTimeline, description: "Bank reconciliation" },
+      { id: "ac52-payables", name: "Payables & Payments", path: "/accounting/payables", icon: CiUser, description: "Payables" },
+      { id: "ac52-receivables", name: "Receivables", path: "/accounting/receivables", icon: CiUser, description: "Receivables" },
+      { id: "ac52-expenses", name: "Expenses & Claims", path: "/accounting/expenses", icon: IoReceiptOutline, description: "Expenses and claims" },
+      { id: "ac52-inventory", name: "Inventory Accounting", path: "/accounting/inventory", icon: CiShop, description: "Inventory" },
+      { id: "ac52-assets", name: "Fixed Assets", path: "/accounting/assets", icon: CiViewBoard, description: "Fixed assets" },
+      { id: "ac52-investments", name: "Short-Term Investments", path: "/accounting/short-term-investments", icon: CiCoins1, description: "Short-term investments" },
+      { id: "ac52-reports", name: "Financial Reports", path: "/accounting/reports", icon: CiViewTable, description: "Financial reports" },
+      { id: "ac52-compliance", name: "Compliance & Tax", path: "/accounting/tax", icon: CiFileOn, description: "Compliance and tax" },
+      { id: "ac52-fx", name: "FX Revaluation", path: "/accounting/fx-revaluation", icon: CiDollar, description: "FX revaluation" },
+      { id: "ac52-consolidation", name: "Group Consolidation", path: "/accounting/consolidation", icon: CiViewBoard, description: "Consolidation" },
+      { id: "ac52-coa", name: "Chart of Accounts", path: "/accounting/chart-governance", icon: CiSettings, description: "Chart governance" },
+      { id: "ac52-vault", name: "Document Vault", path: "/accounting/vault", icon: CiFileOn, description: "Document vault" },
+      { id: "ac52-audit", name: "Audit Trail", path: "/accounting/audit", icon: CiViewBoard, description: "Audit trail" },
+      { id: "ac52-access", name: "Access Control", path: "/accounting/access", icon: CiUser, description: "Access control" },
+      { id: "ac52-integrations", name: "Integrations", path: "/accounting/integrations", icon: CiGrid41, description: "Integrations" },
+      { id: "ac52-settings", name: "Settings", path: "/accounting/settings", icon: CiSettings, description: "Settings" },
+    ],
   },
   {
     id: "procurement",
@@ -381,35 +445,35 @@ export const MODULE_CONFIG: ModuleConfig[] = [
     description: "Accounting and financial operations",
     icon: CiDollar,
     color: "oklch(0.62 0.10 170)",
-    path: "/accounting",
+    path: "/accounting-legacy",
     hiddenFromSwitcher: true,
     subModules: [
-      { id: "accounting-dashboard", name: "Dashboard", path: "/accounting", icon: CiGrid41, description: "Accounting dashboard" },
-      { id: "general-ledger", name: "General Ledger", path: "/accounting/general-ledger", icon: CiFileOn, description: "Chart of accounts and journal entries" },
+      { id: "accounting-dashboard", name: "Dashboard", path: "/accounting-legacy", icon: CiGrid41, description: "Accounting dashboard" },
+      { id: "general-ledger", name: "General Ledger", path: "/accounting-legacy/general-ledger", icon: CiFileOn, description: "Chart of accounts and journal entries" },
       {
         id: "cash-book",
         name: "Cash Book",
-        path: "/accounting/cash-book",
+        path: "/accounting-legacy/cash-book",
         icon: CiMoneyCheck1,
         description: "Cash book management",
 
       },
 
-      { id: "invoices", name: "Sales", path: "/accounting/invoices", icon: CiUser, description: "Customer invoices and payments" },
-      { id: "payables", name: "Purchases", path: "/accounting/payables", icon: CiUser, description: "Supplier bills and payments" },
+      { id: "invoices", name: "Sales", path: "/accounting-legacy/invoices", icon: CiUser, description: "Customer invoices and payments" },
+      { id: "payables", name: "Purchases", path: "/accounting-legacy/payables", icon: CiUser, description: "Supplier bills and payments" },
 
-      // { id: "accounts-receivable", name: "Accounts Receivable", path: "/accounting/debtors", icon: CiUser, description: "Customer invoices and payments" },
-      // { id: "accounts-payable", name: "Accounts Payable", path: "/accounting/creditors", icon: CiWallet, description: "Supplier bills and payments" },
-      { id: "bank-reconciliation", name: "Bank Reconciliation", path: "/accounting/bank-reconciliation", icon: CiViewTimeline, description: "Match bank statements" },
-      { id: "expenses", name: "Expenses", path: "/accounting/expenses", icon: IoReceiptOutline, description: "Expense Management" },
+      // { id: "accounts-receivable", name: "Accounts Receivable", path: "/accounting-legacy/debtors", icon: CiUser, description: "Customer invoices and payments" },
+      // { id: "accounts-payable", name: "Accounts Payable", path: "/accounting-legacy/creditors", icon: CiWallet, description: "Supplier bills and payments" },
+      { id: "bank-reconciliation", name: "Bank Reconciliation", path: "/accounting-legacy/bank-reconciliation", icon: CiViewTimeline, description: "Match bank statements" },
+      { id: "expenses", name: "Expenses", path: "/accounting-legacy/expenses", icon: IoReceiptOutline, description: "Expense Management" },
 
-      { id: "inventory-accounting", name: "Inventory", path: "/accounting/inventory", icon: CiShop, description: "Stock management and COGS" },
+      { id: "inventory-accounting", name: "Inventory", path: "/accounting-legacy/inventory", icon: CiShop, description: "Stock management and COGS" },
 
-      { id: "asset-management", name: "Asset Management", path: "/accounting/assets", icon: CiViewBoard, description: "Fixed assets and depreciation" },
-      { id: "short-term-investments", name: "Short-Term Investments", path: "/accounting/short-term-investments", icon: CiCoins1, description: "Track and manage short-term liquid investments" },
-      { id: "financial-reports", name: "Financial Reports", path: "/accounting/reports", icon: CiViewTable, description: "Financial statements and analytics" },
+      { id: "asset-management", name: "Asset Management", path: "/accounting-legacy/assets", icon: CiViewBoard, description: "Fixed assets and depreciation" },
+      { id: "short-term-investments", name: "Short-Term Investments", path: "/accounting-legacy/short-term-investments", icon: CiCoins1, description: "Track and manage short-term liquid investments" },
+      { id: "financial-reports", name: "Financial Reports", path: "/accounting-legacy/reports", icon: CiViewTable, description: "Financial statements and analytics" },
 
-      { id: "accounting-settings", name: "Settings", path: "/accounting/settings", icon: CiSettings, description: "Chart of accounts and configuration" },
+      { id: "accounting-settings", name: "Settings", path: "/accounting-legacy/settings", icon: CiSettings, description: "Chart of accounts and configuration" },
     ]
   },
   {
@@ -744,6 +808,8 @@ export const MODULE_CONFIG: ModuleConfig[] = [
     icon: Building2,
     color: "oklch(0.50 0.14 275)",
     path: "/investee-portal-v8",
+    hiddenFromSwitcher: true,
+    externalPortalUrl: INVESTEE_PORTAL_EXTERNAL_URL,
     subModules: [
       { id: "ip8-dashboard", name: "Overview", path: "/investee-portal-v8", icon: CiGrid41, description: "Company overview" },
       { id: "ip8-kpis", name: "KPI Centre", path: "/investee-portal-v8/kpis", icon: Target, description: "Investor-agreed metrics" },
@@ -764,6 +830,7 @@ export const MODULE_CONFIG: ModuleConfig[] = [
     icon: CiGrid41,
     description: "Manage applications and their lifecycle",
     color: "oklch(0.68 0.12 240)",
+    hiddenFromSwitcher: true,
     subModules: [
       {
         id: "application-dashboard",
@@ -833,12 +900,25 @@ export const MODULE_CONFIG: ModuleConfig[] = [
     icon: Landmark,
     description: "Limited Partner self-service fund dashboard and document vault",
     color: "oklch(0.60 0.14 220)",
+    hiddenFromSwitcher: true,
+    externalPortalUrl: LP_PORTAL_EXTERNAL_URL,
+    // These mirror the LP portal's own navigation. /investments is deliberately absent:
+    // it is a compatibility redirect map (commitment/capital-account/holdings -> dashboard or
+    // account-activity), not a screen, so listing it would send staff through a redirect.
+    // The previous list pointed at /ledger,
+    // /vault, /reports and /colleagues, which are now redirect stubs onto the screens below —
+    // so every entry bounced through a redirect and the four newer screens were missing.
     subModules: [
       { id: "lp-dashboard", name: "Dashboard", path: "/lp-portal", icon: BarChart3, description: "Fund overview, NAV/IRR metrics, and FX rates" },
-      { id: "lp-ledger", name: "Capital Account", path: "/lp-portal/ledger", icon: DollarSign, description: "Capital calls, distributions, and fees ledger" },
-      { id: "lp-vault", name: "Document Vault", path: "/lp-portal/vault", icon: FileText, description: "Tax, audit, and performance report documents" },
-      { id: "lp-reports", name: "Performance Reports", path: "/lp-portal/reports", icon: CiFileOn, description: "Historical performance report deliveries" },
-      { id: "lp-colleagues", name: "Colleagues", path: "/lp-portal/colleagues", icon: Users, description: "Manage colleague access to your LP account" },
+      { id: "lp-performance", name: "Performance", path: "/lp-portal/performance", icon: BarChart3, description: "Returns, history and benchmark comparison" },
+      { id: "lp-account-activity", name: "Account Activity", path: "/lp-portal/account-activity", icon: DollarSign, description: "Capital account ledger and transaction history" },
+      { id: "lp-capital-activity", name: "Capital Calls & Distributions", path: "/lp-portal/capital-activity", icon: DollarSign, description: "Capital calls, distributions and payment confirmations" },
+      { id: "lp-dealing", name: "Subscriptions & Redemptions", path: "/lp-portal/subscriptions-redemptions", icon: CiFileOn, description: "Subscription and redemption dealing requests" },
+      { id: "lp-documents", name: "Documents", path: "/lp-portal/documents", icon: FileText, description: "Statements, tax, audit and fund reports" },
+      { id: "lp-requests", name: "Requests & Messages", path: "/lp-portal/requests", icon: CiFileOn, description: "Service requests and correspondence with the GP" },
+      { id: "lp-notices", name: "Notices", path: "/lp-portal/notices", icon: CiFileOn, description: "Notices requiring acknowledgement" },
+      { id: "lp-organisation", name: "My Organisation", path: "/lp-portal/organisation", icon: Users, description: "Colleague access and bank instruction changes" },
+      { id: "lp-settings", name: "Settings", path: "/lp-portal/settings", icon: CiFileOn, description: "Notification, display and MFA preferences" },
     ],
   },
 
@@ -876,15 +956,33 @@ function pathMatches(base: string, path: string) {
   return path === b || path.startsWith(`${b}/`)
 }
 
+const moduleOwnsPath = (module: ModuleConfig, path: string): boolean =>
+  pathMatches(module.path, path) ||
+  module.subModules.some(sub => pathMatches(sub.path, path)) ||
+  (module.groups ? module.groups.some(g => {
+    if (g.path && pathMatches(g.path, path)) return true
+    return g.items ? g.items.some(sub => pathMatches(sub.path, path)) : false
+  }) : false)
+
+/**
+ * Resolve the module that owns a path.
+ *
+ * Superseded modules are preferred LAST. Several paths are claimed by both an old module
+ * and the client-design port that replaced it — `/performance` is owned by both
+ * `performance-management` (superseded, declared first) and, in practice, by
+ * `performance-v22`, whose own `path` is the redirecting `/performance-v22`. A plain
+ * `.find()` returns whichever appears earlier in MODULE_CONFIG, which for `/performance`
+ * was the dead module, so `ClientDesignModuleShell` overwrote its own
+ * `defaultModuleId="performance-v22"` with `performance-management` on mount and every
+ * permission check keyed by module id evaluated the wrong id.
+ *
+ * Ordering by supersededness rather than reordering MODULE_CONFIG fixes the whole class
+ * of collision without changing the array, which other code reads positionally.
+ */
 export const getModuleByPath = (path: string): ModuleConfig | undefined => {
-  return MODULE_CONFIG.find(module =>
-    pathMatches(module.path, path) ||
-    module.subModules.some(sub => pathMatches(sub.path, path)) ||
-    (module.groups ? module.groups.some(g => {
-      if (g.path && pathMatches(g.path, path)) return true
-      return g.items ? g.items.some(sub => pathMatches(sub.path, path)) : false
-    }) : false)
-  )
+  const matches = MODULE_CONFIG.filter(module => moduleOwnsPath(module, path))
+  if (matches.length <= 1) return matches[0]
+  return matches.find(m => !SUPERSEDED_MODULE_IDS.has(m.id)) ?? matches[0]
 }
 
 /** Modules shown in the App Switcher (excludes superseded old UIs). */

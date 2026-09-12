@@ -116,7 +116,7 @@ function sentimentClass(s: string): string {
     case "Negative":
       return "bg-[#fee2e2] text-[#dc2626]"
     default:
-      return "bg-[#f1f5f9] text-[#64748b]"
+      return "bg-[#f1f5f9] text-[#111111]"
   }
 }
 
@@ -125,7 +125,7 @@ function commTypeClass(t: string): string {
   if (t === "DDQ") return "bg-[#ede9fe] text-[#6d28d9]"
   if (t === "Meeting" || t === "Presentation") return "bg-[#dbeafe] text-[#1d4ed8]"
   if (t === "Call") return "bg-[#e0f2fe] text-[#0369a1]"
-  return "bg-[#f1f5f9] text-[#475569]"
+  return "bg-[#f1f5f9] text-[#111111]"
 }
 
 const CONFIDENTIALITY_OPTIONS = ["INTERNAL", "EXTERNAL", "CONFIDENTIAL", "INTERNAL_NOTE"]
@@ -145,85 +145,85 @@ function Detail({ item, onClose }: { item: CommRow; onClose: () => void }) {
       <div className="flex items-start justify-between border-b border-[#f1f5f9] px-4 py-3.5">
         <div className="min-w-0 pr-2">
           <div className="flex flex-wrap items-center gap-2">
-            <span className={cn("rounded-[4px] px-1.5 py-0.5 text-[10px] font-semibold", commTypeClass(item.type))}>
+            <span className={cn("rounded-[4px] px-1.5 py-0.5 text-[11px] font-semibold", commTypeClass(item.type))}>
               {item.type}
             </span>
             {item.confidential ? (
-              <span className="inline-flex items-center gap-1 rounded-[4px] bg-[#fef3c7] px-1.5 py-0.5 text-[10px] font-semibold text-[#b45309]">
+              <span className="inline-flex items-center gap-1 rounded-[4px] bg-[#fef3c7] px-1.5 py-0.5 text-[11px] font-semibold text-[#b45309]">
                 <Lock className="h-3 w-3" /> Internal
               </span>
             ) : null}
           </div>
-          <h2 className="mt-2 text-[14px] font-semibold leading-snug text-[#0f172a]">{item.subject}</h2>
-          <p className="mt-1 text-[11px] text-[#94a3b8]">{item.date}</p>
+          <h2 className="mt-2 text-[14px] font-semibold leading-snug text-[#000000]">{item.subject}</h2>
+          <p className="mt-1 text-[11px] text-[#141414]">{item.date}</p>
         </div>
-        <button type="button" onClick={onClose} className="rounded-full p-1 text-[#94a3b8] hover:bg-[#f1f5f9]">
+        <button type="button" onClick={onClose} className="rounded-full p-1 text-[#141414] hover:bg-[#f1f5f9]">
           <X className="h-4 w-4" />
         </button>
       </div>
       <div className="space-y-3 p-4 text-[12px]">
-        <p className="leading-relaxed text-[#475569]">{item.summary}</p>
+        <p className="leading-relaxed text-[#111111]">{item.summary}</p>
         <dl className="space-y-2 border-t border-[#f1f5f9] pt-3">
           <div className="flex justify-between gap-2">
-            <dt className="text-[#94a3b8]">Interaction type</dt>
-            <dd className="text-right text-[#0f172a]">{item.type}</dd>
+            <dt className="text-[#141414]">Interaction type</dt>
+            <dd className="text-right text-[#000000]">{item.type}</dd>
           </div>
           <div className="flex justify-between gap-2">
-            <dt className="text-[#94a3b8]">Occurred</dt>
-            <dd className="text-right text-[#0f172a]">{item.date}</dd>
+            <dt className="text-[#141414]">Occurred</dt>
+            <dd className="text-right text-[#000000]">{item.date}</dd>
           </div>
           <div className="flex justify-between gap-2">
-            <dt className="text-[#94a3b8]">Investor</dt>
-            <dd className="text-right font-medium text-[#0f172a]">{communicationInvestor(item)}</dd>
+            <dt className="text-[#141414]">Investor</dt>
+            <dd className="text-right font-medium text-[#000000]">{communicationInvestor(item)}</dd>
           </div>
           <div className="flex justify-between gap-2">
-            <dt className="text-[#94a3b8]">Contact</dt>
-            <dd className="text-right text-[#0f172a]">{communicationContact(item)}</dd>
+            <dt className="text-[#141414]">Contact</dt>
+            <dd className="text-right text-[#000000]">{communicationContact(item)}</dd>
           </div>
           <div className="flex justify-between gap-2">
-            <dt className="text-[#94a3b8]">Campaign</dt>
-            <dd className="text-right text-[#0f172a]">{communicationCampaign(item)}</dd>
+            <dt className="text-[#141414]">Campaign</dt>
+            <dd className="text-right text-[#000000]">{communicationCampaign(item)}</dd>
           </div>
           <div className="flex justify-between gap-2">
-            <dt className="text-[#94a3b8]">Opportunity</dt>
-            <dd className="text-right text-[#0f172a]">{communicationOpportunity(item)}</dd>
+            <dt className="text-[#141414]">Opportunity</dt>
+            <dd className="text-right text-[#000000]">{communicationOpportunity(item)}</dd>
           </div>
           <div className="flex justify-between gap-2">
-            <dt className="text-[#94a3b8]">Owner</dt>
-            <dd className="text-right text-[#0f172a]">{communicationOwner(item)}</dd>
+            <dt className="text-[#141414]">Owner</dt>
+            <dd className="text-right text-[#000000]">{communicationOwner(item)}</dd>
           </div>
           <div className="flex justify-between gap-2">
-            <dt className="text-[#94a3b8]">Outcome</dt>
-            <dd className="text-right text-[#0f172a]">{item.outcome}</dd>
+            <dt className="text-[#141414]">Outcome</dt>
+            <dd className="text-right text-[#000000]">{item.outcome}</dd>
           </div>
           <div className="flex justify-between gap-2">
-            <dt className="text-[#94a3b8]">Sentiment</dt>
+            <dt className="text-[#141414]">Sentiment</dt>
             <dd>
-              <span className={cn("rounded-[4px] px-1.5 py-0.5 text-[10px] font-semibold", sentimentClass(item.sentiment))}>
+              <span className={cn("rounded-[4px] px-1.5 py-0.5 text-[11px] font-semibold", sentimentClass(item.sentiment))}>
                 {item.sentiment}
               </span>
             </dd>
           </div>
           <div className="flex justify-between gap-2">
-            <dt className="text-[#94a3b8]">Next action</dt>
-            <dd className="text-right text-[#0f172a]">
+            <dt className="text-[#141414]">Next action</dt>
+            <dd className="text-right text-[#000000]">
               {item.nextAction}
               {item.nextActionDate !== "—" ? (
-                <span className="block text-[10px] text-[#94a3b8]">{item.nextActionDate}</span>
+                <span className="block text-[11px] text-[#141414]">{item.nextActionDate}</span>
               ) : null}
             </dd>
           </div>
           <div className="flex justify-between gap-2">
-            <dt className="text-[#94a3b8]">Confidentiality</dt>
-            <dd className="text-right text-[#0f172a]">{confidentiality}</dd>
+            <dt className="text-[#141414]">Confidentiality</dt>
+            <dd className="text-right text-[#000000]">{confidentiality}</dd>
           </div>
           <div className="flex justify-between gap-2">
-            <dt className="text-[#94a3b8]">Participants</dt>
-            <dd className="text-right text-[#0f172a]">{participants.length ? participants.join(", ") : "—"}</dd>
+            <dt className="text-[#141414]">Participants</dt>
+            <dd className="text-right text-[#000000]">{participants.length ? participants.join(", ") : "—"}</dd>
           </div>
           <div className="flex justify-between gap-2">
-            <dt className="text-[#94a3b8]">Attachments</dt>
-            <dd className="text-right text-[#0f172a]">{attachments.length ? attachments.join(", ") : "—"}</dd>
+            <dt className="text-[#141414]">Attachments</dt>
+            <dd className="text-right text-[#000000]">{attachments.length ? attachments.join(", ") : "—"}</dd>
           </div>
         </dl>
       </div>
@@ -327,10 +327,10 @@ export function FundraisingCommunications() {
     <div className="h-full overflow-y-auto bg-[#f8fafc] p-4 md:p-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-xl font-bold tracking-tight text-[#0f172a] md:text-[22px]">
+          <h1 className="text-xl font-bold tracking-tight text-[#000000] md:text-[22px]">
             Communications
           </h1>
-          <p className="mt-1 text-[12px] text-[#64748b]">
+          <p className="mt-1 text-[12px] text-[#111111]">
             Interaction log — emails, calls, meetings, DDQs and internal notes
           </p>
         </div>
@@ -385,15 +385,15 @@ export function FundraisingCommunications() {
         <div className={cn(CARD, "min-w-0 overflow-hidden")}>
           <div className="flex flex-col gap-2 border-b border-[#f1f5f9] px-3 py-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-2">
-              <Mail className="h-4 w-4 text-[#64748b]" />
-              <h2 className="text-[13px] font-semibold text-[#0f172a]">Activity feed</h2>
-              <span className="rounded-[4px] bg-[#f1f5f9] px-1.5 text-[11px] font-semibold text-[#64748b]">
+              <Mail className="h-4 w-4 text-[#111111]" />
+              <h2 className="text-[13px] font-semibold text-[#000000]">Activity feed</h2>
+              <span className="rounded-[4px] bg-[#f1f5f9] px-1.5 text-[11px] font-semibold text-[#111111]">
                 {filtered.length}
               </span>
             </div>
             <div className="flex flex-col gap-2 sm:flex-row">
               <div className="relative sm:w-[220px]">
-                <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#94a3b8]" />
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#141414]" />
                 <Input
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
@@ -424,7 +424,7 @@ export function FundraisingCommunications() {
               </table>
             </div>
           ) : filtered.length === 0 ? (
-            <p className="px-4 py-16 text-center text-[12px] text-[#94a3b8]">
+            <p className="px-4 py-16 text-center text-[12px] text-[#141414]">
               No communications logged yet. Use “Log Interaction” to add one.
             </p>
           ) : (
@@ -434,7 +434,7 @@ export function FundraisingCommunications() {
                   <tr className="border-b border-[#f1f5f9] bg-[#fafafa]">
                     {["Type", "Subject", "Investor", "Campaign", "Sentiment", "Owner", "When", "Next action"].map(
                       (h) => (
-                        <th key={h} className="px-3 py-2 text-[11px] font-semibold text-[#94a3b8]">{h}</th>
+                        <th key={h} className="px-3 py-2 text-[11px] font-semibold text-[#141414]">{h}</th>
                       ),
                     )}
                   </tr>
@@ -450,28 +450,28 @@ export function FundraisingCommunications() {
                       )}
                     >
                       <td className="px-3 py-2.5">
-                        <span className={cn("rounded-[4px] px-1.5 py-0.5 text-[10px] font-semibold", commTypeClass(c.type))}>
+                        <span className={cn("rounded-[4px] px-1.5 py-0.5 text-[11px] font-semibold", commTypeClass(c.type))}>
                           {c.type}
                         </span>
                       </td>
                       <td className="max-w-[220px] px-3 py-2.5">
-                        <p className="truncate text-[12px] font-medium text-[#0f172a]">{c.subject}</p>
+                        <p className="truncate text-[12px] font-medium text-[#000000]">{c.subject}</p>
                         {c.confidential ? (
-                          <p className="mt-0.5 flex items-center gap-1 text-[10px] text-[#b45309]">
+                          <p className="mt-0.5 flex items-center gap-1 text-[11px] text-[#b45309]">
                             <Lock className="h-2.5 w-2.5" /> Internal only
                           </p>
                         ) : null}
                       </td>
-                      <td className="whitespace-nowrap px-3 py-2.5 text-[11px] text-[#64748b]">{communicationInvestor(c)}</td>
-                      <td className="whitespace-nowrap px-3 py-2.5 text-[11px] text-[#64748b]">{communicationCampaign(c)}</td>
+                      <td className="whitespace-nowrap px-3 py-2.5 text-[11px] text-[#111111]">{communicationInvestor(c)}</td>
+                      <td className="whitespace-nowrap px-3 py-2.5 text-[11px] text-[#111111]">{communicationCampaign(c)}</td>
                       <td className="px-3 py-2.5">
-                        <span className={cn("rounded-[4px] px-1.5 py-0.5 text-[10px] font-semibold", sentimentClass(c.sentiment))}>
+                        <span className={cn("rounded-[4px] px-1.5 py-0.5 text-[11px] font-semibold", sentimentClass(c.sentiment))}>
                           {c.sentiment}
                         </span>
                       </td>
-                      <td className="whitespace-nowrap px-3 py-2.5 text-[11px] text-[#64748b]">{communicationOwner(c)}</td>
-                      <td className="whitespace-nowrap px-3 py-2.5 text-[11px] text-[#94a3b8]">{c.date}</td>
-                      <td className="max-w-[140px] truncate px-3 py-2.5 text-[11px] text-[#64748b]">{c.nextAction}</td>
+                      <td className="whitespace-nowrap px-3 py-2.5 text-[11px] text-[#111111]">{communicationOwner(c)}</td>
+                      <td className="whitespace-nowrap px-3 py-2.5 text-[11px] text-[#141414]">{c.date}</td>
+                      <td className="max-w-[140px] truncate px-3 py-2.5 text-[11px] text-[#111111]">{c.nextAction}</td>
                     </tr>
                   ))}
                 </tbody>

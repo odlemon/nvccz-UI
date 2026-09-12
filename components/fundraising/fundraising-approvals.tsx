@@ -20,7 +20,7 @@ import {
   statusClass,
   typeClass,
   type ApprovalStatus,
-} from "./approvals-mock-data"
+} from "./approvals-presentation"
 import {
   FrDialogShell,
   FrField,
@@ -205,8 +205,8 @@ export function FundraisingApprovals() {
     <div className="h-full overflow-y-auto bg-[#f8fafc] p-4 md:p-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-xl font-bold text-[#0f172a] md:text-[22px]">Approvals</h1>
-          <p className="mt-1 text-[12px] text-[#64748b]">
+          <h1 className="text-xl font-bold text-[#000000] md:text-[22px]">Approvals</h1>
+          <p className="mt-1 text-[12px] text-[#111111]">
             Commercial concessions, side letters and stage override approvals
           </p>
         </div>
@@ -230,9 +230,9 @@ export function FundraisingApprovals() {
 
       <div className={cn(CARD, "mt-5 overflow-hidden")}>
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#f1f5f9] px-4 py-3">
-          <h2 className="text-sm font-semibold text-[#0f172a]">Inbox</h2>
+          <h2 className="text-sm font-semibold text-[#000000]">Inbox</h2>
           <div className="flex items-center gap-2">
-            <Filter className="h-3.5 w-3.5 text-[#94a3b8]" />
+            <Filter className="h-3.5 w-3.5 text-[#141414]" />
             <Select
               value={statusFilter}
               onValueChange={(v) => setStatusFilter(v as "all" | ApprovalStatus)}
@@ -263,7 +263,7 @@ export function FundraisingApprovals() {
                   "Requested",
                   "Actions",
                 ].map((h) => (
-                  <th key={h} className="px-3 py-2 text-[11px] font-semibold text-[#94a3b8]">
+                  <th key={h} className="px-3 py-2 text-[11px] font-semibold text-[#141414]">
                     {h}
                   </th>
                 ))}
@@ -284,10 +284,10 @@ export function FundraisingApprovals() {
                         onClick={() => openHistory(req)}
                         className="rounded-full text-left"
                       >
-                        <p className="text-[12px] font-medium text-[#0f172a] hover:text-[#2563eb]">
+                        <p className="text-[12px] font-medium text-[#000000] hover:text-[#2563eb]">
                           {req.title}
                         </p>
-                        <p className="mt-0.5 max-w-[220px] truncate text-[10px] text-[#94a3b8]">
+                        <p className="mt-0.5 max-w-[220px] truncate text-[11px] text-[#141414]">
                           {req.summary}
                         </p>
                       </button>
@@ -295,19 +295,19 @@ export function FundraisingApprovals() {
                     <td className="px-3 py-2.5">
                       <span
                         className={cn(
-                          "rounded-[4px] px-1.5 py-0.5 text-[10px] font-semibold",
+                          "rounded-[4px] px-1.5 py-0.5 text-[11px] font-semibold",
                           typeClass(req.type),
                         )}
                       >
                         {titleCase(req.type)}
                       </span>
                     </td>
-                    <td className="px-3 py-2.5 text-[11px] text-[#64748b]">{req.campaign}</td>
-                    <td className="px-3 py-2.5 text-[11px] text-[#64748b]">{req.investor}</td>
+                    <td className="px-3 py-2.5 text-[11px] text-[#111111]">{req.campaign}</td>
+                    <td className="px-3 py-2.5 text-[11px] text-[#111111]">{req.investor}</td>
                     <td className="px-3 py-2.5">
                       <span
                         className={cn(
-                          "rounded-[4px] px-1.5 py-0.5 text-[10px] font-semibold",
+                          "rounded-[4px] px-1.5 py-0.5 text-[11px] font-semibold",
                           priorityClass(req.priority),
                         )}
                       >
@@ -317,16 +317,16 @@ export function FundraisingApprovals() {
                     <td className="px-3 py-2.5">
                       <span
                         className={cn(
-                          "rounded-[4px] px-1.5 py-0.5 text-[10px] font-semibold",
+                          "rounded-[4px] px-1.5 py-0.5 text-[11px] font-semibold",
                           statusClass(req.status),
                         )}
                       >
                         {titleCase(req.status)}
                       </span>
                     </td>
-                    <td className="px-3 py-2.5 text-[11px] text-[#94a3b8]">
+                    <td className="px-3 py-2.5 text-[11px] text-[#141414]">
                       <p>{req.requestedBy}</p>
-                      <p className="text-[10px]">{req.requestedAt}</p>
+                      <p className="text-[11px]">{req.requestedAt}</p>
                     </td>
                     <td className="px-3 py-2.5">
                       {req.status === "PENDING" ? (
@@ -334,7 +334,7 @@ export function FundraisingApprovals() {
                           <Button
                             size="sm"
                             variant="gradient-create"
-                            className="h-7 rounded-full px-3 text-[10px]"
+                            className="h-7 rounded-full px-3 text-[11px]"
                             onClick={() => openDecision(req, "APPROVED")}
                           >
                             <Check className="h-3 w-3" /> Approve
@@ -342,7 +342,7 @@ export function FundraisingApprovals() {
                           <Button
                             size="sm"
                             variant="outline"
-                            className="h-7 rounded-full px-3 text-[10px] text-[#b91c1c] hover:bg-[#fee2e2]"
+                            className="h-7 rounded-full px-3 text-[11px] text-[#b91c1c] hover:bg-[#fee2e2]"
                             onClick={() => openDecision(req, "REJECTED")}
                           >
                             <X className="h-3 w-3" /> Reject
@@ -365,7 +365,7 @@ export function FundraisingApprovals() {
           </table>
         </div>
         {!loading && rows.length === 0 ? (
-          <p className="px-4 py-10 text-center text-[12px] text-[#94a3b8]">
+          <p className="px-4 py-10 text-center text-[12px] text-[#141414]">
             No requests match this filter.
           </p>
         ) : null}
@@ -390,9 +390,9 @@ export function FundraisingApprovals() {
       >
         <div className="space-y-3">
           {selected ? (
-            <div className="rounded-[6px] border border-[#f1f5f9] bg-[#fafafa] px-3 py-2 text-[11px] text-[#64748b]">
+            <div className="rounded-[6px] border border-[#f1f5f9] bg-[#fafafa] px-3 py-2 text-[11px] text-[#111111]">
               <p>
-                <span className="font-medium text-[#0f172a]">{titleCase(selected.type)}</span> —{" "}
+                <span className="font-medium text-[#000000]">{titleCase(selected.type)}</span> —{" "}
                 {selected.investor}
                 {selected.amount ? ` · ${selected.amount}` : ""}
               </p>

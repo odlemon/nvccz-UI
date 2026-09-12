@@ -3,6 +3,7 @@ function renderTopbar() {
       <button class="icon-btn mobile-menu" data-action="mobile-menu">${icon('apps')}</button>
       <div class="search-wrap">${icon('search')}<input class="search-input" id="globalSearch" placeholder="Search people, work, news and more…" autocomplete="off" /><span class="shortcut">⌘ K</span></div>
       <div class="top-actions">
+        <select class="top-select entity-select" aria-label="Entity"><option>Matanho Capital</option><option>Matanho Holdings</option><option>Matanho Advisory</option></select>
         <button class="icon-btn calendar-top" data-nav="calendar" title="Calendar">${icon('calendar')}</button>
         <button class="icon-btn app-launcher-top" data-arcus-modules title="Switch module">${icon('apps')}</button>
         <button class="icon-btn messages-top" data-action="messages" title="Messages">${icon('message')}</button>

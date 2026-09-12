@@ -16,5 +16,5 @@ export const hv3 = {
   radius: "18px",
   sidebar: "264px",
   topbar: "78px",
-  assetBase: "/home-v3/assets",
+  assetBase: "/home/assets",
 } as const

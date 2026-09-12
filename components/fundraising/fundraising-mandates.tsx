@@ -36,7 +36,7 @@ import {
   frInputClass,
   requirementsFromError,
 } from "./fundraising-modals"
-import type { MandateStage } from "./mandates-mock-data"
+import type { MandateStage } from "./mandates-presentation"
 
 const CARD =
   "rounded-[12px] border border-[#e2e8f0] bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04)]"
@@ -96,7 +96,7 @@ function nextStepLabel(row: CombinedRow) {
 function ScoreBadge({ score }: { score: number | null }) {
   if (score == null) {
     return (
-      <span className={cn("inline-flex h-7 min-w-[28px] items-center justify-center border px-1 text-[11px] font-semibold text-[#94a3b8]", R4, "border-[#e2e8f0] bg-white")}>
+      <span className={cn("inline-flex h-7 min-w-[28px] items-center justify-center border px-1 text-[11px] font-semibold text-[#141414]", R4, "border-[#e2e8f0] bg-white")}>
         —
       </span>
     )
@@ -170,8 +170,8 @@ function FilterSelect({
         R6,
       )}
     >
-      <span className="text-[10px] font-medium leading-none text-[#64748b]">{label}</span>
-      <select value={value} onChange={(e) => onChange(e.target.value)} className="mt-1 bg-transparent text-xs text-[#475569] outline-none">
+      <span className="text-[11px] font-medium leading-none text-[#111111]">{label}</span>
+      <select value={value} onChange={(e) => onChange(e.target.value)} className="mt-1 bg-transparent text-xs text-[#111111] outline-none">
         <option value="all">All</option>
         {options.map((option) => <option key={option} value={option}>{option}</option>)}
       </select>
@@ -185,7 +185,7 @@ function OrgLogo({ row, size = "sm" }: { row: CombinedRow; size?: "sm" | "lg" })
     <span
       className={cn(
         "flex shrink-0 items-center justify-center font-bold",
-        isLg ? "h-10 w-10 text-[10px]" : "h-7 w-7 text-[9px]",
+        isLg ? "h-10 w-10 text-[11px]" : "h-7 w-7 text-[11px]",
         R4,
       )}
       style={{ backgroundColor: row.logoBg, color: row.logoText }}
@@ -198,7 +198,7 @@ function OrgLogo({ row, size = "sm" }: { row: CombinedRow; size?: "sm" | "lg" })
 function DetailSectionHeader({ title }: { title: string }) {
   return (
     <div className="flex items-center justify-between px-5 py-3.5">
-      <h3 className="text-[13px] font-semibold text-[#0f172a]">{title}</h3>
+      <h3 className="text-[13px] font-semibold text-[#000000]">{title}</h3>
     </div>
   )
 }
@@ -232,12 +232,12 @@ function DetailPanel({
           <OrgLogo row={row} size="lg" />
           <div className="min-w-0 flex-1">
             <div className="flex items-start justify-between gap-2">
-              <h2 className="text-[15px] font-semibold leading-snug text-[#0f172a]">{row.name}</h2>
+              <h2 className="text-[15px] font-semibold leading-snug text-[#000000]">{row.name}</h2>
               <button
                 type="button"
                 onClick={onClose}
                 className={cn(
-                  "inline-flex h-7 w-7 shrink-0 items-center justify-center text-[#94a3b8] hover:bg-[#f8fafc] hover:text-[#64748b]",
+                  "inline-flex h-7 w-7 shrink-0 items-center justify-center text-[#141414] hover:bg-[#f8fafc] hover:text-[#111111]",
                   R6,
                 )}
                 aria-label="Close detail panel"
@@ -245,11 +245,11 @@ function DetailPanel({
                 <X className="h-4 w-4" />
               </button>
             </div>
-            <p className="mt-1 text-xs text-[#64748b]">{row.organization}</p>
+            <p className="mt-1 text-xs text-[#111111]">{row.organization}</p>
             <div className="mt-3 flex flex-wrap items-center gap-2">
               <span
                 className={cn(
-                  "inline-flex items-center gap-1 border px-2 py-0.5 text-[10px] font-semibold",
+                  "inline-flex items-center gap-1 border px-2 py-0.5 text-[11px] font-semibold",
                   R4,
                   isRfp ? "border-[#2563eb] text-[#1d4ed8]" : "border-[#16a34a] text-[#15803d]",
                 )}
@@ -303,35 +303,35 @@ function DetailPanel({
           <DetailSectionHeader title="RFP Details" />
           <dl className="space-y-2 px-5 pb-4 text-[12px]">
             <div className="flex justify-between gap-2">
-              <dt className="text-[#94a3b8]">Reference</dt>
-              <dd className="font-medium text-[#0f172a]">{row.raw.referenceNumber || "—"}</dd>
+              <dt className="text-[#141414]">Reference</dt>
+              <dd className="font-medium text-[#000000]">{row.raw.referenceNumber || "—"}</dd>
                 </div>
             <div className="flex justify-between gap-2">
-              <dt className="text-[#94a3b8]">Deadline</dt>
-              <dd className="text-[#0f172a]">{row.rfpDueDate}</dd>
+              <dt className="text-[#141414]">Deadline</dt>
+              <dd className="text-[#000000]">{row.rfpDueDate}</dd>
                 </div>
             <div className="flex justify-between gap-2">
-              <dt className="text-[#94a3b8]">Presentation date</dt>
-              <dd className="text-[#0f172a]">{fmtDate(row.raw.presentationDate) || "—"}</dd>
+              <dt className="text-[#141414]">Presentation date</dt>
+              <dd className="text-[#000000]">{fmtDate(row.raw.presentationDate) || "—"}</dd>
               </div>
             <div className="flex justify-between gap-2">
-              <dt className="text-[#94a3b8]">Outcome</dt>
-              <dd className="text-[#0f172a]">{row.raw.outcome || "PENDING"}</dd>
+              <dt className="text-[#141414]">Outcome</dt>
+              <dd className="text-[#000000]">{row.raw.outcome || "PENDING"}</dd>
       </div>
           </dl>
         </div>
       ) : (
       <div className="border-b border-[#f1f5f9]">
           <div className="flex items-center justify-between px-5 py-3.5">
-            <h3 className="text-[13px] font-semibold text-[#0f172a]">Activation Checklist</h3>
-            <span className="text-[11px] tabular-nums text-[#64748b]">
+            <h3 className="text-[13px] font-semibold text-[#000000]">Activation Checklist</h3>
+            <span className="text-[11px] tabular-nums text-[#111111]">
               {(row as any).checklistDone}/{(row as any).checklistTotal}
             </span>
         </div>
           <ul className="space-y-2.5 px-5 pb-4">
             {MANDATE_ACTIVATION_FLAGS.map((f) => (
               <li key={f.key} className="flex items-center justify-between gap-2">
-                <span className="text-[12px] text-[#334155]">{f.label}</span>
+                <span className="text-[12px] text-[#111111]">{f.label}</span>
                 <MandateCheckbox
                   checked={Boolean(row.raw[f.key])}
                   disabled={togglingKey === f.key}
@@ -348,24 +348,24 @@ function DetailPanel({
         <DetailSectionHeader title="Key Facts" />
         <dl className="space-y-2 px-5 pb-5 text-[12px]">
           <div className="flex justify-between gap-2">
-            <dt className="text-[#94a3b8]">Mandate size / expected AUM</dt>
-            <dd className="font-medium text-[#0f172a]">{row.mandateSize}</dd>
+            <dt className="text-[#141414]">Mandate size / expected AUM</dt>
+            <dd className="font-medium text-[#000000]">{row.mandateSize}</dd>
           </div>
           <div className="flex justify-between gap-2">
-            <dt className="text-[#94a3b8]">Asset class</dt>
-            <dd className="text-[#0f172a]">{row.assetClass}</dd>
+            <dt className="text-[#141414]">Asset class</dt>
+            <dd className="text-[#000000]">{row.assetClass}</dd>
           </div>
           <div className="flex justify-between gap-2">
-            <dt className="text-[#94a3b8]">Geography</dt>
-            <dd className="text-[#0f172a]">{row.geography}</dd>
+            <dt className="text-[#141414]">Geography</dt>
+            <dd className="text-[#000000]">{row.geography}</dd>
           </div>
           <div className="flex justify-between gap-2">
-            <dt className="text-[#94a3b8]">Owner</dt>
-            <dd className="text-[#0f172a]">{ownerLabel(row)}</dd>
+            <dt className="text-[#141414]">Owner</dt>
+            <dd className="text-[#000000]">{ownerLabel(row)}</dd>
                 </div>
           <div className="flex justify-between gap-2">
-            <dt className="text-[#94a3b8]">Next step</dt>
-            <dd className="text-right text-[#0f172a]">{nextStepLabel(row)}</dd>
+            <dt className="text-[#141414]">Next step</dt>
+            <dd className="text-right text-[#000000]">{nextStepLabel(row)}</dd>
               </div>
         </dl>
       </div>
@@ -558,8 +558,8 @@ export function FundraisingMandates() {
       {/* Page header */}
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-2">
-        <h1 className="text-2xl font-semibold tracking-tight text-[#0f172a] sm:text-[28px]">Mandates</h1>
-          {loading ? <Loader2 className="h-4 w-4 animate-spin text-[#94a3b8]" /> : null}
+        <h1 className="text-2xl font-semibold tracking-tight text-[#000000] sm:text-[28px]">Mandates</h1>
+          {loading ? <Loader2 className="h-4 w-4 animate-spin text-[#141414]" /> : null}
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Button type="button" variant="outline" className="rounded-full h-10 px-6 gap-2 shadow-sm" onClick={handleExport}>
@@ -611,7 +611,7 @@ export function FundraisingMandates() {
               All Mandates
               <span
                 className={cn(
-                  "inline-flex h-5 min-w-5 items-center justify-center bg-[#eff6ff] px-1.5 text-[10px] font-semibold tabular-nums text-[#2563eb]",
+                  "inline-flex h-5 min-w-5 items-center justify-center bg-[#eff6ff] px-1.5 text-[11px] font-semibold tabular-nums text-[#2563eb]",
                   R4,
                 )}
               >
@@ -621,7 +621,7 @@ export function FundraisingMandates() {
             <button
               type="button"
               className={cn(
-                "inline-flex h-9 items-center gap-1.5 border border-[#e2e8f0] bg-white px-3 text-xs font-medium text-[#64748b] hover:bg-[#fafbfc]",
+                "inline-flex h-9 items-center gap-1.5 border border-[#e2e8f0] bg-white px-3 text-xs font-medium text-[#111111] hover:bg-[#fafbfc]",
                 R6,
               )}
             >
@@ -633,14 +633,14 @@ export function FundraisingMandates() {
           {/* Filter row */}
           <div className="flex flex-wrap items-center gap-2 border-b border-[#f1f5f9] px-4 py-3">
             <div className="relative w-full min-w-[200px] flex-1 sm:max-w-[220px]">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#94a3b8]" />
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#141414]" />
               <input
                 type="search"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search mandates..."
                 className={cn(
-                  "h-9 w-full border border-[#e2e8f0] bg-white pl-9 pr-3 text-xs text-[#0f172a] placeholder:text-[#94a3b8] focus:border-[#2563eb] focus:outline-none focus:ring-2 focus:ring-[#2563eb]/15",
+                  "h-9 w-full border border-[#e2e8f0] bg-white pl-9 pr-3 text-xs text-[#000000] placeholder:text-[#141414] focus:border-[#2563eb] focus:outline-none focus:ring-2 focus:ring-[#2563eb]/15",
                   R6,
                 )}
               />
@@ -650,7 +650,7 @@ export function FundraisingMandates() {
             <FilterSelect label="Geography" value={geographyFilter} options={Array.from(new Set(combined.map((row) => row.geography))).filter(Boolean)} onChange={setGeographyFilter} />
             <FilterSelect label="Stage" value={stageFilter} options={Array.from(new Set(combined.map((row) => row.stage))).filter(Boolean)} onChange={setStageFilter} />
 
-            <button type="button" onClick={() => { setSearch(""); setTypeFilter("all"); setGeographyFilter("all"); setStageFilter("all") }} className="rounded-full px-2 py-1 text-xs font-medium text-[#64748b] hover:bg-[#f1f5f9] hover:text-[#334155]">
+            <button type="button" onClick={() => { setSearch(""); setTypeFilter("all"); setGeographyFilter("all"); setStageFilter("all") }} className="rounded-full px-2 py-1 text-xs font-medium text-[#111111] hover:bg-[#f1f5f9] hover:text-[#111111]">
               Clear
             </button>
           </div>
@@ -663,31 +663,31 @@ export function FundraisingMandates() {
                   <th className="w-11 px-4 py-3">
                     <MandateCheckbox checked={allChecked} onChange={toggleAll} label="Select all mandates" />
                   </th>
-                  <th className="px-3 py-3 text-[11px] font-semibold uppercase tracking-[0.04em] text-[#64748b]">
+                  <th className="px-3 py-3 text-[11px] font-semibold uppercase tracking-[0.04em] text-[#111111]">
                     Mandate
                   </th>
-                  <th className="px-3 py-3 text-[11px] font-semibold uppercase tracking-[0.04em] text-[#64748b]">
+                  <th className="px-3 py-3 text-[11px] font-semibold uppercase tracking-[0.04em] text-[#111111]">
                     Type
                   </th>
-                  <th className="px-3 py-3 text-[11px] font-semibold uppercase tracking-[0.04em] text-[#64748b]">
+                  <th className="px-3 py-3 text-[11px] font-semibold uppercase tracking-[0.04em] text-[#111111]">
                     Organization
                   </th>
-                  <th className="px-3 py-3 text-[11px] font-semibold uppercase tracking-[0.04em] text-[#64748b]">
+                  <th className="px-3 py-3 text-[11px] font-semibold uppercase tracking-[0.04em] text-[#111111]">
                     Geography
                   </th>
-                  <th className="px-3 py-3 text-[11px] font-semibold uppercase tracking-[0.04em] text-[#64748b]">
+                  <th className="px-3 py-3 text-[11px] font-semibold uppercase tracking-[0.04em] text-[#111111]">
                     Size
                   </th>
-                  <th className="px-3 py-3 text-[11px] font-semibold uppercase tracking-[0.04em] text-[#64748b]">
+                  <th className="px-3 py-3 text-[11px] font-semibold uppercase tracking-[0.04em] text-[#111111]">
                     Stage
                   </th>
-                  <th className="px-3 py-3 text-[11px] font-semibold uppercase tracking-[0.04em] text-[#64748b]">
+                  <th className="px-3 py-3 text-[11px] font-semibold uppercase tracking-[0.04em] text-[#111111]">
                     Due Date
                   </th>
-                  <th className="px-3 py-3 text-[11px] font-semibold uppercase tracking-[0.04em] text-[#64748b]">
+                  <th className="px-3 py-3 text-[11px] font-semibold uppercase tracking-[0.04em] text-[#111111]">
                     Next Step
                   </th>
-                  <th className="px-3 py-3 text-center text-[11px] font-semibold uppercase tracking-[0.04em] text-[#64748b]">
+                  <th className="px-3 py-3 text-center text-[11px] font-semibold uppercase tracking-[0.04em] text-[#111111]">
                     Score
                   </th>
                 </tr>
@@ -697,7 +697,7 @@ export function FundraisingMandates() {
                   <FrTableSkeleton columns={10} rows={7} />
                 ) : filtered.length === 0 ? (
                   <tr>
-                    <td colSpan={10} className="px-4 py-10 text-center text-[13px] text-[#94a3b8]">
+                    <td colSpan={10} className="px-4 py-10 text-center text-[13px] text-[#141414]">
                       {combined.length === 0 ? "No mandates or RFPs recorded yet." : "No mandates match your search."}
                     </td>
                   </tr>
@@ -728,10 +728,10 @@ export function FundraisingMandates() {
                           </span>
                         </div>
                       </td>
-                      <td className="whitespace-nowrap px-3 py-2.5 text-[13px] text-[#334155]">{row.mandateType}</td>
-                      <td className="whitespace-nowrap px-3 py-2.5 text-[13px] text-[#334155]">{row.organization}</td>
-                      <td className="whitespace-nowrap px-3 py-2.5 text-[13px] text-[#334155]">{row.geography}</td>
-                      <td className="whitespace-nowrap px-3 py-2.5 text-[13px] font-medium tabular-nums text-[#0f172a]">
+                      <td className="whitespace-nowrap px-3 py-2.5 text-[13px] text-[#111111]">{row.mandateType}</td>
+                      <td className="whitespace-nowrap px-3 py-2.5 text-[13px] text-[#111111]">{row.organization}</td>
+                      <td className="whitespace-nowrap px-3 py-2.5 text-[13px] text-[#111111]">{row.geography}</td>
+                      <td className="whitespace-nowrap px-3 py-2.5 text-[13px] font-medium tabular-nums text-[#000000]">
                         {row.mandateSize}
                       </td>
                       <td className="whitespace-nowrap px-3 py-2.5">
@@ -748,12 +748,12 @@ export function FundraisingMandates() {
                       <td
                         className={cn(
                           "whitespace-nowrap px-3 py-2.5 text-[13px] tabular-nums",
-                          row.rfpDueDate === "—" ? "text-[#94a3b8]" : "text-[#334155]",
+                          row.rfpDueDate === "—" ? "text-[#141414]" : "text-[#111111]",
                         )}
                       >
                         {row.rfpDueDate}
                       </td>
-                        <td className="max-w-[170px] truncate whitespace-nowrap px-3 py-2.5 text-[13px] text-[#334155]">
+                        <td className="max-w-[170px] truncate whitespace-nowrap px-3 py-2.5 text-[13px] text-[#111111]">
                           {nextStepLabel(row)}
                       </td>
                       <td className="px-3 py-2.5 text-center">
@@ -769,7 +769,7 @@ export function FundraisingMandates() {
 
           {/* Pagination */}
           <div className="flex flex-col gap-3 border-t border-[#e2e8f0] px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-xs text-[#64748b]">
+            <p className="text-xs text-[#111111]">
               Showing {filtered.length === 0 ? 0 : 1} to {filtered.length} of {combined.length} mandates &amp; RFPs
             </p>
             <div className="flex items-center gap-1">
@@ -778,7 +778,7 @@ export function FundraisingMandates() {
                 disabled={page <= 1}
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
                 className={cn(
-                  "inline-flex h-8 w-8 items-center justify-center border border-[#e2e8f0] bg-white text-[#64748b] hover:bg-[#f8fafc] disabled:opacity-40",
+                  "inline-flex h-8 w-8 items-center justify-center border border-[#e2e8f0] bg-white text-[#111111] hover:bg-[#f8fafc] disabled:opacity-40",
                   R6,
                 )}
                 aria-label="Previous page"
@@ -792,7 +792,7 @@ export function FundraisingMandates() {
                 type="button"
                 onClick={() => setPage((p) => p + 1)}
                 className={cn(
-                  "inline-flex h-8 w-8 items-center justify-center border border-[#e2e8f0] bg-white text-[#64748b] hover:bg-[#f8fafc]",
+                  "inline-flex h-8 w-8 items-center justify-center border border-[#e2e8f0] bg-white text-[#111111] hover:bg-[#f8fafc]",
                   R6,
                 )}
                 aria-label="Next page"

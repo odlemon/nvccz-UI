@@ -243,9 +243,9 @@ function ModuleCardNode({ data, id }: NodeProps) {
             : "bg-white border-[#f1f5f9]",
         )}
       >
-        <p className="text-[12px] font-semibold text-[#0f172a] truncate leading-none">{d.label}</p>
+        <p className="text-[12px] font-semibold text-[#000000] truncate leading-none">{d.label}</p>
         {d.isActive ? (
-          <span className="shrink-0 rounded-full bg-[#dbeafe] px-2 py-[3px] text-[10px] font-medium leading-none text-[#1d4ed8]">
+          <span className="shrink-0 rounded-full bg-[#dbeafe] px-2 py-[3px] text-[11px] font-medium leading-none text-[#1d4ed8]">
             This Module
           </span>
         ) : null}
@@ -264,7 +264,7 @@ function ModuleCardNode({ data, id }: NodeProps) {
                       "w-full h-full text-left px-3 text-[12px] transition-colors",
                       selected
                         ? "bg-[#eff6ff] text-[#1d4ed8] font-medium"
-                        : "text-[#475569] hover:bg-[#f8fafc] hover:text-[#0f172a]",
+                        : "text-[#111111] hover:bg-[#f8fafc] hover:text-[#000000]",
                     )}
                     onClick={(e) => {
                       e.stopPropagation()
@@ -323,7 +323,7 @@ function ModuleCardNode({ data, id }: NodeProps) {
         </>
       ) : (
         <div className="px-3 py-3">
-          <p className="text-[11px] text-[#94a3b8]">{d.items.length} line items</p>
+          <p className="text-[11px] text-[#141414]">{d.items.length} line items</p>
         </div>
       )}
     </div>
@@ -348,8 +348,8 @@ function LineItemCardNode({ data }: NodeProps) {
         position={targetPos}
         className="!w-2 !h-2 !bg-[#cbd5e1] !border-[#94a3b8]"
       />
-      <p className="text-[10px] text-[#94a3b8] truncate">{d.moduleLabel}</p>
-      <p className="text-[12px] font-medium text-[#0f172a]">{d.label}</p>
+      <p className="text-[11px] text-[#141414] truncate">{d.moduleLabel}</p>
+      <p className="text-[12px] font-medium text-[#000000]">{d.label}</p>
       <Handle
         type="source"
         id="out"
@@ -706,7 +706,7 @@ function MapCanvas({
 
   if (!modules.length) {
     return (
-      <div className="flex h-full items-center justify-center bg-[#fafbfc] px-6 text-center text-[12px] text-[#94a3b8]">
+      <div className="flex h-full items-center justify-center bg-[#fafbfc] px-6 text-center text-[12px] text-[#141414]">
         No dependency graph yet. Add modules and formulas to see references here.
       </div>
     )
@@ -819,7 +819,7 @@ export function BuilderDependencyMap({
 
 
   const selectClass =
-    "h-8 min-w-[108px] appearance-none rounded-[6px] border border-[#e2e8f0] bg-white pl-2.5 pr-7 text-[12px] text-[#0f172a] outline-none focus:border-[#2563eb] bg-[length:12px] bg-[right_8px_center] bg-no-repeat"
+    "h-8 min-w-[108px] appearance-none rounded-[6px] border border-[#e2e8f0] bg-white pl-2.5 pr-7 text-[12px] text-[#000000] outline-none focus:border-[#2563eb] bg-[length:12px] bg-[right_8px_center] bg-no-repeat"
   const selectChevron =
     "bg-[url('data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%2712%27 height=%2712%27 viewBox=%270 0 24 24%27 fill=%27none%27 stroke=%27%2364748b%27 stroke-width=%272%27%3E%3Cpath d=%27m6 9 6 6 6-6%27/%3E%3C/svg%3E')]"
 
@@ -835,12 +835,12 @@ export function BuilderDependencyMap({
       {/* Toolbar — matches A.3: title left, filters + chrome right */}
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2 justify-between px-4 pt-3 pb-2.5 shrink-0">
         <div className="flex items-center gap-1.5 relative">
-          <h3 className="text-[13px] font-semibold text-[#0f172a] tracking-[-0.01em]">
+          <h3 className="text-[13px] font-semibold text-[#000000] tracking-[-0.01em]">
             Dependency Map
           </h3>
           <button
             type="button"
-            className="text-[#94a3b8] hover:text-[#64748b] rounded-full p-0.5"
+            className="text-[#141414] hover:text-[#111111] rounded-full p-0.5"
             aria-label="About dependency map"
             onClick={() => setTipOpen((v) => !v)}
             onBlur={() => setTimeout(() => setTipOpen(false), 150)}
@@ -848,7 +848,7 @@ export function BuilderDependencyMap({
             <Info className="w-3.5 h-3.5" />
           </button>
           {tipOpen ? (
-            <div className="absolute left-0 top-7 z-20 w-64 rounded-[8px] border border-[#e2e8f0] bg-white p-2.5 text-[11px] text-[#475569] shadow-lg">
+            <div className="absolute left-0 top-7 z-20 w-64 rounded-[8px] border border-[#e2e8f0] bg-white p-2.5 text-[11px] text-[#111111] shadow-lg">
               Live dependency graph for this model. Click a card to focus that module, a line item to
               open it in Properties, or an arrow to trace a reference.
               {circular ? (
@@ -861,7 +861,7 @@ export function BuilderDependencyMap({
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
-          <label className="inline-flex items-center gap-2 text-[12px] text-[#64748b]">
+          <label className="inline-flex items-center gap-2 text-[12px] text-[#111111]">
             <span>View</span>
             <select
               value={view}
@@ -873,7 +873,7 @@ export function BuilderDependencyMap({
             </select>
           </label>
 
-          <label className="inline-flex items-center gap-2 text-[12px] text-[#64748b]">
+          <label className="inline-flex items-center gap-2 text-[12px] text-[#111111]">
             <span>Layout</span>
             <select
               value={layout}
@@ -903,13 +903,13 @@ export function BuilderDependencyMap({
                 )}
               />
             </button>
-            <span className="text-[12px] text-[#475569]">Show Line Items</span>
+            <span className="text-[12px] text-[#111111]">Show Line Items</span>
           </label>
 
           <div className="flex items-center gap-2 ml-1">
             <button
               type="button"
-              className="inline-flex h-8 w-8 items-center justify-center rounded-[6px] border border-[#e2e8f0] bg-white text-[#64748b] hover:bg-[#f8fafc] hover:text-[#0f172a]"
+              className="inline-flex h-8 w-8 items-center justify-center rounded-[6px] border border-[#e2e8f0] bg-white text-[#111111] hover:bg-[#f8fafc] hover:text-[#000000]"
               aria-label={isFullscreen ? "Exit fullscreen" : "Fullscreen"}
               onClick={() => void toggleFullscreen()}
             >
@@ -923,7 +923,7 @@ export function BuilderDependencyMap({
             <div className="inline-flex h-8 items-stretch overflow-hidden rounded-[6px] border border-[#e2e8f0] bg-white">
               <button
                 type="button"
-                className="inline-flex w-8 items-center justify-center text-[#64748b] hover:bg-[#f8fafc] hover:text-[#0f172a] border-r border-[#e2e8f0]"
+                className="inline-flex w-8 items-center justify-center text-[#111111] hover:bg-[#f8fafc] hover:text-[#000000] border-r border-[#e2e8f0]"
                 aria-label="Zoom out"
                 onClick={() => fire("dep-zoom-out")}
               >
@@ -931,7 +931,7 @@ export function BuilderDependencyMap({
               </button>
               <button
                 type="button"
-                className="min-w-[52px] px-1.5 text-[12px] font-medium tabular-nums text-[#475569] hover:bg-[#f8fafc]"
+                className="min-w-[52px] px-1.5 text-[12px] font-medium tabular-nums text-[#111111] hover:bg-[#f8fafc]"
                 title="Fit to view"
                 onClick={() => fire("dep-zoom-reset")}
               >
@@ -939,7 +939,7 @@ export function BuilderDependencyMap({
               </button>
               <button
                 type="button"
-                className="inline-flex w-8 items-center justify-center text-[#64748b] hover:bg-[#f8fafc] hover:text-[#0f172a] border-l border-[#e2e8f0]"
+                className="inline-flex w-8 items-center justify-center text-[#111111] hover:bg-[#f8fafc] hover:text-[#000000] border-l border-[#e2e8f0]"
                 aria-label="Zoom in"
                 onClick={() => fire("dep-zoom-in")}
               >
@@ -973,7 +973,7 @@ export function BuilderDependencyMap({
 
       {/* Legend — bordered bar, centered (A.3) */}
       <div className="flex justify-center px-4 pb-3 shrink-0">
-        <div className="inline-flex flex-wrap items-center gap-x-5 gap-y-1.5 rounded-[8px] border border-[#e2e8f0] bg-white px-4 py-2 text-[11px] text-[#64748b] shadow-[0_1px_2px_rgba(15,23,42,0.03)]">
+        <div className="inline-flex flex-wrap items-center gap-x-5 gap-y-1.5 rounded-[8px] border border-[#e2e8f0] bg-white px-4 py-2 text-[11px] text-[#111111] shadow-[0_1px_2px_rgba(15,23,42,0.03)]">
           <span className="inline-flex items-center gap-2">
             <span className="relative w-8 h-0 border-t-[1.5px] border-[#334155]">
               <span className="absolute -right-[1px] top-1/2 -translate-y-1/2 w-0 h-0 border-y-[3px] border-y-transparent border-l-[5px] border-l-[#334155]" />

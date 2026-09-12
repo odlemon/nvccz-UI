@@ -42,7 +42,7 @@ import {
   taskStatusLabel,
   type DashActivity,
   type DashTaskStatus,
-} from "./dashboard-mock-data"
+} from "./dashboard-presentation"
 
 const CARD =
   "rounded-[6px] border border-[#e2e8f0] bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04)]"
@@ -125,11 +125,11 @@ function KpiCard({ kpi }: { kpi: KpiCardDef }) {
       >
         <Icon className="h-4 w-4" strokeWidth={1.75} />
       </div>
-      <p className="mt-2.5 text-[11px] font-medium leading-snug text-[#64748b]">{kpi.label}</p>
-      <p className="mt-1.5 text-[20px] font-bold leading-none tabular-nums tracking-tight text-[#0f172a]">
+      <p className="mt-2.5 text-[11px] font-medium leading-snug text-[#111111]">{kpi.label}</p>
+      <p className="mt-1.5 text-[20px] font-bold leading-none tabular-nums tracking-tight text-[#000000]">
         {kpi.amount}
       </p>
-      <p className="mt-1.5 text-[10px] text-[#94a3b8]">{kpi.helper}</p>
+      <p className="mt-1.5 text-[11px] text-[#141414]">{kpi.helper}</p>
       {typeof kpi.pct === "number" ? (
         <div className="absolute inset-x-0 bottom-0 h-[3px] bg-[#f1f5f9]">
           <div
@@ -160,8 +160,8 @@ function ProgressBar({
   return (
     <div>
       <div className="flex items-center justify-between text-[11px]">
-        <span className="text-[#64748b]">{label}</span>
-        <span className="font-semibold tabular-nums text-[#0f172a]">
+        <span className="text-[#111111]">{label}</span>
+        <span className="font-semibold tabular-nums text-[#000000]">
           US${valueM.toFixed(1)}M · {pct.toFixed(0)}%
         </span>
       </div>
@@ -199,23 +199,23 @@ function TaskRow({
       <div className="min-w-0 flex-1">
         <p
           className={cn(
-            "text-[12px] font-medium leading-snug text-[#0f172a]",
-            done && "line-through text-[#94a3b8]",
+            "text-[12px] font-medium leading-snug text-[#000000]",
+            done && "line-through text-[#141414]",
           )}
         >
           {task.title}
         </p>
-        <p className="mt-0.5 text-[10px] text-[#94a3b8]">{task.related}</p>
+        <p className="mt-0.5 text-[11px] text-[#141414]">{task.related}</p>
         <div className="mt-1.5 flex flex-wrap items-center gap-2">
           <span
             className={cn(
-              "rounded-[4px] px-1.5 py-0.5 text-[10px] font-semibold",
+              "rounded-[4px] px-1.5 py-0.5 text-[11px] font-semibold",
               taskStatusClass(task.status),
             )}
           >
             {taskStatusLabel(task.status)}
           </span>
-          <span className="text-[10px] text-[#94a3b8]">Due {task.dueDate}</span>
+          <span className="text-[11px] text-[#141414]">Due {task.dueDate}</span>
         </div>
       </div>
     </button>
@@ -276,45 +276,45 @@ function OpportunityRow({
       <td className="whitespace-nowrap px-3 py-2.5">
         <div className="flex items-center gap-2">
           <span
-            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-[4px] text-[9px] font-bold text-white"
+            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-[4px] text-[11px] font-bold text-white"
             style={{ backgroundColor: LOGO_TONES[idx % LOGO_TONES.length] }}
           >
             {oppInitials(opp.investor)}
           </span>
-          <span className="text-[12px] font-medium text-[#0f172a]">{opp.investor}</span>
+          <span className="text-[12px] font-medium text-[#000000]">{opp.investor}</span>
         </div>
       </td>
-      <td className="whitespace-nowrap px-3 py-2.5 text-[11px] text-[#64748b]">
+      <td className="whitespace-nowrap px-3 py-2.5 text-[11px] text-[#111111]">
         {opp.campaign}
       </td>
       <td className="px-3 py-2.5">
         <span
           className={cn(
-            "inline-flex rounded-[4px] px-2 py-0.5 text-[10px] font-semibold",
+            "inline-flex rounded-[4px] px-2 py-0.5 text-[11px] font-semibold",
             stageChipClass(opp.stage),
           )}
         >
           {opp.stage}
         </span>
       </td>
-      <td className="whitespace-nowrap px-3 py-2.5 text-[12px] font-semibold tabular-nums text-[#0f172a]">
+      <td className="whitespace-nowrap px-3 py-2.5 text-[12px] font-semibold tabular-nums text-[#000000]">
         {colA}
       </td>
-      <td className="whitespace-nowrap px-3 py-2.5 text-[12px] font-semibold tabular-nums text-[#0f172a]">
+      <td className="whitespace-nowrap px-3 py-2.5 text-[12px] font-semibold tabular-nums text-[#000000]">
         {colB}
       </td>
       {mode === "pe_vc" ? (
-        <td className="whitespace-nowrap px-3 py-2.5 text-[12px] font-semibold tabular-nums text-[#0f172a]">
+        <td className="whitespace-nowrap px-3 py-2.5 text-[12px] font-semibold tabular-nums text-[#000000]">
           {colC}
         </td>
       ) : null}
-      <td className="whitespace-nowrap px-3 py-2.5 text-[11px] text-[#64748b]">
+      <td className="whitespace-nowrap px-3 py-2.5 text-[11px] text-[#111111]">
         {embeddedOwnerName(opp.raw, opp.owner)}
       </td>
-      <td className="max-w-[160px] truncate px-3 py-2.5 text-[11px] text-[#64748b]">
+      <td className="max-w-[160px] truncate px-3 py-2.5 text-[11px] text-[#111111]">
         {opp.nextAction}
       </td>
-      <td className="whitespace-nowrap px-3 py-2.5 text-[11px] tabular-nums text-[#64748b]">
+      <td className="whitespace-nowrap px-3 py-2.5 text-[11px] tabular-nums text-[#111111]">
         {opp.ageDays}d
       </td>
     </tr>
@@ -696,15 +696,15 @@ export function FundraisingDashboard() {
       {/* Header */}
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
         <div>
-          <h1 className="text-xl font-bold tracking-tight text-[#0f172a] md:text-[22px]">
+          <h1 className="text-xl font-bold tracking-tight text-[#000000] md:text-[22px]">
             Fundraising Dashboard
           </h1>
-          <p className="mt-1 text-[12px] text-[#64748b]">
+          <p className="mt-1 text-[12px] text-[#111111]">
             {selectedCampaign ? selectedCampaign.name : "All Campaigns"}
             {selectedCampaign ? (
-              <span className="text-[#94a3b8]"> · {formatType(selectedCampaign.type)}</span>
+              <span className="text-[#141414]"> · {formatType(selectedCampaign.type)}</span>
             ) : (
-              <span className="text-[#94a3b8]">
+              <span className="text-[#141414]">
                 {" "}
                 · {effectiveMode === "pe_vc" ? "PE/VC commitments view" : "Asset management AUM view"}
               </span>
@@ -738,7 +738,7 @@ export function FundraisingDashboard() {
                   "rounded-full px-2.5 py-1.5 text-[11px] font-medium transition-colors",
                   effectiveMode === "pe_vc"
                     ? "rounded-full bg-gradient-to-r from-blue-600 to-cyan-600 text-white"
-                    : "rounded-full text-[#64748b] hover:bg-[#f8fafc]",
+                    : "rounded-full text-[#111111] hover:bg-[#f8fafc]",
                 )}
               >
                 PE/VC
@@ -753,7 +753,7 @@ export function FundraisingDashboard() {
                   "rounded-full px-2.5 py-1.5 text-[11px] font-medium transition-colors",
                   effectiveMode === "asset_mgmt"
                     ? "rounded-full bg-gradient-to-r from-blue-600 to-cyan-600 text-white"
-                    : "rounded-full text-[#64748b] hover:bg-[#f8fafc]",
+                    : "rounded-full text-[#111111] hover:bg-[#f8fafc]",
                 )}
               >
                 Asset Mgmt
@@ -761,7 +761,7 @@ export function FundraisingDashboard() {
             </div>
           ) : null}
 
-          <span className="inline-flex items-center gap-1.5 text-[12px] text-[#64748b]">
+          <span className="inline-flex items-center gap-1.5 text-[12px] text-[#111111]">
             <CalendarDays className="h-3.5 w-3.5" />
             {loading ? "Refreshing…" : "Live"}
           </span>
@@ -786,7 +786,7 @@ export function FundraisingDashboard() {
       {/* KPI strip */}
       <div className="mt-5 grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
         {loading && !dashboard ? (
-          <div className="col-span-2 flex items-center justify-center py-10 text-[#94a3b8] md:col-span-3 xl:col-span-6">
+          <div className="col-span-2 flex items-center justify-center py-10 text-[#141414] md:col-span-3 xl:col-span-6">
             <Loader2 className="h-5 w-5 animate-spin" />
           </div>
         ) : (
@@ -799,7 +799,7 @@ export function FundraisingDashboard() {
         {/* Campaign progress */}
         <div className={cn(CARD, "p-4")}>
           <div className="flex items-center justify-between">
-            <h2 className="text-[13px] font-semibold text-[#0f172a]">Campaign Progress</h2>
+            <h2 className="text-[13px] font-semibold text-[#000000]">Campaign Progress</h2>
             <Link
               href="/fundraising/commitments"
               className="text-[11px] font-medium text-[#2563eb] hover:underline"
@@ -829,24 +829,24 @@ export function FundraisingDashboard() {
           </div>
           <div className="mt-4 grid grid-cols-2 gap-3 border-t border-[#f1f5f9] pt-3 text-[11px]">
             <div>
-              <p className="text-[#94a3b8]">Start date</p>
-              <p className="mt-0.5 font-semibold text-[#0f172a]">
+              <p className="text-[#141414]">Start date</p>
+              <p className="mt-0.5 font-semibold text-[#000000]">
                 {selectedCampaign?.startDate
                   ? new Date(selectedCampaign.startDate).toLocaleDateString()
                   : "—"}
               </p>
             </div>
             <div>
-              <p className="text-[#94a3b8]">Target close</p>
-              <p className="mt-0.5 font-semibold text-[#0f172a]">
+              <p className="text-[#141414]">Target close</p>
+              <p className="mt-0.5 font-semibold text-[#000000]">
                 {selectedCampaign?.closeDate
                   ? new Date(selectedCampaign.closeDate).toLocaleDateString()
                   : "—"}
               </p>
             </div>
             <div className="col-span-2">
-              <p className="text-[#94a3b8]">Remaining to target</p>
-              <p className="mt-0.5 text-sm font-bold tabular-nums text-[#0f172a]">
+              <p className="text-[#141414]">Remaining to target</p>
+              <p className="mt-0.5 text-sm font-bold tabular-nums text-[#000000]">
                 US${progress.remainingM.toFixed(1)}M
               </p>
             </div>
@@ -856,7 +856,7 @@ export function FundraisingDashboard() {
         {/* Coverage */}
         <div className={cn(CARD, "p-4")}>
           <div className="flex items-center justify-between">
-            <h2 className="text-[13px] font-semibold text-[#0f172a]">Coverage & Forecast</h2>
+            <h2 className="text-[13px] font-semibold text-[#000000]">Coverage & Forecast</h2>
             <Link
               href="/fundraising/forecasts"
               className="text-[11px] font-medium text-[#2563eb] hover:underline"
@@ -866,26 +866,26 @@ export function FundraisingDashboard() {
           </div>
           <div className="mt-4 space-y-2.5 text-[12px]">
             <div className="flex items-center justify-between">
-              <span className="text-[#94a3b8]">Gross pipeline</span>
-              <span className="font-semibold tabular-nums text-[#0f172a]">
+              <span className="text-[#141414]">Gross pipeline</span>
+              <span className="font-semibold tabular-nums text-[#000000]">
                 {coverage.grossPipeline}
               </span>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-[#94a3b8]">Weighted pipeline</span>
-              <span className="font-semibold tabular-nums text-[#0f172a]">
+              <span className="text-[#141414]">Weighted pipeline</span>
+              <span className="font-semibold tabular-nums text-[#000000]">
                 {coverage.weightedPipeline}
               </span>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-[#94a3b8]">Remaining target</span>
-              <span className="font-semibold tabular-nums text-[#0f172a]">
+              <span className="text-[#141414]">Remaining target</span>
+              <span className="font-semibold tabular-nums text-[#000000]">
                 {coverage.remainingTarget}
               </span>
             </div>
             <div className="rounded-[6px] bg-[#f8fafc] p-3">
               <div className="flex items-center justify-between">
-                <span className="text-[11px] text-[#64748b]">Coverage ratio</span>
+                <span className="text-[11px] text-[#111111]">Coverage ratio</span>
                 <span className="text-lg font-bold tabular-nums text-[#7c3aed]">
                   {coverage.coverageRatio}
                 </span>
@@ -903,7 +903,7 @@ export function FundraisingDashboard() {
         {/* Funnel */}
         <div className={cn(CARD, "flex flex-col overflow-hidden")}>
           <div className="flex items-center justify-between border-b border-[#f1f5f9] px-4 py-3">
-            <h2 className="text-[13px] font-semibold text-[#0f172a]">Stage Funnel</h2>
+            <h2 className="text-[13px] font-semibold text-[#000000]">Stage Funnel</h2>
             {stageFilter ? (
               <button
                 type="button"
@@ -913,12 +913,12 @@ export function FundraisingDashboard() {
                 Clear filter
               </button>
             ) : (
-              <span className="text-[10px] text-[#94a3b8]">Click to filter</span>
+              <span className="text-[11px] text-[#141414]">Click to filter</span>
             )}
           </div>
           <ul className="flex-1 divide-y divide-[#f1f5f9]">
             {funnel.length === 0 ? (
-              <li className="px-4 py-10 text-center text-[12px] text-[#94a3b8]">
+              <li className="px-4 py-10 text-center text-[12px] text-[#141414]">
                 No opportunities yet.
               </li>
             ) : (
@@ -941,10 +941,10 @@ export function FundraisingDashboard() {
                       )}
                     >
                       <div className="min-w-0">
-                        <p className="text-[12px] font-medium text-[#0f172a]">{stage.label}</p>
-                        <p className="text-[10px] text-[#94a3b8]">{stage.count} opportunities</p>
+                        <p className="text-[12px] font-medium text-[#000000]">{stage.label}</p>
+                        <p className="text-[11px] text-[#141414]">{stage.count} opportunities</p>
                       </div>
-                      <span className="shrink-0 text-[12px] font-semibold tabular-nums text-[#0f172a]">
+                      <span className="shrink-0 text-[12px] font-semibold tabular-nums text-[#000000]">
                         {stage.amount}
                       </span>
                     </button>
@@ -962,14 +962,14 @@ export function FundraisingDashboard() {
         <section className={cn(CARD, "flex min-w-0 flex-col overflow-hidden")}>
           <div className="flex flex-col gap-2 border-b border-[#f1f5f9] px-3 py-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-2">
-              <h2 className="text-[13px] font-semibold text-[#0f172a]">Open Opportunities</h2>
-              <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-[4px] bg-[#f1f5f9] px-1.5 text-[11px] font-semibold text-[#64748b]">
+              <h2 className="text-[13px] font-semibold text-[#000000]">Open Opportunities</h2>
+              <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-[4px] bg-[#f1f5f9] px-1.5 text-[11px] font-semibold text-[#111111]">
                 {filteredOpportunities.length}
               </span>
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <div className="relative min-w-0 sm:w-[200px]">
-                <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#94a3b8]" />
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#141414]" />
                 <Input
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
@@ -990,21 +990,21 @@ export function FundraisingDashboard() {
             <table className="w-full min-w-[860px] border-collapse text-left">
               <thead>
                 <tr className="border-b border-[#f1f5f9] bg-[#fafafa]">
-                  <th className="px-3 py-2 text-[11px] font-semibold text-[#94a3b8]">Investor</th>
-                  <th className="px-3 py-2 text-[11px] font-semibold text-[#94a3b8]">Campaign</th>
-                  <th className="px-3 py-2 text-[11px] font-semibold text-[#94a3b8]">Stage</th>
-                  <th className="px-3 py-2 text-[11px] font-semibold text-[#94a3b8]">
+                  <th className="px-3 py-2 text-[11px] font-semibold text-[#141414]">Investor</th>
+                  <th className="px-3 py-2 text-[11px] font-semibold text-[#141414]">Campaign</th>
+                  <th className="px-3 py-2 text-[11px] font-semibold text-[#141414]">Stage</th>
+                  <th className="px-3 py-2 text-[11px] font-semibold text-[#141414]">
                     {effectiveMode === "pe_vc" ? "Soft Circle" : "Expected AUM"}
                   </th>
-                  <th className="px-3 py-2 text-[11px] font-semibold text-[#94a3b8]">
+                  <th className="px-3 py-2 text-[11px] font-semibold text-[#141414]">
                     {effectiveMode === "pe_vc" ? "Signed" : "Activated AUM"}
                   </th>
                   {effectiveMode === "pe_vc" ? (
-                    <th className="px-3 py-2 text-[11px] font-semibold text-[#94a3b8]">Funded</th>
+                    <th className="px-3 py-2 text-[11px] font-semibold text-[#141414]">Funded</th>
                   ) : null}
-                  <th className="px-3 py-2 text-[11px] font-semibold text-[#94a3b8]">Owner</th>
-                  <th className="px-3 py-2 text-[11px] font-semibold text-[#94a3b8]">Next Action</th>
-                  <th className="px-3 py-2 text-[11px] font-semibold text-[#94a3b8]">Age</th>
+                  <th className="px-3 py-2 text-[11px] font-semibold text-[#141414]">Owner</th>
+                  <th className="px-3 py-2 text-[11px] font-semibold text-[#141414]">Next Action</th>
+                  <th className="px-3 py-2 text-[11px] font-semibold text-[#141414]">Age</th>
                 </tr>
               </thead>
               <tbody>
@@ -1014,7 +1014,7 @@ export function FundraisingDashboard() {
                   <tr>
                     <td
                       colSpan={effectiveMode === "pe_vc" ? 9 : 8}
-                      className="px-3 py-10 text-center text-[13px] text-[#94a3b8]"
+                      className="px-3 py-10 text-center text-[13px] text-[#141414]"
                     >
                       No opportunities match your filters.
                     </td>
@@ -1040,7 +1040,7 @@ export function FundraisingDashboard() {
         <aside className="flex flex-col gap-4">
           <div className={cn(CARD, "overflow-hidden")}>
             <div className="flex items-center justify-between border-b border-[#f1f5f9] px-3 py-3">
-              <h2 className="text-[13px] font-semibold text-[#0f172a]">My Tasks</h2>
+              <h2 className="text-[13px] font-semibold text-[#000000]">My Tasks</h2>
               <Link
                 href="/fundraising/meetings"
                 className="text-[11px] font-medium text-[#2563eb] hover:underline"
@@ -1050,11 +1050,11 @@ export function FundraisingDashboard() {
             </div>
             <div className="max-h-[280px] overflow-y-auto">
               {loading ? (
-                <div className="flex items-center justify-center py-10 text-[#94a3b8]">
+                <div className="flex items-center justify-center py-10 text-[#141414]">
                   <Loader2 className="h-4 w-4 animate-spin" />
                 </div>
               ) : tasks.length === 0 ? (
-                <p className="px-3 py-10 text-center text-[12px] text-[#94a3b8]">No open tasks.</p>
+                <p className="px-3 py-10 text-center text-[12px] text-[#141414]">No open tasks.</p>
               ) : (
                 tasks.map((task) => (
                   <TaskRow key={task.id} task={task} onToggle={() => toggleTask(task)} />
@@ -1065,27 +1065,27 @@ export function FundraisingDashboard() {
 
           <div className={cn(CARD, "overflow-hidden")}>
             <div className="border-b border-[#f1f5f9] px-3 py-3">
-              <h2 className="text-[13px] font-semibold text-[#0f172a]">Recent Activity</h2>
+              <h2 className="text-[13px] font-semibold text-[#000000]">Recent Activity</h2>
             </div>
             <ul className="max-h-[300px] divide-y divide-[#f1f5f9] overflow-y-auto">
               {loading ? (
-                <li className="px-3 py-10 text-center text-[12px] text-[#94a3b8]">Loading activity…</li>
+                <li className="px-3 py-10 text-center text-[12px] text-[#141414]">Loading activity…</li>
               ) : activities.length === 0 ? (
-                <li className="px-3 py-10 text-center text-[12px] text-[#94a3b8]">
+                <li className="px-3 py-10 text-center text-[12px] text-[#141414]">
                   No recent activity from the audit log.
                 </li>
               ) : (
                 activities.map((item) => (
                   <li key={item.id} className="flex gap-2.5 px-3 py-2.5">
-                    <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-[6px] bg-[#f1f5f9] text-[#64748b]">
+                    <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-[6px] bg-[#f1f5f9] text-[#111111]">
                       <ActivityIcon kind={item.kind} />
                     </span>
                     <div className="min-w-0">
-                      <p className="text-[12px] font-medium leading-snug text-[#0f172a]">
+                      <p className="text-[12px] font-medium leading-snug text-[#000000]">
                         {item.title}
                       </p>
-                      <p className="mt-0.5 text-[10px] leading-snug text-[#64748b]">{item.detail}</p>
-                      <p className="mt-1 text-[10px] text-[#94a3b8]">
+                      <p className="mt-0.5 text-[11px] leading-snug text-[#111111]">{item.detail}</p>
+                      <p className="mt-1 text-[11px] text-[#141414]">
                         {item.actor} · {item.timestamp}
                       </p>
                     </div>

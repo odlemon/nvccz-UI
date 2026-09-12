@@ -36,12 +36,12 @@ type Side = 'BUY' | 'SELL'
 type ChartPeriod = '1D' | '1W' | '1M' | '3M' | '1Y'
 type OrderType = 'MARKET' | 'LIMIT' | 'STOP' | 'STOP_LIMIT'
 
-const fieldClass = 'equity-order-field h-9 w-full rounded-full px-3 text-[10px] outline-none transition'
+const fieldClass = 'equity-order-field h-9 w-full rounded-full px-3 iv2-text-caption outline-none transition'
 const panelClass = 'equity-order-panel rounded-xl'
 
 function Label({ children, help = false }: { children: React.ReactNode; help?: boolean }) {
   return (
-    <span className="equity-order-label mb-1.5 flex items-center gap-1 text-[9px]">
+    <span className="equity-order-label mb-1.5 flex items-center gap-1 iv2-text-micro">
       {children}
       {help && <CircleHelp className="h-3 w-3" />}
     </span>
@@ -477,7 +477,7 @@ export function PlaceEquityOrderModal({ open, onClose, onComplete }: PlaceEquity
       width="max-w-[980px]"
       footer={
         <div className="equity-order-footer flex w-full flex-wrap items-center justify-end gap-2">
-          <label className="equity-order-footer-label mr-auto flex items-center gap-2 text-[9px]">
+          <label className="equity-order-footer-label mr-auto flex items-center gap-2 iv2-text-micro">
             <input
               type="checkbox"
               checked={submitAsDraft}
@@ -486,7 +486,7 @@ export function PlaceEquityOrderModal({ open, onClose, onComplete }: PlaceEquity
             />
             Save as Draft (skip auto-submit)
           </label>
-          <label className="equity-order-footer-label flex items-center gap-2 text-[9px]">
+          <label className="equity-order-footer-label flex items-center gap-2 iv2-text-micro">
             <input
               type="checkbox"
               checked={skipConfirmation}
@@ -498,7 +498,7 @@ export function PlaceEquityOrderModal({ open, onClose, onComplete }: PlaceEquity
           <button
             type="button"
             onClick={close}
-            className="equity-order-button equity-order-button-secondary h-9 rounded-full px-5 text-[10px] font-medium"
+            className="equity-order-button equity-order-button-secondary h-9 rounded-full px-5 iv2-text-caption font-medium"
           >
             Cancel
           </button>
@@ -506,7 +506,7 @@ export function PlaceEquityOrderModal({ open, onClose, onComplete }: PlaceEquity
             type="button"
             disabled={!isValid || previewing || submitting}
             onClick={() => void runPreview()}
-            className="equity-order-button equity-order-button-review h-9 rounded-full px-5 text-[10px] font-medium disabled:cursor-not-allowed disabled:opacity-40"
+            className="equity-order-button equity-order-button-review h-9 rounded-full px-5 iv2-text-caption font-medium disabled:cursor-not-allowed disabled:opacity-40"
           >
             {previewing ? (
               <>
@@ -523,7 +523,7 @@ export function PlaceEquityOrderModal({ open, onClose, onComplete }: PlaceEquity
             disabled={!canPlace || submitting || previewing}
             onClick={() => void placeOrder()}
             className={cn(
-              'equity-order-button flex h-9 items-center gap-2 rounded-full px-5 text-[10px] font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40',
+              'equity-order-button flex h-9 items-center gap-2 rounded-full px-5 iv2-text-caption font-semibold text-white disabled:cursor-not-allowed disabled:opacity-40',
               side === 'BUY' ? 'equity-order-button-buy' : 'equity-order-button-sell',
             )}
             title={!reviewed && !skipConfirmation ? 'Review Order first' : undefined}
@@ -544,7 +544,7 @@ export function PlaceEquityOrderModal({ open, onClose, onComplete }: PlaceEquity
       <div className="equity-order-ticket">
         {(loadError || error || missingMastersHint) && (
           <div
-            className={`mb-2 rounded-xl border px-3 py-2 text-[10px] ${
+            className={`mb-2 rounded-xl border px-3 py-2 iv2-text-caption ${
               loadError || error
                 ? 'border-rose-500/30 bg-rose-500/10 text-rose-200'
                 : 'border-amber-400/30 bg-amber-400/10 text-amber-100'
@@ -559,14 +559,14 @@ export function PlaceEquityOrderModal({ open, onClose, onComplete }: PlaceEquity
           </div>
         )}
         {!loadingMeta && instrument && lastPrice <= 0 && orderType === 'MARKET' && (
-          <div className="mb-2 rounded-xl border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-[10px] text-amber-100">
+          <div className="mb-2 rounded-xl border border-amber-400/30 bg-amber-400/10 px-3 py-2 iv2-text-caption text-amber-100">
             No approved mark on this instrument. Prefer Limit + enter a price, or post/approve a price first.
           </div>
         )}
 
         <section className={cn(panelClass, 'equity-order-market mb-2.5 grid overflow-hidden lg:grid-cols-[1.02fr_1.18fr]')}>
           <div className="p-4">
-            <p className="equity-order-title text-[11px] font-semibold">
+            <p className="equity-order-title iv2-text-label font-semibold">
               {instrument ? `${instrument.shortName || instrument.fullName} (${instrument.ticker})` : 'Select instrument'}
             </p>
             <div className="mt-2.5 grid grid-cols-[1fr_auto_auto] items-center gap-5">
@@ -576,7 +576,7 @@ export function PlaceEquityOrderModal({ open, onClose, onComplete }: PlaceEquity
                 </p>
                 <p
                   className={cn(
-                    'mt-1 flex items-center gap-1.5 text-[10px] font-medium',
+                    'mt-1 flex items-center gap-1.5 iv2-text-caption font-medium',
                     chartChange >= 0 ? 'equity-order-positive' : 'equity-order-negative',
                   )}
                 >
@@ -704,7 +704,7 @@ export function PlaceEquityOrderModal({ open, onClose, onComplete }: PlaceEquity
                   />
                 ))}
                 {hoverIdx != null && chartPoints[hoverIdx] != null && (
-                  <text x={(chartGeometry.plotLeft ?? 48) + 4} y={16} className="fill-current text-[10px] font-mono equity-order-value">
+                  <text x={(chartGeometry.plotLeft ?? 48) + 4} y={16} className="fill-current iv2-text-caption font-mono equity-order-value">
                     {chartPoints[hoverIdx]!.price.toFixed(4)}
                     {chartPoints[hoverIdx]!.at
                       ? ` · ${new Date(chartPoints[hoverIdx]!.at!).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}`
@@ -713,7 +713,7 @@ export function PlaceEquityOrderModal({ open, onClose, onComplete }: PlaceEquity
                 )}
               </svg>
             ) : (
-              <div className="mt-10 text-center text-[10px] text-slate-500">Price history unavailable for this security</div>
+              <div className="mt-10 text-center iv2-text-caption text-slate-500">Price history unavailable for this security</div>
             )}
           </div>
         </section>
@@ -727,7 +727,7 @@ export function PlaceEquityOrderModal({ open, onClose, onComplete }: PlaceEquity
                   type="button"
                   onClick={() => setOrderSide(value)}
                   className={cn(
-                    'h-8 rounded-full text-[9px] font-semibold transition',
+                    'h-8 rounded-full iv2-text-micro font-semibold transition',
                     side === value
                       ? value === 'BUY'
                         ? 'equity-order-tab-buy text-white'
@@ -739,7 +739,7 @@ export function PlaceEquityOrderModal({ open, onClose, onComplete }: PlaceEquity
                 </button>
               ))}
             </div>
-            <h3 className="equity-order-heading mt-3 text-[10px] font-semibold">Order Details</h3>
+            <h3 className="equity-order-heading mt-3 iv2-text-caption font-semibold">Order Details</h3>
             <div className="mt-2.5 space-y-2.5">
               <div>
                 <Label help>Portfolio</Label>
@@ -957,7 +957,7 @@ export function PlaceEquityOrderModal({ open, onClose, onComplete }: PlaceEquity
                   <Money value={consideration} currency={currency} />
                 </span>
               </div>
-              <div className="equity-order-fee-total flex justify-between border-t pt-2 text-[9px] font-semibold">
+              <div className="equity-order-fee-total flex justify-between border-t pt-2 iv2-text-micro font-semibold">
                 <span>{side === 'BUY' ? 'Total consideration' : 'Net proceeds'}</span>
                 <span className="font-mono">
                   <Money value={consideration} currency={currency} />
@@ -972,7 +972,7 @@ export function PlaceEquityOrderModal({ open, onClose, onComplete }: PlaceEquity
             >
               <CheckCircle2 className="h-4 w-4 shrink-0" />
               <div>
-                <p className="text-[9px] font-medium">
+                <p className="iv2-text-micro font-medium">
                   {complianceOutcome
                     ? `Compliance: ${complianceOutcome}${complianceMessage ? ` — ${complianceMessage}` : ''}`
                     : isValid
@@ -989,7 +989,7 @@ export function PlaceEquityOrderModal({ open, onClose, onComplete }: PlaceEquity
 
           <div className="space-y-2.5">
             <section className={cn(panelClass, 'p-4')}>
-              <h3 className="equity-order-heading text-[10px] font-semibold">Existing Holding (from preview)</h3>
+              <h3 className="equity-order-heading iv2-text-caption font-semibold">Existing Holding (from preview)</h3>
               <div className="equity-order-holding-top mt-3 grid grid-cols-1 sm:grid-cols-3">
                 {[
                   ['Current Shares', preview ? holdingBefore.toLocaleString() : '—'],
@@ -998,17 +998,17 @@ export function PlaceEquityOrderModal({ open, onClose, onComplete }: PlaceEquity
                 ].map(([label, value]) => (
                   <div key={label} className="equity-order-metric">
                     <p className="equity-order-label text-[8px]">{label}</p>
-                    <p className="equity-order-value mt-1.5 font-mono text-[10px]">{value}</p>
+                    <p className="equity-order-value mt-1.5 font-mono iv2-text-caption">{value}</p>
                   </div>
                 ))}
               </div>
             </section>
 
             <section className={cn(panelClass, 'p-4')}>
-              <h3 className="equity-order-heading text-[10px] font-semibold">
+              <h3 className="equity-order-heading iv2-text-caption font-semibold">
                 Impact of This Order ({side === 'BUY' ? 'Buy' : 'Sell'} {shares.toLocaleString()} Shares)
               </h3>
-              <div className="mt-3 space-y-2 text-[9px]">
+              <div className="mt-3 space-y-2 iv2-text-micro">
                 <div className="flex justify-between">
                   <span className="equity-order-label">Shares after</span>
                   <span className="font-mono">{holdingAfter != null ? holdingAfter.toLocaleString() : '—'}</span>
@@ -1051,7 +1051,7 @@ export function PlaceEquityOrderModal({ open, onClose, onComplete }: PlaceEquity
             </section>
 
             <section className={cn(panelClass, 'p-4')}>
-              <h3 className="equity-order-heading text-[10px] font-semibold">Order Summary</h3>
+              <h3 className="equity-order-heading iv2-text-caption font-semibold">Order Summary</h3>
               <div className="mt-3 space-y-2 text-[8px]">
                 <div className="flex justify-between gap-4">
                   <span className="equity-order-label">Order value</span>
@@ -1059,7 +1059,7 @@ export function PlaceEquityOrderModal({ open, onClose, onComplete }: PlaceEquity
                     <Money value={orderValue} currency={currency} />
                   </span>
                 </div>
-                <div className="equity-order-summary-total flex justify-between gap-4 border-t pt-2 text-[9px] font-semibold">
+                <div className="equity-order-summary-total flex justify-between gap-4 border-t pt-2 iv2-text-micro font-semibold">
                   <span>{side === 'BUY' ? 'Total Consideration' : 'Net Proceeds'}</span>
                   <span className="equity-order-accent font-mono">
                     <Money value={consideration} currency={currency} />
@@ -1068,12 +1068,12 @@ export function PlaceEquityOrderModal({ open, onClose, onComplete }: PlaceEquity
               </div>
             </section>
             {reviewed && preview && (
-              <div className="equity-order-reviewed rounded-xl border px-4 py-3 text-[9px]">
+              <div className="equity-order-reviewed rounded-xl border px-4 py-3 iv2-text-micro">
                 <p className="font-medium text-emerald-300">Preview ready</p>
                 <p className="mt-1 opacity-80">Review the summary, then place your order when ready.</p>
                 <button
                   type="button"
-                  className="equity-order-button equity-order-button-secondary mt-2 h-8 rounded-full px-4 text-[9px]"
+                  className="equity-order-button equity-order-button-secondary mt-2 h-8 rounded-full px-4 iv2-text-micro"
                   onClick={() => setPreviewModalOpen(true)}
                 >
                   View preview summary
@@ -1094,14 +1094,14 @@ export function PlaceEquityOrderModal({ open, onClose, onComplete }: PlaceEquity
         footer={
           <button
             type="button"
-            className="equity-order-button equity-order-button-secondary h-9 rounded-full px-5 text-[10px]"
+            className="equity-order-button equity-order-button-secondary h-9 rounded-full px-5 iv2-text-caption"
             onClick={() => setPreviewModalOpen(false)}
           >
             Close
           </button>
         }
       >
-        <div className="space-y-3 text-[10px]">
+        <div className="space-y-3 iv2-text-caption">
           <div className="flex justify-between">
             <span className="equity-order-label">Portfolio</span>
             <span>{fund?.name ?? '—'}</span>

@@ -93,9 +93,10 @@ export function useRolePermissions(): UseRolePermissionsReturn {
         ? (userDetails.role as { code?: string }).code
         : null;
     const code = fromDetails || fromRoleObj || fromUser || fromLoginRole || null;
+    const resolved = code ? resolveRoleCode(code) ?? (code as RoleCode) : null;
 
-    if (code && code.toLowerCase() !== "admin") {
-      return code as RoleCode;
+    if (resolved && resolved.toLowerCase() !== "admin") {
+      return resolved;
     }
     // If no roleCode but is admin, return CEO (highest access)
     if (isAdmin) {

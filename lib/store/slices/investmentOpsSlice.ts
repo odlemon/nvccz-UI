@@ -966,6 +966,15 @@ export const createBroker = createAsyncThunk(
   }
 )
 
+export const updateBroker = createAsyncThunk(
+  "investmentOps/updateBroker",
+  async ({ id, data }: { id: string; data: Parameters<typeof investmentOpsApi.updateBroker>[1] }) => {
+    const res = await investmentOpsApi.updateBroker(id, data)
+    if (!res.success) throw new Error(res.error || res.message || "Failed to update broker")
+    return res.data as StakeholderProfile
+  }
+)
+
 export const fetchCustodians = createAsyncThunk(
   "investmentOps/fetchCustodians",
   async () => {
@@ -980,6 +989,15 @@ export const createCustodian = createAsyncThunk(
   async (data: Parameters<typeof investmentOpsApi.createCustodian>[0]) => {
     const res = await investmentOpsApi.createCustodian(data)
     if (!res.success) throw new Error(res.error || res.message || "Failed to create custodian")
+    return res.data as StakeholderProfile
+  }
+)
+
+export const updateCustodian = createAsyncThunk(
+  "investmentOps/updateCustodian",
+  async ({ id, data }: { id: string; data: Parameters<typeof investmentOpsApi.updateCustodian>[1] }) => {
+    const res = await investmentOpsApi.updateCustodian(id, data)
+    if (!res.success) throw new Error(res.error || res.message || "Failed to update custodian")
     return res.data as StakeholderProfile
   }
 )
@@ -1527,6 +1545,10 @@ const investmentOpsSlice = createSlice({
       })
       .addCase(createBroker.rejected, (state) => { state.brokerCreating = false })
 
+      .addCase(updateBroker.fulfilled, (state, action) => {
+        state.brokers = state.brokers.map((b) => (b.id === action.payload.id ? action.payload : b))
+      })
+
       .addCase(fetchCustodians.pending, (state) => { state.custodiansLoading = true })
       .addCase(fetchCustodians.fulfilled, (state, action) => { state.custodiansLoading = false; state.custodians = action.payload })
       .addCase(fetchCustodians.rejected, (state) => { state.custodiansLoading = false })
@@ -1537,6 +1559,10 @@ const investmentOpsSlice = createSlice({
         state.custodians = [action.payload, ...state.custodians]
       })
       .addCase(createCustodian.rejected, (state) => { state.custodianCreating = false })
+
+      .addCase(updateCustodian.fulfilled, (state, action) => {
+        state.custodians = state.custodians.map((c) => (c.id === action.payload.id ? action.payload : c))
+      })
 
       .addCase(fetchCommissions.pending, (state) => { state.commissionsLoading = true })
       .addCase(fetchCommissions.fulfilled, (state, action) => { state.commissionsLoading = false; state.commissions = action.payload })

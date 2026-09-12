@@ -93,9 +93,9 @@ function normalizeDepartments(raw: unknown): Array<{ id: string; name: string }>
 }
 
 const SELECT_TRIGGER =
-  "mt-1 w-full h-9 rounded-full border border-[#e2e8f0] bg-white px-3 text-sm text-[#0f172a] shadow-none justify-start text-left focus:ring-2 focus:ring-[#2563eb]/30 [&>span]:min-w-0 [&>span]:flex-1 [&>span]:truncate [&>span]:text-left"
+  "mt-1 w-full h-9 rounded-full border border-[#e2e8f0] bg-white px-3 text-sm text-[#000000] shadow-none justify-start text-left focus:ring-2 focus:ring-[#2563eb]/30 [&>span]:min-w-0 [&>span]:flex-1 [&>span]:truncate [&>span]:text-left"
 const FIELD =
-  "mt-1 w-full h-9 rounded-full border border-[#e2e8f0] px-3 text-sm text-[#0f172a] bg-white"
+  "mt-1 w-full h-9 rounded-full border border-[#e2e8f0] px-3 text-sm text-[#000000] bg-white"
 
 function FieldSkeleton({ className }: { className?: string }) {
   return <Skeleton className={`mt-1 h-9 w-full rounded-full bg-[#e2e8f0] ${className || ""}`} />
@@ -413,27 +413,27 @@ export function FpaModelPlanningCycleCreateModal({
       <div className="w-full max-w-2xl max-h-[90vh] flex flex-col rounded-xl border border-[#e2e8f0] bg-white shadow-xl overflow-hidden">
         <div className="flex items-start justify-between gap-3 px-4 sm:px-5 py-3 border-b border-[#e2e8f0] shrink-0">
           <div>
-            <h2 className="text-sm font-semibold text-[#0f172a]">Create planning cycle</h2>
-            <p className="text-[11px] text-[#64748b] mt-0.5">Pick a published model, version and planning type.</p>
+            <h2 className="text-sm font-semibold text-[#000000]">Create planning cycle</h2>
+            <p className="text-[11px] text-[#111111] mt-0.5">Pick a published model, version and planning type.</p>
           </div>
-          <button type="button" disabled={busy} onClick={onClose} className="text-[#94a3b8] hover:text-[#475569]" aria-label="Close">
+          <button type="button" disabled={busy} onClick={onClose} className="text-[#141414] hover:text-[#111111]" aria-label="Close">
             <X className="w-4 h-4" />
           </button>
         </div>
 
         <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-3">
           <div>
-            <label className="text-[11px] font-medium text-[#0f172a]">Cycle name</label>
+            <label className="text-[11px] font-medium text-[#000000]">Cycle name</label>
             <input className={FIELD} value={name} onChange={(e) => setName(e.target.value)} placeholder="FY2026 Annual Budget" />
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-[11px] font-medium text-[#0f172a]">Financial year</label>
+              <label className="text-[11px] font-medium text-[#000000]">Financial year</label>
               <input className={FIELD} value={financialYear} onChange={(e) => setFinancialYear(e.target.value)} inputMode="numeric" />
             </div>
             <div>
-              <label className="text-[11px] font-medium text-[#0f172a]">Planning type</label>
+              <label className="text-[11px] font-medium text-[#000000]">Planning type</label>
               {loadingCore ? (
                 <FieldSkeleton />
               ) : (
@@ -444,9 +444,9 @@ export function FpaModelPlanningCycleCreateModal({
                   <SelectTrigger className={SELECT_TRIGGER}>
                     <SelectValue placeholder="Select type" />
                   </SelectTrigger>
-                  <SelectContent className="rounded-xl border-[#e2e8f0] bg-white text-[#0f172a]">
+                  <SelectContent className="rounded-xl border-[#e2e8f0] bg-white text-[#000000]">
                     {(sources?.planningTypes || []).map((t) => (
-                      <SelectItem key={t} value={t} className="rounded-lg text-sm text-[#0f172a]">
+                      <SelectItem key={t} value={t} className="rounded-lg text-sm text-[#000000]">
                         {t}
                       </SelectItem>
                     ))}
@@ -457,7 +457,7 @@ export function FpaModelPlanningCycleCreateModal({
           </div>
 
           <div>
-            <label className="text-[11px] font-medium text-[#0f172a]">Source model</label>
+            <label className="text-[11px] font-medium text-[#000000]">Source model</label>
             {loadingCore ? (
               <FieldSkeleton />
             ) : (
@@ -472,9 +472,9 @@ export function FpaModelPlanningCycleCreateModal({
                 <SelectTrigger className={SELECT_TRIGGER}>
                   <SelectValue placeholder="Select model" />
                 </SelectTrigger>
-                <SelectContent className="rounded-xl border-[#e2e8f0] bg-white text-[#0f172a]">
+                <SelectContent className="rounded-xl border-[#e2e8f0] bg-white text-[#000000]">
                   {(sources?.models || []).map((m) => (
-                    <SelectItem key={m.id} value={m.id} className="rounded-lg text-sm text-[#0f172a]">
+                    <SelectItem key={m.id} value={m.id} className="rounded-lg text-sm text-[#000000]">
                       {m.name}
                     </SelectItem>
                   ))}
@@ -485,7 +485,7 @@ export function FpaModelPlanningCycleCreateModal({
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-[11px] font-medium text-[#0f172a]">Source version</label>
+              <label className="text-[11px] font-medium text-[#000000]">Source version</label>
               {loadingCore || (sourceModelId && loadingVersions) ? (
                 <FieldSkeleton />
               ) : (
@@ -498,20 +498,20 @@ export function FpaModelPlanningCycleCreateModal({
                     <span
                       className={
                         selectedVersionLabel
-                          ? "min-w-0 flex-1 truncate text-left text-sm text-[#0f172a]"
-                          : "min-w-0 flex-1 truncate text-left text-sm text-[#94a3b8]"
+                          ? "min-w-0 flex-1 truncate text-left text-sm text-[#000000]"
+                          : "min-w-0 flex-1 truncate text-left text-sm text-[#141414]"
                       }
                     >
                       {selectedVersionLabel ||
                         (!sourceModelId ? "Select a model first" : "Select version")}
                     </span>
                   </SelectTrigger>
-                  <SelectContent className="rounded-xl border-[#e2e8f0] bg-white text-[#0f172a]">
+                  <SelectContent className="rounded-xl border-[#e2e8f0] bg-white text-[#000000]">
                     {versionsForModel.length === 0 ? (
-                      <div className="px-3 py-2 text-xs text-[#64748b]">No versions for this model</div>
+                      <div className="px-3 py-2 text-xs text-[#111111]">No versions for this model</div>
                     ) : (
                       versionsForModel.map((v) => (
-                        <SelectItem key={v.id} value={v.id} className="rounded-lg text-sm text-[#0f172a]">
+                        <SelectItem key={v.id} value={v.id} className="rounded-lg text-sm text-[#000000]">
                           {versionOptionLabel(v)}
                         </SelectItem>
                       ))
@@ -521,13 +521,13 @@ export function FpaModelPlanningCycleCreateModal({
               )}
             </div>
             <div>
-              <label className="text-[11px] font-medium text-[#0f172a]">Planning horizon (periods)</label>
+              <label className="text-[11px] font-medium text-[#000000]">Planning horizon (periods)</label>
               <input className={FIELD} value={planningHorizon} onChange={(e) => setPlanningHorizon(e.target.value)} inputMode="numeric" />
             </div>
           </div>
 
           <div>
-            <label className="text-[11px] font-medium text-[#0f172a]">Base scenario</label>
+            <label className="text-[11px] font-medium text-[#000000]">Base scenario</label>
             {loadingCore || (sourceModelId && loadingVersions) ? (
               <FieldSkeleton />
             ) : (
@@ -539,9 +539,9 @@ export function FpaModelPlanningCycleCreateModal({
                 <SelectTrigger className={SELECT_TRIGGER}>
                   <SelectValue placeholder="Select scenario" />
                 </SelectTrigger>
-                <SelectContent className="rounded-xl border-[#e2e8f0] bg-white text-[#0f172a]">
+                <SelectContent className="rounded-xl border-[#e2e8f0] bg-white text-[#000000]">
                   {scenariosForModel.map((s) => (
-                    <SelectItem key={s.id} value={s.id} className="rounded-lg text-sm text-[#0f172a]">
+                    <SelectItem key={s.id} value={s.id} className="rounded-lg text-sm text-[#000000]">
                       {s.name}
                     </SelectItem>
                   ))}
@@ -552,22 +552,22 @@ export function FpaModelPlanningCycleCreateModal({
 
           <div className="grid grid-cols-3 gap-3">
             <div>
-              <label className="text-[11px] font-medium text-[#0f172a]">Actuals cutoff</label>
+              <label className="text-[11px] font-medium text-[#000000]">Actuals cutoff</label>
               <input type="date" className={FIELD} value={actualsCutoffPeriod} onChange={(e) => setActualsCutoffPeriod(e.target.value)} />
             </div>
             <div>
-              <label className="text-[11px] font-medium text-[#0f172a]">Forecast start</label>
+              <label className="text-[11px] font-medium text-[#000000]">Forecast start</label>
               <input type="date" className={FIELD} value={forecastStartPeriod} onChange={(e) => setForecastStartPeriod(e.target.value)} />
             </div>
             <div>
-              <label className="text-[11px] font-medium text-[#0f172a]">Submission due</label>
+              <label className="text-[11px] font-medium text-[#000000]">Submission due</label>
               <input type="date" className={FIELD} value={submissionDeadline} onChange={(e) => setSubmissionDeadline(e.target.value)} />
             </div>
           </div>
 
           <div>
-            <label className="text-[11px] font-medium text-[#0f172a] inline-flex items-center gap-1.5">
-              <UserRound className="h-3.5 w-3.5 text-[#64748b]" />
+            <label className="text-[11px] font-medium text-[#000000] inline-flex items-center gap-1.5">
+              <UserRound className="h-3.5 w-3.5 text-[#111111]" />
               Planning owner
               <span className="text-[#dc2626]">*</span>
             </label>
@@ -578,9 +578,9 @@ export function FpaModelPlanningCycleCreateModal({
                 <SelectTrigger className={SELECT_TRIGGER}>
                   <SelectValue placeholder="Select planning owner…" />
                 </SelectTrigger>
-                <SelectContent className="rounded-xl border-[#e2e8f0] bg-white text-[#0f172a]">
+                <SelectContent className="rounded-xl border-[#e2e8f0] bg-white text-[#000000]">
                   {users.map((u) => (
-                    <SelectItem key={u.id} value={u.id} className="rounded-lg text-sm text-[#0f172a]">
+                    <SelectItem key={u.id} value={u.id} className="rounded-lg text-sm text-[#000000]">
                       {userLabel(u)}
                     </SelectItem>
                   ))}
@@ -595,8 +595,8 @@ export function FpaModelPlanningCycleCreateModal({
                 <Users className="h-3.5 w-3.5" />
               </span>
               <div className="min-w-0">
-                <p className="text-[12px] font-semibold text-[#0f172a]">Departments &amp; owners</p>
-                <p className="text-[11px] text-[#667085]">At least one department owner required</p>
+                <p className="text-[12px] font-semibold text-[#000000]">Departments &amp; owners</p>
+                <p className="text-[11px] text-[#111111]">At least one department owner required</p>
               </div>
             </div>
 
@@ -615,8 +615,8 @@ export function FpaModelPlanningCycleCreateModal({
                 <>
                   <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_1fr_auto] gap-2 items-end">
                     <div>
-                      <label className="text-[11px] font-medium text-[#0f172a] inline-flex items-center gap-1">
-                        <Building2 className="h-3 w-3 text-[#94a3b8]" />
+                      <label className="text-[11px] font-medium text-[#000000] inline-flex items-center gap-1">
+                        <Building2 className="h-3 w-3 text-[#141414]" />
                         Department
                       </label>
                       <Select
@@ -631,12 +631,12 @@ export function FpaModelPlanningCycleCreateModal({
                             placeholder={departments.length ? "Select…" : "No departments"}
                           />
                         </SelectTrigger>
-                        <SelectContent className="rounded-xl border-[#e2e8f0] bg-white text-[#0f172a]">
+                        <SelectContent className="rounded-xl border-[#e2e8f0] bg-white text-[#000000]">
                           {departments.map((d) => (
                             <SelectItem
                               key={d.id}
                               value={d.id}
-                              className="rounded-lg text-sm text-[#0f172a]"
+                              className="rounded-lg text-sm text-[#000000]"
                             >
                               {d.name}
                             </SelectItem>
@@ -645,8 +645,8 @@ export function FpaModelPlanningCycleCreateModal({
                       </Select>
                     </div>
                     <div>
-                      <label className="text-[11px] font-medium text-[#0f172a] inline-flex items-center gap-1">
-                        <UserRound className="h-3 w-3 text-[#94a3b8]" />
+                      <label className="text-[11px] font-medium text-[#000000] inline-flex items-center gap-1">
+                        <UserRound className="h-3 w-3 text-[#141414]" />
                         Owner
                       </label>
                       <Select
@@ -665,9 +665,9 @@ export function FpaModelPlanningCycleCreateModal({
                             }
                           />
                         </SelectTrigger>
-                        <SelectContent className="rounded-xl border-[#e2e8f0] bg-white text-[#0f172a]">
+                        <SelectContent className="rounded-xl border-[#e2e8f0] bg-white text-[#000000]">
                           {assigneeOptions.length === 0 ? (
-                            <div className="px-3 py-2 text-xs text-[#64748b]">
+                            <div className="px-3 py-2 text-xs text-[#111111]">
                               {!draftDeptId
                                 ? "Select a department first"
                                 : "No users linked to this department"}
@@ -677,7 +677,7 @@ export function FpaModelPlanningCycleCreateModal({
                               <SelectItem
                                 key={u.id}
                                 value={u.id}
-                                className="rounded-lg text-sm text-[#0f172a]"
+                                className="rounded-lg text-sm text-[#000000]"
                               >
                                 {userLabel(u)}
                               </SelectItem>
@@ -687,8 +687,8 @@ export function FpaModelPlanningCycleCreateModal({
                       </Select>
                     </div>
                     <div>
-                      <label className="text-[11px] font-medium text-[#0f172a] inline-flex items-center gap-1">
-                        <CalendarDays className="h-3 w-3 text-[#94a3b8]" />
+                      <label className="text-[11px] font-medium text-[#000000] inline-flex items-center gap-1">
+                        <CalendarDays className="h-3 w-3 text-[#141414]" />
                         Due
                       </label>
                       <input
@@ -710,8 +710,8 @@ export function FpaModelPlanningCycleCreateModal({
                   </div>
 
                   {owners.length === 0 ? (
-                    <div className="flex items-center gap-2 rounded-xl border border-dashed border-[#d0d5dd] bg-[#f9fafb] px-3 py-3 text-[12px] text-[#667085]">
-                      <Building2 className="h-4 w-4 shrink-0 text-[#98a2b3]" />
+                    <div className="flex items-center gap-2 rounded-xl border border-dashed border-[#d0d5dd] bg-[#f9fafb] px-3 py-3 text-[12px] text-[#111111]">
+                      <Building2 className="h-4 w-4 shrink-0 text-[#141414]" />
                       Add a department owner to continue
                     </div>
                   ) : (
@@ -725,15 +725,15 @@ export function FpaModelPlanningCycleCreateModal({
                             <Building2 className="h-3.5 w-3.5" />
                           </span>
                           <div className="min-w-0 flex-1">
-                            <p className="text-[13px] font-medium text-[#101828] truncate">
+                            <p className="text-[13px] font-medium text-[#000000] truncate">
                               {o.departmentName}
                             </p>
-                            <p className="text-[11px] text-[#667085] truncate inline-flex items-center gap-1.5">
+                            <p className="text-[11px] text-[#111111] truncate inline-flex items-center gap-1.5">
                               <UserRound className="h-3 w-3 shrink-0" />
                               {o.assigneeName}
                               {o.dueDate ? (
                                 <>
-                                  <span className="text-[#d0d5dd]">·</span>
+                                  <span className="text-[#141414]">·</span>
                                   <CalendarDays className="h-3 w-3 shrink-0" />
                                   {o.dueDate}
                                 </>
@@ -771,7 +771,7 @@ export function FpaModelPlanningCycleCreateModal({
         </div>
 
         <div className="flex items-center justify-end gap-2 px-4 sm:px-5 py-3 border-t border-[#e2e8f0] shrink-0">
-          <button type="button" disabled={busy} onClick={onClose} className="h-9 rounded-full border border-[#e2e8f0] bg-white px-4 text-xs font-medium text-[#0f172a] hover:bg-[#f8fafc]">
+          <button type="button" disabled={busy} onClick={onClose} className="h-9 rounded-full border border-[#e2e8f0] bg-white px-4 text-xs font-medium text-[#000000] hover:bg-[#f8fafc]">
             Cancel
           </button>
           <button

@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { Calendar, FileBarChart, Loader2, Play, Settings } from "lucide-react"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
@@ -16,11 +16,12 @@ import { fundraisingApi, toastFrError } from "@/lib/api/fundraising-api"
 import { formatCell, rowColumns, toRowsArray } from "@/lib/fundraising/mappers"
 import { downloadCsvPayload, exportFundraisingCsv } from "@/lib/fundraising/export"
 import {
-  FR_REPORTS,
   categoryClass,
+  scheduleToCadence,
+  toFrReport,
   type FrReport,
   type ReportSchedule,
-} from "./reports-mock-data"
+} from "./reports-presentation"
 import {
   FrDialogShell,
   FrField,
@@ -35,7 +36,8 @@ const CARD =
 const SCHEDULE_OPTIONS: ReportSchedule[] = ["Daily", "Weekly", "Monthly", "On demand"]
 
 export function FundraisingReports() {
-  const [reports] = useState(FR_REPORTS)
+  const [reports, setReports] = useState<FrReport[]>([])
+  const [reportsLoading, setReportsLoading] = useState(true)
   const [campaigns, setCampaigns] = useState<Record<string, any>[]>([])
   const [campaignsLoading, setCampaignsLoading] = useState(true)
   const [campaignId, setCampaignId] = useState("")
@@ -66,13 +68,41 @@ export function FundraisingReports() {
       .finally(() => setCampaignsLoading(false))
   }, [])
 
+  // The runnable catalogue and its schedules are both server state. Loading them together
+  // means a report card can say "Not scheduled" honestly rather than showing a cadence and
+  // owner that nothing on the backend actually holds.
+  const loadReports = useCallback(async () => {
+    setReportsLoading(true)
+    try {
+      const [catalogue, schedules] = await Promise.all([
+        fundraisingApi.listReports(),
+        fundraisingApi.listReportSchedules().catch(() => [] as any[]),
+      ])
+      const byKey = new Map<string, any>()
+      for (const s of schedules ?? []) {
+        const key = String(s?.reportKey ?? "")
+        if (key && !byKey.has(key)) byKey.set(key, s)
+      }
+      setReports((catalogue ?? []).map((entry: any) => toFrReport(entry, byKey.get(String(entry?.reportKey ?? "")))))
+    } catch (err) {
+      toastFrError(err, "Could not load the report catalogue")
+      setReports([])
+    } finally {
+      setReportsLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    void loadReports()
+  }, [loadReports])
+
   const resultRows = selected ? resultsByReport[selected.id] ?? [] : []
   const resultColumns = useMemo(() => rowColumns(resultRows).slice(0, 8), [resultRows])
 
   function openConfigure(report: FrReport) {
     setSelected(report)
     setForm({
-      schedule: report.schedule,
+      schedule: report.schedule ?? "On demand",
       recipients: "fundraising@nvccz.co.zw",
       format: "CSV",
       dateRange: "Last 30 days",
@@ -93,6 +123,28 @@ export function FundraisingReports() {
     }
     setRunning(true)
     try {
+      // A cadence other than "On demand" is a request to schedule the report, so persist it
+      // before running. Previously the dialog collected a cadence and threw it away.
+      if (form.schedule !== "On demand") {
+        try {
+          await fundraisingApi.createReportSchedule({
+            reportKey: selected.reportKey,
+            name: `${selected.name} — ${form.schedule}`,
+            cadence: scheduleToCadence(form.schedule),
+            recipients: form.recipients
+              .split(",")
+              .map((r) => r.trim())
+              .filter(Boolean),
+            format: form.format,
+            filters: campaignId ? { campaignId } : undefined,
+          })
+          toast.success(`Scheduled "${selected.name}" ${form.schedule.toLowerCase()}`)
+          void loadReports()
+        } catch (err) {
+          toastFrError(err, "Could not save the schedule")
+        }
+      }
+
       const data = await fundraisingApi.getReport(
         selected.reportKey,
         campaignId ? { campaignId } : undefined,
@@ -124,8 +176,8 @@ export function FundraisingReports() {
     <div className="h-full overflow-y-auto bg-[#f8fafc] p-4 md:p-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-xl font-bold text-[#0f172a] md:text-[22px]">Reports</h1>
-          <p className="mt-1 text-[12px] text-[#64748b]">
+          <h1 className="text-xl font-bold text-[#000000] md:text-[22px]">Reports</h1>
+          <p className="mt-1 text-[12px] text-[#111111]">
             Fundraising progress, conversion and concentration reports
           </p>
         </div>
@@ -156,36 +208,40 @@ export function FundraisingReports() {
               </div>
               <span
                 className={cn(
-                  "rounded-[4px] px-2 py-0.5 text-[10px] font-semibold",
+                  "rounded-[4px] px-2 py-0.5 text-[11px] font-semibold",
                   categoryClass(report.category),
                 )}
               >
                 {report.category}
               </span>
             </div>
-            <h2 className="mt-3 text-[14px] font-semibold text-[#0f172a]">{report.name}</h2>
-            <p className="mt-1 flex-1 text-[11px] leading-relaxed text-[#64748b]">
+            <h2 className="mt-3 text-[14px] font-semibold text-[#000000]">{report.name}</h2>
+            <p className="mt-1 flex-1 text-[11px] leading-relaxed text-[#111111]">
               {report.description}
             </p>
             <dl className="mt-3 space-y-1.5 border-t border-[#f1f5f9] pt-3 text-[11px]">
               <div className="flex items-center justify-between gap-2">
-                <dt className="flex items-center gap-1.5 text-[#94a3b8]">
+                <dt className="flex items-center gap-1.5 text-[#141414]">
                   <Calendar className="h-3 w-3" /> Schedule
                 </dt>
-                <dd className="font-medium text-[#0f172a]">{report.schedule}</dd>
+                <dd className="font-medium text-[#000000]">
+                  {report.schedule ?? "Not scheduled"}
+                </dd>
               </div>
               <div className="flex items-center justify-between gap-2">
-                <dt className="text-[#94a3b8]">Last run</dt>
-                <dd className="text-[#64748b]">{lastRunAt[report.id] ?? "Not run yet"}</dd>
+                <dt className="text-[#141414]">Last run</dt>
+                <dd className="text-[#111111]">{lastRunAt[report.id] ?? "Not run yet"}</dd>
               </div>
-              <div className="flex items-center justify-between gap-2">
-                <dt className="text-[#94a3b8]">Owner</dt>
-                <dd className="text-[#64748b]">{report.owner}</dd>
-              </div>
+              {report.owner ? (
+                <div className="flex items-center justify-between gap-2">
+                  <dt className="text-[#141414]">Owner</dt>
+                  <dd className="text-[#111111]">{report.owner}</dd>
+                </div>
+              ) : null}
               {report.requiresCampaign ? (
                 <div className="flex items-center justify-between gap-2">
-                  <dt className="text-[#94a3b8]">Requires</dt>
-                  <dd className="text-[#64748b]">Campaign selection</dd>
+                  <dt className="text-[#141414]">Requires</dt>
+                  <dd className="text-[#111111]">Campaign selection</dd>
                 </div>
               ) : null}
             </dl>
@@ -212,7 +268,7 @@ export function FundraisingReports() {
         open={configureOpen}
         onOpenChange={setConfigureOpen}
         title={selected ? `Configure — ${selected.name}` : "Configure report"}
-        description="Schedule and recipients aren't persisted yet. Running executes immediately and downloads CSV."
+        description="Any cadence other than On demand is saved as a schedule. Running executes immediately and downloads CSV."
         size="md"
         footer={
           <FrFormFooter
@@ -225,9 +281,9 @@ export function FundraisingReports() {
       >
         <div className="space-y-3">
           {selected?.requiresCampaign ? (
-            <div className="rounded-[6px] border border-[#f1f5f9] bg-[#fafafa] px-3 py-2 text-[11px] text-[#64748b]">
+            <div className="rounded-[6px] border border-[#f1f5f9] bg-[#fafafa] px-3 py-2 text-[11px] text-[#111111]">
               This report runs against{" "}
-              <span className="font-medium text-[#0f172a]">
+              <span className="font-medium text-[#000000]">
                 {campaigns.find((c) => String(c.id) === campaignId)?.name ?? "no campaign selected"}
               </span>
               . Change the campaign selector at the top of the page to switch.
@@ -300,7 +356,7 @@ export function FundraisingReports() {
         }
       >
         {running ? (
-          <div className="flex items-center justify-center gap-2 py-10 text-[12px] text-[#94a3b8]">
+          <div className="flex items-center justify-center gap-2 py-10 text-[12px] text-[#141414]">
             <Loader2 className="h-4 w-4 animate-spin" /> Running report…
           </div>
         ) : resultRows.length > 0 ? (
@@ -309,7 +365,7 @@ export function FundraisingReports() {
               <thead>
                 <tr className="border-b border-[#f1f5f9] bg-[#fafafa]">
                   {resultColumns.map((col) => (
-                    <th key={col} className="px-3 py-2 text-[11px] font-semibold text-[#94a3b8]">
+                    <th key={col} className="px-3 py-2 text-[11px] font-semibold text-[#141414]">
                       {col}
                     </th>
                   ))}
@@ -319,7 +375,7 @@ export function FundraisingReports() {
                 {resultRows.map((row, i) => (
                   <tr key={i} className="border-b border-[#f1f5f9] last:border-0">
                     {resultColumns.map((col) => (
-                      <td key={col} className="px-3 py-2 text-[11px] text-[#0f172a]">
+                      <td key={col} className="px-3 py-2 text-[11px] text-[#000000]">
                         {formatCell(row[col])}
                       </td>
                     ))}
@@ -329,11 +385,11 @@ export function FundraisingReports() {
             </table>
           </div>
         ) : selected && lastRunAt[selected.id] ? (
-          <p className="py-8 text-center text-[12px] text-[#64748b]">
+          <p className="py-8 text-center text-[12px] text-[#111111]">
             Report completed successfully. The CSV was downloaded; this run returned no preview rows.
           </p>
         ) : (
-          <p className="py-8 text-center text-[12px] text-[#94a3b8]">
+          <p className="py-8 text-center text-[12px] text-[#141414]">
             Not run yet this session — click &quot;Configure &amp; run&quot;.
           </p>
         )}

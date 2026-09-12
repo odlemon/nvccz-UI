@@ -50,13 +50,13 @@ function roomStatusClass(status: DataRoom["status"]): string {
     case "Active":
       return "bg-[#dcfce7] text-[#15803d]"
     case "Draft":
-      return "bg-[#f1f5f9] text-[#64748b]"
+      return "bg-[#f1f5f9] text-[#111111]"
     case "Expired":
       return "bg-[#ffedd5] text-[#c2410c]"
     case "Revoked":
       return "bg-[#fee2e2] text-[#dc2626]"
     default:
-      return "bg-[#f1f5f9] text-[#64748b]"
+      return "bg-[#f1f5f9] text-[#111111]"
   }
 }
 
@@ -108,43 +108,43 @@ function RoomDetail({
             <FolderLock className="h-5 w-5" />
           </span>
           <div>
-            <h2 className="text-[14px] font-semibold text-[#0f172a]">{room.name}</h2>
-            <p className="mt-0.5 text-[11px] text-[#64748b]">{room.campaign}</p>
+            <h2 className="text-[14px] font-semibold text-[#000000]">{room.name}</h2>
+            <p className="mt-0.5 text-[11px] text-[#111111]">{room.campaign}</p>
           </div>
         </div>
         <button
           type="button"
           onClick={onClose}
-          className="rounded-full p-1 text-[#94a3b8] hover:bg-white hover:text-[#64748b]"
+          className="rounded-full p-1 text-[#141414] hover:bg-white hover:text-[#111111]"
         >
           <X className="h-4 w-4" />
         </button>
       </div>
 
       {loadingDetail ? (
-        <div className="flex items-center justify-center gap-2 px-4 py-10 text-[12px] text-[#94a3b8]">
+        <div className="flex items-center justify-center gap-2 px-4 py-10 text-[12px] text-[#141414]">
           <Loader2 className="h-4 w-4 animate-spin" /> Loading room detail…
         </div>
       ) : (
         <div className="space-y-4 p-4 text-[12px]">
           <div className="flex flex-wrap gap-2">
-            <span className={cn("rounded-[4px] px-2 py-0.5 text-[10px] font-semibold", roomStatusClass(room.status))}>
+            <span className={cn("rounded-[4px] px-2 py-0.5 text-[11px] font-semibold", roomStatusClass(room.status))}>
               {room.status}
             </span>
             {room.watermark ? (
-              <span className="inline-flex items-center gap-1 rounded-[4px] bg-[#ede9fe] px-2 py-0.5 text-[10px] font-semibold text-[#6d28d9]">
+              <span className="inline-flex items-center gap-1 rounded-[4px] bg-[#ede9fe] px-2 py-0.5 text-[11px] font-semibold text-[#6d28d9]">
                 <Shield className="h-3 w-3" /> Watermark
               </span>
             ) : null}
             {room.mfaRequired ? (
-              <span className="inline-flex items-center gap-1 rounded-[4px] bg-[#dbeafe] px-2 py-0.5 text-[10px] font-semibold text-[#1d4ed8]">
+              <span className="inline-flex items-center gap-1 rounded-[4px] bg-[#dbeafe] px-2 py-0.5 text-[11px] font-semibold text-[#1d4ed8]">
                 <Lock className="h-3 w-3" /> MFA
               </span>
             ) : null}
             {room.status === "Draft" ? (
               <Button
                 variant="outline"
-                className="h-7 rounded-full px-3 text-[10px]"
+                className="h-7 rounded-full px-3 text-[11px]"
                 disabled={activating}
                 onClick={onActivate}
               >
@@ -162,15 +162,15 @@ function RoomDetail({
               { label: "Downloads (7d)", value: room.downloads7d },
             ].map((x) => (
               <div key={x.label} className="rounded-[6px] border border-[#f1f5f9] bg-[#fafafa] px-2.5 py-2">
-                <p className="text-[10px] text-[#94a3b8]">{x.label}</p>
-                <p className="mt-0.5 font-semibold tabular-nums text-[#0f172a]">{x.value}</p>
+                <p className="text-[11px] text-[#141414]">{x.label}</p>
+                <p className="mt-0.5 font-semibold tabular-nums text-[#000000]">{x.value}</p>
               </div>
             ))}
           </div>
 
           <div className="border-t border-[#f1f5f9] pt-3">
             <div className="mb-2 flex items-center justify-between">
-              <p className="text-[11px] font-semibold text-[#0f172a]">Folders</p>
+              <p className="text-[11px] font-semibold text-[#000000]">Folders</p>
               <button
                 type="button"
                 onClick={onAddFolder}
@@ -180,7 +180,7 @@ function RoomDetail({
               </button>
             </div>
             {room.folders.length === 0 ? (
-              <p className="rounded-[6px] border border-dashed border-[#e2e8f0] px-3 py-4 text-center text-[11px] text-[#94a3b8]">
+              <p className="rounded-[6px] border border-dashed border-[#e2e8f0] px-3 py-4 text-center text-[11px] text-[#141414]">
                 No folders yet.
               </p>
             ) : (
@@ -205,10 +205,10 @@ function RoomDetail({
                           <Folder className={cn("h-5 w-5", tone.icon)} />
                         )}
                       </span>
-                      <span className="line-clamp-2 text-[11px] font-medium leading-snug text-[#0f172a]">
+                      <span className="line-clamp-2 text-[11px] font-medium leading-snug text-[#000000]">
                         {f.name}
                       </span>
-                      <span className="inline-flex items-center gap-1 text-[10px] text-[#64748b]">
+                      <span className="inline-flex items-center gap-1 text-[11px] text-[#111111]">
                         <FileText className="h-3 w-3" />
                         {f.docs} docs
                       </span>
@@ -226,10 +226,10 @@ function RoomDetail({
                   })
                   .map((doc: Record<string, any>, index: number) => (
                     <li key={String(doc.id ?? index)} className="flex items-center justify-between gap-2 px-2.5 py-2">
-                      <span className="min-w-0 truncate text-[10px] text-[#334155]">{doc.fileName || doc.name || "Document"}</span>
+                      <span className="min-w-0 truncate text-[11px] text-[#111111]">{doc.fileName || doc.name || "Document"}</span>
                       <button
                         type="button"
-                        className="shrink-0 rounded-full px-2 py-1 text-[9px] font-medium text-[#2563eb] hover:bg-[#eff6ff] disabled:opacity-50"
+                        className="shrink-0 rounded-full px-2 py-1 text-[11px] font-medium text-[#2563eb] hover:bg-[#eff6ff] disabled:opacity-50"
                         disabled={downloadingId === String(doc.id)}
                         onClick={() => onDownload(String(doc.id), doc.fileName || doc.name || "document")}
                       >
@@ -241,7 +241,7 @@ function RoomDetail({
                       </button>
                     </li>
                   ))}
-                {room.documentsRaw.length === 0 ? <li className="px-2.5 py-3 text-[10px] text-[#94a3b8]">No files returned for this folder.</li> : null}
+                {room.documentsRaw.length === 0 ? <li className="px-2.5 py-3 text-[11px] text-[#141414]">No files returned for this folder.</li> : null}
               </ul>
             ) : null}
             <Button
@@ -256,19 +256,19 @@ function RoomDetail({
           </div>
 
           <div className="border-t border-[#f1f5f9] pt-3">
-            <p className="text-[11px] font-semibold text-[#0f172a]">Access</p>
+            <p className="text-[11px] font-semibold text-[#000000]">Access</p>
             <ul className="mt-2 divide-y divide-[#f1f5f9]">
               {room.accessList.length === 0 ? (
-                <li className="py-2 text-[11px] text-[#94a3b8]">No active invitations</li>
+                <li className="py-2 text-[11px] text-[#141414]">No active invitations</li>
               ) : (
                 room.accessList.map((a) => (
                   <li key={a.id} className="flex items-center gap-2 py-2">
-                    <span className="flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-blue-600 to-cyan-600 text-[10px] font-bold text-white">
+                    <span className="flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-blue-600 to-cyan-600 text-[11px] font-bold text-white">
                       {a.investor.slice(0, 1)}
                     </span>
                     <div className="min-w-0">
-                      <p className="truncate font-medium text-[#0f172a]">{a.investor}</p>
-                      <p className="text-[10px] text-[#94a3b8]">
+                      <p className="truncate font-medium text-[#000000]">{a.investor}</p>
+                      <p className="text-[11px] text-[#141414]">
                         {a.contact} · {a.access} · {a.lastAccess}
                       </p>
                     </div>
@@ -282,17 +282,17 @@ function RoomDetail({
           </div>
 
           <div className="border-t border-[#f1f5f9] pt-3">
-            <p className="text-[11px] font-semibold text-[#0f172a]">Recent activity</p>
+            <p className="text-[11px] font-semibold text-[#000000]">Recent activity</p>
             <ul className="mt-2 space-y-2">
               {room.recentActivity.length === 0 ? (
-                <li className="text-[11px] text-[#94a3b8]">No recent activity</li>
+                <li className="text-[11px] text-[#141414]">No recent activity</li>
               ) : (
                 room.recentActivity.map((a) => (
                   <li key={a.id} className="text-[11px]">
-                    <p className="font-medium text-[#0f172a]">
-                      {a.actor} <span className="font-normal text-[#64748b]">{a.action.toLowerCase()}</span> {a.doc}
+                    <p className="font-medium text-[#000000]">
+                      {a.actor} <span className="font-normal text-[#111111]">{a.action.toLowerCase()}</span> {a.doc}
                     </p>
-                    <p className="text-[10px] text-[#94a3b8]">{a.at}</p>
+                    <p className="text-[11px] text-[#141414]">{a.at}</p>
                   </li>
                 ))
               )}
@@ -563,8 +563,8 @@ export function FundraisingDataRooms() {
       />
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-xl font-bold tracking-tight text-[#0f172a] md:text-[22px]">Data Rooms</h1>
-          <p className="mt-1 text-[12px] text-[#64748b]">
+          <h1 className="text-xl font-bold tracking-tight text-[#000000] md:text-[22px]">Data Rooms</h1>
+          <p className="mt-1 text-[12px] text-[#111111]">
             Secure folders, watermarks, expiry and activity monitoring
           </p>
         </div>
@@ -603,8 +603,8 @@ export function FundraisingDataRooms() {
           { label: "Downloads (7d)", value: rooms.reduce((s, r) => s + r.downloads7d, 0) },
         ].map((k) => (
           <div key={k.label} className={cn(CARD, "p-3.5")}>
-            <p className="text-[11px] text-[#64748b]">{k.label}</p>
-            <p className="mt-1 text-xl font-bold tabular-nums text-[#0f172a]">{k.value}</p>
+            <p className="text-[11px] text-[#111111]">{k.label}</p>
+            <p className="mt-1 text-xl font-bold tabular-nums text-[#000000]">{k.value}</p>
           </div>
         ))}
       </div>
@@ -626,11 +626,11 @@ export function FundraisingDataRooms() {
           ))}
         </div>
       ) : !campaignId ? (
-        <div className="mt-5 rounded-[10px] border border-[#e2e8f0] bg-white p-10 text-center text-[13px] text-[#94a3b8]">
+        <div className="mt-5 rounded-[10px] border border-[#e2e8f0] bg-white p-10 text-center text-[13px] text-[#141414]">
           No campaigns available. Create a campaign first.
         </div>
       ) : rooms.length === 0 ? (
-        <div className="mt-5 rounded-[10px] border border-[#e2e8f0] bg-white p-10 text-center text-[13px] text-[#94a3b8]">
+        <div className="mt-5 rounded-[10px] border border-[#e2e8f0] bg-white p-10 text-center text-[13px] text-[#141414]">
           No data rooms for this campaign yet. Create one to start sharing documents securely.
         </div>
       ) : (
@@ -643,15 +643,15 @@ export function FundraisingDataRooms() {
           <div className="min-w-0 space-y-3">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex items-center gap-2">
-                <FolderLock className="h-4 w-4 text-[#64748b]" />
-                <h2 className="text-[13px] font-semibold text-[#0f172a]">Rooms</h2>
-                <span className="rounded-[4px] bg-[#f1f5f9] px-1.5 text-[11px] font-semibold text-[#64748b]">
+                <FolderLock className="h-4 w-4 text-[#111111]" />
+                <h2 className="text-[13px] font-semibold text-[#000000]">Rooms</h2>
+                <span className="rounded-[4px] bg-[#f1f5f9] px-1.5 text-[11px] font-semibold text-[#111111]">
                   {filtered.length}
                 </span>
               </div>
               <div className="flex flex-col gap-2 sm:flex-row">
                 <div className="relative sm:w-[220px]">
-                  <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#94a3b8]" />
+                  <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#141414]" />
                   <Input
                     value={search}
                     onChange={(e) => setSearch(e.target.value)}
@@ -693,15 +693,15 @@ export function FundraisingDataRooms() {
                       <span className={cn("flex h-11 w-11 items-center justify-center rounded-[10px]", tone.bg)}>
                         <Folder className={cn("h-6 w-6", tone.icon)} />
                       </span>
-                      <span className={cn("rounded-[4px] px-1.5 py-0.5 text-[10px] font-semibold", roomStatusClass(room.status))}>
+                      <span className={cn("rounded-[4px] px-1.5 py-0.5 text-[11px] font-semibold", roomStatusClass(room.status))}>
                         {room.status}
                       </span>
                     </div>
                     <div>
-                      <p className="text-[13px] font-semibold text-[#0f172a]">{room.name}</p>
-                      <p className="mt-0.5 text-[11px] text-[#64748b]">{room.campaign}</p>
+                      <p className="text-[13px] font-semibold text-[#000000]">{room.name}</p>
+                      <p className="mt-0.5 text-[11px] text-[#111111]">{room.campaign}</p>
                     </div>
-                    <div className="flex items-center justify-between border-t border-[#f1f5f9] pt-2 text-[11px] text-[#64748b]">
+                    <div className="flex items-center justify-between border-t border-[#f1f5f9] pt-2 text-[11px] text-[#111111]">
                       <span>{room.documents} docs · {room.investorsInvited} invited</span>
                       <span>Exp {room.expiresOn}</span>
                     </div>
@@ -753,7 +753,7 @@ export function FundraisingDataRooms() {
               </FrField>
             </div>
           ) : step === "security" ? (
-            <label className="flex items-center gap-2 text-[12px] text-[#334155]">
+            <label className="flex items-center gap-2 text-[12px] text-[#111111]">
               <input
                 type="checkbox"
                 checked={requiresMfa}

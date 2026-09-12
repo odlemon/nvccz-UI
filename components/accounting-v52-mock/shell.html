@@ -1,0 +1,30 @@
+<div class="app collapsed" id="app">
+<aside class="sidebar">
+<div class="brand" data-action="toggle-module-menu-v2" role="button" tabindex="0"><img alt="Matanho logo" id="brandLogo"/><div class="brand-mark">M</div></div>
+<div class="tenant"><div class="tenant-meta"><strong>Matanho Capital Partners</strong><span>Finance &amp; Accounting · Production</span></div></div>
+<nav class="nav-scroll" id="nav"></nav>
+<div class="sidebar-foot"><div class="health"><span class="pulse"></span><div><strong>Accounting services operational</strong><span>Last control scan 2 minutes ago</span></div></div><button class="sidebar-toggle-bottom" data-action="toggle-sidebar" id="menuBtn" title="Expand navigation"><span class="toggle-label">Expand menu</span></button></div>
+</aside>
+<section class="shell">
+<header class="topbar">
+<button class="icon-btn mobile-menu" data-action="mobile-menu" aria-label="Open menu"></button>
+<button class="search-launch" data-action="open-command"><span id="searchIcon"></span><span>Search accounts, journals, documents and actions</span><kbd>Cmd K</kbd></button>
+<select class="top-select entity-select" id="entitySelect" title="Entity"></select>
+<select class="top-select" id="periodSelect" title="Accounting period"></select>
+<select class="top-select role-select" id="roleSelect" title="Simulated role"></select>
+<span class="live-pill"><i></i><span id="ledgerHealth">Ledger live</span></span>
+<button class="icon-btn" data-action="toggle-theme" id="themeBtn" title="Theme"></button>
+<button class="icon-btn" data-action="notifications" id="bellBtn" title="Notifications"></button>
+<div class="profile"><div class="avatar">TM</div><div><strong>Tariro Moyo</strong><span id="profileRole">Finance Director</span></div></div>
+</header>
+<main class="content"><div class="page" id="main"></div></main>
+</section>
+</div>
+<div class="drawer-backdrop" data-action="close-drawer" id="drawerBackdrop"></div>
+<aside class="drawer" id="drawer"><div class="drawer-head"><div><h2 id="drawerTitle"></h2><p id="drawerSubtitle"></p></div><button class="icon-btn" data-action="close-drawer" id="drawerClose"></button></div><div class="drawer-body" id="drawerBody"></div><div class="drawer-foot" id="drawerFoot"></div></aside>
+<div class="modal-backdrop" data-action="close-modal" id="modalBackdrop"></div>
+<section class="modal" id="modal"><div class="modal-head"><div><h2 id="modalTitle"></h2><p id="modalSubtitle"></p></div><button class="icon-btn" data-action="close-modal" id="modalClose"></button></div><div class="modal-body" id="modalBody"></div><div class="modal-foot" id="modalFoot"></div></section>
+<div class="command-backdrop" data-action="close-command" id="commandBackdrop"></div>
+<section class="command" id="command"><div class="command-search"><span id="commandIcon"></span><input id="commandInput" placeholder="Search Matanho Accounting..."/><kbd>ESC</kbd></div><div class="command-results" id="commandResults"></div></section>
+<div class="toast-wrap" id="toasts"></div>
+<input hidden="" id="vaultFile" type="file"/>

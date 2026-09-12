@@ -1,0 +1,261 @@
+export type PortalId = 'staff' | 'lp' | 'investee' | 'apply' | 'vendor' | 'events'
+
+/** Baked at build time — which portal this deployment serves. */
+export const PORTAL_ID: PortalId =
+  (process.env.NEXT_PUBLIC_PORTAL as PortalId) || 'staff'
+
+/**
+ * Takes the env *value*, not its name. Next inlines only literal `process.env.NEXT_PUBLIC_X`
+ * references at build time; a computed `process.env[key]` is left as a runtime lookup, and the
+ * portal containers carry no NEXT_PUBLIC_* vars at runtime. So in production builds every URL here
+ * read '' — the staff middleware then redirected /vendor-quotations/rfq-respond to
+ * "-quotations/rfq-respond" and answered 500 to vendors opening their RFQ invitation.
+ */
+function portalExternalUrl(
+  value: string | undefined,
+  localDevPort: number,
+  productionDefault: string,
+): string {
+  if (value) return value
+  if (process.env.NODE_ENV === 'development') {
+    return `http://localhost:${localDevPort}`
+  }
+  return productionDefault
+}
+
+export const LP_PORTAL_EXTERNAL_URL = portalExternalUrl(
+  process.env.NEXT_PUBLIC_LP_PORTAL_URL,
+  3110,
+  '',
+)
+
+export const INVESTEE_PORTAL_EXTERNAL_URL = portalExternalUrl(
+  process.env.NEXT_PUBLIC_INVESTEE_PORTAL_URL,
+  3120,
+  '',
+)
+
+/**
+ * Public funding-application portal (no login).
+ * When set on the staff build, `/funding-application` redirects here.
+ * Set via NEXT_PUBLIC_APPLY_PORTAL_URL at build time — no production default.
+ */
+export const APPLY_PORTAL_EXTERNAL_URL = portalExternalUrl(
+  process.env.NEXT_PUBLIC_APPLY_PORTAL_URL,
+  3130,
+  '',
+)
+
+/**
+ * Vendor portal — vendor registration, KYC, RFQ access, quotation/invoice submission.
+ * Set via NEXT_PUBLIC_VENDOR_PORTAL_URL at build time.
+ */
+export const VENDOR_PORTAL_EXTERNAL_URL = portalExternalUrl(
+  process.env.NEXT_PUBLIC_VENDOR_PORTAL_URL,
+  3140,
+  '',
+)
+
+/**
+ * Events portal — public events, RSVP, feedback.
+ * Set via NEXT_PUBLIC_EVENTS_PORTAL_URL at build time.
+ */
+export const EVENTS_PORTAL_EXTERNAL_URL = portalExternalUrl(
+  process.env.NEXT_PUBLIC_EVENTS_PORTAL_URL,
+  3150,
+  '',
+)
+
+const AUTH_ROUTES = ['/login', '/forgot-password', '/reset-password', '/verify-email']
+
+/** Routes that never require login — staff portal only. */
+export const STAFF_PUBLIC_PASS_THROUGH = [
+  '/permissions-matrix',
+  '/applications/form',
+  '/home',
+  '/portfolio',
+  // The V6 payroll port now serves /payroll (renamed from /payroll-v6).
+  '/payroll',
+  // The V52 accounting port now serves /accounting (renamed from /accounting-v52).
+  '/accounting',
+  '/procurement-v23',
+  // '/performance' deliberately REMOVED (8 Sep 2026). This list is checked at
+  // middleware.ts:350 and returns NextResponse.next() *before* the token check and
+  // before the routePermissions loop, so while it was here every /performance* URL was
+  // reachable with no session and the module's 25 routePermissions entries were dead
+  // code. Removed ahead of wiring real employee performance data into the module.
+  // Note startsWith matching meant this entry also exposed /performance-legacy.
+  // The sibling client-design ports above are still public — same issue, not yet in
+  // scope. See design-refs/performance-role-matrix.md §1.
+  '/fundraising-kyc',
+  '/broker-instruction',
+  // Vendor pages opened from emailed, signed-token links. When the staff build has a vendor portal
+  // URL the middleware forwards these there first; without one they must still open here rather
+  // than bounce a supplier to the staff login.
+  '/vendor-quotations',
+  '/vendor/quotation/submit',
+  '/vendor/invoice/submit',
+  '/vendor-portal',
+  '/public-tenders',
+] as const
+
+/**
+ * `/set-password` is the forced password change for a signed-in user whose password we issued (an
+ * invited investor). It is listed here rather than added to AUTH_ROUTES on purpose: auth routes
+ * redirect an already-authenticated user to the portal home, which is precisely what this page
+ * must not do — the user arrives holding a valid session and has to stay put until they choose a
+ * password. Omitting it produced a redirect loop, /set-password -> /lp-portal -> /set-password.
+ */
+const LP_PREFIXES = ['/lp-portal', '/set-password', ...AUTH_ROUTES]
+const INVESTEE_PREFIXES = ['/investee-portal-v8', '/set-password', ...AUTH_ROUTES]
+/** Apply portal: public form only (no staff chrome, no auth). */
+const APPLY_PREFIXES = ['/funding-application']
+/** Vendor portal: public vendor workflows (no staff chrome, no auth). */
+const VENDOR_PREFIXES = ['/vendor-portal', '/vendor', '/vendor-quotations', '/public-tenders', ...AUTH_ROUTES]
+/** Events portal: public events workflows (no staff chrome, no auth). */
+const EVENTS_PREFIXES = ['/events/rsvp', '/events/public', '/events/feedback', ...AUTH_ROUTES]
+
+export function isAuthRoute(pathname: string): boolean {
+  return AUTH_ROUTES.some((r) => pathname === r || pathname.startsWith(`${r}/`))
+}
+
+/**
+ * Matched on whole path segments, not raw prefixes. Plain `startsWith` made
+ * `/accounting` also admit `/accounting-legacy` and `/accounting-v2` — frozen
+ * modules that had required login — and after the payroll rename `/payroll`
+ * would likewise have opened `/payroll-legacy` to anyone. This list runs before
+ * the token check in middleware, so a stray prefix match publishes a module.
+ */
+export function isStaffPublicPassThrough(pathname: string): boolean {
+  return STAFF_PUBLIC_PASS_THROUGH.some(
+    (route) => pathname === route || pathname.startsWith(`${route}/`),
+  )
+}
+
+/** True when staff should bounce public apply traffic to the dedicated apply domain. */
+export function shouldRedirectFundingApplicationToApplyPortal(): boolean {
+  if (PORTAL_ID !== 'staff') return false
+  const explicit = process.env.NEXT_PUBLIC_APPLY_PORTAL_REDIRECT
+  if (explicit === '0' || explicit === 'false') return false
+  if (explicit === '1' || explicit === 'true') return true
+  if (process.env.NEXT_PUBLIC_APPLY_PORTAL_URL) return true
+  // Local dev: dedicated apply portal on :3130 (see scripts/run-portal-dev.mjs).
+  return process.env.NODE_ENV === 'development'
+}
+
+/** True when staff should bounce vendor traffic to the dedicated vendor domain. */
+export function shouldRedirectVendorToPortal(): boolean {
+  if (PORTAL_ID !== 'staff') return false
+  const explicit = process.env.NEXT_PUBLIC_VENDOR_PORTAL_REDIRECT
+  if (explicit === '0' || explicit === 'false') return false
+  if (explicit === '1' || explicit === 'true') return true
+  if (process.env.NEXT_PUBLIC_VENDOR_PORTAL_URL) return true
+  return process.env.NODE_ENV === 'development'
+}
+
+/** True when staff should bounce events traffic to the dedicated events domain. */
+export function shouldRedirectEventsToPortal(): boolean {
+  if (PORTAL_ID !== 'staff') return false
+  const explicit = process.env.NEXT_PUBLIC_EVENTS_PORTAL_REDIRECT
+  if (explicit === '0' || explicit === 'false') return false
+  if (explicit === '1' || explicit === 'true') return true
+  if (process.env.NEXT_PUBLIC_EVENTS_PORTAL_URL) return true
+  return process.env.NODE_ENV === 'development'
+}
+
+export function fundingApplicationPublicUrl(path = '/funding-application'): string {
+  const suffix = path.startsWith('/') ? path : `/${path}`
+  if (PORTAL_ID === 'apply') return suffix
+  if (shouldRedirectFundingApplicationToApplyPortal()) {
+    return `${APPLY_PORTAL_EXTERNAL_URL.replace(/\/$/, '')}${suffix}`
+  }
+  return suffix
+}
+
+export function isPathAllowedForPortal(pathname: string, portal: PortalId): boolean {
+  if (isAuthRoute(pathname)) return true
+
+  if (portal === 'staff') {
+    if (pathname.startsWith('/lp-portal')) return false
+    if (pathname.startsWith('/application-portal')) return false
+    if (pathname.startsWith('/investee-portal-v8')) return false
+    return true
+  }
+
+  if (portal === 'lp') {
+    return LP_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`))
+  }
+
+  if (portal === 'investee') {
+    return INVESTEE_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`))
+  }
+
+  if (portal === 'apply') {
+    return APPLY_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`))
+  }
+
+  if (portal === 'vendor') {
+    return VENDOR_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`))
+  }
+
+  if (portal === 'events') {
+    return EVENTS_PREFIXES.some((p) => pathname === p || pathname.startsWith(`${p}/`))
+  }
+
+  return false
+}
+
+export function portalHomePath(portal: PortalId): string {
+  switch (portal) {
+    case 'lp':
+      return '/lp-portal'
+    case 'investee':
+      return '/investee-portal-v8'
+    case 'apply':
+      return '/funding-application'
+    case 'vendor':
+      return '/vendor-portal'
+    case 'events':
+      return '/events/public'
+    default:
+      return '/home'
+  }
+}
+
+export function portalLoginMeta(portal: PortalId): {
+  title: string
+  subtitle: string
+} {
+  switch (portal) {
+    case 'lp':
+      return {
+        title: 'LP Portal',
+        subtitle: 'Sign in to view fund performance, documents, and capital activity.',
+      }
+    case 'investee':
+      return {
+        title: 'Investee Portal',
+        subtitle: 'Sign in to manage your application and portfolio company information.',
+      }
+    case 'apply':
+      return {
+        title: 'Funding application',
+        subtitle: 'Submit a funding application. No login required.',
+      }
+    case 'vendor':
+      return {
+        title: 'Vendor Portal',
+        subtitle: 'Access RFQs, submit quotations, and manage your vendor registration.',
+      }
+    case 'events':
+      return {
+        title: 'Events Portal',
+        subtitle: 'Browse events and manage your RSVPs.',
+      }
+    default:
+      return {
+        title: 'Sign in',
+        subtitle: 'Access your organisation workspace.',
+      }
+  }
+}

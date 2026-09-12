@@ -25,7 +25,7 @@ import {
   mandateStatusClass,
   type KycOnboardingStatus,
   type MandateOnboardingStatus,
-} from "./onboarding-mock-data"
+} from "./onboarding-presentation"
 import {
   FrDialogShell,
   FrField,
@@ -80,7 +80,7 @@ function StatusChip({ label, className }: { label: string; className: string }) 
   return (
     <span
       className={cn(
-        "inline-flex whitespace-nowrap rounded-[4px] px-2 py-0.5 text-[10px] font-semibold",
+        "inline-flex whitespace-nowrap rounded-[4px] px-2 py-0.5 text-[11px] font-semibold",
         className,
       )}
     >
@@ -99,9 +99,9 @@ function KpiCard({ kpi }: { kpi: (typeof ONBOARDING_KPIS)[number] }) {
       >
         <Icon className="h-[18px] w-[18px]" strokeWidth={2} />
       </span>
-      <p className="mt-3 text-[12px] font-medium text-[#64748b]">{kpi.label}</p>
-      <p className="mt-1.5 text-[22px] font-bold tabular-nums text-[#0f172a]">{kpi.value}</p>
-      <p className="mt-1 text-[11px] text-[#94a3b8]">{kpi.sublabel}</p>
+      <p className="mt-3 text-[12px] font-medium text-[#111111]">{kpi.label}</p>
+      <p className="mt-1.5 text-[22px] font-bold tabular-nums text-[#000000]">{kpi.value}</p>
+      <p className="mt-1 text-[11px] text-[#141414]">{kpi.sublabel}</p>
     </div>
   )
 }
@@ -115,7 +115,7 @@ function ProgressBar({ pct }: { pct: number }) {
           style={{ width: `${Math.min(pct, 100)}%` }}
         />
       </div>
-      <span className="text-[11px] font-medium tabular-nums text-[#64748b]">{pct}%</span>
+      <span className="text-[11px] font-medium tabular-nums text-[#111111]">{pct}%</span>
     </div>
   )
 }
@@ -149,8 +149,8 @@ function DetailPanel({
         <div className="flex items-start gap-2">
           <UserCheck className="mt-0.5 h-4 w-4 shrink-0 text-[#7c3aed]" />
           <div className="min-w-0">
-            <h2 className="text-[13px] font-semibold text-[#0f172a]">{safeDisplay(item.investor, "Investor")}</h2>
-            <p className="mt-0.5 text-[11px] text-[#64748b]">
+            <h2 className="text-[13px] font-semibold text-[#000000]">{safeDisplay(item.investor, "Investor")}</h2>
+            <p className="mt-0.5 text-[11px] text-[#111111]">
               {item.type} · {safeDisplay(item.campaign, "No campaign")}
             </p>
           </div>
@@ -173,21 +173,21 @@ function DetailPanel({
           </div>
         ) : null}
         <div className="mt-3 flex items-center justify-between text-[11px]">
-          <span className="text-[#94a3b8]">Owner</span>
-          <span className="font-medium text-[#0f172a]">{safeDisplay(item.owner)}</span>
+          <span className="text-[#141414]">Owner</span>
+          <span className="font-medium text-[#000000]">{safeDisplay(item.owner)}</span>
         </div>
         <div className="mt-1 flex items-center justify-between text-[11px]">
-          <span className="text-[#94a3b8]">Started</span>
-          <span className="text-[#64748b]">{item.startedAt}</span>
+          <span className="text-[#141414]">Started</span>
+          <span className="text-[#111111]">{item.startedAt}</span>
         </div>
       </div>
 
       <div className="px-4 py-3">
         <div className="flex items-center justify-between">
-          <h3 className="text-[12px] font-semibold text-[#0f172a]">
+          <h3 className="text-[12px] font-semibold text-[#000000]">
             {isMandate ? "Activation Checklist" : "Readiness Checklist"}
           </h3>
-          <span className="text-[11px] tabular-nums text-[#64748b]">
+          <span className="text-[11px] tabular-nums text-[#111111]">
             {done}/{total}
           </span>
         </div>
@@ -200,7 +200,7 @@ function DetailPanel({
         <ul className="mt-3 space-y-2">
           {item.checklist.slice(0, 5).map((c) => (
             <li key={c.id} className="flex items-center justify-between gap-2">
-              <span className={cn("text-[11px]", c.done ? "text-[#64748b]" : "text-[#0f172a]")}>
+              <span className={cn("text-[11px]", c.done ? "text-[#111111]" : "text-[#000000]")}>
                 {c.label}
               </span>
               {isMandate ? (
@@ -521,11 +521,11 @@ export function FundraisingOnboarding() {
     <div className="h-full overflow-y-auto bg-[#f8fafc] p-4 md:p-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="flex items-center gap-2 text-xl font-bold text-[#0f172a] md:text-[22px]">
+          <h1 className="flex items-center gap-2 text-xl font-bold text-[#000000] md:text-[22px]">
             Client Onboarding
-            {loading ? <Loader2 className="h-4 w-4 animate-spin text-[#94a3b8]" /> : null}
+            {loading ? <Loader2 className="h-4 w-4 animate-spin text-[#141414]" /> : null}
           </h1>
-          <p className="mt-1 text-[12px] text-[#64748b]">
+          <p className="mt-1 text-[12px] text-[#111111]">
             KYC, compliance readiness and mandate activation
           </p>
         </div>
@@ -569,7 +569,7 @@ export function FundraisingOnboarding() {
       ) : null}
       {selected?.kind === "KYC" ? (
         <div className="mt-3 flex flex-wrap gap-2">
-          <span className="self-center text-[11px] font-medium text-[#64748b]">
+          <span className="self-center text-[11px] font-medium text-[#111111]">
             Current: {String(selected.kycStatus).replace(/_/g, " ")}
           </span>
           <Button type="button" variant="outline" className="h-8 rounded-full px-3 text-[11px]" disabled={updatingKyc} onClick={() => openKycLifecycle("UNDER_REVIEW")}>Under review</Button>
@@ -585,13 +585,13 @@ export function FundraisingOnboarding() {
         <div className={cn(CARD, "overflow-hidden")}>
           <div className="flex flex-col gap-3 border-b border-[#f1f5f9] px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-2">
-              <h2 className="text-[13px] font-semibold text-[#0f172a]">Onboarding Cases</h2>
-              <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-[4px] bg-[#f1f5f9] px-1.5 text-[11px] font-semibold text-[#64748b]">
+              <h2 className="text-[13px] font-semibold text-[#000000]">Onboarding Cases</h2>
+              <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-[4px] bg-[#f1f5f9] px-1.5 text-[11px] font-semibold text-[#111111]">
                 {cases.length}
               </span>
             </div>
             <div className="relative w-full sm:w-[220px]">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#94a3b8]" />
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#141414]" />
               <Input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
@@ -614,7 +614,7 @@ export function FundraisingOnboarding() {
                     "Owner",
                     "Started",
                   ].map((h) => (
-                    <th key={h} className="px-3 py-2 text-[11px] font-semibold text-[#94a3b8]">
+                    <th key={h} className="px-3 py-2 text-[11px] font-semibold text-[#141414]">
                       {h}
                     </th>
                   ))}
@@ -625,7 +625,7 @@ export function FundraisingOnboarding() {
                   <FrTableSkeleton columns={8} rows={6} />
                 ) : filtered.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="px-3 py-10 text-center text-[13px] text-[#94a3b8]">
+                    <td colSpan={8} className="px-3 py-10 text-center text-[13px] text-[#141414]">
                       {cases.length === 0 ? "No onboarding cases yet." : "No cases match your search."}
                     </td>
                   </tr>
@@ -640,19 +640,19 @@ export function FundraisingOnboarding() {
                       )}
                     >
                       <td className="px-3 py-2.5">
-                        <span className="text-[12px] font-medium text-[#0f172a]">{safeDisplay(c.investor, "Investor")}</span>
+                        <span className="text-[12px] font-medium text-[#000000]">{safeDisplay(c.investor, "Investor")}</span>
                         {c.complianceHold ? (
                           <AlertTriangle className="ml-1.5 inline h-3 w-3 text-[#dc2626]" />
                         ) : null}
                       </td>
-                      <td className="px-3 py-2.5 text-[11px] text-[#64748b]">{c.type}</td>
+                      <td className="px-3 py-2.5 text-[11px] text-[#111111]">{c.type}</td>
                       <td className="px-3 py-2.5">
                         <StatusChip
                           label={KYC_STATUS_LABEL[c.kycStatus as KycOnboardingStatus] ?? c.kycStatus}
                           className={kycStatusClass(c.kycStatus as KycOnboardingStatus)}
                         />
                       </td>
-                      <td className="px-3 py-2.5 text-[11px] text-[#64748b]">
+                      <td className="px-3 py-2.5 text-[11px] text-[#111111]">
                         {c.mandateStatus
                           ? MANDATE_STATUS_LABEL[c.mandateStatus as MandateOnboardingStatus] ?? c.mandateStatus
                           : "—"}
@@ -664,11 +664,11 @@ export function FundraisingOnboarding() {
                         {c.complianceHold ? (
                           <StatusChip label="Hold" className="bg-[#fee2e2] text-[#dc2626]" />
                         ) : (
-                          <span className="text-[11px] text-[#94a3b8]">—</span>
+                          <span className="text-[11px] text-[#141414]">—</span>
                         )}
                       </td>
-                      <td className="px-3 py-2.5 text-[11px] text-[#64748b]">{safeDisplay(c.owner)}</td>
-                      <td className="px-3 py-2.5 text-[11px] text-[#94a3b8]">{c.startedAt}</td>
+                      <td className="px-3 py-2.5 text-[11px] text-[#111111]">{safeDisplay(c.owner)}</td>
+                      <td className="px-3 py-2.5 text-[11px] text-[#141414]">{c.startedAt}</td>
                     </tr>
                   ))
                 )}
@@ -762,7 +762,7 @@ export function FundraisingOnboarding() {
         }
       >
         <div className="space-y-3">
-          <p className="text-[12px] text-[#64748b]">
+          <p className="text-[12px] text-[#111111]">
             Standard pack: investor profile, UBO declaration, source of funds, and certified ID
             copies.
           </p>
@@ -834,7 +834,7 @@ export function FundraisingOnboarding() {
           id: c.id,
           title: c.label,
           badge: c.done ? "Done" : "Pending",
-          badgeClass: c.done ? "bg-[#dcfce7] text-[#15803d]" : "bg-[#f1f5f9] text-[#64748b]",
+          badgeClass: c.done ? "bg-[#dcfce7] text-[#15803d]" : "bg-[#f1f5f9] text-[#111111]",
         }))}
       />
       <FrRequirementsDialog

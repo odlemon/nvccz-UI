@@ -47,7 +47,7 @@ export function InfoDialog({
       <DialogContent className={`${R} max-w-md`}>
         <DialogHeader>
           <DialogTitle className="text-[15px]">{title}</DialogTitle>
-          <DialogDescription className="text-[13px] text-[#475467] leading-relaxed pt-1">
+          <DialogDescription className="text-[13px] text-[#111111] leading-relaxed pt-1">
             {body}
           </DialogDescription>
         </DialogHeader>
@@ -82,10 +82,10 @@ export function CommentaryAllDialog({
     >
       <DialogContent className={`${R} max-w-4xl max-h-[85vh] overflow-hidden flex flex-col p-0 gap-0`}>
         <DialogHeader className="px-5 pt-5 pb-3 border-b border-[#e4e7ec] shrink-0">
-          <DialogTitle className="text-[16px] font-semibold text-[#101828]">
+          <DialogTitle className="text-[16px] font-semibold text-[#000000]">
             All Commentary Requests
           </DialogTitle>
-          <DialogDescription className="text-[12px] text-[#667085]">
+          <DialogDescription className="text-[12px] text-[#111111]">
             {requests.length} open requests · click a row for full variance detail
           </DialogDescription>
         </DialogHeader>
@@ -95,9 +95,9 @@ export function CommentaryAllDialog({
             <table className="w-full border-collapse text-[12px]">
               <thead className="sticky top-0 bg-[#f9fafb] z-10">
                 <tr className="border-b border-[#e4e7ec]">
-                  <th className="text-left px-4 py-2 font-semibold text-[#344054]">Department</th>
-                  <th className="text-left px-3 py-2 font-semibold text-[#344054]">Area</th>
-                  <th className="px-3 py-2 text-right font-semibold text-[#344054]">Status</th>
+                  <th className="text-left px-4 py-2 font-semibold text-[#111111]">Department</th>
+                  <th className="text-left px-3 py-2 font-semibold text-[#111111]">Area</th>
+                  <th className="px-3 py-2 text-right font-semibold text-[#111111]">Status</th>
                 </tr>
               </thead>
               <tbody>
@@ -110,8 +110,8 @@ export function CommentaryAllDialog({
                       focused?.id === req.id && "bg-[#eff8ff]",
                     )}
                   >
-                    <td className="px-4 py-2.5 font-medium text-[#101828]">{req.dept}</td>
-                    <td className="px-3 py-2.5 text-[#475467]">{req.area}</td>
+                    <td className="px-4 py-2.5 font-medium text-[#000000]">{req.dept}</td>
+                    <td className="px-3 py-2.5 text-[#111111]">{req.area}</td>
                     <td className="px-3 py-2.5 text-right">
                       <StatusBadge status={req.status} />
                     </td>
@@ -125,13 +125,13 @@ export function CommentaryAllDialog({
             {detail ? (
               <div className="space-y-4">
                 <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-wide text-[#98a2b3]">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-[#141414]">
                     Variance Detail
                   </p>
-                  <h3 className="text-[15px] font-semibold text-[#101828] mt-1">
+                  <h3 className="text-[15px] font-semibold text-[#000000] mt-1">
                     {detail.dept} · {detail.area}
                   </h3>
-                  <p className="text-[11px] text-[#667085]">{detail.period}</p>
+                  <p className="text-[11px] text-[#111111]">{detail.period}</p>
                 </div>
                 <p
                   className={cn(
@@ -141,20 +141,20 @@ export function CommentaryAllDialog({
                 >
                   {detail.headline}
                 </p>
-                <p className="text-[12px] text-[#667085]">{detail.pctLabel}</p>
+                <p className="text-[12px] text-[#111111]">{detail.pctLabel}</p>
                 <div>
-                  <p className="text-[11px] font-semibold text-[#344054] mb-1">Explanation</p>
-                  <p className="text-[12px] text-[#475467] leading-relaxed">{detail.explanation}</p>
+                  <p className="text-[11px] font-semibold text-[#111111] mb-1">Explanation</p>
+                  <p className="text-[12px] text-[#111111] leading-relaxed">{detail.explanation}</p>
                 </div>
                 <div>
-                  <p className="text-[11px] font-semibold text-[#344054] mb-1">Corrective Action</p>
-                  <p className="text-[12px] text-[#475467] leading-relaxed">{detail.correctiveAction}</p>
+                  <p className="text-[11px] font-semibold text-[#111111] mb-1">Corrective Action</p>
+                  <p className="text-[12px] text-[#111111] leading-relaxed">{detail.correctiveAction}</p>
                 </div>
                 <dl className={`${R} border border-[#e4e7ec] p-3 space-y-1.5 text-[12px]`}>
                   {detail.supporting.map((row) => (
                     <div key={row.label} className="flex justify-between gap-3">
-                      <dt className="text-[#667085]">{row.label}</dt>
-                      <dd className="font-medium text-[#101828] tabular-nums">{row.value}</dd>
+                      <dt className="text-[#111111]">{row.label}</dt>
+                      <dd className="font-medium text-[#000000] tabular-nums">{row.value}</dd>
                     </div>
                   ))}
                 </dl>
@@ -168,8 +168,8 @@ export function CommentaryAllDialog({
                     {planningInitials(detail.owner)}
                   </span>
                   <div className="flex-1 min-w-0">
-                    <p className="text-[12px] font-medium text-[#101828]">{detail.owner}</p>
-                    <p className="text-[11px] text-[#667085]">Due {detail.due}</p>
+                    <p className="text-[12px] font-medium text-[#000000]">{detail.owner}</p>
+                    <p className="text-[11px] text-[#111111]">Due {detail.due}</p>
                   </div>
                   <StatusBadge status={detail.status} />
                 </div>
@@ -186,7 +186,7 @@ export function CommentaryAllDialog({
                 </button>
               </div>
             ) : (
-              <p className="text-[13px] text-[#98a2b3] text-center py-12">
+              <p className="text-[13px] text-[#141414] text-center py-12">
                 Select a commentary request to view full details.
               </p>
             )}

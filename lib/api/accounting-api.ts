@@ -38,6 +38,39 @@ export interface CreateExpenseCategoryRequest {
   isActive?: boolean
 }
 
+export interface RecurringJournalTemplateLine {
+  chartOfAccountId: string
+  debitAmount: number
+  creditAmount: number
+  description?: string
+}
+
+export interface RecurringJournalTemplate {
+  id: string
+  name: string
+  description: string | null
+  isActive: boolean
+  dayOfMonth: number
+  currencyId: string
+  linesJson: RecurringJournalTemplateLine[]
+  referencePrefix: string
+  createdById: string
+  createdAt: string
+  updatedAt: string
+  currency: AccountingCurrency
+  createdBy: { id: string; email: string; firstName: string; lastName: string }
+  _count?: { runs: number }
+}
+
+export interface CreateRecurringJournalTemplateRequest {
+  name: string
+  description?: string
+  dayOfMonth?: number
+  currencyId: string
+  lines: RecurringJournalTemplateLine[]
+  referencePrefix?: string
+}
+
 // Types matching accounting entities
 export interface AccountingCurrency {
   id: string
@@ -88,6 +121,10 @@ export interface Invoice {
   paymentDate: string | null
   journalEntryId: string
   isActive: boolean
+  /** Present on the live API response despite being absent from earlier versions of this interface (confirmed via direct POST /accounting/invoices response) — dueDate is settable elsewhere, not by CreateInvoiceRequest, so it's frequently null. */
+  dueDate?: string | null
+  paidAmount?: string
+  outstandingAmount?: string
   createdById: string
   createdAt: string
   updatedAt: string
@@ -791,6 +828,9 @@ export interface Expense {
   category?: ExpenseCategory
   vendor?: Vendor
   currency?: AccountingCurrency
+  /** Present on the live API response despite being absent from earlier versions of this interface. */
+  createdById?: string
+  receiptNumber?: string | null
 }
 
 export interface CreateExpenseRequest {
@@ -2075,6 +2115,31 @@ class AccountingApiService {
   async getUnrealizedFxGainsReport(asOfDate?: string): Promise<AccountingResponse<any>> {
     const query = asOfDate ? `?asOfDate=${asOfDate}` : ''
     return apiClient.get<AccountingResponse<any>>(`/accounting/multi-currency/reports/unrealized-fx${query}`)
+  }
+
+  // Recurring Journal Templates
+  // Backend route + controller added alongside this frontend wiring (the RecurringJournalService
+  // and recurring_journal_templates/recurring_journal_runs tables already existed — see
+  // design-refs/vps-pending-migrations.md — but had no HTTP layer before this change).
+  async getRecurringJournalTemplates(activeOnly?: boolean): Promise<AccountingResponse<RecurringJournalTemplate[]>> {
+    const query = activeOnly ? '?activeOnly=true' : ''
+    return apiClient.get<AccountingResponse<RecurringJournalTemplate[]>>(`/accounting/recurring-journal-templates${query}`)
+  }
+
+  async createRecurringJournalTemplate(data: CreateRecurringJournalTemplateRequest): Promise<AccountingResponse<RecurringJournalTemplate>> {
+    return apiClient.post<AccountingResponse<RecurringJournalTemplate>>('/accounting/recurring-journal-templates', data)
+  }
+
+  async setRecurringJournalTemplateActive(id: string, isActive: boolean): Promise<AccountingResponse<RecurringJournalTemplate>> {
+    return apiClient.patch<AccountingResponse<RecurringJournalTemplate>>(`/accounting/recurring-journal-templates/${id}/active`, { isActive })
+  }
+
+  async runRecurringJournalTemplate(id: string, asOf?: string): Promise<AccountingResponse<{ skipped: boolean; journalEntryId?: string; referenceNumber?: string; reason?: string }>> {
+    return apiClient.post<AccountingResponse<any>>(`/accounting/recurring-journal-templates/${id}/run`, asOf ? { asOf } : {})
+  }
+
+  async runDueRecurringJournalTemplates(asOf?: string): Promise<AccountingResponse<{ posted: Array<{ templateId: string; templateName?: string; journalEntryId?: string; referenceNumber?: string; skipped?: boolean; error?: string }> }>> {
+    return apiClient.post<AccountingResponse<any>>('/accounting/recurring-journal-templates/run-due', asOf ? { asOf } : {})
   }
 
   // VAT Rates

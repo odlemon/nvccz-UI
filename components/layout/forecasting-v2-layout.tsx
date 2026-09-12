@@ -34,10 +34,10 @@ export function ForecastingV2Layout({ children }: ForecastingV2LayoutProps) {
 
   return (
     <ForecastingThemeProvider>
-      <div className="min-h-screen bg-background">
-        <SharedTopbar onModuleSelect={handleModuleSelect} currentModule={currentModule} />
+      <div className="flex h-dvh flex-col overflow-hidden bg-background">
+        <SharedTopbar onModuleSelect={handleModuleSelect} currentModule={currentModule} hideThemeToggle />
 
-        <div style={{ height: 'calc(100vh - 80px)' }}>
+        <div className="flex min-h-0 flex-1 overflow-hidden">
           {children}
         </div>
       </div>

@@ -44,6 +44,35 @@ function formatApproval(status: string) {
   return status.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase())
 }
 
+function resolveDocumentFilename(doc: OpsDocument, blob: Blob): string {
+  const base = (doc.title || doc.id).trim()
+  if (/\.[a-z0-9]{2,5}$/i.test(base)) return base
+  const fromRef = doc.fileRef?.match(/\.[a-z0-9]{2,5}$/i)?.[0]
+  if (fromRef) return `${base}${fromRef}`
+  if (blob.type === 'application/pdf') return `${base}.pdf`
+  if (blob.type.includes('json')) return `${base}.json`
+  if (blob.type.includes('spreadsheet') || blob.type.includes('excel')) return `${base}.xlsx`
+  if (blob.type.includes('word')) return `${base}.docx`
+  return `${base}.pdf`
+}
+
+async function normalizeDownloadBlob(blob: Blob): Promise<Blob> {
+  if (!blob.type.includes('json') && blob.size > 64) return blob
+  const text = await blob.text()
+  if (text.trimStart().startsWith('{')) {
+    try {
+      const parsed = JSON.parse(text) as { message?: string; success?: boolean }
+      if (parsed.success === false || parsed.message) {
+        throw new Error(parsed.message || 'Download failed')
+      }
+    } catch (e) {
+      if (e instanceof Error && !e.message.includes('Download')) throw e
+      throw new Error('Download returned an invalid file — try again or re-upload the document.')
+    }
+  }
+  return new Blob([text], { type: blob.type || 'application/octet-stream' })
+}
+
 function Dropdown({ value, options, onChange }: { value: string; options: string[]; onChange: (value: string) => void }) {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
@@ -198,11 +227,12 @@ export default function DocumentationPage() {
     setDownloadError(null)
     setDownloadingId(doc.id)
     try {
-      const blob = await investmentOpsApi.downloadDocument(doc.id)
+      const raw = await investmentOpsApi.downloadDocument(doc.id)
+      const blob = await normalizeDownloadBlob(raw)
       const url = URL.createObjectURL(blob)
       const anchor = document.createElement('a')
       anchor.href = url
-      anchor.download = doc.title || `${doc.id}.bin`
+      anchor.download = resolveDocumentFilename(doc, blob)
       anchor.click()
       URL.revokeObjectURL(url)
     } catch (e) {
@@ -240,13 +270,13 @@ export default function DocumentationPage() {
               </button>
             </div>
           </div>
-          <div className="mt-5 flex flex-wrap gap-1 rounded-full border border-white/[.05] bg-[#090f18]/70 p-1">
+          <div className="mt-5 flex flex-wrap gap-1 rounded-full border border-border bg-muted p-1">
             {categories.map((item) => (
               <button
                 key={item}
                 type="button"
                 onClick={() => setCategory(item)}
-                className={`rounded-full px-4 py-2 text-[10px] font-medium transition ${category === item ? 'bg-white text-[#101722] shadow' : 'text-[#8e9bad] hover:bg-white/[.06] hover:text-white'}`}
+                className={`rounded-full px-4 py-2 text-[10px] font-medium transition ${category === item ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:bg-background/70 hover:text-foreground'}`}
               >
                 {item}
               </button>

@@ -375,6 +375,58 @@ class StockPickerCashApi {
     return apiClient.get(`${BASE}/external-statements/imports/${id}/errors`)
   }
 
+  async listExternalStatementImports(params?: Record<string, string | number | undefined>) {
+    return apiClient.get<OpsEnvelope<OpsPaged<Record<string, unknown>> | Record<string, unknown>[]>>(
+      `${BASE}/external-statements/imports${qs(params ?? {})}`,
+    )
+  }
+
+  // ── Period close / GL export ───────────────────────────────────────────────
+  async listPeriodControls(period: string, params?: { legalEntityId?: string }) {
+    return apiClient.get(
+      `${BASE}/cash-periods/${encodeURIComponent(period)}/controls${qs(params ?? {})}`,
+    )
+  }
+
+  async periodPrecheck(period: string, body?: Record<string, unknown>) {
+    return apiClient.post(`${BASE}/cash-periods/${encodeURIComponent(period)}/precheck`, body ?? {})
+  }
+
+  async periodClose(period: string, body?: Record<string, unknown>, idempotencyKey?: string) {
+    return apiClient.post(`${BASE}/cash-periods/${encodeURIComponent(period)}/close`, body ?? {}, {
+      headers: idempotencyHeaders(idempotencyKey),
+    })
+  }
+
+  async periodReopenRequest(period: string, body?: Record<string, unknown>) {
+    return apiClient.post(
+      `${BASE}/cash-periods/${encodeURIComponent(period)}/reopen-request`,
+      body ?? {},
+    )
+  }
+
+  async periodRestate(period: string, body?: Record<string, unknown>, idempotencyKey?: string) {
+    return apiClient.post(`${BASE}/cash-periods/${encodeURIComponent(period)}/restate`, body ?? {}, {
+      headers: idempotencyHeaders(idempotencyKey),
+    })
+  }
+
+  async createGlExport(data: Record<string, unknown>, idempotencyKey?: string) {
+    return apiClient.post(`${BASE}/cash-gl-exports`, data, {
+      headers: idempotencyHeaders(idempotencyKey),
+    })
+  }
+
+  async getGlExport(id: string) {
+    return apiClient.get(`${BASE}/cash-gl-exports/${id}`)
+  }
+
+  async retryGlExport(id: string, idempotencyKey?: string) {
+    return apiClient.post(`${BASE}/cash-gl-exports/${id}/retry`, {}, {
+      headers: idempotencyHeaders(idempotencyKey),
+    })
+  }
+
   // ── Cash reconciliation batches ────────────────────────────────────────────
   async createReconciliationBatch(data: Record<string, unknown>) {
     return apiClient.post<OpsEnvelope<ReconciliationBatch>>(`${BASE}/reconciliation-batches`, data, {

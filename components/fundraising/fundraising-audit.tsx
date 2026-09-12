@@ -16,7 +16,7 @@ import {
 import { fundraisingApi, toastFrError } from "@/lib/api/fundraising-api"
 import { mapAuditLogRow, titleCase } from "@/lib/fundraising/mappers"
 import { downloadCsvPayload } from "@/lib/fundraising/export"
-import { auditActionClass } from "./audit-mock-data"
+import { auditActionClass } from "./audit-presentation"
 import { FrDialogShell, FrTableSkeleton } from "./fundraising-modals"
 
 const CARD =
@@ -74,6 +74,10 @@ function mapSafeAuditLogRow(raw: Record<string, any>) {
         raw.createdBy,
         raw.performedBy,
       ) || "System",
+    // The API does not resolve the audited object into a name, but the snapshot it stores
+    // in newValue/previousValue carries one (fullName, legalName, title, name…). Read it
+    // from there before giving up, so the Object column identifies the record rather than
+    // reading "Name unavailable" on every row.
     objectName:
       auditLabel(
         raw.objectName,
@@ -84,6 +88,8 @@ function mapSafeAuditLogRow(raw: Record<string, any>) {
         raw.campaign,
         raw.investor,
         raw.opportunity,
+        raw.newValue,
+        raw.previousValue,
       ) || "Name unavailable",
     summary: auditSummary(raw),
   }
@@ -94,8 +100,8 @@ type AuditRow = ReturnType<typeof mapSafeAuditLogRow>
 function DetailField({ label, value }: { label: string; value: ReactNode }) {
   return (
     <div>
-      <p className="text-[10px] font-medium text-[#94a3b8]">{label}</p>
-      <div className="mt-1 text-[12px] text-[#0f172a]">{value}</div>
+      <p className="text-[11px] font-medium text-[#141414]">{label}</p>
+      <div className="mt-1 text-[12px] text-[#000000]">{value}</div>
     </div>
   )
 }
@@ -206,8 +212,8 @@ export function FundraisingAudit() {
     <div className="h-full overflow-y-auto bg-[#f8fafc] p-4 md:p-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-xl font-bold text-[#0f172a] md:text-[22px]">Audit Logs</h1>
-          <p className="mt-1 text-[12px] text-[#64748b]">
+          <h1 className="text-xl font-bold text-[#000000] md:text-[22px]">Audit Logs</h1>
+          <p className="mt-1 text-[12px] text-[#111111]">
             Immutable object-level audit trail for material fundraising actions
           </p>
         </div>
@@ -225,8 +231,8 @@ export function FundraisingAudit() {
       <div className="mt-5 grid grid-cols-2 gap-3 md:grid-cols-4">
         {kpis.map((k) => (
           <div key={k.label} className={cn(CARD, "p-3.5")}>
-            <p className="text-[11px] text-[#64748b]">{k.label}</p>
-            <p className="mt-1 text-xl font-bold tabular-nums text-[#0f172a]">{k.value}</p>
+            <p className="text-[11px] text-[#111111]">{k.label}</p>
+            <p className="mt-1 text-xl font-bold tabular-nums text-[#000000]">{k.value}</p>
           </div>
         ))}
       </div>
@@ -234,15 +240,15 @@ export function FundraisingAudit() {
       <div className={cn(CARD, "mt-5 overflow-hidden")}>
         <div className="flex flex-col gap-2 border-b border-[#f1f5f9] px-3 py-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-2">
-            <ClipboardList className="h-4 w-4 text-[#64748b]" />
-            <h2 className="text-[13px] font-semibold text-[#0f172a]">Event log</h2>
-            <span className="rounded-[4px] bg-[#f1f5f9] px-1.5 py-0.5 text-[10px] font-semibold text-[#64748b]">
+            <ClipboardList className="h-4 w-4 text-[#111111]" />
+            <h2 className="text-[13px] font-semibold text-[#000000]">Event log</h2>
+            <span className="rounded-[4px] bg-[#f1f5f9] px-1.5 py-0.5 text-[11px] font-semibold text-[#111111]">
               {filtered.length}
             </span>
           </div>
           <div className="flex flex-wrap gap-2">
             <div className="relative sm:w-[200px]">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#94a3b8]" />
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#141414]" />
               <Input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
@@ -293,7 +299,7 @@ export function FundraisingAudit() {
             <thead>
               <tr className="border-b border-[#f1f5f9] bg-[#fafafa]">
                 {["Timestamp", "User", "Action", "Object", "Summary", "IP"].map((h) => (
-                  <th key={h} className="px-3 py-2 text-[11px] font-semibold text-[#94a3b8]">
+                  <th key={h} className="px-3 py-2 text-[11px] font-semibold text-[#141414]">
                     {h}
                   </th>
                 ))}
@@ -304,7 +310,7 @@ export function FundraisingAudit() {
                 <FrTableSkeleton columns={6} rows={8} />
               ) : filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-3 py-10 text-center text-[12px] text-[#94a3b8]">
+                  <td colSpan={6} className="px-3 py-10 text-center text-[12px] text-[#141414]">
                     No audit events match your filters.
                   </td>
                 </tr>
@@ -315,16 +321,16 @@ export function FundraisingAudit() {
                     onClick={() => setSelected(log)}
                     className="cursor-pointer border-b border-[#f1f5f9] last:border-0 hover:bg-[#f8fafc]"
                   >
-                    <td className="whitespace-nowrap px-3 py-2 text-[11px] tabular-nums text-[#64748b]">
+                    <td className="whitespace-nowrap px-3 py-2 text-[11px] tabular-nums text-[#111111]">
                       {log.timestamp}
                     </td>
-                    <td className="whitespace-nowrap px-3 py-2 text-[11px] font-medium text-[#0f172a]">
+                    <td className="whitespace-nowrap px-3 py-2 text-[11px] font-medium text-[#000000]">
                       {log.user}
                     </td>
                     <td className="px-3 py-2">
                       <span
                         className={cn(
-                          "inline-flex rounded-[4px] px-1.5 py-0.5 text-[10px] font-semibold",
+                          "inline-flex rounded-[4px] px-1.5 py-0.5 text-[11px] font-semibold",
                           auditActionClass(log.action),
                         )}
                       >
@@ -332,13 +338,13 @@ export function FundraisingAudit() {
                       </span>
                     </td>
                     <td className="px-3 py-2">
-                      <p className="text-[11px] font-medium text-[#0f172a]">{log.objectName}</p>
-                      <p className="mt-0.5 text-[10px] text-[#94a3b8]">{titleCase(log.objectType)}</p>
+                      <p className="text-[11px] font-medium text-[#000000]">{log.objectName}</p>
+                      <p className="mt-0.5 text-[11px] text-[#141414]">{titleCase(log.objectType)}</p>
                     </td>
-                    <td className="max-w-[240px] truncate px-3 py-2 text-[11px] text-[#475569]">
+                    <td className="max-w-[240px] truncate px-3 py-2 text-[11px] text-[#111111]">
                       {log.summary}
                     </td>
-                    <td className="whitespace-nowrap px-3 py-2 font-mono text-[10px] text-[#94a3b8]">
+                    <td className="whitespace-nowrap px-3 py-2 font-mono text-[11px] text-[#141414]">
                       {log.ip}
                     </td>
                   </tr>
@@ -381,7 +387,7 @@ export function FundraisingAudit() {
                 value={
                   <span
                     className={cn(
-                      "inline-flex rounded-[4px] px-1.5 py-0.5 text-[10px] font-semibold",
+                      "inline-flex rounded-[4px] px-1.5 py-0.5 text-[11px] font-semibold",
                       auditActionClass(selected.action),
                     )}
                   >
@@ -397,7 +403,7 @@ export function FundraisingAudit() {
                 value={
                   <>
                     <p className="font-medium">{selected.objectName}</p>
-                    <p className="mt-0.5 text-[11px] text-[#64748b]">{titleCase(selected.objectType)}</p>
+                    <p className="mt-0.5 text-[11px] text-[#111111]">{titleCase(selected.objectType)}</p>
                   </>
                 }
               />
@@ -405,7 +411,7 @@ export function FundraisingAudit() {
             <DetailField
               label="Change summary"
               value={
-                <span className="rounded-[4px] bg-[#f8fafc] px-2 py-1 font-mono text-[11px] text-[#475569]">
+                <span className="rounded-[4px] bg-[#f8fafc] px-2 py-1 font-mono text-[11px] text-[#111111]">
                   {selected.summary}
                 </span>
               }
@@ -425,7 +431,7 @@ export function FundraisingAudit() {
             {selected.details ? (
               <DetailField
                 label="Details"
-                value={<p className="leading-relaxed text-[#475569]">{selected.details}</p>}
+                value={<p className="leading-relaxed text-[#111111]">{selected.details}</p>}
               />
             ) : null}
           </div>

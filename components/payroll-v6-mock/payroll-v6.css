@@ -828,3 +828,13 @@
 @media(max-width:600px){.payroll-v6-root .control-filter-toolbar input, .payroll-v6-root .control-filter-toolbar select{height:40px;font-size:11px}}
 
 
+/* Typography readability — Arcus dev */
+.payroll-v6-root{
+  --mock-text-micro:11px;--mock-text-xs:12px;--mock-text-sm:13px;--mock-text-base:14px;--mock-muted:#525f73;
+  --muted:#525f73;--subtle:#6b778c;font-size:var(--mock-text-base);
+}
+.payroll-v6-root th{font-size:var(--mock-text-micro)!important}
+.payroll-v6-root td{font-size:var(--mock-text-sm)!important}
+.payroll-v6-root .tiny,.payroll-v6-root .form-field label{font-size:var(--mock-text-xs)!important}
+@media(max-width:1280px){.payroll-v6-root{font-size:15px}}
+

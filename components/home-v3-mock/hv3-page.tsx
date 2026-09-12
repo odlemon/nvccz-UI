@@ -2,7 +2,7 @@ import type { ReactNode } from "react"
 
 /**
  * Home Version 3 is a fixture-only client design preview.
- * No ModuleGuard / login required — middleware also pass-throughs `/home-v3`.
+ * No ModuleGuard / login required — middleware also pass-throughs `/home`.
  */
 export function Hv3Page({
   children,

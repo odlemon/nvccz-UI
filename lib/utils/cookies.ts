@@ -56,7 +56,17 @@ export const deleteCookie = (name: string, path: string = '/'): void => {
 
 export const getAuthToken = (): string | null => {
   const tokenKey = process.env.NEXT_PUBLIC_AUTH_TOKEN_KEY || 'token'
-  return getCookie(tokenKey)
+  const fromCookie = getCookie(tokenKey)
+  if (fromCookie) return fromCookie
+  if (typeof window !== 'undefined') {
+    try {
+      const fromLs = window.localStorage.getItem(tokenKey) || window.localStorage.getItem('token')
+      if (fromLs) return fromLs
+    } catch {
+      /* ignore */
+    }
+  }
+  return null
 }
 
 export const getAuthUser = (): any | null => {

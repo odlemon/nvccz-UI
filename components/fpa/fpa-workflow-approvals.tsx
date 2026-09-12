@@ -477,7 +477,7 @@ export function FpaWorkflowApprovals() {
         onChange={(e) => {
           if (e.target.value) selectCycle(e.target.value)
         }}
-        className="h-8 rounded-full border border-[#e2e8f0] bg-[#f8fafc] px-2.5 text-[11px] text-[#475569] max-w-full disabled:opacity-60"
+        className="h-8 rounded-full border border-[#e2e8f0] bg-[#f8fafc] px-2.5 text-[11px] text-[#111111] max-w-full disabled:opacity-60"
       >
         <option value="">Select budget cycle…</option>
         {cycles.map((c) => (
@@ -622,7 +622,7 @@ export function FpaWorkflowApprovals() {
         {loading ? (
           <>
             <div className="rounded-xl border border-[#e2e8f0] bg-white px-4 py-3 flex flex-wrap items-center gap-3">
-              <p className="text-[11px] font-medium text-[#94a3b8]">Switching cycle</p>
+              <p className="text-[11px] font-medium text-[#141414]">Switching cycle</p>
               {cyclePicker}
             </div>
             <WorkflowPageSkeleton />
@@ -736,7 +736,7 @@ export function FpaWorkflowApprovals() {
             />
 
             {!cycleId ? (
-              <div className="rounded-xl border border-[#e2e8f0] bg-white p-10 text-center text-sm text-[#64748b]">
+              <div className="rounded-xl border border-[#e2e8f0] bg-white p-10 text-center text-sm text-[#111111]">
                 Select a budget cycle to open Workflow & Approvals.
               </div>
             ) : (
@@ -823,16 +823,16 @@ export function FpaWorkflowApprovals() {
                       <aside className="h-full min-h-[420px] rounded-xl border border-[#e2e8f0] bg-white p-5 flex items-center justify-center text-center">
                         <div>
                           <Loader2 className="mx-auto h-5 w-5 animate-spin text-[#2563eb]" />
-                          <p className="mt-2 text-[12px] text-[#64748b]">Loading task details…</p>
+                          <p className="mt-2 text-[12px] text-[#111111]">Loading task details…</p>
                         </div>
                       </aside>
                     ) : taskDetailError && selected ? (
                       <aside className="h-full min-h-[420px] rounded-xl border border-[#e2e8f0] bg-white p-5 flex items-center justify-center text-center">
                         <div>
-                          <p className="text-[13px] font-medium text-[#475569]">
+                          <p className="text-[13px] font-medium text-[#111111]">
                             Task details unavailable
                           </p>
-                          <p className="mt-1.5 text-[11px] text-[#94a3b8]">
+                          <p className="mt-1.5 text-[11px] text-[#141414]">
                             {taskDetailError}
                           </p>
                         </div>
@@ -986,34 +986,34 @@ export function FpaWorkflowApprovals() {
           {cycle ? (
             <dl className="grid grid-cols-2 gap-3 text-xs">
               <div>
-                <dt className="text-[#94a3b8]">Status</dt>
-                <dd className="font-medium text-[#0f172a]">{cycle.status}</dd>
+                <dt className="text-[#141414]">Status</dt>
+                <dd className="font-medium text-[#000000]">{cycle.status}</dd>
               </div>
               <div>
-                <dt className="text-[#94a3b8]">Stage</dt>
-                <dd className="font-medium text-[#0f172a]">{cycle.currentStage || "—"}</dd>
+                <dt className="text-[#141414]">Stage</dt>
+                <dd className="font-medium text-[#000000]">{cycle.currentStage || "—"}</dd>
               </div>
               <div>
-                <dt className="text-[#94a3b8]">Start</dt>
-                <dd className="font-medium text-[#0f172a]">
+                <dt className="text-[#141414]">Start</dt>
+                <dd className="font-medium text-[#000000]">
                   {cycle.startDate?.slice(0, 10) || "—"}
                 </dd>
               </div>
               <div>
-                <dt className="text-[#94a3b8]">End</dt>
-                <dd className="font-medium text-[#0f172a]">
+                <dt className="text-[#141414]">End</dt>
+                <dd className="font-medium text-[#000000]">
                   {cycle.endDate?.slice(0, 10) || "—"}
                 </dd>
               </div>
               <div>
-                <dt className="text-[#94a3b8]">Submission deadline</dt>
-                <dd className="font-medium text-[#0f172a]">
+                <dt className="text-[#141414]">Submission deadline</dt>
+                <dd className="font-medium text-[#000000]">
                   {cycle.submissionDeadline?.slice(0, 10) || "—"}
                 </dd>
               </div>
               <div>
-                <dt className="text-[#94a3b8]">Owners</dt>
-                <dd className="font-medium text-[#0f172a]">{cycle.owners?.length || 0}</dd>
+                <dt className="text-[#141414]">Owners</dt>
+                <dd className="font-medium text-[#000000]">{cycle.owners?.length || 0}</dd>
               </div>
             </dl>
           ) : null}

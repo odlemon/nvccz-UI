@@ -5,6 +5,7 @@
 
 # next.js
 /.next/
+/.next-*/
 /out/
 
 # production
@@ -18,6 +19,8 @@ yarn-error.log*
 
 # env files
 .env*
+deploy/nvccz/CREDENTIALS.local.md
+deploy/nvccz/CREDENTIALS.nts-prod.local.md
 
 # vercel
 .vercel
@@ -28,3 +31,31 @@ next-env.d.ts
 
 # local product docs / SRD (not committed)
 /docs/
+
+# claude code worktrees
+.claude/worktrees/
+# Local-only secrets (never commit) - added 2026-09-07 after credential rotation
+.secrets/
+
+# Credential-bearing files that must never be committed (added 2026-09-07).
+# The scratch ops helpers under scripts/_*.py accumulated hard-coded server and
+# database passwords over time; 29 of them still hold live values. _ssh_creds.py
+# is the deliberate exception: it holds no secret, it reads one from
+# .secrets/ssh.env or $ARCUS_SSH_PASSWORD.
+design-refs/credentials-and-database-access.md
+scripts/_*.py
+!scripts/_ssh_creds.py
+.patch-performance-runtime.lock
+.perf-dumps/
+.acc-dumps/
+.lp-dumps/
+.lp-done/
+.lp-final/
+.lp-verify/
+.lp-check/
+.lp-shots/
+
+# Fundraising verification output (scripts/fundraising-*.mjs)
+.fr-dump/
+.fr-trace/
+.fr-e2e/

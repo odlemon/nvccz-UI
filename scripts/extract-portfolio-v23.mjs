@@ -11,7 +11,7 @@ const ROOT = "portfolio-v11-root"
 const OUT_CSS = "components/portfolio-v11-mock/portfolio-v11.css"
 const OUT_RUNTIME = "components/portfolio-v11-mock/matanho-portfolio-runtime.js"
 const OUT_SHELL = "components/portfolio-v11-mock/shell.html"
-const PUBLIC_ASSETS = "public/portfolio-v11/assets"
+const PUBLIC_ASSETS = "public/portfolio/assets"
 
 fs.mkdirSync("components/portfolio-v11-mock", { recursive: true })
 fs.mkdirSync("lib/portfolio-v11-mock", { recursive: true })
@@ -37,8 +37,8 @@ const indexHtml = fs.readFileSync(path.join(CLIENT, "dist/index.html"), "utf8")
 const shellMatch = indexHtml.match(/<div id="app"[\s\S]*?<div id="toastStack"[\s\S]*?<\/div>\s*<\/div>/)
 if (!shellMatch) throw new Error("shell not found")
 let shell = shellMatch[0]
-shell = shell.replace(/\.\/assets\//g, "/portfolio-v11/assets/")
-shell = shell.replace(/src="\/assets\//g, 'src="/portfolio-v11/assets/')
+shell = shell.replace(/\.\/assets\//g, "/portfolio/assets/")
+shell = shell.replace(/src="\/assets\//g, 'src="/portfolio/assets/')
 shell = shell.replace(/\u2318/g, "Cmd")
 fs.writeFileSync(OUT_SHELL, shell + "\n")
 fs.writeFileSync(
@@ -198,12 +198,12 @@ function extractFullCss(clientDir) {
 }
 
 let css = extractFullCss(CLIENT)
-css = css.replace(/url\((['"]?)\/?assets\//g, "url($1/portfolio-v11/assets/")
-css = css.replace(/url\((['"]?)\.\/assets\//g, "url($1/portfolio-v11/assets/")
+css = css.replace(/url\((['"]?)\/?assets\//g, "url($1/portfolio/assets/")
+css = css.replace(/url\((['"]?)\.\/assets\//g, "url($1/portfolio/assets/")
 const scoped = scopeCss(css)
 fs.writeFileSync(
   OUT_CSS,
-  `/* Scoped Matanho Portfolio Management V23 styles (hosted at /portfolio-v11) */\n${scoped}\n`
+  `/* Scoped Matanho Portfolio Management V23 styles (hosted at /portfolio) */\n${scoped}\n`
 )
 console.log("css", fs.statSync(OUT_CSS).size)
 
@@ -212,8 +212,8 @@ code = code.replace(/^window\.__MATANHO_RUNTIME__[^\n]*\n?/, "")
 code = code.replace(/^\s*\(\(\)\s*=>\s*\{/, "")
 code = code.replace(/\}\)\(\);\s*$/, "")
 
-code = code.replace(/"\/assets\//g, '"/portfolio-v11/assets/')
-code = code.replace(/'\/assets\//g, "'/portfolio-v11/assets/")
+code = code.replace(/"\/assets\//g, '"/portfolio/assets/')
+code = code.replace(/'\/assets\//g, "'/portfolio/assets/")
 
 code = code.replace(
   /document\.body\.dataset\.theme\s*=\s*state\.theme/g,
@@ -234,7 +234,7 @@ code = code.replace(
   }`
 )
 
-const runtime = `/* Auto-extracted Matanho Portfolio V23 runtime — adapted for Next.js (/portfolio-v11) */
+const runtime = `/* Auto-extracted Matanho Portfolio V23 runtime — adapted for Next.js (/portfolio) */
 export function startPortfolioV11Runtime(rootEl, options = {}) {
   const initialPage = options.initialPage || 'dashboard';
   window.__PORTFOLIO_V11_NAV__ = options.onNavigate || (() => {});

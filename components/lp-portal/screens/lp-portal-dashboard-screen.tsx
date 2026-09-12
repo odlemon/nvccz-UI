@@ -43,6 +43,7 @@ import {
   formatMultiple,
   formatPercent,
   formatUnits,
+  niceAxisMax,
   parseDecimal,
 } from "@/lib/lp-portal/format"
 import { useLpDashboardBundle } from "@/lib/lp-portal/hooks"
@@ -219,10 +220,10 @@ export function LpPortalDashboardScreen() {
     [historyData],
   )
 
-  const chartYMax = React.useMemo(() => {
-    const maxVal = Math.max(...visibleChartData.flatMap((p) => [p.nav, p.paidIn]), 1)
-    return Math.ceil(maxVal / 50) * 50 || 250
-  }, [visibleChartData])
+  const chartYMax = React.useMemo(
+    () => niceAxisMax(Math.max(...visibleChartData.flatMap((p) => [p.nav, p.paidIn]), 1)),
+    [visibleChartData],
+  )
 
   const lastIndex = Math.max(visibleChartData.length - 1, 0)
 
@@ -233,7 +234,7 @@ export function LpPortalDashboardScreen() {
       {
         label: "Total Commitment",
         value: formatMoneyCompact(kpis.totalCommitment, presentationCurrency),
-        helper: `${kpis.investmentCount} Investments`,
+        helper: `${kpis.investmentCount} ${kpis.investmentCount === 1 ? "Commitment" : "Commitments"}`,
         href: "/lp-portal/investments",
         icon: Gauge,
         iconBg: "bg-[#eaf2ff]",
@@ -258,7 +259,11 @@ export function LpPortalDashboardScreen() {
       {
         label: "Current NAV",
         value: formatMoneyCompact(kpis.currentNav, presentationCurrency),
-        helper: `${formatMultiple(kpis.tvpi)} TVPI`,
+        // SRD section 34's dashboard wireframe carries a ratio row of Net IRR / TVPI / DPI / RVPI.
+        // TVPI and DPI sit on this card and the Distributions card respectively, but RVPI had no
+        // home on the dashboard at all - it appeared only on the Performance screen. It belongs
+        // next to NAV, being residual NAV over paid-in.
+        helper: `${formatMultiple(kpis.tvpi)} TVPI · ${formatMultiple(kpis.rvpi)} RVPI`,
         icon: CircleDollarSign,
         iconBg: "bg-[#f3e8ff]",
         iconColor: "text-[#7c3aed]",
@@ -286,12 +291,18 @@ export function LpPortalDashboardScreen() {
     const kpis = data?.dashboard.kpis
     if (!kpis) return []
     const paidIn = parseDecimal(kpis.paidIn) / 1_000_000
+    const outstanding = parseDecimal(kpis.outstandingCalled ?? "0") / 1_000_000
     const unfunded = parseDecimal(kpis.unfunded) / 1_000_000
     const distributed = parseDecimal(kpis.distributions) / 1_000_000
     const remaining = Math.max(parseDecimal(kpis.currentNav) / 1_000_000 - distributed, 0)
     const commitment = parseDecimal(kpis.totalCommitment)
-    const pct = (value: number) =>
-      commitment > 0 ? `${((value * 1_000_000 / commitment) * 100).toFixed(1)}%` : "—"
+    // Takes the RAW amount, in the same units as `commitment` (which is not scaled down).
+    // The `* 1_000_000` that used to be here was applied on top of call sites that already
+    // pass `xxx * 1_000_000` to undo their own conversion to millions, so every share was
+    // multiplied by a million twice over — the Capital Position legend read "$1.25M
+    // (5000000.0%)" where it should read 5.0%.
+    const pct = (rawValue: number) =>
+      commitment > 0 ? `${((rawValue / commitment) * 100).toFixed(1)}%` : "—"
     return [
       {
         name: "Paid-In Capital",
@@ -300,6 +311,19 @@ export function LpPortalDashboardScreen() {
         percent: pct(paidIn * 1_000_000),
         color: "#1a56db",
       },
+      // Unfunded is commitment minus CALLED, so without this slice the panel showed 5.0% and
+      // 92.5% and silently lost the 2.5% the investor has been called for and still owes.
+      ...(outstanding > 0
+        ? [
+            {
+              name: "Called, Not Yet Paid",
+              value: outstanding,
+              display: formatMoneyCompact(kpis.outstandingCalled ?? "0", presentationCurrency),
+              percent: pct(outstanding * 1_000_000),
+              color: "#f59e0b",
+            },
+          ]
+        : []),
       {
         name: "Unfunded Commitment",
         value: unfunded,
@@ -466,13 +490,20 @@ export function LpPortalDashboardScreen() {
 
           return (
             <Panel key={kpi.label} className="min-h-[118px] px-4 py-3.5">
+              {/*
+                The label used to sit on one line beside the icon, sharing the
+                row with the info button, which left it 84px in a card a sixth
+                of the row wide. Four of the six labels were cut at every
+                viewport tested -- 375, 768 and 1440 -- so an LP saw $25.00M and
+                $23.50M side by side under "Total Com..." and "Unfunded ...".
+                Wrapping alone was not enough: "Commitment" on its own needs
+                90px. The icon and the info button now share the top row and the
+                label takes the card's full width beneath them.
+              */}
               <div className="flex items-start justify-between gap-2">
-                <div className="flex min-w-0 items-center gap-2.5">
-                  <span className={cn("flex size-9 shrink-0 items-center justify-center rounded-lg", kpi.iconBg, kpi.iconColor)}>
-                    <Icon className="size-[18px]" strokeWidth={2} />
-                  </span>
-                  <span className="truncate text-[13px] font-medium leading-4 text-[#475569]">{kpi.label}</span>
-                </div>
+                <span className={cn("flex size-9 shrink-0 items-center justify-center rounded-lg", kpi.iconBg, kpi.iconColor)}>
+                  <Icon className="size-[18px]" strokeWidth={2} />
+                </span>
                 <button
                   type="button"
                   className="mt-0.5 flex size-4 shrink-0 items-center justify-center rounded-full text-[#94a3b8] transition-colors hover:bg-slate-100 hover:text-slate-600"
@@ -482,6 +513,7 @@ export function LpPortalDashboardScreen() {
                   <Info className="size-3.5" strokeWidth={2} />
                 </button>
               </div>
+              <span className="mt-2 block text-[13px] font-medium leading-4 text-[#475569]">{kpi.label}</span>
               <p className="mt-3 text-[24px] font-bold leading-7 tracking-[-0.03em] text-[#0f172a]">{kpi.value}</p>
               {helper}
             </Panel>
@@ -562,7 +594,7 @@ export function LpPortalDashboardScreen() {
                 <YAxis
                   domain={[0, chartYMax]}
                   ticks={Array.from({ length: 6 }, (_, i) => (chartYMax / 5) * i)}
-                  tickFormatter={(value) => (value === 0 ? "$0" : `$${value}M`)}
+                  tickFormatter={(value) => (value === 0 ? "$0" : `$${Number(value.toPrecision(3))}M`)}
                   tick={{ fontSize: 10, fill: "#94a3b8" }}
                   tickLine={false}
                   axisLine={false}

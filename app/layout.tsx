@@ -9,6 +9,7 @@ import { AuthProvider } from "@/lib/auth/AuthProvider"
 import { GlobalRealtimeMount } from "@/components/performance/collaboration/global-realtime-mount"
 import { Toaster } from "sonner"
 import { RouteTransition } from "@/components/route-transition"
+import { ORG_NAME, ORG_LOGO_PATH } from "@/lib/branding"
 import "./globals.css"
 
 const montserrat = Montserrat({
@@ -24,13 +25,13 @@ const inter = Inter({
 })
 
 export const metadata: Metadata = {
-  title: "Matanho — Investment Management ERP",
+  title: `${ORG_NAME} — Investment Management ERP`,
   description: "The infrastructure behind every investment.",
   generator: "v0.app",
   icons: {
-    icon: "/new_logo.png",
-    shortcut: "/new_logo.png",
-    apple: "/new_logo.png",
+    icon: ORG_LOGO_PATH,
+    shortcut: ORG_LOGO_PATH,
+    apple: ORG_LOGO_PATH,
   },
 }
 

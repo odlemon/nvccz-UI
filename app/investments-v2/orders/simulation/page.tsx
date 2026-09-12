@@ -113,6 +113,11 @@ export default function SimulationPage() {
       description="Model portfolio impact without creating, routing or executing an order."
       actions={<Pill tone="violet">What-if only · no execution</Pill>}
     >
+      <p className="rounded-2xl border border-white/[0.06] bg-white/[0.02] px-4 py-3 text-[11px] leading-relaxed text-slate-400">
+        Use this page to stress-test a hypothetical trade before it enters the orderbook.
+        Fill in portfolio, instrument, quantity and price, then click <span className="text-slate-200">Run simulation</span>.
+        Nothing is saved, routed, or sent to a broker — results appear on the right for comparison only.
+      </p>
       {metaError && (
         <div className="rounded-2xl border border-rose-500/30 bg-rose-500/10 px-4 py-2 text-[12px] text-rose-200">
           {metaError}

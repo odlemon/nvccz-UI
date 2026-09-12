@@ -105,7 +105,12 @@ function mapColleague(c: LpColleague): Colleague {
     name: c.name,
     email: c.email,
     role: mapColleagueRole(c.lpRole),
-    funds: c.fundIds.length,
+    // `fundIds` is null when a membership is not restricted to specific funds — the API returns
+    // `Array.isArray(r.fundIds) ? r.fundIds : r.fundIds || null`, so null is the normal
+    // "all funds" case, not an error. The mock store always supplied an array, so reading
+    // `.length` here only started throwing once this screen moved to live data, and it took the
+    // whole screen down through the error boundary rather than failing visibly.
+    funds: Array.isArray(c.fundIds) ? c.fundIds.length : 0,
     mfa: c.mfaEnabled ?? false,
     status: mapColleagueStatus(c.status),
     lastActive: c.lastActiveAt ? formatDate(c.lastActiveAt, "datetime") : "—",

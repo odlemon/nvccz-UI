@@ -64,7 +64,7 @@ function campaignIconFor(type: string) {
 function PanelHeader({ title, link = "View all" }: { title: string; link?: string }) {
   return (
     <div className="flex items-center justify-between border-b border-[#f1f5f9] px-4 py-3.5">
-      <h2 className="text-[13px] font-semibold text-[#0f172a]">{title}</h2>
+      <h2 className="text-[13px] font-semibold text-[#000000]">{title}</h2>
       {link ? (
         <button type="button" className="rounded-full px-2 py-1 text-[11px] font-medium text-[#2563eb] hover:bg-[#eff6ff]">
           {link}
@@ -77,8 +77,8 @@ function PanelHeader({ title, link = "View all" }: { title: string; link?: strin
 function EngagementStat({ label, value }: { label: string; value: number | null }) {
   return (
     <div>
-      <p className="text-[9px] text-[#94a3b8]">{label}</p>
-      <p className="mt-0.5 text-[12px] font-semibold tabular-nums text-[#0f172a]">
+      <p className="text-[11px] text-[#141414]">{label}</p>
+      <p className="mt-0.5 text-[12px] font-semibold tabular-nums text-[#000000]">
         {value == null ? "—" : value.toLocaleString()}
       </p>
     </div>
@@ -109,12 +109,12 @@ function CampaignSummaryCard({
         <span style={{ color: isLive ? "#15803d" : "#6d28d9" }} className="shrink-0">
           <Icon className="h-5 w-5" strokeWidth={1.75} />
         </span>
-        <h3 className="min-w-0 flex-1 text-sm font-semibold leading-snug text-[#0f172a]">
+        <h3 className="min-w-0 flex-1 text-sm font-semibold leading-snug text-[#000000]">
           {campaign.name}
         </h3>
         <span
           className={cn(
-            "shrink-0 rounded-[4px] px-2 py-0.5 text-[10px] font-semibold",
+            "shrink-0 rounded-[4px] px-2 py-0.5 text-[11px] font-semibold",
             isLive ? "bg-[#dcfce7] text-[#15803d]" : "bg-[#ede9fe] text-[#6d28d9]",
           )}
         >
@@ -122,33 +122,33 @@ function CampaignSummaryCard({
         </span>
       </div>
 
-      <p className="mt-2 text-[11px] text-[#94a3b8]">{campaign.type.replace(/_/g, " ")}</p>
-      <p className="mt-0.5 text-[11px] leading-relaxed text-[#64748b]">
+      <p className="mt-2 text-[11px] text-[#141414]">{campaign.type.replace(/_/g, " ")}</p>
+      <p className="mt-0.5 text-[11px] leading-relaxed text-[#111111]">
         {campaign.startDate ? `Starts ${new Date(campaign.startDate).toLocaleDateString()}` : "No start date set"}
         {campaign.closeDate ? ` · Target close ${new Date(campaign.closeDate).toLocaleDateString()}` : ""}
       </p>
 
       <div className="mt-4 grid grid-cols-2 gap-2 border-y border-[#f1f5f9] py-3">
         <div>
-          <p className="text-[10px] text-[#94a3b8]">Target</p>
-          <p className="mt-0.5 text-sm font-semibold tabular-nums text-[#0f172a]">{campaign.target}</p>
+          <p className="text-[11px] text-[#141414]">Target</p>
+          <p className="mt-0.5 text-sm font-semibold tabular-nums text-[#000000]">{campaign.target}</p>
         </div>
         <div>
-          <p className="text-[10px] text-[#94a3b8]">Currency</p>
-          <p className="mt-0.5 text-sm font-semibold tabular-nums text-[#0f172a]">{campaign.currency}</p>
+          <p className="text-[11px] text-[#141414]">Currency</p>
+          <p className="mt-0.5 text-sm font-semibold tabular-nums text-[#000000]">{campaign.currency}</p>
         </div>
       </div>
 
       <div className="mt-3">
-        <p className="text-[10px] text-[#94a3b8]">Owner</p>
-        <p className="mt-0.5 text-[12px] font-medium text-[#0f172a]">
+        <p className="text-[11px] text-[#141414]">Owner</p>
+        <p className="mt-0.5 text-[12px] font-medium text-[#000000]">
           {/^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(campaign.owner) ? "Name unavailable" : campaign.owner}
         </p>
       </div>
 
       <div className="mt-3 border-t border-[#f1f5f9] pt-3">
         {engagementLoading ? (
-          <p className="flex items-center gap-1.5 text-[10px] text-[#94a3b8]">
+          <p className="flex items-center gap-1.5 text-[11px] text-[#141414]">
             <Loader2 className="h-3 w-3 animate-spin" /> Loading engagement…
           </p>
         ) : (
@@ -161,9 +161,9 @@ function CampaignSummaryCard({
               <EngagementStat label="Materials" value={engagement?.materialsDownloaded ?? null} />
             </div>
             <div className="mt-2.5">
-              <div className="flex items-center justify-between text-[10px] text-[#94a3b8]">
+              <div className="flex items-center justify-between text-[11px] text-[#141414]">
                 <span>Progress</span>
-                <span className="font-medium text-[#0f172a]">
+                <span className="font-medium text-[#000000]">
                   {engagement ? `${engagement.progressPct}%` : "—"}
                 </span>
               </div>
@@ -180,7 +180,7 @@ function CampaignSummaryCard({
 
       <div className="mt-auto pt-4">
         {isLive ? (
-          <p className="text-[11px] text-[#94a3b8]">Campaign is active — visible on the pipeline board.</p>
+          <p className="text-[11px] text-[#141414]">Campaign is active — visible on the pipeline board.</p>
         ) : (
           <Button
             type="button"
@@ -193,10 +193,10 @@ function CampaignSummaryCard({
           </Button>
         )}
         <div className="mt-2 flex flex-wrap justify-center gap-1">
-          <button type="button" onClick={() => onPatch(campaign, "edit")} className="rounded-full px-2 py-1 text-[9px] text-[#2563eb] hover:bg-[#eff6ff]">Edit</button>
-          {isLive ? <button type="button" onClick={() => onPatch(campaign, "pause")} className="rounded-full px-2 py-1 text-[9px] text-[#64748b] hover:bg-[#f1f5f9]">Pause</button> : null}
-          <button type="button" onClick={() => onPatch(campaign, "approval")} className="rounded-full px-2 py-1 text-[9px] text-[#64748b] hover:bg-[#f1f5f9]">Submit approval</button>
-          <button type="button" onClick={() => onPatch(campaign, "archive")} className="rounded-full px-2 py-1 text-[9px] text-[#b91c1c] hover:bg-[#fef2f2]">Archive</button>
+          <button type="button" onClick={() => onPatch(campaign, "edit")} className="rounded-full px-2 py-1 text-[11px] text-[#2563eb] hover:bg-[#eff6ff]">Edit</button>
+          {isLive ? <button type="button" onClick={() => onPatch(campaign, "pause")} className="rounded-full px-2 py-1 text-[11px] text-[#111111] hover:bg-[#f1f5f9]">Pause</button> : null}
+          <button type="button" onClick={() => onPatch(campaign, "approval")} className="rounded-full px-2 py-1 text-[11px] text-[#111111] hover:bg-[#f1f5f9]">Submit approval</button>
+          <button type="button" onClick={() => onPatch(campaign, "archive")} className="rounded-full px-2 py-1 text-[11px] text-[#b91c1c] hover:bg-[#fef2f2]">Archive</button>
         </div>
       </div>
     </div>
@@ -244,7 +244,7 @@ function CampaignCardsGrid({
 
   if (campaigns.length === 0) {
     return (
-      <div className="rounded-[12px] border border-[#e2e8f0] bg-white p-10 text-center text-[13px] text-[#94a3b8]">
+      <div className="rounded-[12px] border border-[#e2e8f0] bg-white p-10 text-center text-[13px] text-[#141414]">
         No campaigns yet. Create one to get started.
       </div>
     )
@@ -306,21 +306,21 @@ function CommunicationsPanel({
     <section className={cn(CARD, "flex h-full min-h-0 flex-col overflow-hidden", className)}>
       <PanelHeader title="Communications Timeline" />
       {loading ? (
-        <p className="flex items-center gap-2 p-4 text-[11px] text-[#94a3b8]">
+        <p className="flex items-center gap-2 p-4 text-[11px] text-[#141414]">
           <Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading communications…
         </p>
       ) : items.length === 0 ? (
-        <p className="p-6 text-center text-[11px] text-[#94a3b8]">No communications recorded yet.</p>
+        <p className="p-6 text-center text-[11px] text-[#141414]">No communications recorded yet.</p>
       ) : (
         <ul className="min-h-0 flex-1 divide-y divide-[#f1f5f9] overflow-y-auto">
           {items.slice(0, footer ? 8 : undefined).map((item) => (
             <li key={String(item.id)} className="px-4 py-3">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="truncate text-xs font-medium text-[#0f172a]">{item.subject || "(No subject)"}</p>
-                  <p className="mt-0.5 line-clamp-2 text-[10px] text-[#64748b]">{item.summary || item.notes || "—"}</p>
+                  <p className="truncate text-xs font-medium text-[#000000]">{item.subject || "(No subject)"}</p>
+                  <p className="mt-0.5 line-clamp-2 text-[11px] text-[#111111]">{item.summary || item.notes || "—"}</p>
                 </div>
-                <span className="shrink-0 text-[9px] text-[#94a3b8]">
+                <span className="shrink-0 text-[11px] text-[#141414]">
                   {item.occurredAt ? new Date(item.occurredAt).toLocaleDateString() : "—"}
                 </span>
               </div>
@@ -461,7 +461,7 @@ function OperationsPanel({
             {Array.from({ length: limit ?? 3 }).map((_, index) => <Skeleton key={index} className="h-10 w-full" />)}
           </div>
         ) : visibleItems.length === 0 ? (
-          <p className="p-8 text-center text-[11px] text-[#94a3b8]">
+          <p className="p-8 text-center text-[11px] text-[#141414]">
             {selectedCampaignId ? `No ${meta.title.toLowerCase()} for this campaign.` : "Select or create a campaign first."}
           </p>
         ) : (
@@ -477,19 +477,19 @@ function OperationsPanel({
               const Icon = resource === "templates" ? FileSearch : resource === "distribution-lists" ? Users : resource === "events" ? MapPin : FileText
               return (
                 <li key={String(item.id ?? index)} className="flex items-center gap-3 px-4 py-3">
-                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[6px] bg-[#f1f5f9] text-[#64748b]">
+                  <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-[6px] bg-[#f1f5f9] text-[#111111]">
                     <Icon className="h-3.5 w-3.5" />
                   </span>
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-xs font-medium text-[#0f172a]">{title}</p>
-                    {detail ? <p className="mt-0.5 truncate text-[10px] text-[#94a3b8]">{String(detail)}</p> : null}
+                    <p className="truncate text-xs font-medium text-[#000000]">{title}</p>
+                    {detail ? <p className="mt-0.5 truncate text-[11px] text-[#141414]">{String(detail)}</p> : null}
                   </div>
                   {resource === "materials" && downloadUrl ? (
                     <a
                       href={downloadUrl}
                       download
                       aria-label={`Download ${title}`}
-                      className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-[#e2e8f0] bg-white text-[#64748b] hover:bg-[#f8fafc]"
+                      className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-[#e2e8f0] bg-white text-[#111111] hover:bg-[#f8fafc]"
                     >
                       <Download className="h-3.5 w-3.5" />
                     </a>
@@ -498,7 +498,7 @@ function OperationsPanel({
                       type="button"
                       disabled
                       aria-label={`Download unavailable for ${title}`}
-                      className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-[#e2e8f0] bg-[#f8fafc] text-[#cbd5e1]"
+                      className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-[#e2e8f0] bg-[#f8fafc] text-[#141414]"
                     >
                       <Download className="h-3.5 w-3.5" />
                     </button>
@@ -757,7 +757,7 @@ export function FundraisingCampaigns() {
     <div className="mx-auto max-w-[1600px] space-y-4 p-4 sm:space-y-5 sm:p-5 md:p-6">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0 space-y-3">
-          <h1 className="text-2xl font-semibold tracking-tight text-[#0f172a] sm:text-[28px]">
+          <h1 className="text-2xl font-semibold tracking-tight text-[#000000] sm:text-[28px]">
             Campaigns &amp; Communications
           </h1>
 
@@ -778,7 +778,7 @@ export function FundraisingCampaigns() {
                     "relative rounded-full px-3 py-2.5 text-xs font-medium transition-colors sm:px-4 sm:text-[13px]",
                     activeTab === tab.id
                       ? "text-blue-600 after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:bg-gradient-to-r after:from-blue-600 after:to-cyan-600"
-                      : "text-[#64748b] hover:text-[#334155]",
+                      : "text-[#111111] hover:text-[#111111]",
                   )}
                 >
                   {tab.label}
@@ -786,7 +786,7 @@ export function FundraisingCampaigns() {
               ))}
             </div>
 
-            <div className="flex shrink-0 items-center gap-1.5 pb-2 text-xs text-[#64748b] xl:pb-2.5">
+            <div className="flex shrink-0 items-center gap-1.5 pb-2 text-xs text-[#111111] xl:pb-2.5">
               <CalendarDays className="h-3.5 w-3.5" />
               As at {new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}
             </div>

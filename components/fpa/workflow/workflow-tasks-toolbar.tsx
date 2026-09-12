@@ -47,13 +47,13 @@ export function WorkflowTasksToolbar({
   refreshing?: boolean
 }) {
   const selectClass =
-    "h-8 rounded-lg border border-[#e2e8f0] bg-white px-2.5 text-[11px] text-[#475569] focus:outline-none focus:ring-2 focus:ring-[#2563eb]/20"
+    "h-8 rounded-lg border border-[#e2e8f0] bg-white px-2.5 text-[11px] text-[#111111] focus:outline-none focus:ring-2 focus:ring-[#2563eb]/20"
 
   return (
     <div className="space-y-3 shrink-0">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <h2 className="text-[15px] font-semibold text-[#0f172a]">Workflow Tasks</h2>
+          <h2 className="text-[15px] font-semibold text-[#000000]">Workflow Tasks</h2>
           <div className="flex flex-wrap items-center gap-0.5 mt-2 border-b border-[#e2e8f0]">
             {TABS.map((t) => (
               <button
@@ -64,7 +64,7 @@ export function WorkflowTasksToolbar({
                   "h-8 px-2.5 text-[11px] font-medium border-b-2 -mb-px whitespace-nowrap",
                   tab === t
                     ? "border-[#2563eb] text-[#2563eb]"
-                    : "border-transparent text-[#64748b] hover:text-[#0f172a]",
+                    : "border-transparent text-[#111111] hover:text-[#000000]",
                 )}
               >
                 {tabLabel(t, counts)}
@@ -76,7 +76,7 @@ export function WorkflowTasksToolbar({
           <button
             type="button"
             onClick={onExport}
-            className="h-8 inline-flex items-center gap-1.5 rounded-lg border border-[#e2e8f0] bg-white px-2.5 text-[11px] font-medium text-[#475569] hover:bg-[#f8fafc]"
+            className="h-8 inline-flex items-center gap-1.5 rounded-lg border border-[#e2e8f0] bg-white px-2.5 text-[11px] font-medium text-[#111111] hover:bg-[#f8fafc]"
           >
             <Download className="w-3.5 h-3.5" />
             Export
@@ -84,7 +84,7 @@ export function WorkflowTasksToolbar({
           <button
             type="button"
             onClick={onRefresh}
-            className="h-8 w-8 inline-flex items-center justify-center rounded-lg border border-[#e2e8f0] text-[#64748b] hover:bg-[#f8fafc]"
+            className="h-8 w-8 inline-flex items-center justify-center rounded-lg border border-[#e2e8f0] text-[#111111] hover:bg-[#f8fafc]"
             aria-label="Refresh"
           >
             <RefreshCw className={cn("w-3.5 h-3.5", refreshing && "animate-spin")} />
@@ -124,18 +124,18 @@ export function WorkflowTasksToolbar({
           <option value="LOW">Low</option>
         </select>
         <div className="relative flex-1 min-w-[160px]">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[#94a3b8]" />
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[#141414]" />
           <input
             value={search}
             onChange={(e) => onSearch(e.target.value)}
             placeholder="Search tasks..."
-            className="h-8 w-full rounded-lg border border-[#e2e8f0] bg-white pl-8 pr-8 text-[11px] text-[#0f172a] focus:outline-none focus:ring-2 focus:ring-[#2563eb]/20"
+            className="h-8 w-full rounded-lg border border-[#e2e8f0] bg-white pl-8 pr-8 text-[11px] text-[#000000] focus:outline-none focus:ring-2 focus:ring-[#2563eb]/20"
           />
           {search ? (
             <button
               type="button"
               onClick={() => onSearch("")}
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-[#94a3b8] hover:text-[#64748b]"
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-[#141414] hover:text-[#111111]"
               aria-label="Clear search"
             >
               <X className="w-3.5 h-3.5" />
@@ -144,7 +144,7 @@ export function WorkflowTasksToolbar({
         </div>
         <button
           type="button"
-          className="h-8 w-8 inline-flex items-center justify-center rounded-lg border border-[#e2e8f0] text-[#64748b]"
+          className="h-8 w-8 inline-flex items-center justify-center rounded-lg border border-[#e2e8f0] text-[#111111]"
           aria-label="More filters"
           title="Filters"
         >

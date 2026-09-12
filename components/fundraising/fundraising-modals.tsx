@@ -59,9 +59,9 @@ export function FrDialogShell({
         )}
       >
         <DialogHeader className="border-b border-[#f1f5f9] px-5 pb-3 pt-5 text-left sm:px-6">
-          <DialogTitle className="text-base font-semibold text-[#0f172a]">{title}</DialogTitle>
+          <DialogTitle className="text-base font-semibold text-[#000000]">{title}</DialogTitle>
           {description ? (
-            <DialogDescription className="text-xs text-[#64748b]">{description}</DialogDescription>
+            <DialogDescription className="text-xs text-[#111111]">{description}</DialogDescription>
           ) : null}
         </DialogHeader>
         <div className="max-h-[min(78vh,720px)] overflow-y-auto px-5 py-5 sm:px-6">{children}</div>
@@ -122,17 +122,17 @@ export function FrField({
 }) {
   return (
     <label className={cn("block space-y-1.5", className)}>
-      <span className="text-[11px] font-medium text-[#64748b]">{label}</span>
+      <span className="text-[11px] font-medium text-[#111111]">{label}</span>
       {children}
     </label>
   )
 }
 
 export const frInputClass =
-  "h-9 w-full rounded-[6px] border border-[#e2e8f0] bg-white px-3 text-[12px] text-[#0f172a] outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-500/20"
+  "h-9 w-full rounded-[6px] border border-[#e2e8f0] bg-white px-3 text-[12px] text-[#000000] outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-500/20"
 
 export const frSelectClass =
-  "h-9 w-full rounded-[6px] border border-[#e2e8f0] bg-white px-3 text-[12px] text-[#0f172a] outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-500/20"
+  "h-9 w-full rounded-[6px] border border-[#e2e8f0] bg-white px-3 text-[12px] text-[#000000] outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-500/20"
 
 export function FrTableSkeleton({
   columns,
@@ -205,7 +205,7 @@ export function FrConfirmDialog({
         </>
       }
     >
-      <p className="text-[12px] text-[#475569]">{description || "This action cannot be undone."}</p>
+      <p className="text-[12px] text-[#111111]">{description || "This action cannot be undone."}</p>
     </FrDialogShell>
   )
 }
@@ -338,8 +338,8 @@ export function FrWizardShell({
         )}
       >
         <DialogHeader className="shrink-0 border-b border-[#e2e8f0] px-5 pb-3 pt-5 text-left sm:px-6">
-          <DialogTitle className="text-base font-semibold text-[#0f172a] sm:text-lg">{title}</DialogTitle>
-          <DialogDescription className="text-xs text-[#64748b]">
+          <DialogTitle className="text-base font-semibold text-[#000000] sm:text-lg">{title}</DialogTitle>
+          <DialogDescription className="text-xs text-[#111111]">
             Step {stepIdx + 1} of {steps.length}
             {current ? ` · ${current.label}` : ""}
             {" · "}
@@ -362,15 +362,15 @@ export function FrWizardShell({
                         "flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-[11px]",
                         active && "bg-[#eff6ff] font-medium text-[#2563eb]",
                         done && !active && "text-[#16a34a]",
-                        !active && !done && "text-[#64748b] hover:bg-white",
+                        !active && !done && "text-[#111111] hover:bg-white",
                       )}
                     >
                       <span
                         className={cn(
-                          "flex h-5 w-5 shrink-0 items-center justify-center rounded-full border text-[10px]",
+                          "flex h-5 w-5 shrink-0 items-center justify-center rounded-full border text-[11px]",
                           active && "border-[#2563eb] bg-[#2563eb] text-white",
                           done && !active && "border-[#bbf7d0] bg-[#dcfce7] text-[#16a34a]",
-                          !active && !done && "border-[#e2e8f0] text-[#94a3b8]",
+                          !active && !done && "border-[#e2e8f0] text-[#141414]",
                         )}
                       >
                         {done ? <Check className="h-3 w-3" /> : s.short}
@@ -391,12 +391,12 @@ export function FrWizardShell({
                   type="button"
                   onClick={() => goTo(s.id)}
                   className={cn(
-                    "h-7 shrink-0 rounded-full border px-2.5 text-[10px]",
+                    "h-7 shrink-0 rounded-full border px-2.5 text-[11px]",
                     s.id === stepId
                       ? "border-[#2563eb] bg-[#eff6ff] font-medium text-[#2563eb]"
                       : i < stepIdx
                         ? "border-[#bbf7d0] bg-[#f0fdf4] text-[#16a34a]"
-                        : "border-[#e2e8f0] text-[#64748b]",
+                        : "border-[#e2e8f0] text-[#111111]",
                   )}
                 >
                   {s.short}. {s.label}
@@ -404,11 +404,11 @@ export function FrWizardShell({
               ))}
             </div>
 
-            <h3 className="text-sm font-semibold text-[#0f172a]">{current?.label}</h3>
+            <h3 className="text-sm font-semibold text-[#000000]">{current?.label}</h3>
 
             {errors.length > 0 ? (
               <div className="rounded-md border border-[#fecaca] bg-[#fef2f2] px-3 py-2.5 text-[12px] text-[#7f1d1d]">
-                <p className="font-semibold text-[#0f172a]">
+                <p className="font-semibold text-[#000000]">
                   {errors.length} requirement{errors.length === 1 ? "" : "s"} remain on this step:
                 </p>
                 <ul className="mt-1.5 list-disc space-y-1 pl-4">
@@ -542,21 +542,21 @@ export function FrRequirementsDialog({
         )}
       >
         <DialogHeader className="border-b border-[#f1f5f9] px-5 pb-3 pt-5 text-left sm:px-6">
-          <DialogTitle className="flex items-center gap-2 text-base font-semibold text-[#0f172a]">
+          <DialogTitle className="flex items-center gap-2 text-base font-semibold text-[#000000]">
             <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#fef3c7] text-[#b45309]">
               <AlertTriangle className="h-4 w-4" />
             </span>
             {state.title}
           </DialogTitle>
           {state.description ? (
-            <DialogDescription className="text-xs text-[#64748b]">
+            <DialogDescription className="text-xs text-[#111111]">
               {state.description}
             </DialogDescription>
           ) : null}
         </DialogHeader>
         <div className="max-h-[min(70vh,560px)] overflow-y-auto px-5 py-5 sm:px-6">
           {state.requirements.length === 0 ? (
-            <p className="text-[12px] text-[#64748b]">No further details were provided.</p>
+            <p className="text-[12px] text-[#111111]">No further details were provided.</p>
           ) : (
             <ul className="space-y-2">
               {state.requirements.map((req, i) => (
@@ -635,7 +635,7 @@ export function FrViewAllDialog({
       size={size}
     >
       <div className="relative mb-3">
-        <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#94a3b8]" />
+        <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#141414]" />
         <Input
           value={q}
           onChange={(e) => setQ(e.target.value)}
@@ -644,25 +644,25 @@ export function FrViewAllDialog({
         />
       </div>
       {filtered.length === 0 ? (
-        <p className="py-8 text-center text-[12px] text-[#94a3b8]">{emptyText}</p>
+        <p className="py-8 text-center text-[12px] text-[#141414]">{emptyText}</p>
       ) : (
         <ul className="divide-y divide-[#f1f5f9]">
           {filtered.map((row) => (
             <li key={row.id} className="flex items-start justify-between gap-3 py-3">
               <div className="min-w-0">
-                <p className="text-[13px] font-medium text-[#0f172a]">{row.title}</p>
+                <p className="text-[13px] font-medium text-[#000000]">{row.title}</p>
                 {row.subtitle ? (
-                  <p className="mt-0.5 text-[11px] text-[#64748b]">{row.subtitle}</p>
+                  <p className="mt-0.5 text-[11px] text-[#111111]">{row.subtitle}</p>
                 ) : null}
                 {row.meta ? (
-                  <p className="mt-1 text-[10px] text-[#94a3b8]">{row.meta}</p>
+                  <p className="mt-1 text-[11px] text-[#141414]">{row.meta}</p>
                 ) : null}
               </div>
               {row.badge ? (
                 <span
                   className={cn(
-                    "shrink-0 rounded-[4px] px-2 py-0.5 text-[10px] font-semibold",
-                    row.badgeClass ?? "bg-[#f1f5f9] text-[#64748b]",
+                    "shrink-0 rounded-[4px] px-2 py-0.5 text-[11px] font-semibold",
+                    row.badgeClass ?? "bg-[#f1f5f9] text-[#111111]",
                   )}
                 >
                   {row.badge}

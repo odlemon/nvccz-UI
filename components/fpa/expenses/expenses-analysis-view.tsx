@@ -86,14 +86,14 @@ function fmtM(n: number | null): string {
 }
 
 function varTone(n: number): string {
-  if (Math.abs(n) < 0.05) return "text-[#101828]"
+  if (Math.abs(n) < 0.05) return "text-[#000000]"
   return n > 0 ? "text-[#f04438]" : "text-[#12b76a]"
 }
 
 function statusPill(status: ExpDeptRow["status"]) {
   if (status === "over") return "bg-[#fef3f2] text-[#b42318] border-[#fecdca]"
   if (status === "watch") return "bg-[#fffaeb] text-[#b54708] border-[#fedf89]"
-  return status === "ok" ? "bg-[#ecfdf3] text-[#027a48] border-[#abefc6]" : "bg-[#f2f4f7] text-[#667085] border-[#e4e7ec]"
+  return status === "ok" ? "bg-[#ecfdf3] text-[#027a48] border-[#abefc6]" : "bg-[#f2f4f7] text-[#111111] border-[#e4e7ec]"
 }
 
 function FilterSelect({
@@ -126,14 +126,14 @@ function FilterSelect({
         className="h-10 min-w-[118px] inline-flex items-center rounded-full border border-[#d0d5dd] bg-white pl-2.5 pr-7 text-left hover:bg-[#f9fafb]"
       >
         <span className="flex flex-col justify-center min-w-0 py-1">
-          <span className="text-[9px] font-medium uppercase tracking-wide text-[#98a2b3] leading-none">
+          <span className="text-[11px] font-medium uppercase tracking-wide text-[#141414] leading-none">
             {label}
           </span>
-          <span className="text-[12px] font-semibold text-[#101828] leading-tight mt-0.5 truncate">
+          <span className="text-[12px] font-semibold text-[#000000] leading-tight mt-0.5 truncate">
             {value}
           </span>
         </span>
-        <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 size-4 text-[#98a2b3]" />
+        <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 size-4 text-[#141414]" />
       </button>
       {open ? (
         <div
@@ -149,7 +149,7 @@ function FilterSelect({
               }}
               className={cn(
                 "w-full flex items-center justify-between gap-2 px-3 py-2 text-left text-[12px] hover:bg-[#f9fafb]",
-                opt === value ? "text-[#1570ef] font-semibold" : "text-[#344054]",
+                opt === value ? "text-[#1570ef] font-semibold" : "text-[#111111]",
               )}
             >
               {opt}
@@ -171,8 +171,8 @@ function ExpKpiCard({ kpi, onClick }: { kpi: ExpKpi; onClick?: () => void }) {
       className={`${R} border border-[#e4e7ec] bg-white px-4 py-3 shadow-[0_1px_2px_rgba(16,24,40,0.03)] flex items-center justify-between gap-3 min-h-[92px] w-full text-left hover:border-[#b2ddff] transition-colors`}
     >
       <div className="min-w-0 flex flex-col justify-center">
-        <p className="text-[13px] font-semibold text-[#344054] leading-tight">{kpi.label}</p>
-        <p className="mt-1.5 text-[26px] font-semibold text-[#101828] tabular-nums leading-none tracking-tight">
+        <p className="text-[13px] font-semibold text-[#111111] leading-tight">{kpi.label}</p>
+        <p className="mt-1.5 text-[26px] font-semibold text-[#000000] tabular-nums leading-none tracking-tight">
           {kpi.value}
         </p>
         {kpi.delta ? (
@@ -350,7 +350,7 @@ export function ExpensesAnalysisView({
   }
 
   const hasData = adjustedKpis.length > 0 || displayedDeptRows.length > 0 || displayedByCategory.length > 0 || displayedMonthlyBurn.length > 0 || displayedBridge.length > 0
-  if (loading && !hasData) return <div className="min-h-full bg-[#f1f5f9] flex items-center justify-center gap-2 text-sm text-[#64748b]"><Loader2 className="size-5 animate-spin" /> Loading expense analysis…</div>
+  if (loading && !hasData) return <div className="min-h-full bg-[#f1f5f9] flex items-center justify-center gap-2 text-sm text-[#111111]"><Loader2 className="size-5 animate-spin" /> Loading expense analysis…</div>
   if (error && !hasData) return <div className="min-h-full bg-[#f1f5f9] flex items-center justify-center p-8 text-sm text-[#b42318]">{error}</div>
 
   return (
@@ -358,7 +358,7 @@ export function ExpensesAnalysisView({
       <div className="bg-white border-b border-[#e4e7ec]">
         <div className="px-4 sm:px-5 pt-4 pb-3">
           <div className="flex items-center justify-between gap-3">
-            <h1 className="text-[18px] font-semibold text-[#101828]">Expenses</h1>
+            <h1 className="text-[18px] font-semibold text-[#000000]">Expenses</h1>
             <Button variant="outline" className="rounded-full h-9 px-4 text-xs" onClick={() => onRefresh?.()}>
               <RefreshCw className="size-3.5" />
               Refresh
@@ -396,12 +396,12 @@ export function ExpensesAnalysisView({
               Reset Filters
             </button>
           </div>
-          <p className="mt-2 text-[11px] text-[#667085]">Applied scope: {appliedScope?.entityId ? selectedEntityName : "All entities"} · {appliedScope?.periodFrom || "First period"} → {appliedScope?.periodTo || "Latest period"}</p>
+          <p className="mt-2 text-[11px] text-[#111111]">Applied scope: {appliedScope?.entityId ? selectedEntityName : "All entities"} · {appliedScope?.periodFrom || "First period"} → {appliedScope?.periodTo || "Latest period"}</p>
         </div>
 
         <div className="px-4 sm:px-5 pb-4">
           {adjustedKpis.length === 0 ? (
-            <p className="py-8 text-sm text-[#64748b]">No expense KPIs are available.</p>
+            <p className="py-8 text-sm text-[#111111]">No expense KPIs are available.</p>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3">
               {adjustedKpis.map((k) => (
@@ -419,7 +419,7 @@ export function ExpensesAnalysisView({
       <div className="flex-1 flex min-h-0">
         <div className="flex-1 p-4 sm:p-5 space-y-4 overflow-auto">
           {preview ? <div className="rounded-lg border border-[#99f6e4] bg-[#f0fdfa] px-4 py-3 text-xs font-semibold text-[#0f766e]">Preview · not persisted — cards, charts, and tables below use the preview dataset.</div> : null}
-          {loading && hasData ? <p className="text-xs text-[#667085]"><Loader2 className="mr-1 inline size-3 animate-spin" />Refreshing current scope…</p> : null}
+          {loading && hasData ? <p className="text-xs text-[#111111]"><Loader2 className="mr-1 inline size-3 animate-spin" />Refreshing current scope…</p> : null}
           {error && hasData ? <p className="text-sm text-[#b42318]">{error}</p> : null}
           {overBudgetAlerts.length > 0 ? (
             <section className={`${R} border border-[#fecdca] bg-[#fef3f2] p-4`}>
@@ -442,13 +442,13 @@ export function ExpensesAnalysisView({
                   >
                     <div className="flex items-center gap-2">
                       <span
-                        className="size-7 rounded-full inline-flex items-center justify-center text-[10px] font-semibold text-white shrink-0"
+                        className="size-7 rounded-full inline-flex items-center justify-center text-[11px] font-semibold text-white shrink-0"
                         style={{ backgroundColor: planningAvatarTone(ob.departmentName) }}
                       >
                         {planningInitials(ob.departmentName)}
                       </span>
                       <div className="min-w-0">
-                        <p className="text-sm font-semibold text-[#101828] truncate">{ob.departmentName}</p>
+                        <p className="text-sm font-semibold text-[#000000] truncate">{ob.departmentName}</p>
                         <p className="text-xs text-[#b42318]">
                           {ob.severityPct != null ? `${ob.severityPct.toFixed(1)}% over budget` : ob.severityAmount != null ? `${fmtM(ob.severityAmount)} over budget` : ob.severity || "Over budget"}
                         </p>
@@ -463,13 +463,13 @@ export function ExpensesAnalysisView({
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
             <section className={`${R} border border-[#e4e7ec] bg-white p-4`}>
               <div className="flex items-center justify-between mb-3">
-                <h2 className="text-sm font-semibold text-[#101828]">OpEx by Category</h2>
-                <button type="button" onClick={() => setInfoOpen(true)} className="text-[#98a2b3] hover:text-[#667085]">
+                <h2 className="text-sm font-semibold text-[#000000]">OpEx by Category</h2>
+                <button type="button" onClick={() => setInfoOpen(true)} className="text-[#141414] hover:text-[#111111]">
                   <Info className="size-4" />
                 </button>
               </div>
               {categoryChartData.length === 0 ? (
-                <p className="py-12 text-center text-sm text-[#64748b]">No expense category data is available.</p>
+                <p className="py-12 text-center text-sm text-[#111111]">No expense category data is available.</p>
               ) : <div className="h-[240px] flex items-center">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
@@ -495,7 +495,7 @@ export function ExpensesAnalysisView({
                   {categoryChartData.map((c) => (
                     <div key={c.name} className="flex items-center gap-2 text-xs">
                       <span className="size-2 rounded-full shrink-0" style={{ backgroundColor: c.color }} />
-                      <span className="text-[#667085] truncate">{c.name}</span>
+                      <span className="text-[#111111] truncate">{c.name}</span>
                       <span className="ml-auto tabular-nums font-medium">{fmtM(c.value)}</span>
                     </div>
                   ))}
@@ -505,11 +505,11 @@ export function ExpensesAnalysisView({
 
             <section className={`${R} border border-[#e4e7ec] bg-white p-4`}>
               <div className="flex items-center justify-between mb-3">
-                <h2 className="text-sm font-semibold text-[#101828]">Monthly Burn</h2>
-                <span className="text-xs text-[#667085]">Budget vs Actual vs Forecast</span>
+                <h2 className="text-sm font-semibold text-[#000000]">Monthly Burn</h2>
+                <span className="text-xs text-[#111111]">Budget vs Actual vs Forecast</span>
               </div>
               {displayedMonthlyBurn.length === 0 ? (
-                <p className="py-12 text-center text-sm text-[#64748b]">No monthly burn data is available.</p>
+                <p className="py-12 text-center text-sm text-[#111111]">No monthly burn data is available.</p>
               ) : <div className="h-[240px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <ComposedChart data={displayedMonthlyBurn} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
@@ -528,14 +528,14 @@ export function ExpensesAnalysisView({
 
           <section className={`${R} border border-[#e4e7ec] bg-white overflow-hidden`}>
             <div className="px-4 pt-4 pb-2 flex items-center justify-between">
-              <h2 className="text-sm font-semibold text-[#101828]">
+              <h2 className="text-sm font-semibold text-[#000000]">
                 {view === "Category View" ? "Expenses by Category" : "Department Expenses"}
               </h2>
               <div className="relative" ref={menuRef}>
                 <button
                   type="button"
                   onClick={() => setMenuOpen((o) => !o)}
-                  className="size-8 inline-flex items-center justify-center rounded-full hover:bg-[#f2f4f7] text-[#667085]"
+                  className="size-8 inline-flex items-center justify-center rounded-full hover:bg-[#f2f4f7] text-[#111111]"
                 >
                   <MoreHorizontal className="size-4" />
                 </button>
@@ -555,19 +555,19 @@ export function ExpensesAnalysisView({
               {view === "Category View" ? (
                 <table className="w-full text-sm min-w-[520px]">
                   <thead>
-                    <tr className="border-y border-[#e4e7ec] text-left text-xs text-[#667085] bg-[#f9fafb]">
+                    <tr className="border-y border-[#e4e7ec] text-left text-xs text-[#111111] bg-[#f9fafb]">
                       <th className="px-4 py-3 font-medium">Category</th>
                       <th className="px-4 py-3 font-medium text-right">Amount</th>
                       <th className="px-4 py-3 font-medium text-right">Share</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {visibleCategories.length === 0 ? <tr><td colSpan={3} className="px-4 py-10 text-center text-sm text-[#64748b]">No expense category data is available.</td></tr> : null}
+                    {visibleCategories.length === 0 ? <tr><td colSpan={3} className="px-4 py-10 text-center text-sm text-[#111111]">No expense category data is available.</td></tr> : null}
                     {visibleCategories.map((row) => (
                       <tr key={row.category} className="border-t border-[#f2f4f7]">
-                        <td className="px-4 py-3 font-medium text-[#101828]">{row.category}</td>
+                        <td className="px-4 py-3 font-medium text-[#000000]">{row.category}</td>
                         <td className="px-4 py-3 text-right tabular-nums">{fmtM(row.amount)}</td>
-                        <td className="px-4 py-3 text-right tabular-nums text-[#667085]">{row.sharePct == null ? "—" : `${row.sharePct.toFixed(1)}%`}</td>
+                        <td className="px-4 py-3 text-right tabular-nums text-[#111111]">{row.sharePct == null ? "—" : `${row.sharePct.toFixed(1)}%`}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -575,7 +575,7 @@ export function ExpensesAnalysisView({
               ) : (
               <table className="w-full text-sm min-w-[800px]">
                 <thead>
-                  <tr className="border-y border-[#e4e7ec] text-left text-xs text-[#667085] bg-[#f9fafb]">
+                  <tr className="border-y border-[#e4e7ec] text-left text-xs text-[#111111] bg-[#f9fafb]">
                     <th className="px-4 py-3 font-medium">Department</th>
                     <th className="px-4 py-3 font-medium">Category</th>
                     <th className="px-4 py-3 font-medium text-right">Budget</th>
@@ -589,7 +589,7 @@ export function ExpensesAnalysisView({
                 </thead>
                 <tbody>
                   {filteredRows.length === 0 ? (
-                    <tr><td colSpan={9} className="px-4 py-10 text-center text-sm text-[#64748b]">No department expense data is available.</td></tr>
+                    <tr><td colSpan={9} className="px-4 py-10 text-center text-sm text-[#111111]">No department expense data is available.</td></tr>
                   ) : null}
                   {filteredRows.map((row) => {
                     const varB = row.actual == null || row.budget == null ? null : row.actual - row.budget
@@ -604,15 +604,15 @@ export function ExpensesAnalysisView({
                             {row.dept}
                           </button>
                         </td>
-                        <td className="px-4 py-3 text-[#667085]">{row.category ?? "—"}</td>
-                        <td className="px-4 py-3 text-right tabular-nums text-[#667085]">{fmtM(row.budget)}</td>
+                        <td className="px-4 py-3 text-[#111111]">{row.category ?? "—"}</td>
+                        <td className="px-4 py-3 text-right tabular-nums text-[#111111]">{fmtM(row.budget)}</td>
                         <td className="px-4 py-3 text-right tabular-nums font-medium">{fmtM(row.actual)}</td>
                         <td className="px-4 py-3 text-right tabular-nums">{fmtM(row.runRate)}</td>
                         <td className="px-4 py-3 text-right tabular-nums">{fmtM(row.forecast)}</td>
-                        <td className={cn("px-4 py-3 text-right tabular-nums font-medium", varB == null ? "text-[#667085]" : varTone(varB))}>
+                        <td className={cn("px-4 py-3 text-right tabular-nums font-medium", varB == null ? "text-[#111111]" : varTone(varB))}>
                           {varB == null ? "—" : `${varB >= 0 ? "+" : ""}${fmtM(varB)}`}
                         </td>
-                        <td className="px-4 py-3 text-right tabular-nums text-[#667085]">{row.headcount}</td>
+                        <td className="px-4 py-3 text-right tabular-nums text-[#111111]">{row.headcount}</td>
                         <td className="px-4 py-3">
                           <span className={cn("inline-flex px-2 py-0.5 text-[11px] font-medium border rounded-full capitalize", statusPill(row.status))}>
                             {row.status === "over" ? "Over" : row.status === "watch" ? "Watch" : row.status === "ok" ? "On Track" : "—"}
@@ -628,9 +628,9 @@ export function ExpensesAnalysisView({
           </section>
 
           <section className={`${R} border border-[#e4e7ec] bg-white p-4`}>
-            <h2 className="text-sm font-semibold text-[#101828] mb-3">Budget → Forecast Bridge</h2>
+            <h2 className="text-sm font-semibold text-[#000000] mb-3">Budget → Forecast Bridge</h2>
             {displayedBridge.length === 0 ? (
-              <p className="py-10 text-center text-sm text-[#64748b]">No budget-to-forecast bridge data is available.</p>
+              <p className="py-10 text-center text-sm text-[#111111]">No budget-to-forecast bridge data is available.</p>
             ) : <div className="h-[180px]">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart
@@ -665,9 +665,9 @@ export function ExpensesAnalysisView({
           <section className={`${R} border border-[#e4e7ec] bg-white p-4`}>
             <div className="flex items-center gap-2 mb-4">
               <SlidersHorizontal className="size-4 text-[#0d9488]" />
-              <h2 className="text-sm font-semibold text-[#101828]">What-if sensitivity</h2>
+              <h2 className="text-sm font-semibold text-[#000000]">What-if sensitivity</h2>
             </div>
-            {drivers.length === 0 ? <p className="text-sm text-[#667085]">No expense driver was returned, so sensitivity is unavailable.</p> : <div className="flex flex-wrap items-end gap-2">
+            {drivers.length === 0 ? <p className="text-sm text-[#111111]">No expense driver was returned, so sensitivity is unavailable.</p> : <div className="flex flex-wrap items-end gap-2">
               <FilterSelect label="Driver" value={drivers.find((driver) => driver.code === driverCode) ? `${drivers.find((driver) => driver.code === driverCode)?.name} · ${driverCode}` : "Select driver"} options={["Select driver", ...driverOptions]} onChange={(value) => {
                 const selected = drivers.find((driver) => `${driver.name} · ${driver.code}` === value)
                 setDriverCode(selected?.code ?? "")
@@ -681,7 +681,7 @@ export function ExpensesAnalysisView({
               </Button>
               {preview ? <Button variant="outline" className="rounded-full h-10 px-4" onClick={onResetPreview}>Reset to official</Button> : null}
             </div>}
-            {!driverCode && drivers.length > 0 ? <p className="mt-3 text-[11px] text-[#667085]">Choose a returned driver; no driver code has been guessed.</p> : null}
+            {!driverCode && drivers.length > 0 ? <p className="mt-3 text-[11px] text-[#111111]">Choose a returned driver; no driver code has been guessed.</p> : null}
             {previewError ? <p className="mt-3 text-sm text-[#b42318]">{previewError}</p> : null}
           </section>
         </div>
@@ -690,20 +690,20 @@ export function ExpensesAnalysisView({
           <aside className="w-full sm:w-[360px] shrink-0 border-l border-[#e4e7ec] bg-white flex flex-col">
             <div className="px-4 py-3 border-b border-[#e4e7ec] flex items-start justify-between gap-2">
               <div>
-                <p className="text-xs text-[#667085]">{selectedDetail.category ?? "—"} · {selectedDetail.period}</p>
-                <h3 className="text-base font-semibold text-[#101828] mt-0.5">{selectedDetail.dept}</h3>
+                <p className="text-xs text-[#111111]">{selectedDetail.category ?? "—"} · {selectedDetail.period}</p>
+                <h3 className="text-base font-semibold text-[#000000] mt-0.5">{selectedDetail.dept}</h3>
               </div>
               <button type="button" onClick={() => setDetailOpen(false)} className="size-8 rounded-full hover:bg-[#f2f4f7] inline-flex items-center justify-center">
-                <X className="size-4 text-[#667085]" />
+                <X className="size-4 text-[#111111]" />
               </button>
             </div>
             <div className="p-4 space-y-4 overflow-auto flex-1">
               <div className={`${R} bg-[#f9fafb] border border-[#e4e7ec] p-3`}>
-                <p className="text-xs text-[#667085]">Variance to Budget</p>
-                <p className={cn("text-2xl font-semibold tabular-nums mt-1", selectedDetail.variance === "—" ? "text-[#667085]" : selectedDetail.variance.startsWith("+") ? "text-[#f04438]" : "text-[#12b76a]")}>
+                <p className="text-xs text-[#111111]">Variance to Budget</p>
+                <p className={cn("text-2xl font-semibold tabular-nums mt-1", selectedDetail.variance === "—" ? "text-[#111111]" : selectedDetail.variance.startsWith("+") ? "text-[#f04438]" : "text-[#12b76a]")}>
                   {selectedDetail.variance}
                 </p>
-                <p className="text-xs text-[#667085] mt-1">Utilization {selectedDetail.utilization} · HC {selectedDetail.headcount ?? "—"}</p>
+                <p className="text-xs text-[#111111] mt-1">Utilization {selectedDetail.utilization} · HC {selectedDetail.headcount ?? "—"}</p>
               </div>
               <div className="grid grid-cols-3 gap-2 text-center">
                 {[
@@ -712,12 +712,12 @@ export function ExpensesAnalysisView({
                   { label: "Forecast", value: selectedDetail.forecast },
                 ].map((cell) => (
                   <div key={cell.label} className={`${R} border border-[#e4e7ec] p-2`}>
-                    <p className="text-[10px] text-[#667085]">{cell.label}</p>
+                    <p className="text-[11px] text-[#111111]">{cell.label}</p>
                     <p className="text-sm font-semibold tabular-nums mt-0.5">{cell.value}</p>
                   </div>
                 ))}
               </div>
-              <p className="text-sm text-[#667085]">Line-item detail, ownership, and commentary are not included in this domain response.</p>
+              <p className="text-sm text-[#111111]">Line-item detail, ownership, and commentary are not included in this domain response.</p>
             </div>
           </aside>
         ) : null}
@@ -726,8 +726,8 @@ export function ExpensesAnalysisView({
       {infoOpen ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4" onClick={() => setInfoOpen(false)}>
           <div className={`${R} bg-white max-w-md w-full p-5 shadow-xl`} onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-base font-semibold text-[#101828]">Expense Analysis</h3>
-            <p className="text-sm text-[#475569] mt-2 leading-relaxed">
+            <h3 className="text-base font-semibold text-[#000000]">Expense Analysis</h3>
+            <p className="text-sm text-[#111111] mt-2 leading-relaxed">
               Track departmental OpEx against budget and run rate. Over-budget alerts highlight areas needing attention. Click rows or chart segments for detail.
             </p>
             <Button variant="outline" className="rounded-full mt-4" onClick={() => setInfoOpen(false)}>Close</Button>

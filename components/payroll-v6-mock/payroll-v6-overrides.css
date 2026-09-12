@@ -19,12 +19,23 @@
 }
 
 .payroll-v6-root .sidebar {
-  position: relative;
   z-index: 20;
-  height: 100% !important;
   min-height: 0 !important;
-  max-height: 100%;
-  overflow: hidden;
+}
+
+/* An in-flow, full-height sidebar is the tablet and desktop layout only. Unscoped, this
+   `position: relative` beat the runtime's phone rule (position: fixed, off-canvas) at equal
+   specificity, because this file loads later. At <=760px the translated-away sidebar still
+   took the full height of .app and pushed .shell -- every payroll screen -- below the
+   viewport, where .app's overflow:hidden clipped it. Phones saw a topbar and nothing else.
+   FINDING-018. */
+@media (min-width: 761px) {
+  .payroll-v6-root .sidebar {
+    position: relative;
+    height: 100% !important;
+    max-height: 100%;
+    overflow: hidden;
+  }
 }
 
 .payroll-v6-root .shell {
@@ -42,7 +53,10 @@
   overscroll-behavior: contain;
 }
 
-@media (min-width: 761px) {
+/* The expanded, labelled sidebar only where there is room for it. At min-width:761px this
+   forced a 282px sidebar onto tablets, overriding the runtime's own rail below 1120px and
+   leaving the topbar too narrow for its controls. FINDING-018. */
+@media (min-width: 1121px) {
   .payroll-v6-root .app:not(.collapsed) {
     --sidebar: 282px;
   }
@@ -67,4 +81,26 @@
 
 .payroll-v6-root .toast-stack {
   z-index: 200;
+}
+
+/* Icon containers the runtime styles for size only. Its icon set is stroke-drawn, so without
+   a stroke/fill rule every svg inside these rendered as a solid black shape. FINDING-018. */
+.payroll-v6-root .folder-icon svg,
+.payroll-v6-root .list-icon svg,
+.payroll-v6-root .empty-icon svg,
+.payroll-v6-root .rule-icon svg {
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 1.8;
+}
+.payroll-v6-root .folder-icon svg,
+.payroll-v6-root .rule-icon svg {
+  width: 18px;
+  height: 18px;
+}
+
+/* The compact table theme lets status pills wrap (payroll-v6.css). On the access register a
+   narrow column broke "Active" mid-word, so its pills stay on one line. */
+.payroll-v6-root .access-user-table .status {
+  white-space: nowrap;
 }

@@ -46,8 +46,8 @@ function ReviewList({ items }: { items: { label: string; value: string }[] }) {
     <dl className="divide-y divide-[#f1f5f9] rounded-[6px] border border-[#e2e8f0]">
       {items.map((row) => (
         <div key={row.label} className="flex items-start justify-between gap-3 px-3 py-2.5">
-          <dt className="text-[11px] text-[#64748b]">{row.label}</dt>
-          <dd className="text-right text-[12px] font-medium text-[#0f172a]">{row.value}</dd>
+          <dt className="text-[11px] text-[#111111]">{row.label}</dt>
+          <dd className="text-right text-[12px] font-medium text-[#000000]">{row.value}</dd>
         </div>
       ))}
     </dl>
@@ -261,7 +261,7 @@ export function FrOpportunityWizard({
               <option>EUR</option>
             </select>
           </FrField>
-          <p className="sm:col-span-3 text-[11px] text-[#64748b]">
+          <p className="sm:col-span-3 text-[11px] text-[#111111]">
             Soft circle stays separate from signed / admitted / funded amounts (SRD).
           </p>
         </div>
@@ -521,7 +521,7 @@ export function FrCampaignWizard({
           </FrField>
           <FrField label="Region tags (comma separated)"><input className={frInputClass} value={regionTags} onChange={(e) => setRegionTags(e.target.value)} /></FrField>
           <FrField label="Investor segments (comma separated)"><input className={frInputClass} value={investorSegments} onChange={(e) => setInvestorSegments(e.target.value)} /></FrField>
-          <label className="flex items-center gap-2 text-[12px] text-[#334155]">
+          <label className="flex items-center gap-2 text-[12px] text-[#111111]">
             <input
               type="checkbox"
               checked={activateAfterCreate}

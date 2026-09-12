@@ -390,7 +390,7 @@ export function FpaSettings() {
                 "w-full h-10 inline-flex items-center gap-2.5 px-3 rounded-full text-xs font-semibold tracking-wide text-left transition-all",
                 activeSection === "entities"
                   ? "bg-[#eff8ff] text-[#175cd3]"
-                  : "text-[#475467] hover:bg-[#f9fafb] hover:text-[#101828]",
+                  : "text-[#111111] hover:bg-[#f9fafb] hover:text-[#000000]",
               )}
             >
               <Layers className="w-4 h-4 shrink-0" />
@@ -403,7 +403,7 @@ export function FpaSettings() {
                 "w-full h-10 inline-flex items-center gap-2.5 px-3 rounded-full text-xs font-semibold tracking-wide text-left transition-all",
                 activeSection === "thresholds"
                   ? "bg-[#eff8ff] text-[#175cd3]"
-                  : "text-[#475467] hover:bg-[#f9fafb] hover:text-[#101828]",
+                  : "text-[#111111] hover:bg-[#f9fafb] hover:text-[#000000]",
               )}
             >
               <Sliders className="w-4 h-4 shrink-0" />
@@ -416,7 +416,7 @@ export function FpaSettings() {
                 "w-full h-10 inline-flex items-center gap-2.5 px-3 rounded-full text-xs font-semibold tracking-wide text-left transition-all",
                 activeSection === "sync"
                   ? "bg-[#eff8ff] text-[#175cd3]"
-                  : "text-[#475467] hover:bg-[#f9fafb] hover:text-[#101828]",
+                  : "text-[#111111] hover:bg-[#f9fafb] hover:text-[#000000]",
               )}
             >
               <Database className="w-4 h-4 shrink-0" />
@@ -429,7 +429,7 @@ export function FpaSettings() {
                 "w-full h-10 inline-flex items-center gap-2.5 px-3 rounded-full text-xs font-semibold tracking-wide text-left transition-all",
                 activeSection === "workflow"
                   ? "bg-[#eff8ff] text-[#175cd3]"
-                  : "text-[#475467] hover:bg-[#f9fafb] hover:text-[#101828]",
+                  : "text-[#111111] hover:bg-[#f9fafb] hover:text-[#000000]",
               )}
             >
               <Settings className="w-4 h-4 shrink-0" />
@@ -458,12 +458,12 @@ export function FpaSettings() {
               {/* Creator Card */}
               <section className="rounded-xl border border-[#eaecf0] bg-white p-5 shadow-sm space-y-4">
                 <div className="flex items-center justify-between flex-wrap gap-2">
-                  <h2 className="text-[15px] font-semibold text-[#101828]">Forecast Entities</h2>
-                  <span className="text-[11px] text-[#667085]">Define scopes for consolidations</span>
+                  <h2 className="text-[15px] font-semibold text-[#000000]">Forecast Entities</h2>
+                  <span className="text-[11px] text-[#111111]">Define scopes for consolidations</span>
                 </div>
 
                 {entitiesLoading ? (
-                  <div className="flex items-center gap-2 py-6 text-sm text-[#667085]">
+                  <div className="flex items-center gap-2 py-6 text-sm text-[#111111]">
                     <Loader2 className="size-4 animate-spin" />
                     Loading entities…
                   </div>
@@ -479,7 +479,7 @@ export function FpaSettings() {
                     </button>
                   </div>
                 ) : entities.length === 0 ? (
-                  <p className="py-6 text-sm text-[#667085]">No forecast entities returned by the API.</p>
+                  <p className="py-6 text-sm text-[#111111]">No forecast entities returned by the API.</p>
                 ) : (
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                   {entities.map((e) => {
@@ -492,16 +492,16 @@ export function FpaSettings() {
                           "rounded-xl border p-4 cursor-pointer hover:shadow-md transition-all flex flex-col justify-between min-h-[100px] relative",
                           isSelected
                             ? "border-[#2563eb] bg-[#eff8ff] text-[#175cd3]"
-                            : "border-[#eaecf0] bg-white text-[#344054]",
+                            : "border-[#eaecf0] bg-white text-[#111111]",
                         )}
                       >
                         <div>
-                          <h4 className="text-[13px] font-bold text-[#101828]">{e.name}</h4>
-                          <p className="text-[10px] text-[#667085] mt-1">
+                          <h4 className="text-[13px] font-bold text-[#000000]">{e.name}</h4>
+                          <p className="text-[11px] text-[#111111] mt-1">
                             Currency: <span className="font-semibold">{e.baseCurrency || e.base_currency || "—"}</span>
                           </p>
                         </div>
-                        <span className="text-[10.5px] text-[#2563eb] font-semibold mt-3 block">
+                        <span className="text-[11px] text-[#2563eb] font-semibold mt-3 block">
                           {e.accountCount > 0 ? `${e.accountCount} Accounts mapped` : "No accounts"}
                         </span>
                       </div>
@@ -547,8 +547,8 @@ export function FpaSettings() {
                 <section className="rounded-xl border border-[#eaecf0] bg-white p-5 shadow-sm">
                   <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                     <div>
-                      <h3 className="text-[14px] font-semibold text-[#101828]">Chart of Accounts Mappings</h3>
-                      <p className="text-[11px] text-[#667085] mt-0.5">Accounts linked from General Ledger source</p>
+                      <h3 className="text-[14px] font-semibold text-[#000000]">Chart of Accounts Mappings</h3>
+                      <p className="text-[11px] text-[#111111] mt-0.5">Accounts linked from General Ledger source</p>
                     </div>
                     <input
                       type="search"
@@ -560,7 +560,7 @@ export function FpaSettings() {
                   </div>
 
                   {coaLoading ? (
-                    <p className="text-[12px] text-[#667085] py-4 inline-flex items-center gap-2">
+                    <p className="text-[12px] text-[#111111] py-4 inline-flex items-center gap-2">
                       <Loader2 className="size-3.5 animate-spin" />
                       Loading accounts…
                     </p>
@@ -576,13 +576,13 @@ export function FpaSettings() {
                       </button>
                     </div>
                   ) : !activeCoa.length ? (
-                    <p className="text-[12px] text-[#98a2b3] py-4">No accounts mapped to this entity.</p>
+                    <p className="text-[12px] text-[#141414] py-4">No accounts mapped to this entity.</p>
                   ) : (
                     <ul className="max-h-64 overflow-y-auto text-[12.5px] divide-y divide-[#f2f4f7] pr-1.5">
                       {activeCoa.map((row) => (
                         <li key={row.code} className="flex gap-4 py-2 hover:bg-[#f9fafb] px-2 rounded-md">
-                          <span className="font-mono text-[#667085] w-16 shrink-0">{row.code}</span>
-                          <span className="text-[#344054] font-medium">{row.name}</span>
+                          <span className="font-mono text-[#111111] w-16 shrink-0">{row.code}</span>
+                          <span className="text-[#111111] font-medium">{row.name}</span>
                         </li>
                       ))}
                     </ul>
@@ -593,7 +593,7 @@ export function FpaSettings() {
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div>
                         <h3 className="text-[14px] font-semibold text-[#b42318]">Archive selected entity</h3>
-                        <p className="mt-1 text-[11px] text-[#667085]">
+                        <p className="mt-1 text-[11px] text-[#111111]">
                           Archived entities are removed from the active forecast entity list.
                         </p>
                       </div>
@@ -610,7 +610,7 @@ export function FpaSettings() {
                     </div>
                     {archiveConfirming && (
                       <div className="mt-4 space-y-3 border-t border-[#fef3f2] pt-4">
-                        <label className="block text-xs font-semibold text-[#344054]">
+                        <label className="block text-xs font-semibold text-[#111111]">
                           Reason for archiving
                           <textarea
                             value={archiveReason}
@@ -647,7 +647,7 @@ export function FpaSettings() {
                               setArchiveError(null)
                               setArchiveReferences([])
                             }}
-                            className="h-9 rounded-full border border-[#d0d5dd] px-4 text-xs font-semibold text-[#344054]"
+                            className="h-9 rounded-full border border-[#d0d5dd] px-4 text-xs font-semibold text-[#111111]"
                           >
                             Cancel
                           </button>
@@ -665,8 +665,8 @@ export function FpaSettings() {
           {activeSection === "thresholds" && (
             <section className="rounded-xl border border-[#eaecf0] bg-white p-5 shadow-sm space-y-5">
               <div>
-                <h2 className="text-[15px] font-semibold text-[#101828]">Variance Commentary Thresholds</h2>
-                <p className="text-[12px] text-[#667085] mt-0.5">
+                <h2 className="text-[15px] font-semibold text-[#000000]">Variance Commentary Thresholds</h2>
+                <p className="text-[12px] text-[#111111] mt-0.5">
                   Determine when department managers must explain budget deviations.
                 </p>
               </div>
@@ -678,7 +678,7 @@ export function FpaSettings() {
                 <EmptyState label="No variance settings were returned by the API." />
               ) : (
                 <>
-                  <label className="block max-w-sm text-xs font-semibold text-[#344054]">
+                  <label className="block max-w-sm text-xs font-semibold text-[#111111]">
                     Commentary threshold (%)
                     <input
                       type="number"
@@ -753,8 +753,8 @@ export function FpaSettings() {
           {activeSection === "sync" && (
             <section className="rounded-xl border border-[#eaecf0] bg-white p-5 shadow-sm space-y-4">
               <div>
-                <h2 className="text-[15px] font-semibold text-[#101828]">ERP & Data Hub Integrations</h2>
-                <p className="text-[12px] text-[#667085] mt-0.5">
+                <h2 className="text-[15px] font-semibold text-[#000000]">ERP & Data Hub Integrations</h2>
+                <p className="text-[12px] text-[#111111] mt-0.5">
                   Configure live pipelines to pull historical actuals and metadata structures.
                 </p>
               </div>
@@ -776,12 +776,12 @@ export function FpaSettings() {
                         <div className="flex flex-wrap items-start justify-between gap-3">
                           <div>
                             <div className="flex items-center gap-2">
-                              <h3 className="text-sm font-semibold text-[#101828]">{source.label}</h3>
-                              <span className="rounded-full bg-[#f2f4f7] px-2 py-0.5 text-[10px] font-semibold text-[#475467]">
+                              <h3 className="text-sm font-semibold text-[#000000]">{source.label}</h3>
+                              <span className="rounded-full bg-[#f2f4f7] px-2 py-0.5 text-[11px] font-semibold text-[#111111]">
                                 {source.status}
                               </span>
                             </div>
-                            <p className="mt-1 text-[11px] text-[#667085]">
+                            <p className="mt-1 text-[11px] text-[#111111]">
                               Last sync: {source.lastSyncAt ? new Date(source.lastSyncAt).toLocaleString() : "Never"}
                             </p>
                             {source.lastError && (
@@ -793,7 +793,7 @@ export function FpaSettings() {
                               type="button"
                               disabled={!canManageSettings || Boolean(busy)}
                               onClick={() => void runSourceAction(source, connected ? "disconnect" : "connect")}
-                              className="inline-flex h-9 items-center gap-2 rounded-full border border-[#d0d5dd] px-4 text-xs font-semibold text-[#344054] disabled:opacity-50"
+                              className="inline-flex h-9 items-center gap-2 rounded-full border border-[#d0d5dd] px-4 text-xs font-semibold text-[#111111] disabled:opacity-50"
                             >
                               {busy === (connected ? "disconnect" : "connect") ? (
                                 <Loader2 className="size-3.5 animate-spin" />
@@ -836,8 +836,8 @@ export function FpaSettings() {
           {activeSection === "workflow" && (
             <section className="rounded-xl border border-[#eaecf0] bg-white p-5 shadow-sm space-y-5">
               <div>
-                <h2 className="text-[15px] font-semibold text-[#101828]">Workflow Defaults</h2>
-                <p className="text-[12px] text-[#667085] mt-0.5">
+                <h2 className="text-[15px] font-semibold text-[#000000]">Workflow Defaults</h2>
+                <p className="text-[12px] text-[#111111] mt-0.5">
                   Configure default guidelines and checkpoint restrictions for budget approvals.
                 </p>
               </div>
@@ -849,7 +849,7 @@ export function FpaSettings() {
                 <EmptyState label="No workflow settings were returned by the API." />
               ) : (
                 <>
-                  <label className="block max-w-sm text-xs font-semibold text-[#344054]">
+                  <label className="block max-w-sm text-xs font-semibold text-[#111111]">
                     Workflow path
                     <input
                       type="text"
@@ -918,7 +918,7 @@ export function FpaSettings() {
 
 function LoadingState({ label }: { label: string }) {
   return (
-    <div className="flex items-center gap-2 py-6 text-sm text-[#667085]">
+    <div className="flex items-center gap-2 py-6 text-sm text-[#111111]">
       <Loader2 className="size-4 animate-spin" />
       {label}
     </div>
@@ -926,7 +926,7 @@ function LoadingState({ label }: { label: string }) {
 }
 
 function EmptyState({ label }: { label: string }) {
-  return <p className="rounded-xl border border-[#eaecf0] bg-[#f9fafb] p-4 text-xs text-[#667085]">{label}</p>
+  return <p className="rounded-xl border border-[#eaecf0] bg-[#f9fafb] p-4 text-xs text-[#111111]">{label}</p>
 }
 
 function SettingsErrorState({
@@ -966,8 +966,8 @@ function ToggleRow({
   return (
     <label className="flex items-center justify-between gap-4 rounded-xl border border-[#eaecf0] p-4">
       <span>
-        <span className="block text-xs font-semibold text-[#344054]">{label}</span>
-        <span className="mt-0.5 block text-[11px] text-[#667085]">{description}</span>
+        <span className="block text-xs font-semibold text-[#111111]">{label}</span>
+        <span className="mt-0.5 block text-[11px] text-[#111111]">{description}</span>
       </span>
       <input
         type="checkbox"

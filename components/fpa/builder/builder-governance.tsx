@@ -67,7 +67,7 @@ export function BuilderExceptionsPanel({
                 "h-9 px-2.5 text-[11px] font-medium border-b-2 -mb-px",
                 active === t.id
                   ? "border-[#2563eb] text-[#2563eb]"
-                  : "border-transparent text-[#64748b]",
+                  : "border-transparent text-[#111111]",
               )}
             >
               {t.label} ({t.rows.length})
@@ -76,7 +76,7 @@ export function BuilderExceptionsPanel({
         </div>
         <ul className="divide-y divide-[#f1f5f9] max-h-56 overflow-y-auto">
           {current.rows.length === 0 ? (
-            <li className="px-3 py-4 text-[11px] text-[#94a3b8]">
+            <li className="px-3 py-4 text-[11px] text-[#141414]">
               No {current.label.toLowerCase()}.
             </li>
           ) : (
@@ -98,8 +98,8 @@ export function BuilderExceptionsPanel({
                     <Info className="w-3.5 h-3.5 text-[#2563eb] mt-0.5 shrink-0" />
                   )}
                   <div className="min-w-0">
-                    <p className="text-[11px] font-medium text-[#0f172a]">{e.code || "Issue"}</p>
-                    <p className="text-[11px] text-[#64748b]">{e.message}</p>
+                    <p className="text-[11px] font-medium text-[#000000]">{e.code || "Issue"}</p>
+                    <p className="text-[11px] text-[#111111]">{e.message}</p>
                   </div>
                 </button>
               </li>
@@ -108,7 +108,7 @@ export function BuilderExceptionsPanel({
         </ul>
       </div>
       <div className="rounded-md border border-[#e2e8f0] bg-white p-3">
-        <h4 className="text-sm font-semibold text-[#0f172a] mb-2">Validation Summary</h4>
+        <h4 className="text-sm font-semibold text-[#000000] mb-2">Validation Summary</h4>
         <div className="flex items-center gap-4">
           <Donut
             passed={passed}
@@ -116,7 +116,7 @@ export function BuilderExceptionsPanel({
             errors={errors.length}
             total={Math.max(total, 1)}
           />
-          <ul className="text-[11px] space-y-1 text-[#475569]">
+          <ul className="text-[11px] space-y-1 text-[#111111]">
             <li>Total: {total || "—"}</li>
             <li className="text-[#166534]">Passed: {passed}</li>
             <li className="text-[#d97706]">Warnings: {warnings.length}</li>
@@ -138,13 +138,13 @@ export function BuilderExceptionsPanel({
         className="w-full max-w-3xl rounded-xl border border-[#e2e8f0] bg-white shadow-xl overflow-hidden"
       >
         <div className="flex items-center justify-between border-b border-[#e2e8f0] px-4 py-3">
-          <h3 id="builder-validation-title" className="text-sm font-semibold text-[#0f172a]">
+          <h3 id="builder-validation-title" className="text-sm font-semibold text-[#000000]">
             {title}
           </h3>
           <button
             type="button"
             onClick={onClose}
-            className="h-8 w-8 inline-flex items-center justify-center rounded-md text-[#64748b] hover:bg-[#f8fafc]"
+            className="h-8 w-8 inline-flex items-center justify-center rounded-md text-[#111111] hover:bg-[#f8fafc]"
             aria-label="Close"
           >
             <X className="w-4 h-4" />
@@ -200,22 +200,22 @@ export function BuilderAuditDrawer({ entries, open, onClose }: AuditProps) {
       <div className="w-full max-w-md h-full bg-white border-l border-[#e2e8f0] shadow-xl flex flex-col">
         <div className="px-4 py-3 border-b flex items-center justify-between">
           <h3 className="text-sm font-semibold">Change History</h3>
-          <button type="button" className="text-xs text-[#64748b]" onClick={onClose}>
+          <button type="button" className="text-xs text-[#111111]" onClick={onClose}>
             Close
           </button>
         </div>
         <div className="flex-1 overflow-y-auto p-3">
           {entries.length === 0 ? (
-            <p className="text-xs text-[#94a3b8] py-8 text-center">
+            <p className="text-xs text-[#141414] py-8 text-center">
               Audit log API not available yet.
             </p>
           ) : (
             <ul className="space-y-2">
               {entries.map((e, i) => (
                 <li key={i} className="rounded-md border border-[#e2e8f0] p-2.5 text-[11px]">
-                  <p className="font-medium text-[#0f172a]">{e.action}</p>
-                  <p className="text-[#64748b] mt-0.5">{e.details}</p>
-                  <p className="text-[#94a3b8] mt-1">
+                  <p className="font-medium text-[#000000]">{e.action}</p>
+                  <p className="text-[#111111] mt-0.5">{e.details}</p>
+                  <p className="text-[#141414] mt-1">
                     {e.user} · {e.time}
                   </p>
                 </li>

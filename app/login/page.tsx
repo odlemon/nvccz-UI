@@ -10,6 +10,7 @@ import { loginSchema, type LoginFormData } from "@/lib/validations/auth"
 import { useAppDispatch, useAppSelector } from "@/lib/store"
 import { loginUser, clearError } from "@/lib/store/slices/authSlice"
 import { getRoleBasedRedirect } from "@/lib/utils/role-redirect"
+import { PORTAL_ID, portalHomePath, portalLoginMeta, fundingApplicationPublicUrl } from "@/lib/portal/config"
 import { toast } from "sonner"
 import { MatanhoAuthShell, MATANHO_TEAL } from "@/components/auth/matanho-auth-shell"
 
@@ -77,8 +78,26 @@ function LoginForm() {
   useEffect(() => {
     if (!isAuthenticated || !isSubmitting || isFetchingDetails) return
 
+    // An invited investor signs in with a password we generated and emailed them. Until they
+    // choose their own, the only place they may go is the set-password screen — the requirement
+    // is meaningless if the portal lets them straight past it.
+    if (user?.mustChangePassword) {
+      toast.info("Set your password", {
+        description: "Choose your own password before continuing.",
+      })
+      setTimeout(() => {
+        window.location.href = "/set-password"
+      }, 100)
+      setIsSubmitting(false)
+      return
+    }
+
     if (userDetails) {
-      const redirect = getRoleBasedRedirect(userDetails, userDetails.role.name.toLowerCase() === "applicant")
+      const redirect = getRoleBasedRedirect(
+        userDetails,
+        userDetails.role.name.toLowerCase() === "applicant",
+        PORTAL_ID
+      )
 
       if (redirect.shouldRedirect) {
         toast.success("Login successful!", {
@@ -94,8 +113,7 @@ function LoginForm() {
     }
 
     if (user) {
-      const roleName = (user.role || "admin").toLowerCase()
-      const path = roleName === "applicant" ? "/application-portal" : "/"
+      const path = portalHomePath(PORTAL_ID)
       toast.success("Login successful!", {
         description: `Welcome back, ${user.firstName}!`,
       })
@@ -111,7 +129,7 @@ function LoginForm() {
 
     try {
       setIsSubmitting(true)
-      await dispatch(loginUser(data)).unwrap()
+      await dispatch(loginUser({ ...data, portal: PORTAL_ID })).unwrap()
     } catch (err: any) {
       toast.error("Login failed", {
         description: err || "Please check your credentials and try again.",
@@ -126,11 +144,14 @@ function LoginForm() {
   const inputClass =
     "block w-full h-12 pl-4 pr-11 rounded-xl bg-[#0E1520]/80 border border-white/15 text-white text-sm placeholder:text-white/35 outline-none focus:border-[#14C4CE] focus:ring-1 focus:ring-[#14C4CE]/40 transition-colors disabled:opacity-50"
 
+  const loginMeta = portalLoginMeta(PORTAL_ID)
+  const isStaffPortal = PORTAL_ID === 'staff'
+
   return (
     <MatanhoAuthShell>
       <div className="mb-7">
-        <h2 className="text-[28px] sm:text-[30px] font-semibold text-white tracking-tight">Welcome back</h2>
-        <p className="mt-1.5 text-[14px] text-white/55">Sign in to continue to your account.</p>
+        <h2 className="text-[28px] sm:text-[30px] font-semibold text-white tracking-tight">{loginMeta.title}</h2>
+        <p className="mt-1.5 text-[14px] text-white/55">{loginMeta.subtitle}</p>
       </div>
 
       {error && (
@@ -267,10 +288,15 @@ function LoginForm() {
         </button>
       </div>
 
+      {isStaffPortal && (
       <div className="mt-7 flex flex-col sm:flex-row items-center justify-center gap-x-4 gap-y-2 text-[12px] text-white/45">
         <button
           type="button"
-          onClick={() => router.push("/applications/form")}
+          onClick={() => {
+            const url = fundingApplicationPublicUrl()
+            if (/^https?:\/\//i.test(url)) window.location.href = url
+            else router.push(url)
+          }}
           className="hover:text-white/80 transition-colors"
         >
           Submit application
@@ -280,6 +306,7 @@ function LoginForm() {
           Register as vendor
         </Link>
       </div>
+      )}
     </MatanhoAuthShell>
   )
 }

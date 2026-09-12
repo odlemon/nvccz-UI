@@ -11,6 +11,7 @@ export function PortfolioV11Layout({ children }: { children: React.ReactNode }) 
       backgroundClassName="bg-[#f2f5f9]"
       loadingFallback={<div className="p-8 text-sm text-[#64748B]">Loading Portfolio…</div>}
       mockApp={<PortfolioV11App />}
+      hideThemeToggle
     >
       {children}
     </ClientDesignModuleShell>

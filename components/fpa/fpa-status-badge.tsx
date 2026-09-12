@@ -8,7 +8,7 @@ const tones = {
   success: "bg-[#f0fdf4] text-[#16a34a]",
   danger: "bg-[#fef2f2] text-[#dc2626]",
   warning: "bg-[#fffbeb] text-[#d97706]",
-  neutral: "bg-[#f1f5f9] text-[#64748b]",
+  neutral: "bg-[#f1f5f9] text-[#111111]",
 } as const
 
 export type FpaBadgeTone = keyof typeof tones

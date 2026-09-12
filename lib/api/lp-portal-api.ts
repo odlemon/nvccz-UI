@@ -1,6 +1,6 @@
 import { apiClient } from "./api-client"
 import { createIdempotencyKey } from "@/lib/lp-portal/format"
-import { LP_PORTAL_USE_MOCK } from "@/lib/lp-portal/config"
+import { isLpDomainLive, type LpDataDomain } from "@/lib/lp-portal/config"
 import { mockLpPortalApi } from "@/lib/lp-portal/mock-api"
 
 // ── Envelopes ──────────────────────────────────────────────────────────
@@ -75,6 +75,8 @@ export interface LpSession {
 export interface LpDashboardKpis {
   totalCommitment: string
   paidIn: string
+  called?: string
+  outstandingCalled?: string
   unfunded: string
   currentNav: string
   distributions: string
@@ -82,7 +84,10 @@ export interface LpDashboardKpis {
   tvpi: string
   dpi: string
   rvpi: string
+  /** The investor's own fund commitments — the count behind Total Commitment. */
   investmentCount: number
+  /** Non-exited portfolio companies held by the funds they are invested in. */
+  portfolioCompanyCount?: number
 }
 
 export interface LpOpenEndedSummary {
@@ -361,10 +366,14 @@ export interface LpPerformanceMetrics {
 export interface LpPerformanceByFundRow {
   fundId: string
   fundName: string
-  netIrr: string
-  tvpi: string
-  dpi: string
-  rvpi: string
+  /**
+   * Private-capital multiples. Null for OPEN_ENDED funds, which have no called or paid-in capital
+   * to define them against — see SRD sections 3 and 37. Render an absent measure as "—", never 0.
+   */
+  netIrr: string | null
+  tvpi: string | null
+  dpi: string | null
+  rvpi: string | null
   nav: string
   paidIn: string
   distributions: string
@@ -411,10 +420,17 @@ export interface LpPerformanceHistory {
 
 export interface LpBenchmarkSeries {
   metric: string
+  benchmarkId?: string
   asOfDate: string
+  /** FINAL when approved points exist, otherwise UNAVAILABLE. */
   valuationStatus: string
+  /** False when no approved series is configured for this benchmark and metric. */
+  configured?: boolean
   series: Array<{ date: string; label: string; value: string }>
-  note: string
+  source?: string | null
+  approvedAt?: string | null
+  /** Only set when the benchmark is not configured; never developer placeholder prose. */
+  note: string | null
 }
 
 export interface LpJobStatus {
@@ -523,7 +539,8 @@ export interface LpServiceRequest {
   createdAt: string
   updatedAt: string
   priority?: string
-  submittedBy?: string
+  /** The API returns an actor object here, not a bare name. */
+  submittedBy?: string | { id?: string; email?: string; name?: string } | null
   attachments?: LpServiceRequestAttachment[]
   messages?: Array<{
     id: string
@@ -1154,8 +1171,19 @@ class LpPortalApiService {
     return apiClient.patch(`${this.BASE}/colleagues/${membershipId}/revoke`)
   }
 
-  getBankInstructionChanges(): Promise<LpPortalResponse<LpBankInstructionChange[]>> {
-    return apiClient.get(`${this.BASE}/bank-instructions/changes`)
+  async getBankInstructionChanges(): Promise<LpPortalResponse<LpBankInstructionChange[]>> {
+    // The API answers `{ data: { items: [...] } }` here while this method's contract — and every
+    // caller, e.g. useLpOrganisation -> LpOrganisationScreen — expects a bare array. The mock
+    // store returned the array directly, so the mismatch only appeared once the organisation
+    // domain went live, where it threw "(…).map is not a function" during render and took the
+    // whole screen down via the error boundary. Normalised here so the boundary is the one place
+    // that knows about the envelope.
+    const res = await apiClient.get<LpPortalResponse<LpBankInstructionChange[] | { items?: LpBankInstructionChange[] }>>(
+      `${this.BASE}/bank-instructions/changes`,
+    )
+    const payload = res?.data as LpBankInstructionChange[] | { items?: LpBankInstructionChange[] } | undefined
+    const items = Array.isArray(payload) ? payload : payload?.items ?? []
+    return { ...res, data: items } as LpPortalResponse<LpBankInstructionChange[]>
   }
 
   submitBankInstructionChange(
@@ -1197,6 +1225,179 @@ class LpPortalApiService {
   }
 }
 
-export const lpPortalApi = LP_PORTAL_USE_MOCK
-  ? (mockLpPortalApi as unknown as LpPortalApiService)
-  : new LpPortalApiService()
+/**
+ * Which data domain each API method belongs to.
+ *
+ * This is the seam that lets the portal migrate off the mock store one area at a time instead
+ * of in a single swap. A method missing from this map falls back to live, so a newly added
+ * method reaches the real API by default rather than silently returning mock data — the failure
+ * mode that would otherwise be invisible.
+ */
+const LP_METHOD_DOMAIN: Record<string, LpDataDomain> = {
+  getSession: "session",
+  getRealtime: "session",
+
+  getDashboard: "dashboard",
+  getDashboardActions: "dashboard",
+  getDashboardRecentActivity: "dashboard",
+
+  getCapitalCallSummary: "capital",
+  getCapitalCalls: "capital",
+  getCapitalCall: "capital",
+  getCapitalCallDocuments: "capital",
+  acknowledgeCapitalCall: "capital",
+  uploadPaymentConfirmation: "capital",
+  downloadCapitalCallNotice: "capital",
+  getDistributions: "capital",
+  getDistribution: "capital",
+  downloadDistribution: "capital",
+  downloadDistributionStatement: "capital",
+
+  getAccountActivity: "activity",
+  exportAccountActivity: "activity",
+  getLedger: "activity",
+  getLedgerEntry: "activity",
+
+  getDealingOverview: "dealing",
+  getDealingRules: "dealing",
+  getDealingRequests: "dealing",
+  exportDealingRequests: "dealing",
+  getDealingBankAccounts: "dealing",
+  estimateSubscription: "dealing",
+  submitSubscription: "dealing",
+  estimateRedemption: "dealing",
+  submitRedemption: "dealing",
+
+  getPerformance: "performance",
+  getPerformanceHistory: "performance",
+  getPerformanceBenchmarks: "performance",
+  getPerformanceByFund: "performance",
+  downloadPerformanceReport: "performance",
+  requestPerformanceReport: "performance",
+  getJob: "performance",
+
+  getDocumentsSummary: "documents",
+  getDocuments: "documents",
+  getDocument: "documents",
+  downloadDocument: "documents",
+  previewDocument: "documents",
+  getVault: "documents",
+  downloadVaultDocument: "documents",
+  verifyVaultDocument: "documents",
+
+  getNotices: "notices",
+  getNotice: "notices",
+  acknowledgeNotice: "notices",
+  getNotifications: "notices",
+
+  getRequests: "requests",
+  getRequest: "requests",
+  createRequest: "requests",
+  replyToRequest: "requests",
+  uploadRequestAttachment: "requests",
+  getMessages: "requests",
+  getMessageThread: "requests",
+  replyToMessageThread: "requests",
+  markMessageThreadRead: "requests",
+
+  getOrganisation: "organisation",
+  getColleagues: "organisation",
+  inviteColleague: "organisation",
+  updateColleague: "organisation",
+  revokeColleague: "organisation",
+  getBankInstructionChanges: "organisation",
+  submitBankInstructionChange: "organisation",
+
+  getSettings: "settings",
+  updateNotificationSettings: "settings",
+  updateDisplaySettings: "settings",
+  getMfaSettings: "settings",
+
+  getReports: "reports",
+  downloadReport: "reports",
+}
+
+const liveLpPortalApi = new LpPortalApiService()
+
+/**
+ * Routes each call to the live client or the mock store based on its domain.
+ *
+ * A Proxy rather than a hand-written façade so the two implementations cannot drift out of sync
+ * with this file: any method either side gains is dispatched automatically.
+ */
+/**
+ * Keys the API returns as numeric STRINGS that the UI treats as numbers.
+ *
+ * A type audit of every LP GET found 148 numeric-string fields. Most are monetary decimals,
+ * which are strings on purpose — Prisma serialises Decimal that way to preserve precision, and
+ * the screens run them through `parseDecimal`. These are the ones that are plain counts, where
+ * a string silently turns arithmetic into concatenation and comparison into string comparison.
+ *
+ * Two of these already shipped as visible bugs: a conversation's `unreadCount` summed to "00",
+ * and the session's `unreadCounts` summed to "101" for a real total of 2, which rendered the
+ * notification bell as "9+". The pagination fields are the same hazard one step removed —
+ * `lp-document-centre-screen` survives today only because `Math.min`/`-` happen to coerce,
+ * while `setPage(totalPages)` puts a string into page state.
+ *
+ * Deliberately a key allowlist, not "coerce anything numeric-looking": widening it to money
+ * would destroy the precision those strings exist to protect.
+ */
+const LP_COUNT_KEYS = new Set([
+  "page",
+  "pageSize",
+  "total",
+  "totalPages",
+  "count",
+  "unreadCount",
+  "investmentCount",
+  "portfolioCompanyCount",
+  "newThisWeek",
+  "requiresSignature",
+  "secureDownloadsYtd",
+  "openCount",
+  "paidCallCount",
+  "dueSoonCount",
+])
+
+const isNumericString = (v: unknown): v is string =>
+  typeof v === "string" && v.trim() !== "" && !Number.isNaN(Number(v))
+
+/** Recursively coerce the count-like keys above; everything else is passed through untouched. */
+function coerceLpCounts<T>(node: T): T {
+  if (Array.isArray(node)) return node.map((v) => coerceLpCounts(v)) as unknown as T
+  if (node && typeof node === "object") {
+    const out: Record<string, unknown> = {}
+    for (const [k, v] of Object.entries(node as Record<string, unknown>)) {
+      out[k] = LP_COUNT_KEYS.has(k) && isNumericString(v) ? Number(v) : coerceLpCounts(v)
+    }
+    return out as unknown as T
+  }
+  return node
+}
+
+export const lpPortalApi = new Proxy(liveLpPortalApi, {
+  get(target, prop, receiver) {
+    const name = String(prop)
+    const value = Reflect.get(target, prop, receiver)
+    if (typeof value !== "function") return value
+
+    const domain = LP_METHOD_DOMAIN[name]
+    // Unmapped methods stay live on purpose — see the note on LP_METHOD_DOMAIN.
+    if (domain && !isLpDomainLive(domain)) {
+      const mockFn = (mockLpPortalApi as Record<string, unknown>)[name]
+      if (typeof mockFn === "function") {
+        return (mockFn as (...args: unknown[]) => unknown).bind(mockLpPortalApi)
+      }
+    }
+    // Normalise count-like fields on the way out, so every screen sees numbers instead of each
+    // call site having to remember to coerce. Blobs (downloads) are passed straight through.
+    const bound = (value as (...args: unknown[]) => unknown).bind(target)
+    return (...args: unknown[]) => {
+      const res = bound(...args)
+      if (res instanceof Promise) {
+        return res.then((r) => (r instanceof Blob ? r : coerceLpCounts(r)))
+      }
+      return res
+    }
+  },
+}) as LpPortalApiService

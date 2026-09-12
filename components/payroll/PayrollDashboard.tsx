@@ -156,7 +156,7 @@ export function PayrollDashboard() {
           <p className="text-gray-600 font-normal">Overview of pay runs, employees, and postings</p>
         </div>
         <div className="flex gap-3">
-          <Button className="rounded-full gradient-primary text-white" onClick={() => { location.assign('/payroll/runs') }}>Open Pay Run</Button>
+          <Button className="rounded-full gradient-primary text-white" onClick={() => { location.assign('/payroll-legacy/runs') }}>Open Pay Run</Button>
         </div>
       </div>
 

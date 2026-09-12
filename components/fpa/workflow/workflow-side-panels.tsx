@@ -28,18 +28,18 @@ export function WorkflowDeptProgress({
   return (
     <section className="rounded-xl border border-[#e2e8f0] bg-white p-4 shadow-[0_1px_2px_rgba(15,23,42,0.04)] shrink-0">
       <div className="flex items-center gap-1.5 mb-3">
-        <h2 className="text-[13px] font-semibold text-[#0f172a]">
+        <h2 className="text-[13px] font-semibold text-[#000000]">
           Submission Progress by Department
         </h2>
         <span
-          className="inline-flex h-[15px] w-[15px] items-center justify-center rounded-full border border-[#cbd5e1] text-[#94a3b8]"
+          className="inline-flex h-[15px] w-[15px] items-center justify-center rounded-full border border-[#cbd5e1] text-[#141414]"
           title="Stacked share of submissions by status"
         >
           <Info className="w-2.5 h-2.5" />
         </span>
       </div>
 
-      <div className="flex flex-wrap gap-x-3 gap-y-1.5 mb-3.5 text-[10px] text-[#64748b]">
+      <div className="flex flex-wrap gap-x-3 gap-y-1.5 mb-3.5 text-[11px] text-[#111111]">
         <span className="inline-flex items-center gap-1.5">
           <i className="h-2 w-2 rounded-full bg-[#16a34a]" /> Submitted
         </span>
@@ -55,7 +55,7 @@ export function WorkflowDeptProgress({
       </div>
 
       {rows.length === 0 ? (
-        <p className="text-[12px] text-[#94a3b8] py-4">
+        <p className="text-[12px] text-[#141414] py-4">
           No department progress for this cycle yet.
         </p>
       ) : (
@@ -66,10 +66,10 @@ export function WorkflowDeptProgress({
             return (
               <li key={r.departmentId}>
                 <div className="flex items-center justify-between gap-2 mb-1">
-                  <p className="text-[12px] font-medium text-[#0f172a] truncate">
+                  <p className="text-[12px] font-medium text-[#000000] truncate">
                     {r.departmentName}
                   </p>
-                  <p className="text-[11px] tabular-nums text-[#64748b] shrink-0">{r.percent}%</p>
+                  <p className="text-[11px] tabular-nums text-[#111111] shrink-0">{r.percent}%</p>
                 </div>
                 <div className="h-2 rounded-full bg-[#f1f5f9] overflow-hidden flex">
                   <span className="h-full bg-[#16a34a]" style={{ width: w(r.submitted) }} />
@@ -144,7 +144,7 @@ export function WorkflowActivityFeed({
   return (
     <section className="rounded-xl border border-[#e2e8f0] bg-white p-4 flex flex-col flex-1 min-h-0 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
       <div className="flex items-center justify-between gap-2 mb-3 shrink-0">
-        <h2 className="text-[13px] font-semibold text-[#0f172a]">Comments & Activity</h2>
+        <h2 className="text-[13px] font-semibold text-[#000000]">Comments & Activity</h2>
       </div>
 
       <div className="mb-2 shrink-0">
@@ -156,7 +156,7 @@ export function WorkflowActivityFeed({
           rows={2}
           className={cn(
             "w-full rounded-lg border border-[#e2e8f0] px-3 py-2 text-[12px] resize-none",
-            (!canComment || busy) && "bg-[#f8fafc] text-[#94a3b8]",
+            (!canComment || busy) && "bg-[#f8fafc] text-[#141414]",
           )}
         />
       </div>
@@ -167,7 +167,7 @@ export function WorkflowActivityFeed({
             value={visibility || "ALL"}
             onChange={(e) => onVisibility(e.target.value as "ALL" | "INTERNAL")}
             disabled={busy}
-            className="h-7 rounded-md border border-[#e2e8f0] px-2 text-[10px] text-[#475569]"
+            className="h-7 rounded-md border border-[#e2e8f0] px-2 text-[11px] text-[#111111]"
           >
             <option value="ALL">Visible to all</option>
             <option value="INTERNAL">Internal (FP&A/CFO)</option>
@@ -177,13 +177,13 @@ export function WorkflowActivityFeed({
 
       <div className="fpa-thin-scroll flex-1 space-y-3.5 overflow-y-auto min-h-0">
         {feed.length === 0 ? (
-          <p className="text-[12px] text-[#94a3b8] leading-relaxed">
+          <p className="text-[12px] text-[#141414] leading-relaxed">
             No activity yet. Comments and approval history will appear here.
           </p>
         ) : (
           feed.map((e) => (
             <div key={e.id} className="flex gap-2.5">
-              <div className="h-8 w-8 rounded-full bg-[#e0e7ff] text-[10px] font-semibold text-[#3730a3] flex items-center justify-center shrink-0">
+              <div className="h-8 w-8 rounded-full bg-[#e0e7ff] text-[11px] font-semibold text-[#3730a3] flex items-center justify-center shrink-0">
                 {e.name
                   .split(" ")
                   .map((p) => p[0])
@@ -195,19 +195,19 @@ export function WorkflowActivityFeed({
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
                     <div className="flex items-center gap-1.5 min-w-0">
-                      <p className="text-[12px] font-semibold text-[#0f172a] truncate">{e.name}</p>
+                      <p className="text-[12px] font-semibold text-[#000000] truncate">{e.name}</p>
                       {String(e.visibility || "").toUpperCase() === "INTERNAL" ? (
-                        <span className="text-[9px] font-medium uppercase tracking-wide text-[#7c3aed] bg-[#f5f3ff] px-1.5 py-0.5 rounded shrink-0">
+                        <span className="text-[11px] font-medium uppercase tracking-wide text-[#7c3aed] bg-[#f5f3ff] px-1.5 py-0.5 rounded shrink-0">
                           Internal
                         </span>
                       ) : null}
                     </div>
-                    <p className="text-[10px] text-[#94a3b8]">
+                    <p className="text-[11px] text-[#141414]">
                       {e.at ? formatDateTime(e.at) : formatRelative(e.at) || "—"}
                     </p>
                   </div>
                 </div>
-                <p className="text-[12px] text-[#475569] mt-1 leading-relaxed">{e.body}</p>
+                <p className="text-[12px] text-[#111111] mt-1 leading-relaxed">{e.body}</p>
               </div>
             </div>
           ))

@@ -1,7 +1,17 @@
-// Chart of Accounts state
-chartOfAccounts: ChartOfAccount[]
-chartOfAccountsLoading: boolean
-chartOfAccountsError: string | null
+export interface ChartOfAccount {
+  id: string
+  code: string
+  name: string
+  type: string
+  category: string
+  balance: number
+}
+
+export interface ChartOfAccountsState {
+  chartOfAccounts: ChartOfAccount[]
+  chartOfAccountsLoading: boolean
+  chartOfAccountsError: string | null
+}
 
 // Chart of Accounts actions
 export const setChartOfAccounts = (payload: ChartOfAccount[]) => ({

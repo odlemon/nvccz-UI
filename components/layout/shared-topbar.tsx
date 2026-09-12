@@ -1,9 +1,10 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
+import { ORG_NAME } from "@/lib/branding"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -25,8 +26,10 @@ import {
   CiUser,
   CiLogout,
   CiCalendar,
-  CiCircleInfo
+  CiCircleInfo,
+  CiCircleChevDown,
 } from "react-icons/ci"
+import { Moon, Sun } from "lucide-react"
 import { NotificationsBell } from "@/components/notifications/notifications-bell"
 import { ModuleSwitcherButton } from "./module-switcher-button"
 import {
@@ -39,10 +42,37 @@ import { setCurrency } from "@/lib/store/slices/uiSlice"
 import { logoutUser } from "@/lib/store/slices/authSlice"
 import { toast } from "sonner"
 
+/** Module root selectors that should receive the dark class for full-module theming */
+const MODULE_ROOT_SELECTORS = [
+  "#app",
+  ".app",
+  ".performance-v22-root",
+  ".portfolio-v11-root",
+  ".payroll-v6-root",
+  ".procurement-v23-root",
+  ".accounting-v52-root",
+  ".home-v3-root",
+  ".investments-terminal",
+  ".events-root",
+  ".street-rates-root",
+  ".forecasting-root",
+  ".fundraising-root",
+  ".fundraising-kyc-root",
+].join(", ")
+
+function propagateDarkClass(isDark: boolean) {
+  document.documentElement.classList.toggle("dark", isDark)
+  document.querySelectorAll(MODULE_ROOT_SELECTORS).forEach((el) => {
+    el.classList.toggle("dark", isDark)
+  })
+}
+
 interface SharedTopbarProps {
   onModuleSelect: (module: string) => void
   currentModule: string
   moduleActions?: React.ReactNode
+  /** When true, hide the built-in theme toggle (for modules that provide their own). */
+  hideThemeToggle?: boolean
 }
 
 export function SharedTopbar(props: SharedTopbarProps) {
@@ -55,12 +85,40 @@ export function SharedTopbar(props: SharedTopbarProps) {
   )
 }
 
-function SharedTopbarInner({ currentModule, moduleActions }: SharedTopbarProps) {
+function SharedTopbarInner({ currentModule, moduleActions, hideThemeToggle = false }: SharedTopbarProps) {
   const [isLoggingOut, setIsLoggingOut] = useState(false)
+  const [isDark, setIsDark] = useState(false)
   const appSwitcher = useArcusAppSwitcher()
   const dispatch = useAppDispatch()
   const currency = useAppSelector((state) => state.ui.currency)
   const { user, token, isAuthenticated, userDetails } = useAppSelector((state) => state.auth)
+
+  // Sync theme on mount — read saved preference and apply to all roots.
+  //
+  // hideThemeToggle marks a module as light-only (Street Rates, Fundraising,
+  // Fundraising KYC, FP&A all hardcode light backgrounds and ship no dark
+  // variants). The theme preference is global, so a dark choice made in a
+  // module that supports it used to follow the user into these, darkening the
+  // topbar above a page that stayed light. Force light there instead of
+  // applying a half-theme.
+  useEffect(() => {
+    if (hideThemeToggle) {
+      setIsDark(false)
+      propagateDarkClass(false)
+      return
+    }
+    const saved = localStorage.getItem("arcus-theme")
+    const shouldBeDark = saved === "dark" || (!saved && window.matchMedia("(prefers-color-scheme: dark)").matches)
+    setIsDark(shouldBeDark)
+    propagateDarkClass(shouldBeDark)
+  }, [hideThemeToggle])
+
+  const toggleTheme = useCallback(() => {
+    const next = !isDark
+    setIsDark(next)
+    propagateDarkClass(next)
+    localStorage.setItem("arcus-theme", next ? "dark" : "light")
+  }, [isDark])
 
   // Check if user is applicant
   const isApplicant = user?.role?.toLowerCase() === 'applicant'
@@ -74,7 +132,6 @@ function SharedTopbarInner({ currentModule, moduleActions }: SharedTopbarProps) 
     try {
       await dispatch(logoutUser()).unwrap()
       toast.success("Logged out successfully!")
-      // Redirect to login page after successful logout
       window.location.href = '/login'
     } catch (error) {
       toast.error("Logout failed. Please try again.")
@@ -92,23 +149,19 @@ function SharedTopbarInner({ currentModule, moduleActions }: SharedTopbarProps) 
     <TooltipProvider>
       <>
       <header data-arcus-shared-topbar className="h-20 border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-50">
-        <div className="flex items-center justify-between h-full px-6">
-          {/* Left Section - Logo and Breadcrumb */}
+        <div className="flex items-center justify-between h-full px-3 sm:px-6">
+          {/* Left Section - spacer */}
           <div className="flex items-center gap-4">
-            <div
-              className="flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity"
-              onClick={() => window.location.href = '/home-v3'}
-            >
-              <img src="/new_logo.png" alt="Matanho" height={40} width={140} className="h-10 w-auto object-contain" />
-            </div>
           </div>
 
-          {/* Center Section - Search */}
-          <div className="flex-1 max-w-md mx-8">
+          {/* Center Section - Search. Tight margins on small screens: at 375px the
+              wide mx-8 pushed this into the right-hand controls and the search
+              field visibly overlapped the organisation selector. */}
+          <div className="flex-1 min-w-0 max-w-md mx-2 sm:mx-8">
             <div className="relative">
               <CiSearch size={30} className="absolute left-4 top-1/2 transform -translate-y-1/2 text-muted-foreground" />
               <Input
-                placeholder="Search here..."
+                 placeholder="Search here..."
                 className="pl-14 h-12 bg-background/50 border-border/50 focus:bg-background text-base"
               />
             </div>
@@ -117,6 +170,56 @@ function SharedTopbarInner({ currentModule, moduleActions }: SharedTopbarProps) 
           {/* Right Section - Actions and Profile */}
           <div className="flex items-center gap-3">
             {moduleActions}
+
+            {/* Theme Toggle — matches investments-v2 ThemeToggle */}
+            {!hideThemeToggle && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={toggleTheme}
+                    className="flex h-9 w-9 items-center justify-center rounded-full border border-border transition-all hover:bg-accent hover:text-accent-foreground"
+                    style={{
+                      background: 'var(--secondary)',
+                      color: 'var(--muted-foreground)',
+                    }}
+                    title={`Switch to ${isDark ? 'light' : 'dark'} mode`}
+                    aria-label={`Switch to ${isDark ? 'light' : 'dark'} mode`}
+                    aria-pressed={!isDark}
+                  >
+                    {isDark ? (
+                      <Sun className="w-4 h-4" />
+                    ) : (
+                      <Moon className="w-4 h-4" />
+                    )}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Toggle theme</p>
+                </TooltipContent>
+              </Tooltip>
+            )}
+
+            {/* Company Selector */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                {/* Hidden below sm: there is no room for it beside the search
+                    field on a phone, and it is informational rather than a
+                    control users need on mobile. */}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="hidden sm:flex h-9 gap-1 px-2 text-xs font-medium"
+                >
+                  {ORG_NAME}
+                  <CiCircleChevDown size={14} className="opacity-50" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48">
+                <DropdownMenuItem onClick={() => {}}>{ORG_NAME}</DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
 
             {/* App Switcher with Active Module - Hidden for applicants */}
             {!isApplicant && (
@@ -128,18 +231,6 @@ function SharedTopbarInner({ currentModule, moduleActions }: SharedTopbarProps) 
 
             {/* Notifications */}
             {!isApplicant && <NotificationsBell />}
-
-            {/* Calendar */}
-            {/* <Tooltip>
-            <TooltipTrigger asChild>
-              <div className="p-3 cursor-pointer h-12 w-12 flex items-center justify-center rounded-md hover:bg-accent hover:text-accent-foreground transition-colors">
-                <CiCalendar size={30} />
-              </div>
-            </TooltipTrigger>
-            <TooltipContent>
-              <p>Calendar</p>
-            </TooltipContent>
-          </Tooltip> */}
 
             {/* Profile Dropdown */}
             <DropdownMenu>

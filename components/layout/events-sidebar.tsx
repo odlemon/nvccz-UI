@@ -6,6 +6,7 @@ import Link from "next/link"
 import { cn } from "@/lib/utils"
 import { getModuleById } from "@/lib/config/modules"
 import { useRolePermissions } from "@/lib/hooks/useRolePermissions"
+import { ORG_LOGO_PATH, ORG_NAME } from "@/lib/branding"
 
 export function EventsSidebar() {
   const pathname = usePathname()
@@ -34,7 +35,19 @@ export function EventsSidebar() {
   }
 
   return (
-    <aside className="w-64 bg-white border-r border-border h-[calc(100vh-5rem)] overflow-y-auto sticky top-20 z-10">
+    <aside className="w-64 bg-white border-r border-border h-screen overflow-y-auto sticky top-0 z-10">
+      {/* Brand lockup, so this module opens with the logo like Portfolio and
+          Payroll rather than starting straight into the module card. The layout
+          now places the topbar in the column beside this one, so the sidebar
+          owns the full left edge from y=0. */}
+      <div className="flex h-20 shrink-0 items-center border-b border-border px-4">
+        <img
+          src={ORG_LOGO_PATH}
+          alt={ORG_NAME}
+          className="h-9 w-auto max-w-[150px] object-contain object-left"
+        />
+      </div>
+
       <div className="p-4 space-y-4">
         <div className="flex items-center gap-3 p-3 rounded-lg bg-gradient-to-r from-purple-50 to-purple-100">
           <div

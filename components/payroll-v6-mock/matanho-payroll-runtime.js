@@ -1,4 +1,10 @@
 /* Auto-extracted Matanho Payroll HR V6 — adapted for Next.js */
+import {
+  applySessionUserToProfile,
+  clientDesignSignOut,
+  getClientDesignSessionUser,
+  onClientDesignSessionUser,
+} from "@/components/client-design-mock/runtime-auth";
 export function startPayrollV6Runtime(rootEl, options = {}) {
   const initialPage = options.initialPage || 'overview';
   window.__PAYROLL_V6_NAV__ = options.onNavigate || (() => {});
@@ -20,6 +26,1557 @@ export function startPayrollV6Runtime(rootEl, options = {}) {
   // Client assigns vendorsPage later without a prior declaration (classic-script
   // implicit global); must be declared inside this function scope.
   let vendorsPage;
+  /* BEGIN_PAYROLL_LIVE_BRIDGE */
+/**
+ * Live state handed over by the React host via api.hydrate(). Until the first
+ * hydrate lands this stays empty and the runtime renders its own fixtures, so
+ * a hydrate failure degrades to the previous behaviour instead of a blank page.
+ */
+const __pr6Live = {
+  ready: false,
+  permissions: null, // Set<string> of real backend permission names
+  // The access call failed, which is NOT the same as holding no permissions.
+  // See __pr6DeniedPageHtml.
+  accessUnavailable: false,
+  roleName: null,
+  counts: null, // live sidebar badge counts, keyed by page id
+  reference: null, // tax rules, allowance/deduction types, brackets, levies, courses
+  dashboard: null, // /api/payroll/dashboard payload
+  mypay: null, // self-service payslips, portal and leave balances
+  vendors: null, // supplier registry, read from the real Vendor table
+  inputBatches: null, // payroll input batches and their validation rows
+  payGroups: null, // pay groups with their calendar periods
+  onboarding: null, // onboarding candidates
+  rfqs: null, // sourcing events and vendor bids
+  accessRoster: null, // payroll access register: users, role matrix, segregation rule (4a19)
+  errors: [],
+};
+
+/** True once the host has pushed at least one live payload. */
+function __pr6IsLive() {
+  return __pr6Live.ready === true;
+}
+
+/**
+ * Live sidebar badge count for a nav item. Returns null when we have no live
+ * number, and the caller then renders no badge at all — an absent badge is
+ * honest, a stale hardcoded one is not.
+ */
+function __pr6NavCount(pageId) {
+  if (!__pr6Live.counts) return null;
+  const v = __pr6Live.counts[pageId];
+  if (v === null || v === undefined) return null;
+  const n = Number(v);
+  if (!Number.isFinite(n) || n <= 0) return null;
+  return String(n);
+}
+
+/**
+ * Map the runtime's own permission vocabulary onto the backend catalogue.
+ * The runtime shipped with a client-side role simulator (`roles[state.role]`);
+ * once we are live, entitlement comes from the signed-in user's real grants.
+ */
+const __PR6_PERMISSION_MAP = {
+  'employee.view': ['payroll.employees.view', 'payroll.employees.manage'],
+  'employee.edit': ['payroll.employees.manage'],
+  'salary.view': ['payroll.components.view', 'payroll.components.manage'],
+  'salary.edit': ['payroll.components.manage'],
+  'payroll.prepare': ['payroll.runs.manage'],
+  'payroll.approve': ['payroll.runs.approve'],
+  'payroll.release': ['payroll.runs.release'],
+  'exceptions.resolve': ['payroll.exceptions.manage'],
+  'statutory.manage': ['payroll.tax.manage'],
+  'documents.manage': ['payroll.vault.manage'],
+  'reports.generate': ['payroll.reports.view', 'payroll.reports.manage'],
+  'audit.view': ['payroll.audit.view'],
+  'rbac.manage': ['payroll.access.manage'],
+  // View-only gates for the vault, access and calendar screens (4a19). Gating them on a
+  // manage or prepare grant refused every view-only role the backend lets in.
+  'documents.view': ['payroll.vault.view', 'payroll.vault.manage'],
+  'rbac.view': ['payroll.access.view', 'payroll.access.manage'],
+  'calendar.view': ['payroll.calendar.view', 'payroll.calendar.manage'],
+  // Set by an enhancement IIFE: pagePermission.vendors = 'vendors.manage'.
+  // Missing this mapping denied the Vendors screen to every role including
+  // System Administrator, because an unmapped id used to return a hard false.
+  'vendors.manage': ['payroll.vendors.view', 'payroll.vendors.manage'],
+  // Self-service is authenticated-only on the backend: every signed-in user
+  // may see their own pay, so this is always allowed.
+  'self.view': [],
+};
+
+/** Resolve a runtime permission id against the real backend grants. */
+function __pr6Can(permission) {
+  if (!__pr6IsLive() || !__pr6Live.permissions) return null; // fall through to mock roles
+  const mapped = __PR6_PERMISSION_MAP[permission];
+  // An id we have no mapping for must NOT be a hard deny: pagePermission is
+  // extended by the enhancement IIFEs, and a missing entry locked System
+  // Administrator out of the Vendors screen. Fall through instead, so the
+  // decision is at least made against the role rather than by an oversight.
+  if (!mapped) return null;
+  if (mapped.length === 0) return true;
+  return mapped.some((p) => __pr6Live.permissions.has(p));
+}
+
+/**
+ * Command-centre statistics.
+ *
+ * The overview page shipped with its KPI cards hardcoded — Employees '128',
+ * gross USD 264,720, gross ZiG 7,459,664, deductions 77,444, net 187,276,
+ * readiness '72 / 100' — sitting directly above a run table that was already
+ * rendering live rows. That is the exact failure mode this module is being
+ * fixed for, so every figure here is computed from hydrated data.
+ *
+ * Returns null when there is no live data yet, and the caller then falls back
+ * to the runtime's original literals rather than showing zeros.
+ */
+function __pr6OverviewStats() {
+  if (!__pr6IsLive()) return null;
+
+  const runs = Array.isArray(payrollRuns) ? payrollRuns : [];
+  const staff = Array.isArray(employees) ? employees : [];
+  const exc = Array.isArray(exceptions) ? exceptions : [];
+
+  // payrollRuns is newest-first (see lib/payroll-v6/live-loaders.ts adaptRuns).
+  const latest = runs.length ? runs[0] : null;
+
+  const notReady = staff.filter((e) => Number(e && e.readiness) < 100).length;
+  const readiness = staff.length
+    ? Math.round(staff.reduce((sum, e) => sum + Number((e && e.readiness) || 0), 0) / staff.length)
+    : 0;
+  const criticalOpen = exc.filter(
+    (e) => e && e.severity === 'Critical' && e.status !== 'Resolved',
+  ).length;
+
+  const pct = (v) => (typeof v === 'number' && isFinite(v) ? `${v > 0 ? '+' : ''}${v}%` : '');
+
+  return {
+    employees: String(staff.length),
+    employeesSub: notReady
+      ? `${notReady} not fully payroll-ready`
+      : 'All employees payroll-ready',
+    periodLabel: latest ? String(latest.reference || latest.period || '') : 'No run',
+    grossUSD: latest ? Number(latest.grossUSD) || 0 : 0,
+    grossZiG: latest ? Number(latest.grossZiG) || 0 : 0,
+    deductions: latest ? Number(latest.deductions) || 0 : 0,
+    netUSD: latest ? Number(latest.netUSD) || 0 : 0,
+    variance: latest && latest.variance !== null ? pct(latest.variance) : '',
+    readiness,
+    readinessSub: criticalOpen
+      ? `${criticalOpen} critical control${criticalOpen === 1 ? '' : 's'} block release`
+      : 'No critical controls outstanding',
+    readinessTone: criticalOpen ? 'amber' : '',
+    criticalOpen,
+    employeeDataPct: readiness,
+    exceptionsPct: staff.length ? Math.max(0, 100 - Math.round((criticalOpen / staff.length) * 100)) : 100,
+    runStage: latest ? Number(latest.stage) || 1 : 1,
+  };
+}
+
+/**
+ * Employee-directory statistics.
+ *
+ * The directory KPIs were literals ('128' total, '119' payroll ready, '92.9%'
+ * of active, and fixed 4/3/2/6 counts) sitting above a table that already
+ * rendered live rows, and the footer read "Showing N of 128".
+ */
+function __pr6EmployeeStats() {
+  if (!__pr6IsLive()) return null;
+  const staff = Array.isArray(employees) ? employees : [];
+  const active = staff.filter((e) => e && e.isActive && !e.terminated);
+  const ready = staff.filter((e) => Number(e && e.readiness) === 100);
+  const review = staff.filter((e) => {
+    const r = Number(e && e.readiness);
+    return r >= 60 && r < 100;
+  });
+  const blocked = staff.filter((e) => Number(e && e.readiness) < 60);
+  const onNotice = staff.filter((e) => e && e.terminated);
+  const readyPct = active.length
+    ? ((ready.length / active.length) * 100).toFixed(1)
+    : '0.0';
+  return {
+    total: staff.length,
+    active: active.length,
+    onNotice: onNotice.length,
+    ready: ready.length,
+    readyPct,
+    review: review.length,
+    blocked: blocked.length,
+    departments: Array.from(
+      new Set(staff.map((e) => (e && e.department) || 'Unassigned')),
+    ).sort(),
+  };
+}
+
+/** Distinct department options for the directory filter. */
+function __pr6DepartmentOptions() {
+  const s = __pr6EmployeeStats();
+  if (!s) return '<option>Finance</option><option>People &amp; Culture</option><option>Operations</option>';
+  return s.departments.map((d) => `<option>${d}</option>`).join('');
+}
+
+/** Reference data pushed by hydrate, or an empty object before first load. */
+function __pr6Ref() {
+  return __pr6Live.reference || {};
+}
+
+const __pr6Money = (v, c) =>
+  c === 'ZiG'
+    ? `ZiG ${Number(v || 0).toLocaleString('en-US', { maximumFractionDigits: 0 })}`
+    : `USD ${Number(v || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+/**
+ * Pay-component catalogue.
+ *
+ * The page shipped a hardcoded nine-row table (BASIC/HOUSING/OVERTIME/BONUS/
+ * PAYE/NSSA/MEDICAL/LOAN...) with invented GL codes, plus KPI cards reading
+ * 24 earnings, 17 deductions, 31 formulas, 96% test coverage. The real
+ * catalogue is allowance_types + deduction_types.
+ */
+function __pr6ComponentRows() {
+  if (!__pr6IsLive()) return null;
+  const ref = __pr6Ref();
+  const allow = Array.isArray(ref.allowanceTypes) ? ref.allowanceTypes : [];
+  const ded = Array.isArray(ref.deductionTypes) ? ref.deductionTypes : [];
+
+  const rows = [];
+  for (const a of allow) {
+    rows.push([
+      a.code || '-',
+      a.name || '-',
+      'Earning',
+      a.isTaxable === false ? 'Fixed / non-taxable' : 'Fixed / taxable',
+      '—',
+      '—',
+      a.isActive === false ? 'Inactive' : 'Active',
+    ]);
+  }
+  for (const d of ded) {
+    const rate = Number(d.rate);
+    const calc = rate > 0
+      ? `Rate ${(rate * 100).toFixed(2)}%${d.ceiling ? ` capped at ${Number(d.ceiling).toLocaleString('en-US')}` : ''}`
+      : 'Statutory table';
+    rows.push([
+      d.code || '-',
+      d.name || '-',
+      'Deduction',
+      calc,
+      '—',
+      '—',
+      d.isActive === false ? 'Inactive' : 'Active',
+    ]);
+  }
+  return rows;
+}
+
+function __pr6ComponentStats() {
+  const rows = __pr6ComponentRows();
+  if (!rows) return null;
+  const ref = __pr6Ref();
+  const allow = Array.isArray(ref.allowanceTypes) ? ref.allowanceTypes : [];
+  const ded = Array.isArray(ref.deductionTypes) ? ref.deductionTypes : [];
+  const statutory = ded.filter((d) => d.isStatutory).length;
+  return {
+    earnings: allow.length,
+    earningsSub: `${allow.filter((a) => a.isTaxable !== false).length} taxable, ${allow.filter((a) => a.isTaxable === false).length} non-taxable`,
+    deductions: ded.length,
+    deductionsSub: `${statutory} statutory, ${ded.length - statutory} voluntary`,
+    brackets: Array.isArray(ref.brackets) ? ref.brackets.length : 0,
+    levies: Array.isArray(ref.levies) ? ref.levies.length : 0,
+  };
+}
+
+/**
+ * Tax and statutory rules. The page shipped a fixed rule table and KPIs
+ * (182 test cases, 175 employees, 128 headcount).
+ */
+function __pr6TaxRows() {
+  if (!__pr6IsLive()) return null;
+  const ref = __pr6Ref();
+  const brackets = Array.isArray(ref.brackets) ? ref.brackets : [];
+  return brackets.map((b) => [
+    b.currencyCode || '-',
+    `${Number(b.lowerBound || 0).toLocaleString('en-US')} - ${b.upperBound === null || b.upperBound === undefined ? 'above' : Number(b.upperBound).toLocaleString('en-US')}`,
+    `${(Number(b.marginalRate || 0) * 100).toFixed(0)}%`,
+    Number(b.deductionOffset || 0).toLocaleString('en-US'),
+    b.effectiveFrom ? String(b.effectiveFrom).slice(0, 10) : '—',
+    b.isActive === false ? 'Inactive' : 'Active',
+  ]);
+}
+
+/**
+ * Maker-checker comparison. The runtime hardcoded a May-vs-June table
+ * (126/128 headcount, 256,180 vs 264,720 gross, 7,134,000 vs 7,459,664 ZiG,
+ * PAYE 41,280 vs 42,967, overtime, net 181,200 vs 187,276). Build it from the
+ * two most recent runs instead, and show nothing when there are not two.
+ */
+function __pr6ApprovalCompare() {
+  if (!__pr6IsLive()) return null;
+  const runs = Array.isArray(payrollRuns) ? payrollRuns : [];
+  // Live but with no runs is a real answer, not "no data yet". Returning null
+  // here would fall back to the fixture and show a department manager a
+  // preparer named Rudo Sibanda and "3 unresolved critical" for a payroll they
+  // cannot even see.
+  const cur = runs.length ? runs[0] : __pr6RunPlaceholder;
+  const prev = runs.length > 1 ? runs[1] : null;
+
+  const delta = (a, b) => {
+    if (!prev || !b) return '—';
+    if (Number(b) === 0) return '—';
+    const d = ((Number(a) - Number(b)) / Number(b)) * 100;
+    return `${d > 0 ? '+' : ''}${d.toFixed(1)}%`;
+  };
+  const review = (a, b) => {
+    if (!prev || !b || Number(b) === 0) return 'New';
+    const d = Math.abs(((Number(a) - Number(b)) / Number(b)) * 100);
+    return d > 10 ? 'Investigate' : d > 5 ? 'Review' : 'Expected';
+  };
+
+  const prevLabel = prev ? String(prev.reference || prev.period) : 'No prior run';
+  const hasRun = runs.length > 0;
+  const curLabel = String(cur.reference || cur.period);
+
+  return {
+    prevLabel,
+    curLabel,
+    rows: [
+      ['Headcount', prev ? String(prev.employees ?? '—') : '—', String(cur.employees ?? '—'), delta(cur.employees, prev && prev.employees), review(cur.employees, prev && prev.employees)],
+      ['Gross USD', prev ? __pr6Money(prev.grossUSD) : '—', __pr6Money(cur.grossUSD), delta(cur.grossUSD, prev && prev.grossUSD), review(cur.grossUSD, prev && prev.grossUSD)],
+      ['Deductions', prev ? __pr6Money(prev.deductions) : '—', __pr6Money(cur.deductions), delta(cur.deductions, prev && prev.deductions), review(cur.deductions, prev && prev.deductions)],
+      ['Net pay', prev ? __pr6Money(prev.netUSD) : '—', __pr6Money(cur.netUSD), delta(cur.netUSD, prev && prev.netUSD), review(cur.netUSD, prev && prev.netUSD)],
+    ],
+    current: cur,
+    hasRun,
+    owner: hasRun ? (cur.owner || '—') : '—',
+    criticalOpen: (Array.isArray(exceptions) ? exceptions : []).filter(
+      (e) => e && e.severity === 'Critical' && e.status !== 'Resolved',
+    ).length,
+  };
+}
+
+/**
+ * Close & distribution. Payslip counts, bank batch totals and GL amounts were
+ * all literals (128 payslips, USD 86,420 / 58,310, ZiG 6,201,480, GL 264,720 /
+ * 77,444 / 187,276).
+ */
+function __pr6CloseStats() {
+  if (!__pr6IsLive()) return null;
+  const runs = Array.isArray(payrollRuns) ? payrollRuns : [];
+  const cur = runs.length ? runs[0] : __pr6RunPlaceholder;
+  const headcount = Number(cur.employees) || 0;
+  return {
+    headcount,
+    label: String(cur.reference || cur.period),
+    grossUSD: Number(cur.grossUSD) || 0,
+    deductions: Number(cur.deductions) || 0,
+    netUSD: Number(cur.netUSD) || 0,
+    released: String(cur.rawStatus) === 'COMPLETED',
+    stage: Number(cur.stage) || 1,
+  };
+}
+
+/**
+ * My Pay. The self-service page rendered one hardcoded payslip for
+ * "Rudo Sibanda" (gross 2,250.00, deductions 620.86, net 1,629.14,
+ * ZiG 35,820) regardless of who was signed in.
+ */
+function __pr6MyPay() {
+  if (!__pr6IsLive()) return null;
+  const mp = __pr6Live.mypay || {};
+  const slips = Array.isArray(mp.payslips) ? mp.payslips : [];
+  const balances = Array.isArray(mp.leaveBalances) ? mp.leaveBalances : [];
+  const latest = slips.length ? slips[0] : null;
+  return {
+    employee: mp.employee || null,
+    payslips: slips,
+    latest,
+    leaveBalances: balances,
+    hasData: slips.length > 0,
+  };
+}
+
+/**
+ * Pay components in the shape the enhancement layer's catalogue expects
+ * (payComponentsV2). The fixture carried invented GL codes ("5000 · Salaries"),
+ * per-component employee counts and impact amounts ("USD 208,640"); the API has
+ * no GL mapping or per-component impact, so those render as a dash rather than
+ * as numbers that look measured.
+ */
+function __pr6ComponentsV2() {
+  if (!__pr6IsLive()) return null;
+  const ref = __pr6Ref();
+  const allow = Array.isArray(ref.allowanceTypes) ? ref.allowanceTypes : [];
+  const ded = Array.isArray(ref.deductionTypes) ? ref.deductionTypes : [];
+  if (!allow.length && !ded.length) return null;
+
+  const out = [];
+  for (const a of allow) {
+    out.push({
+      code: a.code || '-',
+      name: a.name || '-',
+      type: 'Earning',
+      calc: a.isTaxable === false ? 'Fixed monthly, non-taxable' : 'Fixed monthly, taxable',
+      currency: 'Employee currency',
+      gl: '—',
+      status: a.isActive === false ? 'Inactive' : 'Active',
+      employees: '—',
+      impact: '—',
+    });
+  }
+  for (const d of ded) {
+    const rate = Number(d.rate);
+    out.push({
+      code: d.code || '-',
+      name: d.name || '-',
+      type: d.isStatutory ? 'Statutory' : 'Deduction',
+      calc:
+        rate > 0
+          ? `Rate ${(rate * 100).toFixed(2)}%${d.ceiling ? ', capped at ' + Number(d.ceiling).toLocaleString('en-US') : ''}`
+          : 'Statutory bracket table',
+      currency: 'Employee currency',
+      gl: '—',
+      status: d.isActive === false ? 'Inactive' : 'Active',
+      employees: '—',
+      impact: '—',
+    });
+  }
+  return out;
+}
+
+/**
+ * Payroll movement trend. The fixture was 24 months of invented figures
+ * (…,'May 2026',257,7.21],['Jun 2026',265,7.46]). Real months come from the
+ * dashboard's monthlyTrend. The second series is the ZiG component, which is
+ * genuinely zero while no dual-currency run exists — an honest flat line beats
+ * a fabricated curve.
+ */
+function __pr6TrendV3() {
+  if (!__pr6IsLive()) return null;
+  const d = __pr6Live.dashboard;
+  const trend = d && Array.isArray(d.monthlyTrend) ? d.monthlyTrend : null;
+  // Live with no dashboard is a real answer, not "not loaded". A role without
+  // payroll.dashboard.view (a plain employee) must not be shown the fixture's
+  // 24 months of invented payroll; an empty series is the honest rendering.
+  if (!trend || !trend.length) return [];
+  return trend.map((t) => [
+    `${t.month} ${t.year}`,
+    Number(t.totalPayroll) || 0,
+    0,
+  ]);
+}
+
+/**
+ * Department distribution. The fixture invented headcount/cost/gross/variance
+ * per department. `cost` is a 0-100 bar, so it is scaled against the largest
+ * department rather than being a currency amount. There is no comparative
+ * period behind `variance`, so it stays 0 instead of being made up.
+ */
+function __pr6DepartmentsV3() {
+  if (!__pr6IsLive()) return null;
+  const d = __pr6Live.dashboard;
+  const rows = d && Array.isArray(d.departmentDistribution) ? d.departmentDistribution : null;
+  // Same reasoning as __pr6TrendV3: empty beats fabricated.
+  if (!rows || !rows.length) return [];
+  const max = rows.reduce((m, r) => Math.max(m, Number(r.total) || 0), 0) || 1;
+  return rows.map((r) => ({
+    name: r.department || 'Unassigned',
+    headcount: Number(r.employeeCount) || 0,
+    cost: Math.round(((Number(r.total) || 0) / max) * 100),
+    gross: Number(r.total) || 0,
+    variance: 0,
+  }));
+}
+
+/**
+ * My Pay view for the signed-in user.
+ *
+ * The page rendered the first roster entry plus a fixed payslip (net 1,629.14,
+ * gross 2,250.00, deductions 620.86, ZiG 35,820, four invented monthly
+ * payslips and six invented earnings lines), so every user saw the same
+ * fabricated pay for somebody who was not them.
+ */
+function __pr6MyPayView() {
+  if (!__pr6IsLive()) return null;
+  const mp = __pr6Live.mypay || {};
+  const slips = Array.isArray(mp.payslips) ? mp.payslips : [];
+  const self = mp.self || {};
+  const latest = mp.latest || null;
+  const balances = Array.isArray(mp.leaveBalances) ? mp.leaveBalances : [];
+  const annual = balances.find((b) => String(b.leaveType).toUpperCase() === 'ANNUAL');
+
+  return {
+    hasPayslip: !!latest,
+    latest,
+    slips,
+    self,
+    annualLeave: annual ? Number(annual.balance) : null,
+    balances,
+    // Line-level earnings and deductions are not exposed by the payslip
+    // endpoint, so show the three totals it does return rather than inventing
+    // a breakdown.
+    breakdown: latest
+      ? [
+          ['Gross earnings', __pr6Money(latest.gross)],
+          ['Total deductions', '(' + __pr6Money(latest.deductions) + ')'],
+          ['Net pay', __pr6Money(latest.net)],
+        ]
+      : [],
+  };
+}
+
+/**
+ * Leave register.
+ *
+ * The page rendered seven employees against index-keyed fixtures — used-YTD
+ * from [5,8,12,3,9,2,4], pending from [1,0,3,2,0,4,1] and liability from
+ * [1480,2940,1320,1670,720,2860,810] — so a row's numbers had nothing to do
+ * with the employee beside them.
+ *
+ * Liability is a real derivation: accrued days x daily rate, where the daily
+ * rate is the monthly basic over 22 working days. Used-YTD and pending have no
+ * backend source (there is no leave-request table), so they show a dash.
+ */
+function __pr6LeaveRows() {
+  if (!__pr6IsLive()) return null;
+  const balances = Array.isArray(__pr6Live.leaveBalances) ? __pr6Live.leaveBalances : [];
+  if (!balances.length) return null;
+  const staff = Array.isArray(employees) ? employees : [];
+  const byNumber = new Map(staff.map((e) => [e.id, e]));
+
+  const annual = balances.filter((b) => String(b.leaveType).toUpperCase() === 'ANNUAL');
+  return annual.map((b) => {
+    const emp = byNumber.get(b.employeeNumber);
+    const basic = emp ? Number(emp.base) || 0 : 0;
+    const days = Number(b.balance) || 0;
+    return {
+      employeeNumber: b.employeeNumber,
+      name: b.name,
+      initials: emp ? emp.initials : '--',
+      department: b.department,
+      available: days,
+      liability: basic > 0 ? (basic / 22) * days : 0,
+    };
+  });
+}
+
+function __pr6LeaveStats() {
+  const rows = __pr6LeaveRows();
+  if (!rows) return null;
+  const totalLiability = rows.reduce((s, r) => s + r.liability, 0);
+  const avg = rows.length
+    ? (rows.reduce((s, r) => s + r.available, 0) / rows.length).toFixed(1)
+    : '0.0';
+  const balances = Array.isArray(__pr6Live.leaveBalances) ? __pr6Live.leaveBalances : [];
+  const types = Array.from(new Set(balances.map((b) => b.leaveType)));
+  return {
+    liability: totalLiability,
+    average: avg,
+    employees: rows.length,
+    types: types.length,
+  };
+}
+
+/**
+ * Training register. The fixture invented six courses with enrolment,
+ * completion and pass-rate columns (128/121/7/94.5% and so on). The real
+ * catalogue is payroll_compliance courses; assignment and certification counts
+ * come from the certifications endpoint, which is currently empty, so those
+ * columns read 0 rather than a fabricated 94.5%.
+ */
+function __pr6TrainingRows() {
+  if (!__pr6IsLive()) return null;
+  const ref = __pr6Ref();
+  const courses = Array.isArray(ref.courses) ? ref.courses : [];
+  if (!courses.length) return null;
+  const certs = Array.isArray(ref.certifications) ? ref.certifications : [];
+
+  return courses.map((c) => {
+    const mine = certs.filter((x) => x.courseId === c.id || x.courseCode === c.code);
+    const done = mine.filter((x) => String(x.status || '').toUpperCase() === 'ACTIVE').length;
+    const assigned = mine.length;
+    const pct = assigned ? `${((done / assigned) * 100).toFixed(1)}%` : '0%';
+    return [
+      c.title || c.code || 'Course',
+      String(assigned),
+      String(done),
+      String(assigned - done),
+      pct,
+      c.renewalPeriodMonths ? `${c.renewalPeriodMonths} month renewal` : '—',
+    ];
+  });
+}
+
+function __pr6TrainingStats() {
+  const rows = __pr6TrainingRows();
+  if (!rows) return null;
+  const ref = __pr6Ref();
+  const certs = Array.isArray(ref.certifications) ? ref.certifications : [];
+  const staff = Array.isArray(employees) ? employees : [];
+  return {
+    courses: rows.length,
+    employees: staff.length,
+    certifications: certs.length,
+    mandatory: (Array.isArray(ref.courses) ? ref.courses : []).filter((c) => c.required || c.isMandatory).length,
+  };
+}
+
+/**
+ * Statutory rule register. The fixture listed five invented rule versions
+ * ("ZW-PAYE-2026.06" approved by "Tawanda Chirenje") and KPIs of 14 published
+ * rules, 182 automated tests and an estimated PAYE of 42,967. The real
+ * configuration is tax_rules plus the ZIMRA bracket and levy tables.
+ */
+function __pr6TaxRows() {
+  if (!__pr6IsLive()) return null;
+  const ref = __pr6Ref();
+  const rules = Array.isArray(ref.taxRules) ? ref.taxRules : [];
+  const brackets = Array.isArray(ref.brackets) ? ref.brackets : [];
+  const levies = Array.isArray(ref.levies) ? ref.levies : [];
+  if (!rules.length && !brackets.length && !levies.length) return null;
+
+  const out = [];
+  for (const r of rules) {
+    out.push([
+      r.type || 'RULE',
+      r.name || '—',
+      r.currency ? r.currency.code : 'USD',
+      r.effectiveDate ? String(r.effectiveDate).slice(0, 10) : '—',
+      r.isActive === false ? 'Inactive' : 'Active',
+      '—',
+    ]);
+  }
+  for (const l of levies) {
+    out.push([
+      l.levyCode || 'LEVY',
+      `${l.levyCode} (${l.currencyCode})`,
+      l.currencyCode || '—',
+      l.effectiveFrom ? String(l.effectiveFrom).slice(0, 10) : '—',
+      l.isActive === false ? 'Inactive' : 'Active',
+      l.rate !== null && l.rate !== undefined ? `Rate ${(Number(l.rate) * 100).toFixed(2)}%` : (l.ceiling ? `Ceiling ${Number(l.ceiling).toLocaleString('en-US')}` : '—'),
+    ]);
+  }
+  return out;
+}
+
+function __pr6TaxStats() {
+  const rows = __pr6TaxRows();
+  if (!rows) return null;
+  const ref = __pr6Ref();
+  const runs = Array.isArray(payrollRuns) ? payrollRuns : [];
+  const latest = runs.length ? runs[0] : null;
+  return {
+    rules: (Array.isArray(ref.taxRules) ? ref.taxRules : []).length,
+    brackets: (Array.isArray(ref.brackets) ? ref.brackets : []).length,
+    levies: (Array.isArray(ref.levies) ? ref.levies : []).length,
+    employees: (Array.isArray(employees) ? employees : []).length,
+    deductions: latest ? Number(latest.deductions) || 0 : 0,
+    period: latest ? String(latest.reference || latest.period) : '—',
+  };
+}
+
+/**
+ * Payroll mix for the latest run: how much of gross is basic versus allowances.
+ * The fixture showed 'USD 208,640' basic / 'USD 49,756' allowances / 79% / 19%.
+ * Basic comes from the employee roster and allowances are the remainder of the
+ * run's gross, so the two always reconcile to the gross actually paid.
+ */
+function __pr6PayrollMix() {
+  if (!__pr6IsLive()) return null;
+  const runs = Array.isArray(payrollRuns) ? payrollRuns : [];
+  const staff = Array.isArray(employees) ? employees : [];
+  const latest = runs.length ? runs[0] : null;
+  if (!latest) return null;
+  const gross = Number(latest.grossUSD) || 0;
+  if (gross <= 0) return null;
+  const basic = staff.reduce((s, e) => s + (Number(e.base) || 0), 0);
+  const allowances = Math.max(0, gross - basic);
+  return {
+    gross,
+    basic,
+    allowances,
+    basicPct: Math.round((basic / gross) * 100),
+    allowancePct: Math.round((allowances / gross) * 100),
+    deductions: Number(latest.deductions) || 0,
+    deductionPct: Math.round(((Number(latest.deductions) || 0) / gross) * 100),
+  };
+}
+
+/**
+ * Coverage of the latest run: how many employees it actually paid against the
+ * roster. Replaces a "1,247 of 1,284 valid" input-batch figure that had no
+ * backend behind it at all (there is no payroll input-batch store).
+ */
+function __pr6RunCoverage() {
+  if (!__pr6IsLive()) return null;
+  const runs = Array.isArray(payrollRuns) ? payrollRuns : [];
+  const staff = Array.isArray(employees) ? employees : [];
+  // Live with nothing to show is a real answer: falling back to null here put
+  // the fixture's "1,247 of 1,284 valid" back on screen for a role that cannot
+  // see payroll at all.
+  const latest = runs.length ? runs[0] : null;
+  const paid = latest ? Number(latest.employees) || 0 : 0;
+  const total = staff.length;
+  return {
+    paid,
+    total,
+    pct: total ? Math.round((paid / total) * 100) : 0,
+  };
+}
+
+/**
+ * Component catalogue health: active versus inactive, and how many deduction
+ * types are statutory. Replaces '182 of 190 tests passed' and '3 changes
+ * awaiting review', neither of which has any backend equivalent.
+ */
+function __pr6ComponentHealth() {
+  if (!__pr6IsLive()) return null;
+  const ref = __pr6Ref();
+  const allow = Array.isArray(ref.allowanceTypes) ? ref.allowanceTypes : [];
+  const ded = Array.isArray(ref.deductionTypes) ? ref.deductionTypes : [];
+  const all = allow.concat(ded);
+  if (!all.length) return null;
+  const active = all.filter((c) => c.isActive !== false).length;
+  const statutory = ded.filter((d) => d.isStatutory).length;
+  return {
+    total: all.length,
+    active,
+    activePct: all.length ? Math.round((active / all.length) * 100) : 0,
+    statutory,
+    statutoryPct: ded.length ? Math.round((statutory / ded.length) * 100) : 0,
+  };
+}
+
+/**
+ * Payroll readiness per department, from the employee roster. Replaces the
+ * training page's invented per-department completion bars (Finance 98%,
+ * Operations 86%, Commercial 89%, Technology 96%, Procurement 93%) — those
+ * departments do not even exist in this database.
+ */
+function __pr6DepartmentReadiness() {
+  if (!__pr6IsLive()) return null;
+  const staff = Array.isArray(employees) ? employees : [];
+  if (!staff.length) return null;
+  const byDept = new Map();
+  for (const e of staff) {
+    const d = e.department || 'Unassigned';
+    const cur = byDept.get(d) || { sum: 0, n: 0 };
+    cur.sum += Number(e.readiness) || 0;
+    cur.n += 1;
+    byDept.set(d, cur);
+  }
+  return Array.from(byDept.entries())
+    .map(([name, v]) => ({ name, pct: Math.round(v.sum / v.n), count: v.n }))
+    .sort((a, b) => b.count - a.count);
+}
+
+/**
+ * Empty-collection placeholders.
+ *
+ * The runtime indexes element zero of payrollRuns, employees, exceptions and
+ * documents directly, because its fixtures were never empty. Once the data
+ * is live those arrays legitimately CAN be empty — a department manager holds
+ * no payroll.runs.view grant, so the loader never fetches runs and hydrate
+ * hands over [] — and reading .id off element zero then throws, taking the whole render
+ * down. Observed on the Approvals screen as deptmgr:
+ *   [payroll-v6] hydrate failed TypeError: Cannot read properties of undefined
+ *
+ * These placeholders render as dashes and zeros, so an empty screen says "no
+ * data" instead of crashing or inventing a value.
+ */
+const __PR6_DASH = '—';
+
+const __pr6RunPlaceholder = {
+  id: __PR6_DASH,
+  reference: __PR6_DASH,
+  period: 'No payroll run',
+  group: __PR6_DASH,
+  employees: 0,
+  currency: 'USD',
+  grossUSD: 0,
+  grossZiG: 0,
+  deductions: 0,
+  netUSD: 0,
+  status: 'None',
+  rawStatus: 'NONE',
+  approvalStatus: 'NONE',
+  stage: 1,
+  owner: __PR6_DASH,
+  variance: null,
+};
+
+const __pr6EmployeePlaceholder = {
+  id: __PR6_DASH,
+  recordId: null,
+  name: 'No employee records',
+  initials: '--',
+  email: null,
+  department: __PR6_DASH,
+  title: __PR6_DASH,
+  branch: __PR6_DASH,
+  type: __PR6_DASH,
+  start: __PR6_DASH,
+  phone: __PR6_DASH,
+  base: 0,
+  zig: 0,
+  currency: 'USD',
+  bank: __PR6_DASH,
+  tax: __PR6_DASH,
+  nssa: __PR6_DASH,
+  readiness: 0,
+  status: 'None',
+  leave: __PR6_DASH,
+  training: __PR6_DASH,
+  documents: __PR6_DASH,
+  terminated: false,
+  isActive: false,
+};
+
+const __pr6ExceptionPlaceholder = {
+  id: __PR6_DASH,
+  employee: 'No exceptions',
+  employeeId: __PR6_DASH,
+  type: 'None',
+  severity: 'Low',
+  source: __PR6_DASH,
+  amount: __PR6_DASH,
+  owner: null,
+  age: null,
+  status: 'None',
+  detail: 'No payroll exceptions are outstanding.',
+};
+
+const __pr6DocumentPlaceholder = {
+  id: __PR6_DASH,
+  name: 'No documents',
+  folder: __PR6_DASH,
+  type: __PR6_DASH,
+  owner: __PR6_DASH,
+  modified: __PR6_DASH,
+  class: __PR6_DASH,
+  versions: 0,
+  content: '',
+};
+
+/**
+ * Access-refusal panel. Shown in place of a page whose permission the
+ * signed-in role does not hold. The sidebar already hides the link, but the
+ * URL still worked: a plain employee reaching /payroll/approvals (then
+ * /payroll-v6/approvals) got the full Maker-Checker screen. A hidden link is
+ * not access control.
+ */
+function __pr6DeniedPageHtml(pageId) {
+  var required = '';
+  try {
+    required = (typeof pagePermission !== 'undefined' && pagePermission[pageId]) || '';
+  } catch (_) {}
+
+  // An unreachable GET /payroll/me/access used to land here, telling a System
+  // Administrator holding all 34 grants that their role lacked permission --
+  // every payroll screen, for the duration of any outage. Failing closed is
+  // right; blaming the user's role for a backend failure is not, and it is the
+  // opposite of actionable because nobody retries a permissions problem.
+  var unavailable = false;
+  try {
+    unavailable = __pr6Live.accessUnavailable === true;
+  } catch (_) {}
+  if (unavailable) {
+    return (
+      '<div class="page"><section class="card"><div class="card-body" style="text-align:center;padding:48px 24px">' +
+      '<h3 style="margin:0 0 6px">We could not verify your access</h3>' +
+      '<p class="muted" style="margin:0 0 12px">Payroll could not reach the permissions service, so this screen is held back until it can. ' +
+      'Your role has not changed.</p>' +
+      '<button class="btn primary" data-pr6-retry type="button">Try again</button>' +
+      '</div></section></div>'
+    );
+  }
+
+  return (
+    '<div class="page"><section class="card"><div class="card-body" style="text-align:center;padding:48px 24px">' +
+    '<h3 style="margin:0 0 6px">You do not have access to this page</h3>' +
+    '<p class="muted" style="margin:0 0 4px">Your role does not hold the payroll permission this screen requires.</p>' +
+    (required ? '<p class="tiny muted">Required permission: ' + required + '</p>' : '') +
+    '</div></section></div>'
+  );
+}
+
+/**
+ * Payroll run register statistics. The page carried '2' open runs, '140'
+ * employees in scope, a gross of 362,960, '12' open exceptions and a
+ * "31 May 2026" last release, none of which came from anywhere.
+ */
+function __pr6RunStats() {
+  if (!__pr6IsLive()) return null;
+  const runs = Array.isArray(payrollRuns) ? payrollRuns : [];
+  const staff = Array.isArray(employees) ? employees : [];
+  const exc = Array.isArray(exceptions) ? exceptions : [];
+  const open = runs.filter((r) => String(r.rawStatus) !== 'COMPLETED');
+  const released = runs.filter((r) => String(r.rawStatus) === 'COMPLETED');
+  const latest = runs.length ? runs[0] : null;
+  const lastReleased = released.length ? released[0] : null;
+  const critical = exc.filter((e) => e && e.severity === 'Critical').length;
+  const high = exc.filter((e) => e && e.severity === 'High').length;
+  return {
+    openRuns: open.length,
+    openSub: open.length ? String(open[0].reference || open[0].period) : 'None in progress',
+    inScope: latest ? Number(latest.employees) || 0 : staff.length,
+    gross: latest ? Number(latest.grossUSD) || 0 : 0,
+    grossSub: latest ? String(latest.reference || latest.period) : 'No run',
+    exceptions: exc.length,
+    exceptionSub: `${critical} critical, ${high} high`,
+    lastRelease: lastReleased ? String(lastReleased.reference || lastReleased.period) : 'None yet',
+    totalRuns: runs.length,
+  };
+}
+
+/**
+ * Pay-period options for the Create Payroll Run dialog.
+ *
+ * The dialog offered exactly two hardcoded periods, "July 2026" and
+ * "June 2026". Both already have runs, and createPayrollRun rejects any period
+ * overlapping an existing one, so creating a run through the UI was impossible
+ * -- every choice returned "A payroll run already exists for this period".
+ *
+ * Offers the next twelve months that no run occupies, most recent first.
+ */
+function __pr6PeriodOptions() {
+  if (!__pr6IsLive()) return null;
+  const runs = Array.isArray(payrollRuns) ? payrollRuns : [];
+  const taken = new Set(
+    runs
+      .map((r) => String(r.reference || ''))
+      .filter(Boolean),
+  );
+  const MONTHS = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December',
+  ];
+  const out = [];
+  const now = new Date();
+  // Start from the month after the newest run, else from this month.
+  let y = now.getUTCFullYear();
+  let m = now.getUTCMonth() + 1;
+  for (let i = 0; i < 24 && out.length < 12; i += 1) {
+    const key = `${y}-${String(m).padStart(2, '0')}`;
+    if (!taken.has(key)) out.push(`${MONTHS[m - 1]} ${y}`);
+    m += 1;
+    if (m > 12) { m = 1; y += 1; }
+  }
+  return out.length ? out : null;
+}
+
+/**
+ * Audit trail statistics. The screen carried '4,812' events, '42' privileged,
+ * '318' sensitive views, '9' blocked actions and a "100%" evidence-hash claim,
+ * none of which existed: the runtime's logEvent() wrote to an in-memory array
+ * that died with the page. The trail is now payroll_audit_events.
+ */
+/**
+ * Vendors & Quotations rows and header figures.
+ *
+ * The screen shipped a hardcoded registry — "Medsure Health Fund", VEN-001 and friends, each with
+ * an invented rating, contract value and compliance percentage — plus KPI cards asserting 26
+ * registered vendors and USD 28,460 of negotiated savings. None of it came from anywhere.
+ *
+ * Returns null when there is no live vendor payload, so the caller can render an honest empty
+ * state instead of falling back to the fixture.
+ */
+/**
+ * Inputs & Validation. The screen hardcoded a five-row error list and a band reading
+ * "1,247 valid rows are ready. 37 rows remain isolated" over "1,284 uploaded" — none of it backed
+ * by anything. Returns null when the role cannot see inputs, so the caller says so rather than
+ * falling back to the fixture.
+ */
+function __pr6Inputs() {
+  const p = __pr6Live.inputBatches;
+  if (!p || !Array.isArray(p.items)) return null;
+  const s = p.summary || {};
+  const latest = p.items[0] || null;
+  return {
+    batches: p.items,
+    latest,
+    totalRows: Number(s.totalRows) || 0,
+    validRows: Number(s.validRows) || 0,
+    errorRows: Number(s.errorRows) || 0,
+    awaitingCommit: Number(s.awaitingCommit) || 0,
+    // Percentage of rows that passed validation; null when nothing has been uploaded, because
+    // 0% and "no data" are different statements.
+    validPct: Number(s.totalRows) > 0 ? Math.round((Number(s.validRows) / Number(s.totalRows)) * 100) : null,
+  };
+}
+
+/** Pay groups with their calendar periods. Replaces a hardcoded single "Monthly Staff" group. */
+function __pr6PayGroups() {
+  const p = __pr6Live.payGroups;
+  if (!p || !Array.isArray(p.items)) return null;
+  const s = p.summary || {};
+  return {
+    groups: p.items,
+    total: Number(p.total) || p.items.length,
+    active: Number(s.active) || 0,
+    periods: Number(s.periods) || 0,
+    openPeriods: Number(s.openPeriods) || 0,
+  };
+}
+
+/** Onboarding pipeline. */
+function __pr6Onboarding() {
+  const p = __pr6Live.onboarding;
+  if (!p || !Array.isArray(p.items)) return null;
+  const s = p.summary || {};
+  return {
+    candidates: p.items,
+    total: Number(p.total) || p.items.length,
+    inProgress: Number(s.inProgress) || 0,
+    complete: Number(s.complete) || 0,
+    byStatus: s.byStatus || {},
+  };
+}
+
+/** Sourcing events and their bids, for the RFQ half of the Vendors screen. */
+function __pr6Rfqs() {
+  const p = __pr6Live.rfqs;
+  if (!p || !Array.isArray(p.items)) return null;
+  const s = p.summary || {};
+  return {
+    rfqs: p.items,
+    open: Number(s.open) || 0,
+    evaluating: Number(s.evaluating) || 0,
+    awarded: Number(s.awarded) || 0,
+    bidsReceived: Number(s.bidsReceived) || 0,
+    closingSoon: Number(s.closingSoon) || 0,
+  };
+}
+
+function __pr6Vendors() {
+  const v = __pr6Live.vendors;
+  if (!v || !Array.isArray(v.items)) return null;
+  const s = v.summary || {};
+  return {
+    items: v.items,
+    total: Number(v.total) || v.items.length,
+    registered: Number(s.registered) || 0,
+    compliant: Number(s.compliant) || 0,
+    pending: Number(s.pending) || 0,
+    expired: Number(s.expired) || 0,
+    blacklisted: Number(s.blacklisted) || 0,
+    categories: Number(s.categories) || 0,
+    ratedCount: Number(s.ratedCount) || 0,
+    averageRating: s.averageRating == null ? null : Number(s.averageRating),
+  };
+}
+
+function __pr6AuditStats() {
+  if (!__pr6IsLive()) return null;
+  const rows = Array.isArray(auditEvents) ? auditEvents : [];
+  const cls = (r) => String((r && r[5]) || '');
+  return {
+    total: rows.length,
+    approvals: rows.filter((r) => cls(r) === 'Approval').length,
+    changes: rows.filter((r) => cls(r) === 'Change').length,
+    actors: new Set(rows.map((r) => String((r && r[1]) || '')).filter(Boolean)).size,
+  };
+}
+
+/**
+ * Action interception.
+ *
+ * Registered in the capture phase before the runtime's own handlers, so a
+ * cancelled event never reaches the mock implementation. The host decides which
+ * action ids are live (its API_ACTIONS allowlist); anything it does not claim
+ * falls through untouched and keeps working as view-state.
+ */
+/**
+ * Retry for the "could not verify your access" panel. Deliberately not a
+ * [data-action]: the host claims only its own allowlist and the runtime has no
+ * case for this, so it would fall through and do nothing. The host already
+ * listens for payroll-v6:reload-request and re-runs the whole load.
+ */
+document.addEventListener('click', (event) => {
+  const el = event.target && event.target.closest ? event.target.closest('[data-pr6-retry]') : null;
+  if (!el) return;
+  event.preventDefault();
+  try {
+    window.dispatchEvent(new Event('payroll-v6:reload-request'));
+  } catch (_) {}
+}, true);
+
+document.addEventListener(
+  'click',
+  (event) => {
+    const el = event.target && event.target.closest ? event.target.closest('[data-action]') : null;
+    if (!el) return;
+    const action = el.dataset ? el.dataset.action : null;
+    if (!action) return;
+
+    // Copy the dataset so the host gets ids/periods without holding a DOM ref.
+    const dataset = {};
+    try {
+      Object.keys(el.dataset || {}).forEach((k) => {
+        dataset[k] = el.dataset[k];
+      });
+    } catch (_) {}
+
+    const detail = { action, dataset, page: (typeof state !== 'undefined' ? state.page : null) };
+    let cancelled = false;
+    try {
+      const ev = new CustomEvent('matanho:before-action', { detail, cancelable: true });
+      window.dispatchEvent(ev);
+      cancelled = ev.defaultPrevented;
+    } catch (_) {}
+
+    if (cancelled) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+    }
+  },
+  true,
+);
+
+
+/**
+ * FINDING-017 — Roles and Access, Document Vault and Pay Calendar render live data only.
+ *
+ * Each of these screens was a page override from the enhancement IIFEs reading a fixture:
+ * userAccess + roles (six people who are not employees, a matrix of ticks, KPIs of "42"
+ * users and "2" SoD conflicts), documents (a register nobody uploaded) and
+ * payGroupsV2 + calendarPeriods (July 2026 pay dates). The overrides are now one-line
+ * delegates into the builders below (patch 4a19). Before the first hydrate they render a
+ * loading panel, never the fixtures.
+ */
+function __pr6Esc(v) {
+  return String(v == null ? '' : v)
+    .split('&').join('&amp;')
+    .split('<').join('&lt;')
+    .split('>').join('&gt;')
+    .split('"').join('&quot;')
+    .split("'").join('&#39;');
+}
+
+function __pr6Has(permission) {
+  return !!(__pr6Live.permissions && __pr6Live.permissions.has(permission));
+}
+
+function __pr6LoadFailed(source) {
+  return (__pr6Live.errors || []).some((e) => e && e.source === source);
+}
+
+function __pr6FileSize(bytes) {
+  if (bytes == null) return '—';
+  const b = Number(bytes);
+  if (!Number.isFinite(b)) return '—';
+  if (b < 1024) return b + ' B';
+  if (b < 1048576) return Math.round(b / 1024) + ' KB';
+  return (b / 1048576).toFixed(1) + ' MB';
+}
+
+function __pr6PendingPanel(eyebrow, title, desc, message, retry) {
+  return '<div class="page">' + pageHead(eyebrow, title, desc) +
+    '<section class="card"><div class="card-body" style="text-align:center;padding:40px 24px">' +
+    '<p class="muted" style="margin:0 0 12px">' + message + '</p>' +
+    (retry ? '<button class="btn primary" data-pr6-retry type="button">Try again</button>' : '') +
+    '</div></section></div>';
+}
+
+/** Readable names for the backend's payroll grants. Unknown ids fall back to the id. */
+const __PR6_PERMISSION_LABELS = {
+  'payroll.dashboard.view': 'View command centre',
+  'payroll.employees.view': 'View employee records',
+  'payroll.employees.manage': 'Change employee records',
+  'payroll.runs.view': 'View payroll runs',
+  'payroll.runs.manage': 'Prepare payroll runs (maker)',
+  'payroll.runs.approve': 'Approve payroll runs (checker)',
+  'payroll.runs.release': 'Release pay and bank files',
+  'payroll.components.view': 'View earnings and deductions',
+  'payroll.components.manage': 'Change earnings and deductions',
+  'payroll.tax.view': 'View tax and statutory rules',
+  'payroll.tax.manage': 'Change tax and statutory rules',
+  'payroll.leave.view': 'View leave',
+  'payroll.leave.manage': 'Change leave',
+  'payroll.training.view': 'View training',
+  'payroll.training.manage': 'Change training',
+  'payroll.vault.view': 'View and download documents',
+  'payroll.vault.manage': 'Upload documents',
+  'payroll.reports.view': 'View reports',
+  'payroll.reports.manage': 'Generate reports',
+  'payroll.audit.view': 'View audit trail',
+  'payroll.access.view': 'View payroll access register',
+  'payroll.access.manage': 'Change payroll access',
+  'payroll.settings.view': 'View settings',
+  'payroll.settings.manage': 'Change settings',
+  'payroll.vendors.view': 'View vendors',
+  'payroll.vendors.manage': 'Manage vendors and RFQs',
+  'payroll.calendar.view': 'View pay calendar',
+  'payroll.calendar.manage': 'Change pay calendar',
+  'payroll.exceptions.view': 'View exceptions',
+  'payroll.exceptions.manage': 'Resolve exceptions',
+  'payroll.inputs.view': 'View inputs',
+  'payroll.inputs.manage': 'Commit inputs',
+  'payroll.onboarding.view': 'View onboarding',
+  'payroll.onboarding.manage': 'Manage onboarding',
+};
+
+function __pr6PermissionLabel(p) {
+  return __PR6_PERMISSION_LABELS[p] || p;
+}
+
+// ------------------------------------------------------------------ access
+
+function __pr6AccessPageHtml() {
+  const eyebrow = 'Identity, authority and segregation';
+  const title = 'Roles and Access Control';
+  const desc = 'Who holds payroll authority, computed from the grants the payroll routes enforce.';
+  if (!__pr6IsLive()) return __pr6PendingPanel(eyebrow, title, desc, 'Loading the payroll access register…');
+
+  const r = __pr6Live.accessRoster;
+  if (!r || !Array.isArray(r.users)) {
+    return __pr6LoadFailed('access/roster')
+      ? __pr6PendingPanel(eyebrow, title, desc, 'The payroll access register could not be loaded.', true)
+      : __pr6PendingPanel(eyebrow, title, desc, 'Your role cannot view the payroll access register.');
+  }
+
+  const esc = __pr6Esc;
+  const s = r.summary || {};
+  const users = r.users;
+  const perms = Array.isArray(r.permissions) ? r.permissions : [];
+  const roles = Array.isArray(r.roles) ? r.roles : [];
+  const dash = '—';
+
+  const kpis =
+    kpi('Users with payroll access', String(s.usersWithPayrollAccess != null ? s.usersWithPayrollAccess : users.length), 'Hold at least one payroll grant', 'users') +
+    kpi('Privileged users', String(s.privileged || 0), 'Change access, release pay, or approve own run', 'key', 'violet') +
+    kpi('MFA coverage', s.mfaCoveragePct == null ? dash : s.mfaCoveragePct + '%', (s.mfaEnrolled || 0) + ' of ' + users.length + ' enrolled', 'shield', 'cyan') +
+    kpi('Self-approval exempt', String(s.selfApprovalConflicts || 0), 'Can approve a run they submitted', 'alert', s.selfApprovalConflicts ? 'amber' : '') +
+    kpi('Terminated with access', String(s.terminatedWithAccess || 0), 'Employee terminated, grants still held', 'lock', s.terminatedWithAccess ? 'red' : 'cyan');
+
+  const duties = (u) => [u.canPrepare ? 'Maker' : '', u.canApprove ? 'Checker' : '', u.canRelease ? 'Release' : ''].filter(Boolean);
+
+  // Five compact columns. The runtime styles .access-user-table table with min-width:920px,
+  // which inside the two-column access grid pushed Status and Grants out of view and cut the
+  // duty chips mid-word at 1440px. The inline min-width on the table lets it fit its card;
+  // below the runtime's breakpoint the cards take over exactly as before.
+  const userRows = users.map((u) => {
+    const dutyText = duties(u).join(' · ') || '<span class="muted">View only</span>';
+    return '<tr>' +
+      '<td><div class="access-user"><div class="mini-avatar">' + esc(u.initials) + '</div><div><strong>' + esc(u.name) + '</strong><div class="tiny muted">' + esc(u.email) + (u.department ? ' · ' + esc(u.department) : '') + '</div></div></div></td>' +
+      '<td><div>' + esc(u.roleName || dash) + '</div><div class="tiny muted">' + u.permissions.length + ' of ' + perms.length + ' grants</div></td>' +
+      '<td><div>' + dutyText + '</div>' + (u.selfApproval ? '<div class="tiny delta warn">Self-approval exempt</div>' : '') + '</td>' +
+      '<td style="white-space:nowrap">' + badge(u.mfaEnrolled ? 'Enrolled' : 'Not enrolled') + '</td>' +
+      '<td style="white-space:nowrap">' + badge(u.status) + '</td>' +
+      '</tr>';
+  });
+
+  const userCards = users.map((u) =>
+    '<article class="access-user-card"><div class="access-user-card-head"><div class="access-user"><div class="mini-avatar">' + esc(u.initials) + '</div><div><strong>' + esc(u.name) + '</strong><div class="tiny muted">' + esc(u.roleName || dash) + '</div></div></div>' + badge(u.status) + '</div>' +
+    '<div class="access-user-card-meta">' +
+    '<div class="fact"><span>Department</span><strong>' + esc(u.department || dash) + '</strong></div>' +
+    '<div class="fact"><span>MFA</span><strong>' + (u.mfaEnrolled ? 'Enrolled' : 'Not enrolled') + '</strong></div>' +
+    '<div class="fact"><span>Duties</span><strong>' + (duties(u).join(', ') || 'View only') + (u.selfApproval ? ' · self-approval exempt' : '') + '</strong></div>' +
+    '<div class="fact"><span>Grants</span><strong>' + u.permissions.length + ' of ' + perms.length + '</strong></div>' +
+    '</div></article>'
+  ).join('');
+
+  const usersCard = users.length
+    ? '<section class="card access-card"><div class="card-head"><div><h3>User access register</h3><p>Everyone holding at least one payroll grant</p></div></div>' +
+      '<div class="table-wrap access-user-table"><table style="min-width:0;width:100%"><thead><tr><th>User</th><th>Role</th><th>Duties</th><th>MFA</th><th>Status</th></tr></thead><tbody>' + userRows.join('') + '</tbody></table></div>' +
+      '<div class="access-user-cards">' + userCards + '</div></section>'
+    : card('User access register', 'Everyone holding at least one payroll grant', '<div class="card-body" style="text-align:center;padding:36px 24px"><strong>No user holds a payroll grant.</strong></div>');
+
+  const seg = r.segregation || {};
+  const exemptUsers = Array.isArray(seg.exemptUsers) ? seg.exemptUsers : [];
+  const segCard =
+    '<section class="card access-card"><div class="card-head"><div><h3>Segregation of duties</h3><p>The rule the payroll backend enforces</p></div></div><div class="card-body sod-list">' +
+    '<div class="sod-rule"><span class="kpi-icon amber">' + icon('lock') + '</span><div><strong>' + esc(seg.rule || dash) + '</strong><div class="tiny muted">' + esc(seg.exception || '') + '</div></div>' + badge('Enforced') + '</div>' +
+    (exemptUsers.length
+      ? '<div class="callout amber" style="margin-top:12px"><span class="kpi-icon amber">' + icon('alert') + '</span><div><strong>' + exemptUsers.length + (exemptUsers.length === 1 ? ' user is' : ' users are') + ' exempt from this rule</strong><ul style="margin:6px 0 0;padding-left:18px">' +
+        exemptUsers.map((x) => '<li><strong>' + esc(x.name) + '</strong> <span class="muted">' + esc(x.roleName || '') + '</span></li>').join('') +
+        '</ul></div></div>'
+      : '<p class="tiny muted" style="margin:12px 0 0">No user with payroll access is exempt.</p>') +
+    '<p class="tiny muted" style="margin:12px 0 0">No other segregation rule is enforced by the payroll backend. Bank-detail changes, statutory rule changes and report filing have no maker-checker control.</p>' +
+    '</div></section>';
+
+  const matrixRows = perms.map((p) =>
+    '<tr><td><strong>' + esc(__pr6PermissionLabel(p)) + '</strong><div class="tiny muted">' + esc(p) + '</div></td>' +
+    roles.map((role) => '<td style="text-align:center">' + (role.permissions.indexOf(p) >= 0 ? '&#10003;' : '<span class="muted">·</span>') + '</td>').join('') +
+    '</tr>'
+  ).join('');
+
+  const roleCards = roles.map((role) =>
+    '<article class="role-access-card"><header class="role-access-card-head"><div><h4>' + esc(role.name) + '</h4><p>' + role.permissions.length + ' of ' + perms.length + ' grants · ' + role.userCount + (role.userCount === 1 ? ' user' : ' users') + '</p></div></header>' +
+    '<div class="role-permission-list">' + role.permissions.map((p) => '<div class="role-permission-row"><div><strong>' + esc(__pr6PermissionLabel(p)) + '</strong><span>' + esc(p) + '</span></div></div>').join('') + '</div></article>'
+  ).join('');
+
+  const matrix = roles.length
+    ? '<section class="card role-matrix-card"><div class="card-head access-toolbar"><div><h3>Role permission matrix</h3><p>Stored grants per role. Read-only: grants are defined in payrollPermissions.ts and applied by the payroll permissions migration.</p></div></div>' +
+      '<div class="role-matrix-scroll"><table><thead><tr><th>Permission</th>' +
+      roles.map((role) => '<th>' + esc(role.name) + '<div class="tiny muted">' + role.userCount + (role.userCount === 1 ? ' user' : ' users') + '</div></th>').join('') +
+      '</tr></thead><tbody>' + matrixRows + '</tbody></table></div><div class="role-card-grid">' + roleCards + '</div></section>'
+    : '';
+
+  return '<div class="page access-dashboard">' + pageHead(eyebrow, title, desc) +
+    '<div class="grid kpis">' + kpis + '</div>' +
+    '<div class="access-primary-grid">' + usersCard + segCard + '</div>' +
+    matrix + '</div>';
+}
+
+// ------------------------------------------------------------------- vault
+
+function __pr6VaultPageHtml() {
+  const eyebrow = 'Governed records management';
+  const title = 'Payroll and HR Document Vault';
+  const desc = 'Payroll and HR documents held behind the payroll vault permissions. Downloads go through the payroll API and are recorded in the audit trail.';
+  if (!__pr6IsLive()) return __pr6PendingPanel(eyebrow, title, desc, 'Loading the document register…');
+  if (__pr6LoadFailed('documents')) {
+    return __pr6PendingPanel(eyebrow, title, desc, 'The document register could not be loaded.', true);
+  }
+
+  const esc = __pr6Esc;
+  const canUpload = can('documents.manage');
+  const all = Array.isArray(documents) ? documents : [];
+  const q = String(state.vaultSearch || '').trim().toLowerCase();
+  const cls = state.vaultClassification || 'All classifications';
+  const owner = state.vaultOwner || 'All owners';
+  const folder = state.folder || 'All documents';
+
+  const classes = Array.from(new Set(all.map((d) => d.class))).sort();
+  const owners = Array.from(new Set(all.map((d) => d.owner))).sort();
+  const base = all.filter((d) => {
+    const hay = [d.name, d.reference, d.folder, d.class, d.owner, d.periodLabel, d.run].join(' ').toLowerCase();
+    return (!q || hay.indexOf(q) >= 0) &&
+      (cls === 'All classifications' || d.class === cls) &&
+      (owner === 'All owners' || d.owner === owner);
+  });
+  const docs = base.filter((d) => folder === 'All documents' || d.folder === folder);
+
+  const opt = (v, cur) => '<option value="' + esc(v) + '"' + (v === cur ? ' selected' : '') + '>' + esc(v) + '</option>';
+  const toolbar =
+    '<section class="card control-filter-card vault-filter-card"><div class="card-body"><div class="control-filter-toolbar">' +
+    '<label class="control-filter-search"><span class="sr-only">Search document vault</span>' + icon('search') +
+    '<input id="vaultSearchInput" value="' + esc(state.vaultSearch || '') + '" placeholder="Search name, reference, category, uploader or period"></label>' +
+    '<label class="control-filter-field"><span>Classification</span><select id="vaultClassificationFilter">' + opt('All classifications', cls) + classes.map((v) => opt(v, cls)).join('') + '</select></label>' +
+    '<label class="control-filter-field"><span>Uploaded by</span><select id="vaultOwnerFilter">' + opt('All owners', owner) + owners.map((v) => opt(v, owner)).join('') + '</select></label>' +
+    '<button class="btn filter-clear" type="button" data-v6-clear-docs>' + icon('x') + 'Clear</button>' +
+    '</div></div></section>';
+
+  const folderList = Array.isArray(folders) && folders.length ? folders : ['All documents'];
+  const folderGrid = folderList.map((name) => {
+    const count = name === 'All documents' ? base.length : base.filter((d) => d.folder === name).length;
+    return '<div class="folder ' + (folder === name ? 'active' : '') + '" data-folder="' + esc(name) + '"><div class="folder-top"><div class="folder-icon">' + icon('folder') + '</div><span class="folder-match-count">' + count + '</span></div><strong>' + esc(name) + '</strong></div>';
+  }).join('');
+
+  const rows = docs.map((d) =>
+    '<tr data-document="' + esc(d.id) + '">' +
+    '<td><div class="access-user"><div class="list-icon">' + icon('file') + '</div><div><strong class="link">' + esc(d.name) + '</strong><div class="tiny muted">' + esc(d.reference) + (d.periodLabel ? ' · ' + esc(d.periodLabel) : '') + '</div></div></div></td>' +
+    '<td>' + esc(d.folder) + '</td>' +
+    '<td>' + badge(d.class) + '</td>' +
+    '<td>' + esc(d.owner) + '</td>' +
+    '<td>' + esc(d.modified) + '</td>' +
+    '<td>' + __pr6FileSize(d.sizeBytes) + '</td>' +
+    '<td><button class="btn small" data-action="download-doc" data-id="' + esc(d.id) + '" data-filename="' + esc(d.name) + '">' + icon('download') + 'Download</button></td>' +
+    '</tr>'
+  );
+
+  let body;
+  if (!all.length) {
+    body = card('Documents', 'Nothing stored yet',
+      '<div class="card-body" style="text-align:center;padding:36px 24px"><strong>No documents have been uploaded to the payroll vault.</strong>' +
+      '<p class="muted" style="margin:6px 0 0">' + (canUpload ? 'Upload a control pack, statutory return or employee record to start the register.' : 'Documents appear here once someone with upload permission adds them.') + '</p></div>');
+  } else if (!docs.length) {
+    body = '<section class="filtered-empty"><div><span class="empty-icon">' + icon('search') + '</span><strong>No documents match these filters</strong><p>Adjust the search, folder, classification or uploader.</p><button class="btn primary" type="button" data-v6-clear-docs>' + icon('x') + 'Clear document filters</button></div></section>';
+  } else {
+    body = tableCard(esc(folder), docs.length + ' of ' + all.length + (all.length === 1 ? ' document' : ' documents'),
+      ['Document', 'Category', 'Classification', 'Uploaded by', 'Uploaded', 'Size', ''], rows);
+  }
+
+  const actions = canUpload ? button('Upload document', 'upload-document', 'primary', 'upload') : '';
+  return '<div class="page">' + pageHead(eyebrow, title, desc, actions) + toolbar +
+    '<div class="folder-grid" style="margin-bottom:14px">' + folderGrid + '</div>' + body + '</div>';
+}
+
+function __pr6DocumentDrawer(id) {
+  const esc = __pr6Esc;
+  const all = Array.isArray(documents) ? documents : [];
+  const d = all.find((x) => x.id === id);
+  if (!d) {
+    toast('Document not found', 'It is not in the current register. Reload the vault and try again.', 'warn');
+    return;
+  }
+  state.activeDoc = d.id;
+  const fact = (k, v) => '<div class="fact"><span>' + k + '</span><strong>' + esc(v == null || v === '' ? '—' : v) + '</strong></div>';
+  openDrawer(
+    esc(d.name),
+    esc(d.reference) + ' · ' + esc(d.folder),
+    '<div class="profile-summary-strip">' + fact('Classification', d.class) + fact('Uploaded by', d.owner) + fact('Uploaded', d.modified) + fact('Size', __pr6FileSize(d.sizeBytes)) + '</div>' +
+    '<section class="card" style="margin-top:12px"><div class="card-body form-grid">' + fact('Pay period', d.periodLabel) + fact('Payroll run', d.run) + fact('File type', d.type) + '</div></section>' +
+    '<p class="tiny muted" style="margin-top:12px">The vault holds the file as uploaded. There is no in-browser editing or versioning, and every download is recorded in the payroll audit trail.</p>',
+    '<button class="btn primary" data-action="download-doc" data-id="' + esc(d.id) + '" data-filename="' + esc(d.name) + '">' + icon('download') + 'Download</button>'
+  );
+}
+
+function __pr6UploadModal() {
+  if (!can('documents.manage')) return deny('documents.manage');
+  const esc = __pr6Esc;
+  const categories = (Array.isArray(folders) ? folders : []).filter((f) => f !== 'All documents');
+  openModal(
+    'Upload to Document Vault',
+    'Stored as uploaded, up to 20 MB, labelled with a category and classification. Viewing and downloading require the payroll vault permissions.',
+    '<div class="form-grid">' +
+    '<div class="form-field full"><label>File</label><input type="file" id="pr6DocFile"></div>' +
+    '<div class="form-field"><label>Category</label><select id="pr6DocCategory">' + categories.map((c) => '<option>' + esc(c) + '</option>').join('') + '</select></div>' +
+    '<div class="form-field"><label>Classification</label><select id="pr6DocClassification"><option value="INTERNAL">Internal</option><option value="CONFIDENTIAL">Confidential</option><option value="RESTRICTED">Restricted</option><option value="HIGHLY_RESTRICTED">Highly restricted</option></select></div>' +
+    '<div class="form-field full"><label>Pay period (optional)</label><input id="pr6DocPeriod" placeholder="September 2026"></div>' +
+    '</div>',
+    button('Cancel', 'close-modal') + button('Upload', 'confirm-upload', 'primary', 'upload')
+  );
+}
+
+// ---------------------------------------------------------------- calendar
+
+function __pr6FmtDay(d) {
+  if (!d) return '—';
+  const t = new Date(d);
+  if (Number.isNaN(t.getTime())) return '—';
+  // Period dates are @db.Date: midnight UTC. Formatting in local time would show the
+  // previous day west of Greenwich.
+  return t.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', timeZone: 'UTC' });
+}
+
+function __pr6CalendarPageHtml() {
+  const eyebrow = 'Payroll administration';
+  const title = 'Pay Groups and Payroll Calendar';
+  const desc = 'Pay groups and their dated periods: input cut-off, pay date and the status each period has reached.';
+  if (!__pr6IsLive()) return __pr6PendingPanel(eyebrow, title, desc, 'Loading pay groups…');
+
+  const c = __pr6PayGroups();
+  if (!c) {
+    return __pr6LoadFailed('pay-groups')
+      ? __pr6PendingPanel(eyebrow, title, desc, 'Pay groups could not be loaded.', true)
+      : __pr6PendingPanel(eyebrow, title, desc, 'Your role cannot view the pay calendar.');
+  }
+
+  const esc = __pr6Esc;
+  const canEdit = __pr6Has('payroll.calendar.manage');
+  const groups = c.groups;
+  const selectedId = groups.some((g) => g.id === state.selectedPayGroup)
+    ? state.selectedPayGroup
+    : (groups[0] ? groups[0].id : null);
+  const group = groups.find((g) => g.id === selectedId) || null;
+  const periods = group
+    ? (group.periods || []).slice().sort((a, b) => new Date(a.periodStart) - new Date(b.periodStart))
+    : [];
+
+  const today = new Date();
+  today.setUTCHours(0, 0, 0, 0);
+  const upcoming = (key) => periods
+    .map((p) => p[key]).filter(Boolean).map((d) => new Date(d))
+    .filter((d) => d >= today).sort((a, b) => a - b)[0] || null;
+  const nextCutoff = upcoming('cutoffDate');
+  const nextPay = upcoming('payDate');
+
+  // "Open periods" is double-quoted on purpose. Patch 522 guards on the single-quoted
+  // form, and the bridge is injected before the patches run, so identical text here
+  // would make 522 report skip (already) on a fresh extract without applying.
+  const kpis =
+    kpi('Active pay groups', String(c.active), c.total + ' configured in total', 'users') +
+    kpi('Next input cut-off', __pr6FmtDay(nextCutoff), group ? esc(group.name) : 'No pay group', 'calendar', 'amber') +
+    kpi('Next payment', __pr6FmtDay(nextPay), group ? esc(group.currencyCode) + ' settlement' : 'No pay group', 'bank', 'cyan') +
+    kpi('Pay periods', String(c.periods), 'Configured across all groups', 'shield', 'cyan') +
+    kpi("Open periods", String(c.openPeriods), 'Periods with status Open', 'clock', 'amber');
+
+  const cadence = (f) => { const v = String(f || ''); return v.charAt(0) + v.slice(1).toLowerCase(); };
+  const groupCards = groups.map((g) =>
+    '<article class="paygroup-card ' + (g.id === selectedId ? 'active' : '') + '" data-paygroup="' + esc(g.id) + '">' +
+    '<div class="paygroup-card-head"><strong>' + esc(g.name) + '</strong>' + badge(g.isActive ? 'Active' : 'Inactive') + '</div>' +
+    '<p>' + esc(g.code) + ' · ' + esc(g.currencyCode) + '</p>' +
+    '<div class="paygroup-meta"><span class="meta-chip">' + esc(cadence(g.frequency)) + '</span>' +
+    (g.payDayOfMonth ? '<span class="meta-chip">Pays on day ' + esc(g.payDayOfMonth) + '</span>' : '') +
+    '<span class="meta-chip">' + g.periodCount + (g.periodCount === 1 ? ' period' : ' periods') + '</span></div></article>'
+  ).join('');
+
+  const rows = periods.map((p) =>
+    '<tr><td data-label="Period"><strong>' + esc(p.periodLabel) + '</strong></td>' +
+    '<td data-label="Starts">' + __pr6FmtDay(p.periodStart) + '</td>' +
+    '<td data-label="Ends">' + __pr6FmtDay(p.periodEnd) + '</td>' +
+    '<td data-label="Input cut-off">' + __pr6FmtDay(p.cutoffDate) + '</td>' +
+    '<td data-label="Pay date">' + __pr6FmtDay(p.payDate) + '</td>' +
+    '<td data-label="Status">' + badge(cadence(p.status)) + '</td>' +
+    (canEdit ? '<td data-label="Action"><button class="btn small" data-action="pr6-edit-period" data-group-id="' + esc(group.id) + '" data-period-label="' + esc(p.periodLabel) + '">Edit</button></td>' : '') +
+    '</tr>'
+  );
+  const headers = ['Period', 'Starts', 'Ends', 'Input cut-off', 'Pay date', 'Status'].concat(canEdit ? [''] : []);
+  const addButton = canEdit && group
+    ? '<button class="btn small" data-action="pr6-edit-period" data-group-id="' + esc(group.id) + '">' + icon('plus') + 'Add period</button>'
+    : '';
+
+  let board;
+  if (!group) {
+    board = card('Pay calendar', 'No pay groups',
+      '<div class="card-body" style="text-align:center;padding:36px 24px"><strong>No pay groups have been set up.</strong><p class="muted" style="margin:6px 0 0">' +
+      (canEdit ? 'Create a pay group, then add its periods.' : 'Pay groups appear here once they are configured.') + '</p></div>');
+  } else if (!rows.length) {
+    board = card(esc(group.name) + ' calendar', 'No periods yet',
+      '<div class="card-body" style="text-align:center;padding:36px 24px"><strong>This pay group has no periods.</strong><p class="muted" style="margin:6px 0 0">' +
+      (canEdit ? 'Add the first period to set its cut-off and pay date.' : 'Periods appear here once they are configured.') + '</p></div>', addButton);
+  } else {
+    board = tableCard(esc(group.name) + ' calendar', 'Dates as stored for each period', headers, rows, addButton);
+  }
+
+  const actions = canEdit ? button('Create pay group', 'new-paygroup', 'primary', 'plus') : '';
+  return '<div class="page">' + pageHead(eyebrow, title, desc, actions) +
+    '<div class="grid kpis">' + kpis + '</div>' +
+    '<div class="calendar-layout"><aside class="paygroup-list">' + (groupCards || '<p class="muted">No pay groups.</p>') + '</aside>' +
+    '<section class="calendar-board">' + board + '</section></div></div>';
+}
+
+function __pr6OpenPeriodModal(groupId, periodLabel) {
+  if (!__pr6Has('payroll.calendar.manage')) {
+    toast('Action restricted', 'Your role cannot change the pay calendar.', 'warn');
+    return;
+  }
+  const esc = __pr6Esc;
+  const c = __pr6PayGroups();
+  const group = c && c.groups.find((g) => g.id === groupId);
+  if (!group) {
+    toast('Pay group not found', 'Reload the calendar and try again.', 'warn');
+    return;
+  }
+  const p = periodLabel ? (group.periods || []).find((x) => x.periodLabel === periodLabel) : null;
+  const iso = (d) => (d ? new Date(d).toISOString().slice(0, 10) : '');
+  const statuses = __PR6_PERIOD_STATUSES;
+  const dateField = (id, label, value) =>
+    '<div class="form-field"><label>' + label + '</label><input type="date" id="' + id + '" value="' + esc(value) + '"></div>';
+  openModal(
+    p ? 'Edit ' + esc(p.periodLabel) : 'Add a period to ' + esc(group.name),
+    // Periods are keyed by label, so the label is fixed when editing: renaming would
+    // silently create a second period rather than change this one.
+    'Saved to the pay group calendar. A period is identified by its label.',
+    '<div class="form-grid"><input type="hidden" id="pr6PeriodGroup" value="' + esc(group.id) + '">' +
+    '<div class="form-field"><label>Period label</label><input id="pr6PeriodLabel" value="' + esc(p ? p.periodLabel : '') + '" placeholder="October 2026"' + (p ? ' readonly' : '') + '></div>' +
+    '<div class="form-field"><label>Status</label><select id="pr6PeriodStatus">' +
+    statuses.map((st) => '<option value="' + st + '"' + (p && p.status === st ? ' selected' : '') + '>' + st.charAt(0) + st.slice(1).toLowerCase() + '</option>').join('') +
+    '</select></div>' +
+    dateField('pr6PeriodStart', 'Period starts', iso(p && p.periodStart)) +
+    dateField('pr6PeriodEnd', 'Period ends', iso(p && p.periodEnd)) +
+    dateField('pr6PeriodCutoff', 'Input cut-off', iso(p && p.cutoffDate)) +
+    dateField('pr6PeriodPayDate', 'Pay date', iso(p && p.payDate)) +
+    '</div>',
+    button('Cancel', 'close-modal') + button('Save period', 'save-period', 'primary', 'calendar')
+  );
+}
+
+/** Must match PERIOD_STATUSES in PayrollOperationsService. */
+const __PR6_PERIOD_STATUSES = ['PLANNED', 'OPEN', 'LOCKED', 'PAID'];
+
+document.addEventListener('click', (event) => {
+  const el = event.target && event.target.closest ? event.target.closest('[data-action="pr6-edit-period"]') : null;
+  if (!el) return;
+  event.preventDefault();
+  __pr6OpenPeriodModal(el.getAttribute('data-group-id'), el.getAttribute('data-period-label'));
+}, true);
+  /* END_PAYROLL_LIVE_BRIDGE */
+
+
+
+
+
 
 
 const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>[...r.querySelectorAll(s)];
@@ -62,7 +1619,7 @@ const roles={
  'Internal Auditor':['employee.view','salary.view','documents.manage','reports.generate','audit.view','self.view'],
  'Employee':['self.view']
 };
-const pagePermission={employees:'employee.view',onboarding:'employee.edit',runs:'payroll.prepare',inputs:'payroll.prepare',exceptions:'exceptions.resolve',approvals:'payroll.approve',close:'payroll.release',components:'salary.edit',calendar:'payroll.prepare',tax:'statutory.manage',training:'employee.view',leave:'employee.view',vault:'documents.manage',reports:'reports.generate',audit:'audit.view',access:'rbac.manage',settings:'rbac.manage',mypay:'self.view'};
+const pagePermission={employees:'employee.view',onboarding:'employee.edit',runs:'payroll.prepare',inputs:'payroll.prepare',exceptions:'exceptions.resolve',approvals:'payroll.approve',close:'payroll.release',components:'salary.edit',calendar:'calendar.view',tax:'statutory.manage',training:'employee.view',leave:'employee.view',vault:'documents.view',reports:'reports.generate',audit:'audit.view',access:'rbac.view',settings:'rbac.manage',mypay:'self.view'};
 const navGroups=[
  ['OPERATIONS',[['overview','Command Centre','home'],['employees','Employees','users','4'],['onboarding','Onboarding','userplus','2'],['runs','Payroll Runs','calculator','3'],['inputs','Inputs & Validation','upload','29'],['exceptions','Exception Workbench','alert','12'],['approvals','Maker-Checker Review','shield','3'],['close','Close & Distribution','send']]],
  ['PAYROLL ADMINISTRATION',[['components','Earnings & Deductions','wallet'],['calendar','Pay Groups & Calendar','calendar'],['tax','Tax & Statutory Rules','calculator']]],
@@ -72,7 +1629,7 @@ const navGroups=[
 ];
 const state={page:(typeof initialPage==='string'&&initialPage)?initialPage:'overview',theme:safeStorage.getItem('matanho-payroll-theme')||'light',role:safeStorage.getItem('matanho-payroll-role')||'Payroll Manager',period:'June 2026',folder:'All documents',employeeSearch:'',reportDraft:null,activeDoc:null,notifications:7};
 
-const employees=[
+let employees=[
  {id:'EMP-0007',name:'Rudo Sibanda',initials:'RS',title:'Finance Officer',department:'Finance',branch:'Harare Head Office',type:'Permanent',start:'12 Feb 2022',currency:'USD / ZiG',base:2250,zig:165000,readiness:96,status:'Ready',bank:'Stanbic Bank **** 4521',tax:'10-284726-K-19',nssa:'073964821',email:'rudo.sibanda@arcusholdings.co.zw',phone:'+263 77 284 6193',documents:12,leave:'15.5 days',training:'Compliant'},
  {id:'EMP-0012',name:'Tendai Moyo',initials:'TM',title:'Payroll Manager',department:'People & Culture',branch:'Harare Head Office',type:'Permanent',start:'03 May 2021',currency:'USD / ZiG',base:3820,zig:295000,readiness:100,status:'Ready',bank:'CBZ Bank **** 1884',tax:'10-183623-J-10',nssa:'081264523',email:'tendai.moyo@arcusholdings.co.zw',phone:'+263 71 255 9004',documents:15,leave:'18.0 days',training:'Compliant'},
  {id:'EMP-0021',name:'Brian Chikota',initials:'BC',title:'Operations Supervisor',department:'Operations',branch:'Bulawayo Branch',type:'Permanent',start:'18 Aug 2020',currency:'USD',base:1880,zig:0,readiness:82,status:'Review',bank:'FBC Bank **** 2207',tax:'10-337821-P-14',nssa:'067341280',email:'brian.chikota@arcusholdings.co.zw',phone:'+263 78 312 7702',documents:9,leave:'8.5 days',training:'1 expiring'},
@@ -96,7 +1653,7 @@ let exceptions=[
  {id:'EXC-0631',employee:'Nyasha Dube',employeeId:'EMP-0035',type:'Allowance duplication',severity:'Medium',source:'Bulk input file',amount:'USD 185.00',owner:'Tariro Moyo',age:'2h 12m',status:'Open',detail:'Transport allowance appears in both recurring and imported inputs.'},
  {id:'EXC-0637',employee:'Simbarashe Zhou',employeeId:'EMP-0078',type:'Cost centre mismatch',severity:'Medium',source:'GL mapping',amount:'USD 2,200.00',owner:'Rudo Sibanda',age:'5h 36m',status:'Investigating',detail:'Employee cost centre is inactive in the current finance ledger mapping.'}
 ];
-const documents=[
+let documents=[
  {id:'DOC-001',name:'June 2026 Payroll Control Pack',folder:'Payroll control packs',type:'Editable report',owner:'Tariro Moyo',modified:'28 Jun 2026 16:42',class:'Restricted',versions:7,status:'Approved',content:'Payroll calculation controls, exception register, maker-checker evidence and release confirmations for June 2026.'},
  {id:'DOC-002',name:'PAYE Return - June 2026',folder:'Statutory returns',type:'Compliance return',owner:'Rudo Sibanda',modified:'28 Jun 2026 15:18',class:'Confidential',versions:3,status:'Ready to file',content:'PAYE reconciliation and employee-level tax schedule generated from the approved June payroll.'},
  {id:'DOC-003',name:'NSSA P4 Schedule - June 2026',folder:'Statutory returns',type:'Compliance return',owner:'Rudo Sibanda',modified:'28 Jun 2026 14:56',class:'Confidential',versions:2,status:'Ready to file',content:'NSSA contribution schedule reconciled to payroll and general ledger control accounts.'},
@@ -106,8 +1663,8 @@ const documents=[
  {id:'DOC-007',name:'Training Compliance Register Q2 2026',folder:'Training and compliance',type:'Compliance register',owner:'Chipo Ndlovu',modified:'25 Jun 2026 13:40',class:'Internal',versions:6,status:'Published',content:'Mandatory training completion, expiry risk and role permission impact register.'},
  {id:'DOC-008',name:'Payroll Access Review - Q2 2026',folder:'Access reviews',type:'Access certification',owner:'Internal Audit',modified:'26 Jun 2026 10:10',class:'Restricted',versions:5,status:'In review',content:'Quarterly certification of payroll roles, privileged access, segregation conflicts and dormant accounts.'}
 ];
-const folders=['All documents','Payroll control packs','Statutory returns','Employee records','Policies and procedures','Bank and payment files','Training and compliance','Access reviews'];
-const reportTemplates=[
+let folders=['All documents','Payroll control packs','Statutory returns','Employee records','Policies and procedures','Bank and payment files','Training and compliance','Access reviews'];
+let reportTemplates=[
  {id:'paye',name:'PAYE Reconciliation and Return Pack',category:'Statutory',desc:'Reconcile taxable earnings, PAYE, ledger control accounts and filing values with employee-level traceability.',freq:'Monthly',perm:'statutory.manage'},
  {id:'nssa',name:'NSSA Contribution Schedule',category:'Statutory',desc:'Employer and employee contribution schedule, exception analysis and payment control totals.',freq:'Monthly',perm:'statutory.manage'},
  {id:'aids',name:'AIDS Levy Control Report',category:'Statutory',desc:'Calculate and reconcile the statutory levy against PAYE with filing-ready supporting schedules.',freq:'Monthly',perm:'statutory.manage'},
@@ -121,7 +1678,7 @@ const reportTemplates=[
  {id:'demographics',name:'Workforce Demographics and Cost',category:'Management',desc:'Headcount and employment cost analysis by entity, branch, department, grade and contract type.',freq:'Monthly',perm:'reports.generate'},
  {id:'termination',name:'Terminations and Final Pay Register',category:'Human capital',desc:'Final pay, leave encashment, deductions, approvals, exit documents and payment status.',freq:'Monthly',perm:'reports.generate'}
 ];
-const auditEvents=[
+let auditEvents=[
  ['28 Jun 2026 17:11','Tariro Moyo','PAYROLL_RELEASE_BLOCKED','PAY-2026-06-M','Release prevented: 3 critical controls remain open','Critical'],
  ['28 Jun 2026 16:58','Rudo Sibanda','REPORT_GENERATED','PAYE-2026-06','Generated PAYE return pack version 3','Information'],
  ['28 Jun 2026 16:42','Tariro Moyo','DOCUMENT_APPROVED','DOC-001','Approved June payroll control pack version 7','Approval'],
@@ -131,7 +1688,7 @@ const auditEvents=[
  ['28 Jun 2026 11:17','Tariro Moyo','ROLE_ASSIGNED','USR-0042','Payroll Processor role assigned until 31 Jul 2026','Access'],
  ['27 Jun 2026 18:22','System','RULESET_PUBLISHED','ZW-2026.06','Approved statutory rules published for June','System']
 ];
-const userAccess=[
+let userAccess=[
  {name:'Tariro Moyo',initials:'TM',role:'Payroll Manager',scope:'All entities / all branches',mfa:'Enforced',last:'28 Jun 17:11',status:'Active'},
  {name:'Rudo Sibanda',initials:'RS',role:'Payroll Processor',scope:'Arcus Holdings / Harare',mfa:'Enforced',last:'28 Jun 16:58',status:'Active'},
  {name:'Chipo Ndlovu',initials:'CN',role:'HR Manager',scope:'All entities / HR records',mfa:'Enforced',last:'28 Jun 15:33',status:'Active'},
@@ -140,8 +1697,8 @@ const userAccess=[
  {name:'Kudzai Maseko',initials:'KM',role:'Payroll Processor',scope:'Contract staff / Bulawayo',mfa:'Pending',last:'22 Jun 11:30',status:'Review'}
 ];
 
-function can(permission){return (roles[state.role]||[]).includes(permission)}
-function permittedPage(id){return id==='overview'||!pagePermission[id]||can(pagePermission[id])||(id==='access'&&state.role!=='Employee')}
+function can(permission){const live=__pr6Can(permission);if(live!==null)return live;return (roles[state.role]||[]).includes(permission)}
+function permittedPage(id){return id==='overview'||!pagePermission[id]||can(pagePermission[id])||(!__pr6IsLive()&&id==='access'&&state.role!=='Employee')||(!__pr6IsLive()&&id==='vault'&&state.role!=='Employee')||(!__pr6IsLive()&&id==='calendar'&&state.role!=='Employee')}
 function money(v,c='USD'){return c==='ZiG'?`ZiG ${Number(v).toLocaleString('en-US',{maximumFractionDigits:0})}`:`USD ${Number(v).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}`}
 function badge(text){const t=String(text).toLowerCase();let cls=t.includes('critical')||t.includes('blocked')||t.includes('overdue')||t.includes('rejected')?'red':t.includes('warning')||t.includes('review')||t.includes('pending')||t.includes('investig')||t.includes('expir')||t.includes('high')?'amber':t.includes('draft')||t.includes('calculated')||t.includes('medium')?'violet':t.includes('ready')||t.includes('approved')||t.includes('released')||t.includes('active')||t.includes('published')||t.includes('compliant')||t.includes('file')?'blue':'slate';return `<span class="status ${cls}">${text}</span>`}
 function button(label,action,cls='',ico=''){return `<button class="btn ${cls}" data-action="${action}">${ico?icon(ico):''}${label}</button>`}
@@ -157,7 +1714,7 @@ function deny(permission){toast('Action restricted',`The ${state.role} role does
 function initials(name){return name.split(' ').map(x=>x[0]).slice(0,2).join('')}
 function maskSalary(e){return can('salary.view')?`${money(e.base)}${e.zig?` + ${money(e.zig,'ZiG')}`:''}`:'USD ****** / ZiG ******'}
 function renderNav(){
- $('#nav').innerHTML=navGroups.map(([g,items])=>`<div class="nav-group">${g}</div>${items.filter(([id])=>permittedPage(id)).map(([id,label,ico,count])=>`<button class="nav-item ${state.page===id?'active':''}" data-page="${id}" title="${label}"><span class="nav-icon">${icon(ico)}</span><span class="nav-label">${label}</span>${count?`<span class="nav-count">${count}</span>`:''}</button>`).join('')}`).join('');
+ $('#nav').innerHTML=navGroups.map(([g,items])=>`<div class="nav-group">${g}</div>${items.filter(([id])=>permittedPage(id)).map(([id,label,ico,count])=>`<button class="nav-item ${state.page===id?'active':''}" data-page="${id}" title="${label}"><span class="nav-icon">${icon(ico)}</span><span class="nav-label">${label}</span>${(()=>{const c=__pr6IsLive()?__pr6NavCount(id):count;return c?`<span class="nav-count">${c}</span>`:''})()}</button>`).join('')}`).join('');
 }
 function lineChart(){const vals=[188,194,201,199,214,228,225,238,246,252,257,265],zig=[5.1,5.3,5.5,5.6,6.1,6.3,6.4,6.7,6.8,7.0,7.2,7.46],months=['Jul','Aug','Sep','Oct','Nov','Dec','Jan','Feb','Mar','Apr','May','Jun'];const W=760,H=220,p=38;const x=i=>p+i*(W-2*p)/(vals.length-1), y=v=>H-p-(v-175)/(275-175)*(H-2*p);const path=vals.map((v,i)=>(i?'L':'M')+x(i)+' '+y(v)).join(' ');return `<div class="chart-shell"><svg viewBox="0 0 ${W} ${H}"><defs><linearGradient id="payArea" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1768ff" stop-opacity=".25"/><stop offset="1" stop-color="#1768ff" stop-opacity="0"/></linearGradient></defs>${[0,1,2,3,4].map(i=>`<line class="chart-grid" x1="${p}" x2="${W-p}" y1="${p+i*(H-2*p)/4}" y2="${p+i*(H-2*p)/4}"/>`).join('')}<path d="${path} L${x(vals.length-1)} ${H-p} L${p} ${H-p} Z" fill="url(#payArea)"/><path class="chart-line" d="${path}"/>${vals.map((v,i)=>`<circle class="chart-point" cx="${x(i)}" cy="${y(v)}" r="4"><title>${months[i]}: USD ${v},000 gross payroll; ZiG ${zig[i]}m</title></circle>`).join('')}${months.map((m,i)=>`<text class="chart-label" x="${x(i)}" y="${H-12}" text-anchor="middle">${m}</text>`).join('')}<text class="chart-title" x="14" y="16">USD gross payroll (thousands)</text></svg></div><div class="legend"><span><i style="background:var(--blue)"></i>USD gross payroll</span><span><i style="background:var(--violet)"></i>ZiG component shown in tooltip</span></div>`}
 function barChart(){const data=[['Finance',54],['Operations',92],['Commercial',41],['Technology',37],['People',26],['Procurement',14]];const W=650,H=230,p=42,bw=58,g=35,max=100;return `<div class="chart-shell"><svg viewBox="0 0 ${W} ${H}"><defs><linearGradient id="barGrad" x1="0" y1="1" x2="0" y2="0"><stop offset="0" stop-color="#1768ff"/><stop offset="1" stop-color="#62a0ff"/></linearGradient></defs>${[0,25,50,75,100].map(v=>`<line class="chart-grid" x1="${p}" x2="${W-15}" y1="${H-p-v/max*(H-2*p)}" y2="${H-p-v/max*(H-2*p)}"/><text class="chart-label" x="${p-8}" y="${H-p-v/max*(H-2*p)+3}" text-anchor="end">${v}</text>`).join('')}${data.map((d,i)=>{const x=p+20+i*(bw+g),h=d[1]/max*(H-2*p);return `<rect class="bar" x="${x}" y="${H-p-h}" width="${bw}" height="${h}"><title>${d[0]}: ${d[1]} employees</title></rect><text class="chart-label" x="${x+bw/2}" y="${H-18}" text-anchor="middle">${d[0].slice(0,7)}</text>`}).join('')}<text class="chart-title" x="14" y="16">Employees by department</text></svg></div>`}
@@ -165,11 +1722,11 @@ function workflow(stage=4){const steps=[['1','Period','Configured'],['2','Inputs
 function overviewPage(){
  const recent=payrollRuns.slice(0,4).map(r=>`<tr data-run="${r.id}"><td><span class="link">${r.id}</span></td><td><strong>${r.group}</strong><div class="tiny muted">${r.period}</div></td><td>${r.employees}</td><td class="money">${money(r.grossUSD)}</td><td>${badge(r.status)}</td><td>${r.owner}</td></tr>`);
  return `<div class="page">${pageHead('Payroll operating system','Payroll Operations Command Centre','Monitor readiness, dual-currency payroll, exceptions, deadlines, statutory obligations and recent runs from one governed control centre.',button('Open June payroll','runs','soft','eye')+button('Continue payroll run','continue-run','primary','arrow'))}
- ${workflow(4)}
- <div class="grid kpis">${kpi('Employees','128','4 not fully payroll-ready','users','', '+2 this month')}${kpi('Gross payroll',money(264720),'June 2026 USD component','wallet','cyan','+3.3%')}${kpi('Gross payroll',money(7459664,'ZiG'),'June 2026 local component','wallet','violet','+4.6%')}${kpi('Deductions',money(77444),'PAYE, NSSA, benefits and loans','calculator','', '+2.1%')}${kpi('Net pay',money(187276),'Before bank release controls','bank','cyan')}${kpi('Readiness score','72 / 100','3 critical controls block release','shield','amber','Review')}</div>
+ ${workflow((()=>{const o=__pr6OverviewStats();return o?o.runStage:4})())}
+ <div class="grid kpis">${(()=>{const o=__pr6OverviewStats();if(!o)return `${kpi('Employees','128','4 not fully payroll-ready','users','', '+2 this month')}${kpi('Gross payroll',money(264720),'June 2026 USD component','wallet','cyan','+3.3%')}${kpi('Gross payroll',money(7459664,'ZiG'),'June 2026 local component','wallet','violet','+4.6%')}${kpi('Deductions',money(77444),'PAYE, NSSA, benefits and loans','calculator','', '+2.1%')}${kpi('Net pay',money(187276),'Before bank release controls','bank','cyan')}${kpi('Readiness score','72 / 100','3 critical controls block release','shield','amber','Review')}`;return kpi('Employees',o.employees,o.employeesSub,'users','','')+kpi('Gross payroll',money(o.grossUSD),o.periodLabel+' USD component','wallet','cyan',o.variance)+kpi('Gross payroll',money(o.grossZiG,'ZiG'),o.periodLabel+' local component','wallet','violet','')+kpi('Deductions',money(o.deductions),'PAYE, NSSA, AIDS levy and SDL','calculator','','')+kpi('Net pay',money(o.netUSD),'Before bank release controls','bank','cyan')+kpi('Readiness score',o.readiness+' / 100',o.readinessSub,'shield',o.readinessTone,o.criticalOpen?'Review':'')})()}</div>
  <div class="grid two" style="margin-bottom:14px">
   ${card('Payroll movement trend','Gross payroll for the last 12 months',`<div class="card-body">${lineChart()}</div>`,`<button class="btn small" data-action="drill-payroll">Drill down ${icon('arrow')}</button>`)}
-  ${card('Payroll readiness','Calculated from records, inputs, exceptions and approvals',`<div class="card-body"><div style="display:grid;grid-template-columns:145px 1fr;gap:17px;align-items:center"><div class="donut"><div class="donut-center"><strong>72</strong><span>of 100</span></div></div><div>${progressRow('Employee data',96,'96% complete')}${progressRow('Payroll inputs',97,'1,247 of 1,284 valid','cyan')}${progressRow('Critical exceptions',63,'3 unresolved','red')}${progressRow('Maker-checker review',78,'4 of 6 controls','amber')}</div></div><div class="callout amber" style="margin-top:13px"><span class="kpi-icon amber">${icon('alert')}</span><div><strong>Release controls are not yet satisfied</strong><p>Resolve three critical exceptions and complete the independent bank-account-change review.</p></div></div></div>`)}
+  ${card('Payroll readiness','Calculated from records, inputs, exceptions and approvals',`<div class="card-body"><div style="display:grid;grid-template-columns:145px 1fr;gap:17px;align-items:center"><div class="donut"><div class="donut-center"><strong>${(()=>{const o=__pr6OverviewStats();return o?o.readiness:72})()}</strong><span>of 100</span></div></div><div>${(()=>{const o=__pr6OverviewStats();return o?progressRow('Employee data',o.employeeDataPct,o.employeeDataPct+'% complete'):progressRow('Employee data',96,'96% complete')})()}${(()=>{const c=__pr6RunCoverage();return c?progressRow('Employees paid',c.pct,c.paid+' of '+c.total+' on the roster','cyan'):progressRow('Payroll inputs',97,'1,247 of 1,284 valid','cyan')})()}${(()=>{const o=__pr6OverviewStats();return o?progressRow('Critical exceptions',o.exceptionsPct,o.criticalOpen+' unresolved','red'):progressRow('Critical exceptions',63,'3 unresolved','red')})()}${(()=>{const o=__pr6OverviewStats();return o?progressRow('Payroll run progress',Math.round((o.runStage/6)*100),'Stage '+o.runStage+' of 6','amber'):progressRow('Maker-checker review',78,'4 of 6 controls','amber')})()}</div></div><div class="callout amber" style="margin-top:13px"><span class="kpi-icon amber">${icon('alert')}</span><div><strong>Release controls are not yet satisfied</strong><p>Resolve three critical exceptions and complete the independent bank-account-change review.</p></div></div></div>`)}
  </div>
  <div class="grid two">
   <div class="stack">
@@ -187,15 +1744,14 @@ function employeesPage(){
  const filtered=employees.filter(e=>!state.employeeSearch||[e.name,e.id,e.department,e.branch,e.title].join(' ').toLowerCase().includes(state.employeeSearch.toLowerCase()));
  const rows=filtered.map(e=>`<tr data-employee="${e.id}"><td><input class="checkbox" type="checkbox"></td><td><div class="access-user"><div class="mini-avatar">${e.initials}</div><div><strong class="link">${e.name}</strong><div class="tiny muted">${e.id} - ${e.title}</div></div></div></td><td>${e.department}<div class="tiny muted">${e.branch}</div></td><td>${e.type}</td><td class="money">${maskSalary(e)}</td><td><div style="display:flex;align-items:center;gap:8px"><div class="progress" style="width:66px"><span style="width:${e.readiness}%"></span></div><strong>${e.readiness}%</strong></div></td><td>${badge(e.status)}</td><td><button class="btn small" data-employee="${e.id}">${icon('eye')}Open</button></td></tr>`);
  return `<div class="page">${pageHead('People administration','Employee Directory and Payroll Readiness','Search and govern the employee population while reviewing employment, compensation, bank, statutory, document and payroll-readiness data.',button('Export employee register','export-employees','', 'download')+button('Add employee','new-employee','primary','userplus'))}
- <div class="grid kpis">${kpi('Total employees','128','124 active, 4 on notice','users')}${kpi('Payroll ready','119','92.9% of active population','check','cyan')}${kpi('Under review','4','Data or approval issue','alert','amber')}${kpi('Blocked','3','Cannot enter final payroll','lock','red')}${kpi('New starters','2','Effective this payroll period','userplus','violet')}${kpi('Contract expiries','6','Within the next 60 days','calendar','amber')}</div>
- <section class="card"><div class="filters"><input id="employeeSearch" value="${state.employeeSearch}" placeholder="Search name, employee ID, department or branch"><select><option>All departments</option><option>Finance</option><option>People & Culture</option><option>Operations</option></select><select><option>All readiness states</option><option>Ready</option><option>Review</option><option>Blocked</option></select><div class="spacer"></div><span class="tiny muted">Showing ${filtered.length} of 128 employees</span></div><div class="table-wrap"><table><thead><tr><th></th><th>Employee</th><th>Organisation</th><th>Contract</th><th>Compensation</th><th>Readiness</th><th>Status</th><th></th></tr></thead><tbody>${rows.join('')}</tbody></table></div></section>
+ <div class="grid kpis">${(()=>{const s=__pr6EmployeeStats();if(!s)return `${kpi('Total employees','128','124 active, 4 on notice','users')}${kpi('Payroll ready','119','92.9% of active population','check','cyan')}${kpi('Under review','4','Data or approval issue','alert','amber')}${kpi('Blocked','3','Cannot enter final payroll','lock','red')}`;return kpi('Total employees',String(s.total),s.active+' active, '+s.onNotice+' on notice','users')+kpi('Payroll ready',String(s.ready),s.readyPct+'% of active population','check','cyan')+kpi('Under review',String(s.review),'Data or approval issue','alert','amber')+kpi('Blocked',String(s.blocked),'Cannot enter final payroll','lock','red')})()}</div>
+ <section class="card"><div class="filters"><input id="employeeSearch" value="${state.employeeSearch}" placeholder="Search name, employee ID, department or branch"><select><option>All departments</option>${__pr6DepartmentOptions()}</select><select><option>All readiness states</option><option>Ready</option><option>Review</option><option>Blocked</option></select><div class="spacer"></div><span class="tiny muted">Showing ${filtered.length} of ${(()=>{const s=__pr6EmployeeStats();return s?s.total:128})()} employees</span></div><div class="table-wrap"><table><thead><tr><th></th><th>Employee</th><th>Organisation</th><th>Contract</th><th>Compensation</th><th>Readiness</th><th>Status</th><th></th></tr></thead><tbody>${rows.join('')}</tbody></table></div></section>
  </div>`;
 }
 function onboardingPage(){
- const candidates=[['ONB-026','Kundai Marufu','Risk Analyst','01 Jul 2026','Compensation review','Chipo Ndlovu'],['ONB-027','Rutendo Zinyemba','Branch Administrator','08 Jul 2026','Documents outstanding','Chipo Ndlovu']];
- const rows=candidates.map(c=>`<tr data-action="open-onboarding"><td><span class="link">${c[0]}</span></td><td><strong>${c[1]}</strong><div class="tiny muted">${c[2]}</div></td><td>${c[3]}</td><td>${badge(c[4])}</td><td>${c[5]}</td><td><button class="btn small" data-action="open-onboarding">Continue ${icon('arrow')}</button></td></tr>`);
+ const __ob=__pr6Onboarding();const rows=__ob?(__ob.candidates.length?__ob.candidates.map(c=>`<tr data-candidate="${c.id}"><td><div class="access-user"><div class="mini-avatar">${(c.name||'?').split(' ').map(x=>x[0]).join('').slice(0,2).toUpperCase()}</div><strong class="link">${c.name}</strong></div></td><td>${c.position||'\u2014'}</td><td>${c.department||'\u2014'}</td><td>${c.startDate?String(c.startDate).slice(0,10):'\u2014'}</td><td>${badge(c.status)}</td></tr>`):[`<tr><td colspan="5" class="tiny muted">No candidates are in onboarding.</td></tr>`]):[`<tr><td colspan="5" class="tiny muted">Onboarding is not visible to your role.</td></tr>`];
  return `<div class="page">${pageHead('Governed employment setup','New Employee and Contract Onboarding','Capture identity, employment, compensation, statutory eligibility, bank details, documents, approvals and dual-currency allocation through a controlled workflow.',button('Import employees','import-employees','', 'upload')+button('Start onboarding','new-employee','primary','plus'))}
- <div class="panel-band"><div class="eyebrow" style="color:#7eb6ff">CONTROLLED ONBOARDING</div><h2>One employment record. One auditable source of truth.</h2><p>Every change is validated, versioned and routed to the right maker-checker authority before the employee becomes payroll-ready.</p><div class="band-stats"><div class="band-stat"><span>Open onboarding cases</span><strong>2</strong></div><div class="band-stat"><span>Average completion time</span><strong>2.4 days</strong></div><div class="band-stat"><span>First-time-right rate</span><strong>94%</strong></div><div class="band-stat"><span>Missing documents</span><strong>3</strong></div></div></div>
+ <div class="panel-band"><div class="eyebrow" style="color:#7eb6ff">CONTROLLED ONBOARDING</div><h2>One employment record. One auditable source of truth.</h2><p>Every change is validated, versioned and routed to the right maker-checker authority before the employee becomes payroll-ready.</p><div class="band-stats">${(()=>{const o=__pr6Onboarding();const stat=(l,v)=>`<div class="band-stat"><span>${l}</span><strong>${v}</strong></div>`;if(!o)return stat('Open onboarding cases','\u2014')+stat('Completed','\u2014')+stat('Awaiting documents','\u2014')+stat('Total candidates','\u2014');return stat('Open onboarding cases',o.inProgress)+stat('Completed',o.complete)+stat('Awaiting documents',o.byStatus.DOCUMENTS||0)+stat('Total candidates',o.total)})()}</div></div>
  ${card('Onboarding workflow','Identity, contract, compensation and statutory readiness',`<div class="card-body">${workflow(3)}</div>`)}<div style="height:14px"></div>
  ${tableCard('Active onboarding cases','Draft and in-progress employee records',['Case','Employee','Start date','Current stage','Owner',''],rows)}
  </div>`;
@@ -203,34 +1759,33 @@ function onboardingPage(){
 function runsPage(){
  const rows=payrollRuns.map(r=>`<tr data-run="${r.id}"><td><span class="link">${r.id}</span></td><td><strong>${r.group}</strong><div class="tiny muted">${r.period}</div></td><td>${r.employees}</td><td>${r.currency}</td><td class="money">${money(r.grossUSD)}${r.grossZiG?`<div class="tiny muted">${money(r.grossZiG,'ZiG')}</div>`:''}</td><td>${r.variance>0?'+':''}${r.variance}%</td><td>${badge(r.status)}</td><td>${r.owner}</td><td><button class="btn small" data-run="${r.id}">${icon('eye')}Open</button></td></tr>`);
  return `<div class="page">${pageHead('Payroll execution','Payroll Runs','Configure, calculate, validate, approve, release and close every pay group while retaining calculation lineage and immutable approval evidence.',button('Compare periods','compare-runs','', 'refresh')+button('Create payroll run','new-run','primary','plus'))}
- <div class="grid kpis">${kpi('Open payroll runs','2','June 2026 processing','calculator')}${kpi('Employees in scope','140','Monthly and executive groups','users','cyan')}${kpi('Current gross',money(362960),'USD before ZiG component','wallet','violet')}${kpi('Open exceptions','12','3 critical, 4 high','alert','red')}${kpi('Approval controls','4 / 6','Two controls outstanding','shield','amber')}${kpi('Last release','31 May 2026','Bank settlement completed','bank','cyan')}</div>
+ <div class="grid kpis">${(()=>{const r=__pr6RunStats();if(!r)return `${kpi('Open payroll runs','2','June 2026 processing','calculator')}${kpi('Employees in scope','140','Monthly and executive groups','users','cyan')}`;return kpi('Open payroll runs',String(r.openRuns),r.openSub,'calculator')+kpi('Employees in scope',String(r.inScope),'On the latest run','users','cyan')+kpi('Current gross',money(r.gross),r.grossSub,'wallet','violet')+kpi('Open exceptions',String(r.exceptions),r.exceptionSub,'alert','red')+kpi('Runs on record',String(r.totalRuns),'All payroll periods','audit')+kpi('Last release',r.lastRelease,'Most recent completed run','bank','cyan')})()}</div>
  ${tableCard('Payroll run register','Current and historical payroll processing records',['Run ID','Pay group','Employees','Currency','Gross payroll','Variance','Status','Owner',''],rows,`<div class="segmented"><button class="active">All runs</button><button>Open</button><button>Released</button></div>`)}
  </div>`;
 }
 function inputsPage(){
- const errors=[['Line 44','EMP-0044','Tax number','Required value is missing','Critical'],['Line 109','EMP-0035','Transport allowance','Duplicate recurring component','Critical'],['Line 278','EMP-0021','Overtime hours','61% above six-month average','Warning'],['Line 331','EMP-0063','Contract end date','Falls before payment date','Critical'],['Line 402','EMP-0078','Cost centre','Mapping is inactive','Warning']];
- const rows=errors.map(e=>`<tr><td>${e[0]}</td><td><span class="link" data-employee="${e[1]}">${e[1]}</span></td><td>${e[2]}</td><td>${e[3]}</td><td>${badge(e[4])}</td><td><button class="btn small" data-action="resolve-input">Resolve</button></td></tr>`);
+ const __ib=__pr6Inputs();const rows=__ib?(__ib.latest&&__ib.latest.errorRows>0?[`<tr><td colspan="6" class="tiny muted">Open the batch to see its ${__ib.errorRows} isolated row(s).</td></tr>`]:[`<tr><td colspan="6" class="tiny muted">${__ib.batches.length?'No rows are isolated. All uploaded rows passed validation.':'No input batches have been uploaded.'}</td></tr>`]):[`<tr><td colspan="6" class="tiny muted">Payroll inputs are not visible to your role.</td></tr>`];
  return `<div class="page">${pageHead('Controlled data intake','Payroll Inputs Import and Validation','Map, validate and safely commit bulk payroll inputs while isolating errors, warnings, duplicates and outliers before calculation.',button('Download template','download-input-template','', 'download')+button('Upload input file','upload-inputs','primary','upload'))}
- <div class="panel-band"><div class="eyebrow" style="color:#7eb6ff">INPUT BATCH INP-2026-06-04</div><h2>1,247 valid rows are ready. 37 rows remain isolated.</h2><p>The valid population can be committed without allowing invalid rows into calculation. Every correction preserves the original file, mapping and reviewer evidence.</p><div class="band-stats"><div class="band-stat"><span>Rows uploaded</span><strong>1,284</strong></div><div class="band-stat"><span>Valid</span><strong>1,247</strong></div><div class="band-stat"><span>Warnings</span><strong>29</strong></div><div class="band-stat"><span>Errors</span><strong>8</strong></div></div></div>
- ${card('Import workflow','Upload, map, validate and commit',`<div class="card-body"><div class="stepper"><div class="step done"><b>1</b><span>Upload</span></div><div class="step done"><b>2</b><span>Map columns</span></div><div class="step active"><b>3</b><span>Validate</span></div><div class="step"><b>4</b><span>Commit</span></div></div>${progressRow('Validation completion',97,'1,247 of 1,284 rows valid','cyan')}<div class="actions" style="margin-top:13px">${button('Export error file','export-errors','', 'download')}${button('Commit valid rows','commit-inputs','primary','check')}</div></div>`)}<div style="height:14px"></div>
+ <div class="panel-band"><div class="eyebrow" style="color:#7eb6ff">${(()=>{const b=__pr6Inputs();return b?(b.latest?'INPUT BATCH '+b.latest.reference:'NO INPUT BATCH'):'INPUT BATCHES UNAVAILABLE'})()}</div><h2>${(()=>{const b=__pr6Inputs();if(!b)return 'Payroll inputs are not visible to your role.';if(!b.latest)return 'No input batches have been uploaded.';return b.validRows+' valid row'+(b.validRows===1?'':'s')+' ready. '+b.errorRows+' row'+(b.errorRows===1?'':'s')+' isolated.'})()}</h2><p>The valid population can be committed without allowing invalid rows into calculation. Every correction preserves the original file, mapping and reviewer evidence.</p><div class="band-stats">${(()=>{const b=__pr6Inputs();const stat=(l,v)=>`<div class="band-stat"><span>${l}</span><strong>${v}</strong></div>`;if(!b)return stat('Rows uploaded','\u2014')+stat('Valid','\u2014')+stat('Resolved','\u2014')+stat('Errors','\u2014');const resolved=b.batches.reduce((n,x)=>n+(x.totalRows-x.validRows-x.errorRows),0);return stat('Rows uploaded',b.totalRows)+stat('Valid',b.validRows)+stat('Resolved',Math.max(0,resolved))+stat('Errors',b.errorRows)})()}</div></div>
+ ${card('Import workflow','Upload, map, validate and commit',`<div class="card-body"><div class="stepper"><div class="step done"><b>1</b><span>Upload</span></div><div class="step done"><b>2</b><span>Map columns</span></div><div class="step active"><b>3</b><span>Validate</span></div><div class="step"><b>4</b><span>Commit</span></div></div>${(()=>{const b=__pr6Inputs();if(!b)return progressRow('Validation completion',0,'Payroll inputs are not visible to your role','cyan');if(!b.totalRows)return progressRow('Validation completion',0,'No rows have been uploaded','cyan');return progressRow('Validation completion',b.validPct===null?0:b.validPct,b.validRows+' of '+b.totalRows+' rows valid','cyan')})()}<div class="actions" style="margin-top:13px">${button('Export error file','export-errors','', 'download')}${button('Commit valid rows','commit-inputs','primary','check')}</div></div>`)}<div style="height:14px"></div>
  ${tableCard('Validation issues','Errors remain isolated from the calculation engine',['Source row','Employee','Field','Validation message','Severity',''],rows)}
  </div>`;
 }
 function exceptionsPage(){
  const rows=exceptions.map(e=>`<tr data-exception="${e.id}"><td><span class="link">${e.id}</span></td><td><strong>${e.employee}</strong><div class="tiny muted">${e.employeeId}</div></td><td>${e.type}</td><td>${badge(e.severity)}</td><td>${e.source}</td><td class="money">${e.amount}</td><td>${e.owner}</td><td>${e.age}</td><td>${badge(e.status)}</td></tr>`);
  return `<div class="page">${pageHead('Validation and investigation','Payroll Exception Resolution Workbench','Investigate individual failures, compare source records, attach evidence, resolve issues or escalate them without losing calculation traceability.',button('Export register','export-exceptions','', 'download')+button('Assign cases','assign-exceptions','soft','users'))}
- <div class="grid kpis">${kpi('Records validated','116','Employees clear of exceptions','check','cyan')}${kpi('Open exceptions','12','Across all severity levels','alert','amber')}${kpi('Critical','3','Release-blocking issues','lock','red')}${kpi('High priority','4','Due within 24 hours','clock','amber')}${kpi('Investigating','2','Assigned with evidence','search','violet')}${kpi('Resolved today','7','Average resolution 2.8 hours','check','cyan')}</div>
+ <div class="grid kpis">${(()=>{const __pr6RecordsValidated=1;const emps=Array.isArray(__pr6Live.employees)?__pr6Live.employees:null;if(!emps)return kpi('Records validated','\u2014','Employee records are not visible to your role','check','cyan');const exc=Array.isArray(__pr6Live.exceptions)?__pr6Live.exceptions:[];const flagged=new Set(exc.map(e=>e.employeeNumber||e.employeeId).filter(Boolean));const clear=emps.filter(e=>!flagged.has(e.id)&&!flagged.has(e.recordId)).length;return kpi('Records validated',String(clear),'Of '+emps.length+' employees, clear of exceptions','check','cyan')})()}${kpi('Open exceptions','12','Across all severity levels','alert','amber')}${kpi('Critical','3','Release-blocking issues','lock','red')}${kpi('High priority','4','Due within 24 hours','clock','amber')}${kpi('Investigating','2','Assigned with evidence','search','violet')}${kpi('Resolved today','7','Average resolution 2.8 hours','check','cyan')}</div>
  ${tableCard('Exception register','Select an exception to inspect source data, evidence and the investigation history',['Exception','Employee','Type','Severity','Source','Value','Owner','Age','Status'],rows)}
  </div>`;
 }
 function approvalsPage(){
- const current=payrollRuns[0];
+ const current=(payrollRuns[0]||__pr6RunPlaceholder);
  return `<div class="page">${pageHead('Governed review','Maker-Checker Payroll Approval Review','Review period variances, sampled calculations, source evidence, unresolved exceptions and sensitive master-data changes before approval.',button('Download review pack','download-review-pack','', 'download')+button('Submit decision','approval-decision','primary','shield'))}
- <div class="panel-band"><div class="eyebrow" style="color:#7eb6ff">${current.id} - ${current.period}</div><h2>Approval review is 78% complete</h2><p>The maker cannot approve their own payroll. Final approval requires an independent approver and completion of all release-blocking controls.</p><div class="band-stats"><div class="band-stat"><span>Prepared by</span><strong>Rudo Sibanda</strong></div><div class="band-stat"><span>Primary checker</span><strong>Tariro Moyo</strong></div><div class="band-stat"><span>Gross payroll</span><strong>${money(current.grossUSD)}</strong></div><div class="band-stat"><span>Unresolved critical</span><strong>3</strong></div></div></div>
+ <div class="panel-band"><div class="eyebrow" style="color:#7eb6ff">${current.id} - ${current.period}</div><h2>${(()=>{const c=__pr6ApprovalCompare();if(!c)return 'Approval review is 78% complete';if(!c.hasRun)return 'No payroll run to review';const st=String(c.current.rawStatus||'');return st==='PENDING_APPROVAL'?'Awaiting independent approval':st==='APPROVED'?'Approved, awaiting release':st==='COMPLETED'?'Released':'Draft payroll run'})()}</h2><p>The maker cannot approve their own payroll. Final approval requires an independent approver and completion of all release-blocking controls.</p><div class="band-stats"><div class="band-stat"><span>Prepared by</span><strong>${(()=>{const c=__pr6ApprovalCompare();return c?c.owner:'Rudo Sibanda'})()}</strong></div><div class="band-stat"><span>Gross payroll</span><strong>${money(current.grossUSD)}</strong></div><div class="band-stat"><span>Unresolved critical</span><strong>${(()=>{const c=__pr6ApprovalCompare();return c?c.criticalOpen:3})()}</strong></div></div></div>
  <div class="grid two">
   <div class="stack">
-   ${card('Payroll summary - before vs current','Movement, variance and materiality review',`<div class="table-wrap"><table><thead><tr><th>Measure</th><th>May 2026</th><th>June 2026</th><th>Variance</th><th>Review</th></tr></thead><tbody>${[['Headcount','126','128','+2','Expected'],['Gross USD','USD 256,180.00','USD 264,720.00','+3.3%','Expected'],['Gross ZiG','ZiG 7,134,000','ZiG 7,459,664','+4.6%','Review'],['PAYE','USD 41,280.00','USD 42,967.00','+4.1%','Expected'],['Overtime','USD 8,420.00','USD 11,984.00','+42.3%','Investigate'],['Net pay','USD 181,200.00','USD 187,276.00','+3.4%','Expected']].map(r=>`<tr><td><strong>${r[0]}</strong></td><td>${r[1]}</td><td>${r[2]}</td><td>${r[3]}</td><td>${badge(r[4])}</td></tr>`).join('')}</tbody></table></div>`)}
-   ${card('Sampled employee calculations','Risk-based recalculation and evidence',`<div class="table-wrap"><table><thead><tr><th>Employee</th><th>Sample reason</th><th>Gross</th><th>Net</th><th>Recalculation</th></tr></thead><tbody>${[['Rudo Sibanda','Bank change','USD 2,250.00','USD 1,629.14','Matched'],['Brian Chikota','Overtime outlier','USD 2,308.40','USD 1,641.72','Review'],['Farai Mutasa','Missing tax number','USD 1,350.00','Not final','Blocked'],['Tatenda Maposa','Contract expiry','ZiG 148,000','ZiG 129,620','Review']].map(r=>`<tr><td><strong>${r[0]}</strong></td><td>${r[1]}</td><td>${r[2]}</td><td>${r[3]}</td><td>${badge(r[4])}</td></tr>`).join('')}</tbody></table></div>`)}
+   ${card('Payroll summary - before vs current','Movement, variance and materiality review',`<div class="table-wrap"><table><thead><tr><th>Measure</th><th>${(()=>{const c=__pr6ApprovalCompare();return c?c.prevLabel:'May 2026'})()}</th><th>${(()=>{const c=__pr6ApprovalCompare();return c?c.curLabel:'June 2026'})()}</th><th>Variance</th><th>Review</th></tr></thead><tbody>${((__pr6ApprovalCompare()||{}).rows||[['Headcount','126','128','+2','Expected'],['Gross USD','USD 256,180.00','USD 264,720.00','+3.3%','Expected'],['Gross ZiG','ZiG 7,134,000','ZiG 7,459,664','+4.6%','Review'],['PAYE','USD 41,280.00','USD 42,967.00','+4.1%','Expected'],['Overtime','USD 8,420.00','USD 11,984.00','+42.3%','Investigate'],['Net pay','USD 181,200.00','USD 187,276.00','+3.4%','Expected']]).map(r=>`<tr><td><strong>${r[0]}</strong></td><td>${r[1]}</td><td>${r[2]}</td><td>${r[3]}</td><td>${badge(r[4])}</td></tr>`).join('')}</tbody></table></div>`)}
+   ${card('Sampled employee calculations','Risk-based recalculation and evidence',`<div class="table-wrap"><table><thead><tr><th>Employee</th><th>Sample reason</th><th>Gross</th><th>Net</th><th>Recalculation</th></tr></thead><tbody>${(()=>{const __pr6ApprovalSample=1;const runs=Array.isArray(__pr6Live.payrollRuns)?__pr6Live.payrollRuns:null;if(!runs)return `<tr><td colspan="5" class="tiny muted">Payroll runs are not visible to your role.</td></tr>`;return `<tr><td colspan="5" class="tiny muted">${runs.length?'Open a run to review its recalculated lines.':'No payroll runs are awaiting approval.'}</td></tr>`})()}</tbody></table></div>`)}
   </div>
   <div class="stack">
    ${card('Review checklist','All controls are independently attested',`<div class="card-body list">${[['Payroll population reconciled','Complete','blue'],['Employee master changes verified','Complete','blue'],['Earnings and allowances reviewed','Complete','blue'],['Deduction and loan controls','Complete','blue'],['Bank account changes independently verified','Pending','amber'],['Critical exceptions resolved','Blocked','red'],['Statutory ruleset approved','Complete','blue'],['GL mapping reconciled','Pending','amber']].map(x=>`<div class="list-row"><div class="list-icon ${x[2]}">${x[2]==='blue'?icon('check'):icon('alert')}</div><div class="list-main"><strong>${x[0]}</strong><span>Reviewer evidence retained</span></div>${badge(x[1])}</div>`).join('')}</div>`)}
@@ -242,9 +1797,9 @@ function closePage(){
  return `<div class="page">${pageHead('Finalisation and distribution','Payroll Close and Distribution Centre','Control payslip generation, bank payment batches, general-ledger journals, statutory output packs and final release through one governed close process.',button('Download close pack','download-close-pack','', 'download')+button('Release payroll','release-payroll','primary','send'))}
  ${workflow(5)}
  <div class="grid four" style="margin-bottom:14px">
-  ${card('1. Payslip generation','Secure dual-currency documents',`<div class="card-body">${progressRow('Generated',100,'128 of 128','cyan')}<div class="list">${[['Digital payslips','128','Generated'],['Verification hashes','128','Generated'],['Suppressed payslips','0','None']].map(x=>`<div class="list-row"><div class="list-main"><strong>${x[0]}</strong><span>${x[2]}</span></div><strong>${x[1]}</strong></div>`).join('')}</div><button class="btn small soft" data-page="mypay">Preview payslip</button></div>`)}
-  ${card('2. Bank payment batches','Controlled settlement instructions',`<div class="card-body">${progressRow('Prepared',94,'4 of 5 batches','amber')}<div class="list">${[['USD payroll - Stanbic','USD 86,420','Ready'],['USD payroll - CBZ','USD 58,310','Ready'],['ZiG payroll - multiple','ZiG 6,201,480','Ready'],['Bank changes holding batch','USD 2,250','Blocked']].map(x=>`<div class="list-row"><div class="list-main"><strong>${x[0]}</strong><span>${x[1]}</span></div>${badge(x[2])}</div>`).join('')}</div></div>`)}
-  ${card('3. General ledger journal','Entity and cost-centre posting',`<div class="card-body">${progressRow('Reconciled',87,'13 of 15 controls','amber')}<div class="list">${[['Gross payroll expense','USD 264,720','Matched'],['Payroll liabilities','USD 77,444','Matched'],['Net pay control','USD 187,276','Matched'],['Inactive cost centre','USD 2,200','Exception']].map(x=>`<div class="list-row"><div class="list-main"><strong>${x[0]}</strong><span>${x[1]}</span></div>${badge(x[2])}</div>`).join('')}</div></div>`)}
+  ${card('1. Payslip generation','Secure dual-currency documents',`<div class="card-body">${(()=>{const c=__pr6CloseStats();if(!c)return progressRow('Generated',100,'128 of 128','cyan');const n=c.released?c.headcount:0;return progressRow('Generated',c.headcount?Math.round((n/c.headcount)*100):0,n+' of '+c.headcount,'cyan')})()}<div class="list">${(()=>{const c=__pr6CloseStats();const n=c?String(c.released?c.headcount:0):'128';return [['Digital payslips',n,c&&c.released?'Generated':'Pending'],['Verification hashes',n,c&&c.released?'Generated':'Pending'],['Suppressed payslips','0','None']]})().map(x=>`<div class="list-row"><div class="list-main"><strong>${x[0]}</strong><span>${x[2]}</span></div><strong>${x[1]}</strong></div>`).join('')}</div><button class="btn small soft" data-page="mypay">Preview payslip</button></div>`)}
+  ${card('2. Bank payment batches','Controlled settlement instructions',`<div class="card-body">${progressRow('Prepared',94,'4 of 5 batches','amber')}<div class="list">${(()=>{const c=__pr6CloseStats();if(!c)return [['USD payroll - Stanbic','USD 86,420','Ready'],['USD payroll - CBZ','USD 58,310','Ready']];return [['Net pay batch ('+c.label+')',__pr6Money(c.netUSD),c.released?'Ready':'Pending'],['Employees in batch',String(c.headcount),c.released?'Ready':'Pending']]})().map(x=>`<div class="list-row"><div class="list-main"><strong>${x[0]}</strong><span>${x[1]}</span></div>${badge(x[2])}</div>`).join('')}</div></div>`)}
+  ${card('3. General ledger journal','Entity and cost-centre posting',`<div class="card-body">${progressRow('Reconciled',87,'13 of 15 controls','amber')}<div class="list">${(()=>{const c=__pr6CloseStats();if(!c)return [['Gross payroll expense','USD 264,720','Matched'],['Payroll liabilities','USD 77,444','Matched'],['Net pay control','USD 187,276','Matched']];return [['Gross payroll expense',__pr6Money(c.grossUSD),'Matched'],['Payroll liabilities',__pr6Money(c.deductions),'Matched'],['Net pay control',__pr6Money(c.netUSD),'Matched']]})().map(x=>`<div class="list-row"><div class="list-main"><strong>${x[0]}</strong><span>${x[1]}</span></div>${badge(x[2])}</div>`).join('')}</div></div>`)}
   ${card('4. Statutory output pack','Returns, schedules and evidence',`<div class="card-body">${progressRow('Prepared',75,'3 of 4 packs','violet')}<div class="list">${[['PAYE return pack','Ready to file'],['NSSA P4 schedule','Ready to file'],['AIDS levy control','Ready to file'],['NEC contribution file','Pending']].map(x=>`<div class="list-row"><div class="list-main"><strong>${x[0]}</strong><span>June 2026</span></div>${badge(x[1])}</div>`).join('')}</div></div>`)}
  </div>
  <div class="grid two">
@@ -254,15 +1809,14 @@ function closePage(){
 }
 function componentsPage(){
  const comps=[['BASIC','Basic salary','Earning','Fixed / monthly','Employee currency','5000 - Salaries','Active'],['HOUSING','Housing allowance','Earning','Formula: 15% basic','USD / ZiG','5010 - Allowances','Active'],['TRANSPORT','Transport allowance','Earning','Fixed / monthly','USD / ZiG','5010 - Allowances','Active'],['OVERTIME','Overtime pay','Earning','Rate x approved hours','Employee currency','5020 - Overtime','Active'],['BONUS','Performance bonus','Earning','Ad hoc approved input','USD','5030 - Bonuses','Draft'],['PAYE','PAYE tax','Deduction','Statutory table','USD / ZiG','2100 - PAYE payable','Active'],['NSSA','NSSA contribution','Deduction','Statutory rule','USD / ZiG','2110 - NSSA payable','Active'],['MEDICAL','Medical aid contribution','Deduction','Plan and tier','USD','2125 - Medical payable','Active'],['LOAN','Employee loan repayment','Deduction','Amortisation schedule','USD / ZiG','1305 - Staff loans','Active']];
- const rows=comps.map(c=>`<tr data-action="edit-component"><td><span class="link">${c[0]}</span></td><td><strong>${c[1]}</strong></td><td>${badge(c[2])}</td><td>${c[3]}</td><td>${c[4]}</td><td>${c[5]}</td><td>${badge(c[6])}</td><td><button class="btn small" data-action="edit-component">${icon('edit')}Edit</button></td></tr>`);
+ const rows=(__pr6ComponentRows()||comps).map(c=>`<tr data-action="edit-component"><td><span class="link">${c[0]}</span></td><td><strong>${c[1]}</strong></td><td>${badge(c[2])}</td><td>${c[3]}</td><td>${c[4]}</td><td>${c[5]}</td><td>${badge(c[6])}</td><td><button class="btn small" data-action="edit-component">${icon('edit')}Edit</button></td></tr>`);
  return `<div class="page">${pageHead('Payroll administration','Earnings and Deductions Configuration','Configure pay components, eligibility, currency treatment, formulas, tax treatment, general-ledger mapping, versioning and approval controls.',button('Import configuration','import-components','', 'upload')+button('Create component','new-component','primary','plus'))}
- <div class="grid kpis">${kpi('Earning components','24','18 recurring, 6 variable','wallet')}${kpi('Deduction components','17','8 statutory, 9 voluntary','calculator','violet')}${kpi('Active formulas','31','Versioned calculation logic','settings','cyan')}${kpi('Pending approval','3','Configuration changes','shield','amber')}${kpi('GL mappings','100%','All active components mapped','check','cyan')}${kpi('Rule test coverage','96%','182 automated test cases','audit')}</div>
+ <div class="grid kpis">${(()=>{const c=__pr6ComponentStats();if(!c)return `${kpi('Earning components','24','18 recurring, 6 variable','wallet')}${kpi('Deduction components','17','8 statutory, 9 voluntary','calculator','violet')}`;return kpi('Earning components',String(c.earnings),c.earningsSub,'wallet')+kpi('Deduction components',String(c.deductions),c.deductionsSub,'calculator','violet')+kpi('Tax brackets',String(c.brackets),'Progressive PAYE bands','settings','cyan')+kpi('Statutory levies',String(c.levies),'AIDS levy, NSSA and SDL rates','shield','amber')})()}</div>
  ${tableCard('Pay component catalogue','Every component is versioned, tested and approved before it affects payroll',['Code','Component','Type','Calculation','Currency','GL mapping','Status',''],rows)}
  </div>`;
 }
 function calendarPage(){
- const months=['Jul 2026','Aug 2026','Sep 2026','Oct 2026','Nov 2026','Dec 2026'];
- const rows=months.map((m,i)=>`<tr><td><strong>${m}</strong></td><td>${['20 Jul','20 Aug','21 Sep','20 Oct','20 Nov','18 Dec'][i]}</td><td>${['23 Jul','24 Aug','24 Sep','23 Oct','23 Nov','21 Dec'][i]}</td><td>${['24 Jul','25 Aug','25 Sep','26 Oct','24 Nov','22 Dec'][i]}</td><td>${['27 Jul','27 Aug','28 Sep','28 Oct','26 Nov','23 Dec'][i]}</td><td>${['31 Jul','31 Aug','30 Sep','30 Oct','30 Nov','31 Dec'][i]}</td><td>${badge(i===0?'Open':'Scheduled')}</td><td><button class="btn small" data-action="edit-schedule">Edit</button></td></tr>`);
+ const __cal=__pr6PayGroups();const __periods=__cal?__cal.groups.flatMap(g=>(g.periods||[]).map(p=>({g:g.name,...p}))):null;const rows=__periods?(__periods.length?__periods.map(p=>`<tr><td><strong>${p.periodLabel}</strong><div class="tiny muted">${p.g}</div></td><td>${p.cutoffDate?String(p.cutoffDate).slice(0,10):'\u2014'}</td><td>${p.payDate?String(p.payDate).slice(0,10):'\u2014'}</td><td>${badge(p.status)}</td></tr>`):[`<tr><td colspan="4" class="tiny muted">No pay periods are configured.</td></tr>`]):[`<tr><td colspan="4" class="tiny muted">The payroll calendar is not visible to your role.</td></tr>`];
  return `<div class="page">${pageHead('Payroll administration','Pay Groups and Payroll Calendar','Define pay groups, cut-offs, calculation dates, review windows, approvals, payments and statutory deadlines across entities and branches.',button('Copy prior year','copy-calendar','', 'refresh')+button('Create pay group','new-paygroup','primary','plus'))}
  <div class="grid two" style="margin-bottom:14px">
   ${card('Pay groups','Population, currency and processing cadence',`<div class="card-body list">${[['Monthly Staff','128 employees','USD / ZiG','Active'],['Executives','12 employees','USD','Active'],['Contract Staff','34 employees','ZiG','Active'],['Commission Sales','21 employees','USD / ZiG','Review']].map((x,i)=>`<div class="list-row" data-action="edit-paygroup"><div class="list-icon ${i===3?'amber':''}">${icon('users')}</div><div class="list-main"><strong>${x[0]}</strong><span>${x[1]} - ${x[2]}</span></div>${badge(x[3])}</div>`).join('')}</div>`)}
@@ -273,26 +1827,27 @@ function calendarPage(){
 }
 function taxPage(){
  const rules=[['ZW-PAYE-2026.06','PAYE tax tables','USD / ZiG','01 Jun 2026','Approved','Tawanda Chirenje'],['ZW-NSSA-2026.01','NSSA contribution limits','USD / ZiG','01 Jan 2026','Published','Tariro Moyo'],['ZW-AIDS-2026.01','AIDS levy','USD / ZiG','01 Jan 2026','Published','Tariro Moyo'],['ZW-NEC-2026.02','NEC contribution rates','USD / ZiG','01 Feb 2026','Published','Chipo Ndlovu'],['ZW-PAYE-2026.07-D','PAYE proposed adjustment','USD','01 Jul 2026','Draft','Rudo Sibanda']];
- const rows=rules.map(r=>`<tr data-action="open-rule"><td><span class="link">${r[0]}</span></td><td><strong>${r[1]}</strong></td><td>${r[2]}</td><td>${r[3]}</td><td>${badge(r[4])}</td><td>${r[5]}</td><td><button class="btn small" data-action="open-rule">Open</button></td></tr>`);
+ const rows=(__pr6TaxRows()||rules).map(r=>`<tr data-action="open-rule"><td><span class="link">${r[0]}</span></td><td><strong>${r[1]}</strong></td><td>${r[2]}</td><td>${r[3]}</td><td>${badge(r[4])}</td><td>${r[5]}</td><td><button class="btn small" data-action="open-rule">Open</button></td></tr>`);
  return `<div class="page">${pageHead('System configuration','Tax and Statutory Rule Configuration','Version, test, approve and publish statutory rules with effective dating, impact analysis, automated test cases and complete audit history.',button('Run impact analysis','tax-impact','', 'calculator')+button('Create rule version','new-tax-rule','primary','plus'))}
- <div class="grid kpis">${kpi('Published rules','14','Current Zimbabwe ruleset','shield','cyan')}${kpi('Draft versions','2','Not yet applied to payroll','edit','violet')}${kpi('Automated tests','182','175 passed, 7 under review','audit')}${kpi('Employees impacted','128','June ruleset population','users')}${kpi('Estimated PAYE',money(42967),'June 2026 control total','wallet','cyan')}${kpi('Next review','15 Jul 2026','Quarterly rule certification','calendar','amber')}</div>
+ <div class="grid kpis">${(()=>{const t=__pr6TaxStats();if(!t)return `${kpi('Published rules','14','Current Zimbabwe ruleset','shield','cyan')}${kpi('Draft versions','2','Not yet applied to payroll','edit','violet')}`;return kpi('Tax rules',String(t.rules),'Configured statutory rules','shield','cyan')+kpi('PAYE brackets',String(t.brackets),'Progressive band table','settings','violet')+kpi('Statutory levies',String(t.levies),'AIDS levy, NSSA and SDL','audit')+kpi('Employees impacted',String(t.employees),'On the active payroll','users')+kpi('Statutory deductions',money(t.deductions),t.period+' control total','wallet','cyan')})()}</div>
  ${tableCard('Statutory rule library','Approved and draft effective-dated payroll rules',['Ruleset','Rule','Currency','Effective date','Status','Owner',''],rows)}
  </div>`;
 }
 function trainingPage(){
  const certs=[['Anti-Money Laundering','128','121','7','94.5%','31 Jul 2026'],['Payroll Data Privacy','128','128','0','100%','30 Jun 2027'],['Cybersecurity Awareness','128','118','10','92.2%','15 Jul 2026'],['Health and Safety','96','89','7','92.7%','20 Aug 2026'],['First Aid Certification','18','14','4','77.8%','12 Jul 2026'],['Defensive Driving','34','29','5','85.3%','05 Aug 2026']];
- const rows=certs.map(c=>`<tr data-action="training-detail"><td><strong class="link">${c[0]}</strong></td><td>${c[1]}</td><td>${c[2]}</td><td>${c[3]}</td><td><div style="display:flex;align-items:center;gap:8px"><div class="progress" style="width:100px"><span style="width:${c[4]}"></span></div><strong>${c[4]}</strong></div></td><td>${c[5]}</td><td><button class="btn small" data-action="training-detail">Details</button></td></tr>`);
+ const rows=(__pr6TrainingRows()||certs).map(c=>`<tr data-action="training-detail"><td><strong class="link">${c[0]}</strong></td><td>${c[1]}</td><td>${c[2]}</td><td>${c[3]}</td><td><div style="display:flex;align-items:center;gap:8px"><div class="progress" style="width:100px"><span style="width:${c[4]}"></span></div><strong>${c[4]}</strong></div></td><td>${c[5]}</td><td><button class="btn small" data-action="training-detail">Details</button></td></tr>`);
  return `<div class="page">${pageHead('Human capital compliance','Training and Certification Compliance Centre','Track mandatory training, expiry risk and the operational or payroll permissions affected by expired certification.',button('Export register','export-training','', 'download')+button('Record completion','record-training','primary','plus'))}
- <div class="grid kpis">${kpi('Total employees','128','All employment categories','users')}${kpi('Fully compliant','94','73.4% across requirements','check','cyan')}${kpi('Due within 30 days','21','Certification expiry risk','clock','amber')}${kpi('Overdue','13','May affect operational access','alert','red')}${kpi('Average completion','91.7%','Across mandatory courses','graduation','violet')}${kpi('Permissions affected','6','Access restrictions pending','lock','amber')}</div>
+ <div class="grid kpis">${(()=>{const t=__pr6TrainingStats();if(!t)return `${kpi('Total employees','128','All employment categories','users')}${kpi('Fully compliant','94','73.4% across requirements','check','cyan')}`;return kpi('Total employees',String(t.employees),'All employment categories','users')+kpi('Courses in catalogue',String(t.courses),'Configured training courses','graduation','cyan')+kpi('Certifications recorded',String(t.certifications),'Across all employees','check','violet')+kpi('Mandatory courses',String(t.mandatory),'Required for compliance','shield','amber')})()}</div>
  <div class="grid two">
   ${tableCard('Certification register','Completion and expiry status by mandatory requirement',['Requirement','Assigned','Complete','Outstanding','Completion','Next expiry',''],rows)}
-  <div class="stack">${card('Compliance by department','Required training completion',`<div class="card-body">${progressRow('Finance',98,'98% complete')}${progressRow('People & Culture',100,'100% complete','cyan')}${progressRow('Operations',86,'86% complete','amber')}${progressRow('Commercial',89,'89% complete','violet')}${progressRow('Technology',96,'96% complete')}${progressRow('Procurement',93,'93% complete','cyan')}</div>`)}${card('Highest-risk expiries','Immediate follow-up required',`<div class="card-body list">${[['Brian Chikota','Anti-Money Laundering','12 days'],['Tatenda Maposa','Health and Safety','9 days'],['Farai Mutasa','Cybersecurity Awareness','Overdue'],['Kundai Marufu','Payroll Data Privacy','Not started']].map((x,i)=>`<div class="list-row"><div class="list-icon ${i>1?'red':'amber'}">${initials(x[0])}</div><div class="list-main"><strong>${x[0]}</strong><span>${x[1]}</span></div><div class="list-end"><strong>${x[2]}</strong><span>risk window</span></div></div>`).join('')}</div>`)}</div>
+  <div class="stack">${card('Compliance by department','Required training completion',`<div class="card-body">${(()=>{const d=__pr6DepartmentReadiness();return d?d.map(x=>progressRow(x.name,x.pct,x.pct+'% payroll-ready ('+x.count+')','cyan')).join(''):`${progressRow('Finance',98,'98% complete')}${progressRow('People & Culture',100,'100% complete','cyan')}${progressRow('Operations',86,'86% complete','amber')}${progressRow('Commercial',89,'89% complete','violet')}${progressRow('Technology',96,'96% complete')}${progressRow('Procurement',93,'93% complete','cyan')}`})()}</div>`)}${card('Highest-risk expiries','Immediate follow-up required',`<div class="card-body list">${[['Brian Chikota','Anti-Money Laundering','12 days'],['Tatenda Maposa','Health and Safety','9 days'],['Farai Mutasa','Cybersecurity Awareness','Overdue'],['Kundai Marufu','Payroll Data Privacy','Not started']].map((x,i)=>`<div class="list-row"><div class="list-icon ${i>1?'red':'amber'}">${initials(x[0])}</div><div class="list-main"><strong>${x[0]}</strong><span>${x[1]}</span></div><div class="list-end"><strong>${x[2]}</strong><span>risk window</span></div></div>`).join('')}</div>`)}</div>
  </div></div>`;
 }
 function leavePage(){
- const rows=employees.slice(0,7).map((e,i)=>`<tr data-employee="${e.id}"><td><div class="access-user"><div class="mini-avatar">${e.initials}</div><strong class="link">${e.name}</strong></div></td><td>${e.department}</td><td>${e.leave}</td><td>${[5,8,12,3,9,2,4][i]} days</td><td>${[1,0,3,2,0,4,1][i]} pending</td><td class="money">${can('salary.view')?money([1480,2940,1320,1670,720,2860,810][i]):'Restricted'}</td><td>${badge(i===4?'Review':'Within policy')}</td></tr>`);
+ const __lv=__pr6LeaveRows();
+ const rows=__lv?__lv.map(r=>`<tr data-employee="${r.employeeNumber}"><td><div class="access-user"><div class="mini-avatar">${r.initials}</div><strong class="link">${r.name}</strong></div></td><td>${r.department}</td><td>${r.available} days</td><td>\u2014</td><td>\u2014</td><td class="money">${can('salary.view')?money(r.liability):'Restricted'}</td><td>${badge('Within policy')}</td></tr>`):employees.slice(0,7).map((e,i)=>`<tr data-employee="${e.id}"><td><div class="access-user"><div class="mini-avatar">${e.initials}</div><strong class="link">${e.name}</strong></div></td><td>${e.department}</td><td>${e.leave}</td><td>${[5,8,12,3,9,2,4][i]} days</td><td>${[1,0,3,2,0,4,1][i]} pending</td><td class="money">${can('salary.view')?money([1480,2940,1320,1670,720,2860,810][i]):'Restricted'}</td><td>${badge(i===4?'Review':'Within policy')}</td></tr>`);
  return `<div class="page">${pageHead('Human capital administration','Leave and Benefits','Manage leave balances, approvals, payroll impact, benefit enrolment, liabilities and employee-facing self-service records.',button('Export liability report','export-leave','', 'download')+button('Record leave adjustment','leave-adjustment','primary','plus'))}
- <div class="grid kpis">${kpi('Annual leave liability',money(184620),'Estimated financial provision','wallet')}${kpi('Average balance','14.2 days','Across active employees','calendar','cyan')}${kpi('Pending requests','17','Manager decisions outstanding','clock','amber')}${kpi('Policy exceptions','4','Above carry-forward threshold','alert','red')}${kpi('Medical aid enrolled','112','87.5% of employees','heart','violet')}${kpi('Loan deductions','19','Active employee loans','calculator')}</div>
+ <div class="grid kpis">${(()=>{const l=__pr6LeaveStats();if(!l)return `${kpi('Annual leave liability',money(184620),'Estimated financial provision','wallet')}${kpi('Average balance','14.2 days','Across active employees','calendar','cyan')}`;return kpi('Annual leave liability',money(l.liability),'Accrued days at basic/22 per day','wallet')+kpi('Average balance',l.average+' days','Across employees with a balance','calendar','cyan')+kpi('Employees with leave',String(l.employees),'Holding an annual balance','users','violet')+kpi('Leave types',String(l.types),'Configured balance categories','settings')})()}</div>
  ${tableCard('Leave balance and liability register','Payroll-linked leave balances and provisions',['Employee','Department','Available','Used YTD','Pending','Liability','Policy status'],rows)}
  </div>`;
 }
@@ -306,14 +1861,14 @@ function vaultPage(){
 }
 function reportsPage(){
  return `<div class="page">${pageHead('Compliance and management reporting','Compliance Report Studio','Generate filing-ready, audit-ready and management reports from governed payroll data. Preview, edit, approve and export every report with retained lineage.',button('Scheduled reports','scheduled-reports','', 'calendar')+button('Build custom report','custom-report','primary','plus'))}
- <div class="grid kpis">${kpi('Report templates','12','Statutory, control and management','report')}${kpi('Generated this month','28','Across June payroll workflows','file','cyan')}${kpi('Awaiting approval','4','Maker-checker review required','shield','amber')}${kpi('Scheduled deliveries','9','Secure recipients and channels','send','violet')}${kpi('Filing deadlines','4','Within the next 17 days','calendar','amber')}${kpi('Evidence completeness','96%','Source and approval lineage','audit','cyan')}</div>
+ <div class="grid kpis">${kpi('Report templates','12','Statutory, control and management','report')}${kpi('Generated this month','28','Across June payroll workflows','file','cyan')}${kpi('Awaiting approval','4','Maker-checker review required','shield','amber')}${kpi('Scheduled deliveries','9','Secure recipients and channels','send','violet')}${kpi('Filing deadlines','4','Within the next 17 days','calendar','amber')}${kpi('Evidence completeness','\u2014','No completeness measure is recorded','audit','cyan')}</div>
  <div class="report-grid">${reportTemplates.map(r=>`<article class="report-card" data-report="${r.id}"><div class="report-icon">${icon('report')}</div><h4>${r.name}</h4><p>${r.desc}</p><footer><span>${r.category} - ${r.freq}</span><strong class="link">Generate ${icon('chev')}</strong></footer></article>`).join('')}</div>
  </div>`;
 }
 function auditPage(){
  const rows=auditEvents.map(a=>`<tr><td>${a[0]}</td><td><strong>${a[1]}</strong></td><td><span class="link">${a[2]}</span></td><td>${a[3]}</td><td>${a[4]}</td><td>${badge(a[5])}</td><td><button class="btn small" data-action="audit-evidence">Evidence</button></td></tr>`);
  return `<div class="page">${pageHead('Immutable governance history','Payroll Audit Trail','Search every sensitive view, change, approval, rule publication, calculation, report generation and release action with evidence hashes and source lineage.',button('Verify ledger hash','verify-audit','', 'shield')+button('Export audit evidence','export-audit','primary','download'))}
- <div class="grid kpis">${kpi('Events this period','4,812','Across all payroll workspaces','audit')}${kpi('Privileged events','42','Role and configuration changes','key','violet')}${kpi('Sensitive data views','318','Compensation and bank fields','eye')}${kpi('Blocked actions','9','Prevented by policy controls','lock','red')}${kpi('Evidence hashes','100%','All events cryptographically linked','shield','cyan')}${kpi('Retention','7 years','Zimbabwe payroll evidence policy','calendar')}</div>
+ <div class="grid kpis">${(()=>{const a=__pr6AuditStats();if(!a)return `${kpi('Events this period','4,812','Across all payroll workspaces','audit')}${kpi('Privileged events','42','Role and configuration changes','key','violet')}`;return kpi('Events recorded',String(a.total),'In the payroll audit trail','audit')+kpi('Approval events',String(a.approvals),'Submissions, approvals and rejections','key','violet')+kpi('Change events',String(a.changes),'Runs created, processed and released','eye')+kpi('Distinct actors',String(a.actors),'Users who acted on payroll','users','cyan')+kpi('Retention','7 years','Zimbabwe payroll evidence policy','calendar')})()}</div>
  ${tableCard('Immutable event ledger','Filter by actor, action, record, time, entity or severity',['Timestamp','Actor','Action','Record','Detail','Class',''],rows,`<button class="btn small" data-action="audit-filter">Advanced filters</button>`)}
  </div>`;
 }
@@ -322,7 +1877,7 @@ function accessPage(){
  const users=userAccess.map(u=>`<tr><td><div class="access-user"><div class="mini-avatar">${u.initials}</div><div><strong>${u.name}</strong><div class="tiny muted">MFA identity verified</div></div></div></td><td>${u.role}</td><td>${u.scope}</td><td>${badge(u.mfa)}</td><td>${u.last}</td><td>${badge(u.status)}</td><td><button class="btn small" data-action="edit-access">Review</button></td></tr>`);
  return `<div class="page">${pageHead('Identity, authority and segregation','Roles and Access Control','Define least-privilege roles, data scopes, temporary access, maker-checker boundaries, sensitive-field masking, MFA and quarterly access certification.',button('Run access review','run-access-review','', 'audit')+button('Assign access','assign-access','primary','userplus'))}
  ${!can('rbac.manage')?`<div class="callout amber" style="margin-bottom:14px"><span class="kpi-icon amber">${icon('lock')}</span><div><strong>Read-only RBAC preview</strong><p>Your current ${state.role} role can view this demonstration but cannot change permissions or assignments.</p></div></div>`:''}
- <div class="grid kpis">${kpi('Active users','42','Across payroll and HR workspaces','users')}${kpi('Privileged users','6','Administrator or release authority','key','violet')}${kpi('MFA coverage','97.6%','1 user pending enrolment','shield','cyan')}${kpi('SoD conflicts','2','Both are compensating-control cases','alert','amber')}${kpi('Temporary access','3','Expires within 30 days','clock','amber')}${kpi('Dormant accounts','0','90-day inactivity threshold','lock','cyan')}</div>
+ <div class="grid kpis">${kpi('Active users','42','Across payroll and HR workspaces','users')}${kpi('Privileged users','6','Administrator or release authority','key','violet')}${kpi('MFA coverage','\u2014','MFA enrolment is not tracked for staff accounts','shield','cyan')}${kpi('SoD conflicts','2','Both are compensating-control cases','alert','amber')}${kpi('Temporary access','3','Expires within 30 days','clock','amber')}${kpi('Dormant accounts','0','90-day inactivity threshold','lock','cyan')}</div>
  <div class="grid two" style="margin-bottom:14px">
   ${tableCard('User access register','Identity, role, scope and certification status',['User','Role','Data scope','MFA','Last activity','Status',''],users)}
   ${card('Segregation-of-duties rules','Prevent incompatible payroll authority combinations',`<div class="card-body">${[['Prepare payroll vs approve payroll','Hard block','No user may prepare and independently approve the same run'],['Edit bank details vs release payments','Hard block','Bank master changes require separate verification and release'],['Edit statutory rules vs publish rules','Hard block','Rule author cannot publish their own version'],['Generate reports vs approve filings','Review','Filing approval requires a second person'],['HR employee changes vs payroll calculation','Monitor','Sensitive changes are included in the payroll review pack']].map((r,i)=>`<div class="sod-rule"><div class="rule-icon">${icon(i<3?'lock':'shield')}</div><div><strong>${r[0]}</strong><div class="tiny muted">${r[2]}</div></div>${badge(r[1])}</div>`).join('')}</div>`)}
@@ -342,42 +1897,54 @@ function settingsPage(){
  </div></div>`;
 }
 function myPayPage(){
- const e=employees[0];
- return `<div class="page">${pageHead('Employee self-service','My Pay','Secure employee access to payslips, tax summaries, bank details, leave, employment records, training and personal documents.',button('Update bank details','ess-bank-change','', 'bank')+button('Download June payslip','download-payslip','primary','download'))}
- <div class="panel-band"><div class="eyebrow" style="color:#7eb6ff">JUNE 2026 NET PAY</div><h2>${money(1629.14)} <span style="font-size:15px;color:#9fc0ed">+ ${money(35820,'ZiG')}</span></h2><p>Payment date: 30 June 2026 - Payslip verification hash: 5db2-79a1-c840</p><div class="band-stats"><div class="band-stat"><span>Gross earnings</span><strong>${money(2250)}</strong></div><div class="band-stat"><span>Total deductions</span><strong>${money(620.86)}</strong></div><div class="band-stat"><span>PAYE year to date</span><strong>${money(1945.23)}</strong></div><div class="band-stat"><span>Leave available</span><strong>${e.leave}</strong></div></div></div>
+ const __mp=__pr6MyPayView();
+ // (employees[0]||__pr6EmployeePlaceholder) is the first person in the roster, not the signed-in user.
+ const e=__mp?{leave:(__mp.annualLeave===null?'\u2014':__mp.annualLeave+' days'),bank:__mp.self.bank,tax:__mp.self.tax,nssa:__mp.self.nssa,currency:__mp.self.currency,id:__mp.self.employeeNumber,title:'\u2014',department:__mp.self.department,branch:'\u2014',type:'\u2014',start:__mp.self.start}:(employees[0]||__pr6EmployeePlaceholder);
+ return `<div class="page">${pageHead('Employee self-service','My Pay','Secure employee access to payslips, tax summaries, bank details, leave, employment records, training and personal documents.',button('Update bank details','ess-bank-change','', 'bank')+(()=>{const m=__pr6MyPay();const slip=m&&m.latest?m.latest:null;if(!slip)return `<button class="btn primary" disabled title="No payslip has been issued to you yet">${icon('download')}No payslip available</button>`;const period=slip.period||slip.periodLabel||'latest';return `<button class="btn primary" data-action="download-payslip" data-payslip-id="${slip.id}">${icon('download')}Download ${period} payslip</button>`})())}
+ <div class="panel-band"><div class="eyebrow" style="color:#7eb6ff">${__mp&&__mp.latest?String(__mp.latest.period).toUpperCase()+' NET PAY':'NET PAY'}</div><h2>${__mp?(__mp.hasPayslip?money(__mp.latest.net):'No payslip yet'):money(1629.14)}</h2><p>${__mp?(__mp.hasPayslip?'Pay period '+__mp.latest.period:'No payroll run has been processed for you yet.'):'Payment date: 30 June 2026'}</p><div class="band-stats"><div class="band-stat"><span>Gross earnings</span><strong>${__mp?(__mp.hasPayslip?money(__mp.latest.gross):'\u2014'):money(2250)}</strong></div><div class="band-stat"><span>Total deductions</span><strong>${__mp?(__mp.hasPayslip?money(__mp.latest.deductions):'\u2014'):money(620.86)}</strong></div><div class="band-stat"><span>Payslips on record</span><strong>${__mp?__mp.slips.length:3}</strong></div><div class="band-stat"><span>Leave available</span><strong>${e.leave}</strong></div></div></div>
  <div class="grid three">
-  ${card('Recent payslips','Secure, hash-verified payroll documents',`<div class="card-body list">${[['June 2026','USD 1,629.14 + ZiG 35,820','Available'],['May 2026','USD 1,588.62 + ZiG 34,600','Available'],['April 2026','USD 1,576.18 + ZiG 34,100','Available'],['March 2026','USD 1,562.90 + ZiG 33,420','Available']].map(x=>`<div class="list-row" data-action="preview-payslip"><div class="list-icon">${icon('file')}</div><div class="list-main"><strong>${x[0]}</strong><span>${x[1]}</span></div>${badge(x[2])}</div>`).join('')}</div>`)}
-  ${card('Earnings and deductions','June 2026 pay breakdown',`<div class="card-body">${[['Basic salary','USD 2,250.00'],['Housing allowance','USD 337.50'],['Transport allowance','USD 185.00'],['PAYE','(USD 482.14)'],['NSSA','(USD 31.50)'],['Medical aid','(USD 107.22)']].map(x=>`<div class="list-row"><div class="list-main"><strong>${x[0]}</strong></div><strong>${x[1]}</strong></div>`).join('')}</div>`)}
+  ${card('Recent payslips','Secure, hash-verified payroll documents',`<div class="card-body list">${(__mp?(__mp.slips.length?__mp.slips.map(p=>[p.period,money(p.net),'Available']):[['No payslips yet','\u2014','Pending']]):[['June 2026','USD 1,629.14 + ZiG 35,820','Available']]).map(x=>`<div class="list-row" data-action="preview-payslip"><div class="list-icon">${icon('file')}</div><div class="list-main"><strong>${x[0]}</strong><span>${x[1]}</span></div>${badge(x[2])}</div>`).join('')}</div>`)}
+  ${card('Earnings and deductions','June 2026 pay breakdown',`<div class="card-body">${(__mp?(__mp.breakdown.length?__mp.breakdown:[['No pay breakdown available','\u2014']]):[['Basic salary','USD 2,250.00'],['Housing allowance','USD 337.50'],['Transport allowance','USD 185.00'],['PAYE','(USD 482.14)'],['NSSA','(USD 31.50)'],['Medical aid','(USD 107.22)']]).map(x=>`<div class="list-row"><div class="list-main"><strong>${x[0]}</strong></div><strong>${x[1]}</strong></div>`).join('')}</div>`)}
   ${card('Bank and tax details','Sensitive values are protected',`<div class="card-body">${[['Bank account',e.bank],['Taxpayer reference',e.tax],['NSSA number',e.nssa],['Payment currency',e.currency],['Next payment date','30 Jun 2026']].map(x=>`<div class="fact" style="margin-bottom:8px"><span>${x[0]}</span><strong>${x[1]}</strong></div>`).join('')}<button class="btn soft" data-action="ess-bank-change">Request bank detail change</button></div>`)}
-  ${card('Leave balance','Current entitlement and activity',`<div class="card-body"><div class="readiness-ring" style="--pct:78%;margin:0 auto 15px"><strong>15.5</strong></div>${progressRow('Annual leave used',40,'10 of 25 days','violet')}${progressRow('Pending leave',12,'3 days requested','amber')}<button class="btn soft" style="margin-top:12px" data-action="request-leave">Request leave</button></div>`)}
+  ${card('Leave balance','Current entitlement and activity',`<div class="card-body"><div class="readiness-ring" style="--pct:${__mp&&__mp.annualLeave!==null?Math.min(100,Math.round((__mp.annualLeave/25)*100)):78}%;margin:0 auto 15px"><strong>${__mp?(__mp.annualLeave===null?'\u2014':__mp.annualLeave):15.5}</strong></div>${(__mp?__mp.balances:[]).map(b=>progressRow(b.leaveType.charAt(0)+b.leaveType.slice(1).toLowerCase()+' balance',Math.min(100,Math.round((Number(b.balance)/25)*100)),Number(b.balance)+' days','violet')).join('')}<button class="btn soft" style="margin-top:12px" data-action="request-leave">Request leave</button></div>`)}
   ${card('Employment record','Current governed employee information',`<div class="card-body">${[['Employee ID',e.id],['Job title',e.title],['Department',e.department],['Branch',e.branch],['Employment type',e.type],['Start date',e.start]].map(x=>`<div class="list-row"><div class="list-main"><span>${x[0]}</span></div><strong>${x[1]}</strong></div>`).join('')}</div>`)}
-  ${card('Training and certificates','Mandatory learning and expiry status',`<div class="card-body list">${[['Payroll Data Privacy','Complete','30 Jun 2027'],['Cybersecurity Awareness','Complete','15 Jul 2027'],['Anti-Money Laundering','Complete','31 Jul 2026']].map(x=>`<div class="list-row"><div class="list-icon">${icon('graduation')}</div><div class="list-main"><strong>${x[0]}</strong><span>Expires ${x[2]}</span></div>${badge(x[1])}</div>`).join('')}</div>`)}
+  ${card('Training and certificates','Mandatory learning and expiry status',`<div class="card-body list">${(__pr6IsLive()?(((__pr6Ref().certifications)||[]).length?((__pr6Ref().certifications)||[]).map(c=>[c.courseTitle||c.code||'Course',c.status||'Recorded',c.expiresAt?String(c.expiresAt).slice(0,10):'\u2014']):[['No certifications recorded','Pending','\u2014']]):[['Payroll Data Privacy','Complete','30 Jun 2027'],['Cybersecurity Awareness','Complete','15 Jul 2027'],['Anti-Money Laundering','Complete','31 Jul 2026']]).map(x=>`<div class="list-row"><div class="list-icon">${icon('graduation')}</div><div class="list-main"><strong>${x[0]}</strong><span>Expires ${x[2]}</span></div>${badge(x[1])}</div>`).join('')}</div>`)}
  </div></div>`;
 }
 function render(){
  renderNav();
  const pages={overview:overviewPage,employees:employeesPage,onboarding:onboardingPage,runs:runsPage,inputs:inputsPage,exceptions:exceptionsPage,approvals:approvalsPage,close:closePage,components:componentsPage,calendar:calendarPage,tax:taxPage,training:trainingPage,leave:leavePage,vault:vaultPage,reports:reportsPage,audit:auditPage,access:accessPage,settings:settingsPage,mypay:myPayPage};
- const fn=pages[state.page]||overviewPage;$('#content').innerHTML=fn();$('#content').scrollTop=0;
+ const fn=pages[state.page]||overviewPage;if(typeof permittedPage==='function'&&!permittedPage(state.page)){$('#content').innerHTML=__pr6DeniedPageHtml(state.page);$('#content').scrollTop=0;wireTopProfile();return;}$('#content').innerHTML=fn();$('#content').scrollTop=0;
+ wireTopProfile();
+}
+function wireTopProfile(){
+  const prof=$('.profile');
+  if(prof){prof.style.cursor='pointer';prof.dataset.action='profile-menu'}
+  applySessionUserToProfile(rootEl);
+}
+function openProfileMenu(){
+  const u=getClientDesignSessionUser()||{name:'Tariro Moyo',email:'',role:state.role,initials:'TM'};
+  openDrawer('Your profile',u.email||u.role,`<div class="employee-profile"><div class="photo-avatar">${u.initials||'U'}</div><div><h2 style="font-size:21px;margin:0">${u.name}</h2><div class="muted" style="margin-top:4px">${u.role}</div>${u.email?`<div class="tiny muted" style="margin-top:6px">${u.email}</div>`:''}</div></div>`,`${button('Sign out','client-design-sign-out','danger')}${button('Close','close-drawer')}`);
 }
 function openDrawer(title,sub,body,foot=''){$('#drawerHead').innerHTML=`<div><h2>${title}</h2><p>${sub}</p></div>${closeButton('drawer')}`;$('#drawerBody').innerHTML=body;$('#drawerFoot').innerHTML=foot||`<button class="btn" data-action="close-drawer">Close</button>`;$('#drawer').classList.add('open');$('#drawerBackdrop').classList.add('open')}
 function closeDrawer(){$('#drawer').classList.remove('open');$('#drawerBackdrop').classList.remove('open')}
 function openModal(title,sub,body,foot='',wide=false){$('#modalHead').innerHTML=`<div><h2>${title}</h2><p>${sub}</p></div>${closeButton('modal')}`;$('#modalBody').innerHTML=body;$('#modalFoot').innerHTML=foot||`<button class="btn" data-action="close-modal">Close</button>`;$('#modal').classList.toggle('wide',wide);$('#modal').classList.add('open');$('#modalBackdrop').classList.add('open')}
 function closeModal(){$('#modal').classList.remove('open','wide');$('#modalBackdrop').classList.remove('open')}
-function employeeDrawer(id){const e=employees.find(x=>x.id===id)||employees[0];const body=`<div class="employee-profile"><div class="photo-avatar">${e.initials}</div><div><div class="eyebrow">${e.id} - ${badge(e.status)}</div><h2 style="font-size:22px;margin:0">${e.name}</h2><div class="muted" style="margin-top:4px">${e.title} - ${e.department} - ${e.branch}</div><div class="profile-facts"><div class="fact"><span>Employment type</span><strong>${e.type}</strong></div><div class="fact"><span>Start date</span><strong>${e.start}</strong></div><div class="fact"><span>Payroll currency</span><strong>${e.currency}</strong></div></div></div></div>
+function employeeDrawer(id){const e=employees.find(x=>x.id===id)||(employees[0]||__pr6EmployeePlaceholder);const body=`<div class="employee-profile"><div class="photo-avatar">${e.initials}</div><div><div class="eyebrow">${e.id} - ${badge(e.status)}</div><h2 style="font-size:22px;margin:0">${e.name}</h2><div class="muted" style="margin-top:4px">${e.title} - ${e.department} - ${e.branch}</div><div class="profile-facts"><div class="fact"><span>Employment type</span><strong>${e.type}</strong></div><div class="fact"><span>Start date</span><strong>${e.start}</strong></div><div class="fact"><span>Payroll currency</span><strong>${e.currency}</strong></div></div></div></div>
  <div class="tabs" style="margin-top:18px"><button class="tab active">Employment</button><button class="tab">Compensation</button><button class="tab">Bank and statutory</button><button class="tab">Documents</button><button class="tab">Leave</button><button class="tab">Training</button><button class="tab">Audit</button></div>
  <div class="grid two"><section class="drawer-section"><h3>Employment details</h3><div class="form-grid">${[['Job title',e.title],['Department',e.department],['Branch',e.branch],['Contract type',e.type],['Start date',e.start],['Line manager','Tawanda Chirenje']].map(x=>`<div class="fact"><span>${x[0]}</span><strong>${x[1]}</strong></div>`).join('')}</div></section><section class="drawer-section"><h3>Payroll readiness</h3><div style="display:flex;gap:16px;align-items:center"><div class="readiness-ring" style="--pct:${e.readiness}%"><strong>${e.readiness}%</strong></div><div style="flex:1">${progressRow('Employee master',100,'Complete','cyan')}${progressRow('Statutory data',e.tax==='Pending'?45:100,e.tax==='Pending'?'Tax number missing':'Complete',e.tax==='Pending'?'red':'cyan')}${progressRow('Documents',e.documents/16*100,`${e.documents} records retained`,'violet')}</div></div></section></div>
  <section class="drawer-section"><h3>Compensation summary</h3><div class="grid four"><div class="fact"><span>Monthly base</span><strong>${maskSalary(e)}</strong></div><div class="fact"><span>Housing allowance</span><strong>${can('salary.view')?money(e.base*.15):'Restricted'}</strong></div><div class="fact"><span>Estimated net</span><strong>${can('salary.view')?money(e.base*.72):'Restricted'}</strong></div><div class="fact"><span>Cost centre</span><strong>${e.department.slice(0,3).toUpperCase()}-001</strong></div></div></section>
  <section class="drawer-section"><h3>Bank and statutory identifiers</h3><div class="grid three"><div class="fact"><span>Bank account</span><strong>${can('salary.view')?e.bank:'Restricted'}</strong></div><div class="fact"><span>Taxpayer reference</span><strong>${can('salary.view')?e.tax:'Restricted'}</strong></div><div class="fact"><span>NSSA number</span><strong>${can('salary.view')?e.nssa:'Restricted'}</strong></div></div></section>
  <section class="drawer-section"><h3>Contact and employee services</h3><div class="grid two"><div class="fact"><span>Email</span><strong>${e.email}</strong></div><div class="fact"><span>Mobile</span><strong>${e.phone}</strong></div><div class="fact"><span>Leave available</span><strong>${e.leave}</strong></div><div class="fact"><span>Training status</span><strong>${e.training}</strong></div></div></section>
  <section class="drawer-section"><h3>Recent governed activity</h3><div class="timeline"><div class="timeline-item"><div><strong>Payroll readiness recalculated</strong><p>Employee master, statutory data and documents were revalidated.</p></div><time>Today</time></div><div class="timeline-item warn"><div><strong>Bank details reviewed</strong><p>Independent verification requested before the payroll freeze.</p></div><time>26 Jun</time></div><div class="timeline-item"><div><strong>Compensation review approved</strong><p>Annual review version 3 approved by delegated authority.</p></div><time>01 Jun</time></div></div></section>`;
- openDrawer(e.name,`${e.id} - Governed employee and compensation record`,body,`${button('Open document vault','employee-documents','', 'folder')}${button('Edit employee','edit-employee','primary','edit')}`)}
-function runDrawer(id){const r=payrollRuns.find(x=>x.id===id)||payrollRuns[0];openDrawer(r.id,`${r.period} - ${r.group}`,`${workflow(r.stage)}<div class="grid three" style="margin:16px 0"><div class="fact"><span>Employees</span><strong>${r.employees}</strong></div><div class="fact"><span>Gross USD</span><strong>${money(r.grossUSD)}</strong></div><div class="fact"><span>Gross ZiG</span><strong>${r.grossZiG?money(r.grossZiG,'ZiG'):'Not applicable'}</strong></div><div class="fact"><span>Deductions</span><strong>${money(r.deductions)}</strong></div><div class="fact"><span>Net USD</span><strong>${money(r.netUSD)}</strong></div><div class="fact"><span>Variance</span><strong>${r.variance>0?'+':''}${r.variance}%</strong></div></div><div class="drawer-section"><h3>Control status</h3>${[['Employee population','128 expected / 128 included','Complete'],['Input batch','1,247 rows committed','Complete'],['Calculation version','v2026.06.4 locked','Complete'],['Exceptions','3 critical remain open','Blocked'],['Maker-checker','4 of 6 controls complete','Review'],['Release authority','Not yet available','Pending']].map(x=>`<div class="list-row"><div class="list-main"><strong>${x[0]}</strong><span>${x[1]}</span></div>${badge(x[2])}</div>`).join('')}</div><div class="drawer-section"><h3>Calculation evidence</h3><div class="callout blue"><span class="kpi-icon">${icon('shield')}</span><div><strong>Ruleset ZW-2026.06</strong><p>Calculation hash 74f2a90c...e81c - source inputs and rule versions retained.</p></div></div></div>`,`${button('Download evidence','download-run-evidence','', 'download')}${button('Open current stage',r.stage<4?'inputs':r.stage===4?'approvals':'close','primary','arrow')}`)}
-function exceptionDrawer(id){const e=exceptions.find(x=>x.id===id)||exceptions[0];openDrawer(e.type,`${e.id} - ${e.employee} - ${e.severity}`,`<div class="callout ${e.severity==='Critical'?'red':'amber'}"><span class="kpi-icon ${e.severity==='Critical'?'red':'amber'}">${icon('alert')}</span><div><strong>${e.detail}</strong><p>Source: ${e.source} - Value affected: ${e.amount}</p></div></div><div class="grid three" style="margin:15px 0"><div class="fact"><span>Employee</span><strong>${e.employee}</strong></div><div class="fact"><span>Owner</span><strong>${e.owner}</strong></div><div class="fact"><span>Age</span><strong>${e.age}</strong></div><div class="fact"><span>Severity</span><strong>${e.severity}</strong></div><div class="fact"><span>Status</span><strong>${e.status}</strong></div><div class="fact"><span>Payroll run</span><strong>PAY-2026-06-M</strong></div></div><div class="drawer-section"><h3>Source record comparison</h3><div class="table-wrap"><table><thead><tr><th>Field</th><th>Employee master</th><th>Payroll input</th><th>Expected</th></tr></thead><tbody><tr><td>Value</td><td>${e.amount}</td><td>${e.type.includes('Bank')?'Changed account':'Imported value'}</td><td>${e.type.includes('Bank')?'Independent verification':'Policy compliant value'}</td></tr><tr><td>Last changed</td><td>26 Jun 2026 15:33</td><td>28 Jun 2026 09:04</td><td>Before payroll freeze</td></tr><tr><td>Changed by</td><td>Chipo Ndlovu</td><td>Bulk import service</td><td>Authorised role</td></tr></tbody></table></div></div><div class="drawer-section"><h3>Investigation notes</h3><textarea id="exceptionNote" style="width:100%;min-height:110px;border:1px solid var(--line);border-radius:11px;background:var(--surface);padding:10px" placeholder="Record evidence, checks performed and resolution basis..."></textarea></div><div class="drawer-section"><h3>Case history</h3><div class="timeline"><div class="timeline-item bad"><div><strong>Exception created</strong><p>Validation rule identified a release-blocking condition.</p></div><time>09:04</time></div><div class="timeline-item warn"><div><strong>Assigned to ${e.owner}</strong><p>Case routed by severity and data ownership.</p></div><time>09:06</time></div></div></div>`,`${button('Escalate','escalate-exception','', 'send')}<button class="btn primary" data-action="resolve-exception" data-id="${e.id}">${icon('check')}Resolve with evidence</button>`)}
+ openDrawer(e.name,`${e.id} - Governed employee and compensation record`,body,`${button('Open document vault','employee-documents','', 'folder')}<button class="btn primary" data-action="edit-employee" data-record-id="${e.recordId||''}">${icon('edit')}Edit employee</button>`)}
+function runDrawer(id){const r=payrollRuns.find(x=>x.id===id)||(payrollRuns[0]||__pr6RunPlaceholder);openDrawer(r.id,`${r.period} - ${r.group}`,`${workflow(r.stage)}<div class="grid three" style="margin:16px 0"><div class="fact"><span>Employees</span><strong>${r.employees}</strong></div><div class="fact"><span>Gross USD</span><strong>${money(r.grossUSD)}</strong></div><div class="fact"><span>Gross ZiG</span><strong>${r.grossZiG?money(r.grossZiG,'ZiG'):'Not applicable'}</strong></div><div class="fact"><span>Deductions</span><strong>${money(r.deductions)}</strong></div><div class="fact"><span>Net USD</span><strong>${money(r.netUSD)}</strong></div><div class="fact"><span>Variance</span><strong>${r.variance>0?'+':''}${r.variance}%</strong></div></div><div class="drawer-section"><h3>Control status</h3>${[['Employee population','128 expected / 128 included','Complete'],['Input batch','1,247 rows committed','Complete'],['Calculation version','v2026.06.4 locked','Complete'],['Exceptions','3 critical remain open','Blocked'],['Maker-checker','4 of 6 controls complete','Review'],['Release authority','Not yet available','Pending']].map(x=>`<div class="list-row"><div class="list-main"><strong>${x[0]}</strong><span>${x[1]}</span></div>${badge(x[2])}</div>`).join('')}</div><div class="drawer-section"><h3>Calculation evidence</h3><div class="callout blue"><span class="kpi-icon">${icon('shield')}</span><div><strong>Ruleset ZW-2026.06</strong><p>Calculation hash 74f2a90c...e81c - source inputs and rule versions retained.</p></div></div></div>`,`${button('Download evidence','download-run-evidence','', 'download')}${button('Open current stage',r.stage<4?'inputs':r.stage===4?'approvals':'close','primary','arrow')}`)}
+function exceptionDrawer(id){const e=exceptions.find(x=>x.id===id)||(exceptions[0]||__pr6ExceptionPlaceholder);openDrawer(e.type,`${e.id} - ${e.employee} - ${e.severity}`,`<div class="callout ${e.severity==='Critical'?'red':'amber'}"><span class="kpi-icon ${e.severity==='Critical'?'red':'amber'}">${icon('alert')}</span><div><strong>${e.detail}</strong><p>Source: ${e.source} - Value affected: ${e.amount}</p></div></div><div class="grid three" style="margin:15px 0"><div class="fact"><span>Employee</span><strong>${e.employee}</strong></div><div class="fact"><span>Owner</span><strong>${e.owner}</strong></div><div class="fact"><span>Age</span><strong>${e.age}</strong></div><div class="fact"><span>Severity</span><strong>${e.severity}</strong></div><div class="fact"><span>Status</span><strong>${e.status}</strong></div><div class="fact"><span>Payroll run</span><strong>PAY-2026-06-M</strong></div></div><div class="drawer-section"><h3>Source record comparison</h3><div class="table-wrap"><table><thead><tr><th>Field</th><th>Employee master</th><th>Payroll input</th><th>Expected</th></tr></thead><tbody><tr><td>Value</td><td>${e.amount}</td><td>${e.type.includes('Bank')?'Changed account':'Imported value'}</td><td>${e.type.includes('Bank')?'Independent verification':'Policy compliant value'}</td></tr><tr><td>Last changed</td><td>26 Jun 2026 15:33</td><td>28 Jun 2026 09:04</td><td>Before payroll freeze</td></tr><tr><td>Changed by</td><td>Chipo Ndlovu</td><td>Bulk import service</td><td>Authorised role</td></tr></tbody></table></div></div><div class="drawer-section"><h3>Investigation notes</h3><textarea id="exceptionNote" style="width:100%;min-height:110px;border:1px solid var(--line);border-radius:11px;background:var(--surface);padding:10px" placeholder="Record evidence, checks performed and resolution basis..."></textarea></div><div class="drawer-section"><h3>Case history</h3><div class="timeline"><div class="timeline-item bad"><div><strong>Exception created</strong><p>Validation rule identified a release-blocking condition.</p></div><time>09:04</time></div><div class="timeline-item warn"><div><strong>Assigned to ${e.owner}</strong><p>Case routed by severity and data ownership.</p></div><time>09:06</time></div></div></div>`,`${button('Escalate','escalate-exception','', 'send')}<button class="btn primary" data-action="resolve-exception" data-id="${e.id}">${icon('check')}Resolve with evidence</button>`)}
 function documentHtml(doc){return `<div class="document-page" id="documentEditor" contenteditable="false"><div class="doc-head"><div><div class="doc-brand">MATANHO</div><div style="font-size:10px;color:#1768ff;font-weight:800">PAYROLL AND HUMAN CAPITAL</div></div><div class="doc-meta">Document ID: ${doc.id}<br>Version: ${doc.versions}<br>Classification: ${doc.class}</div></div><h1>${doc.name}</h1><p><strong>Status:</strong> ${doc.status} &nbsp; <strong>Owner:</strong> ${doc.owner}</p><p>${doc.content}</p><h2>1. Purpose and scope</h2><p>This governed record supports the payroll and human-capital control environment for Arcus Holdings Private Limited. It is generated from approved source data and retains a complete version, approval and distribution history.</p><h2>2. Control summary</h2><table><thead><tr><th>Control</th><th>Result</th><th>Evidence</th></tr></thead><tbody><tr><td>Population reconciliation</td><td>Complete</td><td>128 employees reconciled</td></tr><tr><td>Calculation verification</td><td>Complete</td><td>Ruleset ZW-2026.06</td></tr><tr><td>Exception management</td><td>Review</td><td>3 critical cases open</td></tr><tr><td>Maker-checker approval</td><td>Pending</td><td>4 of 6 controls complete</td></tr></tbody></table><h2>3. Management commentary</h2><p>Click Edit to update this section. Saved changes create a new document version and are recorded in the immutable audit trail.</p><h2>4. Approval record</h2><p>Prepared by: Rudo Sibanda<br>Reviewed by: Tariro Moyo<br>Final authority: Pending</p></div>`}
-function documentDrawer(id){const d=documents.find(x=>x.id===id)||documents[0];state.activeDoc=d.id;openDrawer(d.name,`${d.id} - ${d.folder} - Version ${d.versions}`,`<div class="editable-note">Preview mode. Select Edit to make governed changes and create a new version.</div><div class="doc-preview">${documentHtml(d)}</div>`,`${button('Download editable DOC','download-doc','', 'download')}${button('Export PDF','download-doc-pdf','', 'file')}${button('Edit document','edit-document','primary','edit')}`)}
-function openNewEmployee(){if(!can('employee.edit'))return deny('employee.edit');openModal('New Employee and Contract Onboarding','Create a governed employment and payroll record.',`<div class="stepper"><div class="step done"><b>1</b><span>Identity</span></div><div class="step active"><b>2</b><span>Employment</span></div><div class="step"><b>3</b><span>Compensation</span></div><div class="step"><b>4</b><span>Bank and tax</span></div><div class="step"><b>5</b><span>Documents</span></div><div class="step"><b>6</b><span>Review</span></div></div><div class="form-grid"><div class="form-field"><label>First name</label><input id="newFirst" value="Kundai"></div><div class="form-field"><label>Surname</label><input id="newLast" value="Marufu"></div><div class="form-field"><label>Job title</label><input id="newTitle" value="Risk Analyst"></div><div class="form-field"><label>Department</label><select id="newDept"><option>Risk and Compliance</option><option>Finance</option><option>Operations</option></select></div><div class="form-field"><label>Branch</label><select><option>Harare Head Office</option><option>Bulawayo Branch</option></select></div><div class="form-field"><label>Employment type</label><select><option>Permanent</option><option>Contract</option></select></div><div class="form-field"><label>Start date</label><input type="date" value="2026-07-01"></div><div class="form-field"><label>Payroll currency</label><select><option>USD / ZiG</option><option>USD</option><option>ZiG</option></select></div><div class="form-field"><label>Monthly base USD</label><input value="2150.00"></div><div class="form-field"><label>Monthly base ZiG</label><input value="125000"></div><div class="form-field full"><label>Onboarding control note</label><textarea>Offer and identity documents verified. Compensation requires HR Manager review before payroll activation.</textarea></div></div>`,`${button('Save draft','save-onboarding','', 'file')}${button('Continue and validate','complete-onboarding','primary','arrow')}`)}
-function openNewRun(){if(!can('payroll.prepare'))return deny('payroll.prepare');openModal('Create Payroll Run','Configure the period, pay group, dual-currency treatment, exchange rate and statutory rules.',`<div class="stepper"><div class="step active"><b>1</b><span>Period and currency</span></div><div class="step"><b>2</b><span>Inputs</span></div><div class="step"><b>3</b><span>Validate</span></div><div class="step"><b>4</b><span>Review</span></div></div><div class="form-grid"><div class="form-field"><label>Pay period</label><select id="runPeriod"><option>July 2026</option><option>June 2026</option></select></div><div class="form-field"><label>Pay group</label><select id="runGroup"><option>Monthly Staff</option><option>Executives</option><option>Contract Staff</option></select></div><div class="form-field"><label>Calculation date</label><input type="date" value="2026-07-24"></div><div class="form-field"><label>Payment date</label><input type="date" value="2026-07-31"></div><div class="form-field"><label>Processing currencies</label><select><option>USD and ZiG</option><option>USD only</option><option>ZiG only</option></select></div><div class="form-field"><label>Exchange rate source</label><select><option>Approved treasury rate</option><option>RBZ reference rate</option></select></div><div class="form-field"><label>USD / ZiG rate</label><input value="31.8420"></div><div class="form-field"><label>Statutory ruleset</label><select><option>ZW-2026.06 - Published</option></select></div><div class="form-field full"><div class="callout blue"><span class="kpi-icon">${icon('shield')}</span><div><strong>Impact preview</strong><p>128 employees in scope. 4 employees require data review before inputs can be committed.</p></div></div></div></div>`,`${button('Save draft','save-run','', 'file')}${button('Create and continue','create-run','primary','arrow')}`)}
-function uploadDocumentModal(){if(!can('documents.manage'))return deny('documents.manage');openModal('Upload to Document Vault','Files are virus scanned, classified, versioned and protected by data-scope permissions.',`<div class="form-grid"><div class="form-field full"><label>Select files</label><input type="file" id="docFile" multiple></div><div class="form-field"><label>Folder</label><select id="docFolder">${folders.slice(1).map(f=>`<option>${f}</option>`).join('')}</select></div><div class="form-field"><label>Classification</label><select id="docClass"><option>Internal</option><option>Confidential</option><option>Restricted</option><option>Highly restricted</option></select></div><div class="form-field"><label>Retention policy</label><select><option>Payroll evidence - 7 years</option><option>Employee record - employment + 7 years</option><option>Policy - superseded + 7 years</option></select></div><div class="form-field"><label>Approval workflow</label><select><option>HR Manager review</option><option>Payroll Manager review</option><option>No approval required</option></select></div><div class="form-field full"><label>Description</label><textarea id="docDescription" placeholder="Describe the document and its control purpose..."></textarea></div></div>`,`${button('Cancel','close-modal')}${button('Upload and classify','confirm-upload','primary','upload')}`)}
+function documentDrawer(id){if(__pr6IsLive())return __pr6DocumentDrawer(id);const d=documents.find(x=>x.id===id)||(documents[0]||__pr6DocumentPlaceholder);state.activeDoc=d.id;openDrawer(d.name,`${d.id} - ${d.folder} - Version ${d.versions}`,`<div class="editable-note">Preview mode. Select Edit to make governed changes and create a new version.</div><div class="doc-preview">${documentHtml(d)}</div>`,`${button('Download editable DOC','download-doc','', 'download')}${button('Export PDF','download-doc-pdf','', 'file')}${button('Edit document','edit-document','primary','edit')}`)}
+function openNewEmployee(){if(!can('employee.edit'))return deny('employee.edit');openModal('New Employee and Contract Onboarding','Create a governed employment and payroll record.',`<div class="stepper"><div class="step done"><b>1</b><span>Identity</span></div><div class="step active"><b>2</b><span>Employment</span></div><div class="step"><b>3</b><span>Compensation</span></div><div class="step"><b>4</b><span>Bank and tax</span></div><div class="step"><b>5</b><span>Documents</span></div><div class="step"><b>6</b><span>Review</span></div></div><div class="form-grid"><div class="form-field"><label>First name</label><input id="newFirst" value=""></div><div class="form-field"><label>Surname</label><input id="newLast" value=""></div><div class="form-field"><label>Work email</label><input id="newEmail" type="email" placeholder="first.last@nts.local"></div><div class="form-field"><label>Employee number</label><input id="newEmployeeNumber" placeholder="EMP-0000"></div><div class="form-field"><label>Basic salary</label><input id="newBasicSalary" type="number" min="0" step="0.01" placeholder="0.00"></div><div class="form-field"><label>Job title</label><input id="newTitle" value="Risk Analyst"></div><div class="form-field"><label>Department</label><select id="newDept"><option>Risk and Compliance</option><option>Finance</option><option>Operations</option></select></div><div class="form-field"><label>Branch</label><select><option>Harare Head Office</option><option>Bulawayo Branch</option></select></div><div class="form-field"><label>Employment type</label><select><option>Permanent</option><option>Contract</option></select></div><div class="form-field"><label>Start date</label><input type="date" value="2026-07-01"></div><div class="form-field"><label>Payroll currency</label><select><option>USD / ZiG</option><option>USD</option><option>ZiG</option></select></div><div class="form-field"><label>Monthly base USD</label><input value="2150.00"></div><div class="form-field"><label>Monthly base ZiG</label><input value="125000"></div><div class="form-field full"><label>Onboarding control note</label><textarea>Offer and identity documents verified. Compensation requires HR Manager review before payroll activation.</textarea></div></div>`,`${button('Save draft','save-onboarding','', 'file')}${button('Continue and validate','complete-onboarding','primary','arrow')}`)}
+function openNewRun(){if(!can('payroll.prepare'))return deny('payroll.prepare');openModal('Create Payroll Run','Configure the period, pay group, dual-currency treatment, exchange rate and statutory rules.',`<div class="stepper"><div class="step active"><b>1</b><span>Period and currency</span></div><div class="step"><b>2</b><span>Inputs</span></div><div class="step"><b>3</b><span>Validate</span></div><div class="step"><b>4</b><span>Review</span></div></div><div class="form-grid"><div class="form-field"><label>Pay period</label><select id="runPeriod">${(()=>{const o=__pr6PeriodOptions();return o?o.map(x=>`<option>${x}</option>`).join(''):'<option>July 2026</option><option>June 2026</option>'})()}</select></div><div class="form-field"><label>Pay group</label><select id="runGroup"><option>Monthly Staff</option><option>Executives</option><option>Contract Staff</option></select></div><div class="form-field"><label>Calculation date</label><input type="date" value="2026-07-24"></div><div class="form-field"><label>Payment date</label><input type="date" value="2026-07-31"></div><div class="form-field"><label>Processing currencies</label><select><option>USD and ZiG</option><option>USD only</option><option>ZiG only</option></select></div><div class="form-field"><label>Exchange rate source</label><select><option>Approved treasury rate</option><option>RBZ reference rate</option></select></div><div class="form-field"><label>USD / ZiG rate</label><input value="31.8420"></div><div class="form-field"><label>Statutory ruleset</label><select><option>ZW-2026.06 - Published</option></select></div><div class="form-field full"><div class="callout blue"><span class="kpi-icon">${icon('shield')}</span><div><strong>Impact preview</strong><p>128 employees in scope. 4 employees require data review before inputs can be committed.</p></div></div></div></div>`,`${button('Save draft','save-run','', 'file')}${button('Create and continue','create-run','primary','arrow')}`)}
+function uploadDocumentModal(){if(__pr6IsLive())return __pr6UploadModal();if(!can('documents.manage'))return deny('documents.manage');openModal('Upload to Document Vault','Files are virus scanned, classified, versioned and protected by data-scope permissions.',`<div class="form-grid"><div class="form-field full"><label>Select files</label><input type="file" id="docFile" multiple></div><div class="form-field"><label>Folder</label><select id="docFolder">${folders.slice(1).map(f=>`<option>${f}</option>`).join('')}</select></div><div class="form-field"><label>Classification</label><select id="docClass"><option>Internal</option><option>Confidential</option><option>Restricted</option><option>Highly restricted</option></select></div><div class="form-field"><label>Retention policy</label><select><option>Payroll evidence - 7 years</option><option>Employee record - employment + 7 years</option><option>Policy - superseded + 7 years</option></select></div><div class="form-field"><label>Approval workflow</label><select><option>HR Manager review</option><option>Payroll Manager review</option><option>No approval required</option></select></div><div class="form-field full"><label>Description</label><textarea id="docDescription" placeholder="Describe the document and its control purpose..."></textarea></div></div>`,`${button('Cancel','close-modal')}${button('Upload and classify','confirm-upload','primary','upload')}`)}
 function createDocumentModal(){if(!can('documents.manage'))return deny('documents.manage');openModal('Create Editable Document','Start a governed document from a controlled template.',`<div class="form-grid"><div class="form-field full"><label>Document title</label><input id="createdDocName" value="July 2026 Payroll Processing Checklist"></div><div class="form-field"><label>Template</label><select><option>Payroll control checklist</option><option>Policy document</option><option>Employee letter</option><option>Management memo</option></select></div><div class="form-field"><label>Folder</label><select id="createdDocFolder">${folders.slice(1).map(f=>`<option>${f}</option>`).join('')}</select></div><div class="form-field"><label>Classification</label><select><option>Restricted</option><option>Internal</option><option>Confidential</option></select></div><div class="form-field"><label>Review owner</label><select><option>Tariro Moyo</option><option>Chipo Ndlovu</option></select></div><div class="form-field full"><label>Initial purpose</label><textarea id="createdDocContent">Governed checklist for input validation, payroll calculation, exception resolution, maker-checker approval and release controls.</textarea></div></div>`,`${button('Cancel','close-modal')}${button('Create and edit','confirm-create-document','primary','edit')}`)}
 function reportContent(r){const title=r.name;return `<div class="document-page" id="reportEditor" contenteditable="true"><div class="doc-head"><div><div class="doc-brand">MATANHO</div><div style="font-size:10px;color:#1768ff;font-weight:800">PAYROLL COMPLIANCE REPORT</div></div><div class="doc-meta">Period: June 2026<br>Generated: 28 Jun 2026<br>Status: Draft for review</div></div><h1>${title}</h1><p><strong>Entity:</strong> Arcus Holdings Private Limited<br><strong>Prepared by:</strong> ${state.role==='Employee'?'Rudo Sibanda':'Tariro Moyo'}<br><strong>Source payroll:</strong> PAY-2026-06-M - ruleset ZW-2026.06</p><h2>Executive control summary</h2><p>This report was generated from governed payroll, employee-master, statutory-rule and finance-control data. All values retain source lineage to calculation version v2026.06.4 and the immutable payroll event ledger.</p><table><thead><tr><th>Control measure</th><th>June 2026</th><th>May 2026</th><th>Variance</th></tr></thead><tbody><tr><td>Employees processed</td><td>128</td><td>126</td><td>+2</td></tr><tr><td>Gross payroll - USD</td><td>264,720.00</td><td>256,180.00</td><td>+3.3%</td></tr><tr><td>Gross payroll - ZiG</td><td>7,459,664</td><td>7,134,000</td><td>+4.6%</td></tr><tr><td>Total deductions - USD</td><td>77,444.00</td><td>74,980.00</td><td>+3.3%</td></tr><tr><td>Net pay - USD</td><td>187,276.00</td><td>181,200.00</td><td>+3.4%</td></tr></tbody></table><h2>Reconciliation and exceptions</h2><p>Payroll population and gross-to-net control totals reconcile to the current calculation. Three critical exceptions remain open and prevent final release. These relate to a bank-account change, missing taxpayer reference and contract-end-date validation.</p><table><thead><tr><th>Reference</th><th>Issue</th><th>Owner</th><th>Status</th></tr></thead><tbody><tr><td>EXC-0612</td><td>Bank account change within freeze window</td><td>Tariro Moyo</td><td>Open</td></tr><tr><td>EXC-0617</td><td>Missing tax number</td><td>Chipo Ndlovu</td><td>Open</td></tr><tr><td>EXC-0629</td><td>Contract end date before payment date</td><td>Chipo Ndlovu</td><td>Open</td></tr></tbody></table><h2>Compliance conclusion</h2><p>Calculation controls are substantially complete. Filing or release approval must not be recorded until all report-specific exceptions are resolved and independently evidenced.</p><h2>Approval record</h2><p>Prepared by: ____________________ Date: __________<br>Reviewed by: ____________________ Date: __________<br>Approved by: ____________________ Date: __________</p></div>`}
 function generateReport(id){const r=reportTemplates.find(x=>x.id===id)||reportTemplates[0];if(!can(r.perm)&&!can('reports.generate'))return deny(r.perm);state.reportDraft={...r,version:1};openModal(r.name,`${r.category} - Editable generated report - ${r.freq}`,`<div class="editable-note">Edit mode is active. Changes remain a draft until Save Version is selected.</div><div class="doc-preview">${reportContent(r)}</div>`,`${button('Download DOC','download-report-doc','', 'download')}${button('Export PDF','download-report-pdf','', 'file')}${button('Preview','preview-report','soft','eye')}${button('Save version','save-report','primary','check')}`,true);logEvent('REPORT_DRAFT_CREATED',r.id,`Generated editable ${r.name} draft`,'Change')}
@@ -411,25 +1978,27 @@ document.addEventListener('click',e=>{
 function handleAction(action,el){
  if(pageIds.has(action)){goPage(action);return}
  switch(action){
+  case 'profile-menu':openProfileMenu();break;
+  case 'client-design-sign-out':closeDrawer();closeModal();clientDesignSignOut();break;
   case 'close-drawer':closeDrawer();break;case 'close-modal':closeModal();break;
   case 'new-employee':case 'open-onboarding':openNewEmployee();break;case 'new-run':openNewRun();break;
   case 'continue-run':goPage('approvals');break;case 'upload-document':uploadDocumentModal();break;case 'create-document':createDocumentModal();break;
   case 'approval-decision':approvalDecisionModal();break;case 'notification':notificationsDrawer();break;
   case 'employee-documents':state.folder='Employee records';goPage('vault');break;
-  case 'edit-employee':if(!can('employee.edit'))deny('employee.edit');else genericModal('Edit Employee Record','Sensitive employment changes are versioned and routed for review.');break;
+  case 'edit-employee':{if(!can('employee.edit')){deny('employee.edit');break}const __rid=(el&&el.dataset&&el.dataset.recordId)||'';if(!__rid){toast('No employee selected','Open an employee record before editing it.','warn');break}openModal('Edit Employee Record','Leave a field blank to keep its current value. Bank and salary changes are versioned and routed for review.',`<div class="form-grid"><div class="form-field"><label>Bank name</label><input id="editBankName" placeholder="Leave blank to keep current"></div><div class="form-field"><label>Branch code</label><input id="editBranchCode" placeholder="Leave blank to keep current"></div><div class="form-field"><label>Account number</label><input id="editAccountNumber" placeholder="Leave blank to keep current"></div><div class="form-field"><label>Basic salary</label><input id="editBasicSalary" type="number" step="0.01" min="0" placeholder="Leave blank to keep current"></div><div class="form-field"><label>ID number</label><input id="editIdNumber" placeholder="Leave blank to keep current"></div><div class="form-field"><label>Next of kin</label><input id="editNextOfKin" placeholder="Leave blank to keep current"></div><div class="form-field"><label>Address</label><input id="editAddress" placeholder="Leave blank to keep current"></div></div>`,`<button class="btn primary" data-action="save-employee" data-record-id="${__rid}">${icon('check')}Save changes</button>`);break}
   case 'resolve-exception':{if(!can('exceptions.resolve'))return deny('exceptions.resolve');const x=exceptions.find(v=>v.id===el.dataset.id);if(x){x.status='Resolved';logEvent('PAYROLL_EXCEPTION_RESOLVED',x.id,`Resolved ${x.type} for ${x.employee}`,'Change');toast('Exception resolved',`${x.id} is now resolved and will be revalidated.`);closeDrawer();render()}break}
   case 'escalate-exception':toast('Exception escalated','The case owner and Payroll Manager have been notified.','warn');break;
-  case 'approve-payroll':if(!can('payroll.approve'))deny('payroll.approve');else if(exceptions.some(x=>x.severity==='Critical'&&x.status!=='Resolved'))toast('Approval blocked','Resolve all critical exceptions before approval can be recorded.','bad');else{payrollRuns[0].status='Approved';payrollRuns[0].stage=5;logEvent('PAYROLL_APPROVED',payrollRuns[0].id,'Payroll approved after all controls passed','Approval');toast('Payroll approved','The run is ready for final release.');render()}break;
-  case 'reject-payroll':if(!can('payroll.approve'))deny('payroll.approve');else{payrollRuns[0].status='Returned for correction';logEvent('PAYROLL_REJECTED',payrollRuns[0].id,'Payroll returned for correction','Approval');toast('Payroll returned','The preparer has been notified with the reviewer comment.','warn');render()}break;
+  case 'approve-payroll':if(!can('payroll.approve'))deny('payroll.approve');else if(exceptions.some(x=>x.severity==='Critical'&&x.status!=='Resolved'))toast('Approval blocked','Resolve all critical exceptions before approval can be recorded.','bad');else{(payrollRuns[0]||__pr6RunPlaceholder).status='Approved';(payrollRuns[0]||__pr6RunPlaceholder).stage=5;logEvent('PAYROLL_APPROVED',(payrollRuns[0]||__pr6RunPlaceholder).id,'Payroll approved after all controls passed','Approval');toast('Payroll approved','The run is ready for final release.');render()}break;
+  case 'reject-payroll':if(!can('payroll.approve'))deny('payroll.approve');else{(payrollRuns[0]||__pr6RunPlaceholder).status='Returned for correction';logEvent('PAYROLL_REJECTED',(payrollRuns[0]||__pr6RunPlaceholder).id,'Payroll returned for correction','Approval');toast('Payroll returned','The preparer has been notified with the reviewer comment.','warn');render()}break;
   case 'record-decision':{const d=$('#decisionType')?.value||'Return for correction';logEvent('PAYROLL_DECISION_RECORDED','PAY-2026-06-M',`${d}: ${$('#decisionBasis')?.value||''}`,'Approval');closeModal();toast('Decision recorded',`${d} was written to the immutable approval trail.`);break}
-  case 'release-payroll':if(!can('payroll.release'))deny('payroll.release');else if(exceptions.some(x=>x.severity==='Critical'&&x.status!=='Resolved')||payrollRuns[0].status!=='Approved')toast('Release blocked','Critical exceptions and maker-checker approval must be complete before release.','bad');else{payrollRuns[0].status='Released';payrollRuns[0].stage=6;logEvent('PAYROLL_RELEASED',payrollRuns[0].id,'Bank batches, payslips and GL journals released','Approval');toast('Payroll released','Bank, payslip and ledger distribution has started.');render()}break;
+  case 'release-payroll':if(!can('payroll.release'))deny('payroll.release');else if(exceptions.some(x=>x.severity==='Critical'&&x.status!=='Resolved')||(payrollRuns[0]||__pr6RunPlaceholder).status!=='Approved')toast('Release blocked','Critical exceptions and maker-checker approval must be complete before release.','bad');else{(payrollRuns[0]||__pr6RunPlaceholder).status='Released';(payrollRuns[0]||__pr6RunPlaceholder).stage=6;logEvent('PAYROLL_RELEASED',(payrollRuns[0]||__pr6RunPlaceholder).id,'Bank batches, payslips and GL journals released','Approval');toast('Payroll released','Bank, payslip and ledger distribution has started.');render()}break;
   case 'commit-inputs':if(!can('payroll.prepare'))deny('payroll.prepare');else{logEvent('INPUT_BATCH_COMMITTED','INP-2026-06-04','1,247 valid rows committed; 37 rows retained in isolation','Change');toast('Valid inputs committed','1,247 rows entered the calculation population.');}break;
   case 'resolve-input':toast('Validation case opened','The source row and employee record are ready for correction.');break;
   case 'edit-document':{if(!can('documents.manage'))return deny('documents.manage');const editor=$('#documentEditor');if(editor){editor.contentEditable='true';editor.focus();$('.editable-note',$('#drawerBody')).textContent='Edit mode is active. Saving creates a new governed version.';$('#drawerFoot').innerHTML=`${button('Cancel edit','cancel-doc-edit')}${button('Save new version','save-document','primary','check')}`;}break}
   case 'cancel-doc-edit':documentDrawer(state.activeDoc);break;
   case 'save-document':{const d=documents.find(x=>x.id===state.activeDoc);if(d){d.versions++;d.modified='Just now';d.status='In review';d.content=$('#documentEditor')?.innerText.slice(0,300)||d.content;logEvent('DOCUMENT_VERSION_CREATED',d.id,`Created version ${d.versions} of ${d.name}`,'Change');toast('Document version saved',`Version ${d.versions} has been routed for review.`);documentDrawer(d.id)}break}
-  case 'download-doc':{const d=documents.find(x=>x.id===state.activeDoc)||documents[0];htmlToDoc(`${fileName(d.name)}_v${d.versions}.doc`,d.name,$('#documentEditor')?.innerHTML||documentHtml(d));toast('Editable document downloaded','A Microsoft Word compatible file was created.');break}
-  case 'download-doc-pdf':{const d=documents.find(x=>x.id===state.activeDoc)||documents[0];downloadBlob(`${fileName(d.name)}_v${d.versions}.pdf`,createSimplePdf(d.name,textFromEditor('#documentEditor')));toast('PDF exported','The previewed document was exported as PDF.');break}
+  case 'download-doc':{const d=documents.find(x=>x.id===state.activeDoc)||(documents[0]||__pr6DocumentPlaceholder);htmlToDoc(`${fileName(d.name)}_v${d.versions}.doc`,d.name,$('#documentEditor')?.innerHTML||documentHtml(d));toast('Editable document downloaded','A Microsoft Word compatible file was created.');break}
+  case 'download-doc-pdf':{const d=documents.find(x=>x.id===state.activeDoc)||(documents[0]||__pr6DocumentPlaceholder);downloadBlob(`${fileName(d.name)}_v${d.versions}.pdf`,createSimplePdf(d.name,textFromEditor('#documentEditor')));toast('PDF exported','The previewed document was exported as PDF.');break}
   case 'confirm-upload':{const f=$('#docFile')?.files?.[0];const name=f?.name||'Uploaded Payroll Evidence.pdf';const d={id:`DOC-${String(documents.length+1).padStart(3,'0')}`,name,folder:$('#docFolder')?.value||'Payroll control packs',type:'Uploaded evidence',owner:'Tariro Moyo',modified:'Just now',class:$('#docClass')?.value||'Restricted',versions:1,status:'In review',content:$('#docDescription')?.value||'Uploaded governed payroll evidence.'};documents.unshift(d);logEvent('DOCUMENT_UPLOADED',d.id,`Uploaded and classified ${d.name}`,'Change');closeModal();state.folder=d.folder;render();toast('Document uploaded',`${d.name} was scanned, classified and versioned.`);break}
   case 'confirm-create-document':{const d={id:`DOC-${String(documents.length+1).padStart(3,'0')}`,name:$('#createdDocName')?.value||'New Payroll Document',folder:$('#createdDocFolder')?.value||'Payroll control packs',type:'Editable document',owner:'Tariro Moyo',modified:'Just now',class:'Restricted',versions:1,status:'Draft',content:$('#createdDocContent')?.value||'New editable document.'};documents.unshift(d);logEvent('DOCUMENT_CREATED',d.id,`Created editable document ${d.name}`,'Change');closeModal();state.folder=d.folder;render();documentDrawer(d.id);break}
   case 'download-report-doc':{const r=state.reportDraft||reportTemplates[0];htmlToDoc(`${fileName(r.name)}_June_2026.doc`,r.name,$('#reportEditor')?.innerHTML||'');toast('Editable report downloaded','The current report version was exported to a Word-compatible document.');break}
@@ -457,7 +2026,7 @@ function handleAction(action,el){
   case 'ess-bank-change':genericModal('Bank Detail Change Request','Bank changes require identity verification and independent payroll review.');break;
   case 'request-leave':genericModal('Request Leave','The request will route to the line manager and update payroll-linked leave balances after approval.');break;
   case 'new-component':genericModal('Create Pay Component','Configure calculation, currency, tax and general-ledger treatment.');break;
-  case 'new-paygroup':genericModal('Create Pay Group','Define population, calendar, currencies and approval authority.');break;
+  case 'new-paygroup':openModal('Create Pay Group','Define the population, its cycle and the currency it is paid in.',`<div class="form-grid"><div class="form-field"><label>Group name</label><input id="newPayGroupName" placeholder="Monthly Staff"></div><div class="form-field"><label>Code</label><input id="newPayGroupCode" placeholder="MTH-STAFF"></div><div class="form-field"><label>Frequency</label><select id="newPayGroupFrequency"><option value="MONTHLY">Monthly</option><option value="FORTNIGHTLY">Fortnightly</option><option value="WEEKLY">Weekly</option></select></div><div class="form-field"><label>Pay day of month</label><input id="newPayGroupPayDay" type="number" min="1" max="31" placeholder="25"></div><div class="form-field"><label>Currency</label><input id="newPayGroupCurrency" value="USD"></div></div>`,`${button('Create pay group','save-paygroup','primary','plus')}`);break;
   case 'new-tax-rule':genericModal('Create Statutory Rule Version','New rules must pass impact analysis, automated tests and independent publication approval.');break;
   case 'record-training':genericModal('Record Training Completion','Attach verified evidence and update certification expiry.');break;
   case 'leave-adjustment':genericModal('Record Leave Adjustment','Adjustments require a reason and HR approval.');break;
@@ -607,8 +2176,8 @@ init();
     const filtered=employees.filter(e=>!state.employeeSearch||[e.name,e.id,e.department,e.branch,e.title].join(' ').toLowerCase().includes(state.employeeSearch.toLowerCase()));
     const rows=filtered.map(e=>`<tr data-employee="${e.id}"><td><input class="checkbox" type="checkbox" aria-label="Select ${attr(e.name)}"></td><td><div class="access-user">${employeeImage(e)}<div><strong class="link">${e.name}</strong><div class="tiny muted">${e.id} · ${e.title}</div></div></div></td><td>${e.department}<div class="tiny muted">${e.branch}</div></td><td>${e.type}</td><td class="money">${maskSalary(e)}</td><td><div style="display:flex;align-items:center;gap:7px"><div class="progress" style="width:64px"><span style="width:${e.readiness}%"></span></div><strong style="font-weight:500">${e.readiness}%</strong></div></td><td>${badge(e.status)}</td><td><button class="btn small" data-employee="${e.id}">${icon('eye')}Open</button></td></tr>`);
     return `<div class="page">${pageHead('People administration','Employee Directory and Payroll Readiness','Search and govern employment, compensation, bank, statutory, document, leave, training and payroll-readiness records from one responsive workspace.',button('Export employee register','export-employees','', 'download')+button('Add employee','new-employee','primary','userplus'))}
-      <div class="grid kpis">${kpi('Total employees','128','124 active and 4 serving notice','users')}${kpi('Payroll ready','119','92.9% of the active population','check','cyan')}${kpi('Under review','4','Data or approval issue','alert','amber')}${kpi('Blocked','3','Cannot enter final payroll','lock','red')}${kpi('New starters','2','Effective in this pay period','userplus','violet')}${kpi('Contract expiries','6','Within the next 60 days','calendar','amber')}</div>
-      <section class="card"><div class="filters"><input id="employeeSearch" value="${attr(state.employeeSearch)}" placeholder="Search name, employee ID, department or branch"><select><option>All departments</option><option>Finance</option><option>People & Culture</option><option>Operations</option></select><select><option>All readiness states</option><option>Ready</option><option>Review</option><option>Blocked</option></select><div class="spacer"></div><span class="tiny muted">Showing ${filtered.length} of 128 employees</span></div><div class="table-wrap"><table><thead><tr><th></th><th>Employee</th><th>Organisation</th><th>Contract</th><th>Compensation</th><th>Readiness</th><th>Status</th><th></th></tr></thead><tbody>${rows.join('')}</tbody></table></div></section>
+      <div class="grid kpis">${(()=>{const s=__pr6EmployeeStats();if(!s)return `${kpi('Total employees','128','124 active and 4 serving notice','users')}${kpi('Payroll ready','119','92.9% of the active population','check','cyan')}`;return kpi('Total employees',String(s.total),s.active+' active and '+s.onNotice+' serving notice','users')+kpi('Payroll ready',String(s.ready),s.readyPct+'% of the active population','check','cyan')+kpi('Under review',String(s.review),'Data or approval issue','alert','amber')+kpi('Blocked',String(s.blocked),'Cannot enter final payroll','lock','red')})()}</div>
+      <section class="card"><div class="filters"><input id="employeeSearch" value="${attr(state.employeeSearch)}" placeholder="Search name, employee ID, department or branch"><select><option>All departments</option>${__pr6DepartmentOptions()}</select><select><option>All readiness states</option><option>Ready</option><option>Review</option><option>Blocked</option></select><div class="spacer"></div><span class="tiny muted">Showing ${filtered.length} of ${(()=>{const s=__pr6EmployeeStats();return s?s.total:128})()} employees</span></div><div class="table-wrap"><table><thead><tr><th></th><th>Employee</th><th>Organisation</th><th>Contract</th><th>Compensation</th><th>Readiness</th><th>Status</th><th></th></tr></thead><tbody>${rows.join('')}</tbody></table></div></section>
     </div>`;
   };
 
@@ -627,11 +2196,11 @@ init();
   };
 
   employeeDrawer = function(id,tab='Employment'){
-    const e=employees.find(x=>x.id===id)||employees[0];
+    const e=employees.find(x=>x.id===id)||(employees[0]||__pr6EmployeePlaceholder);
     state.activeEmployeeTab=tab;
     const tabs=['Employment','Compensation','Bank and statutory','Documents','Leave','Training','Audit'];
     const body=`<div class="employee-profile">${employeeImage(e,'employee-photo')}<div><div class="eyebrow">${e.id} · ${badge(e.status)}</div><h2 style="font-size:21px;margin:0">${e.name}</h2><div class="muted" style="margin-top:4px">${e.title} · ${e.department} · ${e.branch}</div><div class="profile-facts"><div class="fact"><span>Employment type</span><strong>${e.type}</strong></div><div class="fact"><span>Start date</span><strong>${e.start}</strong></div><div class="fact"><span>Payroll currency</span><strong>${e.currency}</strong></div></div></div></div><div class="employee-tabs" role="tablist">${tabs.map(t=>`<button class="tab ${t===tab?'active':''}" data-employee-tab="${attr(t)}" data-employee-id="${e.id}" role="tab">${t}</button>`).join('')}</div><div id="employeeTabPanel">${employeeTabPanel(e,tab)}</div>`;
-    openDrawer(e.name,`${e.id} · Governed employee, compensation and compliance record`,body,`${button('Activity','employee-audit','', 'audit')}${button('Open document vault','employee-documents','', 'folder')}${button('Edit employee','edit-employee','primary','edit')}`);
+    openDrawer(e.name,`${e.id} · Governed employee, compensation and compliance record`,body,`${button('Activity','employee-audit','', 'audit')}${button('Open document vault','employee-documents','', 'folder')}<button class="btn primary" data-action="edit-employee" data-record-id="${e.recordId||''}">${icon('edit')}Edit employee</button>`);
   };
 
   const payComponentsV2=[
@@ -648,11 +2217,11 @@ init();
 
   componentsPage = function(){
     state.componentFilter=state.componentFilter||'All';
-    const filtered=payComponentsV2.filter(c=>state.componentFilter==='All'||c.type===state.componentFilter||(state.componentFilter==='Draft changes'&&c.status==='Draft'));
+    const filtered=(__pr6ComponentsV2()||payComponentsV2).filter(c=>state.componentFilter==='All'||c.type===state.componentFilter||(state.componentFilter==='Draft changes'&&c.status==='Draft'));
     const rows=filtered.map(c=>`<tr data-component="${c.code}"><td data-label="Code"><span class="link">${c.code}</span></td><td data-label="Component"><strong>${c.name}</strong><div class="tiny muted">${c.employees} employees · ${c.impact}</div></td><td data-label="Type">${badge(c.type)}</td><td data-label="Calculation"><span class="component-formula">${c.calc}</span></td><td data-label="Currency">${c.currency}</td><td data-label="GL mapping">${c.gl}</td><td data-label="Status">${badge(c.status)}</td><td data-label="Action"><button class="btn small" data-component="${c.code}">${icon('eye')}Open</button></td></tr>`);
     return `<div class="page">${pageHead('Payroll administration','Earnings and Deductions Configuration','Configure eligible populations, currency treatment, formulas, tax treatment, general-ledger mapping, versioning and maker-checker controls in a responsive catalogue.',button('Import configuration','import-components','', 'upload')+button('Create component','new-component','primary','plus'))}
-      <div class="grid kpis">${kpi('Earning components','24','18 recurring and 6 variable','wallet')}${kpi('Deduction components','17','8 statutory and 9 voluntary','calculator','violet')}${kpi('Active formulas','31','Versioned calculation logic','settings','cyan')}${kpi('Pending approval','3','Configuration changes','shield','amber')}${kpi('GL mappings','100%','All active components mapped','check','cyan')}${kpi('Rule test coverage','96%','182 automated test cases','audit')}</div>
-      <div class="component-layout"><section class="card"><div class="card-head"><div><h3>Pay component catalogue</h3><p>Every component is effective-dated, tested and independently approved before use</p></div><div class="segmented component-tabs">${['All','Earning','Deduction','Statutory','Draft changes'].map(f=>`<button class="${state.componentFilter===f?'active':''}" data-component-filter="${attr(f)}">${f}</button>`).join('')}</div></div><div class="table-wrap component-table"><table class="responsive-table"><thead><tr><th>Code</th><th>Component</th><th>Type</th><th>Calculation</th><th>Currency</th><th>GL mapping</th><th>Status</th><th></th></tr></thead><tbody>${rows.join('')}</tbody></table></div></section><aside class="component-side">${card('Configuration health','Current catalogue control position',`<div class="card-body">${progressRow('Formula test coverage',96,'182 of 190 tests passed','cyan')}${progressRow('GL mapping completeness',100,'All active components mapped','cyan')}${progressRow('Approval queue',74,'3 changes awaiting review','amber')}<div class="callout amber" style="margin-top:12px"><span class="kpi-icon amber">${icon('shield')}</span><div><strong>Three draft changes cannot affect payroll</strong><p>Publication requires an independent reviewer and successful impact analysis.</p></div></div></div>`)}<div style="height:12px"></div>${card('Monthly composition','June payroll concentration',`<div class="card-body">${progressRow('Basic salary',79,'USD 208,640','cyan')}${progressRow('Allowances',19,'USD 49,756','violet')}${progressRow('Variable pay',8,'USD 21,140','amber')}${progressRow('Deductions',29,'USD 77,444','red')}</div>`)}</aside></div>
+      <div class="grid kpis">${(()=>{const c=__pr6ComponentStats();if(!c)return `${kpi('Earning components','24','18 recurring and 6 variable','wallet')}${kpi('Deduction components','17','8 statutory and 9 voluntary','calculator','violet')}`;return kpi('Earning components',String(c.earnings),c.earningsSub,'wallet')+kpi('Deduction components',String(c.deductions),c.deductionsSub,'calculator','violet')+kpi('Tax brackets',String(c.brackets),'Progressive PAYE bands','settings','cyan')+kpi('Statutory levies',String(c.levies),'AIDS levy, NSSA and SDL rates','shield','amber')})()}</div>
+      <div class="component-layout"><section class="card"><div class="card-head"><div><h3>Pay component catalogue</h3><p>Every component is effective-dated, tested and independently approved before use</p></div><div class="segmented component-tabs">${['All','Earning','Deduction','Statutory','Draft changes'].map(f=>`<button class="${state.componentFilter===f?'active':''}" data-component-filter="${attr(f)}">${f}</button>`).join('')}</div></div><div class="table-wrap component-table"><table class="responsive-table"><thead><tr><th>Code</th><th>Component</th><th>Type</th><th>Calculation</th><th>Currency</th><th>GL mapping</th><th>Status</th><th></th></tr></thead><tbody>${rows.join('')}</tbody></table></div></section><aside class="component-side">${card('Configuration health','Current catalogue control position',`<div class="card-body">${(()=>{const h=__pr6ComponentHealth();return h?progressRow('Active components',h.activePct,h.active+' of '+h.total+' active','cyan'):progressRow('Formula test coverage',96,'182 of 190 tests passed','cyan')})()}${progressRow('GL mapping completeness',100,'All active components mapped','cyan')}${(()=>{const h=__pr6ComponentHealth();return h?progressRow('Statutory deductions',h.statutoryPct,h.statutory+' statutory of '+(h.total-h.active+h.active)+' components','amber'):progressRow('Approval queue',74,'3 changes awaiting review','amber')})()}<div class="callout amber" style="margin-top:12px"><span class="kpi-icon amber">${icon('shield')}</span><div><strong>Three draft changes cannot affect payroll</strong><p>Publication requires an independent reviewer and successful impact analysis.</p></div></div></div>`)}<div style="height:12px"></div>${card('Monthly composition','June payroll concentration',`<div class="card-body">${(()=>{const m=__pr6PayrollMix();return m?progressRow('Basic salary',m.basicPct,money(m.basic),'cyan'):progressRow('Basic salary',79,'USD 208,640','cyan')})()}${(()=>{const m=__pr6PayrollMix();return m?progressRow('Allowances',m.allowancePct,money(m.allowances),'violet'):progressRow('Allowances',19,'USD 49,756','violet')})()}${(()=>{const m=__pr6PayrollMix();return m?progressRow('Net pay',Math.max(0,100-m.deductionPct),money(m.gross-m.deductions),'amber'):progressRow('Variable pay',8,'USD 21,140','amber')})()}${(()=>{const m=__pr6PayrollMix();return m?progressRow('Deductions',m.deductionPct,money(m.deductions),'red'):progressRow('Deductions',29,'USD 77,444','red')})()}</div>`)}</aside></div>
     </div>`;
   };
 
@@ -676,22 +2245,13 @@ init();
     ['Dec 2026','18 Dec','21 Dec','22 Dec','23 Dec','31 Dec','11 Jan','Scheduled']
   ];
 
-  calendarPage = function(){
-    state.selectedPayGroup=state.selectedPayGroup||'monthly';
-    const group=payGroupsV2.find(g=>g.id===state.selectedPayGroup)||payGroupsV2[0];
-    const milestones=[['Inputs close','20 Jul','Cut-off'],['Calculate','23 Jul','System'],['Review','24 Jul','Maker-checker'],['Approve','27 Jul','Authority'],['Payment','31 Jul','Bank'],['Statutory','10 Aug','Filing']];
-    const rows=calendarPeriods.map((r,i)=>`<tr data-calendar-milestone="${i}"><td data-label="Period"><strong>${r[0]}</strong></td><td data-label="Input cut-off">${r[1]}</td><td data-label="Calculation">${r[2]}</td><td data-label="Review">${r[3]}</td><td data-label="Approval">${r[4]}</td><td data-label="Payment">${r[5]}</td><td data-label="Statutory filing">${r[6]}</td><td data-label="Status">${badge(r[7])}</td><td data-label="Action"><button class="btn small" data-action="edit-schedule-v2" data-period="${r[0]}">Edit</button></td></tr>`);
-    return `<div class="page">${pageHead('Payroll administration','Pay Groups and Payroll Calendar','Define populations, currencies, cut-offs, calculation dates, review windows, approvals, payments and statutory deadlines across entities and branches.',button('Copy prior year','copy-calendar-v2','', 'refresh')+button('Create pay group','new-paygroup','primary','plus'))}
-      <div class="grid kpis">${kpi('Active pay groups','4','195 employees across all groups','users')}${kpi('Next input cut-off',group.cutoff,`${group.name} · ${group.employees} employees`,'calendar','amber')}${kpi('Next payment',group.payment,`${group.currency} settlement`,'bank','cyan')}${kpi('Schedule controls','18 / 18','All required milestones configured','shield','cyan')}${kpi('Approval SLAs','96%','On time over the last 12 periods','clock','violet')}${kpi('Calendar conflicts','0','No holiday or banking conflicts','check','cyan')}</div>
-      <div class="calendar-layout"><aside class="paygroup-list">${payGroupsV2.map(g=>`<article class="paygroup-card ${g.id===group.id?'active':''}" data-paygroup="${g.id}"><div class="paygroup-card-head"><strong>${g.name}</strong>${badge(g.status)}</div><p>${g.employees} employees · ${g.currency}</p><div class="paygroup-meta"><span class="meta-chip">${g.cadence}</span><span class="meta-chip">Cut-off ${g.cutoff}</span><span class="meta-chip">Pay ${g.payment}</span></div></article>`).join('')}</aside><section class="calendar-board"><div class="milestone-strip">${milestones.map((m,i)=>`<article class="milestone-card ${i===0?'active':''}" data-calendar-milestone="${i}"><span>${m[2]}</span><strong>${m[0]}</strong><span style="margin-top:4px">${m[1]}</span></article>`).join('')}</div><section class="card"><div class="card-head"><div><h3>${group.name} · payroll calendar</h3><p>${group.employees} employees · ${group.currency} · governed milestone schedule</p></div><button class="btn small" data-action="edit-schedule-v2" data-period="July 2026">Edit active period</button></div><div class="table-wrap calendar-table"><table class="responsive-table"><thead><tr><th>Period</th><th>Input cut-off</th><th>Calculation</th><th>Review</th><th>Approval</th><th>Payment</th><th>Statutory filing</th><th>Status</th><th></th></tr></thead><tbody>${rows.join('')}</tbody></table></div></section><div class="schedule-health"><div class="fact"><span>Freeze rule</span><strong>5 business days before payment</strong></div><div class="fact"><span>Late-input authority</span><strong>Payroll Manager + business owner</strong></div><div class="fact"><span>Release authority</span><strong>CFO or delegated treasury authority</strong></div></div></section></div>
-    </div>`;
-  };
+  calendarPage = function(){ return __pr6CalendarPageHtml(); };
 
   const openScheduleModal = period => openModal(`Edit ${period || 'payroll'} schedule`,'Changes are versioned and require independent approval before the calendar is published.',`<div class="form-grid"><div class="form-field"><label>Pay group</label><select><option>Monthly Staff</option><option>Executives</option><option>Contract Staff</option></select></div><div class="form-field"><label>Period</label><input value="${period || 'July 2026'}"></div><div class="form-field"><label>Input cut-off</label><input type="date" value="2026-07-20"></div><div class="form-field"><label>Calculation date</label><input type="date" value="2026-07-23"></div><div class="form-field"><label>Review date</label><input type="date" value="2026-07-24"></div><div class="form-field"><label>Approval date</label><input type="date" value="2026-07-27"></div><div class="form-field"><label>Payment date</label><input type="date" value="2026-07-31"></div><div class="form-field"><label>Statutory deadline</label><input type="date" value="2026-08-10"></div><div class="form-field full"><label>Change reason</label><textarea placeholder="Record the operational reason and supporting authority..."></textarea></div></div>`,`${button('Cancel','close-modal')}${button('Save draft schedule','save-schedule-v2','primary','check')}`,true);
 
   reportsPage = function(){
     return `<div class="page">${pageHead('Compliance and management reporting','Compliance Report Studio','Generate filing-ready, audit-ready and management reports from governed payroll data. Every template opens as an editable preview before approval or export.',button('Scheduled reports','scheduled-reports','', 'calendar')+button('Build custom report','custom-report','primary','plus'))}
-      <div class="grid kpis">${kpi('Report templates','12','Statutory, control and management','report')}${kpi('Generated this month','28','Across June payroll workflows','file','cyan')}${kpi('Awaiting approval','4','Maker-checker review required','shield','amber')}${kpi('Scheduled deliveries','9','Secure recipients and channels','send','violet')}${kpi('Filing deadlines','4','Within the next 17 days','calendar','amber')}${kpi('Evidence completeness','96%','Source and approval lineage','audit','cyan')}</div>
+      <div class="grid kpis">${kpi('Report templates','12','Statutory, control and management','report')}${kpi('Generated this month','28','Across June payroll workflows','file','cyan')}${kpi('Awaiting approval','4','Maker-checker review required','shield','amber')}${kpi('Scheduled deliveries','9','Secure recipients and channels','send','violet')}${kpi('Filing deadlines','4','Within the next 17 days','calendar','amber')}${kpi('Evidence completeness','\u2014','No completeness measure is recorded','audit','cyan')}</div>
       <div class="report-grid">${reportTemplates.map((r,i)=>`<article class="report-card" data-report="${r.id}"><div class="report-preview-mini"><div class="report-icon">${icon('report')}</div><div class="sheet-lines"><i></i><i></i><i></i><i></i></div></div><div class="report-card-content"><h4>${r.name}</h4><p>${r.desc}</p><footer><span>${r.category} · ${r.freq}</span>${badge(i%4===0?'Needs review':'Ready')}</footer><div class="report-card-actions"><button class="btn small soft" data-report="${r.id}">${icon('eye')}Preview</button><button class="btn small" data-report="${r.id}">${icon('edit')}Generate draft</button></div></div></article>`).join('')}</div>
     </div>`;
   };
@@ -710,11 +2270,11 @@ init();
   ];
 
   vendorsPage = function(){
-    const rows=vendorsV2.map(v=>`<tr data-vendor="${v.id}"><td><div class="access-user"><div class="vendor-logo">${v.initials}</div><div><strong class="link">${v.name}</strong><div class="tiny muted">${v.id} · ${v.category}</div></div></div></td><td>${v.country}</td><td>${v.contact}<div class="tiny muted">${v.email}</div></td><td><div style="display:flex;align-items:center;gap:7px"><div class="progress" style="width:62px"><span style="width:${v.compliance}%"></span></div><strong>${v.compliance}%</strong></div></td><td>${v.rating} / 5</td><td>${v.spend}</td><td>${badge(v.status)}</td><td><button class="btn small" data-vendor="${v.id}">${icon('eye')}Open</button></td></tr>`);
+    const __vn=__pr6Vendors();const rows=__vn?(__vn.items.length?__vn.items.map(v=>`<tr data-vendor="${v.id}"><td><div class="access-user"><div class="vendor-logo">${(v.name||'?').slice(0,2).toUpperCase()}</div><div><strong class="link">${v.name}</strong><div class="tiny muted">${v.category||'Uncategorised'}</div></div></div></td><td>${v.paymentTerms||'\u2014'}</td><td>${v.contactPerson||'\u2014'}<div class="tiny muted">${v.email||''}</div></td><td>${badge(v.complianceStatus)}</td><td>${v.rating==null?'<span class="tiny muted">Not rated</span>':v.rating+' / 5'}</td><td>${v.blacklisted?badge('Blacklisted'):badge('Active')}</td></tr>`):[`<tr><td colspan="6" class="tiny muted">No vendors are registered.</td></tr>`]):[`<tr><td colspan="6" class="tiny muted">Vendor registry unavailable for your role.</td></tr>`];
     return `<div class="page">${pageHead('HR and payroll procurement','Vendor Registry and Quotation Management','Govern vendors, issue secure bid forms by email, receive structured submissions, compare quotations and retain complete sourcing evidence.',button('Create RFQ','new-rfq','', 'file')+button('Add vendor','new-vendor','primary','plus'))}
-      <div class="grid kpis">${kpi('Registered vendors','26','18 approved and 8 in review','briefcase')}${kpi('Compliance ready','21','Five vendors require documents','shield','cyan')}${kpi('Open RFQs','4','Two close within seven days','file','amber')}${kpi('Bids received','17','Across active sourcing events','download','violet')}${kpi('Evaluated savings','USD 28,460','Year-to-date negotiated value','wallet','cyan')}${kpi('Expiring records','6','Within the next 60 days','calendar','amber')}</div>
-      <div class="vendor-layout"><section class="card"><div class="card-head"><div><h3>Vendor registry</h3><p>Due diligence, compliance, service performance and spend visibility</p></div><button class="btn small" data-action="download-vendor-register">${icon('download')}Export</button></div><div class="table-wrap"><table><thead><tr><th>Vendor</th><th>Coverage</th><th>Primary contact</th><th>Compliance</th><th>Rating</th><th>12-month spend</th><th>Status</th><th></th></tr></thead><tbody>${rows.join('')}</tbody></table></div></section><aside class="stack">${card('Open sourcing event','RFQ-HR-2026-014 · Medical aid administration',`<div class="card-body"><div class="profile-summary-strip"><div class="fact"><span>Invited</span><strong>6 vendors</strong></div><div class="fact"><span>Bids received</span><strong>3</strong></div><div class="fact"><span>Closes</span><strong>05 Aug 2026</strong></div><div class="fact"><span>Budget</span><strong>USD 32,000</strong></div></div>${progressRow('Submission progress',50,'3 of 6 invited vendors','cyan')}<div class="actions" style="margin-top:12px">${button('Send bid form','send-bid-form','primary','send')}${button('Preview form','preview-bid-form','', 'eye')}</div></div>`)}${card('Vendor control health','Registry-wide compliance position',`<div class="card-body">${progressRow('Tax clearance',92,'24 of 26 valid','cyan')}${progressRow('Bank verification',100,'All active vendors verified','cyan')}${progressRow('Data protection terms',85,'22 of 26 signed','amber')}${progressRow('Conflict declarations',96,'25 of 26 current','violet')}</div>`)}</aside></div>
-      <div class="grid two" style="margin-top:12px"><section class="card"><div class="card-head"><div><h3>Quotation comparison</h3><p>Weighted technical, commercial and compliance evaluation</p></div><button class="btn small primary" data-action="compare-quotations">Open full comparison</button></div><div class="card-body quote-matrix"><div class="quote-row header"><div>Vendor</div><div>Technical</div><div>Commercial</div><div>Compliance</div><div>Total</div></div>${quoteRowsV2.map(q=>`<div class="quote-row"><div class="quote-cell" data-label="Vendor"><strong>${q.vendor}</strong><span>${q.price}</span></div><div class="quote-cell" data-label="Technical"><strong>${q.technical}%</strong><div class="score-bar"><i style="width:${q.technical}%"></i></div></div><div class="quote-cell" data-label="Commercial"><strong>${q.commercial}%</strong><div class="score-bar"><i style="width:${q.commercial}%"></i></div></div><div class="quote-cell" data-label="Compliance"><strong>${q.compliance}%</strong><div class="score-bar"><i style="width:${q.compliance}%"></i></div></div><div class="quote-cell" data-label="Weighted total">${badge(`${q.total}%${q.recommended?' · Preferred':''}`)}</div></div>`).join('')}</div></section><section class="card"><div class="card-head"><div><h3>System-generated vendor bid form</h3><p>Secure, structured and linked to the RFQ evidence record</p></div></div><div class="card-body"><div class="bid-form-preview"><h4>Medical Aid Administration · RFQ-HR-2026-014</h4><div class="bid-form-fields"><div class="bid-field"><span>Vendor identity</span><strong>Pre-filled from secure invitation</strong></div><div class="bid-field"><span>Pricing schedule</span><strong>Currency, tax and rate basis</strong></div><div class="bid-field"><span>Technical response</span><strong>Service, SLA and implementation</strong></div><div class="bid-field"><span>Compliance evidence</span><strong>Upload required documents</strong></div><div class="bid-field"><span>Declarations</span><strong>Conflicts and beneficial ownership</strong></div><div class="bid-field"><span>Submission control</span><strong>Timestamp and verification hash</strong></div></div></div><div class="actions" style="margin-top:12px">${button('Preview vendor experience','preview-bid-form','', 'eye')}${button('Email secure form','send-bid-form','primary','send')}</div></div></section></div>
+      <div class="grid kpis">${(()=>{const v=__pr6Vendors();if(!v)return kpi('Registered vendors','\u2014','Vendor registry unavailable for your role','briefcase');return kpi('Registered vendors',String(v.registered),v.categories+' categories','briefcase')+kpi('Compliance ready',String(v.compliant),v.pending+' pending, '+v.expired+' expired','shield','cyan')+kpi('Blacklisted',String(v.blacklisted),v.blacklisted?'Excluded from sourcing':'None excluded','shield',v.blacklisted?'amber':'')+kpi('Rated vendors',String(v.ratedCount),v.averageRating==null?'No ratings recorded':'Average '+v.averageRating+' / 5','briefcase','violet')})()}</div>
+      <div class="vendor-layout"><section class="card"><div class="card-head"><div><h3>Vendor registry</h3><p>Due diligence, compliance, service performance and spend visibility</p></div><button class="btn small" data-action="download-vendor-register">${icon('download')}Export</button></div><div class="table-wrap"><table><thead><tr><th>Vendor</th><th>Coverage</th><th>Primary contact</th><th>Compliance</th><th>Rating</th><th>12-month spend</th><th>Status</th><th></th></tr></thead><tbody>${rows.join('')}</tbody></table></div></section><aside class="stack">${card('Open sourcing event',`${(()=>{const __pr6RfqSubtitle=1;const q=__pr6Rfqs();if(!q)return 'Not visible to your role';const r=q.rfqs.find(x=>x.status==='OPEN'||x.status==='EVALUATING')||q.rfqs[0];return r?(r.reference+' · '+r.title):'No sourcing event has been raised'})()}`,`<div class="card-body">${(()=>{const __pr6RfqFacts=1;const q=__pr6Rfqs();const fact=(l,v)=>`<div class="fact"><span>${l}</span><strong>${v}</strong></div>`;if(!q)return `<div class="profile-summary-strip">`+fact('Invited','\u2014')+fact('Bids received','\u2014')+`</div>`;const r=q.rfqs.find(x=>x.status==='OPEN'||x.status==='EVALUATING')||q.rfqs[0];if(!r)return `<div class="profile-summary-strip">`+fact('Invited','0')+fact('Bids received','0')+`</div>`;const pct=r.invitedCount?Math.round((r.bidCount/r.invitedCount)*100):0;return `<div class="profile-summary-strip">`+fact('Invited',r.invitedCount+' vendor'+(r.invitedCount===1?'':'s'))+fact('Bids received',r.bidCount)+fact('Closes',r.closingDate?String(r.closingDate).slice(0,10):'\u2014')+fact('Status',r.status)+`</div>`+progressRow('Submission progress',pct,r.bidCount+' of '+r.invitedCount+' invited vendors','cyan')})()}<div class="actions" style="margin-top:12px">${button('Send bid form','send-bid-form','primary','send')}${button('Preview form','preview-bid-form','', 'eye')}</div></div>`)}${card('Vendor control health','Registry-wide compliance position',`<div class="card-body">${progressRow('Tax clearance',92,'24 of 26 valid','cyan')}${progressRow('Bank verification',100,'All active vendors verified','cyan')}${progressRow('Data protection terms',85,'22 of 26 signed','amber')}${progressRow('Conflict declarations',96,'25 of 26 current','violet')}</div>`)}</aside></div>
+      <div class="grid two" style="margin-top:12px"><section class="card"><div class="card-head"><div><h3>Quotation comparison</h3><p>Weighted technical, commercial and compliance evaluation</p></div><button class="btn small primary" data-action="compare-quotations">Open full comparison</button></div><div class="card-body quote-matrix"><div class="quote-row header"><div>Vendor</div><div>Technical</div><div>Commercial</div><div>Compliance</div><div>Total</div></div>${(()=>{const __pr6QuoteRows=1;const q=__pr6Rfqs();if(!q)return `<div class="quote-row"><div class="quote-cell">Not visible to your role</div></div>`;const r=q.rfqs.find(x=>x.status==='OPEN'||x.status==='EVALUATING')||q.rfqs[0];const bids=r?r.bids.filter(b=>b.status!=='INVITED'):[];if(!bids.length)return `<div class="quote-row"><div class="quote-cell">No bids have been submitted.</div></div>`;const cell=(l,v)=>`<div class="quote-cell" data-label="${l}"><strong>${v==null?'\u2014':v+'%'}</strong><div class="score-bar"><i style="width:${v==null?0:v}%"></i></div></div>`;return bids.map(b=>`<div class="quote-row"><div class="quote-cell" data-label="Vendor"><strong>${b.vendorName}</strong><span>${b.amount==null?'\u2014':b.currencyCode+' '+Number(b.amount).toLocaleString()}</span></div>`+cell('Technical',b.technicalScore)+cell('Commercial',b.commercialScore)+cell('Compliance',b.complianceScore)+`<div class="quote-cell" data-label="Total"><strong>${b.weightedScore==null?'Not scored':b.weightedScore+'%'}</strong></div></div>`).join('')})()}</div></section><section class="card"><div class="card-head"><div><h3>System-generated vendor bid form</h3><p>Secure, structured and linked to the RFQ evidence record</p></div></div><div class="card-body"><div class="bid-form-preview"><h4>Medical Aid Administration · RFQ-HR-2026-014</h4><div class="bid-form-fields"><div class="bid-field"><span>Vendor identity</span><strong>Pre-filled from secure invitation</strong></div><div class="bid-field"><span>Pricing schedule</span><strong>Currency, tax and rate basis</strong></div><div class="bid-field"><span>Technical response</span><strong>Service, SLA and implementation</strong></div><div class="bid-field"><span>Compliance evidence</span><strong>Upload required documents</strong></div><div class="bid-field"><span>Declarations</span><strong>Conflicts and beneficial ownership</strong></div><div class="bid-field"><span>Submission control</span><strong>Timestamp and verification hash</strong></div></div></div><div class="actions" style="margin-top:12px">${button('Preview vendor experience','preview-bid-form','', 'eye')}${button('Email secure form','send-bid-form','primary','send')}</div></div></section></div>
     </div>`;
   };
 
@@ -742,8 +2302,9 @@ init();
     renderNav();
     const pages={overview:overviewPage,employees:employeesPage,onboarding:onboardingPage,runs:runsPage,inputs:inputsPage,exceptions:exceptionsPage,approvals:approvalsPage,close:closePage,components:componentsPage,calendar:calendarPage,tax:taxPage,training:trainingPage,leave:leavePage,vendors:vendorsPage,vault:vaultPage,reports:reportsPage,audit:auditPage,access:accessPage,settings:settingsPage,mypay:myPayPage};
     const fn=pages[state.page]||overviewPage;
+    if(typeof permittedPage==='function'&&!permittedPage(state.page)){document.querySelector('#content').innerHTML=__pr6DeniedPageHtml(state.page);document.querySelector('#content').scrollTop=0;}else{
     document.querySelector('#content').innerHTML=fn();
-    document.querySelector('#content').scrollTop=0;
+    document.querySelector('#content').scrollTop=0;}
     updateSidebarControl();
   };
 
@@ -765,7 +2326,7 @@ init();
     const employeeTab=event.target.closest('[data-employee-tab]');
     if(employeeTab){
       event.preventDefault();event.stopImmediatePropagation();
-      const employee=employees.find(x=>x.id===employeeTab.dataset.employeeId)||employees[0];
+      const employee=employees.find(x=>x.id===employeeTab.dataset.employeeId)||(employees[0]||__pr6EmployeePlaceholder);
       document.querySelectorAll('.employee-tabs .tab').forEach(t=>t.classList.toggle('active',t===employeeTab));
       const panel=document.querySelector('#employeeTabPanel');
       if(panel) panel.innerHTML=employeeTabPanel(employee,employeeTab.dataset.employeeTab);
@@ -833,13 +2394,13 @@ init();
     return `<button type="button" class="btn ${cls}" data-action="${escapeTextV3(action)}" aria-label="${escapeTextV3(label)}">${ico?icon(ico):''}<span class="btn-label">${label}</span></button>`;
   };
 
-  const payrollTrendDataV3 = [
+  const payrollTrendDataV3_fixture = [
     ['Jul 2024',166,4.10],['Aug 2024',171,4.24],['Sep 2024',175,4.35],['Oct 2024',179,4.47],['Nov 2024',182,4.61],['Dec 2024',186,4.78],
     ['Jan 2025',181,4.84],['Feb 2025',184,4.92],['Mar 2025',188,5.02],['Apr 2025',191,5.08],['May 2025',193,5.14],['Jun 2025',196,5.20],
     ['Jul 2025',188,5.10],['Aug 2025',194,5.28],['Sep 2025',201,5.46],['Oct 2025',199,5.58],['Nov 2025',214,6.02],['Dec 2025',228,6.28],
     ['Jan 2026',225,6.36],['Feb 2026',238,6.62],['Mar 2026',246,6.82],['Apr 2026',252,7.01],['May 2026',257,7.21],['Jun 2026',265,7.46]
   ];
-  const departmentTrendDataV3 = [
+  const departmentTrendDataV3_fixture = [
     {name:'Finance',headcount:54,cost:82,gross:72.4,variance:3.8},{name:'Operations',headcount:92,cost:100,gross:96.1,variance:5.4},{name:'Commercial',headcount:41,cost:74,gross:61.8,variance:4.1},
     {name:'Technology',headcount:37,cost:68,gross:58.6,variance:6.2},{name:'People',headcount:26,cost:61,gross:44.9,variance:2.9},{name:'Procurement',headcount:14,cost:48,gross:31.2,variance:1.7}
   ];
@@ -847,9 +2408,10 @@ init();
   const chartButtonV3 = (label,attrs,active=false,ico='') => `<button type="button" class="chart-control ${active?'active':''}" ${attrs}>${ico?icon(ico):''}${label}</button>`;
   const payrollRangeRowsV3 = () => {
     const n=state.chartRange==='6M'?6:state.chartRange==='24M'?24:12;
-    return payrollTrendDataV3.slice(-n);
+    return (__pr6TrendV3()||payrollTrendDataV3_fixture).slice(-n);
   };
   const trendSummaryV3 = rows => {
+    if(!rows||!rows.length)return{last:['\u2014',0,0],change:0,avg:0};
     const first=rows[0],last=rows[rows.length-1],avg=rows.reduce((a,r)=>a+r[1],0)/rows.length;
     const change=((last[1]-first[1])/first[1])*100;
     return {last,change,avg};
@@ -857,6 +2419,7 @@ init();
 
   lineChart = function(){
     const rows=payrollRangeRowsV3();
+    if(!rows||!rows.length){return `<section class="chart-module" id="payrollTrendChart"><div class="card-body" style="text-align:center;padding:40px 20px"><p class="muted">No payroll trend data available.</p><p class="tiny muted">Either no payroll has been processed yet, or your role cannot view the payroll dashboard.</p></div></section>`;}
     const labels=rows.map(r=>r[0]);
     const usd=rows.map(r=>r[1]);
     const zig=rows.map(r=>r[2]);
@@ -893,7 +2456,7 @@ init();
   };
 
   barChart = function(){
-    let data=[...departmentTrendDataV3];
+    let data=[...(__pr6DepartmentsV3()||departmentTrendDataV3_fixture)];
     if(state.departmentChartSort==='highest') data.sort((a,b)=>Math.max(b.headcount,b.cost)-Math.max(a.headcount,a.cost));
     const W=820,H=300,left=58,right=20,top=32,bottom=66,plotH=H-top-bottom,max=100,groupW=(W-left-right)/data.length,barW=Math.min(34,groupW*.28);
     const y=v=>top+(max-v)/max*plotH;
@@ -958,7 +2521,7 @@ init();
       case 'chart-payroll-detail':goPage('runs');toast('Trend context retained','Open a payroll run to inspect period calculations, evidence and movements.');break;
       case 'chart-department-detail':{const target=document.querySelector('[data-chart-point="department"]');if(target)openDepartmentDetailV3(target);break;}
       case 'chart-export-payroll':exportCSV('Matanho_Payroll_Trend.csv',['Period','USD gross payroll (000)','ZiG gross payroll (m)'],payrollRangeRowsV3());break;
-      case 'chart-export-departments':exportCSV('Matanho_Department_Payroll_Profile.csv',['Department','Headcount index','Payroll cost index','Gross USD (000)','Period variance %'],departmentTrendDataV3.map(d=>[d.name,d.headcount,d.cost,d.gross,d.variance]));break;
+      case 'chart-export-departments':exportCSV('Matanho_Department_Payroll_Profile.csv',['Department','Headcount index','Payroll cost index','Gross USD (000)','Period variance %'],(__pr6DepartmentsV3()||departmentTrendDataV3_fixture).map(d=>[d.name,d.headcount,d.cost,d.gross,d.variance]));break;
       case 'audit-evidence':openDrawer('Audit evidence record','Hash-verified event evidence',`<div class="callout blue"><span class="kpi-icon">${icon('shield')}</span><div><strong>Evidence chain verified</strong><p>The event, actor identity, timestamp, source record and linked document hashes are internally consistent.</p></div></div><div class="grid three" style="margin-top:12px"><div class="fact"><span>Event hash</span><strong>74f2a90c…e81c</strong></div><div class="fact"><span>Identity method</span><strong>Entra MFA</strong></div><div class="fact"><span>Retention</span><strong>7 years</strong></div></div>`);break;
       case 'audit-filter':openModal('Advanced audit filters','Filter the immutable event ledger without altering source evidence.',`<div class="form-grid"><div class="form-field"><label>Actor or role</label><input placeholder="Name, role or identity"></div><div class="form-field"><label>Action class</label><select><option>All classes</option><option>Change</option><option>Approval</option><option>Access</option></select></div><div class="form-field"><label>From</label><input type="date" value="2026-06-01"></div><div class="form-field"><label>To</label><input type="date" value="2026-06-30"></div><div class="form-field full"><label>Record or evidence reference</label><input placeholder="PAY-2026-06-M or evidence hash"></div></div>`,`${button('Clear','close-modal')}${button('Apply filters','close-modal','primary','filter')}`);break;
       case 'edit-access':if(!can('rbac.manage'))deny('rbac.manage');else genericModal('Review Payroll Access','Update the role, data scope, expiry and approval route for this identity.');break;
@@ -1052,32 +2615,7 @@ init();
     }
   }
 
-  accessPage = function(){
-    const roleNames = Object.keys(roles);
-    const matrixRows = permissions.map(([permission,label]) => `<tr><td><strong>${label}</strong><div class="tiny muted">${permission}</div></td>${roleNames.map(role=>`<td><button class="perm-toggle ${(roles[role]||[]).includes(permission)?'on':''} ${!can('rbac.manage')?'locked':''}" data-permission="${permission}" data-role="${role}" title="${role}: ${label}" aria-label="${role}: ${label}">${(roles[role]||[]).includes(permission)?'&#10003;':''}</button></td>`).join('')}</tr>`);
-    const userRows = userAccess.map(user => `<tr><td><div class="access-user"><div class="mini-avatar">${user.initials}</div><div><strong>${user.name}</strong><div class="tiny muted">MFA identity verified</div></div></div></td><td>${user.role}</td><td>${user.scope}</td><td>${badge(user.mfa)}</td><td>${user.last}</td><td>${badge(user.status)}</td><td><button class="btn small" data-action="edit-access">Review</button></td></tr>`);
-    const userCards = userAccess.map(user => `<article class="access-user-card"><div class="access-user-card-head"><div class="access-user"><div class="mini-avatar">${user.initials}</div><div><strong>${user.name}</strong><div class="tiny muted">${user.role}</div></div></div>${badge(user.status)}</div><div class="access-user-card-meta"><div class="fact"><span>Data scope</span><strong>${user.scope}</strong></div><div class="fact"><span>MFA</span><strong>${user.mfa}</strong></div><div class="fact"><span>Last activity</span><strong>${user.last}</strong></div><div class="fact"><span>Identity</span><strong>Verified</strong></div></div><button class="btn small" data-action="edit-access">Review access</button></article>`).join('');
-    const roleCards = roleNames.map(role => {
-      const granted=(roles[role]||[]).length;
-      return `<article class="role-access-card"><header class="role-access-card-head"><div><h4>${role}</h4><p>${granted} of ${permissions.length} permissions enabled</p></div>${badge(role==='System Administrator'?'Privileged':'Active')}</header><div class="role-permission-list">${permissions.map(([permission,label])=>`<div class="role-permission-row"><div><strong>${label}</strong><span>${permission}</span></div><button class="perm-toggle ${(roles[role]||[]).includes(permission)?'on':''} ${!can('rbac.manage')?'locked':''}" data-permission="${permission}" data-role="${role}" title="${role}: ${label}" aria-label="${role}: ${label}">${(roles[role]||[]).includes(permission)?'&#10003;':''}</button></div>`).join('')}</div></article>`;
-    }).join('');
-    const sodRules = [
-      ['Prepare payroll vs approve payroll','Hard block','No user may prepare and independently approve the same run'],
-      ['Edit bank details vs release payments','Hard block','Bank master changes require separate verification and release'],
-      ['Edit statutory rules vs publish rules','Hard block','Rule author cannot publish their own version'],
-      ['Generate reports vs approve filings','Review','Filing approval requires a second person'],
-      ['HR employee changes vs payroll calculation','Monitor','Sensitive changes are included in the payroll review pack']
-    ];
-    return `<div class="page access-dashboard">${pageHead('Identity, authority and segregation','Roles and Access Control','Define least-privilege roles, responsive data scopes, temporary access, maker-checker boundaries, sensitive-field masking, MFA and quarterly access certification.',button('Run access review','run-access-review','', 'audit')+button('Assign access','assign-access','primary','userplus'))}
-      ${!can('rbac.manage')?`<div class="callout amber"><span class="kpi-icon amber">${icon('lock')}</span><div><strong>Read-only RBAC preview</strong><p>Your current ${state.role} role can view this demonstration but cannot change permissions or assignments.</p></div></div>`:''}
-      <div class="grid kpis">${kpi('Active users','42','Across payroll and HR workspaces','users')}${kpi('Privileged users','6','Administrator or release authority','key','violet')}${kpi('MFA coverage','97.6%','1 user pending enrolment','shield','cyan')}${kpi('SoD conflicts','2','Both are compensating-control cases','alert','amber')}${kpi('Temporary access','3','Expires within 30 days','clock','amber')}${kpi('Dormant accounts','0','90-day inactivity threshold','lock','cyan')}</div>
-      <div class="access-primary-grid">
-        <section class="card access-card"><div class="card-head"><div><h3>User access register</h3><p>Identity, role, scope and certification status</p></div><button class="btn small" data-action="access-filter">Filter users</button></div><div class="table-wrap access-user-table"><table><thead><tr><th>User</th><th>Role</th><th>Data scope</th><th>MFA</th><th>Last activity</th><th>Status</th><th></th></tr></thead><tbody>${userRows.join('')}</tbody></table></div><div class="access-user-cards">${userCards}</div></section>
-        <section class="card access-card"><div class="card-head"><div><h3>Segregation-of-duties rules</h3><p>Prevent incompatible payroll authority combinations</p></div></div><div class="card-body sod-list">${sodRules.map((rule,index)=>`<div class="sod-rule"><div class="rule-icon">${icon(index<3?'lock':'shield')}</div><div><strong>${rule[0]}</strong><div class="tiny muted">${rule[2]}</div></div>${badge(rule[1])}</div>`).join('')}</div></section>
-      </div>
-      <section class="card role-matrix-card"><div class="card-head access-toolbar"><div><h3>Role permission matrix</h3><p>Toggle access by role. Production changes require an approved access request and are fully audited.</p></div><span class="access-toolbar-note">The first column and headings remain visible while scrolling.</span></div><div class="role-matrix-scroll"><table><thead><tr><th>Permission</th>${roleNames.map(role=>`<th>${role.replace(' / ',' /<br>')}</th>`).join('')}</tr></thead><tbody>${matrixRows.join('')}</tbody></table></div><div class="role-card-grid">${roleCards}</div></section>
-    </div>`;
-  };
+  accessPage = function(){ return __pr6AccessPageHtml(); };
 
   const originalRenderV4 = render;
   render = function(){
@@ -1444,40 +2982,7 @@ init();
   state.reportFrequency ??= 'All frequencies';
   state.reportStatus ??= 'All statuses';
 
-  vaultPage = function(){
-    const query=normaliseV6(state.vaultSearch);
-    const classifications=uniqueV6(documents.map(d=>d.class));
-    const statuses=uniqueV6(documents.map(d=>d.status));
-    const owners=uniqueV6(documents.map(d=>d.owner));
-    const baseFiltered=documents.filter(d=>{
-      const haystack=[d.name,d.id,d.type,d.folder,d.class,d.owner,d.status,d.content].join(' ').toLowerCase();
-      return (!query||haystack.includes(query))
-        && (state.vaultClassification==='All classifications'||d.class===state.vaultClassification)
-        && (state.vaultStatus==='All statuses'||d.status===state.vaultStatus)
-        && (state.vaultOwner==='All owners'||d.owner===state.vaultOwner);
-    });
-    const docs=baseFiltered.filter(d=>state.folder==='All documents'||d.folder===state.folder);
-    const rows=docs.map(d=>`<tr data-document="${attrV6(d.id)}"><td><div class="access-user"><div class="list-icon">${icon('file')}</div><div><strong class="link">${d.name}</strong><div class="tiny muted">${d.id} · ${d.type}</div></div></div></td><td>${d.folder}</td><td>${badge(d.class)}</td><td>${d.owner}</td><td>${d.modified}</td><td>${d.versions}</td><td>${badge(d.status)}</td><td><button class="btn small" data-document="${attrV6(d.id)}">${icon('eye')}Preview</button></td></tr>`);
-    const activeFilters=[
-      state.vaultSearch ? `Search: ${state.vaultSearch}` : '',
-      state.folder!=='All documents' ? state.folder : '',
-      state.vaultClassification!=='All classifications' ? state.vaultClassification : '',
-      state.vaultStatus!=='All statuses' ? state.vaultStatus : '',
-      state.vaultOwner!=='All owners' ? state.vaultOwner : ''
-    ];
-    const foldersMarkup=folders.slice(0,8).map((folderName,index)=>{
-      const count=folderName==='All documents' ? baseFiltered.length : baseFiltered.filter(d=>d.folder===folderName).length;
-      return `<div class="folder ${state.folder===folderName?'active':''} ${count===0?'is-filtered-out':''}" data-folder="${attrV6(folderName)}"><div class="folder-top"><div class="folder-icon">${icon('folder')}</div><span class="folder-match-count">${count}</span></div><strong>${folderName}</strong><span>${index===0?'Matching governed records':'Retention and access policy applied'}</span></div>`;
-    }).join('');
-    const resultsBody=docs.length
-      ? tableCard(state.folder,'Editable and version-controlled records',['Document','Folder','Classification','Owner','Modified','Versions','Status',''],rows,`<div class="segmented"><button class="active">List</button><button>Recent</button><button>Needs review</button></div>`)
-      : `<section class="filtered-empty"><div><span class="empty-icon">${icon('search')}</span><strong>No documents match these filters</strong><p>Adjust the search terms, folder, classification, status or owner to display governed records.</p><button class="btn primary" type="button" data-v6-clear-docs>${icon('x')}Clear document filters</button></div></section>`;
-    return `<div class="page">${pageHead('Governed records management','Payroll and HR Document Vault','Store, classify, edit, preview, version, approve and securely distribute payroll, employee and compliance documents with retention controls.',button('Create document','create-document','', 'edit')+button('Upload files','upload-document','primary','upload'))}
-      <section class="card control-filter-card vault-filter-card"><div class="card-body"><div class="control-filter-toolbar"><label class="control-filter-search"><span class="sr-only">Search document vault</span>${icon('search')}<input id="vaultSearchInput" value="${attrV6(state.vaultSearch)}" placeholder="Search document name, ID, owner, type or content"></label><label class="control-filter-field"><span>Classification</span><select id="vaultClassificationFilter">${optionV6('All classifications','All classifications',state.vaultClassification)}${classifications.map(v=>optionV6(v,v,state.vaultClassification)).join('')}</select></label><label class="control-filter-field"><span>Status</span><select id="vaultStatusFilter">${optionV6('All statuses','All statuses',state.vaultStatus)}${statuses.map(v=>optionV6(v,v,state.vaultStatus)).join('')}</select></label><label class="control-filter-field"><span>Owner</span><select id="vaultOwnerFilter">${optionV6('All owners','All owners',state.vaultOwner)}${owners.map(v=>optionV6(v,v,state.vaultOwner)).join('')}</select></label><button class="btn filter-clear" type="button" data-v6-clear-docs>${icon('x')}Clear</button></div><div class="control-filter-summary"><div class="control-filter-count"><strong>${docs.length}</strong><span>of ${documents.length} documents shown</span></div><div class="control-filter-active">${activeChipsV6(activeFilters)}</div></div></div></section>
-      <div class="folder-grid" style="margin-bottom:14px">${foldersMarkup}</div>
-      ${resultsBody}
-    </div>`;
-  };
+  vaultPage = function(){ return __pr6VaultPageHtml(); };
 
   reportsPage = function(){
     const query=normaliseV6(state.reportSearch);
@@ -1502,7 +3007,7 @@ init();
       ? `<div class="report-grid filtered-report-grid">${filtered.map(r=>`<article class="report-card" data-report="${attrV6(r.id)}"><div class="report-preview-mini"><div class="report-icon">${icon('report')}</div><div class="sheet-lines"><i></i><i></i><i></i><i></i></div></div><div class="report-card-content"><h4>${r.name}</h4><p>${r.desc}</p><footer><span>${r.category} · ${r.freq}</span>${badge(r._status)}</footer><div class="report-card-actions"><button class="btn small soft" data-report="${attrV6(r.id)}">${icon('eye')}Preview</button><button class="btn small" data-report="${attrV6(r.id)}">${icon('edit')}Generate draft</button></div></div></article>`).join('')}</div>`
       : `<section class="filtered-empty"><div><span class="empty-icon">${icon('report')}</span><strong>No report templates match these filters</strong><p>Try another report name, compliance category, reporting frequency or readiness state.</p><button class="btn primary" type="button" data-v6-clear-reports>${icon('x')}Clear report filters</button></div></section>`;
     return `<div class="page">${pageHead('Compliance and management reporting','Compliance Report Studio','Generate filing-ready, audit-ready and management reports from governed payroll data. Every template opens as an editable preview before approval or export.',button('Scheduled reports','scheduled-reports','', 'calendar')+button('Build custom report','custom-report','primary','plus'))}
-      <div class="grid kpis">${kpi('Report templates','12','Statutory, control and management','report')}${kpi('Generated this month','28','Across June payroll workflows','file','cyan')}${kpi('Awaiting approval','4','Maker-checker review required','shield','amber')}${kpi('Scheduled deliveries','9','Secure recipients and channels','send','violet')}${kpi('Filing deadlines','4','Within the next 17 days','calendar','amber')}${kpi('Evidence completeness','96%','Source and approval lineage','audit','cyan')}</div>
+      <div class="grid kpis">${kpi('Report templates','12','Statutory, control and management','report')}${kpi('Generated this month','28','Across June payroll workflows','file','cyan')}${kpi('Awaiting approval','4','Maker-checker review required','shield','amber')}${kpi('Scheduled deliveries','9','Secure recipients and channels','send','violet')}${kpi('Filing deadlines','4','Within the next 17 days','calendar','amber')}${kpi('Evidence completeness','\u2014','No completeness measure is recorded','audit','cyan')}</div>
       <section class="card control-filter-card report-filter-card"><div class="card-body"><div class="control-filter-toolbar"><label class="control-filter-search"><span class="sr-only">Search compliance reports</span>${icon('search')}<input id="reportSearchInput" value="${attrV6(state.reportSearch)}" placeholder="Search report name, purpose, category or frequency"></label><label class="control-filter-field"><span>Category</span><select id="reportCategoryFilter">${optionV6('All categories','All categories',state.reportCategory)}${categories.map(v=>optionV6(v,v,state.reportCategory)).join('')}</select></label><label class="control-filter-field"><span>Frequency</span><select id="reportFrequencyFilter">${optionV6('All frequencies','All frequencies',state.reportFrequency)}${frequencies.map(v=>optionV6(v,v,state.reportFrequency)).join('')}</select></label><label class="control-filter-field"><span>Readiness</span><select id="reportStatusFilter">${optionV6('All statuses','All readiness states',state.reportStatus)}${statuses.map(v=>optionV6(v,v,state.reportStatus)).join('')}</select></label><button class="btn filter-clear" type="button" data-v6-clear-reports>${icon('x')}Clear</button></div><div class="control-filter-summary"><div class="control-filter-count"><strong>${filtered.length}</strong><span>of ${allReports.length} report templates shown</span></div><div class="control-filter-active">${activeChipsV6(activeFilters)}</div></div></div></section>
       ${reportCards}
     </div>`;
@@ -1564,7 +3069,83 @@ init();
   }
   if (typeof render === 'function') render();
 
+  const __pr6SessionOff = onClientDesignSessionUser(() => {
+    applySessionUserToProfile(rootEl)
+    wireTopProfile()
+  })
+  wireTopProfile()
+
   api = {
+    /**
+     * Replace the runtime's fixtures with live API data and re-render.
+     * Injected by scripts/patch-payroll-runtime.mjs — see that script.
+     *
+     * Partial payloads are fine: only the keys present are replaced, so one
+     * failed loader does not blank the whole module.
+     */
+    hydrate(payload) {
+      if (!payload || typeof payload !== 'object') return;
+      try {
+        if (Array.isArray(payload.employees)) employees = payload.employees;
+        if (Array.isArray(payload.payrollRuns)) payrollRuns = payload.payrollRuns;
+        if (Array.isArray(payload.exceptions)) exceptions = payload.exceptions;
+        if (Array.isArray(payload.documents)) documents = payload.documents;
+        if (Array.isArray(payload.folders)) folders = payload.folders;
+        if (Array.isArray(payload.reportTemplates)) reportTemplates = payload.reportTemplates;
+        if (Array.isArray(payload.auditEvents)) auditEvents = payload.auditEvents;
+        if (Array.isArray(payload.userAccess)) userAccess = payload.userAccess;
+
+        __pr6Live.accessUnavailable = payload.accessUnavailable === true;
+        if (payload.accessRoster !== undefined) __pr6Live.accessRoster = payload.accessRoster;
+        if (Array.isArray(payload.permissions)) {
+          __pr6Live.permissions = new Set(payload.permissions);
+        }
+        if (payload.roleName) {
+          __pr6Live.roleName = payload.roleName;
+          // Keep the runtime's own role label in step so any remaining
+          // role-driven copy shows the real role rather than the mock default.
+          if (typeof state !== 'undefined') state.role = payload.roleName;
+        }
+        if (payload.counts && typeof payload.counts === 'object') {
+          __pr6Live.counts = payload.counts;
+        }
+        // Reference/self-service payloads have no fixture equivalent in the
+        // runtime, so they are kept on the live store for the page builders.
+        if (payload.reference && typeof payload.reference === 'object') {
+          __pr6Live.reference = payload.reference;
+        }
+        if (payload.dashboard && typeof payload.dashboard === 'object') {
+          __pr6Live.dashboard = payload.dashboard;
+        }
+        if (payload.mypay && typeof payload.mypay === 'object') {
+          __pr6Live.mypay = payload.mypay;
+        }
+        if (Array.isArray(payload.leaveBalances)) {
+          __pr6Live.leaveBalances = payload.leaveBalances;
+        }
+        if (payload.vendors !== undefined) {
+          __pr6Live.vendors = payload.vendors;
+        }
+        if (payload.inputBatches !== undefined) {
+          __pr6Live.inputBatches = payload.inputBatches;
+        }
+        if (payload.payGroups !== undefined) {
+          __pr6Live.payGroups = payload.payGroups;
+        }
+        if (payload.onboarding !== undefined) {
+          __pr6Live.onboarding = payload.onboarding;
+        }
+        if (payload.rfqs !== undefined) {
+          __pr6Live.rfqs = payload.rfqs;
+        }
+        if (Array.isArray(payload.errors)) __pr6Live.errors = payload.errors;
+
+        __pr6Live.ready = true;
+        if (typeof render === 'function') render();
+      } catch (err) {
+        try { console.error('[payroll-v6] hydrate failed', err); } catch (_) {}
+      }
+    },
     setPage(page) {
       if (typeof permittedPage === 'function' && !permittedPage(page)) return;
       state.page = page;
@@ -1573,11 +3154,17 @@ init();
       try { closeDrawer(); closeModal(); closeCommand(); } catch (_) {}
     },
     destroy() {
+      try { __pr6SessionOff?.() } catch (_) {}
       try { __pr6Abort.abort(); } catch (_) {}
       delete window.__PAYROLL_V6_NAV__;
       try { delete window.MatanhoUI; } catch (_) {}
       rootEl.innerHTML = '';
     },
   };
+  try {
+    window.MatanhoUI = window.MatanhoUI || {};
+    window.MatanhoUI.hydrate = (payload) => api.hydrate && api.hydrate(payload);
+  } catch (_) {}
+
   return api;
 }

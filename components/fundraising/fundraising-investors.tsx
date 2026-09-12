@@ -18,7 +18,7 @@ import {
   kycChipClass,
   kycLabel,
   type InvestorOrg,
-} from "./investors-mock-data"
+} from "./investors-presentation"
 import {
   FrConfirmDialog,
   FrDialogShell,
@@ -56,7 +56,7 @@ const STATUS_OPTIONS = [
 function statusClass(s: InvestorOrg["status"]) {
   if (s === "Active") return "bg-[#dcfce7] text-[#15803d]"
   if (s === "Prospect") return "bg-[#dbeafe] text-[#1d4ed8]"
-  return "bg-[#f1f5f9] text-[#64748b]"
+  return "bg-[#f1f5f9] text-[#111111]"
 }
 
 function DetailPanel({
@@ -134,13 +134,13 @@ function DetailPanel({
             {org.logoLabel}
           </span>
           <div>
-            <h2 className="text-[14px] font-semibold text-[#0f172a]">{org.legalName}</h2>
-            <p className="mt-0.5 text-[11px] text-[#64748b]">
+            <h2 className="text-[14px] font-semibold text-[#000000]">{org.legalName}</h2>
+            <p className="mt-0.5 text-[11px] text-[#111111]">
               {org.type} · {org.country}
             </p>
           </div>
         </div>
-        <button type="button" onClick={onClose} className="rounded-full p-1 text-[#94a3b8] hover:bg-[#f1f5f9]">
+        <button type="button" onClick={onClose} className="rounded-full p-1 text-[#141414] hover:bg-[#f1f5f9]">
           <X className="h-4 w-4" />
         </button>
       </div>
@@ -152,8 +152,8 @@ function DetailPanel({
             type="button"
             onClick={() => setTab(id)}
             className={cn(
-              "shrink-0 rounded-full px-2.5 py-1.5 text-[10px] font-medium",
-              tab === id ? "bg-[#eff6ff] text-[#2563eb]" : "text-[#64748b] hover:bg-[#f8fafc]",
+              "shrink-0 rounded-full px-2.5 py-1.5 text-[11px] font-medium",
+              tab === id ? "bg-[#eff6ff] text-[#2563eb]" : "text-[#111111] hover:bg-[#f8fafc]",
             )}
           >
             {label}
@@ -163,7 +163,7 @@ function DetailPanel({
 
       <div className="space-y-4 p-4 text-[12px]">
         {detailLoading ? (
-          <p className="flex items-center gap-2 text-[11px] text-[#94a3b8]">
+          <p className="flex items-center gap-2 text-[11px] text-[#141414]">
             <Loader2 className="h-3.5 w-3.5 animate-spin" /> Loading 360° detail…
           </p>
         ) : null}
@@ -177,10 +177,10 @@ function DetailPanel({
               .slice(0, 6)
               .map(([key, value]) => (
                 <div key={key} className="rounded-[6px] bg-[#f8fafc] p-2.5">
-                  <p className="text-[9px] uppercase tracking-wide text-[#94a3b8]">
+                  <p className="text-[11px] uppercase tracking-wide text-[#141414]">
                     {key.replace(/([A-Z])/g, " $1").replace(/^./, (c) => c.toUpperCase())}
                   </p>
-                  <p className="mt-0.5 text-[13px] font-semibold text-[#0f172a]">{String(value)}</p>
+                  <p className="mt-0.5 text-[13px] font-semibold text-[#000000]">{String(value)}</p>
                 </div>
               ))}
           </div>
@@ -188,67 +188,67 @@ function DetailPanel({
 
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <p className="text-[10px] text-[#94a3b8]">Estimated AUM</p>
-            <p className="mt-0.5 font-semibold text-[#0f172a]">{org.estimatedAum}</p>
+            <p className="text-[11px] text-[#141414]">Estimated AUM</p>
+            <p className="mt-0.5 font-semibold text-[#000000]">{org.estimatedAum}</p>
           </div>
           <div>
-            <p className="text-[10px] text-[#94a3b8]">Ticket range</p>
-            <p className="mt-0.5 font-semibold text-[#0f172a]">{org.ticketRange}</p>
+            <p className="text-[11px] text-[#141414]">Ticket range</p>
+            <p className="mt-0.5 font-semibold text-[#000000]">{org.ticketRange}</p>
           </div>
           <div>
-            <p className="text-[10px] text-[#94a3b8]">Contacts</p>
-            <p className="mt-0.5 font-semibold text-[#0f172a]">{contactsCount ?? "—"}</p>
+            <p className="text-[11px] text-[#141414]">Contacts</p>
+            <p className="mt-0.5 font-semibold text-[#000000]">{contactsCount ?? "—"}</p>
           </div>
           <div>
-            <p className="text-[10px] text-[#94a3b8]">Open opportunities</p>
-            <p className="mt-0.5 font-semibold text-[#0f172a]">{opportunitiesCount ?? org.openOpportunities}</p>
+            <p className="text-[11px] text-[#141414]">Open opportunities</p>
+            <p className="mt-0.5 font-semibold text-[#000000]">{opportunitiesCount ?? org.openOpportunities}</p>
           </div>
         </div>
 
         <div className="border-t border-[#f1f5f9] pt-3">
-          <p className="text-[11px] font-semibold text-[#0f172a]">Relationship</p>
+          <p className="text-[11px] font-semibold text-[#000000]">Relationship</p>
           <dl className="mt-2 space-y-2">
             <div className="flex justify-between gap-2">
-              <dt className="text-[#94a3b8]">Owner</dt>
-              <dd className="font-medium text-[#0f172a]">{org.owner}</dd>
+              <dt className="text-[#141414]">Owner</dt>
+              <dd className="font-medium text-[#000000]">{org.owner}</dd>
             </div>
             <div className="flex justify-between gap-2">
-              <dt className="text-[#94a3b8]">Status</dt>
+              <dt className="text-[#141414]">Status</dt>
               <dd>
-                <span className={cn("rounded-[4px] px-1.5 py-0.5 text-[10px] font-semibold", statusClass(org.status))}>
+                <span className={cn("rounded-[4px] px-1.5 py-0.5 text-[11px] font-semibold", statusClass(org.status))}>
                   {org.status}
                 </span>
               </dd>
             </div>
             <div className="flex justify-between gap-2">
-              <dt className="text-[#94a3b8]">Last interaction</dt>
-              <dd className="text-[#0f172a]">{org.lastInteraction}</dd>
+              <dt className="text-[#141414]">Last interaction</dt>
+              <dd className="text-[#000000]">{org.lastInteraction}</dd>
             </div>
             <div className="flex justify-between gap-2">
-              <dt className="text-[#94a3b8]">Next action</dt>
-              <dd className="text-right text-[#0f172a]">{org.nextAction}</dd>
+              <dt className="text-[#141414]">Next action</dt>
+              <dd className="text-right text-[#000000]">{org.nextAction}</dd>
             </div>
             <div className="flex justify-between gap-2">
-              <dt className="text-[#94a3b8]">Commitments</dt>
-              <dd className="font-medium text-[#0f172a]">{org.commitments}</dd>
+              <dt className="text-[#141414]">Commitments</dt>
+              <dd className="font-medium text-[#000000]">{org.commitments}</dd>
             </div>
           </dl>
         </div>
 
         <div className="border-t border-[#f1f5f9] pt-3">
-          <p className="text-[11px] font-semibold text-[#0f172a]">Compliance</p>
+          <p className="text-[11px] font-semibold text-[#000000]">Compliance</p>
           <div className="mt-2 flex flex-wrap gap-2">
-            <span className={cn("rounded-[4px] px-2 py-0.5 text-[10px] font-semibold", kycChipClass(org.kycStatus))}>
+            <span className={cn("rounded-[4px] px-2 py-0.5 text-[11px] font-semibold", kycChipClass(org.kycStatus))}>
               KYC: {kycLabel(org.kycStatus)}
             </span>
             <span
               className={cn(
-                "rounded-[4px] px-2 py-0.5 text-[10px] font-semibold",
+                "rounded-[4px] px-2 py-0.5 text-[11px] font-semibold",
                 org.sanctionsStatus === "Clear"
                   ? "bg-[#dcfce7] text-[#15803d]"
                   : org.sanctionsStatus === "Flagged"
                     ? "bg-[#fee2e2] text-[#dc2626]"
-                    : "bg-[#f1f5f9] text-[#64748b]",
+                    : "bg-[#f1f5f9] text-[#111111]",
               )}
             >
               Sanctions: {org.sanctionsStatus}
@@ -257,13 +257,13 @@ function DetailPanel({
         </div>
 
         <div className="border-t border-[#f1f5f9] pt-3">
-          <p className="text-[11px] font-semibold text-[#0f172a]">Asset preferences</p>
+          <p className="text-[11px] font-semibold text-[#000000]">Asset preferences</p>
           <div className="mt-2 flex flex-wrap gap-1.5">
             {org.assetPreferences.length === 0 ? (
-              <span className="text-[11px] text-[#94a3b8]">None on file</span>
+              <span className="text-[11px] text-[#141414]">None on file</span>
             ) : (
               org.assetPreferences.map((p) => (
-                <span key={p} className="rounded-[4px] bg-[#f1f5f9] px-2 py-0.5 text-[10px] font-medium text-[#475569]">
+                <span key={p} className="rounded-[4px] bg-[#f1f5f9] px-2 py-0.5 text-[11px] font-medium text-[#111111]">
                   {p}
                 </span>
               ))
@@ -285,15 +285,15 @@ function DetailPanel({
         </div>
           </>
         ) : !Array.isArray(tabRows) || tabRows.length === 0 ? (
-          <p className="py-8 text-center text-[11px] text-[#94a3b8]">
+          <p className="py-8 text-center text-[11px] text-[#141414]">
             No {tabs.find(([id]) => id === tab)?.[1].toLowerCase()} on file.
           </p>
         ) : (
           <ul className="divide-y divide-[#f1f5f9]">
             {tabRows.map((row: Record<string, any>, index: number) => (
               <li key={String(row.id ?? index)} className="py-2.5">
-                <p className="font-medium text-[#0f172a]">{rowTitle(row, index)}</p>
-                <p className="mt-0.5 text-[10px] text-[#94a3b8]">{rowMeta(row) || "No further detail"}</p>
+                <p className="font-medium text-[#000000]">{rowTitle(row, index)}</p>
+                <p className="mt-0.5 text-[11px] text-[#141414]">{rowMeta(row) || "No further detail"}</p>
               </li>
             ))}
           </ul>
@@ -547,10 +547,10 @@ export function FundraisingInvestors() {
     <div className="h-full overflow-y-auto bg-[#f8fafc] p-4 md:p-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-xl font-bold tracking-tight text-[#0f172a] md:text-[22px]">
+          <h1 className="text-xl font-bold tracking-tight text-[#000000] md:text-[22px]">
             Investor Organisations
           </h1>
-          <p className="mt-1 text-[12px] text-[#64748b]">
+          <p className="mt-1 text-[12px] text-[#111111]">
             Institutional investor database — one org, many opportunities
           </p>
         </div>
@@ -600,15 +600,15 @@ export function FundraisingInvestors() {
         <div className={cn(CARD, "min-w-0 overflow-hidden")}>
           <div className="flex flex-col gap-2 border-b border-[#f1f5f9] px-3 py-3 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex items-center gap-2">
-              <Building2 className="h-4 w-4 text-[#64748b]" />
-              <h2 className="text-[13px] font-semibold text-[#0f172a]">Directory</h2>
-              <span className="rounded-[4px] bg-[#f1f5f9] px-1.5 text-[11px] font-semibold text-[#64748b]">
+              <Building2 className="h-4 w-4 text-[#111111]" />
+              <h2 className="text-[13px] font-semibold text-[#000000]">Directory</h2>
+              <span className="rounded-[4px] bg-[#f1f5f9] px-1.5 text-[11px] font-semibold text-[#111111]">
                 {filtered.length}
               </span>
             </div>
             <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
               <div className="relative sm:w-[200px]">
-                <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#94a3b8]" />
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#141414]" />
                 <Input
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
@@ -658,7 +658,7 @@ export function FundraisingInvestors() {
                 <tr className="border-b border-[#f1f5f9] bg-[#fafafa]">
                   {["Organisation", "Type", "Owner", "KYC", "Status", "Commitments", "Next action", "Score"].map(
                     (h) => (
-                      <th key={h} className="px-3 py-2 text-[11px] font-semibold text-[#94a3b8]">{h}</th>
+                      <th key={h} className="px-3 py-2 text-[11px] font-semibold text-[#141414]">{h}</th>
                     ),
                   )}
                 </tr>
@@ -668,7 +668,7 @@ export function FundraisingInvestors() {
                   <FrTableSkeleton columns={8} rows={7} />
                 ) : filtered.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="px-3 py-10 text-center text-[13px] text-[#94a3b8]">
+                    <td colSpan={8} className="px-3 py-10 text-center text-[13px] text-[#141414]">
                       No investors match your filters.
                     </td>
                   </tr>
@@ -685,32 +685,32 @@ export function FundraisingInvestors() {
                       <td className="px-3 py-2.5">
                         <div className="flex items-center gap-2">
                           <span
-                            className="flex h-7 w-7 items-center justify-center rounded-[4px] text-[10px] font-bold text-white"
+                            className="flex h-7 w-7 items-center justify-center rounded-[4px] text-[11px] font-bold text-white"
                             style={{ backgroundColor: org.logoBg }}
                           >
                             {org.logoLabel}
                           </span>
                           <div>
-                            <p className="text-[12px] font-medium text-[#0f172a]">{org.legalName}</p>
-                            <p className="text-[10px] text-[#94a3b8]">{org.country}</p>
+                            <p className="text-[12px] font-medium text-[#000000]">{org.legalName}</p>
+                            <p className="text-[11px] text-[#141414]">{org.country}</p>
                           </div>
                         </div>
                       </td>
-                      <td className="whitespace-nowrap px-3 py-2.5 text-[11px] text-[#64748b]">{org.type}</td>
-                      <td className="whitespace-nowrap px-3 py-2.5 text-[11px] text-[#64748b]">{org.owner}</td>
+                      <td className="whitespace-nowrap px-3 py-2.5 text-[11px] text-[#111111]">{org.type}</td>
+                      <td className="whitespace-nowrap px-3 py-2.5 text-[11px] text-[#111111]">{org.owner}</td>
                       <td className="px-3 py-2.5">
-                        <span className={cn("rounded-[4px] px-1.5 py-0.5 text-[10px] font-semibold", kycChipClass(org.kycStatus))}>
+                        <span className={cn("rounded-[4px] px-1.5 py-0.5 text-[11px] font-semibold", kycChipClass(org.kycStatus))}>
                           {kycLabel(org.kycStatus)}
                         </span>
                       </td>
                       <td className="px-3 py-2.5">
-                        <span className={cn("rounded-[4px] px-1.5 py-0.5 text-[10px] font-semibold", statusClass(org.status))}>
+                        <span className={cn("rounded-[4px] px-1.5 py-0.5 text-[11px] font-semibold", statusClass(org.status))}>
                           {org.status}
                         </span>
                       </td>
-                      <td className="whitespace-nowrap px-3 py-2.5 text-[11px] text-[#0f172a]">{org.commitments}</td>
-                      <td className="max-w-[160px] truncate px-3 py-2.5 text-[11px] text-[#64748b]">{org.nextAction}</td>
-                      <td className="px-3 py-2.5 text-[12px] font-semibold tabular-nums text-[#0f172a]">{org.score}</td>
+                      <td className="whitespace-nowrap px-3 py-2.5 text-[11px] text-[#000000]">{org.commitments}</td>
+                      <td className="max-w-[160px] truncate px-3 py-2.5 text-[11px] text-[#111111]">{org.nextAction}</td>
+                      <td className="px-3 py-2.5 text-[12px] font-semibold tabular-nums text-[#000000]">{org.score}</td>
                     </tr>
                   ))
                 )}

@@ -36,6 +36,11 @@ export interface User {
   firstName: string
   lastName: string
   role: string
+  /**
+   * Set when the password was issued by us rather than chosen — an invited investor is emailed a
+   * temporary one. The login flow and the middleware both send such a user to /set-password.
+   */
+  mustChangePassword?: boolean
   permissions: Array<{
     name: string
     value: boolean

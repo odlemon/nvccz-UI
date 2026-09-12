@@ -32,6 +32,8 @@ services:
     depends_on:
       mysql:
         condition: service_healthy
+      upload:
+        condition: service_healthy
     networks:
       - default
       - edge
@@ -44,6 +46,8 @@ services:
       DB_PORT: "3306"
       DATABASE_URL: mysql://arcus_prod:${MYSQL_PASSWORD}@mysql:3306/arcus_prod
       RUN_SEED: "1"
+      REMOTE_UPLOAD_SERVICE_URL: http://upload:3050/upload
+      REMOTE_MEDIA_INTERNAL_BASE: http://upload:3050/uploads
     volumes:
       - arcus_demo_api_storage:/app/storage/local-upload-mock
     labels:
@@ -53,6 +57,25 @@ services:
       - traefik.http.routers.arcus-demo-api.entrypoints=websecure
       - traefik.http.routers.arcus-demo-api.tls.certresolver=le
       - traefik.http.services.arcus-demo-api.loadbalancer.server.port=3009
+
+  upload:
+    build:
+      context: ../upload-service
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment:
+      PORT: "3050"
+      UPLOAD_ROOT: /data/uploads
+    volumes:
+      - arcus_demo_upload:/data/uploads
+    ports:
+      - "127.0.0.1:3051:3050"
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://127.0.0.1:3050/health',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
 
   ui:
     build:
@@ -85,3 +108,4 @@ volumes:
   arcus_demo_api_storage:
     external: true
     name: arcus-prod_arcus_prod_api_storage
+  arcus_demo_upload:

@@ -1,7 +1,11 @@
 /* Auto-extracted Matanho V17.1 runtime — adapted for Home Version 3 */
+import { clientDesignSignOut } from "@/components/client-design-mock/runtime-auth";
 export function startMatanhoRuntime(rootEl, options = {}) {
   const initialRoute = options.initialRoute || "home";
   window.__HOME_V3_NAV__ = options.onNavigate || (() => {});
+  if (typeof options.onSignOut === "function") {
+    window.__HOME_V3_SIGN_OUT__ = options.onSignOut;
+  }
   window.MATANHO_DATA = options.data;
   window.MATANHO_CONFIG = options.config || { useMockData: true, apiBaseUrl: "" };
 
@@ -101,18 +105,35 @@ export function startMatanhoRuntime(rootEl, options = {}) {
     ],
     aiDraft: saved.aiDraft || {type:'Executive update',audience:'Investment team',subject:'Q3 progress update',body:''},
     newsBookmarks: saved.newsBookmarks || [],
-    profile: saved.profile || { name: D.user.name, role: D.user.role, email: D.user.email, location: D.user.location, bio:'Investment leader focused on building disciplined systems, strong teams and durable institutional value.' }
+    profile: options.liveSession
+      ? {
+          ...(saved.profile || {}),
+          name: D.user.name,
+          role: D.user.role,
+          email: D.user.email,
+          location: D.user.location || saved.profile?.location || "",
+          bio:
+            saved.profile?.bio ||
+            "Investment leader focused on building disciplined systems, strong teams and durable institutional value.",
+        }
+      : saved.profile || {
+          name: D.user.name,
+          role: D.user.role,
+          email: D.user.email,
+          location: D.user.location,
+          bio: "Investment leader focused on building disciplined systems, strong teams and durable institutional value.",
+        },
   };
   state.apps = state.apps.map(a => ({...a, hasAccess: a.hasAccess ?? !['procurement','analytics'].includes(a.id)}));
   state.settings = {...{language:'English (UK)',timezone:'CAT — Harare',density:'comfortable',saturation:118,glass:true,motion:true,autoHero:true,calendarAlerts:true,newsDigest:true,forumMentions:true,performanceReminders:true,profileVisibility:'Organisation',usageAnalytics:true}, ...state.settings};
   const heroScenes = [
-    {src:'/home-v3/assets/hero-scenes/4k/01-sunlit-bonsai.jpg',tablet:'/home-v3/assets/hero-scenes/1080p/01-sunlit-bonsai.jpg',mobile:'/home-v3/assets/hero-scenes/mobile/01-sunlit-bonsai.jpg',label:'Sunlit bonsai',mood:'Clarity'},
-    {src:'/home-v3/assets/hero-scenes/4k/02-quiet-courtyard.jpg',tablet:'/home-v3/assets/hero-scenes/1080p/02-quiet-courtyard.jpg',mobile:'/home-v3/assets/hero-scenes/mobile/02-quiet-courtyard.jpg',label:'Quiet courtyard',mood:'Intention'},
-    {src:'/home-v3/assets/hero-scenes/4k/03-morning-serenity.jpg',tablet:'/home-v3/assets/hero-scenes/1080p/03-morning-serenity.jpg',mobile:'/home-v3/assets/hero-scenes/mobile/03-morning-serenity.jpg',label:'Morning serenity',mood:'Focus'},
-    {src:'/home-v3/assets/hero-scenes/4k/04-soft-focus-bonsai.jpg',tablet:'/home-v3/assets/hero-scenes/1080p/04-soft-focus-bonsai.jpg',mobile:'/home-v3/assets/hero-scenes/mobile/04-soft-focus-bonsai.jpg',label:'Soft light',mood:'Balance'},
-    {src:'/home-v3/assets/hero-scenes/4k/05-minimal-zen.jpg',tablet:'/home-v3/assets/hero-scenes/1080p/05-minimal-zen.jpg',mobile:'/home-v3/assets/hero-scenes/mobile/05-minimal-zen.jpg',label:'Minimal zen',mood:'Perspective'},
-    {src:'/home-v3/assets/hero-scenes/4k/06-sand-garden.jpg',tablet:'/home-v3/assets/hero-scenes/1080p/06-sand-garden.jpg',mobile:'/home-v3/assets/hero-scenes/mobile/06-sand-garden.jpg',label:'Sand garden',mood:'Momentum'},
-    {src:'/home-v3/assets/hero-scenes/4k/07-evening-stillness.jpg',tablet:'/home-v3/assets/hero-scenes/1080p/07-evening-stillness.jpg',mobile:'/home-v3/assets/hero-scenes/mobile/07-evening-stillness.jpg',label:'Evening stillness',mood:'Reflection'}
+    {src:'/home/assets/hero-scenes/4k/01-sunlit-bonsai.jpg',tablet:'/home/assets/hero-scenes/1080p/01-sunlit-bonsai.jpg',mobile:'/home/assets/hero-scenes/mobile/01-sunlit-bonsai.jpg',label:'Sunlit bonsai',mood:'Clarity'},
+    {src:'/home/assets/hero-scenes/4k/02-quiet-courtyard.jpg',tablet:'/home/assets/hero-scenes/1080p/02-quiet-courtyard.jpg',mobile:'/home/assets/hero-scenes/mobile/02-quiet-courtyard.jpg',label:'Quiet courtyard',mood:'Intention'},
+    {src:'/home/assets/hero-scenes/4k/03-morning-serenity.jpg',tablet:'/home/assets/hero-scenes/1080p/03-morning-serenity.jpg',mobile:'/home/assets/hero-scenes/mobile/03-morning-serenity.jpg',label:'Morning serenity',mood:'Focus'},
+    {src:'/home/assets/hero-scenes/4k/04-soft-focus-bonsai.jpg',tablet:'/home/assets/hero-scenes/1080p/04-soft-focus-bonsai.jpg',mobile:'/home/assets/hero-scenes/mobile/04-soft-focus-bonsai.jpg',label:'Soft light',mood:'Balance'},
+    {src:'/home/assets/hero-scenes/4k/05-minimal-zen.jpg',tablet:'/home/assets/hero-scenes/1080p/05-minimal-zen.jpg',mobile:'/home/assets/hero-scenes/mobile/05-minimal-zen.jpg',label:'Minimal zen',mood:'Perspective'},
+    {src:'/home/assets/hero-scenes/4k/06-sand-garden.jpg',tablet:'/home/assets/hero-scenes/1080p/06-sand-garden.jpg',mobile:'/home/assets/hero-scenes/mobile/06-sand-garden.jpg',label:'Sand garden',mood:'Momentum'},
+    {src:'/home/assets/hero-scenes/4k/07-evening-stillness.jpg',tablet:'/home/assets/hero-scenes/1080p/07-evening-stillness.jpg',mobile:'/home/assets/hero-scenes/mobile/07-evening-stillness.jpg',label:'Evening stillness',mood:'Reflection'}
   ];
   function currentHeroScene(){
     const now=new Date();
@@ -225,6 +246,18 @@ export function startMatanhoRuntime(rootEl, options = {}) {
       window.__HOME_V3_NAV__(state.route);
     }
   }
+  function applySessionUser(nextUser) {
+    if (!nextUser) return;
+    D.user = { ...D.user, ...nextUser };
+    state.profile = {
+      ...state.profile,
+      name: D.user.name,
+      role: D.user.role,
+      email: D.user.email,
+      location: D.user.location || state.profile.location || "",
+    };
+    render();
+  }
   function navigate(route) {
     state.route = route;
     state.mobileNav = false;
@@ -241,7 +274,7 @@ export function startMatanhoRuntime(rootEl, options = {}) {
   function renderSidebar() {
     const groups = D.nav.map(group => `<section class="nav-section"><div class="nav-label">${group.section}</div>${group.items.map(item=>`<button class="nav-item ${state.route===item.id?'active':''}" data-nav="${item.id}" title="${item.label}">${icon(item.icon)}<span>${item.label}</span></button>`).join('')}</section>`).join('');
     return `${state.mobileNav?'<button class="sidebar-scrim" data-action="mobile-menu" aria-label="Close navigation"></button>':''}<aside class="sidebar ${state.mobileNav?'open':''} ${state.sidebarCollapsed?'collapsed':''}">
-      <div class="brand"><img class="brand-full" src="/home-v3/assets/matanho-logo.png" alt="Matanho"/><div class="brand-mark" aria-label="Matanho">m</div><button class="collapse-control" data-action="collapse-sidebar" title="${state.sidebarCollapsed?'Expand':'Collapse'} navigation">${icon(state.sidebarCollapsed?'chevron':'arrow')}</button></div>
+      <div class="brand"><img class="brand-full" src="/home/assets/matanho-logo.png" alt="Matanho"/><div class="brand-mark" aria-label="Matanho">m</div><button class="collapse-control" data-action="collapse-sidebar" title="${state.sidebarCollapsed?'Expand':'Collapse'} navigation">${icon(state.sidebarCollapsed?'chevron':'arrow')}</button></div>
       <div class="sidebar-scroll">${groups}</div>
       <div class="sidebar-bottom">
         <button class="nav-item utility-item" data-action="settings" title="Settings">${icon('settings')}<span>Settings</span></button>
@@ -254,15 +287,16 @@ export function startMatanhoRuntime(rootEl, options = {}) {
   }
   function renderTopbar() {
     return `<header class="topbar">
-      <button class="icon-btn mobile-menu" data-action="mobile-menu">${icon('apps')}</button>
-      <div class="search-wrap">${icon('search')}<input class="search-input" id="globalSearch" placeholder="Search people, work, news and more…" autocomplete="off" /><span class="shortcut">⌘ K</span></div>
-      <div class="top-actions">
-        <button class="icon-btn calendar-top" data-nav="calendar" title="Calendar">${icon('calendar')}</button>
-        <button class="icon-btn app-launcher-top" data-arcus-modules title="Switch module">${icon('apps')}</button>
-        <button class="icon-btn messages-top" data-action="messages" title="Messages">${icon('message')}</button>
-        <button class="icon-btn notifications-top" data-action="notifications" title="Notifications">${icon('bell')}<i class="badge-dot"></i></button>
-        <button class="profile-top" data-action="profile-popover">${avatar(D.user.initials)}${icon('down')}</button>
-      </div>
+      <button class="icon-button mobile-menu" data-action="mobile-nav" aria-label="Open navigation">${icon('apps')}</button>
+      <button class="search-trigger" data-action="search">${icon('search')}<span>Search people, work, news, KPIs and documents...</span><kbd>Ctrl K</kbd></button>
+      <div class="spacer"></div>
+      <select id="entitySelect" class="top-select entity" aria-label="Entity"><option>Matanho Capital</option><option>Matanho Holdings</option><option>Matanho Advisory</option></select>
+      <select id="yearSelect" class="top-select year" aria-label="Financial year"><option>FY 2026</option><option>FY 2025</option></select>
+      <select id="roleSelect" class="top-select role" aria-label="Demo role"><option>HR/M&amp;E Manager</option><option>Executive</option><option>Department Manager</option><option>Employee</option><option>SysAdmin</option></select>
+      <button class="icon-button theme-toggle" data-action="toggle-theme" title="Toggle Theme" aria-label="Toggle theme">${icon('sun')}</button>
+      <button class="icon-button apps" data-action="apps" aria-label="Matanho applications">${icon('apps')}</button>
+      <button class="icon-button notification-button" data-action="notifications" aria-label="Notifications">${icon('bell')}<span class="notification-count">4</span></button>
+      <button class="user-button" data-action="user-menu"><span class="avatar">${esc(D.user.initials||'TM')}</span><span class="user-copy"><strong>${esc(D.user.name||'Tariro Moyo')}</strong><span id="userRoleCopy">${esc(D.user.role||'HR/M&E Manager')}</span></span></button>
     </header>`;
   }
   function pageHead(title, subtitle='', actions='') {
@@ -406,7 +440,7 @@ export function startMatanhoRuntime(rootEl, options = {}) {
           <div class="greeting">Good ${d.period}, ${D.user.firstName} ${icon(d.icon,'day-icon')}</div>
           <div class="hero-time">${d.time.replace(/\s?(AM|PM)/,'')}<span>${d.ampm}</span></div>
           <div class="hero-date">${d.date}</div>
-          <div class="hero-location">${icon('location')}<span>In Office&nbsp;&nbsp;•&nbsp;&nbsp;Harare, Zimbabwe</span></div>
+          <div class="hero-location">${icon('location')}<span>${D.user.location ? esc(D.user.location) : 'In Office · Harare, Zimbabwe'}</span></div>
           <div class="quote"><span>Daily perspective</span><strong>${quote}</strong></div>
         </div>
         <div class="hero-scene-control">
@@ -485,7 +519,7 @@ export function startMatanhoRuntime(rootEl, options = {}) {
       <aside><section class="card side-list trending-card"><div class="card-title"><div><span class="eyebrow">Live signal</span><h3>Trending now</h3></div><button class="link-btn">See all</button></div>${D.news.slice(0,5).map((n,i)=>`<div class="rank-row" data-news-open="${n.id}"><div class="rank">0${i+1}</div><div><strong>${n.title}</strong><span>${n.source} · ${n.time}</span></div></div>`).join('')}</section><section class="card side-list market-pulse-card" style="margin-top:14px"><div class="card-title"><div><span class="eyebrow">Market pulse</span><h3>At a glance</h3></div><span class="live-pill"><i></i> Live</span></div>${[['MSCI Frontier','+1.8%','up'],['ZSE All Share','+0.9%','up'],['USD / ZWL','Stable','flat'],['Gold','−0.4%','down']].map(x=>`<div class="market-pulse-row"><span>${x[0]}</span><strong class="${x[2]}">${x[1]}</strong></div>`).join('')}</section><section class="card side-list" style="margin-top:14px"><div class="card-title"><h3>Sources you follow</h3><button class="link-btn">Manage</button></div>${['Matanho Newsroom','Reuters','Bloomberg','TechCabal'].map((source,i)=>`<div class="source-follow-row"><span class="source-mark source-${i}">${source.slice(0,1)}</span><div><strong>${source}</strong><small>${['Company intelligence','Global markets','Institutional finance','African technology'][i]}</small></div><span class="follow-check">${icon('check')}</span></div>`).join('')}</section></aside></div>`;
   }
   function newsArticleView(n) {
-    return `${pageHead('', '', `<button class="secondary-btn" data-action="back-news">${icon('arrow')} Back to news</button>`)}<div class="article-layout article-layout-premium"><article class="card article-main article-main-premium"><div class="breadcrumb">News / ${n.category} / ${n.source}</div><div class="article-kicker">${n.category} · Investment intelligence</div><h1>${n.title}</h1><p class="article-deck">${n.excerpt}</p><div class="article-byline"><div class="article-author">${avatar(D.people[0])}<div><strong>Nyasha Moyo</strong><span>Matanho Research · 30 July 2026</span></div></div><div class="toolbar"><button class="ghost-btn small-btn" data-news-bookmark="${n.id}">${icon('bookmark')} ${state.newsBookmarks.includes(n.id)?'Saved':'Save'}</button><button class="ghost-btn small-btn" data-action="share">${icon('send')} Share</button><button class="ghost-btn small-btn">${icon('headphones')} Listen</button></div></div><div class="article-hero"><img src="${n.id===2?'/home-v3/assets/news/article-hero.jpg':n.image}" alt="${esc(n.title)}"/></div><div class="article-copy"><p class="article-lead">Matanho is strengthening the way institutional teams turn market context into investment conviction. The initiative combines disciplined research, transparent decision-making and a clearer connection between portfolio signals and action.</p><p>Teams will be able to work from shared evidence, retain context across discussions and surface the decisions that need attention before they become operational risk.</p><div class="article-insight-grid"><div><span>Decision horizon</span><strong>12–18 months</strong></div><div><span>Primary signal</span><strong>Operating evidence</strong></div><div><span>Portfolio relevance</span><strong>High</strong></div></div><blockquote>“The standard is not more information. It is better judgement, made at the right moment.”</blockquote><p>The next phase will focus on practical adoption across investment, client and operating teams, supported by governance controls and a measured rollout.</p></div></article><aside><section class="card side-list article-index"><div class="card-title"><h3>In this article</h3></div>${['What is changing','Why it matters','How the model works','What comes next'].map((x,i)=>`<div class="rank-row"><div class="rank">0${i+1}</div><div><strong>${x}</strong></div></div>`).join('')}</section><section class="card side-list" style="margin-top:14px"><div class="card-title"><h3>Related stories</h3></div>${D.news.filter(x=>x.id!==n.id).slice(0,3).map(x=>`<div class="related-story" data-news-open="${x.id}"><div class="latest-thumb"><img src="${x.image}" alt="${esc(x.title)}"/></div><div><strong>${x.title}</strong><span>${x.read} read</span></div></div>`).join('')}</section><section class="card analyst-card" style="margin-top:14px"><div class="analyst-card-top">${avatar(D.people[0])}<div><strong>Talk to the analyst</strong><span>Nyasha Moyo · Research</span></div></div><p>Ask a follow-up question or request the supporting market note.</p><button class="secondary-btn" data-action="message-person">${icon('message')} Start a conversation</button></section></aside></div>`;
+    return `${pageHead('', '', `<button class="secondary-btn" data-action="back-news">${icon('arrow')} Back to news</button>`)}<div class="article-layout article-layout-premium"><article class="card article-main article-main-premium"><div class="breadcrumb">News / ${n.category} / ${n.source}</div><div class="article-kicker">${n.category} · Investment intelligence</div><h1>${n.title}</h1><p class="article-deck">${n.excerpt}</p><div class="article-byline"><div class="article-author">${avatar(D.people[0])}<div><strong>Nyasha Moyo</strong><span>Matanho Research · 30 July 2026</span></div></div><div class="toolbar"><button class="ghost-btn small-btn" data-news-bookmark="${n.id}">${icon('bookmark')} ${state.newsBookmarks.includes(n.id)?'Saved':'Save'}</button><button class="ghost-btn small-btn" data-action="share">${icon('send')} Share</button><button class="ghost-btn small-btn">${icon('headphones')} Listen</button></div></div><div class="article-hero"><img src="${n.id===2?'/home/assets/news/article-hero.jpg':n.image}" alt="${esc(n.title)}"/></div><div class="article-copy"><p class="article-lead">Matanho is strengthening the way institutional teams turn market context into investment conviction. The initiative combines disciplined research, transparent decision-making and a clearer connection between portfolio signals and action.</p><p>Teams will be able to work from shared evidence, retain context across discussions and surface the decisions that need attention before they become operational risk.</p><div class="article-insight-grid"><div><span>Decision horizon</span><strong>12–18 months</strong></div><div><span>Primary signal</span><strong>Operating evidence</strong></div><div><span>Portfolio relevance</span><strong>High</strong></div></div><blockquote>“The standard is not more information. It is better judgement, made at the right moment.”</blockquote><p>The next phase will focus on practical adoption across investment, client and operating teams, supported by governance controls and a measured rollout.</p></div></article><aside><section class="card side-list article-index"><div class="card-title"><h3>In this article</h3></div>${['What is changing','Why it matters','How the model works','What comes next'].map((x,i)=>`<div class="rank-row"><div class="rank">0${i+1}</div><div><strong>${x}</strong></div></div>`).join('')}</section><section class="card side-list" style="margin-top:14px"><div class="card-title"><h3>Related stories</h3></div>${D.news.filter(x=>x.id!==n.id).slice(0,3).map(x=>`<div class="related-story" data-news-open="${x.id}"><div class="latest-thumb"><img src="${x.image}" alt="${esc(x.title)}"/></div><div><strong>${x.title}</strong><span>${x.read} read</span></div></div>`).join('')}</section><section class="card analyst-card" style="margin-top:14px"><div class="analyst-card-top">${avatar(D.people[0])}<div><strong>Talk to the analyst</strong><span>Nyasha Moyo · Research</span></div></div><p>Ask a follow-up question or request the supporting market note.</p><button class="secondary-btn" data-action="message-person">${icon('message')} Start a conversation</button></section></aside></div>`;
   }
   function newsView(){ return state.selectedNews ? newsArticleView(D.news.find(x=>x.id===state.selectedNews)||D.news[0]) : newsLibraryView(); }
 
@@ -879,8 +913,18 @@ export function startMatanhoRuntime(rootEl, options = {}) {
   function showNotifications(anchor){
     const r=anchor.getBoundingClientRect(); portal.innerHTML=`<div class="popover" style="top:${r.bottom+8}px;right:${Math.max(16,innerWidth-r.right)}px"><h3>Notifications</h3>${[['Your portfolio review starts in 45 minutes.','calendar'],['Nyasha mentioned you in Q3 strategy workshop prep.','forum'],['The June payslip is ready to view.','wallet']].map((x,i)=>`<div class="notification"><div class="task-icon">${icon(x[1])}</div><div><strong>${x[0]}</strong><span>${i?'Earlier today':'Just now'}</span></div></div>`).join('')}</div>`;
   }
+  function signOut() {
+    closePortal();
+    if (clientDesignSignOut()) return;
+    toast('This prototype keeps you signed in.');
+  }
   function showProfile(anchor){
-    const r=anchor.getBoundingClientRect(); portal.innerHTML=`<div class="popover" style="top:${r.bottom+8}px;right:${Math.max(16,innerWidth-r.right)}px"><div style="display:flex;gap:10px;align-items:center;padding:6px">${avatar(D.user.initials)}<div><strong style="font-size:12px">${D.user.name}</strong><div style="font-size:9px;color:var(--muted);margin-top:2px">${D.user.email}</div></div></div><div class="detail-section"><button class="nav-item" data-nav="my-profile">${icon('profile')} My profile</button><button class="nav-item" data-action="settings">${icon('settings')} Settings</button><button class="nav-item" data-action="sign-out">${icon('arrow')} Sign out</button></div></div>`;
+    const r=anchor.getBoundingClientRect(); portal.innerHTML=`<div class="popover" style="top:${r.bottom+8}px;right:${Math.max(16,innerWidth-r.right)}px"><div style="display:flex;gap:10px;align-items:center;padding:6px">${avatar(D.user.initials)}<div><strong style="font-size:12px">${D.user.name}</strong><div style="font-size:9px;color:var(--muted);margin-top:2px">${D.user.email}</div></div></div><div class="detail-section"><button type="button" class="nav-item" data-nav="my-profile">${icon('profile')} My profile</button><button type="button" class="nav-item" data-action="settings">${icon('settings')} Settings</button><button type="button" class="nav-item" data-action="sign-out">${icon('arrow')} Sign out</button></div></div>`;
+    portal.querySelector('[data-action="sign-out"]')?.addEventListener('click', (ev) => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      signOut();
+    }, { once: true });
   }
   function commandPalette(query=''){
     const q=query.toLowerCase(); const items=[];
@@ -960,9 +1004,9 @@ export function startMatanhoRuntime(rootEl, options = {}) {
       if(action==='edit-profile-preferences'){const p=state.profilePreferences;modal('Work and visibility preferences',`<form id="profilePreferencesForm"><div class="form-grid"><div class="form-field"><label>Focus hours</label><input class="input-control" name="focusHours" value="${esc(p.focusHours)}"/></div><div class="form-field"><label>Preferred contact</label><select class="select-control" name="preferredContact"><option ${p.preferredContact==='Microsoft Teams'?'selected':''}>Microsoft Teams</option><option ${p.preferredContact==='Email'?'selected':''}>Email</option><option ${p.preferredContact==='Phone'?'selected':''}>Phone</option></select></div><div class="form-field"><label>Office days</label><input class="input-control" name="officeDays" value="${esc(p.officeDays)}"/></div><div class="form-field"><label>Timezone</label><select class="select-control" name="timezone"><option>CAT (Harare)</option><option>SAST (Johannesburg)</option><option>GMT (London)</option></select></div></div><div class="settings-toggle-grid">${[['showAvailability','Show availability'],['shareSkills','Share skills and endorsements'],['showProjects','Show current projects'],['discoverable','Allow profile discovery']].map(([k,l])=>`<label class="setting-toggle"><div><strong>${l}</strong><span>Control visibility across Matanho.</span></div><input type="checkbox" name="${k}" ${p[k]?'checked':''}/><i></i></label>`).join('')}</div><div class="form-actions"><button type="button" class="secondary-btn" data-action="close-portal">Cancel</button><button class="primary-btn">Save preferences</button></div></form>`);return}
       if(action==='settings'){modal('Settings & personalisation',`<form id="settingsForm" class="settings-form"><section class="settings-section"><div class="settings-section-head"><div class="settings-icon">${icon('sun')}</div><div><h3>Appearance</h3><p>Tune clarity, colour and spatial density.</p></div></div><div class="settings-grid"><div class="form-field"><label>Language</label><select class="select-control" name="language"><option ${state.settings.language==='English (UK)'?'selected':''}>English (UK)</option><option>English (US)</option></select></div><div class="form-field"><label>Timezone</label><select class="select-control" name="timezone"><option ${state.settings.timezone==='CAT — Harare'?'selected':''}>CAT — Harare</option><option>SAST — Johannesburg</option><option>GMT — London</option></select></div><div class="form-field"><label>Interface density</label><select class="select-control" name="density"><option value="comfortable" ${state.settings.density==='comfortable'?'selected':''}>Comfortable</option><option value="compact" ${state.settings.density==='compact'?'selected':''}>Compact</option><option value="spacious" ${state.settings.density==='spacious'?'selected':''}>Spacious</option></select></div><div class="form-field"><label>Profile visibility</label><select class="select-control" name="profileVisibility"><option ${state.settings.profileVisibility==='Organisation'?'selected':''}>Organisation</option><option ${state.settings.profileVisibility==='My teams'?'selected':''}>My teams</option><option ${state.settings.profileVisibility==='Projects only'?'selected':''}>Projects only</option></select></div><div class="form-field full"><label>OLED colour intensity <span id="saturationValue">${state.settings.saturation}%</span></label><input id="saturationRange" class="range-control" type="range" min="95" max="130" step="1" name="saturation" value="${state.settings.saturation}"/><div class="range-labels"><span>Natural</span><span>Vivid</span></div></div></div></section><section class="settings-section"><div class="settings-section-head"><div class="settings-icon">${icon('sparkles')}</div><div><h3>Experience</h3><p>Choose how the workspace behaves.</p></div></div><div class="settings-toggle-grid">${[["glass","Frosted premium surfaces","Adds refined depth without reducing contrast"],["motion","Interface motion","Enables subtle transitions and chart animation"],["autoHero","Daily Japandi scene","Rotates the home hero image each day"],["usageAnalytics","Improve Matanho","Shares anonymous product usage diagnostics"]].map(([key,title,desc])=>`<label class="setting-toggle"><div><strong>${title}</strong><span>${desc}</span></div><input type="checkbox" name="${key}" ${state.settings[key]?'checked':''}/><i></i></label>`).join('')}</div></section><section class="settings-section"><div class="settings-section-head"><div class="settings-icon">${icon('bell')}</div><div><h3>Notifications</h3><p>Control the signals that interrupt your day.</p></div></div><div class="settings-toggle-grid">${[["calendarAlerts","Calendar reminders","Meeting reminders and schedule changes"],["newsDigest","News digest","Daily editorial and market briefing"],["forumMentions","Forum mentions","Replies, accepted insights and mentions"],["performanceReminders","Performance reminders","Goal updates, reviews and evidence prompts"]].map(([key,title,desc])=>`<label class="setting-toggle"><div><strong>${title}</strong><span>${desc}</span></div><input type="checkbox" name="${key}" ${state.settings[key]?'checked':''}/><i></i></label>`).join('')}</div></section><div class="settings-preview"><span>Live preview</span><strong>Light Japandi · ${state.settings.saturation}% OLED colour · ${state.settings.density}</strong></div><div class="form-actions"><button type="button" class="secondary-btn" data-action="close-portal">Cancel</button><button class="primary-btn">Save preferences</button></div></form>`);return}
       if(action==='help'){modal('Help & Support',`<p style="font-size:12px;color:var(--muted);line-height:1.6">Search the knowledge base or create a support request.</p><input class="input-control" style="width:100%" placeholder="What do you need help with?"/><div class="service-grid" style="margin-top:14px"><button class="service-card card" data-service="support"><div class="task-icon">${icon('support')}</div><div><h4>IT support</h4><p>Device, software or access.</p></div></button><button class="service-card card"><div class="task-icon">${icon('help')}</div><div><h4>How-to guides</h4><p>Learn how to use Matanho.</p></div></button></div>`);return}
-      if(action==='sign-out'){toast('This prototype keeps you signed in.');return}
+      if(action==='sign-out'){signOut();return}
       if(action==='export-cover'){exportCover();return}
-      if(action==='copy-cover-link'){navigator.clipboard?.writeText(location.origin+'/home-v3/cover');toast('Share link copied.','success');return}
+      if(action==='copy-cover-link'){navigator.clipboard?.writeText(location.origin+'/home/cover');toast('Share link copied.','success');return}
       if(action==='create-newsletter-list'){if(state.newsletterRole==='Read only'){toast('Your role has read-only access.');return}modal('Create newsletter list',`<form id="newsletterListForm"><div class="form-grid"><div class="form-field full"><label>List name</label><input class="input-control" name="name" required placeholder="e.g. Quarterly client partners"/></div><div class="form-field"><label>Channel</label><select class="select-control" name="type"><option>Internal</option><option ${state.newsletterRole==='Publisher'?'':'disabled'}>External</option></select></div><div class="form-field"><label>Estimated recipients</label><input class="input-control" type="number" name="members" min="1" value="12"/></div><div class="form-field full"><label>Owner</label><select class="select-control" name="owner"><option>Communications</option><option>Investment team</option><option>Client Relations</option><option>People & Culture</option></select></div></div><div class="form-actions"><button type="button" class="secondary-btn" data-action="close-portal">Cancel</button><button class="primary-btn">Create list</button></div></form>`);return}
       if(action==='share-newsletter'||action==='publish-newsletter'){if(state.newsletterRole==='Read only'){toast('Read-only users cannot share newsletters.');return}const canExternal=state.newsletterRole==='Publisher';modal(canExternal?'Share or schedule newsletter':'Submit newsletter for approval',`<form id="newsletterShareForm"><div class="form-grid"><div class="form-field full"><label>Newsletter</label><input class="input-control" name="title" value="Market Brief · July 2026"/></div><div class="form-field"><label>Channel</label><select class="select-control" name="channel"><option>Internal</option><option ${canExternal?'':'disabled'}>External</option></select></div><div class="form-field"><label>Audience</label><select class="select-control" name="audience">${state.newsletterLists.filter(x=>canExternal||x.type==='Internal').map(x=>`<option>${x.name}</option>`).join('')}</select></div><div class="form-field"><label>Send date</label><input class="input-control" type="date" name="date"/></div><div class="form-field"><label>Approval</label><select class="select-control" name="approval"><option>${canExternal?'Publish directly':'Send to publisher'}</option><option>Request legal review</option></select></div><div class="form-field full"><label>Distribution note</label><textarea class="textarea-control" name="note" placeholder="Optional context for approvers or recipients"></textarea></div></div><div class="governance-notice">${icon('lock')} External distribution is logged, permission-checked and limited to Publisher roles.</div><div class="form-actions"><button type="button" class="secondary-btn" data-action="close-portal">Cancel</button><button class="primary-btn">${canExternal?'Schedule distribution':'Submit for approval'}</button></div></form>`);return}
       if(action==='request-newsletter-access'){modal('Request newsletter access',`<form id="newsletterAccessForm"><div class="form-field"><label>Requested role</label><select class="select-control" name="role"><option>Editor</option><option>Publisher</option></select></div><div class="form-field"><label>Business reason</label><textarea class="textarea-control" name="reason" required></textarea></div><div class="form-actions"><button type="button" class="secondary-btn" data-action="close-portal">Cancel</button><button class="primary-btn">Submit request</button></div></form>`);return}
@@ -991,7 +1035,7 @@ export function startMatanhoRuntime(rootEl, options = {}) {
       if(action==='add-person'){modal('Add person',`<form id="personForm"><div class="form-grid"><div class="form-field"><label>Full name</label><input class="input-control" name="name" required/></div><div class="form-field"><label>Email</label><input class="input-control" type="email" name="email" required/></div><div class="form-field"><label>Role</label><input class="input-control" name="role"/></div><div class="form-field"><label>Team</label><select class="select-control"><option>Investments</option><option>Operations</option><option>People & Culture</option></select></div></div><div class="form-actions"><button type="button" class="secondary-btn" data-action="close-portal">Cancel</button><button class="primary-btn">Add person</button></div></form>`);return}
       if(action==='message-person'){toast('Message composer opened.');return}
       if(action==='schedule-person'){navigate('calendar');return}
-      if(action==='copy-profile'){navigator.clipboard?.writeText(location.origin+'/home-v3/profile');toast('Profile link copied.','success');return}
+      if(action==='copy-profile'){navigator.clipboard?.writeText(location.origin+'/home/profile');toast('Profile link copied.','success');return}
       if(action==='edit-profile'){modal('Edit profile',`<form id="profileForm"><div class="form-grid"><div class="form-field"><label>Name</label><input class="input-control" name="name" value="${esc(state.profile.name)}"/></div><div class="form-field"><label>Role</label><input class="input-control" name="role" value="${esc(state.profile.role)}"/></div><div class="form-field"><label>Email</label><input class="input-control" name="email" value="${esc(state.profile.email)}"/></div><div class="form-field"><label>Location</label><input class="input-control" name="location" value="${esc(state.profile.location)}"/></div><div class="form-field full"><label>Bio</label><textarea class="textarea-control" name="bio">${esc(state.profile.bio)}</textarea></div></div><div class="form-actions"><button type="button" class="secondary-btn" data-action="close-portal">Cancel</button><button class="primary-btn">Save changes</button></div></form>`);return}
       if(action==='download-payslip'){const blob=new Blob(['MATANHO\nPayslip — June 2026\nGross pay: US$4,870.00\nDeductions: US$1,420.00\nTake-home pay: US$3,450.00'],{type:'text/plain'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='Matanho_Payslip_June_2026.txt';a.click();toast('Payslip downloaded.','success');return}
       if(action==='build-workflow'){modal('Build a workflow',`<form id="workflowForm"><div class="form-grid"><div class="form-field full"><label>When this happens</label><select class="select-control"><option>An expense is approved</option><option>A goal is completed</option><option>A new employee joins</option></select></div><div class="form-field full"><label>Do this</label><select class="select-control"><option>Create accounting journal</option><option>Notify owner</option><option>Update performance goal</option></select></div><div class="form-field full"><label>Workflow name</label><input class="input-control" name="name" value="Automate expense approvals"/></div></div><div class="form-actions"><button type="button" class="secondary-btn" data-action="close-portal">Cancel</button><button class="primary-btn">Create workflow</button></div></form>`);return}
@@ -1039,7 +1083,7 @@ export function startMatanhoRuntime(rootEl, options = {}) {
     const ai=e.target.closest('[data-ai-prompt]'); if(ai){state.aiMessages=[];navigate('matanho-ai');setTimeout(()=>{aiRespond(ai.dataset.aiPrompt)},50);return}
     const cmd=e.target.closest('[data-command-route]'); if(cmd){if(cmd.dataset.commandPerson)state.selectedPerson=cmd.dataset.commandPerson;if(cmd.dataset.commandNews)state.selectedNews=Number(cmd.dataset.commandNews);closePortal();navigate(cmd.dataset.commandRoute);return}
     if(e.target.classList.contains('overlay'))closePortal();
-  });
+  }, __hv3Sig);
 
   document.addEventListener('input', e => {
     if(e.target.id==='saturationRange'){rootEl.style.setProperty('--user-saturation',String(Number(e.target.value)/100));const label=document.getElementById('saturationValue');if(label)label.textContent=`${e.target.value}%`;return}
@@ -1105,6 +1149,9 @@ export function startMatanhoRuntime(rootEl, options = {}) {
         /* keep existing */
       }
       render();
+    },
+    setSessionUser(user) {
+      applySessionUser(user);
     },
     destroy() {
       try {

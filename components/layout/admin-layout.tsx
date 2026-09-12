@@ -3,6 +3,7 @@
 import type React from "react"
 import { useState, useEffect } from "react"
 import { usePathname } from "next/navigation"
+import { Menu } from "lucide-react"
 import { SharedTopbar } from "./shared-topbar"
 import { AdminSidebar } from "./admin-sidebar"
 import { MODULE_CONFIG, getModuleByPath } from "@/lib/config/modules"
@@ -13,6 +14,7 @@ interface AdminLayoutProps {
 
 export function AdminLayout({ children }: AdminLayoutProps) {
   const [currentModule, setCurrentModule] = useState("admin-management")
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
   const pathname = usePathname()
 
   useEffect(() => {
@@ -22,26 +24,46 @@ export function AdminLayout({ children }: AdminLayoutProps) {
     }
   }, [pathname])
 
+  // Close the mobile drawer on navigation.
+  useEffect(() => {
+    setMobileSidebarOpen(false)
+  }, [pathname])
+
   const handleModuleSelect = (module: string) => {
-    console.log('AdminLayout handleModuleSelect called with:', module)
     setCurrentModule(module)
-    
     const moduleConfig = MODULE_CONFIG.find(m => m.id === module)
     if (moduleConfig) {
-      console.log('Navigating to:', moduleConfig.path)
       window.location.href = moduleConfig.path
     }
   }
 
   return (
     <div className="min-h-screen bg-background">
-      <SharedTopbar onModuleSelect={handleModuleSelect} currentModule={currentModule} />
-
+      {/* Sidebar first, topbar inside the right-hand column, so the sidebar runs
+          the full height of the viewport and touches the top the way Portfolio's
+          does. Matches Events / FP&A / Fundraising. */}
       <div className="flex">
-        <AdminSidebar />
-        <main className="flex-1 overflow-auto">
-          {children}
-        </main>
+        <button
+          type="button"
+          onClick={() => setMobileSidebarOpen(true)}
+          className="md:hidden fixed top-24 left-3 z-10 flex items-center gap-2 rounded-full bg-white border border-border shadow-sm px-3 py-2 text-sm font-medium text-gray-800"
+          aria-label="Open Admin Management menu"
+        >
+          <Menu className="w-4 h-4" />
+          Menu
+        </button>
+        <AdminSidebar mobileOpen={mobileSidebarOpen} onMobileClose={() => setMobileSidebarOpen(false)} />
+        <div className="flex min-w-0 flex-1 flex-col">
+          {/* Admin Management is light-only: its pages (Company Addresses, User/Role
+              Management) hardcode light-theme classes and ship no dark variant, so a dark
+              preference carried in from another module left the topbar dark above a page
+              that stayed light. hideThemeToggle both hides the toggle and forces light,
+              same as Street Rates / Fundraising / FP&A. */}
+          <SharedTopbar onModuleSelect={handleModuleSelect} currentModule={currentModule} hideThemeToggle />
+          <main className="flex-1 overflow-auto pt-12 md:pt-0">
+            {children}
+          </main>
+        </div>
       </div>
     </div>
   )

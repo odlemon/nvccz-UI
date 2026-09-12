@@ -11,6 +11,7 @@ export function PayrollV6Layout({ children }: { children: React.ReactNode }) {
       backgroundClassName="bg-[#f3f6fb]"
       loadingFallback={<div className="p-8 text-sm text-[#64748B]">Loading Payroll…</div>}
       mockApp={<PayrollV6App />}
+      hideThemeToggle
     >
       {children}
     </ClientDesignModuleShell>

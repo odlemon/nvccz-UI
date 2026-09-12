@@ -728,10 +728,11 @@ export const applicationPortalApiService = {
   },
 
   // Term Sheet endpoints
-  async signTermSheet(termSheetId: string, signature: Blob | File): Promise<SignTermSheetResponse> {
+  async signTermSheet(applicationId: string, signature: Blob | File): Promise<SignTermSheetResponse> {
     const formData = new FormData();
     formData.append('signature', signature, 'signature.png');
-    return apiClient.post<SignTermSheetResponse>(`/term-sheets/${termSheetId}/sign`, formData);
+    // BE route is POST /term-sheets/:applicationId/sign (application id, not term-sheet row id).
+    return apiClient.post<SignTermSheetResponse>(`/term-sheets/${applicationId}/sign`, formData);
   },
 
   async getMyTermSheets(params?: { page?: number; limit?: number }): Promise<MyTermSheetsResponse> {

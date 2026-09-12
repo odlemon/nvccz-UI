@@ -212,7 +212,7 @@ export function FpaRevenue() {
   if (!selectedModelId) {
     return (
       <div className="min-h-full bg-[#f1f5f9] flex items-center justify-center p-8">
-        <p className="text-sm text-[#64748b]">Select a model to load revenue analysis.</p>
+        <p className="text-sm text-[#111111]">Select a model to load revenue analysis.</p>
       </div>
     )
   }

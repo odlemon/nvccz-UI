@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
-"""Pack UI, upload to 31.220.82.129, rebuild UI containers only. Does not touch secrets/API/DB."""
+"""Pack UI, upload to 31.220.82.129, rebuild UI containers only. Does not touch secrets/API/DB.
+
+DEPRECATED for day-to-day Arcus Dev work:
+  Prefer `scripts/deploy-arcus-dev-selective.py` (DEV-only, portal-selective, rollback snapshot).
+  This script still rebuilds BOTH dev+demo and uses legacy service name `ui`.
+"""
 from __future__ import annotations
 
 import hashlib
@@ -10,10 +15,11 @@ import tempfile
 from pathlib import Path
 
 import paramiko
+from _ssh_creds import SSH_PASSWORD  # rotated 2026-09-07; value lives in .secrets/ssh.env
 
 HOST = "31.220.82.129"
 USER = "root"
-PASSWORD = "Debgjnk4@!z"
+PASSWORD = SSH_PASSWORD
 REMOTE_ROOT = "/var/www/projects/arcus"
 UI_ROOT = Path(r"C:\Users\lysp\Downloads\nvccz-new")
 

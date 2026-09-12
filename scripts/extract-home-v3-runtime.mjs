@@ -43,6 +43,11 @@ code = code.replace(
   "/* hashchange disabled — Next.js owns routing */\n  "
 )
 
+code = code.replace(
+  /if\(action==='sign-out'\)\{toast\('This prototype keeps you signed in\.'\);return\}/,
+  "if(action==='sign-out'){closePortal();if(typeof window.__HOME_V3_SIGN_OUT__==='function'){window.__HOME_V3_SIGN_OUT__();return}toast('This prototype keeps you signed in.');return}"
+)
+
 // Scope DOM lookups to mount root
 code = code.replace(/document\.getElementById\('app'\)/g, "app")
 code = code.replace(/document\.getElementById\(\"app\"\)/g, "app")
@@ -67,6 +72,9 @@ fs.writeFileSync(
 export function startMatanhoRuntime(rootEl, options = {}) {
   const initialRoute = options.initialRoute || "home";
   window.__HOME_V3_NAV__ = options.onNavigate || (() => {});
+  if (typeof options.onSignOut === "function") {
+    window.__HOME_V3_SIGN_OUT__ = options.onSignOut;
+  }
   window.MATANHO_DATA = options.data;
   window.MATANHO_CONFIG = options.config || { useMockData: true, apiBaseUrl: "" };
 

@@ -66,8 +66,8 @@ function fmtM(n: number | null | undefined, signed = false): string {
 }
 
 function cellTone(n: number, type: CashStatementRow["type"]): string {
-  if (type === "total") return "font-semibold text-[#101828]"
-  if (n === 0) return "text-[#667085]"
+  if (type === "total") return "font-semibold text-[#000000]"
+  if (n === 0) return "text-[#111111]"
   return n > 0 ? "text-[#12b76a]" : "text-[#f04438]"
 }
 
@@ -101,10 +101,10 @@ function FilterSelect({
         className="h-10 min-w-[118px] inline-flex items-center rounded-full border border-[#d0d5dd] bg-white pl-2.5 pr-7 text-left hover:bg-[#f9fafb]"
       >
         <span className="flex flex-col justify-center min-w-0 py-1">
-          <span className="text-[9px] font-medium uppercase tracking-wide text-[#98a2b3] leading-none">{label}</span>
-          <span className="text-[12px] font-semibold text-[#101828] leading-tight mt-0.5 truncate">{value}</span>
+          <span className="text-[11px] font-medium uppercase tracking-wide text-[#141414] leading-none">{label}</span>
+          <span className="text-[12px] font-semibold text-[#000000] leading-tight mt-0.5 truncate">{value}</span>
         </span>
-        <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 size-4 text-[#98a2b3]" />
+        <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 size-4 text-[#141414]" />
       </button>
       {open ? (
         <div className={`absolute left-0 top-[calc(100%+4px)] z-40 min-w-[180px] ${R} border border-[#e4e7ec] bg-white py-1 shadow-lg`}>
@@ -118,7 +118,7 @@ function FilterSelect({
               }}
               className={cn(
                 "w-full flex items-center justify-between gap-2 px-3 py-2 text-left text-[12px] hover:bg-[#f9fafb]",
-                opt === value ? "text-[#1570ef] font-semibold" : "text-[#344054]",
+                opt === value ? "text-[#1570ef] font-semibold" : "text-[#111111]",
               )}
             >
               {opt}
@@ -140,8 +140,8 @@ function CashKpiCard({ kpi, onClick }: { kpi: CashKpi; onClick?: () => void }) {
       className={`${R} border border-[#e4e7ec] bg-white px-4 py-3 shadow-[0_1px_2px_rgba(16,24,40,0.03)] flex items-center justify-between gap-3 min-h-[92px] w-full text-left hover:border-[#b2ddff] transition-colors`}
     >
       <div className="min-w-0 flex flex-col justify-center">
-        <p className="text-[13px] font-semibold text-[#344054] leading-tight">{kpi.label}</p>
-        <p className="mt-1.5 text-[26px] font-semibold text-[#101828] tabular-nums leading-none tracking-tight">{kpi.value}</p>
+        <p className="text-[13px] font-semibold text-[#111111] leading-tight">{kpi.label}</p>
+        <p className="mt-1.5 text-[26px] font-semibold text-[#000000] tabular-nums leading-none tracking-tight">{kpi.value}</p>
         {kpi.delta ? (
           <p className={cn("mt-1.5 text-[12px] font-medium", kpi.up !== false ? "text-[#12b76a]" : "text-[#f04438]")}>
             {kpi.delta}
@@ -308,7 +308,7 @@ export function CashFlowAnalysisView({
   }
 
   const hasData = adjustedKpis.length > 0 || displayedPeriods.length > 0 || displayedRows.length > 0
-  if (loading && !hasData) return <div className="min-h-full bg-[#f1f5f9] flex items-center justify-center gap-2 text-sm text-[#64748b]"><Loader2 className="size-5 animate-spin" /> Loading cash flow analysis…</div>
+  if (loading && !hasData) return <div className="min-h-full bg-[#f1f5f9] flex items-center justify-center gap-2 text-sm text-[#111111]"><Loader2 className="size-5 animate-spin" /> Loading cash flow analysis…</div>
   if (error && !hasData) return <div className="min-h-full bg-[#f1f5f9] flex items-center justify-center p-8 text-sm text-[#b42318]">{error}</div>
 
   return (
@@ -316,7 +316,7 @@ export function CashFlowAnalysisView({
       <div className="bg-white border-b border-[#e4e7ec]">
         <div className="px-4 sm:px-5 pt-4 pb-3">
           <div className="flex items-center justify-between gap-3">
-            <h1 className="text-[18px] font-semibold text-[#101828]">Cash Flow</h1>
+            <h1 className="text-[18px] font-semibold text-[#000000]">Cash Flow</h1>
             <Button variant="outline" className="rounded-full h-9 px-4 text-xs" onClick={() => onRefresh?.()}>
               <RefreshCw className="size-3.5" />
               Refresh
@@ -334,12 +334,12 @@ export function CashFlowAnalysisView({
               Reset Filters
             </button>
           </div>
-          <p className="mt-2 text-[11px] text-[#667085]">Applied scope: {appliedScope?.entityId ? selectedEntityName : "All entities"} · {appliedScope?.periodFrom || "First period"} → {appliedScope?.periodTo || "Latest period"}</p>
+          <p className="mt-2 text-[11px] text-[#111111]">Applied scope: {appliedScope?.entityId ? selectedEntityName : "All entities"} · {appliedScope?.periodFrom || "First period"} → {appliedScope?.periodTo || "Latest period"}</p>
         </div>
 
         <div className="px-4 sm:px-5 pb-4">
           {adjustedKpis.length === 0 ? (
-            <p className="py-8 text-sm text-[#64748b]">No cash flow KPIs are available.</p>
+            <p className="py-8 text-sm text-[#111111]">No cash flow KPIs are available.</p>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3">
               {adjustedKpis.map((k) => (
@@ -353,24 +353,24 @@ export function CashFlowAnalysisView({
       <div className="flex-1 flex min-h-0">
         <div className="flex-1 p-4 sm:p-5 space-y-4 overflow-auto">
           {preview ? <div className="rounded-lg border border-[#bfdbfe] bg-[#eff6ff] px-4 py-3 text-xs font-semibold text-[#1d4ed8]">Preview · not persisted — cards, charts, and tables below use the preview dataset.</div> : null}
-          {loading && hasData ? <p className="text-xs text-[#667085]"><Loader2 className="mr-1 inline size-3 animate-spin" />Refreshing current scope…</p> : null}
+          {loading && hasData ? <p className="text-xs text-[#111111]"><Loader2 className="mr-1 inline size-3 animate-spin" />Refreshing current scope…</p> : null}
           {error && hasData ? <p className="text-sm text-[#b42318]">{error}</p> : null}
           {view === "Runway View" ? (
             <section className={`${R} border border-[#e4e7ec] bg-white p-4`}>
-              <h2 className="text-sm font-semibold text-[#101828] mb-3">Cash Runway by Scenario</h2>
-              <p className="py-12 text-center text-sm text-[#64748b]">Scenario runway breakdown is not available for this domain view.</p>
+              <h2 className="text-sm font-semibold text-[#000000] mb-3">Cash Runway by Scenario</h2>
+              <p className="py-12 text-center text-sm text-[#111111]">Scenario runway breakdown is not available for this domain view.</p>
             </section>
           ) : (
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
               <section className={`${R} border border-[#e4e7ec] bg-white p-4`}>
                 <div className="flex items-center justify-between mb-3">
-                  <h2 className="text-sm font-semibold text-[#101828]">Net Cash Flow</h2>
-                  <button type="button" onClick={() => setInfoOpen(true)} className="text-[#98a2b3] hover:text-[#667085]">
+                  <h2 className="text-sm font-semibold text-[#000000]">Net Cash Flow</h2>
+                  <button type="button" onClick={() => setInfoOpen(true)} className="text-[#141414] hover:text-[#111111]">
                     <Info className="size-4" />
                   </button>
                 </div>
                 {netCashChart.length === 0 ? (
-                  <p className="py-12 text-center text-sm text-[#64748b]">No monthly cash flow data is available.</p>
+                  <p className="py-12 text-center text-sm text-[#111111]">No monthly cash flow data is available.</p>
                 ) : <div className="h-[240px]">
                   <ResponsiveContainer width="100%" height="100%">
                     <ComposedChart data={netCashChart} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
@@ -389,10 +389,10 @@ export function CashFlowAnalysisView({
 
               <section className={`${R} border border-[#e4e7ec] bg-white p-4`}>
                 <div className="flex items-center justify-between mb-3">
-                  <h2 className="text-sm font-semibold text-[#101828]">Closing Cash Balance</h2>
+                  <h2 className="text-sm font-semibold text-[#000000]">Closing Cash Balance</h2>
                 </div>
                 {closingCashChart.length === 0 ? (
-                  <p className="py-12 text-center text-sm text-[#64748b]">No closing cash history is available.</p>
+                  <p className="py-12 text-center text-sm text-[#111111]">No closing cash history is available.</p>
                 ) : <div className="h-[240px]">
                   <ResponsiveContainer width="100%" height="100%">
                     <ComposedChart data={closingCashChart} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
@@ -410,9 +410,9 @@ export function CashFlowAnalysisView({
 
           <section className={`${R} border border-[#e4e7ec] bg-white overflow-hidden`}>
             <div className="px-4 pt-4 pb-2 flex items-center justify-between">
-              <h2 className="text-sm font-semibold text-[#101828]">Cash Statement</h2>
+              <h2 className="text-sm font-semibold text-[#000000]">Cash Statement</h2>
               <div className="relative" ref={menuRef}>
-                <button type="button" onClick={() => setMenuOpen((o) => !o)} className="size-8 inline-flex items-center justify-center rounded-full hover:bg-[#f2f4f7] text-[#667085]">
+                <button type="button" onClick={() => setMenuOpen((o) => !o)} className="size-8 inline-flex items-center justify-center rounded-full hover:bg-[#f2f4f7] text-[#111111]">
                   <MoreHorizontal className="size-4" />
                 </button>
                 {menuOpen ? (
@@ -430,7 +430,7 @@ export function CashFlowAnalysisView({
             <div className="overflow-x-auto">
               <table className="w-full text-sm min-w-[720px]">
                 <thead>
-                  <tr className="border-y border-[#e4e7ec] text-left text-xs text-[#667085] bg-[#f9fafb]">
+                  <tr className="border-y border-[#e4e7ec] text-left text-xs text-[#111111] bg-[#f9fafb]">
                     <th className="px-4 py-3 font-medium sticky left-0 bg-[#f9fafb]">Line Item</th>
                     {displayedPeriods.map((key) => (
                       <th key={key} className={cn("px-3 py-3 font-medium text-right", key === activePeriod && "bg-[#eff8ff] text-[#1570ef]")}>
@@ -441,7 +441,7 @@ export function CashFlowAnalysisView({
                 </thead>
                 <tbody>
                   {visibleRows.length === 0 ? (
-                    <tr><td colSpan={Math.max(displayedPeriods.length + 1, 2)} className="px-4 py-10 text-center text-sm text-[#64748b]">No cash statement rows are available.</td></tr>
+                    <tr><td colSpan={Math.max(displayedPeriods.length + 1, 2)} className="px-4 py-10 text-center text-sm text-[#111111]">No cash statement rows are available.</td></tr>
                   ) : null}
                   {visibleRows.map((row) => (
                     <tr key={row.id} className={cn("border-t border-[#f2f4f7]", row.type === "total" && "bg-[#f9fafb]")}>
@@ -453,7 +453,7 @@ export function CashFlowAnalysisView({
                           key={key}
                           className={cn(
                             "px-3 py-3 text-right tabular-nums cursor-pointer hover:bg-[#eff8ff]",
-                            row.values[key] == null ? "text-[#667085]" : cellTone(row.values[key], row.type),
+                            row.values[key] == null ? "text-[#111111]" : cellTone(row.values[key], row.type),
                             key === activePeriod && "bg-[#eff8ff]/50",
                           )}
                           onClick={() => pickCell(row, key)}
@@ -471,10 +471,10 @@ export function CashFlowAnalysisView({
           <section className={`${R} border border-[#e4e7ec] bg-white p-4`}>
             <div className="flex items-center gap-2 mb-4">
               <SlidersHorizontal className="size-4 text-[#2563eb]" />
-              <h2 className="text-sm font-semibold text-[#101828]">What-if: Collection Days</h2>
-              <span className="text-xs text-[#667085] ml-auto tabular-nums">{collectionDays} days</span>
+              <h2 className="text-sm font-semibold text-[#000000]">What-if: Collection Days</h2>
+              <span className="text-xs text-[#111111] ml-auto tabular-nums">{collectionDays} days</span>
             </div>
-            {drivers.length === 0 ? <p className="text-sm text-[#667085]">No cash driver was returned, so this control is unavailable.</p> : <>
+            {drivers.length === 0 ? <p className="text-sm text-[#111111]">No cash driver was returned, so this control is unavailable.</p> : <>
               <div className="flex flex-wrap items-end gap-2">
                 <FilterSelect label="Driver" value={drivers.find((driver) => driver.code === driverCode) ? `${drivers.find((driver) => driver.code === driverCode)?.name} · ${driverCode}` : "Select driver"} options={["Select driver", ...driverOptions]} onChange={(value) => {
                   const selected = drivers.find((driver) => `${driver.name} · ${driver.code}` === value)
@@ -489,7 +489,7 @@ export function CashFlowAnalysisView({
                 </Button>
                 {preview ? <Button variant="outline" className="rounded-full h-10 px-4" onClick={onResetPreview}>Reset to official</Button> : null}
               </div>
-              {!driverCode ? <p className="mt-3 text-[11px] text-[#667085]">Choose a returned driver; no driver code has been guessed.</p> : null}
+              {!driverCode ? <p className="mt-3 text-[11px] text-[#111111]">Choose a returned driver; no driver code has been guessed.</p> : null}
             </>}
             {previewError ? <p className="mt-3 text-sm text-[#b42318]">{previewError}</p> : null}
           </section>
@@ -499,30 +499,30 @@ export function CashFlowAnalysisView({
           <aside className="w-full sm:w-[360px] shrink-0 border-l border-[#e4e7ec] bg-white flex flex-col">
             <div className="px-4 py-3 border-b border-[#e4e7ec] flex items-start justify-between gap-2">
               <div>
-                <p className="text-xs text-[#667085]">{selectedDetail.type} · {selectedDetail.period}</p>
-                <h3 className="text-base font-semibold text-[#101828] mt-0.5">{selectedDetail.line}</h3>
+                <p className="text-xs text-[#111111]">{selectedDetail.type} · {selectedDetail.period}</p>
+                <h3 className="text-base font-semibold text-[#000000] mt-0.5">{selectedDetail.line}</h3>
               </div>
               <button type="button" onClick={() => setDetailOpen(false)} className="size-8 rounded-full hover:bg-[#f2f4f7] inline-flex items-center justify-center">
-                <X className="size-4 text-[#667085]" />
+                <X className="size-4 text-[#111111]" />
               </button>
             </div>
             <div className="p-4 space-y-4 overflow-auto flex-1">
               <div className={`${R} bg-[#f9fafb] border border-[#e4e7ec] p-3`}>
-                <p className="text-xs text-[#667085]">Period Amount</p>
-                <p className="text-2xl font-semibold tabular-nums mt-1 text-[#101828]">{selectedDetail.amount}</p>
-                <p className="text-xs text-[#667085] mt-1">YTD {selectedDetail.ytd}</p>
+                <p className="text-xs text-[#111111]">Period Amount</p>
+                <p className="text-2xl font-semibold tabular-nums mt-1 text-[#000000]">{selectedDetail.amount}</p>
+                <p className="text-xs text-[#111111] mt-1">YTD {selectedDetail.ytd}</p>
               </div>
               {selectedDetail.drivers.length > 0 ? <div>
-                <p className="text-xs font-semibold text-[#344054] mb-2">Cash Drivers</p>
+                <p className="text-xs font-semibold text-[#111111] mb-2">Cash Drivers</p>
                 <ul className="space-y-2">
                   {selectedDetail.drivers.map((d) => (
                     <li key={d.label} className="flex justify-between text-sm">
-                      <span className="text-[#667085]">{d.label}</span>
+                      <span className="text-[#111111]">{d.label}</span>
                       <span className="font-medium tabular-nums">{d.value}</span>
                     </li>
                   ))}
                 </ul>
-              </div> : <p className="text-sm text-[#667085]">Budget variance, drivers, and commentary are not included in this domain response.</p>}
+              </div> : <p className="text-sm text-[#111111]">Budget variance, drivers, and commentary are not included in this domain response.</p>}
             </div>
           </aside>
         ) : null}
@@ -531,8 +531,8 @@ export function CashFlowAnalysisView({
       {infoOpen ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4" onClick={() => setInfoOpen(false)}>
           <div className={`${R} bg-white max-w-md w-full p-5 shadow-xl`} onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-base font-semibold text-[#101828]">Cash Flow Analysis</h3>
-            <p className="text-sm text-[#475569] mt-2 leading-relaxed">
+            <h3 className="text-base font-semibold text-[#000000]">Cash Flow Analysis</h3>
+            <p className="text-sm text-[#111111] mt-2 leading-relaxed">
               Track inflows, outflows, and closing cash by period. Sensitivity uses a returned cash driver and activates a clearly labeled, non-persisted preview dataset.
             </p>
             <Button variant="outline" className="rounded-full mt-4" onClick={() => setInfoOpen(false)}>Close</Button>

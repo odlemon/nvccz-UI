@@ -62,6 +62,10 @@ export interface ApplicationCreateRequest {
   foundingDate: string
   requestedAmount: number
   fundId?: string
+  /** Staff Add Deal: INTERNAL; applicant form: APPLICANT_FORM (when BE supports). */
+  source?: string
+  /** Ownership/valuation/governance fields the Add Deal wizard collects (proposedOwnership, preMoneyValuation, ownershipPercent, boardComposition, keyShareholders, governanceNotes, targetCloseDate, ...). */
+  applicationFormData?: Record<string, unknown>
   files: File[]
   documentTypes: string[]
 }
@@ -182,9 +186,26 @@ export interface ActivityDetailResponse {
 }
 
 class ApplicationsApiService {
-  // Get all applications
-  async getAll(): Promise<ApplicationsResponse> {
-    return apiClient.get<ApplicationsResponse>('/applications')
+  // Get all applications (use light for Deal Flow / pipeline lists)
+  async getAll(params?: {
+    light?: boolean
+    page?: number
+    limit?: number
+    paginate?: boolean
+    stage?: string
+    fundId?: string
+  }): Promise<ApplicationsResponse> {
+    const q = new URLSearchParams()
+    if (params?.light) q.set('light', 'true')
+    if (params?.paginate || params?.page != null || params?.limit != null) {
+      q.set('paginate', 'true')
+      if (params.page != null) q.set('page', String(params.page))
+      if (params.limit != null) q.set('limit', String(params.limit))
+    }
+    if (params?.stage) q.set('stage', params.stage)
+    if (params?.fundId) q.set('fundId', params.fundId)
+    const qs = q.toString()
+    return apiClient.get<ApplicationsResponse>(qs ? `/applications?${qs}` : '/applications')
   }
 
   // ── New Flow APIs ──────────────────────────────────────────────────
@@ -266,6 +287,14 @@ class ApplicationsApiService {
       formData.append('fundId', applicationData.fundId)
     }
 
+    if (applicationData.source) {
+      formData.append('source', applicationData.source)
+    }
+
+    if (applicationData.applicationFormData) {
+      formData.append('applicationFormData', JSON.stringify(applicationData.applicationFormData))
+    }
+
     // Append files
     applicationData.files.forEach((file) => {
       formData.append('files', file)
@@ -278,9 +307,75 @@ class ApplicationsApiService {
     return apiClient.post<ApplicationCreateResponse>('/applications', formData)
   }
 
+  /**
+   * Public draft upload — no applicationId. Files go to media storage; returns URLs
+   * to attach later via createWithDocumentUrls.
+   */
+  async uploadDocuments(
+    files: File[],
+    documentTypes: string[],
+    applicationId?: string,
+  ): Promise<{
+    success: boolean
+    message?: string
+    data?: {
+      applicationId?: string
+      documents: Array<{
+        id?: string
+        documentType: string
+        fileName: string
+        fileUrl: string
+        fileSize: number
+        filePath?: string
+      }>
+    }
+  }> {
+    const formData = new FormData()
+    files.forEach((file) => formData.append('files', file))
+    formData.append('documentTypes', JSON.stringify(documentTypes))
+    if (applicationId) formData.append('applicationId', applicationId)
+    return apiClient.post('/applications/upload-documents', formData)
+  }
+
+  /** Create application using already-uploaded media URLs (public JSON body). */
+  async createWithDocumentUrls(payload: {
+    applicantName: string
+    applicantEmail: string
+    applicantPhone: string
+    applicantAddress: string
+    businessName: string
+    businessDescription: string
+    industry: string
+    businessStage: string
+    foundingDate: string
+    requestedAmount: number
+    fundId?: string
+    /** Public form: APPLICANT_FORM; staff Add Deal uses multipart create with INTERNAL. */
+    source?: string
+    applicationFormData?: Record<string, unknown>
+    documents: Array<{
+      documentType: string
+      fileName: string
+      fileUrl: string
+      fileSize: number
+      isRequired?: boolean
+    }>
+  }): Promise<ApplicationCreateResponse> {
+    return apiClient.post<ApplicationCreateResponse>('/applications', payload)
+  }
+
+  /** Analyst clarification request — backend emails the applicant. */
+  async requestClarification(
+    applicationId: string,
+    body: { subject: string; message: string; recipientEmail?: string },
+  ): Promise<{ success: boolean; message?: string; data?: unknown }> {
+    return apiClient.post(`/applications/${applicationId}/request-clarification`, body)
+  }
+
   // Get a single application by ID
-  async getById(id: string): Promise<ApplicationCreateResponse> {
-    return apiClient.get<ApplicationCreateResponse>(`/applications/${id}`)
+  async getById(id: string, opts?: { light?: boolean }): Promise<ApplicationCreateResponse> {
+    const qs = opts?.light ? '?light=true' : ''
+    return apiClient.get<ApplicationCreateResponse>(`/applications/${id}${qs}`)
   }
 
   // Update an application
@@ -306,6 +401,14 @@ class ApplicationsApiService {
   // Assign task to user for due diligence
   async assignDueDiligenceTask(applicationId: string, taskData: TaskAssignmentRequest): Promise<TaskAssignmentResponse> {
     return apiClient.post<TaskAssignmentResponse>(`/applications/${applicationId}/due-diligence/assign-task`, taskData)
+  }
+
+  /** Change application workflow stage */
+  async changeStage(
+    applicationId: string,
+    body: { newStage: string; notes?: string },
+  ): Promise<ApplicationCreateResponse> {
+    return apiClient.post<ApplicationCreateResponse>(`/applications/${applicationId}/change-stage`, body)
   }
 
   // Create activity for a task

@@ -11,6 +11,7 @@ export function PerformanceV22Layout({ children }: { children: React.ReactNode }
       backgroundClassName="bg-[#f5f6f8]"
       loadingFallback={<div className="p-8 text-sm text-[#64748B]">Loading Performance…</div>}
       mockApp={<PerformanceV22App />}
+      hideThemeToggle
     >
       {children}
     </ClientDesignModuleShell>

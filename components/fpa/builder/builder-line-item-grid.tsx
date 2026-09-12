@@ -497,7 +497,7 @@ const HISTORY_ROWS = [
 /** Renders formulas with highlighted [Line Item] refs. */
 function FormulaText({ formula }: { formula: string }) {
   if (!formula || formula === "Input") {
-    return <span className="text-[#94a3b8] font-sans">Input</span>
+    return <span className="text-[#141414] font-sans">Input</span>
   }
   const parts = formula.split(/(\[[^\]]+\])/g)
   return (
@@ -511,7 +511,7 @@ function FormulaText({ formula }: { formula: string }) {
             {part}
           </span>
         ) : (
-          <span key={i} className="text-[#334155]">
+          <span key={i} className="text-[#111111]">
             {part}
           </span>
         ),
@@ -604,8 +604,8 @@ export function BuilderLineItemGrid({
 
   const pathTitle = pathOverride ? (
     <>
-      <span className="text-[#64748b] font-medium">{pathOverride.parent}</span>
-      <span className="text-[#94a3b8] mx-1">/</span>
+      <span className="text-[#111111] font-medium">{pathOverride.parent}</span>
+      <span className="text-[#141414] mx-1">/</span>
       <span>{pathOverride.leaf}</span>
     </>
   ) : module ? (
@@ -650,8 +650,8 @@ export function BuilderLineItemGrid({
     >
       <div className="px-4 pt-3 pb-0 shrink-0">
         <div className="flex items-center gap-2 mb-2">
-          <h2 className="text-[14px] font-semibold text-[#0f172a] min-w-0 truncate">{pathTitle}</h2>
-          <Info className="w-3.5 h-3.5 text-[#94a3b8] shrink-0" aria-hidden />
+          <h2 className="text-[14px] font-semibold text-[#000000] min-w-0 truncate">{pathTitle}</h2>
+          <Info className="w-3.5 h-3.5 text-[#141414] shrink-0" aria-hidden />
           <div className="ml-auto flex items-center gap-1.5">
             {onOpenDetailedWorkspace ? (
               <button
@@ -684,7 +684,7 @@ export function BuilderLineItemGrid({
             <button
               type="button"
               onClick={() => void toggleFullscreen()}
-              className="h-8 w-8 inline-flex items-center justify-center rounded-full border border-[#e2e8f0] text-[#64748b] hover:bg-[#f8fafc]"
+              className="h-8 w-8 inline-flex items-center justify-center rounded-full border border-[#e2e8f0] text-[#111111] hover:bg-[#f8fafc]"
               title={isFullscreen ? "Exit fullscreen" : "Fullscreen"}
               aria-label={isFullscreen ? "Exit fullscreen" : "Fullscreen"}
             >
@@ -708,7 +708,7 @@ export function BuilderLineItemGrid({
                   "h-9 text-[13px] font-medium border-b-2 -mb-px px-0.5",
                   centreTab === t.id
                     ? "border-[#2563eb] text-[#2563eb]"
-                    : "border-transparent text-[#64748b] hover:text-[#334155]",
+                    : "border-transparent text-[#111111] hover:text-[#111111]",
                 )}
               >
                 {t.label}
@@ -720,7 +720,7 @@ export function BuilderLineItemGrid({
               <select
                 value={filter}
                 onChange={(e) => setFilter(e.target.value as typeof filter)}
-                className="h-7 rounded-md border border-[#e2e8f0] bg-white px-2 text-[11px] text-[#334155]"
+                className="h-7 rounded-md border border-[#e2e8f0] bg-white px-2 text-[11px] text-[#111111]"
               >
                 <option value="all">All</option>
                 <option value="input">Inputs</option>
@@ -733,7 +733,7 @@ export function BuilderLineItemGrid({
                   "h-7 w-7 inline-flex items-center justify-center rounded-full border",
                   showFilterBar
                     ? "border-[#bfdbfe] bg-[#eff6ff] text-[#2563eb]"
-                    : "border-[#e2e8f0] text-[#64748b]",
+                    : "border-[#e2e8f0] text-[#111111]",
                 )}
                 aria-label="Toggle search filter"
                 title="Search line items"
@@ -747,7 +747,7 @@ export function BuilderLineItemGrid({
         {centreTab === "items" && showFilterBar && (
           <div className="py-2">
             <div className="relative max-w-sm">
-              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[#94a3b8]" />
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[#141414]" />
               <input
                 value={rowQuery}
                 onChange={(e) => setRowQuery(e.target.value)}
@@ -797,7 +797,7 @@ export function BuilderLineItemGrid({
             />
           </div>
 
-          <div className="px-4 py-2 border-t border-[#e2e8f0] flex flex-wrap items-center gap-4 text-[12px] text-[#64748b] bg-white shrink-0">
+          <div className="px-4 py-2 border-t border-[#e2e8f0] flex flex-wrap items-center gap-4 text-[12px] text-[#111111] bg-white shrink-0">
             <button
               type="button"
               disabled={!canEdit}
@@ -819,7 +819,7 @@ export function BuilderLineItemGrid({
                   onChange={(e) =>
                     setViewGrain(e.target.value as ViewGrain)
                   }
-                  className="h-7 rounded-md border border-[#e2e8f0] bg-white px-1.5 text-[12px] font-medium text-[#0f172a]"
+                  className="h-7 rounded-md border border-[#e2e8f0] bg-white px-1.5 text-[12px] font-medium text-[#000000]"
                 >
                   <option value="Monthly">Monthly</option>
                   <option value="Quarterly">Quarterly</option>
@@ -827,7 +827,7 @@ export function BuilderLineItemGrid({
                 </select>
               </label>
               <span>
-                Currency: <span className="text-[#0f172a] font-medium">{currency}</span>
+                Currency: <span className="text-[#000000] font-medium">{currency}</span>
               </span>
             </span>
           </div>
@@ -849,12 +849,12 @@ function LinksView({
   const calc = rows.filter((r) => r.kind === "CALCULATED")
   return (
     <div className="p-4 space-y-3">
-      <p className="text-[12px] text-[#64748b]">
+      <p className="text-[12px] text-[#111111]">
         Formula links for this module — click a node to select it in the inspector.
       </p>
       <div className="grid gap-3">
         {calc.length === 0 ? (
-          <p className="text-[13px] text-[#94a3b8] py-8 text-center">
+          <p className="text-[13px] text-[#141414] py-8 text-center">
             No calculated items in the current filter.
           </p>
         ) : (
@@ -871,10 +871,10 @@ function LinksView({
               )}
             >
               <div className="flex items-center gap-2 mb-2">
-                <span className="inline-flex h-5 min-w-[22px] items-center justify-center rounded bg-[#eff6ff] px-1 text-[10px] font-bold italic text-[#2563eb]">
+                <span className="inline-flex h-5 min-w-[22px] items-center justify-center rounded bg-[#eff6ff] px-1 text-[11px] font-bold italic text-[#2563eb]">
                   fx
                 </span>
-                <span className="text-[13px] font-semibold text-[#0f172a]">{row.name}</span>
+                <span className="text-[13px] font-semibold text-[#000000]">{row.name}</span>
               </div>
               <div className="pl-1">
                 <FormulaText formula={row.formula} />
@@ -917,13 +917,13 @@ function TemplatesPanel({
     <div className="flex-1 overflow-auto p-4 space-y-4 bg-[#fafbfc]">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h3 className="text-[14px] font-semibold text-[#0f172a]">Line item templates</h3>
-          <p className="text-[12px] text-[#64748b] mt-0.5">
+          <h3 className="text-[14px] font-semibold text-[#000000]">Line item templates</h3>
+          <p className="text-[12px] text-[#111111] mt-0.5">
             Apply a template into the current module, then tweak formulas.
           </p>
         </div>
         <div className="relative w-full sm:w-64">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[#94a3b8]" />
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[#141414]" />
           <input
             value={q}
             onChange={(e) => setQ(e.target.value)}
@@ -933,7 +933,7 @@ function TemplatesPanel({
         </div>
       </div>
       {loading ? (
-        <p className="text-center text-[13px] text-[#94a3b8] py-10">Loading templates…</p>
+        <p className="text-center text-[13px] text-[#141414] py-10">Loading templates…</p>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
           {list.map((t) => (
@@ -947,14 +947,14 @@ function TemplatesPanel({
                 </span>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <h4 className="text-[13px] font-semibold text-[#0f172a]">{t.name}</h4>
-                    <span className="rounded-full bg-[#f1f5f9] px-2 py-0.5 text-[10px] font-medium text-[#64748b]">
+                    <h4 className="text-[13px] font-semibold text-[#000000]">{t.name}</h4>
+                    <span className="rounded-full bg-[#f1f5f9] px-2 py-0.5 text-[11px] font-medium text-[#111111]">
                       {t.tag}
                     </span>
                   </div>
-                  <p className="text-[12px] text-[#64748b] mt-1 leading-relaxed">{t.desc}</p>
+                  <p className="text-[12px] text-[#111111] mt-1 leading-relaxed">{t.desc}</p>
                   <div className="mt-3 flex items-center justify-between gap-2">
-                    <span className="inline-flex items-center gap-1 text-[11px] text-[#94a3b8]">
+                    <span className="inline-flex items-center gap-1 text-[11px] text-[#141414]">
                       <FileSpreadsheet className="w-3.5 h-3.5" />
                       {t.items} line items
                     </span>
@@ -972,7 +972,7 @@ function TemplatesPanel({
             </article>
           ))}
           {!list.length && (
-            <p className="col-span-full text-center text-[13px] text-[#94a3b8] py-10">
+            <p className="col-span-full text-center text-[13px] text-[#141414] py-10">
               {q.trim()
                 ? `No templates match “${q}”.`
                 : "No templates available from the API yet."}
@@ -1004,10 +1004,10 @@ function ValidationsPanel({
   return (
     <div className="flex-1 overflow-auto p-4 space-y-4 bg-[#fafbfc]">
       <div>
-        <h3 className="text-[14px] font-semibold text-[#0f172a]">
+        <h3 className="text-[14px] font-semibold text-[#000000]">
           Validations{moduleLabel ? ` · ${moduleLabel}` : ""}
         </h3>
-        <p className="text-[12px] text-[#64748b] mt-0.5">
+        <p className="text-[12px] text-[#111111] mt-0.5">
           Live checks for this model. Focus jumps you to the related line item when available.
         </p>
       </div>
@@ -1028,7 +1028,7 @@ function ValidationsPanel({
               "h-8 rounded-full border px-3 text-[11px] font-medium",
               sev === chip.id
                 ? "border-[#2563eb] bg-[#eff6ff] text-[#2563eb]"
-                : "border-[#e2e8f0] bg-white text-[#475569] hover:bg-[#f8fafc]",
+                : "border-[#e2e8f0] bg-white text-[#111111] hover:bg-[#f8fafc]",
             )}
           >
             {chip.label}
@@ -1055,8 +1055,8 @@ function ValidationsPanel({
               )}
             </span>
             <div className="min-w-0 flex-1">
-              <p className="text-[13px] font-semibold text-[#0f172a]">{v.rule}</p>
-              <p className="text-[12px] text-[#64748b] mt-0.5 leading-relaxed">{v.detail}</p>
+              <p className="text-[13px] font-semibold text-[#000000]">{v.rule}</p>
+              <p className="text-[12px] text-[#111111] mt-0.5 leading-relaxed">{v.detail}</p>
             </div>
             <button
               type="button"
@@ -1071,7 +1071,7 @@ function ValidationsPanel({
           </li>
         ))}
         {!list.length && (
-          <li className="px-4 py-10 text-center text-[13px] text-[#94a3b8]">
+          <li className="px-4 py-10 text-center text-[13px] text-[#141414]">
             {rows != null && !source.length
               ? "No validation issues — run Validate Model to refresh."
               : "No issues in this filter."}
@@ -1103,15 +1103,15 @@ function HistoryPanel({
     <div className="flex-1 overflow-auto p-4 space-y-4 bg-[#fafbfc]">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h3 className="text-[14px] font-semibold text-[#0f172a]">
+          <h3 className="text-[14px] font-semibold text-[#000000]">
             Change history{moduleLabel ? ` · ${moduleLabel}` : ""}
           </h3>
-          <p className="text-[12px] text-[#64748b] mt-0.5">
+          <p className="text-[12px] text-[#111111] mt-0.5">
             Who changed formulas and inputs in this model.
           </p>
         </div>
         <div className="relative w-full sm:w-64">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[#94a3b8]" />
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[#141414]" />
           <input
             value={q}
             onChange={(e) => setQ(e.target.value)}
@@ -1127,14 +1127,14 @@ function HistoryPanel({
             <div className="rounded-xl border border-[#e2e8f0] bg-white px-4 py-3 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
               <div className="flex flex-wrap items-start gap-2 justify-between">
                 <div className="min-w-0">
-                  <p className="text-[13px] font-semibold text-[#0f172a]">
+                  <p className="text-[13px] font-semibold text-[#000000]">
                     {h.action}{" "}
                     <span className="text-[#2563eb] font-medium">{h.target}</span>
                   </p>
                   {h.detail ? (
-                    <p className="text-[12px] text-[#64748b] mt-1 font-mono">{h.detail}</p>
+                    <p className="text-[12px] text-[#111111] mt-1 font-mono">{h.detail}</p>
                   ) : null}
-                  <p className="mt-2 flex flex-wrap items-center gap-3 text-[11px] text-[#94a3b8]">
+                  <p className="mt-2 flex flex-wrap items-center gap-3 text-[11px] text-[#141414]">
                     <span className="inline-flex items-center gap-1">
                       <User className="w-3 h-3" /> {h.user}
                     </span>
@@ -1148,7 +1148,7 @@ function HistoryPanel({
           </li>
         ))}
         {!list.length && (
-          <li className="pl-6 py-10 text-[13px] text-[#94a3b8]">
+          <li className="pl-6 py-10 text-[13px] text-[#141414]">
             {q.trim()
               ? `No history matches “${q}”.`
               : rows != null
@@ -1213,7 +1213,7 @@ function LiveItemsTable({
   return (
     <table className="w-full text-[12px] border-collapse min-w-[720px]">
       <thead className="sticky top-0 z-10 bg-[#f8fafc]">
-        <tr className="text-left text-[#64748b] border-b border-[#e2e8f0]">
+        <tr className="text-left text-[#111111] border-b border-[#e2e8f0]">
           <th className="w-8 px-2 py-2 font-medium">#</th>
           <th className="px-3 py-2 font-medium min-w-[150px]">Line Item</th>
           <th className="px-3 py-2 font-medium min-w-[180px]">Formula</th>
@@ -1240,17 +1240,17 @@ function LiveItemsTable({
               )}
               onClick={() => onSelect(li)}
             >
-              <td className="px-2 py-2 text-[#94a3b8]">{idx + 1}</td>
+              <td className="px-2 py-2 text-[#141414]">{idx + 1}</td>
               <td className="px-3 py-2">
                 <div className="flex items-center gap-2">
                   {kind === "INPUT" ? (
                     <BarChart3 className="w-3.5 h-3.5 text-[#16a34a] shrink-0" />
                   ) : (
-                    <span className="inline-flex h-5 min-w-[22px] items-center justify-center rounded bg-[#eff6ff] px-1 text-[10px] font-bold italic text-[#2563eb] shrink-0">
+                    <span className="inline-flex h-5 min-w-[22px] items-center justify-center rounded bg-[#eff6ff] px-1 text-[11px] font-bold italic text-[#2563eb] shrink-0">
                       fx
                     </span>
                   )}
-                  <span className="font-medium text-[#0f172a]">{li.name}</span>
+                  <span className="font-medium text-[#000000]">{li.name}</span>
                 </div>
               </td>
               <td className="px-3 py-2">
@@ -1326,7 +1326,7 @@ function LiveItemsTable({
         })}
         {!items.length && (
           <tr>
-            <td colSpan={3 + displayLabels.length} className="px-4 py-10 text-center text-[#94a3b8]">
+            <td colSpan={3 + displayLabels.length} className="px-4 py-10 text-center text-[#141414]">
               No line items{canEdit ? " — add one to start." : "."}
             </td>
           </tr>
@@ -1363,8 +1363,8 @@ export function CreateLineItemDialog({ open, onClose, onCreate, defaultCategory 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4">
       <div className="w-full max-w-md rounded-xl border border-[#e2e8f0] bg-white p-4 shadow-xl space-y-3">
-        <h3 className="text-sm font-semibold text-[#0f172a]">Add line item</h3>
-        <label className="block text-xs text-[#64748b]">
+        <h3 className="text-sm font-semibold text-[#000000]">Add line item</h3>
+        <label className="block text-xs text-[#111111]">
           Name
           <input
             className="mt-1 w-full h-9 rounded-full border border-[#e2e8f0] px-3 text-sm"
@@ -1381,7 +1381,7 @@ export function CreateLineItemDialog({ open, onClose, onCreate, defaultCategory 
             }}
           />
         </label>
-        <label className="block text-xs text-[#64748b]">
+        <label className="block text-xs text-[#111111]">
           Code
           <input
             className="mt-1 w-full h-9 rounded-full border border-[#e2e8f0] px-3 text-sm font-mono"
@@ -1389,7 +1389,7 @@ export function CreateLineItemDialog({ open, onClose, onCreate, defaultCategory 
             onChange={(e) => setCode(e.target.value.toUpperCase())}
           />
         </label>
-        <label className="block text-xs text-[#64748b]">
+        <label className="block text-xs text-[#111111]">
           Type
           <select
             className="mt-1 w-full h-9 rounded-full border border-[#e2e8f0] px-3 text-sm"

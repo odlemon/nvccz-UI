@@ -100,3 +100,18 @@ export function downloadBlob(blob: Blob, filename: string) {
   a.remove()
   window.URL.revokeObjectURL(url)
 }
+
+/**
+ * A "nice" chart axis ceiling for a series whose peak is `maxValue`, in the same units the axis
+ * is labelled in.
+ *
+ * Three charts each rounded up to a fixed multiple of 50 ("$M"), which put every position below
+ * 50M on a 0-50M axis: an investor peaking at $1.25M had both series drawn flat along the
+ * baseline. The step has to scale with the data instead of being a constant.
+ */
+export function niceAxisMax(maxValue: number): number {
+  const peak = Math.max(Math.abs(maxValue), 1e-9)
+  const magnitude = Math.pow(10, Math.floor(Math.log10(peak)))
+  const step = [1, 2, 2.5, 5, 10].find((m) => peak <= m * magnitude) ?? 10
+  return Number((step * magnitude).toPrecision(3))
+}

@@ -1,5 +1,74 @@
 # Fundraising frontend QA issues
 
+> ## Re-verification — 9 Sep 2026 (`feature/fundraising-live`)
+>
+> **Every one of the 220 issues below is STALE.** They are not a worklist; they are the
+> fallout of a single build break in a different working copy.
+>
+> ### How that was established
+>
+> The capture header records `API: http://localhost:3002/api` and the session notes show, for
+> all twenty screens, `h1="" rows=0 api=0` — the walk never rendered a fundraising screen and
+> never made a single fundraising API call. Issue 80 gives the reason:
+>
+> ```
+> Module build failed … the name `fmtDate` is defined multiple times
+>   ,-[C:\Users\lysp\Documents\frontend nvccz\lib\fundraising\mappers.ts:200:1]
+> ```
+>
+> That path is **a different checkout** (`Documents\frontend nvccz`, not
+> `Downloads\nvccz-new`). The module did not compile, so every route 404'd or timed out.
+> That single break produced all 20 "No fundraising/investors API calls observed" mediums,
+> all 20 "Unhandled page error" highs, and the 2 dashboard highs.
+>
+> ### Current state of that break
+>
+> Fixed in this checkout. `lib/fundraising/mappers.ts` defines `fmtDate` exactly once (the
+> second grep hit is `fmtDateTime`), and `npx tsc --noEmit` reports no syntax errors in the
+> module — only 4 pre-existing type errors, listed in `fundraising-test-plan.md`.
+>
+> ### Disposition
+>
+> | Original issues | Count | Disposition |
+> |---|---:|---|
+> | `[high] Runtime — Unhandled page error` | 20 | **Stale** — all are the same `fmtDate` build failure in another checkout |
+> | `[high] Dashboard — Navigation timeout / Tab probe crashed` | 2 | **Stale** — consequence of the same break |
+> | `[medium] <screen> — No fundraising/investors API calls observed` | 19 | **Stale** — the module never loaded, so no calls could be made. All 20 screens now make live calls; see the per-screen table in `fundraising-test-plan.md` |
+> | `[low] Console — console.error` | 179 | **Stale and out of scope** — almost all are `zse/top-gainers` CORS failures from the market-data widget on the shared shell, unrelated to fundraising |
+>
+> ### Replacement
+>
+> This file is superseded by **`fundraising-test-plan.md`**, which records what was observed
+> per screen and per role on the running system, with the artefacts to back it. The issues
+> found and fixed in this pass — none of which appear below — are:
+>
+> | Defect | Where | Status |
+> |---|---|---|
+> | Report catalogue hardcoded with invented owners and cadences | `fundraising-reports.tsx` | **Fixed** — loads `GET /fundraising/reports` and its schedules |
+> | Configure dialog collected a cadence and discarded it | `fundraising-reports.tsx` | **Fixed** — persists via `POST /reports/schedules` |
+> | Pipeline by Stage collapsed all opportunities into one "Unspecified" bucket | `fundraising-pipeline.tsx` | **Fixed** — funnel shape + `currentStage` |
+> | Data-room Documents / Views (7d) / Downloads (7d) permanently zero | `mappers.ts` + backend | **Fixed** — `_count` shape + new 7-day aggregation |
+> | Audit and activity feeds showed "Name unavailable" for every actor | backend | **Fixed** — actor resolution on audit rows |
+> | Approvals showed "Name unavailable" for campaign, investor and requester | backend | **Fixed** — object resolution on approval rows |
+> | Due-diligence matrix empty on arrival | `fundraising-due-diligence.tsx` | **Fixed** — selects the first case |
+> | 20 `*-mock-data.ts` fixtures, 2 with fabricated KPI money | `components/fundraising/` | **Fixed** — deleted; helpers moved to `*-presentation.ts` |
+>
+> ### Checked and found NOT to be defects
+>
+> - **KPI cards on Commitments and Onboarding.** Both fixtures carried invented values
+>   (`US$33.21M`, counts of `6`). Neither reached the screen: the id list in each constant was
+>   diffed against the `switch` that overwrites `amount`/`value`, and every id was covered.
+>   Removed anyway, as a fixture of fake money beside a live screen is a trap for the next edit.
+> - **Tab switching.** The brief flagged a pattern of tabs navigating instead of switching in
+>   place. All six tabbed screens here use local `useState` + `onClick`; the only `router.push`
+>   is an explicit "open investor" action in a drawer. Verified in the browser on Settings.
+> - **Write refusal being silent for non-editing roles.** First measurement said the refusal was
+>   invisible; that was a measurement error — sonner clears after ~4s and the check ran at 4s.
+>   Polling from the click shows "You do not have permission to edit fundraising data".
+
+---
+
+
 **Captured:** 2026-07-16T22:48:50.293Z
 **App:** http://localhost:3001
 **API:** http://localhost:3002/api

@@ -1,6 +1,7 @@
-/* Home V3: sidebar stays put; only main.content scrolls. */
+/* Home V3: fixed full-viewport sidebar + main fills host below SharedTopbar. */
 
 .home-v3-root {
+  position: relative;
   display: flex;
   flex-direction: column;
   height: 100%;
@@ -9,6 +10,7 @@
 }
 
 .home-v3-root #app {
+  position: relative;
   flex: 1 1 auto;
   min-height: 0;
   height: 100%;
@@ -16,29 +18,10 @@
 }
 
 .home-v3-root .app-shell {
-  display: grid;
-  grid-template-columns: var(--sidebar) minmax(0, 1fr);
-  grid-template-rows: minmax(0, 1fr);
+  position: relative;
   height: 100%;
   min-height: 0 !important;
   overflow: hidden;
-}
-
-.home-v3-root .app-shell.sidebar-collapsed {
-  --sidebar: 84px;
-}
-
-.home-v3-root .sidebar {
-  position: relative !important;
-  inset: auto !important;
-  height: 100% !important;
-  width: auto !important;
-  min-height: 0;
-  overflow: visible;
-}
-
-.home-v3-root .sidebar.collapsed {
-  width: auto !important;
 }
 
 .home-v3-root .sidebar-scroll {
@@ -46,14 +29,56 @@
   min-height: 0;
 }
 
-.home-v3-root .main {
-  margin-left: 0 !important;
-  display: flex;
-  flex-direction: column;
-  height: 100% !important;
-  min-height: 0 !important;
-  max-height: 100%;
-  overflow: hidden !important;
+/*
+ * Match Performance / Portfolio: nav rail is position:fixed to the viewport
+ * (top:0 / 100dvh) so the matanho brand sits flush with no white gap.
+ * Main stays absolute inside the flex-1 host (below SharedTopbar) so page
+ * content is not hidden under the Arcus bar and cannot collapse to blank.
+ */
+@media (min-width: 981px) {
+  [data-arcus-shell] .home-v3-root .sidebar {
+    position: fixed !important;
+    inset: 0 auto 0 0 !important;
+    width: var(--sidebar) !important;
+    height: 100dvh !important;
+    max-height: 100dvh !important;
+    z-index: 50 !important;
+    margin: 0 !important;
+    top: 0 !important;
+    border-radius: 0 !important;
+  }
+
+  /* Brand row sits at the rail top (no empty strip above logo). */
+  [data-arcus-shell] .home-v3-root .sidebar .brand {
+    padding-top: 10px !important;
+    margin-top: 0 !important;
+  }
+
+  [data-arcus-shell] .home-v3-root .sidebar.collapsed {
+    width: 84px !important;
+  }
+
+  [data-arcus-shell] .home-v3-root .main {
+    position: absolute !important;
+    top: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    left: var(--sidebar) !important;
+    margin-left: 0 !important;
+    width: auto !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    inset: 0 0 0 var(--sidebar) !important;
+    display: flex !important;
+    flex-direction: column !important;
+    overflow: hidden !important;
+  }
+
+  [data-arcus-shell] .home-v3-root .app-shell.sidebar-collapsed .main {
+    left: 84px !important;
+    inset: 0 0 0 84px !important;
+  }
 }
 
 .home-v3-root .content {
@@ -64,28 +89,67 @@
   overscroll-behavior: contain;
 }
 
-.home-v3-root .app-shell.sidebar-collapsed .main {
-  margin-left: 0 !important;
+/*
+ * Kill the HTML mock topbar under SharedTopbar.
+ * Must beat arcus-header-overrides `.home-v3-root .topbar { display:flex;
+ * height/min-height:80px }` so it does not reserve an invisible 80px strip
+ * above page-head (that gap + 100vh main caused the extra right scrollbar).
+ */
+[data-arcus-shell] .home-v3-root .topbar,
+[data-arcus-shell] .home-v3-root header.topbar,
+[data-arcus-shell] .home-v3-root .main > .topbar,
+[data-arcus-shell] .home-v3-root .app-shell .topbar {
+  display: none !important;
+  height: 0 !important;
+  min-height: 0 !important;
+  max-height: 0 !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border: 0 !important;
+  overflow: hidden !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+  position: absolute !important;
+  inset: 0 auto auto 0 !important;
+  width: 0 !important;
+  flex: 0 0 0 !important;
+}
+
+/* Base CSS uses min-height:100vh on .main — clamp to the shell host only. */
+[data-arcus-shell] .home-v3-root .main {
+  min-height: 0 !important;
+}
+
+/* Content scrolls inside the host; never grow the document / double-scroll. */
+[data-arcus-shell] .home-v3-root,
+[data-arcus-shell] .home-v3-root #app,
+[data-arcus-shell] .home-v3-root .app-shell {
+  overflow: hidden !important;
+}
+
+[data-arcus-shell] .home-v3-root .content {
+  padding-top: 16px !important;
 }
 
 @media (max-width: 980px) {
-  .home-v3-root .app-shell {
-    display: block;
-  }
-
   .home-v3-root .sidebar,
   .home-v3-root .sidebar.collapsed {
     position: fixed !important;
     inset: 0 auto 0 0 !important;
     height: 100dvh !important;
     width: 260px !important;
+    z-index: 50 !important;
   }
 
   .home-v3-root .main,
   .home-v3-root .app-shell.sidebar-collapsed .main {
+    position: absolute !important;
+    inset: 0 !important;
     margin-left: 0 !important;
-    height: 100% !important;
+    height: auto !important;
     min-height: 0 !important;
+    display: flex !important;
+    flex-direction: column !important;
     overflow: hidden !important;
   }
 }

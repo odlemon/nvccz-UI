@@ -44,9 +44,9 @@ export function WorkflowPlanningCycleCard({
     <section className="rounded-xl border border-[#e2e8f0] bg-white p-4 sm:p-5 h-full flex flex-col min-w-0 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
       <div className="flex items-start justify-between gap-3 mb-5">
         <div className="min-w-0 space-y-1">
-          <p className="text-[11px] font-medium text-[#94a3b8]">Planning Cycle</p>
+          <p className="text-[11px] font-medium text-[#141414]">Planning Cycle</p>
           <div className="flex flex-wrap items-center gap-2">
-            <h1 className="text-lg sm:text-xl font-semibold text-[#0f172a] truncate leading-tight">
+            <h1 className="text-lg sm:text-xl font-semibold text-[#000000] truncate leading-tight">
               {cycle?.name || "Select a budget cycle"}
             </h1>
             {cycle ? (
@@ -88,14 +88,14 @@ export function WorkflowPlanningCycleCard({
             type="button"
             onClick={onCycleDetails}
             disabled={!cycle}
-            className="h-9 inline-flex items-center gap-1.5 rounded-lg border border-[#e2e8f0] bg-white px-3 text-xs font-medium text-[#475569] disabled:opacity-50 hover:bg-[#f8fafc]"
+            className="h-9 inline-flex items-center gap-1.5 rounded-lg border border-[#e2e8f0] bg-white px-3 text-xs font-medium text-[#111111] disabled:opacity-50 hover:bg-[#f8fafc]"
           >
-            <LayoutGrid className="w-3.5 h-3.5 text-[#94a3b8]" />
+            <LayoutGrid className="w-3.5 h-3.5 text-[#141414]" />
             Cycle Details
           </button>
           <button
             type="button"
-            className="h-9 w-9 inline-flex items-center justify-center rounded-lg border border-[#e2e8f0] text-[#64748b] hover:bg-[#f8fafc]"
+            className="h-9 w-9 inline-flex items-center justify-center rounded-lg border border-[#e2e8f0] text-[#111111] hover:bg-[#f8fafc]"
             aria-label="More"
           >
             <MoreVertical className="w-4 h-4" />
@@ -117,7 +117,7 @@ export function WorkflowPlanningCycleCard({
                       "h-8 w-8 rounded-full flex items-center justify-center shrink-0 text-xs font-semibold border-2",
                       done && "bg-[#16a34a] border-[#16a34a] text-white",
                       current && "bg-[#2563eb] border-[#2563eb] text-white",
-                      !done && !current && "bg-white border-[#e2e8f0] text-[#94a3b8]",
+                      !done && !current && "bg-white border-[#e2e8f0] text-[#141414]",
                     )}
                   >
                     {done ? <Check className="w-4 h-4" strokeWidth={2.5} /> : i + 1}
@@ -139,23 +139,23 @@ export function WorkflowPlanningCycleCard({
                   <p
                     className={cn(
                       "text-[12px] font-semibold leading-tight",
-                      current ? "text-[#2563eb]" : done ? "text-[#0f172a]" : "text-[#94a3b8]",
+                      current ? "text-[#2563eb]" : done ? "text-[#000000]" : "text-[#141414]",
                     )}
                   >
                     {stage.label}
                   </p>
                   {done ? (
-                    <p className="text-[10px] text-[#64748b] mt-0.5 leading-snug">
+                    <p className="text-[11px] text-[#111111] mt-0.5 leading-snug">
                       <span className="text-[#16a34a] font-medium">Completed</span>
                       {dateLabel ? ` ${dateLabel}` : ""}
                     </p>
                   ) : current ? (
-                    <p className="text-[10px] text-[#2563eb] mt-0.5 leading-snug font-medium">
+                    <p className="text-[11px] text-[#2563eb] mt-0.5 leading-snug font-medium">
                       In Progress
                       {dateLabel ? ` ${dateLabel}` : ""}
                     </p>
                   ) : (
-                    <p className="text-[10px] text-[#94a3b8] mt-0.5 leading-snug">
+                    <p className="text-[11px] text-[#141414] mt-0.5 leading-snug">
                       {dateLabel || "—"}
                     </p>
                   )}

@@ -189,8 +189,8 @@ export function BuilderModulesTree({
   if (!liveFolders.length) {
     return (
       <div className="flex flex-col min-h-0 flex-1 rounded-xl border border-[#e2e8f0] bg-white p-4">
-        <h2 className="text-[13px] font-semibold text-[#0f172a] mb-2">Modules</h2>
-        <p className="text-[12px] text-[#94a3b8]">No modules yet. Create one to start building.</p>
+        <h2 className="text-[13px] font-semibold text-[#000000] mb-2">Modules</h2>
+        <p className="text-[12px] text-[#141414]">No modules yet. Create one to start building.</p>
         {canCreateModule ? (
           <button
             type="button"
@@ -208,7 +208,7 @@ export function BuilderModulesTree({
     <div className="flex flex-col min-h-0 flex-1 rounded-xl border border-[#e2e8f0] bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04)] overflow-hidden">
       <div className="px-3 pt-3 pb-2 shrink-0">
         <div className="flex items-center justify-between mb-2.5">
-          <h2 className="text-[13px] font-semibold text-[#0f172a]">Modules</h2>
+          <h2 className="text-[13px] font-semibold text-[#000000]">Modules</h2>
           <button
             type="button"
             onClick={() => {
@@ -221,12 +221,12 @@ export function BuilderModulesTree({
           </button>
         </div>
         <div className="relative">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[#94a3b8]" />
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[#141414]" />
           <input
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="Search modules..."
-            className="h-8 w-full rounded-md border border-[#e2e8f0] bg-white pl-8 pr-2 text-[12px] text-[#0f172a] placeholder:text-[#94a3b8] focus:outline-none focus:ring-2 focus:ring-[#2563eb]/20"
+            className="h-8 w-full rounded-md border border-[#e2e8f0] bg-white pl-8 pr-2 text-[12px] text-[#000000] placeholder:text-[#141414] focus:outline-none focus:ring-2 focus:ring-[#2563eb]/20"
           />
         </div>
       </div>
@@ -239,17 +239,17 @@ export function BuilderModulesTree({
             <li key={folder.id}>
               <button
                 type="button"
-                className="w-full flex items-center gap-1.5 h-8 px-2 rounded-md text-[12px] font-medium text-[#0f172a] hover:bg-[#f8fafc]"
+                className="w-full flex items-center gap-1.5 h-8 px-2 rounded-md text-[12px] font-medium text-[#000000] hover:bg-[#f8fafc]"
                 onClick={() => toggle(folder.id)}
               >
                 {open ? (
-                  <ChevronDown className="w-3.5 h-3.5 text-[#94a3b8] shrink-0" />
+                  <ChevronDown className="w-3.5 h-3.5 text-[#141414] shrink-0" />
                 ) : (
-                  <ChevronRight className="w-3.5 h-3.5 text-[#94a3b8] shrink-0" />
+                  <ChevronRight className="w-3.5 h-3.5 text-[#141414] shrink-0" />
                 )}
                 <Folder className="w-3.5 h-3.5 text-[#2563eb] fill-[#2563eb]/15 shrink-0" />
                 <span className="truncate text-left flex-1">{folder.name}</span>
-                <span className="ml-1 inline-flex min-w-[20px] h-5 items-center justify-center rounded bg-[#f1f5f9] px-1.5 text-[10px] font-medium text-[#64748b] tabular-nums">
+                <span className="ml-1 inline-flex min-w-[20px] h-5 items-center justify-center rounded bg-[#f1f5f9] px-1.5 text-[11px] font-medium text-[#111111] tabular-nums">
                   {count}
                 </span>
               </button>
@@ -266,14 +266,14 @@ export function BuilderModulesTree({
                             "group w-full flex items-center gap-2 h-8 pl-2 pr-1 rounded-md text-[12px] text-left",
                             sel
                               ? "bg-[#eff6ff] text-[#2563eb] font-medium"
-                              : "text-[#475569] hover:bg-[#f8fafc]",
+                              : "text-[#111111] hover:bg-[#f8fafc]",
                           )}
                           onClick={() => selectLeaf(folder, leaf)}
                         >
                           <FileText
                             className={cn(
                               "w-3.5 h-3.5 shrink-0",
-                              sel ? "text-[#2563eb]" : "text-[#94a3b8]",
+                              sel ? "text-[#2563eb]" : "text-[#141414]",
                             )}
                           />
                           <span className="truncate flex-1">{leaf.name}</span>
@@ -281,7 +281,7 @@ export function BuilderModulesTree({
                             <span
                               role="button"
                               tabIndex={0}
-                              className="h-6 w-6 inline-flex items-center justify-center rounded text-[#64748b] hover:bg-white/80"
+                              className="h-6 w-6 inline-flex items-center justify-center rounded text-[#111111] hover:bg-white/80"
                               onClick={(e) => {
                                 e.stopPropagation()
                                 setMenuLeafId((v) => (v === leaf.id ? null : leaf.id))
@@ -322,7 +322,7 @@ export function BuilderModulesTree({
                             {canCreateModule && onAddChildModule ? (
                               <button
                                 type="button"
-                                className="w-full px-3 py-1.5 text-left text-[12px] text-[#334155] hover:bg-[#f8fafc]"
+                                className="w-full px-3 py-1.5 text-left text-[12px] text-[#111111] hover:bg-[#f8fafc]"
                                 onClick={(e) => {
                                   e.stopPropagation()
                                   setMenuLeafId(null)
@@ -338,7 +338,7 @@ export function BuilderModulesTree({
                               <>
                                 <button
                                   type="button"
-                                  className="w-full px-3 py-1.5 text-left text-[12px] text-[#334155] hover:bg-[#f8fafc]"
+                                  className="w-full px-3 py-1.5 text-left text-[12px] text-[#111111] hover:bg-[#f8fafc]"
                                   onClick={(e) => {
                                     e.stopPropagation()
                                     setMenuLeafId(null)
@@ -350,7 +350,7 @@ export function BuilderModulesTree({
                                 </button>
                                 <button
                                   type="button"
-                                  className="w-full px-3 py-1.5 text-left text-[12px] text-[#334155] hover:bg-[#f8fafc]"
+                                  className="w-full px-3 py-1.5 text-left text-[12px] text-[#111111] hover:bg-[#f8fafc]"
                                   onClick={(e) => {
                                     e.stopPropagation()
                                     setMenuLeafId(null)
@@ -385,7 +385,7 @@ export function BuilderModulesTree({
           )
         })}
         {!filtered.length && (
-          <li className="px-3 py-6 text-center text-[12px] text-[#94a3b8]">No modules found</li>
+          <li className="px-3 py-6 text-center text-[12px] text-[#141414]">No modules found</li>
         )}
       </ul>
     </div>
@@ -515,7 +515,7 @@ export function BuilderDimensionsPanel({
     <div className="flex flex-col min-h-[220px] max-h-[46%] shrink-0 rounded-xl border border-[#e2e8f0] bg-white shadow-[0_1px_2px_rgba(15,23,42,0.04)] overflow-hidden">
       <div className="px-3 pt-3 pb-2 shrink-0">
         <div className="flex items-center justify-between mb-2.5">
-          <h2 className="text-[13px] font-semibold text-[#0f172a]">Dimensions</h2>
+          <h2 className="text-[13px] font-semibold text-[#000000]">Dimensions</h2>
           <button
             type="button"
             onClick={() => {
@@ -528,12 +528,12 @@ export function BuilderDimensionsPanel({
           </button>
         </div>
         <div className="relative">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[#94a3b8]" />
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-[#141414]" />
           <input
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="Search dimensions..."
-            className="h-8 w-full rounded-md border border-[#e2e8f0] bg-white pl-8 pr-2 text-[12px] text-[#0f172a] placeholder:text-[#94a3b8] focus:outline-none focus:ring-2 focus:ring-[#2563eb]/20"
+            className="h-8 w-full rounded-md border border-[#e2e8f0] bg-white pl-8 pr-2 text-[12px] text-[#000000] placeholder:text-[#141414] focus:outline-none focus:ring-2 focus:ring-[#2563eb]/20"
           />
         </div>
       </div>
@@ -570,15 +570,15 @@ export function BuilderDimensionsPanel({
                   )}
                 </span>
                 <span className="min-w-0 flex-1">
-                  <span className="block text-[12px] font-semibold text-[#0f172a]">{d.name}</span>
-                  <span className="block text-[11px] text-[#94a3b8] truncate">{d.subtitle}</span>
+                  <span className="block text-[12px] font-semibold text-[#000000]">{d.name}</span>
+                  <span className="block text-[11px] text-[#141414] truncate">{d.subtitle}</span>
                 </span>
               </button>
             </li>
           )
         })}
         {!rows.length && (
-          <li className="px-2 py-6 text-center text-[12px] text-[#94a3b8]">
+          <li className="px-2 py-6 text-center text-[12px] text-[#141414]">
             No dimensions from API yet
           </li>
         )}

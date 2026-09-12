@@ -687,6 +687,42 @@ export interface InvoiceIntake {
 }
 
 // Generic Response Type
+/** GET /procurement/vendor-portal/purchase-order — what a vendor's invoice link resolves to. */
+export interface VendorPortalPurchaseOrder {
+  poNumber: string
+  status: string
+  /** False once the PO is BILLED (or never sent); the form is shown read-only then. */
+  openForInvoice: boolean
+  orderDate: string
+  expectedDeliveryDate: string | null
+  paymentTerms: string | null
+  subtotal: number | null
+  taxAmount: number | null
+  totalAmount: number | null
+  vendor: { name: string; email: string | null } | null
+  currency: { id: string; code: string; symbol: string } | null
+  /** VAT the server applies to a vendor-submitted invoice, as a percentage. */
+  vatPercent: number
+  items: Array<{
+    id: string
+    itemName: string
+    description: string | null
+    unit: string | null
+    quantity: number
+    quantityReceived: number
+    unitPrice: number
+    totalPrice: number
+  }>
+  invoices: Array<{
+    invoiceNumber: string
+    status: string
+    totalAmount: number
+    invoiceDate: string
+    createdAt: string
+  }>
+  tokenExpiresAt: string
+}
+
 export interface ProcurementResponse<T> {
   success: boolean
   message?: string
@@ -1194,6 +1230,24 @@ class ProcurementApiServiceV2 {
    */
   async createInvoice(data: any): Promise<ProcurementResponse<ProcurementInvoice>> {
     return apiClient.post<ProcurementResponse<ProcurementInvoice>>('/procurement/invoices', data)
+  }
+
+  /**
+   * PUBLIC: the purchase order behind a vendor's emailed invoice link.
+   * GET /procurement/vendor-portal/purchase-order?token=<signed PO_VENDOR_INVOICE token>
+   */
+  async getVendorPortalPurchaseOrder(token: string): Promise<ProcurementResponse<VendorPortalPurchaseOrder>> {
+    return apiClient.get<ProcurementResponse<VendorPortalPurchaseOrder>>(
+      `/procurement/vendor-portal/purchase-order?token=${encodeURIComponent(token)}`,
+    )
+  }
+
+  /** PUBLIC: upload a vendor's invoice PDF (multipart field `document`); use data.documentUrl as documentPath. */
+  async uploadVendorInvoiceDocument(formData: FormData): Promise<ProcurementResponse<{ documentUrl?: string }>> {
+    return apiClient.postFormData<ProcurementResponse<{ documentUrl?: string }>>(
+      '/procurement/invoices/upload-document',
+      formData,
+    )
   }
 
   /**

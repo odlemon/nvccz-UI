@@ -44,6 +44,7 @@ import {
   formatMultiple,
   formatPercent,
   formatUnits,
+  niceAxisMax,
   parseDecimal,
 } from "@/lib/lp-portal/format"
 import { useLpPerformanceBundle } from "@/lib/lp-portal/hooks"
@@ -119,8 +120,10 @@ function KpiCard({
 
 function formatCapitalY(v: number) {
   if (v === 0) return "$0"
-  if (v < 0) return `($${Math.abs(v)}M)`
-  return `$${v}M`
+  // trim binary-float tails such as 1.2000000000000002 out of the tick labels
+  const n = Number(Math.abs(v).toPrecision(3))
+  if (v < 0) return `($${n}M)`
+  return `$${n}M`
 }
 
 function CapitalAxisTick({
@@ -281,10 +284,10 @@ export function LpPerformanceScreen() {
     return historyFull
   }, [chartPeriod, historyFull])
 
-  const chartYMax = React.useMemo(() => {
-    const maxVal = Math.max(...chartData.flatMap((p) => [p.nav, p.paidIn, p.dist]), 1)
-    return Math.ceil(maxVal / 50) * 50 || 250
-  }, [chartData])
+  const chartYMax = React.useMemo(
+    () => niceAxisMax(Math.max(...chartData.flatMap((p) => [p.nav, p.paidIn, p.dist]), 1)),
+    [chartData],
+  )
 
   const lastIndex = Math.max(chartData.length - 1, 0)
 
@@ -301,10 +304,18 @@ export function LpPerformanceScreen() {
     ]
   }, [metrics])
 
-  const capitalYMax = React.useMemo(() => {
-    const maxAbs = Math.max(...capitalFlow.map((item) => Math.abs(item.value)), 1)
-    return Math.ceil(maxAbs / 50) * 50 || 200
-  }, [capitalFlow])
+  const capitalYMax = React.useMemo(
+    () => niceAxisMax(Math.max(...capitalFlow.map((item) => Math.abs(item.value)), 1)),
+    [capitalFlow],
+  )
+
+  const benchmarkLatest = React.useMemo(() => {
+    const b = data?.benchmarks
+    if (!b || b.configured === false || !b.series?.length) return "—"
+    const last = b.series[b.series.length - 1]
+    const v = parseDecimal(last.value)
+    return b.metric === "TVPI" ? formatMultiple(String(v)) : formatPercent(String(v))
+  }, [data?.benchmarks])
 
   const fundRows = React.useMemo(
     () =>
@@ -312,13 +323,20 @@ export function LpPerformanceScreen() {
         fundId: row.fundId,
         fund: row.fundName,
         structure: mapPerformanceStructure(row),
-        netIrr: formatPercent(row.netIrr),
-        tvpi: formatMultiple(row.tvpi),
+        // These come back null for OPEN_ENDED funds, which have no called or paid-in capital to
+        // define them against (SRD sections 3 and 37). Passing null through the formatters would
+        // print "0.0%" and "0.00x" — a zero is a claim, and an absent measure is not zero.
+        netIrr: row.netIrr == null ? "—" : formatPercent(row.netIrr),
+        tvpi: row.tvpi == null ? "—" : formatMultiple(row.tvpi),
         nav: formatMoneyCompact(row.nav, reportingCurrency),
-        benchmark: data?.benchmarks.note ?? "—",
+        // The Benchmark column used to render `benchmarks.note`, which was the backend's own
+        // placeholder sentence ("replace with approved index feed when available") — developer
+        // prose shown to investors in a data column. It now shows the benchmark's latest approved
+        // value, or an em dash when no approved series is configured.
+        benchmark: benchmarkLatest,
         asOf: asOfLabel,
       })),
-    [asOfLabel, data?.benchmarks.note, data?.byFund, reportingCurrency],
+    [asOfLabel, benchmarkLatest, data?.byFund, reportingCurrency],
   )
 
   React.useEffect(() => {
@@ -643,7 +661,7 @@ export function LpPerformanceScreen() {
                 <YAxis
                   domain={[0, chartYMax]}
                   ticks={Array.from({ length: 6 }, (_, i) => (chartYMax / 5) * i)}
-                  tickFormatter={(v) => (v === 0 ? "$0" : `$${v}M`)}
+                  tickFormatter={(v) => (v === 0 ? "$0" : `$${Number(v.toPrecision(3))}M`)}
                   tick={{ fontSize: 10, fill: "#9ca3af" }}
                   axisLine={false}
                   tickLine={false}
@@ -755,7 +773,9 @@ export function LpPerformanceScreen() {
               {benchmarkLoading ? (
                 Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-8 w-full" />)
               ) : benchmarkBars.length === 0 ? (
-                <p className="text-center text-[12px] text-[#9ca3af]">No benchmark data available</p>
+                <p className="text-center text-[12px] text-[#9ca3af]">
+                  {data?.benchmarks?.note ?? "No approved benchmark series is configured."}
+                </p>
               ) : (
                 benchmarkBars.map((row) => (
                   <div key={row.name} className="grid grid-cols-1 gap-1.5">
