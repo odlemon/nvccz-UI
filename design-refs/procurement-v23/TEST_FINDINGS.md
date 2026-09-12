@@ -405,9 +405,17 @@ The prod UI script rebuilds all six portals; this promotion is staff-scoped, so
 Verification on production is read-only by design: it carries no procurement test data and none was
 seeded. Reading an actual invoice there needs a real vendor document and a real user.
 
-**Before the client uses AI Invoice Capture on production:** prod has no `LLM_*` variables, so it
-falls back to the committed key in `src/config/llmGlobals.ts`. Set a real `LLM_API_KEY` in
-`prod.env` and rotate the committed one.
+**LLM credentials — settled.** Production deliberately runs on the committed default in
+`src/config/llmGlobals.ts`, the same DeepSeek key and base URL the portfolio module already uses for
+application scoring. No `LLM_*` variables are set on prod and none are wanted; `getLlmConfig()`
+falls through to `LLM_GLOBAL_DEFAULTS`.
+
+Verified on production through the same path the invoice reader uses: `baseUrl
+https://api.deepseek.com/v1`, `model deepseek-chat`, `configured true`, `fromEnv false`, and a live
+chat round-trip returned `ok`. Extraction therefore works on prod as shipped.
+
+The key being in the repository rather than the environment is a known, accepted trade-off, recorded
+here so the next person does not "fix" it by moving it and breaking both modules at once.
 
 ---
 
