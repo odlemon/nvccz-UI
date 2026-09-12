@@ -14,6 +14,10 @@ export const PR23_PAGE_TO_PATH: Record<string, string> = {
   'orders': '/procurement-v23/purchase-orders',
   'receiving': '/procurement-v23/goods-received',
   'invoices': '/procurement-v23/invoices',
+  // Same trap as quotations above: AI Invoice Capture was added to the sidebar in cycle six
+  // without a path, so opening it from any page other than the dashboard pushed
+  // /procurement-v23 and bounced the user back to the Command Centre.
+  'intake': '/procurement-v23/intake',
   'accounts': '/procurement-v23/accounts',
   'documents': '/procurement-v23/documents',
   'reports': '/procurement-v23/reports',
@@ -49,6 +53,7 @@ export const PR23_NAV_PAGES = [
   { id: 'pr23-orders', page: 'orders', path: '/procurement-v23/purchase-orders', name: 'Purchase Orders' },
   { id: 'pr23-receiving', page: 'receiving', path: '/procurement-v23/goods-received', name: 'Receiving & Inspection' },
   { id: 'pr23-invoices', page: 'invoices', path: '/procurement-v23/invoices', name: 'Invoices & 3-Way Match' },
+  { id: 'pr23-intake', page: 'intake', path: '/procurement-v23/intake', name: 'AI Invoice Capture' },
   { id: 'pr23-accounts', page: 'accounts', path: '/procurement-v23/accounts', name: 'Accounts & Asset Transfers' },
   { id: 'pr23-documents', page: 'documents', path: '/procurement-v23/documents', name: 'Document Vault' },
   { id: 'pr23-reports', page: 'reports', path: '/procurement-v23/reports', name: 'Reports Vault' },

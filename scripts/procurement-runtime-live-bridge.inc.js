@@ -369,6 +369,9 @@ function __pr23InvoiceLinesHtml(poRecordId) {
 
 /** Capture a supplier invoice against a real purchase order, replacing the fixture form. */
 function __pr23InvoiceCaptureModal(tenderId) {
+  // A capture started from AI Invoice Capture is about the order chosen there, not whichever tender
+  // happens to still be selected on the match workspace — that filter could leave no orders at all.
+  if (__pr23LastExtractionPo) tenderId = '';
   const inChain = tenderId ? new Set(__pr23MatchChain(tenderId).orders.map(o => o.recordId)) : null;
   const open = (state.orders || []).filter(o => __PR23_INVOICEABLE.includes(String(o.rawStatus || '').toUpperCase()) && (!inChain || inChain.has(o.recordId)));
   if (!open.length) {
@@ -395,6 +398,8 @@ function __pr23InvoiceCaptureModal(tenderId) {
  * files nobody had uploaded and announced captures that never happened.
  */
 let __pr23LastExtraction = null;
+/** The order the operator chose on AI Invoice Capture, carried into the capture form. */
+let __pr23LastExtractionPo = null;
 
 /** Purchase orders an invoice can be captured against — the same rule as the capture form. */
 function __pr23AiCaptureOrders() {
@@ -482,6 +487,16 @@ function __pr23PrefillCaptureFromExtraction() {
   if (!p) return;
   const form = document.querySelector('#invoiceCaptureV23');
   if (!form) return;
+  // The order first: choosing it rebuilds the line rows, so anything filled in before this would be
+  // thrown away.
+  if (__pr23LastExtractionPo) {
+    const po = form.querySelector('#invoicePoV23');
+    if (po && [...po.options].some(o => o.value === __pr23LastExtractionPo)) {
+      po.value = __pr23LastExtractionPo;
+      const box = form.querySelector('#invoiceLinesV23');
+      if (box) box.innerHTML = __pr23InvoiceLinesHtml(__pr23LastExtractionPo);
+    }
+  }
   if (p.invoiceDate && /^\d{4}-\d{2}-\d{2}/.test(String(p.invoiceDate))) {
     const date = form.querySelector('[name="invoiceDate"]');
     if (date) date.value = String(p.invoiceDate).slice(0, 10);
@@ -505,6 +520,8 @@ if (typeof window !== 'undefined') {
   /** Called by the host once the API returns; the runtime owns this DOM, so the filling in happens here. */
   window.__pr23ApplyExtraction = function (result) {
     __pr23LastExtraction = result || null;
+    const po = document.querySelector('#aiInvoicePoV23');
+    __pr23LastExtractionPo = po && po.value ? po.value : null;
     const box = document.querySelector('#aiInvoiceResultV23');
     if (box) box.innerHTML = __pr23ExtractionHtml(result || {});
   };

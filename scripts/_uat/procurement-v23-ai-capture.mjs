@@ -48,7 +48,10 @@ try {
   const errors = []
   page.on("pageerror", (e) => errors.push(String(e.message || e)))
 
-  await page.goto(`${BASE}/procurement-v23`, { waitUntil: "domcontentloaded", timeout: LOAD })
+  // Deliberately NOT the dashboard. Opening the page from /procurement-v23 is the one route where a
+  // missing path mapping cannot bite, because the host skips the router push when the path already
+  // matches. Cycle six shipped without a path for `intake`, and this test passed anyway.
+  await page.goto(`${BASE}/procurement-v23/invoices`, { waitUntil: "domcontentloaded", timeout: LOAD })
   await page.waitForSelector("#nav .nav-item", { timeout: LOAD })
   await page.waitForTimeout(2500)
 
@@ -60,9 +63,26 @@ try {
   const heading = (await page.locator(".page-head h1").first().textContent())?.trim()
   record("the page opens", heading === "AI Invoice Capture", `heading "${heading}"`)
 
+  // It must still be there a moment later: the router push happens after the runtime renders, so a
+  // wrong path shows the page and then replaces it with the Command Centre.
+  await page.waitForTimeout(4000)
+  const settledHeading = (await page.locator(".page-head h1").first().textContent())?.trim()
+  const url = page.url()
+  record(
+    "it stays open, and the address bar follows it",
+    settledHeading === "AI Invoice Capture" && /\/procurement-v23\/intake$/.test(url),
+    `heading "${settledHeading}" at ${url.replace(/^https?:\/\/[^/]+/, "")}`,
+  )
+
   const emptyState = (await page.locator("#aiInvoiceResultV23").textContent())?.trim() || ""
   record("honest empty state before any upload", /Nothing read yet/i.test(emptyState), emptyState.slice(0, 80))
 
+  // Live data arrives after the page first paints, and the runtime re-renders when it does, which
+  // clears anything already typed or chosen. Wait for the orders to land before touching the form,
+  // the way a person waits for a page to finish loading.
+  await page
+    .waitForFunction(() => document.querySelectorAll("#aiInvoicePoV23 option").length > 1, null, { timeout: 60000 })
+    .catch(() => {})
   const poOptions = await page.locator("#aiInvoicePoV23 option").count()
   record("purchase orders are offered", poOptions > 0, `${poOptions} option(s) incl. the no-PO choice`)
 
