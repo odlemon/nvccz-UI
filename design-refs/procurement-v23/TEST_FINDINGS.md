@@ -405,6 +405,34 @@ The prod UI script rebuilds all six portals; this promotion is staff-scoped, so
 Verification on production is read-only by design: it carries no procurement test data and none was
 seeded. Reading an actual invoice there needs a real vendor document and a real user.
 
+### Full regression on the promoted build (dev)
+
+AI Invoice Capture was verified on dev when it landed, but the rest of the module was not re-run
+against the new build until that gap was pointed out. Both suites were then run on dev against
+API `09a19ad` and staff `1ae2c63`, mail guard on and restored afterwards:
+
+| Suite | Result |
+|---|---|
+| `procurement-v23-actions.mjs`, 17 steps | **17/17** verified through the API |
+| `procurement-v23-workflows.mjs`, W1–W9 + N1–N4 | **15/15** verified through the API |
+
+The procure-to-pay dataset was rebuilt first, because the earlier dev run had consumed it.
+
+One test was stale and was rewritten rather than deleted. Actions step 5 asserted "OCR extraction is
+refused, nothing saved", which cycle six made false. It now asserts what must still hold: Upload
+invoice opens AI Invoice Capture, and merely opening it creates no invoice — the run recorded
+`invoices 8 -> 8`. Deleting the step would have quietly dropped the guard against a phantom invoice.
+
+Dev runs need the login pointed at dev as well as the browser, or `seedAuth` mints its token from the
+local database and every request 401s:
+`API=https://dev-api.matanho.com/api STAFF_BASE=https://dev.matanho.com NEXT_PUBLIC_API_BASE_URL=https://dev-api.matanho.com/api`.
+
+**Production was not redeployed for this.** Everything committed after the promotion is documentation
+and test tooling: `09a19ad..HEAD` is empty in the API repo and the staff diff is one markdown file, so
+production already runs the exact code these suites passed. The suites are deliberately never run
+against production — they create requisitions, vendors, orders, invoices and payments, would need test
+personas seeded as real users, and would send real email, since the mail guard covers dev only.
+
 **LLM credentials — settled.** Production deliberately runs on the committed default in
 `src/config/llmGlobals.ts`, the same DeepSeek key and base URL the portfolio module already uses for
 application scoring. No `LLM_*` variables are set on prod and none are wanted; `getLlmConfig()`

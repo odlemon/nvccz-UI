@@ -9,7 +9,7 @@
  *   2. Procurement Manager awards RFQ-B from the Approval Centre         -> quotation ACCEPTED, PO raised
  *   3. Operations member raises a requisition through the form           -> PENDING_APPROVAL, own department
  *   4. Procurement Officer registers a vendor through the V6 form        -> vendor exists
- *   5. Accountant runs OCR extraction, which is not connected            -> refused, no invoice created
+ *   5. Accountant opens Upload invoice                                   -> AI Invoice Capture, no invoice created
  *   6. Procurement Officer sends an RFQ from PR-E in the tender builder  -> RFQ linked to PR-E
  *   7. Procurement Officer scores RFQ-C's bids in Bid Evaluation         -> evaluation scores stored, complete
  *   8. Procurement Manager awards RFQ-C from the award panel             -> chosen quotation ACCEPTED, PO raised, RFQ AWARDED
@@ -262,19 +262,26 @@ await step("4 Procurement Officer registers a vendor (V6 form)", async (open) =>
   )
 })
 
-// ------------------------------------------------------------------ 5. unconnected step is refused
-// OCR extraction of an uploaded invoice has no backend behind it (manual capture does, step 10).
-await step("5 Unconnected OCR extraction is refused, nothing saved", async (open) => {
-  const label = "5 Unconnected OCR extraction is refused, nothing saved"
+// ------------------------------------------------------------------ 5. OCR extraction is connected
+// Until cycle six this opened a fixture modal whose "extract" button announced a reading that never
+// happened, and the step asserted that refusal. Upload invoice now opens AI Invoice Capture, which
+// reads a real PDF. Opening it still writes nothing: the invoice is created only when the capture
+// form is saved (step 10), so the count must not move.
+await step("5 Upload invoice opens AI Invoice Capture, nothing saved", async (open) => {
+  const label = "5 Upload invoice opens AI Invoice Capture, nothing saved"
   const email = "proc.ap@nts.local"
   const before = ((await api(email, "/procurement/invoices")) ?? []).length
   const { page, errors } = await open(email, "/procurement-v23/invoices")
   await page.click('[data-action="upload-invoice-v5"]')
-  await page.waitForSelector('[data-action="extract-invoice-v5"]')
-  await page.click('[data-action="extract-invoice-v5"]')
-  const toast = await toasts(page)
+  await page.waitForSelector("#aiInvoiceCaptureV23", { timeout: 60000 })
+  const heading = (await page.locator(".page-head h1").first().textContent())?.trim()
+  const readControls = await page.locator('[data-action="confirm-extract-invoice-v23"]').count()
   const after = ((await api(email, "/procurement/invoices")) ?? []).length
-  record(/not connected/i.test(toast) && after === before, label, `invoices ${before} -> ${after} · "${toast}"${suffix(errors)}`)
+  record(
+    heading === "AI Invoice Capture" && readControls > 0 && after === before,
+    label,
+    `invoices ${before} -> ${after} · "${heading}", ${readControls} read control(s)${suffix(errors)}`,
+  )
 })
 
 // ------------------------------------------------------------------ 6. tender builder
