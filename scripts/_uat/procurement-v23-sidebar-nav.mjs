@@ -13,8 +13,10 @@
  *
  * For each page in the role's sidebar this clicks the entry, checks the page stays and the address bar
  * follows, then clicks the page's first opener (a create / new / record / … button in the page head) and
- * checks that something visibly happens: a form, a drawer, a refusal, or a page change. It closes what
- * opened and never confirms a form, so nothing is written.
+ * checks that something visibly happens: a form, a drawer, a refusal, or a page change. For the openers
+ * the host gates, the role's grants (read from the API, not the page) must decide it: a form only for a
+ * role holding the grant, a refusal otherwise. It closes what opened and never confirms a form, so
+ * nothing is written.
  *
  * Against dev, API, STAFF_BASE and NEXT_PUBLIC_API_BASE_URL must all point at dev (handoff §5), or the
  * token is minted against the local database and every request 401s into /login.
@@ -22,7 +24,7 @@
 import fs from "node:fs"
 import path from "node:path"
 import { chromium } from "playwright"
-import { seedAuth, STAFF_BASE } from "./_routes.mjs"
+import { API, PASSWORD, seedAuth, STAFF_BASE } from "./_routes.mjs"
 
 const arg = (n) => process.argv.find((a) => a.startsWith(`--${n}=`))?.slice(n.length + 3)
 const BASE = arg("base") || STAFF_BASE
@@ -60,6 +62,26 @@ const PATHS = {
 /** Buttons that open something. Their confirm-* step is what writes, and this never clicks one. */
 const OPENER = /^(create|new|add|register|record|capture|upload|raise|open|start)-/
 
+/**
+ * Openers the host refuses to a role without the grant; keep in step with OPENER_GRANTS in
+ * lib/procurement-v23/actions.ts. Opening one of these for a role without the grant is a failure even
+ * though "something happened": right after a navigation the host once had no grants to check against.
+ */
+const OPENER_GRANTS = {
+  "create-po-v6": ["orders.manage"],
+  "create-tender": ["rfq.manage"],
+  "record-grn": ["receiving.manage"],
+  "record-payment-v23": ["invoices.pay"],
+  "create-plan-v5": ["plans.manage"],
+  "add-plan-item": ["plans.manage"],
+  "create-contract-v6": ["contracts.manage"],
+  "upload-document-v5": ["documents.manage"],
+  "upload-document-v6": ["documents.manage"],
+  "register-vendor-v6": ["vendors.manage"],
+  "run-ocr-v5": ["intake.manage"],
+  "upload-invoice-v5": ["intake.manage"],
+}
+
 fs.mkdirSync(OUT, { recursive: true })
 const results = []
 
@@ -67,6 +89,17 @@ const browser = await chromium.launch()
 const context = await browser.newContext({ viewport: { width: 1500, height: 1000 } })
 try {
   await seedAuth(context, BASE, EMAIL, "staff")
+  // The role's grants from the API. The page's own copy is what went missing after a navigation.
+  const signIn = await (await fetch(`${API}/auth/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email: EMAIL, password: PASSWORD, portal: "staff" }),
+  })).json()
+  const accessBody = await (await fetch(`${API}/procurement/me/access`, {
+    headers: { Authorization: `Bearer ${signIn.token || signIn?.data?.token}` },
+  })).json().catch(() => ({}))
+  const accessData = accessBody.data ?? accessBody
+  const access = { isPrivileged: Boolean(accessData.isPrivileged), permissions: new Set(accessData.permissions || []) }
   const page = await context.newPage()
   const errors = []
   page.on("pageerror", (e) => errors.push(String(e.message || e)))
@@ -140,6 +173,19 @@ try {
               ? `moved to ${after.page}`
               : null
       check(`opener "${opener.label}" (${opener.action}) does something`, !!what, what || "nothing visible happened")
+      const needs = OPENER_GRANTS[opener.action]
+      if (needs && !access.isPrivileged) {
+        const holds = needs.some((g) => access.permissions.has(`procurement.${g}`))
+        const refused = Boolean(newToast && /does not have permission/i.test(newToast))
+        check(
+          holds ? "role holds the grant and is not refused" : "role lacks the grant and is refused",
+          holds ? !refused : refused && !after.modalOpen && !after.drawerOpen && after.page === before.page,
+          `${needs.join(" or ")} ${holds ? "held" : "not held"} · ${what || "nothing happened"}`,
+        )
+      }
+      if (after.page && after.page !== before.page) {
+        check("the opener stays within the role's sidebar", offered.includes(after.page), `moved to ${after.page}`)
+      }
       check("no page errors from the opener", errors.length === mark, errors.slice(mark, mark + 2).join(" | ") || "none")
       if (!what || errors.length !== mark) {
         await page.screenshot({ path: path.join(OUT, `${pid}-opener.png`) }).catch(() => {})
