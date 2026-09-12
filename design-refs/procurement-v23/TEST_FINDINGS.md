@@ -376,8 +376,38 @@ Two false alarms, recorded because both cost time and neither was a defect:
 (4 May 2026). Every environment without `LLM_API_KEY` falls back to it — dev included — so invoice
 reading on dev currently runs on that key. It should be rotated and moved into the environment.
 
-**Production:** untouched. All nine prod containers healthy, API health 200, restarts 0, started before
-this work began; nothing from cycle six is deployed there.
+### Promoted to production — 12 September 2026
+
+Cycles four, five and six went to production together: API `321fcdc` → `09a19ad`, staff portal
+`9cceab1` → `2a36e93`.
+
+**The stock prod API script would have broken three pages.** `deploy_prod_api_committed.py` states
+"No migrations" — true when it was written, but the promoted range adds
+`db:migrate:procurement-registers`, and a direct probe found `procurement_documents`,
+`procurement_contracts`, `procurement_plans` and `procurement_plan_items` all **absent** on
+`nvccz_prod` and all present on dev. Swapping the image alone would have served Plan, Contracts and
+Document Vault against tables that do not exist. `deploy_prod_api_registers.py` therefore builds,
+tags the running image for rollback, runs the migration from the **new** image, verifies all four
+tables, and swaps only then — refusing to swap if the migration fails or any table is still missing.
+The migration is additive (`CREATE TABLE IF NOT EXISTS`, no drops, no rewrites) and idempotent.
+
+The prod UI script rebuilds all six portals; this promotion is staff-scoped, so
+`deploy_prod_staff_only.py` cut it to `ui-staff`. The other five portals were never touched.
+
+| | Production |
+|---|---|
+| API | built, migration `MIGRATE_EXIT=0`, four tables created, IMAGE_MATCH, PROD_API_OK, restarts 0 |
+| Register tables | absent before → present after (rows=0, awaiting real records) |
+| Staff portal | rebuilt and swapped, healthy, restarts 0; "AI Invoice Capture" present in the served chunk |
+| Other portals | lp, investee, apply, vendor, events untouched (11–17 hours uptime) |
+| Rollback | `nvccz-prod-api:pre-registers-20260912`, `nvccz-prod-ui-staff:pre-registers-20260912` |
+
+Verification on production is read-only by design: it carries no procurement test data and none was
+seeded. Reading an actual invoice there needs a real vendor document and a real user.
+
+**Before the client uses AI Invoice Capture on production:** prod has no `LLM_*` variables, so it
+falls back to the committed key in `src/config/llmGlobals.ts`. Set a real `LLM_API_KEY` in
+`prod.env` and rotate the committed one.
 
 ---
 
