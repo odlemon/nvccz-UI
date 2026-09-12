@@ -304,12 +304,26 @@ export async function handleProcurementV23Action(
           }
         }
         const title = val('#prForm [name="title"]')
-        const itemName = val('#prForm [name="item"]')
-        const quantity = Number(val('#prForm [name="qty"]'))
+        // Every line on the form. The vendored form had exactly one; without the live lines, the form itself is
+        // the single "line".
+        const lineRows = [...document.querySelectorAll<HTMLElement>("#prForm [data-pr-line]")]
+        const formEl = document.querySelector<HTMLElement>("#prForm")
+        const lines = (lineRows.length ? lineRows : formEl ? [formEl] : []).map((row) => {
+          const field = (n: string) =>
+            ((row.querySelector(`[name="${n}"]`) as HTMLInputElement | HTMLSelectElement | null)?.value ?? "").trim()
+          const estimate = Number(field("price"))
+          return {
+            itemName: field("item"),
+            quantity: Number(field("qty")),
+            unit: field("uom") || undefined,
+            // The requester's unit estimate; it stays internal and is never copied onto an RFQ.
+            unitPrice: estimate > 0 ? estimate : undefined,
+          }
+        })
         const missing: string[] = []
         if (!title) missing.push("requirement title")
-        if (!itemName) missing.push("line item")
-        if (!(quantity > 0)) missing.push("a quantity above zero")
+        if (!lines.length || lines.some((l) => !l.itemName)) missing.push(lines.length > 1 ? "an item on every line" : "line item")
+        if (lines.some((l) => !(l.quantity > 0))) missing.push("a quantity above zero on every line")
         if (missing.length) return { handled: true, error: `Cannot raise the requisition — missing ${missing.join(", ")}.` }
 
         const created = await createRequisition({
@@ -318,15 +332,7 @@ export async function handleProcurementV23Action(
           priority: "MEDIUM",
           justification: val('#prForm [name="motivation"]') || undefined,
           sourcingCategory: val('#prForm [name="category"]') || undefined,
-          items: [
-            {
-              itemName,
-              quantity,
-              unit: val('#prForm [name="uom"]') || undefined,
-              // The requester's unit estimate; it stays internal and is never copied onto an RFQ.
-              unitPrice: Number(val('#prForm [name="price"]')) > 0 ? Number(val('#prForm [name="price"]')) : undefined,
-            },
-          ],
+          items: lines,
         })
         const number = created?.requisitionNumber ?? "The requisition"
         if (action === "save-pr") {

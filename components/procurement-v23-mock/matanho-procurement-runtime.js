@@ -983,6 +983,73 @@ function __pr23BudgetNotice() {
   return `<p>Remaining against ${label}: ${money(budget - committed)} of ${money(budget)} (${money(committed)} already ordered). The approver sees this figure; it does not block the request.</p>`;
 }
 
+// ---------------------------------------------------------------- requisition line items
+
+/**
+ * The New requisition form's lines. The vendored form had one fixed row with a $1,000 unit estimate already
+ * filled in, so a request for three different things could not be raised, and every request carried an
+ * estimate nobody had given. In a live session the requester adds as many lines as the request needs, and
+ * the unit estimate is optional and starts empty.
+ */
+function __pr23PrLineRowHtml() {
+  const uoms = ['Each', 'Box', 'Ream', 'Pack', 'Lot', 'Month'].map(u => `<option>${u}</option>`).join('');
+  return `<tr data-pr-line><td><input name="item" required placeholder="What is needed"></td><td><select name="uom">${uoms}</select></td><td><input name="qty" type="number" min="1" step="1" value="1" required style="width:80px"></td><td><input name="price" type="number" min="0" step="0.01" placeholder="Optional" style="width:110px"></td><td data-pr-line-total>—</td></tr>`;
+}
+
+/** The lines table body, with Add line / Remove last line in the footer rather than inside a row. */
+function __pr23PrLinesTbody() {
+  return `<tbody id="prLinesV23">${__pr23PrLineRowHtml()}</tbody><tfoot><tr><td colspan="5"><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">${btn('Add line', 'add-pr-line-v23', '', 'plus')}${btn('Remove last line', 'remove-pr-line-v23')}<span class="muted" id="prLinesTotalV23" style="margin-left:auto">Estimated total —</span></div></td></tr></tfoot>`;
+}
+
+function __pr23PrLinesRecalc() {
+  const rows = [...document.querySelectorAll('#prLinesV23 [data-pr-line]')];
+  let sum = 0;
+  let priced = 0;
+  rows.forEach(row => {
+    const q = Number(row.querySelector('[name="qty"]')?.value || 0);
+    const p = Number(row.querySelector('[name="price"]')?.value || 0);
+    const cell = row.querySelector('[data-pr-line-total]');
+    if (q > 0 && p > 0) {
+      sum += q * p;
+      priced += 1;
+      if (cell) cell.textContent = __pr23Money2(q * p);
+    } else if (cell) {
+      cell.textContent = '—';
+    }
+  });
+  const total = document.querySelector('#prLinesTotalV23');
+  if (!total) return;
+  const unpriced = rows.length - priced;
+  total.textContent = priced
+    ? `Estimated total ${__pr23Money2(sum)}${unpriced ? ` (${unpriced} line${unpriced === 1 ? '' : 's'} without an estimate)` : ''}`
+    : 'Estimated total —';
+}
+
+// Add and remove requisition lines in place. Capture phase, and the click ends here, so none of the vendored
+// dispatchers treats these buttons as a prototype action.
+__pr23On(document, 'click', event => {
+  const control = event.target && event.target.closest && event.target.closest('[data-action="add-pr-line-v23"], [data-action="remove-pr-line-v23"]');
+  if (!control) return;
+  event.preventDefault();
+  event.stopImmediatePropagation();
+  const body = document.querySelector('#prLinesV23');
+  if (!body) return;
+  if (control.dataset.action === 'add-pr-line-v23') {
+    body.insertAdjacentHTML('beforeend', __pr23PrLineRowHtml());
+    const rows = body.querySelectorAll('[data-pr-line]');
+    const last = rows[rows.length - 1];
+    if (last) last.querySelector('[name="item"]')?.focus();
+  } else {
+    const rows = body.querySelectorAll('[data-pr-line]');
+    if (rows.length > 1) rows[rows.length - 1].remove();
+  }
+  __pr23PrLinesRecalc();
+}, true);
+
+__pr23On(document, 'input', event => {
+  if (event.target && event.target.closest && event.target.closest('#prLinesV23')) __pr23PrLinesRecalc();
+}, __pr23Sig);
+
 // Re-draw dependent parts of the live forms when a select changes. Removed with the runtime (__pr23Sig).
 __pr23On(document, 'change', event => {
   const target = event.target;
@@ -1504,7 +1571,7 @@ function previewReport(id){const r=state.reports.find(x=>x.id===id)||state.repor
 function formField(label,input,full=''){return `<div class="field ${full}"><label>${label}</label>${input}</div>`}
 function createPlanModal(){openModal('Create annual procurement plan','Create the plan header, then add requirements and submit through the approval workflow.',`<form id="planForm" class="form-grid">${formField('Plan name','<input name="name" required value="FY 2027 Procurement Plan">')}${formField('Entity',`<select name="entity">${entities.map(x=>`<option>${x[1]}</option>`).join('')}</select>`)}${formField('Financial year','<select name="year"><option>FY 2027</option><option>FY 2026</option></select>')}${formField('Currency','<select name="currency"><option>USD</option><option>ZiG</option><option>ZAR</option></select>')}${formField('Budget ceiling','<input name="budget" type="number" required value="1000000">')}${formField('Plan owner','<input name="owner" value="Group Procurement">')}${formField('Planning assumptions','<textarea name="notes">Capture strategic priorities, demand assumptions and known funding constraints.</textarea>','full')}</form>`,btn('Save draft','save-plan')+btn('Create & add items','create-plan-confirm','primary'))}
 function addPlanItemModal(){if(__pr23Live())return __pr23PlanItemModal();openModal('Add procurement plan item','Budget validation and sourcing method are captured before submission.',`<form id="planItemForm" class="form-grid">${formField('Requirement','<input name="description" required>','full')}${formField('Entity',`<select name="entity">${entities.slice(1).map(x=>`<option>${x[1]}</option>`).join('')}</select>`)}${formField('Category','<select name="category"><option>Technology</option><option>Medical</option><option>Agriculture</option><option>Fleet</option><option>Facilities</option></select>')}${formField('Quarter','<select name="quarter"><option>Q1</option><option>Q2</option><option>Q3</option><option>Q4</option></select>')}${formField('Sourcing method','<select name="method"><option>Open tender</option><option>Restricted tender</option><option>Competitive quotations</option><option>Framework</option></select>')}${formField('Estimated budget','<input name="budget" type="number" required>')}${formField('Cost centre','<input name="cost" value="CC-1001">')}${formField('Business justification','<textarea name="notes"></textarea>','full')}</form>`,btn('Save item','save-plan-item','primary'))}
-function requisitionModal(){openModal('New purchase requisition','Create an internal, investee or subsidiary request with line items, budget check and approval routing.',`<form id="prForm" class="form-grid">${formField('Request source','<select name="type"><option>Internal</option><option>Investee</option><option>Subsidiary</option></select>')}${formField('Entity',`<select name="entity">${entities.slice(1).map(x=>`<option>${x[1]}</option>`).join('')}</select>`)}${formField('Department / cost centre','<select name="cost"><option>IT & Digital / CC-1001</option><option>Finance / CC-1002</option><option>Operations / CC-2001</option></select>')}${formField('Category','<select name="category"><option>Technology</option><option>Medical</option><option>Agriculture</option><option>Facilities</option><option>Fleet</option></select>')}${formField('Requirement title','<input name="title" required>','full')}<div class="field full"><label>Line items</label><div class="table-wrap"><table style="min-width:650px"><thead><tr><th>Item</th><th>UOM</th><th>Qty</th><th>Unit estimate</th><th>Total</th></tr></thead><tbody><tr><td><input name="item" required></td><td><select name="uom"><option>Each</option><option>Box</option><option>Lot</option><option>Month</option></select></td><td><input name="qty" type="number" value="1"></td><td><input name="price" type="number" value="1000"></td><td>$1,000</td></tr></tbody></table></div></div>${formField('Internal motivation','<textarea name="motivation" required></textarea>','full')}${formField('Attachment','<input type="file" accept=".pdf,.doc,.docx,.xlsx,.csv">','full')}<div class="field full"><div class="notice"><div><strong>Live budget check</strong>${__pr23Live()?__pr23BudgetNotice():'<p>Remaining budget: $86,400. The request will warn or block according to the cost-centre control.</p>'}</div></div></div></form>`,btn('Save draft','save-pr')+btn('Submit for approval','submit-pr','primary'))}
+function requisitionModal(){openModal('New purchase requisition','Create an internal, investee or subsidiary request with line items, budget check and approval routing.',`<form id="prForm" class="form-grid">${formField('Request source','<select name="type"><option>Internal</option><option>Investee</option><option>Subsidiary</option></select>')}${formField('Entity',`<select name="entity">${entities.slice(1).map(x=>`<option>${x[1]}</option>`).join('')}</select>`)}${formField('Department / cost centre','<select name="cost"><option>IT & Digital / CC-1001</option><option>Finance / CC-1002</option><option>Operations / CC-2001</option></select>')}${formField('Category','<select name="category"><option>Technology</option><option>Medical</option><option>Agriculture</option><option>Facilities</option><option>Fleet</option></select>')}${formField('Requirement title','<input name="title" required>','full')}<div class="field full"><label>Line items</label><div class="table-wrap"><table style="min-width:650px"><thead><tr><th>Item</th><th>UOM</th><th>Qty</th><th>Unit estimate</th><th>Total</th></tr></thead>${__pr23Live()?__pr23PrLinesTbody():`<tbody><tr><td><input name="item" required></td><td><select name="uom"><option>Each</option><option>Box</option><option>Lot</option><option>Month</option></select></td><td><input name="qty" type="number" value="1"></td><td><input name="price" type="number" value="1000"></td><td>$1,000</td></tr></tbody>`}</table></div></div>${formField('Internal motivation','<textarea name="motivation" required></textarea>','full')}${formField('Attachment','<input type="file" accept=".pdf,.doc,.docx,.xlsx,.csv">','full')}<div class="field full"><div class="notice"><div><strong>Live budget check</strong>${__pr23Live()?__pr23BudgetNotice():'<p>Remaining budget: $86,400. The request will warn or block according to the cost-centre control.</p>'}</div></div></div></form>`,btn('Save draft','save-pr')+btn('Submit for approval','submit-pr','primary'))}
 function vendorModal(){openModal('Register vendor','Zimbabwe vendor controls include duplicate BP/VAT validation, mandatory bank details, currency and tax clearance.',`<form id="vendorForm" class="form-grid">${formField('Legal name','<input name="name" required>')}${formField('Category','<select name="category"><option>Technology</option><option>Medical</option><option>Facilities</option><option>Fleet</option></select>')}${formField('BP number','<input name="bp" required>')}${formField('VAT number','<input name="vat" required>')}${formField('Bank','<input name="bank" required>')}${formField('Branch code','<input name="branch" required>')}${formField('Default currency','<select name="currency"><option>USD</option><option>ZiG</option><option>ZAR</option></select>')}${formField('ITF263 expiry','<input name="itf" type="date">')}${formField('Certificate of incorporation','<input type="file">')}${formField('CR14 / current company extract','<input type="file">')}</form>`,btn('Cancel','close-overlay')+btn('Validate & register','register-vendor-confirm','primary'))}
 function inviteVendorsModal(){const eligible=state.vendors.filter(v=>v.status!=='Blacklisted');openModal('Invite vendors to bid','Only category-eligible, non-blacklisted suppliers are available. The system emails a unique secure bid-form link.',`<div class="notice" style="margin-bottom:14px"><span class="kpi-icon">${icon('mail')}</span><div><strong>Secure system-generated bid form</strong><p>Each vendor receives an individual expiring link. Submissions are timestamped, sealed and cannot be edited after closing.</p></div></div><div class="list">${eligible.map(v=>`<label class="list-row"><input type="checkbox" checked> <div class="list-main"><strong>${v.name}</strong><span>${v.category} · ${v.currency} · ${v.status}</span></div><span>${v.rating}/5</span></label>`).join('')}</div>`,btn('Preview vendor form','vendor-bid-preview')+btn(`Email ${eligible.length} invitations`,'send-invitations','primary','mail'))}
 function vendorBidPreview(id='TN-2026-014'){openModal('Vendor Bid Submission Form',`${id} · secure external form preview`,`<div class="notice" style="margin-bottom:14px"><div><strong>Unique vendor link · expires at tender close</strong><p>Vendor identity and tender reference are locked by the invitation token.</p></div></div><div class="form-grid">${formField('Vendor','<input value="TechNova Solutions" readonly>')}${formField('Tender','<input value="'+id+'" readonly>')}${formField('Technical response','<textarea placeholder="Structured response to mandatory and scored criteria"></textarea>','full')}${formField('Bid currency','<select><option>USD</option><option>ZiG</option><option>ZAR</option></select>')}${formField('Total bid price','<input type="number" value="1280000">')}${formField('Delivery period','<input value="12 weeks">')}${formField('Warranty / support','<input value="36 months">')}${formField('Commercial schedule','<input type="file" accept=".xlsx,.csv,.pdf">','full')}${formField('Declarations','<label><input type="checkbox"> I declare the bid is accurate and disclose all conflicts.</label>','full')}${formField('Authorised signature','<input placeholder="Type authorised signatory name">','full')}</div>`,btn('Save draft','vendor-save-draft')+btn('Seal & submit bid','vendor-submit-bid','primary','signature'))}

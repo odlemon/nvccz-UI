@@ -810,6 +810,73 @@ function __pr23BudgetNotice() {
   return `<p>Remaining against ${label}: ${money(budget - committed)} of ${money(budget)} (${money(committed)} already ordered). The approver sees this figure; it does not block the request.</p>`;
 }
 
+// ---------------------------------------------------------------- requisition line items
+
+/**
+ * The New requisition form's lines. The vendored form had one fixed row with a $1,000 unit estimate already
+ * filled in, so a request for three different things could not be raised, and every request carried an
+ * estimate nobody had given. In a live session the requester adds as many lines as the request needs, and
+ * the unit estimate is optional and starts empty.
+ */
+function __pr23PrLineRowHtml() {
+  const uoms = ['Each', 'Box', 'Ream', 'Pack', 'Lot', 'Month'].map(u => `<option>${u}</option>`).join('');
+  return `<tr data-pr-line><td><input name="item" required placeholder="What is needed"></td><td><select name="uom">${uoms}</select></td><td><input name="qty" type="number" min="1" step="1" value="1" required style="width:80px"></td><td><input name="price" type="number" min="0" step="0.01" placeholder="Optional" style="width:110px"></td><td data-pr-line-total>—</td></tr>`;
+}
+
+/** The lines table body, with Add line / Remove last line in the footer rather than inside a row. */
+function __pr23PrLinesTbody() {
+  return `<tbody id="prLinesV23">${__pr23PrLineRowHtml()}</tbody><tfoot><tr><td colspan="5"><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">${btn('Add line', 'add-pr-line-v23', '', 'plus')}${btn('Remove last line', 'remove-pr-line-v23')}<span class="muted" id="prLinesTotalV23" style="margin-left:auto">Estimated total —</span></div></td></tr></tfoot>`;
+}
+
+function __pr23PrLinesRecalc() {
+  const rows = [...document.querySelectorAll('#prLinesV23 [data-pr-line]')];
+  let sum = 0;
+  let priced = 0;
+  rows.forEach(row => {
+    const q = Number(row.querySelector('[name="qty"]')?.value || 0);
+    const p = Number(row.querySelector('[name="price"]')?.value || 0);
+    const cell = row.querySelector('[data-pr-line-total]');
+    if (q > 0 && p > 0) {
+      sum += q * p;
+      priced += 1;
+      if (cell) cell.textContent = __pr23Money2(q * p);
+    } else if (cell) {
+      cell.textContent = '—';
+    }
+  });
+  const total = document.querySelector('#prLinesTotalV23');
+  if (!total) return;
+  const unpriced = rows.length - priced;
+  total.textContent = priced
+    ? `Estimated total ${__pr23Money2(sum)}${unpriced ? ` (${unpriced} line${unpriced === 1 ? '' : 's'} without an estimate)` : ''}`
+    : 'Estimated total —';
+}
+
+// Add and remove requisition lines in place. Capture phase, and the click ends here, so none of the vendored
+// dispatchers treats these buttons as a prototype action.
+__pr23On(document, 'click', event => {
+  const control = event.target && event.target.closest && event.target.closest('[data-action="add-pr-line-v23"], [data-action="remove-pr-line-v23"]');
+  if (!control) return;
+  event.preventDefault();
+  event.stopImmediatePropagation();
+  const body = document.querySelector('#prLinesV23');
+  if (!body) return;
+  if (control.dataset.action === 'add-pr-line-v23') {
+    body.insertAdjacentHTML('beforeend', __pr23PrLineRowHtml());
+    const rows = body.querySelectorAll('[data-pr-line]');
+    const last = rows[rows.length - 1];
+    if (last) last.querySelector('[name="item"]')?.focus();
+  } else {
+    const rows = body.querySelectorAll('[data-pr-line]');
+    if (rows.length > 1) rows[rows.length - 1].remove();
+  }
+  __pr23PrLinesRecalc();
+}, true);
+
+__pr23On(document, 'input', event => {
+  if (event.target && event.target.closest && event.target.closest('#prLinesV23')) __pr23PrLinesRecalc();
+}, __pr23Sig);
+
 // Re-draw dependent parts of the live forms when a select changes. Removed with the runtime (__pr23Sig).
 __pr23On(document, 'change', event => {
   const target = event.target;

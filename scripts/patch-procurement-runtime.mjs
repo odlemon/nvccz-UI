@@ -1187,6 +1187,20 @@ s = replaceUnique(
   }
 }
 
+// ---------------------------------------------------------------------------
+// 25. New requisition takes as many lines as the request needs
+// ---------------------------------------------------------------------------
+// The vendored form had one fixed line with a $1,000 unit estimate already filled in: a request for
+// three different things could not be raised from the UI, and every request carried an estimate
+// nobody had given. The bridge's __pr23PrLinesTbody() supplies the live lines.
+s = replaceUnique(
+  s,
+  '<tbody><tr><td><input name="item" required></td><td><select name="uom"><option>Each</option><option>Box</option><option>Lot</option><option>Month</option></select></td><td><input name="qty" type="number" value="1"></td><td><input name="price" type="number" value="1000"></td><td>$1,000</td></tr></tbody>',
+  '${__pr23Live()?__pr23PrLinesTbody():`<tbody><tr><td><input name="item" required></td><td><select name="uom"><option>Each</option><option>Box</option><option>Lot</option><option>Month</option></select></td><td><input name="qty" type="number" value="1"></td><td><input name="price" type="number" value="1000"></td><td>$1,000</td></tr></tbody>`}',
+  "new requisition -> as many lines as the request needs, no invented estimate",
+  "__pr23Live()?__pr23PrLinesTbody():",
+)
+
 console.log(`\n${applied} applied, ${skipped} already in place, ${missed} missed`)
 if (missed) {
   console.error("One or more patches did not find their anchor. The runtime is NOT fully patched.")
