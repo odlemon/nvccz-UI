@@ -3,6 +3,13 @@
  *
  *   node scripts/_uat/procurement-v23-ai-capture.mjs <path-to-invoice.pdf> [--base=http://localhost:3001]
  *
+ * Against dev, point the LOGIN at dev too. _routes.mjs mints its token from
+ * NEXT_PUBLIC_API_BASE_URL, which .env.local pins to the local API — so without this the run signs
+ * in against the local database, every request 401s, and the browser lands on /login:
+ *
+ *   NEXT_PUBLIC_API_BASE_URL=https://dev-api.matanho.com/api UAT_LOAD_TIMEOUT_MS=180000 \
+ *     node scripts/_uat/procurement-v23-ai-capture.mjs invoice.pdf --base=https://dev.matanho.com
+ *
  * Signs in, opens the page from the sidebar, uploads a real PDF, and checks that what the model
  * read is rendered for checking and carried into the capture form. Writes a screenshot beside the
  * run so the rendering can be eyeballed.
@@ -18,6 +25,8 @@ const BASE = arg("base") || STAFF_BASE
 const OUT = path.resolve(arg("out") || ".procurement-ai-capture")
 const EMAIL = arg("user") || "proc.ap@nts.local"
 const WAIT = Number(process.env.UAT_EXTRACT_TIMEOUT_MS || 180000)
+/** Dev pages take 78-130s over the remote link; a local run is far quicker. */
+const LOAD = Number(process.env.UAT_LOAD_TIMEOUT_MS || 90000)
 
 if (!PDF || !fs.existsSync(PDF)) {
   console.error("Pass the path to a PDF invoice as the first argument.")
@@ -39,15 +48,15 @@ try {
   const errors = []
   page.on("pageerror", (e) => errors.push(String(e.message || e)))
 
-  await page.goto(`${BASE}/procurement-v23`, { waitUntil: "domcontentloaded", timeout: 90000 })
-  await page.waitForSelector("#nav .nav-item", { timeout: 90000 })
+  await page.goto(`${BASE}/procurement-v23`, { waitUntil: "domcontentloaded", timeout: LOAD })
+  await page.waitForSelector("#nav .nav-item", { timeout: LOAD })
   await page.waitForTimeout(2500)
 
   const navItem = page.locator('#nav .nav-item[data-page="intake"]')
   record("sidebar offers AI Invoice Capture", (await navItem.count()) > 0, `${await navItem.count()} entry`)
 
   await navItem.first().click()
-  await page.waitForSelector("#aiInvoiceCaptureV23", { timeout: 30000 })
+  await page.waitForSelector("#aiInvoiceCaptureV23", { timeout: LOAD })
   const heading = (await page.locator(".page-head h1").first().textContent())?.trim()
   record("the page opens", heading === "AI Invoice Capture", `heading "${heading}"`)
 
@@ -82,7 +91,7 @@ try {
   const capture = page.locator('#aiInvoiceResultV23 [data-action="capture-invoice-v5"]')
   if (await capture.count()) {
     await capture.first().click()
-    await page.waitForSelector("#invoiceCaptureV23", { timeout: 30000 })
+    await page.waitForSelector("#invoiceCaptureV23", { timeout: LOAD })
     await page.waitForTimeout(800)
     const modal = (await page.locator("#invoiceCaptureV23").textContent())?.trim() || ""
     const date = await page.locator('#invoiceCaptureV23 [name="invoiceDate"]').inputValue()

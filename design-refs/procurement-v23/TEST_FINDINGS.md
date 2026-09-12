@@ -235,8 +235,10 @@ The first run passed 11 of 15:
 
 ### Still not built
 
-OCR extraction, eSignature, vendor messaging, withholding tax, fixed-asset transfers, evaluation
-committees and declarations, report schedules and download logs, and budget enforcement.
+eSignature, vendor messaging, withholding tax, fixed-asset transfers, evaluation committees and
+declarations, report schedules and download logs, and budget enforcement.
+
+OCR extraction left this list on 12 September 2026; it is built and verified in cycle six below.
 
 ### Re-crawl on the fixed build
 
@@ -290,6 +292,92 @@ Checked in the browser after the last two fixes:
 
 **Production:** unchanged. It still runs the cycle-three build (API `321fcdc`, staff `9cceab1`); nothing
 from cycle four or cycle five is deployed there.
+
+---
+
+## Cycle six — AI invoice capture, 12 September 2026 (local and dev)
+
+**What was asked.** Replace the fixture OCR queue with real extraction — an LLM reading the document,
+the way the portfolio module reads an application — and give it a page.
+
+**What was built.** Procurement → **AI Invoice Capture** (`intake`), in the sidebar between Invoices &
+3-Way Match and Accounts. One PDF at a time: it uploads, Suite 06 reads it (pdf-parse → LLM → strict
+JSON), and every field comes back with the model's own confidence beside it. "Capture this invoice"
+opens the existing capture form with the reading carried across. The invoice is still written by
+`POST /procurement/invoices`, so three-way matching, approval and payment are untouched.
+
+UI nvccz-new `1ae2c63`; API nvccz `b9e86f6`, `09a19ad`.
+
+### Why a new endpoint
+
+Suite 06 already had an intake pipeline, but `POST /procurement/suite06/intakes` demands a vendor, a
+purchase order **and** a goods receipt before it will read anything, and its `create-draft-bill` writes a
+**PurchaseInvoice** — a different register from V23's **ProcurementInvoice**. Neither suits the desk that
+opens the post. `POST /procurement/suite06/extract-for-capture` takes one PDF and returns the fields in a
+single call. Where the vendor is known (named, or resolved from the purchase order) the reading is stored
+as a `VendorInvoiceIntake`, so it reaches the verification queue and feeds the per-vendor correction map;
+the schema already made both links nullable. Without a vendor the PDF is still read and nothing is stored,
+because refusing to read an invoice merely because nobody has picked the vendor yet would be worse.
+
+### What it says when it cannot read
+
+| Situation | What the operator is told |
+|---|---|
+| Scanned PDF with no text layer | 400 — "most likely a scan with no text layer. Capture this invoice by hand." |
+| Model unreachable, or the read timed out | 503 — "could not be reached… capture this invoice by hand, or ask an administrator" |
+| Extraction not configured on the server | 503 — capture by hand, or set `LLM_API_KEY` |
+| Below the 0.85 confidence threshold | The page says so and asks for every field to be checked against the PDF |
+| Role without `procurement.intake.manage` | Refused before the upload, so no LLM call is spent |
+
+### Found and fixed while testing
+
+| What the tester saw | Fix |
+|---|---|
+| Unit prices on the review screen read $7, $14 and $4 for a $6.50, $14.25 and $3.80 invoice — the runtime's `money()` rounds to whole dollars | Extracted amounts render to the cent, in the invoice's own currency |
+| An unreachable model would have surfaced as a bare 500 | A network failure or timeout answers 503, saying to capture by hand |
+
+### Results
+
+`scripts/_uat/procurement-v23-ai-capture.mjs` drives the page in a browser as the Accountant.
+
+| | Local | Dev |
+|---|---|---|
+| Extraction through the API | 200 in 2s | 200 in 2s |
+| UI checks | **12/12** | **12/12** |
+| Guard: manager / requester / accountant | 403 / 403 / 200 | 403 / 403 / 200 |
+
+Read from the test invoice in both places: `INV-SW-4471`, 2026-09-08, USD, VAT 15%, three lines
+(40 × $6.50, 12 × $14.25, 25 × $3.80) at 0.98 confidence, filed as `VIN-2026-0001` on dev.
+
+### Deployed to dev and confirmed there
+
+12 September 2026 · API `09a19ad`, staff portal `1ae2c63` (stamp 20260912-025314).
+
+| | Dev |
+|---|---|
+| API | built, `db:migrate:all` 142 ok / 0 failed / 6 skipped, IMAGE_MATCH, health 200 |
+| Staff portal | rebuilt and swapped, healthy |
+| Mail | guard on for the run and restored afterwards; the run saves no invoice, so no mail was produced |
+
+Two false alarms, recorded because both cost time and neither was a defect:
+
+- **The dev container looked to have no outbound HTTPS.** `wget` inside the image called every host
+  unreachable, npm and Google included. The images carry no CA certificates, so busybox wget fails TLS
+  validation and cannot be told apart from a blocked network. Node's own `fetch` — what axios actually
+  uses — reaches the model host (401/421/200).
+- **AI Invoice Capture appeared to be missing from the dev sidebar.** The deployed chunk was correct all
+  along. `scripts/_uat/_routes.mjs` mints its login token from `NEXT_PUBLIC_API_BASE_URL`, which
+  `.env.local` pins to the local API, so the dev run signed in against the *local* database and was
+  bounced to `/login`. Dev sweeps need `NEXT_PUBLIC_API_BASE_URL=https://dev-api.matanho.com/api`.
+
+### Needs an administrator, not code
+
+`src/config/llmGlobals.ts` carries a literal API key on line 13, tracked in git since `d53ca49`
+(4 May 2026). Every environment without `LLM_API_KEY` falls back to it — dev included — so invoice
+reading on dev currently runs on that key. It should be rotated and moved into the environment.
+
+**Production:** untouched. All nine prod containers healthy, API health 200, restarts 0, started before
+this work began; nothing from cycle six is deployed there.
 
 ---
 
