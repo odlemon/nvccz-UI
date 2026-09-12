@@ -1096,6 +1096,66 @@ for (const [find, fixture, count] of [
   s = replaceEvery(s, find, repl, `letterhead: no fixture fallback in "${find}"`, repl, count)
 }
 
+// ---------------------------------------------------------------------------
+// 23. AI Invoice Capture — a page that reads a real supplier invoice
+// ---------------------------------------------------------------------------
+// The fixture OCR queue listed three files nobody had uploaded (invoice_aug_001.pdf,
+// medequip_44019.pdf, unknown_scan_14.jpg) with invented confidence figures, and its buttons
+// announced captures that never happened. In a live session the OCR controls now open a page that
+// uploads one real PDF, reads it through Suite 06 (pdf-parse -> LLM -> strict JSON) and prefills
+// the capture form. The invoice is still written by the capture form, so matching, approval and
+// payment are untouched.
+s = replaceUnique(
+  s,
+  "['invoices','Invoices & 3-Way Match','invoice','12'],['accounts','Accounts & Asset Transfers','account','4']",
+  "['invoices','Invoices & 3-Way Match','invoice','12'],['intake','AI Invoice Capture','invoice',''],['accounts','Accounts & Asset Transfers','account','4']",
+  "sidebar: AI Invoice Capture, under Fulfil & Account",
+  "['intake','AI Invoice Capture','invoice','']",
+)
+s = replaceUnique(
+  s,
+  "invoices:invoicesPage,accounts:accountsPage,",
+  "invoices:invoicesPage,intake:__pr23AiCapturePage,accounts:accountsPage,",
+  "page map: intake -> the AI capture page",
+  "intake:__pr23AiCapturePage",
+)
+s = replaceUnique(
+  s,
+  "'run-ocr-v5': a => openWideModal(",
+  "'run-ocr-v5': a => __pr23Live() ? (state.page = 'intake', render()) : openWideModal(",
+  "Run OCR opens AI Invoice Capture in a live session",
+  "'run-ocr-v5': a => __pr23Live()",
+)
+s = replaceUnique(
+  s,
+  "'upload-invoice-v5': a => invoiceIntakeModalV5(",
+  "'upload-invoice-v5': a => __pr23Live() ? (state.page = 'intake', render()) : invoiceIntakeModalV5(",
+  "Upload invoice opens AI Invoice Capture in a live session",
+  "'upload-invoice-v5': a => __pr23Live()",
+)
+s = replaceUnique(
+  s,
+  "'upload-invoice': a => invoiceIntakeModalV5(",
+  "'upload-invoice': a => __pr23Live() ? (state.page = 'intake', render()) : invoiceIntakeModalV5(",
+  "Upload invoice (v5 alias) opens AI Invoice Capture in a live session",
+  "'upload-invoice': a => __pr23Live()",
+)
+// The button no longer opens a queue, so it no longer says it does.
+s = replaceUnique(
+  s,
+  "actionButton('Process OCR queue','run-ocr-v5')",
+  "actionButton('AI invoice capture','run-ocr-v5')",
+  "invoices page: 'Process OCR queue' -> 'AI invoice capture'",
+  "actionButton('AI invoice capture','run-ocr-v5')",
+)
+s = replaceUnique(
+  s,
+  "actionButton('Run OCR','run-ocr-v5',t.id)",
+  "actionButton('AI invoice capture','run-ocr-v5',t.id)",
+  "match workspace: 'Run OCR' -> 'AI invoice capture'",
+  "actionButton('AI invoice capture','run-ocr-v5',t.id)",
+)
+
 console.log(`\n${applied} applied, ${skipped} already in place, ${missed} missed`)
 if (missed) {
   console.error("One or more patches did not find their anchor. The runtime is NOT fully patched.")

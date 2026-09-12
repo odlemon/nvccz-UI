@@ -307,6 +307,42 @@ export async function captureProcurementInvoice(body: {
   return unwrapData(await apiClient.post<ApiResponse<ProcurementRecord>>("/procurement/invoices", body))
 }
 
+export type ExtractedInvoiceLine = { description: string; quantity: number; unitPrice: number; lineTotal: number }
+
+/** What the model read off the invoice PDF. Every field may be null: nothing is assumed. */
+export type ExtractedInvoice = {
+  invoiceNumber: string | null
+  invoiceDate: string | null
+  currencyCode: string | null
+  lines: ExtractedInvoiceLine[]
+  taxTreatment?: "VAT_15" | "ZERO_RATED" | "EXEMPT" | "UNKNOWN"
+  fieldConfidence?: Record<string, number>
+  overallConfidence: number
+}
+
+export type InvoiceExtraction = {
+  payload: ExtractedInvoice | null
+  documentUrl: string
+  intake: { id: string; intakeNumber: string; status: string; taxParseStatus?: string | null } | null
+  /** Whether the extraction was stored (it is, once the vendor is known). */
+  storedIntake: boolean
+  /** Below the confidence threshold: the operator is told to check every field. */
+  lowConfidence: boolean
+  threshold: number
+}
+
+/**
+ * POST /procurement/suite06/extract-for-capture — multipart `document` (PDF) and an optional
+ * `purchaseOrderId`. Reads the invoice and hands the fields back for the capture form to
+ * prefill; nothing is captured until the operator saves, which still goes through
+ * POST /procurement/invoices.
+ */
+export async function extractInvoiceForCapture(form: FormData): Promise<InvoiceExtraction> {
+  return unwrapData(
+    await apiClient.postFormData<ApiResponse<InvoiceExtraction>>("/procurement/suite06/extract-for-capture", form),
+  )
+}
+
 export async function approveProcurementInvoice(id: string, isTaxable = true): Promise<ProcurementRecord> {
   return unwrapData(
     await apiClient.put<ApiResponse<ProcurementRecord>>(`/procurement/invoices/${encodeURIComponent(id)}/approve`, { isTaxable }),

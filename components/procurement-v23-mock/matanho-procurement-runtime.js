@@ -94,7 +94,7 @@ const entities=[['group','Group Consolidated'],['holdings','Matanho Holdings'],[
 const navGroups=[
  ['Overview',[['dashboard','Command Centre','dashboard',''],['plan','Annual Procurement Plan','plan',''],['approvals','Approval Centre','approve','11']]],
  ['Source',[['requisitions','Purchase Requisitions','requisition','14'],['tenders','Tenders & RFx','tender','8'],['evaluation','Bid Evaluation','evaluate','5'],['vendors','Vendor Registry','vendor',''],['contracts','Contracts & Awards','contract','']]],
- ['Fulfil & Account',[['orders','Purchase Orders','order',''],['receiving','Receiving & Inspection','receive','9'],['invoices','Invoices & 3-Way Match','invoice','12'],['accounts','Accounts & Asset Transfers','account','4']]],
+ ['Fulfil & Account',[['orders','Purchase Orders','order',''],['receiving','Receiving & Inspection','receive','9'],['invoices','Invoices & 3-Way Match','invoice','12'],['intake','AI Invoice Capture','invoice',''],['accounts','Accounts & Asset Transfers','account','4']]],
  ['Documents & Control',[['documents','Document Vault','document',''],['reports','Reports Vault','report',''],['audit','Audit & Compliance','audit',''],['settings','Configuration & RBAC','settings','']]]
 ];
 const state={page:(typeof initialPage==='string'&&initialPage)?initialPage:'dashboard',entity:'group',year:'FY 2026',expanded:true,filters:{period:'FY 2026',category:'All categories',status:'All statuses',currency:'USD'},planStatus:'Draft',planVersion:'v1.0',evaluationTender:null,accountTab:'journals',settingsTab:'rbac',theme:'light',
@@ -556,6 +556,131 @@ function __pr23InvoiceCaptureModal(tenderId) {
     `<form id="invoiceCaptureV23" class="form-grid"><div class="field"><label>Purchase order</label><select name="po" id="invoicePoV23">${options}</select></div><div class="field"><label>Invoice date</label><input type="date" name="invoiceDate" value="${iso(new Date())}" required></div><div class="field"><label>Due date</label><input type="date" name="dueDate" value="${iso(new Date(Date.now() + 30 * 86400000))}"></div><div class="field full"><label>Invoice lines</label><div id="invoiceLinesV23">${__pr23InvoiceLinesHtml(open[0].recordId)}</div></div></form>`,
     btn('Cancel', 'close-overlay') + btn('Capture invoice', 'confirm-capture-invoice-v5', 'primary'),
   );
+  __pr23PrefillCaptureFromExtraction();
+}
+
+// ---------------------------------------------------------------- AI invoice capture (LLM extraction)
+
+/**
+ * Suite 06 reads the supplier's PDF (pdf-parse -> LLM -> strict JSON) and the fields land here for
+ * checking. Nothing is saved by reading: the invoice is still written by the capture form, so
+ * three-way matching, approval and payment are unchanged. The fixture queue this replaces listed
+ * files nobody had uploaded and announced captures that never happened.
+ */
+let __pr23LastExtraction = null;
+
+/** Purchase orders an invoice can be captured against — the same rule as the capture form. */
+function __pr23AiCaptureOrders() {
+  return (state.orders || []).filter(o => __PR23_INVOICEABLE.includes(String(o.rawStatus || '').toUpperCase()));
+}
+
+/**
+ * Extracted amounts to the cent, in the invoice's own currency. The runtime's money() rounds to
+ * whole dollars, which showed a $6.50 unit price as "$7" — wrong on the one screen whose entire
+ * purpose is checking the figures against the PDF.
+ */
+function __pr23Money2(n, currencyCode) {
+  const v = Number(n);
+  if (!Number.isFinite(v)) return '—';
+  const code = /^[A-Za-z]{3}$/.test(String(currencyCode || '')) ? String(currencyCode).toUpperCase() : 'USD';
+  try {
+    return new Intl.NumberFormat('en-US', { style: 'currency', currency: code, minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v);
+  } catch (e) {
+    return `${code} ${v.toFixed(2)}`;
+  }
+}
+
+function __pr23TaxTreatmentLabel(t) {
+  if (t === 'VAT_15') return 'VAT 15%';
+  if (t === 'ZERO_RATED') return 'Zero rated';
+  if (t === 'EXEMPT') return 'Exempt';
+  return 'Not determined';
+}
+
+/** What the model read, field by field, with its own confidence beside each one. */
+function __pr23ExtractionHtml(result) {
+  const p = (result && result.payload) || {};
+  const lines = Array.isArray(p.lines) ? p.lines : [];
+  const pct = Math.round(Number(p.overallConfidence || 0) * 100);
+  const threshold = Math.round(Number(result && result.threshold || 0) * 100);
+  const fc = p.fieldConfidence || {};
+  const field = (label, value, key) => {
+    const c = fc[key] == null ? null : Math.round(Number(fc[key]) * 100);
+    const shown = (value == null || value === '') ? 'Not found' : value;
+    return `<div class="list-row"><div class="list-main"><strong>${__pr23Esc(shown)}</strong><span>${__pr23Esc(label)}${c == null ? '' : ` · ${c}% confidence`}</span></div>${c == null ? '' : status(c >= threshold ? 'Ready' : 'Review')}</div>`;
+  };
+  const rows = lines.map(l => `<tr><td>${__pr23Esc(l.description)}</td><td>${Number(l.quantity) || 0}</td><td>${__pr23Money2(l.unitPrice, p.currencyCode)}</td><td>${__pr23Money2(l.lineTotal, p.currencyCode)}</td></tr>`);
+  const total = lines.reduce((t, l) => t + (Number(l.lineTotal) || 0), 0);
+  const banner = (result && result.lowConfidence)
+    ? `<div class="notice"><div><strong>Below the confidence threshold</strong><p>Read at ${pct}%, under the ${threshold}% mark. Check every field against the PDF before saving.</p></div></div>`
+    : `<div class="notice"><div><strong>Read at ${pct}% confidence</strong><p>These are the figures the model read, not a checked invoice. Compare them with the PDF before saving.</p></div></div>`;
+  const filed = (result && result.intake && result.intake.intakeNumber)
+    ? `Filed as ${__pr23Esc(result.intake.intakeNumber)} in the intake register.`
+    : 'Not filed: without a purchase order the vendor is unknown, so this reading is not kept.';
+  return `${banner}<div class="list" style="margin-top:12px">${field('Invoice number', p.invoiceNumber, 'invoiceNumber')}${field('Invoice date', p.invoiceDate, 'invoiceDate')}${field('Currency', p.currencyCode, 'currencyCode')}${field('Tax treatment', __pr23TaxTreatmentLabel(p.taxTreatment), 'taxTreatment')}</div>
+    ${lines.length ? table(['Description', 'Quantity', 'Unit price', 'Line total'], rows) : '<p class="muted" style="margin-top:12px">No invoice lines could be read.</p>'}
+    <p class="muted" style="margin-top:8px">${lines.length ? `Lines total ${__pr23Money2(total, p.currencyCode)} before tax. ` : ''}${filed}</p>
+    <div style="margin-top:12px">${btn('Capture this invoice', 'capture-invoice-v5', 'primary', 'invoice')}</div>`;
+}
+
+/** The page: upload on the left of the flow, what was read below it, then the capture form. */
+function __pr23AiCapturePage() {
+  if (!__pr23Live()) {
+    return `<div class="page">${pageHead('Accounts payable', 'AI Invoice Capture', 'Reads a supplier invoice PDF and fills in the capture form.', '')}${card('Live procurement only', 'This page reads real invoices', '<div class="card-body"><p class="muted">Invoice reading runs against the procurement service and is not part of the offline preview.</p></div>')}</div>`;
+  }
+  const orders = __pr23AiCaptureOrders();
+  const options = ['<option value="">No purchase order yet</option>']
+    .concat(orders.map(o => `<option value="${__pr23Esc(o.recordId)}">${__pr23Esc(o.id)} · ${__pr23Esc(o.vendor)}</option>`))
+    .join('');
+  const upload = `<div class="card-body"><form id="aiInvoiceCaptureV23" class="form-grid">
+      <div class="field full"><label>Supplier invoice (PDF)</label><input type="file" name="document" accept="application/pdf,.pdf" required></div>
+      <div class="field full"><label>Purchase order</label><select id="aiInvoicePoV23">${options}</select></div>
+    </form>
+    <p class="muted" style="margin-top:8px">The PDF has to carry selectable text; a photograph or a flat scan cannot be read. Naming the purchase order identifies the vendor, keeps the reading on record, and teaches the model that vendor's layout.</p>
+    <div style="margin-top:12px">${btn('Read the invoice', 'confirm-extract-invoice-v23', 'primary', 'invoice')}</div></div>`;
+  const result = `<div class="card-body" id="aiInvoiceResultV23"><p class="muted">Nothing read yet. Upload a PDF above and its invoice number, date, currency and lines appear here for checking.</p></div>`;
+  return `<div class="page">${pageHead(
+    'Accounts payable',
+    'AI Invoice Capture',
+    'Reads the supplier’s invoice PDF and hands the fields to the capture form. Every figure stays yours to check before anything is saved.',
+    btn('Capture by hand', 'capture-invoice-v5', '', 'invoice'),
+  )}
+    ${card('Upload the invoice', 'One PDF at a time', upload)}
+    ${card('What was read', 'Check each field against the PDF before saving', result)}</div>`;
+}
+
+/** Carry the reading into the capture form: the invoice date, and unit prices where the lines line up. */
+function __pr23PrefillCaptureFromExtraction() {
+  const p = __pr23LastExtraction && __pr23LastExtraction.payload;
+  if (!p) return;
+  const form = document.querySelector('#invoiceCaptureV23');
+  if (!form) return;
+  if (p.invoiceDate && /^\d{4}-\d{2}-\d{2}/.test(String(p.invoiceDate))) {
+    const date = form.querySelector('[name="invoiceDate"]');
+    if (date) date.value = String(p.invoiceDate).slice(0, 10);
+  }
+  const lines = Array.isArray(p.lines) ? p.lines : [];
+  const prices = [...form.querySelectorAll('[data-inv-price]')];
+  // Only when every line matches one on the order: a partial fill would put a price on the wrong item.
+  if (lines.length && prices.length === lines.length) {
+    prices.forEach((input, i) => {
+      const unit = Number(lines[i].unitPrice);
+      if (Number.isFinite(unit) && unit > 0) input.value = String(unit);
+    });
+  }
+  const note = lines.length === prices.length && lines.length
+    ? `Invoice date and unit prices were filled in from ${__pr23Esc(p.invoiceNumber || 'the PDF')}. Check them against the invoice.`
+    : `The invoice date was filled in from ${__pr23Esc(p.invoiceNumber || 'the PDF')}. Its ${lines.length} read line${lines.length === 1 ? '' : 's'} did not match the ${prices.length} line${prices.length === 1 ? '' : 's'} on this order, so the prices were left alone.`;
+  form.insertAdjacentHTML('afterbegin', `<div class="notice full" style="margin-bottom:12px"><div><strong>Prefilled from the read invoice</strong><p>${note}</p></div></div>`);
+}
+
+if (typeof window !== 'undefined') {
+  /** Called by the host once the API returns; the runtime owns this DOM, so the filling in happens here. */
+  window.__pr23ApplyExtraction = function (result) {
+    __pr23LastExtraction = result || null;
+    const box = document.querySelector('#aiInvoiceResultV23');
+    if (box) box.innerHTML = __pr23ExtractionHtml(result || {});
+  };
 }
 
 // ---------------------------------------------------------------- direct purchase order
@@ -888,6 +1013,8 @@ const __PR23_PAGE_GRANTS = {
   orders: ['orders.view', 'orders.manage'],
   receiving: ['receiving.view', 'receiving.manage', 'receiving.approve'],
   invoices: ['invoices.view', 'invoices.approve', 'invoices.pay'],
+  // Reading an invoice spends an LLM call and files an intake, so it needs the intake grant itself.
+  intake: ['intake.manage'],
   accounts: ['invoices.view', 'invoices.pay'],
   documents: ['documents.view', 'documents.manage'],
   audit: ['audit.view'],
@@ -897,6 +1024,7 @@ const __PR23_PAGE_TITLES = {
   dashboard: 'Command Centre', plan: 'Annual Procurement Plan', approvals: 'Approval Centre', requisitions: 'Purchase Requisitions',
   tenders: 'Tenders & RFx', quotations: 'Quotation Comparison', evaluation: 'Bid Evaluation', vendors: 'Vendor Registry',
   contracts: 'Contracts & Awards', orders: 'Purchase Orders', receiving: 'Receiving & Inspection', invoices: 'Invoices & 3-Way Match',
+  intake: 'AI Invoice Capture',
   accounts: 'Accounts & Asset Transfers', documents: 'Document Vault', reports: 'Reports Vault', audit: 'Audit & Compliance',
   settings: 'Configuration & RBAC', analytics: 'Analytics',
 };
@@ -1315,7 +1443,7 @@ function analyticsPage(){
  const title=state.analyticsTitle||'Procurement Analytics';
  return `<div class="page">${pageHead('Granular drill-down',title,'Filtered transactional detail with supporting charts, entity exposure, category movement and record-level evidence.',btn('Back','go-back')+btn('Export analysis','download-analysis','','download'))}${filterBar()}<div class="grid kpis">${kpi('Records','287','Current filtered population','document')}${kpi('Gross value',money(5120000),'Current filter selection','account')}${kpi('Average cycle','8.4 days','Requisition to PO','report')}${kpi('Within plan','91%','Budget-aligned value','plan')}${kpi('Exceptions','15','Require owner action','audit')}${kpi('Forecast variance','4.8%','Against approved plan','report')}</div><div class="grid two" style="margin-bottom:14px">${card('Trend by period','Click a point to inspect the underlying month',`<div class="card-body">${lineChart('analytics-detail')}</div>`)}${card('Entity contribution','Filtered value distribution',`<div class="card-body">${bars([['Matanho Holdings',88],['Lumina Health Group',73],['Kariba Agro Limited',62],['Kudu Logistics',49],['Nyanga Hospitality',36]],'analytics-entities')}</div>`)}</div>${card('Underlying records','Granular records that support the selected visual',table(['Record','Type','Entity','Category','Owner','Value','Status'],state.tenders.slice(0,5).map(t=>`<tr data-record="tender" data-id="${t.id}"><td><strong class="link">${t.id}</strong></td><td>Tender</td><td>${t.entity}</td><td>${t.category}</td><td>${t.owner}</td><td>${money(t.value)}</td><td>${status(t.stage)}</td></tr>`)))}</div>`
 }
-const pages={dashboard:dashboardPage,plan:planPage,requisitions:requisitionsPage,tenders:tendersPage,evaluation:evaluationPage,vendors:vendorsPage,contracts:contractsPage,orders:ordersPage,receiving:receivingPage,invoices:invoicesPage,accounts:accountsPage,documents:documentsPage,reports:reportsPage,approvals:approvalsPage,audit:auditPage,settings:settingsPage,analytics:analyticsPage};
+const pages={dashboard:dashboardPage,plan:planPage,requisitions:requisitionsPage,tenders:tendersPage,evaluation:evaluationPage,vendors:vendorsPage,contracts:contractsPage,orders:ordersPage,receiving:receivingPage,invoices:invoicesPage,intake:__pr23AiCapturePage,accounts:accountsPage,documents:documentsPage,reports:reportsPage,approvals:approvalsPage,audit:auditPage,settings:settingsPage,analytics:analyticsPage};
 function renderNav(){
  $('#nav').innerHTML=navGroups.map(([g,items])=>[g,__pr23Live()?items.filter(([id])=>__pr23PageAllowed(id)):items]).filter(([,items])=>items.length).map(([g,items])=>`<div class="nav-group">${g}</div>${items.map(([id,l,ic,c])=>`<button class="nav-item ${state.page===id?'active':''}" data-page="${id}" title="${l}"><span class="nav-icon">${icon(ic)}</span><span class="nav-label">${l}</span>${(()=>{const n=__pr23NavCount(id,c);return n?`<span class="nav-count">${n}</span>`:''})()}</button>`).join('')}`).join('');
 }
@@ -1811,7 +1939,7 @@ window.MatanhoProcurement=Object.freeze({version:'8.0.0',navigate,render,getStat
 
   function matchSelectionPageV5(){
     const candidates=state.tenders.filter(t=>t.bids>0 || /Award|Evaluation|opening/i.test(t.stage));
-    return `<div class="page">${pageHead('Invoice automation','Invoices & 3-Way Match','Choose the actual tender or sourcing event first. The system will then show the linked purchase orders, goods received notes, invoices and match exceptions for that event.',actionButton('Upload invoice','upload-invoice-v5','','primary','plus')+actionButton('Capture invoice','capture-invoice-v5','','','invoice')+actionButton('Record payment','record-payment-v23','','','account')+actionButton('Process OCR queue','run-ocr-v5'))}${filterBar()}
+    return `<div class="page">${pageHead('Invoice automation','Invoices & 3-Way Match','Choose the actual tender or sourcing event first. The system will then show the linked purchase orders, goods received notes, invoices and match exceptions for that event.',actionButton('Upload invoice','upload-invoice-v5','','primary','plus')+actionButton('Capture invoice','capture-invoice-v5','','','invoice')+actionButton('Record payment','record-payment-v23','','','account')+actionButton('AI invoice capture','run-ocr-v5'))}${filterBar()}
       <div class="grid kpis">${kpi('Invoices captured','186','OCR confidence 93.7%','invoice')}${kpi('Matched','102','Ready for approval or AP','approve')}${kpi('Exceptions','15','Price, quantity or missing GRN','audit')}${kpi('WHT required','6','30% where ITF263 missing','account')}${kpi('VAT input',money(286400),'Extracted for tax accounting','account')}${kpi('Invoice exposure',money(2480000),'Approved and pending','account')}</div>
       ${card('Select a tender or procurement source','Each match workspace is isolated to the selected tender, its award, purchase order, GRN and invoice chain.',`<div class="source-card-grid card-body">${candidates.map((t,i)=>`<button class="source-card" data-action="select-match-tender-v5" data-id="${t.id}"><div class="source-top">${(()=>{const c=__pr23Live()?__pr23MatchChain(t.id):null;return c?`<span class="status ${c.tone}">${c.label}</span>`:`<span class="status ${i===0?'green':'amber'}">${i===0?'Invoice received':'Awaiting invoice'}</span>`})()}<span class="muted">${t.id}</span></div><h3>${esc(t.title)}</h3><p>${esc(t.entity)} · ${esc(t.method)}</p><div class="source-meta"><div><span>Linked POs</span><strong>${__pr23Live()?__pr23MatchChain(t.id).orders.length:i+1}</strong></div><div><span>GRNs</span><strong>${__pr23Live()?__pr23MatchChain(t.id).grns.length:(i===0?1:0)}</strong></div><div><span>Invoices</span><strong>${__pr23Live()?__pr23MatchChain(t.id).invoices.length:(i===0?2:1)}</strong></div></div></button>`).join('')}</div>`)}</div>`;
   }
@@ -1823,7 +1951,7 @@ window.MatanhoProcurement=Object.freeze({version:'8.0.0',navigate,render,getStat
     const inv=__chain?(__chain.invoices[0]||{id:'—',amount:null,tax:'—',match:'No invoice'}):(state.invoices.find(i=>i.po===po.id)||state.invoices[0]);
     const rows=(__chain?__chain.invoices:state.invoices).map(i=>`<tr data-record="invoice" data-id="${i.id}"><td><strong class="link">${i.id}</strong><span class="row-tools-inline">${smallAction('Preview','preview-invoice-v5',i.id,'eye')}</span></td><td>${esc(i.vendor)}</td><td>${esc(i.po)}</td><td class="money">${money(i.amount)}</td><td>${status(i.match)}</td><td>${esc(i.tax)}</td><td>${status(i.status)}</td><td>${smallAction('Open match','open-match-detail-v5',i.id,'arrow')}</td></tr>`);
     return `<div class="page"><div class="breadcrumbs"><button data-action="back-match-list-v5">Invoices & 3-Way Match</button><i>›</i><span>${t.id}</span><i>›</i><strong>${esc(t.title)}</strong></div>
-      ${pageHead('Tender-specific P2P chain',t.title,`${t.id} · ${t.entity} · source-to-payment document chain`,actionButton('Upload invoice','upload-invoice-v5',t.id,'primary','plus')+actionButton('Capture invoice','capture-invoice-v5',t.id,'','invoice')+actionButton('Record payment','record-payment-v23',t.id,'','account')+actionButton('Run OCR','run-ocr-v5',t.id)+actionButton('Activity','activity-menu',t.id,'','more'))}
+      ${pageHead('Tender-specific P2P chain',t.title,`${t.id} · ${t.entity} · source-to-payment document chain`,actionButton('Upload invoice','upload-invoice-v5',t.id,'primary','plus')+actionButton('Capture invoice','capture-invoice-v5',t.id,'','invoice')+actionButton('Record payment','record-payment-v23',t.id,'','account')+actionButton('AI invoice capture','run-ocr-v5',t.id)+actionButton('Activity','activity-menu',t.id,'','more'))}
       <div class="workflow-strip"><div class="workflow-step done"><strong>Tender</strong><span>${t.id}</span></div><div class="workflow-step done"><strong>Award</strong><span>Approved supplier</span></div><div class="workflow-step done"><strong>Purchase order</strong><span>${po.id}</span></div><div class="workflow-step done"><strong>Goods receipt</strong><span>${grn.id}</span></div><div class="workflow-step current"><strong>Invoice & match</strong><span>${inv.id}</span></div><div class="workflow-step"><strong>Accounts payable</strong><span>${/Matched/.test(inv.match)?'Ready':'Exception held'}</span></div></div>
       <div class="match-triptych" style="margin-bottom:14px">
         <section class="match-panel"><div class="match-head"><strong>Purchase Order</strong>${status('Controlled')}</div><div class="match-body"><div class="match-lines"><div class="match-line"><span>PO number</span><strong>${po.id}</strong></div><div class="match-line"><span>Vendor</span><strong>${esc(po.vendor)}</strong></div><div class="match-line"><span>Order value</span><strong>${money(po.amount)}</strong></div><div class="match-line"><span>Delivery date</span><strong>${esc(po.delivery)}</strong></div></div><div class="actions" style="margin-top:12px">${smallAction('Preview','preview-document',po.id,'eye')}${smallAction('Edit','edit-record-v5',po.id)}</div></div></section>
@@ -2064,8 +2192,8 @@ window.MatanhoProcurement=Object.freeze({version:'8.0.0',navigate,render,getStat
     'confirm-import-quotations-v5': () => {closeOverlay();toast('Quotations imported','Four structured schedules were validated and staged for comparison.')},
     'select-match-tender-v5': a => {state.matchTender=a.dataset.id;state.page='invoices';closeOverlay();render()},
     'back-match-list-v5': () => {state.matchTender=null;render()},
-    'upload-invoice-v5': a => invoiceIntakeModalV5(a.dataset.id||state.matchTender||'',false),
-    'upload-invoice': a => invoiceIntakeModalV5(a.dataset.id||state.matchTender||'',false),
+    'upload-invoice-v5': a => __pr23Live() ? (state.page = 'intake', render()) : invoiceIntakeModalV5(a.dataset.id||state.matchTender||'',false),
+    'upload-invoice': a => __pr23Live() ? (state.page = 'intake', render()) : invoiceIntakeModalV5(a.dataset.id||state.matchTender||'',false),
     'capture-invoice-v5': a => invoiceIntakeModalV5(a.dataset.id||state.matchTender||'',true), 'record-payment-v23': a => __pr23PaymentModal(a.dataset.id||''),
     'extract-invoice-v5': () => {
       const f=$('#invoiceFormV5'); if(!f?.reportValidity())return; const d=new FormData(f); const tender=d.get('tender');
@@ -2078,7 +2206,7 @@ window.MatanhoProcurement=Object.freeze({version:'8.0.0',navigate,render,getStat
       state.invoices.unshift({id:d.get('invoice')||'INV-'+Date.now(),vendor:d.get('vendor')||'Selected vendor',po:String(d.get('po')||state.orders[0].id).split(' · ')[0],amount:Number(d.get('amount'))||0,match:'Pending 3-way match',tax:'VAT 15%',status:'Captured'});state.matchTender=tender||state.matchTender;closeOverlay();render();toast('Invoice captured','Duplicate, vendor, tax and three-way-match controls are running.');
     },
     'save-invoice-draft-v5': () => {closeOverlay();toast('Invoice draft saved','The source document and captured fields can be completed later.')},
-    'run-ocr-v5': a => openWideModal('OCR invoice processing queue',`${a.dataset.id||state.matchTender||'All authorised tenders'} · Review extraction confidence and capture status.`,`<div class="table-wrap"><table><thead><tr><th>File</th><th>Detected vendor</th><th>PO</th><th>Confidence</th><th>Status</th><th>Action</th></tr></thead><tbody><tr><td>invoice_aug_001.pdf</td><td>TechNova Solutions</td><td>PO-2026-0584</td><td>96.4%</td><td>${status('Ready')}</td><td>${smallAction('Capture','capture-ocr-item-v5','invoice_aug_001.pdf')}</td></tr><tr><td>medequip_44019.pdf</td><td>MedEquip Africa</td><td>PO-2026-0583</td><td>91.2%</td><td>${status('Review')}</td><td>${smallAction('Review fields','review-ocr-item-v5','medequip_44019.pdf')}</td></tr><tr><td>unknown_scan_14.jpg</td><td>Not confirmed</td><td>Not found</td><td>62.8%</td><td>${status('Exception')}</td><td>${smallAction('Review fields','review-ocr-item-v5','unknown_scan_14.jpg')}</td></tr></tbody></table></div>`,actionButton('Process all ready','process-ocr-ready-v5','','primary'),'wide'),
+    'run-ocr-v5': a => __pr23Live() ? (state.page = 'intake', render()) : openWideModal('OCR invoice processing queue',`${a.dataset.id||state.matchTender||'All authorised tenders'} · Review extraction confidence and capture status.`,`<div class="table-wrap"><table><thead><tr><th>File</th><th>Detected vendor</th><th>PO</th><th>Confidence</th><th>Status</th><th>Action</th></tr></thead><tbody><tr><td>invoice_aug_001.pdf</td><td>TechNova Solutions</td><td>PO-2026-0584</td><td>96.4%</td><td>${status('Ready')}</td><td>${smallAction('Capture','capture-ocr-item-v5','invoice_aug_001.pdf')}</td></tr><tr><td>medequip_44019.pdf</td><td>MedEquip Africa</td><td>PO-2026-0583</td><td>91.2%</td><td>${status('Review')}</td><td>${smallAction('Review fields','review-ocr-item-v5','medequip_44019.pdf')}</td></tr><tr><td>unknown_scan_14.jpg</td><td>Not confirmed</td><td>Not found</td><td>62.8%</td><td>${status('Exception')}</td><td>${smallAction('Review fields','review-ocr-item-v5','unknown_scan_14.jpg')}</td></tr></tbody></table></div>`,actionButton('Process all ready','process-ocr-ready-v5','','primary'),'wide'),
     'run-ocr': a => handlers['run-ocr-v5'](a),
     'capture-ocr-item-v5': a => {toast('Invoice captured',`${a.dataset.id} was added to the invoice register and queued for three-way matching.`);a.closest('tr')?.remove()},
     'review-ocr-item-v5': a => invoiceIntakeModalV5(state.matchTender||'',true),

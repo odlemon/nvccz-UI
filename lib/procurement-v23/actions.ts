@@ -36,6 +36,7 @@ import {
   createRequisition,
   createRfq,
   createVendor,
+  extractInvoiceForCapture,
   payProcurementInvoice,
   postJournalEntry,
   readProcurementError,
@@ -81,6 +82,7 @@ export const LIVE_ACTIONS = [
   "save-bid-winner-v6",
   "create-grn-confirm",
   "confirm-capture-invoice-v5",
+  "confirm-extract-invoice-v23",
   "pr-to-rfq",
   "save-po-v6",
   "submit-po-v6",
@@ -185,9 +187,9 @@ const UNCONNECTED_TERMINAL_STEPS = new Set<string>([
   "access-review",
   "archive-record",
   "validate-plan-v5",
-  // The OCR queue lists fixture files (invoice_aug_001.pdf, medequip_44019.pdf); its Capture and
-  // Process buttons announced captures that never happened. Found by the full UI census.
-  "run-ocr-v5",
+  // The fixture OCR queue listed files nobody uploaded (invoice_aug_001.pdf, medequip_44019.pdf) and
+  // its buttons announced captures that never happened. In a live session "Run OCR" now opens AI
+  // Invoice Capture, which reads a real PDF; these two belong to that fixture modal, which no longer opens.
   "capture-ocr-item-v5",
   "process-ocr-ready-v5",
   // Found by the full UI census: the eSign envelope modal is a sample, and opening its tabs crashed
@@ -228,6 +230,9 @@ const OPENER_GRANTS: Record<string, { grants: string[]; what: string }> = {
   "upload-document-v5": { grants: ["documents.manage"], what: "filing documents in the vault" },
   "upload-document-v6": { grants: ["documents.manage"], what: "filing documents in the vault" },
   "register-vendor-v6": { grants: ["vendors.manage"], what: "registering vendors" },
+  // Reading an invoice costs an LLM call and stores an intake, so the grant is checked before the upload.
+  "run-ocr-v5": { grants: ["intake.manage"], what: "capturing supplier invoices" },
+  "upload-invoice-v5": { grants: ["intake.manage"], what: "capturing supplier invoices" },
 }
 
 /** The refusal to show for an opener the signed-in role cannot complete, or null to let it open. */
@@ -773,6 +778,49 @@ export async function handleProcurementV23Action(
           handled: true,
           reload: true,
           message: `${invoice?.invoiceNumber ?? "The invoice"} captured against ${po.id} and sent to Finance for approval.`,
+        }
+      }
+
+      // ------------------------------------------------- AI invoice capture (reading the PDF)
+      // Reads the supplier's PDF and prefills the capture form. Nothing is saved here: the
+      // operator checks every field and saves through confirm-capture-invoice-v5 as before.
+      case "confirm-extract-invoice-v23": {
+        if (!has("intake.manage")) return refuse("capturing supplier invoices")
+        const form = document.querySelector<HTMLFormElement>("#aiInvoiceCaptureV23")
+        if (!form) return { handled: true, error: "Open AI Invoice Capture again; the upload form is not on screen." }
+        if (!form.reportValidity()) return { handled: true }
+        const file = form.querySelector<HTMLInputElement>('[name="document"]')?.files?.[0]
+        if (!file) return { handled: true, error: "Attach the supplier's invoice PDF first." }
+        if (!/\.pdf$/i.test(file.name)) {
+          return {
+            handled: true,
+            error: "The invoice has to be a PDF. A photograph or a scan has to be saved as a PDF carrying selectable text before it can be read.",
+          }
+        }
+        const fd = new FormData()
+        fd.append("document", file)
+        const poId = val("#aiInvoicePoV23")
+        if (poId) fd.append("purchaseOrderId", poId)
+
+        const result = await extractInvoiceForCapture(fd)
+        const lineCount = result.payload?.lines?.length ?? 0
+        if (!lineCount && !result.payload?.invoiceNumber) {
+          return {
+            handled: true,
+            error: "Nothing could be read from that PDF — most likely a scan with no text layer. Capture this invoice by hand.",
+          }
+        }
+        // The runtime owns the page's DOM, so the bridge does the filling in.
+        const apply = (window as unknown as { __pr23ApplyExtraction?: (r: unknown) => void }).__pr23ApplyExtraction
+        if (typeof apply === "function") apply(result)
+
+        const pct = Math.round(Number(result.payload?.overallConfidence ?? 0) * 100)
+        const read = `Read ${lineCount} line${lineCount === 1 ? "" : "s"} at ${pct}% confidence`
+        return {
+          handled: true,
+          message: result.lowConfidence
+            ? `${read} — below the ${Math.round(result.threshold * 100)}% threshold, so check every field before you save.`
+            : `${read}. Check the fields against the PDF, then save the invoice.`,
         }
       }
 
