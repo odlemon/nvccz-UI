@@ -54,6 +54,7 @@ const PAGES = [
   ["orders", "/procurement-v23/purchase-orders"],
   ["receiving", "/procurement-v23/goods-received"],
   ["invoices", "/procurement-v23/invoices"],
+  ["intake", "/procurement-v23/intake"],
   ["accounts", "/procurement-v23/accounts"],
   ["documents", "/procurement-v23/documents"],
   ["reports", "/procurement-v23/reports"],

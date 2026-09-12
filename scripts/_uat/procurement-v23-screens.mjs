@@ -26,7 +26,7 @@ const PAGES = [
   ["quotations", "/procurement-v23/quotations"], ["evaluation", "/procurement-v23/evaluation"],
   ["vendors", "/procurement-v23/vendors"], ["contracts", "/procurement-v23/contracts"],
   ["orders", "/procurement-v23/purchase-orders"], ["receiving", "/procurement-v23/goods-received"],
-  ["invoices", "/procurement-v23/invoices"], ["accounts", "/procurement-v23/accounts"],
+  ["invoices", "/procurement-v23/invoices"], ["intake", "/procurement-v23/intake"], ["accounts", "/procurement-v23/accounts"],
   ["documents", "/procurement-v23/documents"], ["reports", "/procurement-v23/reports"],
   ["audit", "/procurement-v23/audit"], ["settings", "/procurement-v23/settings"], ["analytics", "/procurement-v23/analytics"],
 ].filter(([id]) => !list(arg("pages")).length || list(arg("pages")).includes(id))
