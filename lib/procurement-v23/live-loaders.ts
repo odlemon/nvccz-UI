@@ -803,6 +803,10 @@ export async function loadProcurementV23LiveData(): Promise<ProcurementV23LivePa
     GoodsReceivedNote: "goods receipt",
     ProcurementInvoice: "invoice",
     Vendor: "vendor",
+    ProcurementPlan: "plan",
+    ProcurementContract: "contract",
+    ProcurementDocument: "document",
+    VendorInvoiceIntake: "invoice reading",
   }
   const auditEventsLive = auditRows.map((a) => {
     const act = String(a.action ?? "")
