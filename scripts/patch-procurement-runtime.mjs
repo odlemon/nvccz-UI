@@ -1201,6 +1201,21 @@ s = replaceUnique(
   "__pr23Live()?__pr23PrLinesTbody():",
 )
 
+// ---------------------------------------------------------------------------
+// 26. The requester chooses the requisition's category, from the categories vendors are registered in
+// ---------------------------------------------------------------------------
+// The vendored Category list (Technology, Medical, Agriculture, Facilities, Fleet) defaulted to
+// Technology, and none of it but Technology matched a registered vendor. Every requisition raised from
+// the UI was sourced as TECHNOLOGY without anyone choosing it, and the API then refused an RFQ to any
+// other vendor ("category does not match this requisition sourcing category").
+s = replaceUnique(
+  s,
+  "formField('Category','<select name=\"category\"><option>Technology</option><option>Medical</option><option>Agriculture</option><option>Facilities</option><option>Fleet</option></select>')",
+  "(__pr23Live()?formField('Category','<select name=\"category\" required>'+__pr23RequisitionCategoryOptions()+'</select>'):formField('Category','<select name=\"category\"><option>Technology</option><option>Medical</option><option>Agriculture</option><option>Facilities</option><option>Fleet</option></select>'))",
+  "new requisition -> category chosen from live vendor categories",
+  "'<select name=\"category\" required>'+__pr23RequisitionCategoryOptions()",
+)
+
 console.log(`\n${applied} applied, ${skipped} already in place, ${missed} missed`)
 if (missed) {
   console.error("One or more patches did not find their anchor. The runtime is NOT fully patched.")

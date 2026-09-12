@@ -164,10 +164,34 @@ function __pr23SourceOptions() {
   return ready.map(r => `<option value="${__pr23Esc(r.recordId)}">${__pr23Esc(r.id)} - ${__pr23Esc(r.title)}</option>`).join('');
 }
 
-/** Tender categories are the vendor registry's categories, so the category filter can match vendors. */
+/** The vendor registry's categories: what a requisition may be sourced as, and what an RFQ may invite. */
+function __pr23VendorCategories() {
+  return [...new Set((state.vendors || []).map(v => v.category).filter(c => c && c !== '—'))].sort();
+}
+
+/**
+ * Tender categories are the vendor registry's categories, so the category filter can match vendors. The
+ * builder opens on the first approved requisition, so the category starts as that requisition's own: the
+ * API refuses to invite a vendor whose category differs from the requisition's.
+ */
 function __pr23CategoryOptions() {
-  const categories = [...new Set((state.vendors || []).map(v => v.category).filter(c => c && c !== '—'))];
-  return (categories.length ? categories : ['Uncategorised']).map(c => `<option>${__pr23Esc(c)}</option>`).join('');
+  const categories = __pr23VendorCategories();
+  const first = (state.requisitions || []).find(r => r.rawStatus === 'APPROVED');
+  const preset = first && categories.includes(first.category) ? first.category : null;
+  return (categories.length ? categories : ['Uncategorised'])
+    .map(c => `<option${c === preset ? ' selected' : ''}>${__pr23Esc(c)}</option>`)
+    .join('');
+}
+
+/**
+ * The New requisition form's categories. The vendored list (Technology, Medical, Agriculture, …) defaulted to
+ * Technology and matched no registered vendor but that one, so every request was sourced as Technology
+ * without anyone choosing it. The requester now picks one of the categories vendors are registered in.
+ */
+function __pr23RequisitionCategoryOptions() {
+  const categories = __pr23VendorCategories();
+  if (!categories.length) return '<option value="">No vendor category is registered yet</option>';
+  return '<option value="">Choose a category</option>' + categories.map(c => `<option>${__pr23Esc(c)}</option>`).join('');
 }
 
 // ---------------------------------------------------------------- bid evaluation and award
@@ -880,6 +904,16 @@ __pr23On(document, 'input', event => {
 // Re-draw dependent parts of the live forms when a select changes. Removed with the runtime (__pr23Sig).
 __pr23On(document, 'change', event => {
   const target = event.target;
+  // RFQ builder: the tender category follows the source requisition, and the builder re-filters its vendors.
+  if (target && target.name === 'source' && target.closest && target.closest('#tenderFormV13')) {
+    const req = (state.requisitions || []).find(r => r.recordId === target.value);
+    const category = document.querySelector('#rfxCategoryV13');
+    if (req && category && [...category.options].some(o => o.value === req.category) && category.value !== req.category) {
+      category.value = req.category;
+      category.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+    return;
+  }
   if (!target || !target.id) return;
   if (target.id === 'grnPoV23') {
     const box = document.querySelector('#grnLinesV23');
