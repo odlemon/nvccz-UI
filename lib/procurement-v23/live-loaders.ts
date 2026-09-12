@@ -963,6 +963,16 @@ export async function loadProcurementV23LiveData(): Promise<ProcurementV23LivePa
       sub: "Planned beyond each plan budget",
     },
     // Contracts
+    // The runtime summed every row in the register, terminated contracts included — and a terminated
+    // contract's award comes back as an award awaiting a contract, so its value was counted twice.
+    "Contract value": (() => {
+      const active = contractsView.filter((c) => c.kind === "contract" && c.status === "Active")
+      const awards = contractsView.filter((c) => c.kind === "award")
+      return {
+        value: money([...active, ...awards].reduce((t, c) => t + (c.value || 0), 0)),
+        sub: `${active.length} active contract${active.length === 1 ? "" : "s"} and ${awards.length} award${awards.length === 1 ? "" : "s"} awaiting a contract`,
+      }
+    })(),
     "Renewals in 90 days": {
       value: contractsView.filter(
         (c) => c.kind === "contract" && c.rawStatus === "ACTIVE" && c.end !== DASH && new Date(c.end).getTime() - Date.now() < 90 * 864e5,
