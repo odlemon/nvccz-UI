@@ -1156,6 +1156,37 @@ s = replaceUnique(
   "actionButton('AI invoice capture','run-ocr-v5',t.id)",
 )
 
+// ---------------------------------------------------------------------------
+// 24. Every document and window listener is removed with the runtime
+// ---------------------------------------------------------------------------
+// RouteTransition in the root layout keys the page on its pathname, so each sidebar navigation
+// unmounts the host and starts a new runtime. destroy() aborts __pr23Abort, but only the listeners
+// given __pr23Sig went with it. The vendored layers' capture-phase click dispatchers stayed on
+// document and window, bound to the emptied root of the runtime they came from: the first to match a
+// click stopped it reaching the live runtime, then threw on $('#drawerLayer') being null. After one
+// sidebar navigation, every button the host does not claim did nothing ("Capture this invoice", D1).
+{
+  const label = "document and window listeners are removed by destroy()"
+  const anchor = "const __pr23Sig = { signal: __pr23Abort.signal };"
+  const helperMarker = "const __pr23On = "
+  const helper =
+    " const __pr23On = (target, type, fn, opts) => target.addEventListener(type, fn, Object.assign(typeof opts === 'object' && opts !== null ? { ...opts } : { capture: opts === true }, { signal: __pr23Abort.signal }));"
+  const calls = /(?<![.\w])(document|window)\.addEventListener\(/g
+  const pending = (s.match(calls) || []).length
+  if (s.includes(helperMarker) && pending === 0) {
+    console.log(`  skip (already)  ${label}`)
+    skipped += 1
+  } else if (!s.includes(helperMarker) && s.split(anchor).length !== 2) {
+    console.warn(`  MISS            ${label} (abort signal anchor not found exactly once)`)
+    missed += 1
+  } else {
+    if (!s.includes(helperMarker)) s = s.replace(anchor, anchor + helper)
+    s = s.replace(calls, "__pr23On($1, ")
+    console.log(`  patch           ${label} (${pending} listener${pending === 1 ? "" : "s"})`)
+    applied += 1
+  }
+}
+
 console.log(`\n${applied} applied, ${skipped} already in place, ${missed} missed`)
 if (missed) {
   console.error("One or more patches did not find their anchor. The runtime is NOT fully patched.")

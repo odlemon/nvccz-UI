@@ -19,7 +19,7 @@ export function startProcurementV23Runtime(rootEl, runtimeOptions = {}) {
   rootEl.classList.toggle('dark', rootEl.dataset.theme === 'dark');
 
   const __pr23Abort = new AbortController();
-  const __pr23Sig = { signal: __pr23Abort.signal };
+  const __pr23Sig = { signal: __pr23Abort.signal }; const __pr23On = (target, type, fn, opts) => target.addEventListener(type, fn, Object.assign(typeof opts === 'object' && opts !== null ? { ...opts } : { capture: opts === true }, { signal: __pr23Abort.signal }));
   let api = { setPage() {}, destroy() {} };
 
 
@@ -984,7 +984,7 @@ function __pr23BudgetNotice() {
 }
 
 // Re-draw dependent parts of the live forms when a select changes. Removed with the runtime (__pr23Sig).
-document.addEventListener('change', event => {
+__pr23On(document, 'change', event => {
   const target = event.target;
   if (!target || !target.id) return;
   if (target.id === 'grnPoV23') {
@@ -1527,7 +1527,7 @@ function submitPlan(){state.plans.unshift({id:'PLAN-27-'+Math.random().toString(
 function savePlanItem(){const f=$('#planItemForm');if(!f?.reportValidity())return;const d=new FormData(f);state.planItems.unshift({id:'PPI-'+String(state.planItems.length+1).padStart(4,'0'),description:d.get('description'),entity:d.get('entity'),category:d.get('category'),quarter:d.get('quarter'),method:d.get('method'),budget:Number(d.get('budget')),status:'Draft'});closeOverlay();toast('Plan item saved','Budget validation and plan totals were refreshed.');render()}
 function submitPR(){const f=$('#prForm');if(!f?.reportValidity())return;const d=new FormData(f);state.requisitions.unshift({id:'PR-'+Math.random().toString(36).slice(2,6).toUpperCase()+'-'+String(Date.now()).slice(-4),title:d.get('title'),entity:d.get('entity'),type:d.get('type'),category:d.get('category'),amount:Number(d.get('qty'))*Number(d.get('price')),status:'Pending Department Head Approval',budget:'Within budget',owner:'Current user'});closeOverlay();toast('Requisition submitted','Approval routing was created and the department head was notified.');render()}
 function registerVendor(){const f=$('#vendorForm');if(!f?.reportValidity())return;const d=new FormData(f);if(state.vendors.some(v=>v.bp===d.get('bp')||v.vat===d.get('vat'))){toast('Vendor already exists','A vendor with this BP or VAT number is already registered.');return}state.vendors.unshift({id:'VEN-'+String(483+state.vendors.length).padStart(5,'0'),name:d.get('name'),category:d.get('category'),country:'Zimbabwe',bp:d.get('bp'),vat:d.get('vat'),currency:d.get('currency'),status:'Due diligence',rating:0,itf:d.get('itf')?'Uploaded':'Missing',spend:0});closeOverlay();toast('Vendor registered','The vendor is in due diligence and cannot be invited until approved.');render()}
-document.addEventListener('click',e=>{
+__pr23On(document, 'click',e=>{
  const page=e.target.closest('[data-page]');if(page){navigate(page.dataset.page);return}
  const a=e.target.closest('[data-action]');
  const rec=e.target.closest('[data-record]');if(rec&&!a){detailDrawer(rec.dataset.record,rec.dataset.id);return}
@@ -1642,11 +1642,11 @@ document.addEventListener('click',e=>{
   default:toast('Action available',`${action.replaceAll('-',' ')} is ready in this interactive prototype.`)
  }
 }, __pr23Sig);
-document.addEventListener('change',e=>{
+__pr23On(document, 'change',e=>{
  if(e.target.id==='entitySelect'){state.entity=e.target.value;render()}
  if(e.target.id==='yearSelect'){state.year=e.target.value;render()}
 }, __pr23Sig);
-document.addEventListener('keydown',e=>{if(e.key==='Escape')closeOverlay();if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='k'){e.preventDefault();$('[data-action="search"]')?.click()}}, __pr23Sig);
+__pr23On(document, 'keydown',e=>{if(e.key==='Escape')closeOverlay();if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='k'){e.preventDefault();$('[data-action="search"]')?.click()}}, __pr23Sig);
 $('#entitySelect').innerHTML=entities.map(x=>`<option value="${x[0]}">${x[1]}</option>`).join('');
 const mobileMenuButton=$('.mobile-menu');if(mobileMenuButton)mobileMenuButton.innerHTML=icon('menu');$('[data-action="apps-launcher"]').innerHTML=icon('apps');$('[data-action="notifications"]').innerHTML=icon('bell');
 if(initialPage&&pages[initialPage])state.page=initialPage;
@@ -2353,7 +2353,7 @@ window.MatanhoProcurement=Object.freeze({version:'8.0.0',navigate,render,getStat
   const v4Render=render;
   render=function(){v4Render();requestAnimationFrame(enhanceCurrentPageV5)};
 
-  document.addEventListener('click',event=>{
+  __pr23On(document, 'click',event=>{
     const actionEl=event.target.closest('[data-action]');
     const chart=event.target.closest('[data-chart]');
     if(!actionEl&&chart){event.preventDefault();event.stopImmediatePropagation();state.analysisContext=chart.dataset.chart;state.analysisLabel='';state.page='analytics';render();return}
@@ -2695,7 +2695,7 @@ window.MatanhoProcurement=Object.freeze({version:'8.0.0',navigate,render,getStat
     const rect=canvas.getBoundingClientRect(),ratio=window.devicePixelRatio||1;canvas.width=Math.max(1,Math.floor(rect.width*ratio));canvas.height=Math.max(1,Math.floor(rect.height*ratio));const ctx=canvas.getContext('2d');ctx.scale(ratio,ratio);ctx.lineWidth=2;ctx.lineCap='round';ctx.strokeStyle='#000000';let drawing=false;
     const point=e=>{const r=canvas.getBoundingClientRect();const p=e.touches?.[0]||e;return{x:p.clientX-r.left,y:p.clientY-r.top}};
     const start=e=>{drawing=true;canvas.dataset.ink='1';const p=point(e);ctx.beginPath();ctx.moveTo(p.x,p.y);e.preventDefault()};const move=e=>{if(!drawing)return;const p=point(e);ctx.lineTo(p.x,p.y);ctx.stroke();e.preventDefault()};const end=()=>{drawing=false};
-    canvas.addEventListener('pointerdown',start);canvas.addEventListener('pointermove',move);window.addEventListener('pointerup',end,{once:false});
+    canvas.addEventListener('pointerdown',start);canvas.addEventListener('pointermove',move);__pr23On(window, 'pointerup',end,{once:false});
     const typed=$('#typedSignatureV6');if(typed)typed.addEventListener('input',()=>{$('#signaturePreviewV6').textContent=typed.value||'Signature'});
   }
 
@@ -3691,7 +3691,7 @@ window.MatanhoProcurement=Object.freeze({version:'8.0.0',navigate,render,getStat
     requestAnimationFrame(() => requestAnimationFrame(enhanceV11));
   };
 
-  document.addEventListener('click', event => {
+  __pr23On(document, 'click', event => {
     const actionEl = event.target.closest('[data-action]');
     if (!actionEl) {
       if (!event.target.closest('.document-actions-menu-v11')) document.querySelector('#activityRoot')?.replaceChildren();
@@ -3726,7 +3726,7 @@ window.MatanhoProcurement=Object.freeze({version:'8.0.0',navigate,render,getStat
     if (action === 'confirm-send-selected-po-v11') { const count=state.poSelectionV11.length; closeOverlay(); state.poSelectionV11=[]; render(); toast('Purchase orders sent',`${count} selected purchase order${count===1?' was':'s were'} sent to the relevant vendors.`); }
   }, true);
 
-  document.addEventListener('change', event => {
+  __pr23On(document, 'change', event => {
     if (event.target.matches('.po-select-v11')) {
       const value=event.target.value;
       state.poSelectionV11 = event.target.checked ? [...new Set([...state.poSelectionV11,value])] : state.poSelectionV11.filter(x=>x!==value);
@@ -3915,7 +3915,7 @@ window.MatanhoProcurement=Object.freeze({version:'8.0.0',navigate,render,getStat
     const next=Math.max(14,...state.tenders.map(t=>Number(String(t.id).match(/(\d+)$/)?.[1]||0)))+1;const id=`TN-2026-${String(next).padStart(3,'0')}`;const closeDate=d.close?new Date(d.close).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}):'TBC';const record={id,title:d.title,entity:d.entity,category:d.category,method:d.method,value:d.value,close:closeDate,stage:publish?'Published':'Draft',bids:0,owner:d.owner||'Nyasha Moyo',invitedVendors:d.vendors,invitationScope:d.inviteScope,lines:d.lines,weights:d.weights};state.tenders.unshift(record);const pack=tenderPackFromDraftV13(d,id);pack.id=`DOC-${id}`;pack.name=`${id} Tender Pack - ${d.title}`;pack.folder='Tenders & Bids';pack.relatedRecord=id;pack.status=publish?'Published':'Draft';state.documents.unshift(pack);state.tenderDraftV13=null;return record;
   }
 
-  window.addEventListener('click', event => {
+  __pr23On(window, 'click', event => {
     const el=event.target.closest('[data-action]');
     if(!el) return;
     const action=el.dataset.action,id=el.dataset.id||'';
@@ -4168,7 +4168,7 @@ window.MatanhoProcurement=Object.freeze({version:'8.0.0',navigate,render,getStat
     render=function(){closeMenu();registry.clear();const result=previousRender();scheduleEnhance();return result;};
   }
 
-  document.addEventListener('click',event=>{
+  __pr23On(document, 'click',event=>{
     const trigger=event.target.closest('.row-actions-trigger-v16');
     if(trigger){event.preventDefault();event.stopImmediatePropagation();openMenu(trigger);return;}
     if(event.target.closest('.row-actions-menu-v16')){queueMicrotask(closeMenu);return;}
@@ -4182,7 +4182,7 @@ window.MatanhoProcurement=Object.freeze({version:'8.0.0',navigate,render,getStat
     closeMenu();
   },true);
 
-  document.addEventListener('keydown',event=>{
+  __pr23On(document, 'keydown',event=>{
     if(event.key==='Escape')closeMenu();
     const row=event.target.closest?.('tbody tr.row-primary-open-v18');
     if(row&&(event.key==='Enter'||event.key===' ')&&!isInteractiveTarget(event.target)&&!row.matches('[data-action],[data-page]')){
@@ -4201,8 +4201,8 @@ window.MatanhoProcurement=Object.freeze({version:'8.0.0',navigate,render,getStat
 
   const observer=new MutationObserver(scheduleEnhance);
   if(workspace)observer.observe(workspace,{subtree:true,childList:true});
-  window.addEventListener('resize',closeMenu,{passive:true});
-  window.addEventListener('scroll',closeMenu,{passive:true,capture:true});
+  __pr23On(window, 'resize',closeMenu,{passive:true});
+  __pr23On(window, 'scroll',closeMenu,{passive:true,capture:true});
   document.title='Matanho Procurement & Tender Management - V18';
   scheduleEnhance();
   const api=Object.freeze({version:VERSION,enhance,closeMenu});
@@ -4471,7 +4471,7 @@ window.MatanhoProcurement=Object.freeze({version:'8.0.0',navigate,render,getStat
     root.append(menu);
   }
 
-  window.addEventListener('click',event=>{
+  __pr23On(window, 'click',event=>{
     const actionEl=event.target.closest?.('[data-action]');if(!actionEl)return;
     const action=actionEl.dataset.action,id=actionEl.dataset.id;
     const doc=resolveDocumentV19(id);
@@ -4482,7 +4482,7 @@ window.MatanhoProcurement=Object.freeze({version:'8.0.0',navigate,render,getStat
     if(['edit-doc-v11','save-doc-v11','upload-doc-version-v11','confirm-upload-version-v11','edit-document','save-document-v5','upload-version','confirm-upload-version-v5'].includes(action)&&immutable){event.preventDefault();event.stopImmediatePropagation();toast('Editing disabled','Vendor-provided source documents are immutable. Request a replacement or create a separate internal review record.');return;}
   },true);
 
-  document.addEventListener('keydown',event=>{
+  __pr23On(document, 'keydown',event=>{
     if(event.key!=='Enter'&&event.key!==' ')return;
     const row=event.target.closest?.('.vendor-source-row-v19');if(!row)return;
     const id=row.querySelector('[data-id]')?.dataset.id;if(!id)return;
@@ -4597,7 +4597,7 @@ window.MatanhoProcurement=Object.freeze({version:'8.0.0',navigate,render,getStat
     return adapter.request(path,options);
   }
 
-  document.addEventListener('click',event=>{
+  __pr23On(document, 'click',event=>{
     const control=event.target.closest?.('[data-page],[data-action],[data-record]');
     if(!control) return;
     const page=control.dataset.page;
@@ -4613,14 +4613,14 @@ window.MatanhoProcurement=Object.freeze({version:'8.0.0',navigate,render,getStat
     }));
   },true);
 
-  window.addEventListener('resize',ensureActiveNavigationVisible,{passive:true});
+  __pr23On(window, 'resize',ensureActiveNavigationVisible,{passive:true});
   ensureActiveNavigationVisible();
 
-  window.addEventListener('error',event=>{
+  __pr23On(window, 'error',event=>{
     emit('matanho:error',{message:event.message,source:event.filename,line:event.lineno,column:event.colno});
     safeToast('Something went wrong','The interface recovered, but this action may need to be retried.','warning');
   });
-  window.addEventListener('unhandledrejection',event=>{
+  __pr23On(window, 'unhandledrejection',event=>{
     const message=event.reason?.message||String(event.reason||'Unhandled promise rejection');
     emit('matanho:error',{message});
     safeToast('Request could not be completed',message,'warning');
@@ -4700,7 +4700,7 @@ window.MatanhoProcurement=Object.freeze({version:'8.0.0',navigate,render,getStat
   const previousRenderV20=typeof render==='function'?render:null;
   if(previousRenderV20){render=function(...args){const result=previousRenderV20(...args);requestAnimationFrame(enhanceAuditV20);return result;};}
   const disallowedAuditActionsV20=new Set(['edit-record-v5','save-record-v5','edit-document','edit-doc-v11','save-doc-v11','archive-record','delete-record','delete-document','add-note','save-note']);
-  window.addEventListener('click',event=>{
+  __pr23On(window, 'click',event=>{
     const auditRow=event.target.closest?.('tr[data-record="audit"],tr[data-audit-entry-v20]');
     const actionEl=event.target.closest?.('[data-action]');
     const id=auditRow?.dataset.id||auditRow?.dataset.auditEntryV20||actionEl?.dataset.id;
@@ -4708,7 +4708,7 @@ window.MatanhoProcurement=Object.freeze({version:'8.0.0',navigate,render,getStat
     if(actionEl&&isAuditIdV20(id)&&disallowedAuditActionsV20.has(actionEl.dataset.action)){event.preventDefault();event.stopImmediatePropagation();toast('Audit event locked','Audit events are append-only and cannot be edited, deleted, archived or overwritten. Record a new compensating event instead.','warning');return;}
     if(actionEl?.dataset.action==='view-history'&&isAuditIdV20(id)){event.preventDefault();event.stopImmediatePropagation();openAuditEventV20(id);return;}
   },true);
-  document.addEventListener('keydown',event=>{
+  __pr23On(document, 'keydown',event=>{
     if(!['Enter',' '].includes(event.key))return;const row=event.target.closest?.('tr[data-record="audit"],tr[data-audit-entry-v20]');if(!row)return;event.preventDefault();openAuditEventV20(row.dataset.id||row.dataset.auditEntryV20);
   }, __pr23Sig);
   const handlers=window.MatanhoProcurementHandlers||{};
@@ -4776,7 +4776,7 @@ window.MatanhoProcurement=Object.freeze({version:'8.0.0',navigate,render,getStat
     };
   }
 
-  window.addEventListener('click',event=>{
+  __pr23On(window, 'click',event=>{
     const control=event.target.closest?.('[data-action]');
     if(!control)return;
     const action=control.dataset.action;

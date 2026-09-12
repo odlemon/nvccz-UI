@@ -811,7 +811,7 @@ function __pr23BudgetNotice() {
 }
 
 // Re-draw dependent parts of the live forms when a select changes. Removed with the runtime (__pr23Sig).
-document.addEventListener('change', event => {
+__pr23On(document, 'change', event => {
   const target = event.target;
   if (!target || !target.id) return;
   if (target.id === 'grnPoV23') {
