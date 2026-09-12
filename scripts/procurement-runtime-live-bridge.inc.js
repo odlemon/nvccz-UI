@@ -164,9 +164,22 @@ function __pr23SourceOptions() {
   return ready.map(r => `<option value="${__pr23Esc(r.recordId)}">${__pr23Esc(r.id)} - ${__pr23Esc(r.title)}</option>`).join('');
 }
 
-/** The vendor registry's categories: what a requisition may be sourced as, and what an RFQ may invite. */
+/**
+ * Procurement categories, one list for every form: what a vendor is registered as, what a requisition is
+ * sourced as, and what an RFQ invites. The API compares categories case- and space-insensitively
+ * ("Office Supplies" matches OFFICE_SUPPLIES). The base list is there for every role — a requester cannot read
+ * the vendor register, and a list built from it alone came up empty for them — and any other category a
+ * vendor or requisition already carries is added to it.
+ */
+const __PR23_BASE_CATEGORIES = ['Office Supplies', 'Furniture', 'Technology', 'Facilities', 'Fleet', 'Medical', 'Agriculture', 'Professional Services'];
+
 function __pr23VendorCategories() {
-  return [...new Set((state.vendors || []).map(v => v.category).filter(c => c && c !== '—'))].sort();
+  const known = [...(state.vendors || []).map(v => v.category), ...(state.requisitions || []).map(r => r.category)]
+    .filter(c => c && c !== '—');
+  const key = c => String(c).trim().toUpperCase().replace(/[\s-]+/g, '_');
+  const seen = new Map();
+  for (const c of [...__PR23_BASE_CATEGORIES, ...known]) if (!seen.has(key(c))) seen.set(key(c), c);
+  return [...seen.values()].sort((a, b) => a.localeCompare(b));
 }
 
 /**
@@ -181,6 +194,24 @@ function __pr23CategoryOptions() {
   return (categories.length ? categories : ['Uncategorised'])
     .map(c => `<option${c === preset ? ' selected' : ''}>${__pr23Esc(c)}</option>`)
     .join('');
+}
+
+/**
+ * The New requisition form's Entity and Department, as the requisition is actually saved: the organisation, and
+ * the requester's own department (the host raises it against that). The vendored selects showed "Matanho Holdings"
+ * and "IT & Digital / CC-1001" to everyone, whatever their department.
+ */
+function __pr23RequisitionEntityField() {
+  const org = (state.letterhead && state.letterhead.company) || 'Your organisation';
+  return formField('Entity', `<select name="entity" disabled><option>${__pr23Esc(org)}</option></select>`);
+}
+
+function __pr23RequisitionDepartmentField() {
+  const live = __pr23Live() || {};
+  const dept = live.access && live.access.department;
+  return formField('Department / cost centre', dept
+    ? `<select name="cost" disabled><option>${__pr23Esc(dept)}</option></select>`
+    : '<p class="muted">Your account has no department, so a requisition cannot be raised yet. Ask an administrator to set it.</p>');
 }
 
 /**

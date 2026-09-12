@@ -1216,6 +1216,33 @@ s = replaceUnique(
   "'<select name=\"category\" required>'+__pr23RequisitionCategoryOptions()",
 )
 
+// ---------------------------------------------------------------------------
+// 27. Register vendor uses the same category list as requisitions and RFQs
+// ---------------------------------------------------------------------------
+// The vendored list (Technology, Medical, Agriculture, Fleet, Facilities, Professional services) could not
+// register an Office Supplies or Furniture vendor, while the API matches RFQ invitations on category.
+s = replaceUnique(
+  s,
+  "formField('Category','<select name=\"category\"><option>Technology</option><option>Medical</option><option>Agriculture</option><option>Fleet</option><option>Facilities</option><option>Professional services</option></select>')",
+  "(__pr23Live()?formField('Category','<select name=\"category\" required>'+__pr23RequisitionCategoryOptions()+'</select>'):formField('Category','<select name=\"category\"><option>Technology</option><option>Medical</option><option>Agriculture</option><option>Fleet</option><option>Facilities</option><option>Professional services</option></select>'))",
+  "register vendor -> category from the shared procurement list",
+  "__pr23RequisitionCategoryOptions()+'</select>'):formField('Category','<select name=\"category\"><option>Technology</option><option>Medical</option><option>Agriculture</option><option>Fleet</option><option>Facilities</option><option>Professional services</option></select>'))",
+)
+
+// ---------------------------------------------------------------------------
+// 28. New requisition shows the entity and department it is really raised against
+// ---------------------------------------------------------------------------
+// The vendored selects showed "Matanho Holdings" and "IT & Digital / CC-1001" to every requester. Neither is
+// saved - the host raises the requisition against the requester's own department - so a live session shows
+// the organisation and that department, read-only.
+s = replaceUnique(
+  s,
+  "${formField('Entity',`<select name=\"entity\">${entities.slice(1).map(x=>`<option>${x[1]}</option>`).join('')}</select>`)}${formField('Department / cost centre','<select name=\"cost\"><option>IT & Digital / CC-1001</option><option>Finance / CC-1002</option><option>Operations / CC-2001</option></select>')}",
+  "${__pr23Live()?__pr23RequisitionEntityField()+__pr23RequisitionDepartmentField():formField('Entity',`<select name=\"entity\">${entities.slice(1).map(x=>`<option>${x[1]}</option>`).join('')}</select>`)+formField('Department / cost centre','<select name=\"cost\"><option>IT & Digital / CC-1001</option><option>Finance / CC-1002</option><option>Operations / CC-2001</option></select>')}",
+  "new requisition -> real entity and department, read-only",
+  "__pr23RequisitionEntityField()+__pr23RequisitionDepartmentField()",
+)
+
 console.log(`\n${applied} applied, ${skipped} already in place, ${missed} missed`)
 if (missed) {
   console.error("One or more patches did not find their anchor. The runtime is NOT fully patched.")
