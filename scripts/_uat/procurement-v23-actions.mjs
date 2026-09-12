@@ -208,6 +208,8 @@ await step("3 Operations member raises a requisition (form)", async (open) => {
   const { page, errors } = await open(email, "/procurement-v23/requisitions")
   await page.click('[data-action="create-requisition"]')
   await page.waitForSelector("#prForm")
+  // Category is required (cycle seven): choose the first real one; option 0 is "Choose a category".
+  await page.selectOption('#prForm select[name="category"]', { index: 1 })
   await page.fill('#prForm [name="title"]', title)
   await page.fill('#prForm [name="item"]', "Whiteboard markers")
   await page.fill('#prForm [name="qty"]', "24")

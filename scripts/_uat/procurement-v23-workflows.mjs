@@ -121,6 +121,8 @@ await step("W1 Requester saves a draft, edits it and submits it", async (open, l
   const { page, errors } = await open(email, "/procurement-v23/requisitions")
   await page.click('[data-action="create-requisition"]')
   await page.waitForSelector("#prForm")
+  // Category is required (cycle seven): choose the first real one; option 0 is "Choose a category".
+  await page.selectOption('#prForm select[name="category"]', { index: 1 })
   await page.fill('#prForm [name="title"]', title)
   await page.fill('#prForm [name="item"]', "Printer paper")
   await page.fill('#prForm [name="qty"]', "10")
@@ -427,6 +429,8 @@ await step("N1 A requisition without a title is refused and nothing is saved", a
   const { page, errors } = await open(email, "/procurement-v23/requisitions")
   await page.click('[data-action="create-requisition"]')
   await page.waitForSelector("#prForm")
+  // Category is required (cycle seven): choose the first real one; option 0 is "Choose a category".
+  await page.selectOption('#prForm select[name="category"]', { index: 1 })
   await page.fill('#prForm [name="item"]', "Pens")
   await page.fill('#prForm [name="qty"]', "5")
   await page.click('[data-action="submit-pr"]')
