@@ -125,7 +125,14 @@ try {
   record("the invoice number was read", new RegExp(escapeRe(EXPECT.invoiceNumber)).test(read), `expected ${EXPECT.invoiceNumber} · ${new RegExp(escapeRe(EXPECT.invoiceNumber)).test(read) ? "found" : "not found"}`)
   record("a confidence figure is shown", /\d+% confidence/.test(read), read.match(/\d+% confidence/)?.[0] || "none")
   record("invoice lines were read", new RegExp(escapeRe(EXPECT.lineText), "i").test(read), `expected "${EXPECT.lineText}"`)
-  record("the reading was filed", /Filed as VIN-/.test(read) || /Not filed/.test(read), read.match(/Filed as (VIN-[0-9-]+)/)?.[1] || "not filed")
+  // No purchase order is chosen before this reading, so the vendor is unknown and the reading must say it is not kept;
+  // a reading filed without an order, or no word either way, is a failure. (Filing against an order is covered by
+  // procurement-v23-invoice-processing.mjs and procurement-v23-invoice-documents.mjs.)
+  record(
+    "a reading without an order says it is not kept",
+    /Not filed: without a purchase order the vendor is unknown/.test(read) && !/Filed as VIN-/.test(read),
+    read.match(/Filed as (VIN-[0-9-]+)/)?.[1] ? `filed as ${read.match(/Filed as (VIN-[0-9-]+)/)[1]}` : /Not filed/.test(read) ? "not filed, with its reason" : "no filing message",
+  )
   // The runtime's money() rounds to whole dollars, which showed a $6.50 unit price as "$7" on the
   // one screen meant for comparing figures with the PDF.
   record("amounts are shown to the cent", EXPECT.cents.every((c) => read.includes(c)), `expected ${EXPECT.cents.join(" and ")} · read ${read.match(/\$[\d,]+\.\d{2}/g)?.slice(0, 4).join(" ") || "no cent amounts"}`)
