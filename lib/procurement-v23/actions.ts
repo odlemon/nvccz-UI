@@ -50,6 +50,7 @@ import {
   sendPurchaseOrder,
   submitRequisition,
   updateRequisition,
+  updateVendor,
 } from "@/lib/api/procurement-v23-api"
 import type { ProcurementV23LivePayload } from "@/lib/procurement-v23/live-loaders"
 
@@ -98,6 +99,7 @@ export const LIVE_ACTIONS = [
   "confirm-reject-approval-v6",
   "register-vendor-confirm",
   "register-vendor-confirm-v6",
+  "save-vendor-profile-v23",
   "send-po-v6",
   "create-send-tender-v13",
   "create-send-tender-from-preview-v13",
@@ -225,6 +227,10 @@ const UNCONNECTED_TERMINAL_STEPS = new Set<string>([
   // Document Vault "Request replacement" announced a controlled request to the document's source;
   // nothing is sent anywhere.
   "request-source-document-v19",
+  // Cycle nine audit: "Validate import" announced "12 line items passed" for a CSV nobody read, and the report
+  // builder previewed the sample RPT-0104.
+  "validate-pr-import",
+  "preview-built-report-v5",
 ])
 
 /**
@@ -253,6 +259,7 @@ const OPENER_GRANTS: Record<string, { grants: string[]; what: string }> = {
   "upload-document-v5": { grants: ["documents.manage"], what: "filing documents in the vault" },
   "upload-document-v6": { grants: ["documents.manage"], what: "filing documents in the vault" },
   "register-vendor-v6": { grants: ["vendors.manage"], what: "registering vendors" },
+  "edit-vendor-v6": { grants: ["vendors.manage"], what: "changing vendor details" },
   // Reading an invoice costs an LLM call and stores an intake, so the grant is checked before the upload.
   "run-ocr-v5": { grants: ["intake.manage"], what: "capturing supplier invoices" },
   "upload-invoice-v5": { grants: ["intake.manage"], what: "capturing supplier invoices" },
@@ -277,6 +284,27 @@ const NOT_BUILT_OPENERS: Record<string, string> = {
   "message-vendor-v6": "Vendor messaging is not connected yet. Contact the vendor from your mail for now.",
   // Its Send request was refused, and the form proposed a due date already past (5 Aug 2026).
   "request-vendor-docs-v6": "Requesting documents from vendors is not connected yet. Ask the vendor by mail, then file what they send in the Document Vault.",
+  // The profile's "Send compliance reminder" opens the same document request.
+  "send-vendor-reminder-v6": "Requesting documents from vendors is not connected yet. Ask the vendor by mail, then file what they send in the Document Vault.",
+  // Found by the cycle nine audit of every control the census met that actions.ts did not name: each opens a form
+  // whose only save is refused (so the sweep left a form with nothing to press), or shows sample content.
+  "import-pr": "Importing requisition lines from CSV is not available. Add the lines on the requisition form.",
+  "add-note": "Internal notes are not recorded. Use the requisition's justification or the approval comment.",
+  "evaluation-settings": "Evaluation criteria are set on the RFQ when it is created, not here.",
+  "build-report-v5": "Custom report building is not available. Run a report template to export the live records.",
+  "build-report": "Custom report building is not available. Run a report template to export the live records.",
+  "schedule-report-v5": "Report schedules are not stored. Run a report template when you need it.",
+  "import-quotations-v5": "Quotations arrive from the vendor portal, from the link in the RFQ; they are not imported here.",
+  "upload-record-file-v5": "Attach documents to a record from the Document Vault.",
+  "invite-vendors": "Vendors are invited when the RFQ is created and sent, from the tender builder.",
+  "vendor-bid-preview": "Vendors fill in their quotation on the vendor portal, from the link in their RFQ.",
+  "view-history": "A record's history is in Audit & Compliance.",
+  "create-template-v5": "Document templates are not editable here; purchase orders use the organisation's letterhead.",
+  "edit-document": "Document templates are not editable here; purchase orders use the organisation's letterhead.",
+  "edit-report-template": "Report templates are not editable here. Run a template to export the live records.",
+  "edit-doc-v11": "Controlled documents are not edited here. Upload a new version from the Document Vault.",
+  "edit-approval-doc-v13": "Approval documents are generated from the record and are not edited here.",
+  "upload-version": "Upload a new version from the Document Vault.",
 }
 
 /**
@@ -626,6 +654,31 @@ export async function handleProcurementV23Action(
           reload: true,
           message: `${created?.name ?? name} registered${cleared ? " with a valid tax clearance" : " and placed in compliance review"}.${bankTyped ? " Bank details were not saved here; Finance records them." : ""}`,
         }
+      }
+
+      case "save-vendor-profile-v23": {
+        // The live Edit profile form (bridge __pr23VendorEditModal): only the fields the vendor record keeps.
+        if (!has("vendors.manage")) return refuse("changing vendor details")
+        const F = "#vendorEditFormV23"
+        const form = document.querySelector<HTMLFormElement>(F)
+        if (form && !form.reportValidity()) return { handled: true }
+        const v = byDisplayId("vendors", val(`${F} [name="vendorId"]`))
+        if (!v) return { handled: true, error: "That vendor is no longer in the registry. Refresh and try again." }
+        const name = val(`${F} [name="name"]`)
+        if (!name) return { handled: true, error: "The vendor's legal name is required." }
+        const taxExpiry = val(`${F} [name="taxExpiry"]`)
+        const updated = await updateVendor(String(v.recordId), {
+          name,
+          contactPerson: val(`${F} [name="contact"]`),
+          email: val(`${F} [name="email"]`),
+          phone: val(`${F} [name="phone"]`),
+          address: val(`${F} [name="address"]`),
+          paymentTerms: val(`${F} [name="paymentTerms"]`),
+          // A cleared date is left as it was: the tax clearance is replaced, not removed, from here.
+          ...(taxExpiry ? { taxClearanceExpiryDate: taxExpiry } : {}),
+        })
+        closeRuntimeOverlay()
+        return { handled: true, reload: true, message: `${updated?.name ?? name} updated.` }
       }
 
       // ---------------------------------------------------------- purchase orders

@@ -1707,6 +1707,60 @@ s = replaceUnique(
   "${__pr23Live()?__pr23VendorHistoryCard(v):''}",
 )
 
+// 55b. Vendor Registry's "Automated compliance reminders" card: no reminder automation exists on the backend, so its
+// Save schedule and Run now were refused and the sweep removed them, leaving a schedule form with sample Last run and
+// Next run times and nothing to press. A live session does not show the card.
+s = replaceUnique(
+  s,
+  "return `<section class=\"card compliance-automation-v7\">",
+  "if(__pr23Live())return '';return `<section class=\"card compliance-automation-v7\">",
+  "vendor registry -> no reminder automation card when live",
+  "if(__pr23Live())return '';return `<section class=\"card compliance-automation-v7\">",
+)
+// 55d. Vendor profile "Edit profile" opens the live form, which offers only what the vendor record keeps and saves it.
+s = replaceUnique(
+  s,
+  "handlers['edit-vendor-v6']=a=>{",
+  "handlers['edit-vendor-v6']=a=>{if(__pr23Live())return __pr23VendorEditModal(a.dataset.id);",
+  "vendor profile -> edit opens the live vendor form",
+  "if(__pr23Live())return __pr23VendorEditModal(a.dataset.id);",
+)
+// 55c. New record's "Annual plan" opened the base plan modal, whose Create is refused; the plan page's own create is live.
+s = replaceUnique(
+  s,
+  '<button class="folder" data-action="create-plan"><span class="folder-icon">',
+  "<button class=\"folder\" data-action=\"${__pr23Live()?'create-plan-v5':'create-plan'}\"><span class=\"folder-icon\">",
+  "new record -> annual plan opens the live plan form",
+  "data-action=\"${__pr23Live()?'create-plan-v5':'create-plan'}\"",
+)
+// 55e. SRD §3 vendor master: the Company profile card showed BP, VAT, contact and email, but not the phone, address and
+// payment terms the vendor record keeps.
+s = replaceUnique(
+  s,
+  "<div class=\"field\"><label>Email</label><input value=\"${esc(v.email)}\" readonly></div></div></div>`)}",
+  "<div class=\"field\"><label>Email</label><input value=\"${esc(v.email)}\" readonly></div>${__pr23Live()?`<div class=\"field\"><label>Phone</label><input value=\"${esc(v.phone)}\" readonly></div><div class=\"field\"><label>Payment terms</label><input value=\"${esc(v.paymentTerms)}\" readonly></div><div class=\"field full\"><label>Address</label><input value=\"${esc(v.address)}\" readonly></div>`:''}</div></div>`)}",
+  "vendor profile -> phone, payment terms and address",
+  "<label>Payment terms</label><input value=\"${esc(v.paymentTerms)}\" readonly>",
+)
+// 55f. The profile's "Vendor communications and received documents" card is vendor messaging, which is not connected:
+// in a live session it only ever read "No communication records". Not shown.
+s = replaceUnique(
+  s,
+  "${card('Vendor communications and received documents',",
+  "${__pr23Live()?'':card('Vendor communications and received documents',",
+  "vendor profile -> no messaging card when live",
+  "${__pr23Live()?'':card('Vendor communications and received documents',",
+)
+// 55g. The profile's "Compliance document register" listed the design's sample documents; the live vendor carries none
+// (vendor KYC uploads are not part of this module), so it only ever read "No records to show yet". Not shown.
+s = replaceUnique(
+  s,
+  "${card('Compliance document register',",
+  "${__pr23Live()?'':card('Compliance document register',",
+  "vendor profile -> no sample compliance register when live",
+  "${__pr23Live()?'':card('Compliance document register',",
+)
+
 // ---------------------------------------------------------------------------
 // 56. A requisition shows its approval route
 // ---------------------------------------------------------------------------

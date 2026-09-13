@@ -894,14 +894,8 @@ export function adaptAc52AuditEvents(rows: AuditLogRow[], userRoles: Map<string,
     return {
       time: Number.isNaN(ts.getTime())
         ? '—'
-        : ts.toLocaleString('en-GB', {
-            day: '2-digit',
-            month: 'short',
-            year: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit',
-            second: '2-digit',
-          }),
+        : // Spelt out: en-GB's short month is "Sept" on newer ICU and "Sep" on older.
+          `${String(ts.getDate()).padStart(2, '0')} ${['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][ts.getMonth()]} ${ts.getFullYear()}, ${[ts.getHours(), ts.getMinutes(), ts.getSeconds()].map((n) => String(n).padStart(2, '0')).join(':')}`,
       event: r.action,
       record: r.entityId || r.entityType || '—',
       user: name || 'System',

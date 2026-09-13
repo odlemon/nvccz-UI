@@ -346,7 +346,7 @@ function __pr23VendorHistoryCard(v) {
   const invoiceRows = h.invoices.slice(0, 8).map(i => `<tr><td><strong>${__pr23Esc(i.id)}</strong>${i.supplierRef ? `<br><span class="muted">Supplier ref ${__pr23Esc(i.supplierRef)}</span>` : ''}</td><td>${__pr23Esc(i.date)}</td><td class="money">${money(i.amount)}</td><td>${status(i.match)}</td><td>${i.flagged ? status('Flagged') : status(i.status)}</td></tr>`);
   const itemRows = h.items.slice(0, 10).map(it => {
     const change = it.first ? ((it.last - it.first) / it.first) * 100 : 0;
-    return `<tr><td>${__pr23Esc(it.item)}</td><td>${it.orders}</td><td class="money">${money(it.first)}</td><td class="money">${money(it.last)}</td><td>${it.orders > 1 ? `${change > 0 ? '+' : ''}${change.toFixed(1)}%` : '—'}</td></tr>`;
+    return `<tr><td>${__pr23Esc(it.item)}</td><td>${it.orders}</td><td class="money">${__pr23Cents(it.first)}</td><td class="money">${__pr23Cents(it.last)}</td><td>${it.orders > 1 ? `${change > 0 ? '+' : ''}${change.toFixed(1)}%` : '—'}</td></tr>`;
   });
   const none = text => `<div class="card-body"><p class="muted">${text}</p></div>`;
   return kpis
@@ -356,6 +356,28 @@ function __pr23VendorHistoryCard(v) {
     + '<div style="height:14px"></div>'
     + card('Item prices over time', 'Unit price on this vendor\'s orders, first and latest', canOrders ? (itemRows.length ? table(['Item', 'Orders', 'First price', 'Latest price', 'Change'], itemRows) : none('No priced order line yet.')) : none('Purchase orders are not visible to your role.'))
     + '<div style="height:14px"></div>';
+}
+
+/**
+ * SRD §3 vendor master: edit a vendor's company name, contact, email, phone, address, payment terms and tax clearance.
+ * Only fields the vendor record keeps are offered (the prototype's form also had country, currency, status and a WHT
+ * rate, none of which is stored). Bank details stay with Finance; blacklisting and registration approval have their own
+ * actions. Saved by save-vendor-profile-v23 (lib/procurement-v23/actions.ts).
+ */
+function __pr23VendorEditModal(id) {
+  const v = (state.vendors || []).find(x => x.id === id);
+  if (!v) return;
+  const value = x => (x == null || x === '—' ? '' : __pr23Esc(String(x)));
+  const body = `<form id="vendorEditFormV23" class="form-grid"><input type="hidden" name="vendorId" value="${__pr23Esc(v.id)}">`
+    + formField('Legal name', `<input name="name" value="${value(v.name)}" required maxlength="191">`, 'full')
+    + formField('Contact person', `<input name="contact" value="${value(v.contact)}" maxlength="191">`)
+    + formField('Email', `<input name="email" type="email" value="${value(v.email)}" maxlength="191">`)
+    + formField('Phone', `<input name="phone" value="${value(v.phone)}" maxlength="64">`)
+    + formField('Payment terms', `<input name="paymentTerms" value="${value(v.paymentTerms)}" placeholder="e.g. 30 days from invoice" maxlength="191">`)
+    + formField('Address', `<textarea name="address" rows="2" maxlength="500">${value(v.address)}</textarea>`, 'full')
+    + formField('Tax clearance (ITF263) expiry', `<input name="taxExpiry" type="date" value="${value(v.taxExpiry)}">`)
+    + `</form><p class="muted" style="margin:10px 0 0">Bank details are changed by Finance. Blacklisting and registration approval are separate actions on the vendor.</p>`;
+  openModal('Edit vendor profile', v.name, body, btn('Save changes', 'save-vendor-profile-v23', 'primary'));
 }
 
 /** Open invoices flagged for review (match flags, possible duplicates, the supplier's document disagreeing). */
@@ -659,7 +681,7 @@ function __pr23ApprovalRouteHtml(route) {
     return '<div class="notice" style="margin-top:14px"><div><strong>Approval route</strong><p>No approval route is recorded for this requisition. It is decided by the head or deputy head of its department.</p></div></div>';
   }
   const label = { APPROVED: 'Approved', REJECTED: 'Rejected', WAITING: 'Waiting', UPCOMING: 'Not yet', NOT_REACHED: 'Not reached' };
-  const when = iso => (iso ? new Date(iso).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false }) : '');
+  const when = iso => (iso ? __pr23DayTimeLabel(iso) : '');
   const rows = route.steps.map(s => {
     const people = (s.approvers || []).map(p => p.name).join(', ');
     const decided = s.decidedBy
@@ -680,7 +702,7 @@ function __pr23ApprovalRouteHtml(route) {
  * the requisition, with a budget check no backend performs and a stock justification in place of the requester's own.
  */
 function __pr23RequisitionDocument(pr, isMotivation) {
-  const date = iso => (iso ? new Date(iso).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—');
+  const date = iso => __pr23DayLabel(iso);
   const route = pr.approvalRoute;
   const stepStatus = { APPROVED: 'Approved', REJECTED: 'Rejected', WAITING: 'Waiting', UPCOMING: 'Not yet', NOT_REACHED: 'Not reached' };
   const lines = (pr.items || []).map(i => {
@@ -719,7 +741,7 @@ function __pr23ApprovalMatrixHtml() {
   const rows = __pr23MatrixRowsHtml(m.steps);
   const route = card(
     'Requisition approval route',
-    m.updatedAt ? `Last changed ${new Date(m.updatedAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}` : 'Who approves a purchase requisition',
+    m.updatedAt ? `Last changed ${__pr23DayLabel(m.updatedAt)}` : 'Who approves a purchase requisition',
     table(heads, rows.length ? rows : ['<tr><td colspan="4" class="muted">No route is set. Each requisition is decided by the head of its department, or its deputy.</td></tr>']),
     m.canEdit ? __pr23ActionButton('Edit route', 'edit-approval-matrix-v23', '', 'primary', 'settings') : '',
   );
@@ -974,7 +996,7 @@ function __pr23ApprovalsPageHtml() {
   const kpis = [
     kpi('Waiting on me', String(mine.length), mine.length ? `${cash(value(mine))} in value` : 'Nothing to decide', 'approve'),
     kpi('Open approvals', String(all.length), others ? `${others} waiting on someone else` : 'Every one is yours to decide', 'audit'),
-    kpi('Longest open', __pr23Waiting(oldest), oldest ? `Since ${new Date(oldest).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}` : 'No open approvals', 'account'),
+    kpi('Longest open', __pr23Waiting(oldest), oldest ? `Since ${__pr23DayLabel(oldest).replace(/ d{4}$/, '')}` : 'No open approvals', 'account'),
   ].join('');
   return `<div class="page">${pageHead('Decision workflow', 'Approval Centre', 'Decisions waiting on you, and every approval still open across procurement.', __pr23ActionButton('Approval matrix', 'approval-matrix', '', '', 'settings') + __pr23ActionButton('Export register', 'export-approvals-v6', '', '', 'download'))}<div class="grid kpis">${kpis}</div><section class="card">${tabs}<div class="settings-pane">${content}</div></section></div>`;
 }
@@ -1888,7 +1910,7 @@ function __pr23AuditStreamNote() {
 
 /** Today as the procurement documents print dates. */
 function __pr23Today() {
-  return new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+  return __pr23DayLabel(new Date().toISOString());
 }
 
 /** Labels of an approval's supporting documents in a live session (see __pr23SupportDocument). */
@@ -2198,6 +2220,14 @@ function __pr23DayLabel(iso) {
   if (!iso) return '—';
   const d = new Date(iso);
   return Number.isNaN(d.getTime()) ? '—' : `${String(d.getDate()).padStart(2, '0')} ${__PR23_MONTHS[d.getMonth()]} ${d.getFullYear()}`;
+}
+
+/** "13 Sep 2026, 14:05" */
+function __pr23DayTimeLabel(iso) {
+  const day = __pr23DayLabel(iso);
+  if (day === '—') return day;
+  const d = new Date(iso);
+  return `${day}, ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
 
 function __pr23OrderFilters() {
@@ -2753,7 +2783,7 @@ __pr23On(document, 'click',e=>{
   case 'activity-menu':case 'plan-activity':case 'tender-activity':case 'record-activity':activityMenu(a,id||'Current workspace');break;
   case 'apply-filters':$$('[data-filter]').forEach(x=>state.filters[x.dataset.filter]=x.value);state.filterApplied=true;render();if(__pr23Live())requestAnimationFrame(()=>toast('Filters applied',__pr23ApplyTableFilters()));else toast('Dashboard filters applied','Charts, KPIs and tables now use the selected period, category, status and currency.');break;
   case 'reset-filters':state.filters={period:'FY 2026',category:'All categories',status:'All statuses',currency:'USD'};state.filterApplied=false;render();toast('Filters reset',__pr23Live()?'Showing every record your role can see.':'Showing the full authorised population.');break;
-  case 'new-menu':openModal('Create procurement record','Start a controlled workflow.',`<div class="grid three"><button class="folder" data-action="create-plan"><span class="folder-icon">${icon('plan')}</span><span><strong>Annual plan</strong><span>Create and submit a plan</span></span></button><button class="folder" data-action="create-requisition"><span class="folder-icon">${icon('requisition')}</span><span><strong>Requisition</strong><span>Internal or investee request</span></span></button><button class="folder" data-action="create-tender"><span class="folder-icon">${icon('tender')}</span><span><strong>Tender / RFx</strong><span>Competitive sourcing event</span></span></button><button class="folder" data-action="register-vendor"><span class="folder-icon">${icon('vendor')}</span><span><strong>Vendor</strong><span>Onboarding and KYC</span></span></button><button class="folder" data-action="create-po"><span class="folder-icon">${icon('order')}</span><span><strong>Purchase order</strong><span>From approved source</span></span></button><button class="folder" data-action="upload-invoice"><span class="folder-icon">${icon('invoice')}</span><span><strong>Invoice</strong><span>OCR and match intake</span></span></button></div>`);break;
+  case 'new-menu':openModal('Create procurement record','Start a controlled workflow.',`<div class="grid three"><button class="folder" data-action="${__pr23Live()?'create-plan-v5':'create-plan'}"><span class="folder-icon">${icon('plan')}</span><span><strong>Annual plan</strong><span>Create and submit a plan</span></span></button><button class="folder" data-action="create-requisition"><span class="folder-icon">${icon('requisition')}</span><span><strong>Requisition</strong><span>Internal or investee request</span></span></button><button class="folder" data-action="create-tender"><span class="folder-icon">${icon('tender')}</span><span><strong>Tender / RFx</strong><span>Competitive sourcing event</span></span></button><button class="folder" data-action="register-vendor"><span class="folder-icon">${icon('vendor')}</span><span><strong>Vendor</strong><span>Onboarding and KYC</span></span></button><button class="folder" data-action="create-po"><span class="folder-icon">${icon('order')}</span><span><strong>Purchase order</strong><span>From approved source</span></span></button><button class="folder" data-action="upload-invoice"><span class="folder-icon">${icon('invoice')}</span><span><strong>Invoice</strong><span>OCR and match intake</span></span></button></div>`);break;
   case 'create-plan':createPlanModal();break;
   case 'add-plan-item':addPlanItemModal();break;
   case 'create-plan-confirm':case 'save-plan':submitPlan();break;
@@ -3801,7 +3831,7 @@ window.MatanhoProcurement=Object.freeze({version:'8.0.0',navigate,render,getStat
   function vendorDetailPageV6(v){
     const docs=v.complianceDocs.map(d=>`<tr><td><strong>${esc(d.type)}</strong></td><td>${esc(d.version)}</td><td>${esc(d.updated)}</td><td>${status(d.status)}</td><td><div class="actions">${smallAction('Preview','preview-vendor-doc-v6',`${v.id}|${d.type}`,'eye')}${smallAction('Upload replacement','vendor-upload-doc-v6',`${v.id}|${d.type}`,'plus')}${smallAction('Request update','request-vendor-docs-v6',v.id,'mail')}</div></td></tr>`);
     const msgs=state.vendorMessagesV6.filter(m=>m.vendor===v.name).map(m=>`<tr><td>${esc(m.date)}</td><td>${esc(m.direction)}</td><td><strong>${esc(m.subject)}</strong><br><span class="muted">${esc(m.body.slice(0,95))}${m.body.length>95?'...':''}</span></td><td>${m.attachments.map(a=>`<span class="vendor-doc-chip-v6 valid">${esc(a)}</span>`).join('')||'-'}</td><td>${status(m.status)}</td><td>${smallAction('Open','open-vendor-message-v6',m.id)}</td></tr>`);
-    return `<div class="page"><div class="breadcrumbs"><button data-action="back-vendors-v6">Vendor Registry</button><i>›</i><strong>${esc(v.name)}</strong></div>${pageHead('Vendor profile',v.name,__pr23Live()?[v.bp,v.category,v.email].filter(x=>x&&x!=='—').join(' | '):`${v.id} | ${v.category} | ${v.country}`,actionV6('Edit profile','edit-vendor-v6',v.id,'primary')+actionV6('Request documents','request-vendor-docs-v6',v.id,'','mail')+actionV6('Open vendor portal','vendor-portal-v6',v.id,'','vendor')+actionV6('Send message','message-vendor-v6',v.id,'','mail'))}<div class="grid kpis">${kpi('Vendor rating',__pr23Live()&&(v.rating==null||v.rating==='—')?'Not rated':`${v.rating} / 5`,'Historical delivery and quality','vendor')}${kpi('Lifetime spend',money(v.spend),'Across authorised entities','account')}${kpi('Tax clearance',taxRuleV6(v).status,v.taxExpiry?`Expires ${fmtDateV6(v.taxExpiry)}`:'No approved document','audit')}${kpi('Compliance documents',v.complianceDocs.filter(d=>d.status==='Valid').length,`${v.complianceDocs.length} tracked records`,'document')}${kpi('Open requests',state.vendorRequestsV6.filter(r=>r.vendor===v.name&&r.status!=='Complete').length,'Automated reminders active','mail')}${kpi('Messages',state.vendorMessagesV6.filter(m=>m.vendor===v.name).length,'Inbound and outbound','mail')}</div><div class="grid two" style="margin-bottom:14px">${card('Purchase tax and compliance rule','Displayed on purchase contracts, POs, invoices and payment review.',`<div class="card-body">${taxRuleCardV6(v)}<div class="actions" style="margin-top:12px">${actionV6('Send compliance reminder','send-vendor-reminder-v6',v.id,'','mail')}${actionV6('Preview PO clause','preview-tax-clause-v6',v.id,'','eye')}</div></div>`)}${card('Company profile','Editable vendor master information and controlled change history.',`<div class="card-body"><div class="form-grid"><div class="field"><label>Legal name</label><input value="${esc(v.name)}" readonly></div><div class="field"><label>Vendor ID</label><input value="${esc(v.id)}" readonly></div><div class="field"><label>BP number</label><input value="${esc(v.bp)}" readonly></div><div class="field"><label>VAT number</label><input value="${esc(v.vat)}" readonly></div><div class="field"><label>Primary contact</label><input value="${esc(v.contact)}" readonly></div><div class="field"><label>Email</label><input value="${esc(v.email)}" readonly></div></div></div>`)}</div>${card('Compliance document register','Vendors can upload current documents through the secure portal; internal reviewers approve or reject each version.',table(['Document','Version','Updated','Status','Actions'],docs))}<div style="height:14px"></div>${__pr23Live()?__pr23VendorHistoryCard(v):''}${card('Vendor communications and received documents','Messages and files received from the vendor are retained against the vendor record and in the Document Vault.',table(['Date','Direction','Subject','Attachments','Status',''],msgs.length?msgs:[`<tr><td colspan="6">No communication records.</td></tr>`]))}</div>`;
+    return `<div class="page"><div class="breadcrumbs"><button data-action="back-vendors-v6">Vendor Registry</button><i>›</i><strong>${esc(v.name)}</strong></div>${pageHead('Vendor profile',v.name,__pr23Live()?[v.bp,v.category,v.email].filter(x=>x&&x!=='—').join(' | '):`${v.id} | ${v.category} | ${v.country}`,actionV6('Edit profile','edit-vendor-v6',v.id,'primary')+actionV6('Request documents','request-vendor-docs-v6',v.id,'','mail')+actionV6('Open vendor portal','vendor-portal-v6',v.id,'','vendor')+actionV6('Send message','message-vendor-v6',v.id,'','mail'))}<div class="grid kpis">${kpi('Vendor rating',__pr23Live()&&(v.rating==null||v.rating==='—')?'Not rated':`${v.rating} / 5`,'Historical delivery and quality','vendor')}${kpi('Lifetime spend',money(v.spend),'Across authorised entities','account')}${kpi('Tax clearance',taxRuleV6(v).status,v.taxExpiry?`Expires ${fmtDateV6(v.taxExpiry)}`:'No approved document','audit')}${kpi('Compliance documents',v.complianceDocs.filter(d=>d.status==='Valid').length,`${v.complianceDocs.length} tracked records`,'document')}${kpi('Open requests',state.vendorRequestsV6.filter(r=>r.vendor===v.name&&r.status!=='Complete').length,'Automated reminders active','mail')}${kpi('Messages',state.vendorMessagesV6.filter(m=>m.vendor===v.name).length,'Inbound and outbound','mail')}</div><div class="grid two" style="margin-bottom:14px">${card('Purchase tax and compliance rule','Displayed on purchase contracts, POs, invoices and payment review.',`<div class="card-body">${taxRuleCardV6(v)}<div class="actions" style="margin-top:12px">${actionV6('Send compliance reminder','send-vendor-reminder-v6',v.id,'','mail')}${actionV6('Preview PO clause','preview-tax-clause-v6',v.id,'','eye')}</div></div>`)}${card('Company profile','Editable vendor master information and controlled change history.',`<div class="card-body"><div class="form-grid"><div class="field"><label>Legal name</label><input value="${esc(v.name)}" readonly></div><div class="field"><label>Vendor ID</label><input value="${esc(v.id)}" readonly></div><div class="field"><label>BP number</label><input value="${esc(v.bp)}" readonly></div><div class="field"><label>VAT number</label><input value="${esc(v.vat)}" readonly></div><div class="field"><label>Primary contact</label><input value="${esc(v.contact)}" readonly></div><div class="field"><label>Email</label><input value="${esc(v.email)}" readonly></div>${__pr23Live()?`<div class="field"><label>Phone</label><input value="${esc(v.phone)}" readonly></div><div class="field"><label>Payment terms</label><input value="${esc(v.paymentTerms)}" readonly></div><div class="field full"><label>Address</label><input value="${esc(v.address)}" readonly></div>`:''}</div></div>`)}</div>${__pr23Live()?'':card('Compliance document register','Vendors can upload current documents through the secure portal; internal reviewers approve or reject each version.',table(['Document','Version','Updated','Status','Actions'],docs))}<div style="height:14px"></div>${__pr23Live()?__pr23VendorHistoryCard(v):''}${__pr23Live()?'':card('Vendor communications and received documents','Messages and files received from the vendor are retained against the vendor record and in the Document Vault.',table(['Date','Direction','Subject','Attachments','Status',''],msgs.length?msgs:[`<tr><td colspan="6">No communication records.</td></tr>`]))}</div>`;
   }
   function vendorsPageV6(){ const v=state.vendors.find(x=>x.id===state.vendorDetail); return v?vendorDetailPageV6(v):vendorRegisterPageV6(); }
 
@@ -4410,7 +4440,7 @@ window.MatanhoProcurement=Object.freeze({version:'8.0.0',navigate,render,getStat
   function reminderAutomationCardV7(){
     const s=state.complianceReminderSettingsV7;
     const log=state.complianceReminderLogV7.slice(0,3).map(x=>`<div class="list-row"><div class="list-main"><strong>${esc(x.result)}</strong><span>${esc(x.date)} · ${esc(x.source)}</span></div>${status('Delivered')}</div>`).join('');
-    return `<section class="card compliance-automation-v7"><div class="card-head"><div><h3>Automated compliance reminders</h3><p>Notify vendors and internal control owners before tax-clearance expiry and when required documents are missing.</p></div><label class="automation-switch-v7"><input id="autoReminderEnabledV7" type="checkbox" ${s.enabled?'checked':''}><span>${s.enabled?'Enabled':'Paused'}</span></label></div><div class="card-body"><div class="automation-grid-v7"><label><span>Cadence</span><select id="autoReminderCadenceV7"><option ${s.cadence==='Daily at 08:00 CAT'?'selected':''}>Daily at 08:00 CAT</option><option ${s.cadence==='Every 3 days'?'selected':''}>Every 3 days</option><option ${s.cadence==='Weekly on Monday'?'selected':''}>Weekly on Monday</option></select></label><label><span>Expiry reminder days</span><input id="autoReminderThresholdsV7" value="${esc(s.thresholds)}"></label><label><span>Vendor delivery</span><select id="autoReminderChannelV7"><option>Email + secure vendor portal</option><option>Secure vendor portal only</option><option>Email only</option></select></label><label><span>Internal recipients</span><input id="autoReminderRecipientsV7" value="${esc(s.internalRecipients)}"></label></div><div class="source-meta" style="margin-top:12px"><div><span>Last run</span><strong>${esc(s.lastRun)}</strong></div><div><span>Next run</span><strong>${esc(s.nextRun)}</strong></div><div><span>Rules</span><strong>Missing, expired and expiring ITF263</strong></div></div><div class="actions" style="margin-top:12px">${actionV6('Save schedule','save-reminder-automation-v7','','primary','settings')}${actionV6('Run now','run-reminder-automation-v7','','','mail')}</div><div class="automation-log-v7">${log}</div></div></section>`;
+    if(__pr23Live())return '';return `<section class="card compliance-automation-v7"><div class="card-head"><div><h3>Automated compliance reminders</h3><p>Notify vendors and internal control owners before tax-clearance expiry and when required documents are missing.</p></div><label class="automation-switch-v7"><input id="autoReminderEnabledV7" type="checkbox" ${s.enabled?'checked':''}><span>${s.enabled?'Enabled':'Paused'}</span></label></div><div class="card-body"><div class="automation-grid-v7"><label><span>Cadence</span><select id="autoReminderCadenceV7"><option ${s.cadence==='Daily at 08:00 CAT'?'selected':''}>Daily at 08:00 CAT</option><option ${s.cadence==='Every 3 days'?'selected':''}>Every 3 days</option><option ${s.cadence==='Weekly on Monday'?'selected':''}>Weekly on Monday</option></select></label><label><span>Expiry reminder days</span><input id="autoReminderThresholdsV7" value="${esc(s.thresholds)}"></label><label><span>Vendor delivery</span><select id="autoReminderChannelV7"><option>Email + secure vendor portal</option><option>Secure vendor portal only</option><option>Email only</option></select></label><label><span>Internal recipients</span><input id="autoReminderRecipientsV7" value="${esc(s.internalRecipients)}"></label></div><div class="source-meta" style="margin-top:12px"><div><span>Last run</span><strong>${esc(s.lastRun)}</strong></div><div><span>Next run</span><strong>${esc(s.nextRun)}</strong></div><div><span>Rules</span><strong>Missing, expired and expiring ITF263</strong></div></div><div class="actions" style="margin-top:12px">${actionV6('Save schedule','save-reminder-automation-v7','','primary','settings')}${actionV6('Run now','run-reminder-automation-v7','','','mail')}</div><div class="automation-log-v7">${log}</div></div></section>`;
   }
 
   function runReminderAutomationV7(source='Manual run'){
@@ -4467,7 +4497,7 @@ window.MatanhoProcurement=Object.freeze({version:'8.0.0',navigate,render,getStat
     state.vendors.unshift(v);closeOverlay();state.vendorDetail=id;render();toast('Vendor registered',`${v.name} is in compliance review. The ${v.whtRate}% invalid-clearance rule and automated reminder schedule were saved.`)
   };
 
-  handlers['edit-vendor-v6']=a=>{
+  handlers['edit-vendor-v6']=a=>{if(__pr23Live())return __pr23VendorEditModal(a.dataset.id);
     const v=state.vendors.find(x=>x.id===a.dataset.id);if(!v)return;const rule=taxRuleV6(v);
     openV6Modal('Edit vendor profile',`${v.id} · Controlled master-data change`, `<form id="editVendorFormV7"><div class="dense-form-grid">${formField('Legal name',`<input name="name" value="${esc(v.name)}" required>`,'span2')}${formField('Category',`<input name="category" value="${esc(v.category)}">`)}${formField('Country',`<select name="country"><option>${esc(v.country)}</option><option>Zimbabwe</option><option>South Africa</option><option>Zambia</option></select>`)}${formField('Contact',`<input name="contact" value="${esc(v.contact)}">`)}${formField('Email',`<input name="email" value="${esc(v.email)}" type="email">`)}${formField('Default currency',`<select name="currency"><option>${esc(v.currency)}</option><option>USD</option><option>ZiG</option><option>ZAR</option></select>`)}${formField('Vendor status',`<select name="status"><option>${esc(v.status)}</option><option>Compliance review</option><option>Active</option><option>Suspended</option><option>Blacklisted</option></select>`)}${formField('Tax-clearance status',`<select name="taxStatus" id="editVendorTaxStatusV7"><option ${rule.state==='valid'?'selected':''}>Valid</option><option ${rule.state==='expiring'?'selected':''}>Expiring</option><option ${rule.state==='expired'?'selected':''}>Expired</option><option ${rule.state==='missing'?'selected':''}>Missing</option><option ${rule.state==='special'?'selected':''}>Not applicable</option></select>`)}${formField('Tax-clearance expiry',`<input name="taxExpiry" type="date" value="${esc(v.taxExpiry||'')}">`)}${formField('WHT rate when invalid',`<div class="input-suffix-v7"><input name="whtRate" id="editVendorWhtRateV7" type="number" min="0" max="100" step="0.01" value="${Number(v.whtRate||30)}"><span>%</span></div>`)}${formField('Automated reminder schedule',`<select name="reminderSchedule"><option>${esc(v.reminderSchedule||'Use automated group schedule')}</option><option>Use automated group schedule</option><option>Daily until received</option><option>Every 3 days</option><option>Do not automate</option></select>`)}${formField('Change reason','<textarea name="reason" required>Update vendor master information following verified supporting evidence.</textarea>','full')}</div></form>`,actionV6('Save changes','save-vendor-profile-v7',v.id,'primary'),'xl');
     requestAnimationFrame(()=>{const s=$('#editVendorTaxStatusV7'),r=$('#editVendorWhtRateV7');if(!s||!r)return;const sync=()=>{if(!s.isConnected||!r.isConnected)return;const invalid=/Missing|Expired/.test(s.value);r.disabled=!invalid;if(!invalid)r.value='0';else if(Number(r.value)===0)r.value='30'};s.addEventListener('change',sync);sync()});

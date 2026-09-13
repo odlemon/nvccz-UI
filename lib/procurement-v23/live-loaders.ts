@@ -95,11 +95,23 @@ const num = (v: unknown): number | null => {
 const sum = (rows: ProcurementRecord[], pick: (r: ProcurementRecord) => unknown): number =>
   rows.reduce((total, r) => total + (num(pick(r)) ?? 0), 0)
 
+// Spelt out: en-GB's short month is "Sept" on newer ICU and "Sep" on older, so one page read two ways side by side.
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+const pad2 = (n: number) => String(n).padStart(2, "0")
+
 function fmtDate(v: unknown): string {
   if (!v) return DASH
   const d = new Date(String(v))
   if (Number.isNaN(d.getTime())) return DASH
-  return d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })
+  return `${pad2(d.getDate())} ${MONTHS[d.getMonth()]} ${d.getFullYear()}`
+}
+
+/** "13 Sep 2026, 14:05" */
+function fmtDateTime(v: unknown): string {
+  const day = fmtDate(v)
+  if (day === DASH) return DASH
+  const d = new Date(String(v))
+  return `${day}, ${pad2(d.getHours())}:${pad2(d.getMinutes())}`
 }
 
 function personName(u: any): string {
@@ -456,6 +468,7 @@ export async function loadProcurementV23LiveData(): Promise<ProcurementV23LivePa
     email: v.email ?? DASH,
     contact: v.contactPerson ?? DASH,
     phone: v.phone ?? DASH,
+    address: v.address ?? DASH,
     paymentTerms: v.paymentTerms ?? DASH,
     taxExpiry: v.taxClearanceExpiryDate ? String(v.taxClearanceExpiryDate).slice(0, 10) : null,
     companyProfileDate: null,
@@ -1060,9 +1073,7 @@ export async function loadProcurementV23LiveData(): Promise<ProcurementV23LivePa
         : /CREATE|UPDATE|SUBMIT/.test(act)
           ? "Workflow"
           : "System"
-    const when = a.occurredAt
-      ? new Date(a.occurredAt).toLocaleString("en-GB", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: false })
-      : DASH
+    const when = fmtDateTime(a.occurredAt)
     return [
       `AUD-${String(a.id).slice(-8).toUpperCase()}`,
       `${titleCase(act)} ${AUDIT_ENTITY[a.entityType] ?? titleCase(a.entityType)}`,
