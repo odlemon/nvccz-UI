@@ -1772,6 +1772,67 @@ function __pr23NoAccessHtml(page) {
   return `<div class="page">${pageHead('Procurement access', title, `Your role does not include ${title}. Procurement access is granted on your role in Admin → Roles.`, '')}${card('Pages your role can open', 'Choose where to go', `<div class="card-body list">${links}</div>`)}</div>`;
 }
 
+// ---------------------------------------------------------------- purchase order register filters
+
+/** "13 Sep 2026", or an em dash when there is no date. */
+function __pr23DayLabel(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? '—' : d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
+function __pr23OrderFilters() {
+  return state.poFiltersV23 || { vendor: '', from: '', to: '', status: '' };
+}
+
+/** SRD §5 Phase 2: the purchase order register filters by vendor, order date and status. */
+function __pr23FilteredOrders() {
+  const f = __pr23OrderFilters();
+  return (state.orders || []).filter(o => {
+    if (f.vendor && o.vendor !== f.vendor) return false;
+    if (f.status && o.status !== f.status) return false;
+    const day = o.orderDate ? new Date(o.orderDate).toISOString().slice(0, 10) : '';
+    if (f.from && (!day || day < f.from)) return false;
+    if (f.to && (!day || day > f.to)) return false;
+    return true;
+  });
+}
+
+function __pr23OrderFiltersHtml() {
+  const f = __pr23OrderFilters();
+  const all = state.orders || [];
+  const uniq = xs => [...new Set(xs.filter(x => x && x !== '—'))].sort((a, b) => String(a).localeCompare(String(b)));
+  const opt = (v, t, selected) => `<option value="${__pr23Esc(v)}"${selected ? ' selected' : ''}>${__pr23Esc(t)}</option>`;
+  const vendors = opt('', 'All vendors', !f.vendor) + uniq(all.map(o => o.vendor)).map(v => opt(v, v, f.vendor === v)).join('');
+  const statuses = opt('', 'All statuses', !f.status) + uniq(all.map(o => o.status)).map(s => opt(s, s, f.status === s)).join('');
+  const active = Boolean(f.vendor || f.status || f.from || f.to);
+  const shown = __pr23FilteredOrders().length;
+  return `<div class="filterbar" id="poFiltersV23" style="margin-bottom:12px;flex-wrap:wrap"><select data-po-filter="vendor" aria-label="Vendor">${vendors}</select><label style="font-size:12px;color:var(--muted);display:inline-flex;gap:6px;align-items:center">Ordered from <input type="date" data-po-filter="from" value="${__pr23Esc(f.from)}" aria-label="Ordered from"></label><label style="font-size:12px;color:var(--muted);display:inline-flex;gap:6px;align-items:center">to <input type="date" data-po-filter="to" value="${__pr23Esc(f.to)}" aria-label="Ordered to"></label><select data-po-filter="status" aria-label="Status">${statuses}</select><button class="btn small" type="button" data-action="po-filters-reset-v23"${active ? '' : ' disabled'}>Clear filters</button><span class="right" style="color:var(--muted);font-size:11px" data-po-filter-count>${shown} of ${all.length} purchase order${all.length === 1 ? '' : 's'}${active ? ' · filtered' : ''}</span></div>`;
+}
+
+/** The register's empty row: no order at all, or none matching the filters. */
+function __pr23OrderEmptyRows() {
+  const f = __pr23OrderFilters();
+  const filtered = Boolean(f.vendor || f.status || f.from || f.to);
+  return [`<tr class="pr23-empty-row"><td colspan="10" class="muted">${filtered ? 'No purchase order matches these filters.' : 'No purchase order has been raised yet.'}</td></tr>`];
+}
+
+__pr23On(document, 'change', event => {
+  const input = event.target && event.target.closest && event.target.closest('[data-po-filter]');
+  if (!input) return;
+  state.poFiltersV23 = { ...__pr23OrderFilters(), [input.dataset.poFilter]: input.value };
+  render();
+}, true);
+
+__pr23On(document, 'click', event => {
+  const control = event.target && event.target.closest && event.target.closest('[data-action="po-filters-reset-v23"]');
+  if (!control) return;
+  event.preventDefault();
+  event.stopImmediatePropagation();
+  state.poFiltersV23 = { vendor: '', from: '', to: '', status: '' };
+  render();
+}, true);
+
 // ---------------------------------------------------------------- filter bar (full UI census)
 
 /** Filter choices built from the records loaded now, so every choice matches something. */
@@ -3381,8 +3442,8 @@ window.MatanhoProcurement=Object.freeze({version:'8.0.0',navigate,render,getStat
     {id:'CTR-2026-079',tender:'TN-2026-012',title:'Solar Irrigation Supply Framework',vendor:'GreenGrid Energy',entity:'Kariba Agro Limited',value:860000,start:'2026-08-01',end:'2027-07-31',status:'Compliance review'}
   ];
   function ordersPageV6(){
-    const rows=state.orders.map(o=>{const v=state.vendors.find(x=>x.name===o.vendor);const rule=taxRuleV6(v);return `<tr><td><strong class="link">${esc(o.id)}</strong></td><td>${esc(o.vendor)}</td><td>${esc(o.entity)}</td><td>${money(o.amount)}</td><td>${o.asset?'Fixed asset':'Goods / services'}</td><td>${vendorStatusChipV6(v||{})}</td><td>${rule.withholding?`${rule.withholding}% WHT`:'Standard'}</td><td>${esc(o.delivery)}</td><td>${status(o.status)}</td><td><div class="actions">${smallAction('Preview','preview-po-v6',o.id,'eye')}${smallAction('Edit','edit-po-v6',o.id)}${smallAction('Send','send-po-v6',o.id,'mail')}${smallAction('eSign','esign-new-v6',o.id,'signature')}</div></td></tr>`});
-    return `<div class="page">${pageHead('Committed procurement','Purchase Orders','Generate controlled purchase orders from approved awards or requisitions. Vendor tax-clearance and configured withholding rules are evaluated before approval and shown on the PO.',actionV6('Create PO','create-po','','primary','plus')+actionV6('Send selected','email-po','','','mail')+actionV6('Signature queue','signature-queue','','','signature'))}${filterBar()}<div class="grid kpis">${kpi('Open POs',state.orders.filter(o=>!/Delivered|Billed|Cancelled/i.test(o.status)).length,'Not yet delivered, billed or cancelled','order')}${kpi('Value outstanding',money(state.orders.filter(o=>!/Delivered|Billed|Cancelled/i.test(o.status)).reduce((n,o)=>n+(Number(o.amount)||0),0)),'Committed not fully received','account')}${kpi('Tax alerts',state.orders.filter(o=>taxRuleV6(o.vendor).withholding>0).length,'Missing or expired clearance','audit')}${kpi('Asset purchases',state.orders.filter(o=>o.asset).length,'Transfer after accepted GRN','transfer')}${kpi('Awaiting acknowledgement','1','Vendor reminder active','mail')}${kpi('eSign coverage','100%','Controlled approval documents','signature')}</div><div class="notice" style="margin-bottom:14px"><span class="kpi-icon">${icon('audit')}</span><div><strong>Tax compliance is evaluated at purchase creation</strong><p>The purchase order carries the vendor compliance status, configured tax rule, approval evidence and any required withholding clause. Automated reminders do not bypass the control.</p></div></div>${card('Purchase order register','Preview, edit, send, sign and monitor every controlled purchase order.',table(['PO','Vendor','Entity','Amount','Classification','Tax clearance','Tax rule','Delivery','Status','Actions'],rows))}</div>`;
+    const rows=(__pr23Live()?__pr23FilteredOrders():state.orders).map(o=>{const v=state.vendors.find(x=>x.name===o.vendor);const rule=taxRuleV6(v);return `<tr><td><strong class="link">${esc(o.id)}</strong></td><td>${esc(o.vendor)}</td><td>${esc(o.entity)}</td><td>${money(o.amount)}</td><td>${__pr23Live()?__pr23DayLabel(o.orderDate):(o.asset?'Fixed asset':'Goods / services')}</td><td>${vendorStatusChipV6(v||{})}</td><td>${rule.withholding?`${rule.withholding}% WHT`:'Standard'}</td><td>${esc(o.delivery)}</td><td>${status(o.status)}</td><td><div class="actions">${smallAction('Preview','preview-po-v6',o.id,'eye')}${smallAction('Edit','edit-po-v6',o.id)}${smallAction('Send','send-po-v6',o.id,'mail')}${__pr23Live()?'':smallAction('eSign','esign-new-v6',o.id,'signature')}</div></td></tr>`});
+    return `<div class="page">${pageHead('Committed procurement','Purchase Orders','Generate controlled purchase orders from approved awards or requisitions. Vendor tax-clearance and configured withholding rules are evaluated before approval and shown on the PO.',actionV6('Create PO','create-po','','primary','plus')+actionV6('Send selected','email-po','','','mail')+(__pr23Live()?'':actionV6('Signature queue','signature-queue','','','signature')))}${__pr23Live()?'':filterBar()}<div class="grid kpis">${kpi('Open POs',state.orders.filter(o=>!/Delivered|Billed|Cancelled/i.test(o.status)).length,'Not yet delivered, billed or cancelled','order')}${kpi('Value outstanding',money(state.orders.filter(o=>!/Delivered|Billed|Cancelled/i.test(o.status)).reduce((n,o)=>n+(Number(o.amount)||0),0)),'Committed not fully received','account')}${kpi('Tax alerts',state.orders.filter(o=>taxRuleV6(o.vendor).withholding>0).length,'Missing or expired clearance','audit')}${kpi('Asset purchases',state.orders.filter(o=>o.asset).length,'Transfer after accepted GRN','transfer')}${kpi('Awaiting acknowledgement','1','Vendor reminder active','mail')}${__pr23Live()?'':kpi('eSign coverage','100%','Controlled approval documents','signature')}</div><div class="notice" style="margin-bottom:14px"><span class="kpi-icon">${icon('audit')}</span><div><strong>Tax compliance is evaluated at purchase creation</strong><p>The purchase order carries the vendor compliance status, configured tax rule, approval evidence and any required withholding clause. Automated reminders do not bypass the control.</p></div></div>${__pr23Live()?__pr23OrderFiltersHtml():''}${card('Purchase order register',__pr23Live()?'Every purchase order your role can see. The filters narrow this register; the cards above cover every order.':'Preview, edit, send, sign and monitor every controlled purchase order.',table(['PO','Vendor','Entity','Amount',__pr23Live()?'Ordered':'Classification','Tax clearance','Tax rule','Delivery','Status','Actions'],__pr23Live()&&!rows.length?__pr23OrderEmptyRows():rows))}</div>`;
   }
   function contractsPageV6(){
     const rows=state.contractsV6.map(c=>{const v=state.vendors.find(x=>x.name===c.vendor);const rule=taxRuleV6(v);return `<tr>${__pr23Live()&&c.kind==='award'?`<td><span class="muted">Not yet contracted</span></td><td><strong>${esc(c.title)}</strong><br><span class="muted">Award on ${esc(c.tender)} · ${esc(c.id)}</span></td>`:`<td><strong class="link">${esc(c.id)}</strong></td><td><strong>${esc(c.title)}</strong><br><span class="muted">${esc(c.tender)}</span></td>`}<td>${esc(c.vendor)}</td><td>${esc(c.entity)}</td><td>${money(c.value)}</td><td>${vendorStatusChipV6(v||{})}</td><td>${rule.withholding?`${rule.withholding}% withholding clause`:'Standard clause'}</td><td>${fmtDateV6(c.end)}</td><td>${status(c.status)}</td><td><div class="actions">${smallAction('Preview','preview-contract-v6',c.id,'eye')}${smallAction('Edit','edit-contract-v6',c.id)}${smallAction('Send','send-document',c.id,'mail')}${smallAction('eSign','esign-new-v6',c.id,'signature')}</div></td></tr>`});

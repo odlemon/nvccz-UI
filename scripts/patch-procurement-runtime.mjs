@@ -1382,7 +1382,8 @@ s = replaceUnique(
   "'evaluationLive','letterhead'];",
   "'evaluationLive','letterhead','approvalGroupV23'];",
   "hydrate() -> every open approval",
-  "'letterhead','approvalGroupV23'];",
+  // The approval-matrix step below extends this list's tail, so the marker stops before its end.
+  "'letterhead','approvalGroupV23'",
 )
 s = replaceUnique(
   s,
@@ -1749,6 +1750,57 @@ s = replaceUnique(
   "openModal('New purchase requisition',__pr23Live()?'Raise a request with its lines and justification. It is routed for approval when you submit it.':'Create an internal, investee or subsidiary request with line items, budget check and approval routing.',",
   "new requisition -> subtitle promises only what happens",
   "__pr23Live()?'Raise a request with its lines and justification.",
+)
+
+// ---------------------------------------------------------------------------
+// 59. The purchase order register filters by vendor, date and status
+// ---------------------------------------------------------------------------
+// SRD §5 Phase 2: "Implement filtering by vendor, date, and status". The register had the module-wide filter bar
+// (year, department, status) which hides rows by matching their text, no vendor or date filter, and no order date on
+// the rows. A live session filters the orders themselves (__pr23FilteredOrders) with a vendor, an order-date range and
+// a status, shows the order date in place of a classification that always read "Goods / services", and drops the
+// eSignature row action, queue and coverage card: eSignature is not part of the SRD and has no backend.
+s = replaceUnique(
+  s,
+  "const rows=state.orders.map(o=>{const v=state.vendors.find(x=>x.name===o.vendor);const rule=taxRuleV6(v);",
+  "const rows=(__pr23Live()?__pr23FilteredOrders():state.orders).map(o=>{const v=state.vendors.find(x=>x.name===o.vendor);const rule=taxRuleV6(v);",
+  "purchase orders -> rows follow the register filters",
+  "(__pr23Live()?__pr23FilteredOrders():state.orders).map(o=>",
+)
+s = replaceUnique(
+  s,
+  "<td>${o.asset?'Fixed asset':'Goods / services'}</td><td>${vendorStatusChipV6(v||{})}</td>",
+  "<td>${__pr23Live()?__pr23DayLabel(o.orderDate):(o.asset?'Fixed asset':'Goods / services')}</td><td>${vendorStatusChipV6(v||{})}</td>",
+  "purchase orders -> order date on each row",
+  "${__pr23Live()?__pr23DayLabel(o.orderDate):",
+)
+s = replaceUnique(
+  s,
+  "${smallAction('Send','send-po-v6',o.id,'mail')}${smallAction('eSign','esign-new-v6',o.id,'signature')}",
+  "${smallAction('Send','send-po-v6',o.id,'mail')}${__pr23Live()?'':smallAction('eSign','esign-new-v6',o.id,'signature')}",
+  "purchase orders -> no eSignature row action",
+  "${__pr23Live()?'':smallAction('eSign','esign-new-v6',o.id,'signature')}",
+)
+s = replaceUnique(
+  s,
+  "+actionV6('Send selected','email-po','','','mail')+actionV6('Signature queue','signature-queue','','','signature'))}${filterBar()}",
+  "+actionV6('Send selected','email-po','','','mail')+(__pr23Live()?'':actionV6('Signature queue','signature-queue','','','signature')))}${__pr23Live()?'':filterBar()}",
+  "purchase orders -> register filters replace the text-matching bar; no signature queue",
+  "(__pr23Live()?'':actionV6('Signature queue','signature-queue','','','signature')))}${__pr23Live()?'':filterBar()}",
+)
+s = replaceUnique(
+  s,
+  "${kpi('Awaiting acknowledgement','1','Vendor reminder active','mail')}${kpi('eSign coverage','100%','Controlled approval documents','signature')}",
+  "${kpi('Awaiting acknowledgement','1','Vendor reminder active','mail')}${__pr23Live()?'':kpi('eSign coverage','100%','Controlled approval documents','signature')}",
+  "purchase orders -> no eSignature coverage card",
+  "${__pr23Live()?'':kpi('eSign coverage','100%','Controlled approval documents','signature')}",
+)
+s = replaceUnique(
+  s,
+  "${card('Purchase order register','Preview, edit, send, sign and monitor every controlled purchase order.',table(['PO','Vendor','Entity','Amount','Classification','Tax clearance','Tax rule','Delivery','Status','Actions'],rows))}",
+  "${__pr23Live()?__pr23OrderFiltersHtml():''}${card('Purchase order register',__pr23Live()?'Every purchase order your role can see. The filters narrow this register; the cards above cover every order.':'Preview, edit, send, sign and monitor every controlled purchase order.',table(['PO','Vendor','Entity','Amount',__pr23Live()?'Ordered':'Classification','Tax clearance','Tax rule','Delivery','Status','Actions'],__pr23Live()&&!rows.length?__pr23OrderEmptyRows():rows))}",
+  "purchase orders -> vendor, date and status filters over the register",
+  "${__pr23Live()?__pr23OrderFiltersHtml():''}",
 )
 
 // ---------------------------------------------------------------------------

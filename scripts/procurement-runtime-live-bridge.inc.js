@@ -1599,6 +1599,67 @@ function __pr23NoAccessHtml(page) {
   return `<div class="page">${pageHead('Procurement access', title, `Your role does not include ${title}. Procurement access is granted on your role in Admin → Roles.`, '')}${card('Pages your role can open', 'Choose where to go', `<div class="card-body list">${links}</div>`)}</div>`;
 }
 
+// ---------------------------------------------------------------- purchase order register filters
+
+/** "13 Sep 2026", or an em dash when there is no date. */
+function __pr23DayLabel(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? '—' : d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
+function __pr23OrderFilters() {
+  return state.poFiltersV23 || { vendor: '', from: '', to: '', status: '' };
+}
+
+/** SRD §5 Phase 2: the purchase order register filters by vendor, order date and status. */
+function __pr23FilteredOrders() {
+  const f = __pr23OrderFilters();
+  return (state.orders || []).filter(o => {
+    if (f.vendor && o.vendor !== f.vendor) return false;
+    if (f.status && o.status !== f.status) return false;
+    const day = o.orderDate ? new Date(o.orderDate).toISOString().slice(0, 10) : '';
+    if (f.from && (!day || day < f.from)) return false;
+    if (f.to && (!day || day > f.to)) return false;
+    return true;
+  });
+}
+
+function __pr23OrderFiltersHtml() {
+  const f = __pr23OrderFilters();
+  const all = state.orders || [];
+  const uniq = xs => [...new Set(xs.filter(x => x && x !== '—'))].sort((a, b) => String(a).localeCompare(String(b)));
+  const opt = (v, t, selected) => `<option value="${__pr23Esc(v)}"${selected ? ' selected' : ''}>${__pr23Esc(t)}</option>`;
+  const vendors = opt('', 'All vendors', !f.vendor) + uniq(all.map(o => o.vendor)).map(v => opt(v, v, f.vendor === v)).join('');
+  const statuses = opt('', 'All statuses', !f.status) + uniq(all.map(o => o.status)).map(s => opt(s, s, f.status === s)).join('');
+  const active = Boolean(f.vendor || f.status || f.from || f.to);
+  const shown = __pr23FilteredOrders().length;
+  return `<div class="filterbar" id="poFiltersV23" style="margin-bottom:12px;flex-wrap:wrap"><select data-po-filter="vendor" aria-label="Vendor">${vendors}</select><label style="font-size:12px;color:var(--muted);display:inline-flex;gap:6px;align-items:center">Ordered from <input type="date" data-po-filter="from" value="${__pr23Esc(f.from)}" aria-label="Ordered from"></label><label style="font-size:12px;color:var(--muted);display:inline-flex;gap:6px;align-items:center">to <input type="date" data-po-filter="to" value="${__pr23Esc(f.to)}" aria-label="Ordered to"></label><select data-po-filter="status" aria-label="Status">${statuses}</select><button class="btn small" type="button" data-action="po-filters-reset-v23"${active ? '' : ' disabled'}>Clear filters</button><span class="right" style="color:var(--muted);font-size:11px" data-po-filter-count>${shown} of ${all.length} purchase order${all.length === 1 ? '' : 's'}${active ? ' · filtered' : ''}</span></div>`;
+}
+
+/** The register's empty row: no order at all, or none matching the filters. */
+function __pr23OrderEmptyRows() {
+  const f = __pr23OrderFilters();
+  const filtered = Boolean(f.vendor || f.status || f.from || f.to);
+  return [`<tr class="pr23-empty-row"><td colspan="10" class="muted">${filtered ? 'No purchase order matches these filters.' : 'No purchase order has been raised yet.'}</td></tr>`];
+}
+
+__pr23On(document, 'change', event => {
+  const input = event.target && event.target.closest && event.target.closest('[data-po-filter]');
+  if (!input) return;
+  state.poFiltersV23 = { ...__pr23OrderFilters(), [input.dataset.poFilter]: input.value };
+  render();
+}, true);
+
+__pr23On(document, 'click', event => {
+  const control = event.target && event.target.closest && event.target.closest('[data-action="po-filters-reset-v23"]');
+  if (!control) return;
+  event.preventDefault();
+  event.stopImmediatePropagation();
+  state.poFiltersV23 = { vendor: '', from: '', to: '', status: '' };
+  render();
+}, true);
+
 // ---------------------------------------------------------------- filter bar (full UI census)
 
 /** Filter choices built from the records loaded now, so every choice matches something. */
