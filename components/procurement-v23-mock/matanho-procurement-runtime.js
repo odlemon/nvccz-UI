@@ -1784,6 +1784,92 @@ function __pr23NoAccessHtml(page) {
   return `<div class="page">${pageHead('Procurement access', title, `Your role does not include ${title}. Procurement access is granted on your role in Admin → Roles.`, '')}${card('Pages your role can open', 'Choose where to go', `<div class="card-body list">${links}</div>`)}</div>`;
 }
 
+// ---------------------------------------------------------------- Command Centre: the SRD §7 dashboard cards
+
+const __PR23_SPEND_RANGES = [['month', 'This month'], ['quarter', 'This quarter'], ['year', 'This year'], ['12m', 'Last 12 months'], ['all', 'All time']];
+
+function __pr23RangeStart(range) {
+  const now = new Date();
+  if (range === 'month') return new Date(now.getFullYear(), now.getMonth(), 1);
+  if (range === 'quarter') return new Date(now.getFullYear(), Math.floor(now.getMonth() / 3) * 3, 1);
+  if (range === 'year') return new Date(now.getFullYear(), 0, 1);
+  if (range === '12m') return new Date(now.getFullYear(), now.getMonth() - 11, 1);
+  return null;
+}
+
+/** A flagged invoice's reasons as brief labels, as SRD §7 asks ("Price Mismatch", "PO Not Found"). */
+function __pr23FlagLabels(inv) {
+  const labels = [];
+  const add = l => { if (!labels.includes(l)) labels.push(l); };
+  if (/no purchase order/i.test(inv.match || '')) add('No purchase order');
+  for (const f of inv.matchFlags || []) {
+    const t = String((f && f.type) || '');
+    if (t === 'PRICE_OVER_PO') add('Price above the order');
+    else if (t === 'LINE_NOT_ON_PO') add('Item not on the order');
+    else if (t === 'QTY_OVER_ORDERED') add('Quantity above the order');
+    else if (t === 'QTY_OVER_RECEIVED') add('Quantity above what was received');
+    else if (t === 'POSSIBLE_DUPLICATE') add('Possible duplicate');
+  }
+  if (inv.reading && inv.reading.status === 'READ' && inv.reading.agrees === false) add("Supplier's document differs");
+  return labels.length ? labels : (inv.reviewReasons || []).slice(0, 1);
+}
+
+/**
+ * SRD §7 Procurement Dashboard: "Awaiting My Approval" with a large count and a link to the list, "Recent POs" with
+ * status and a quick view, "Spend by Department" over a selectable date range with the exact amount on hover, and
+ * "Invoices to Review" with a brief reason for each. The Command Centre had spend by category, a mixed decision queue
+ * and an attention list; none of the four was there as specified.
+ */
+function __pr23DashboardSrdHtml() {
+  const reqsForMe = (state.requisitions || []).filter(r => r.awaitingMe && String(r.rawStatus || '').toUpperCase() === 'PENDING_APPROVAL');
+  const others = Math.max(0, (state.approvalPromptsV6 || []).length - reqsForMe.length);
+  const awaiting = card('Awaiting my approval', 'Requisitions waiting for your decision', `<div class="card-body"><div data-page="approvals" style="cursor:pointer"><div data-dash-awaiting style="font-size:44px;font-weight:700;line-height:1">${reqsForMe.length}</div><p class="muted" style="margin:6px 0 0">${reqsForMe.length === 1 ? 'requisition' : 'requisitions'} pending your approval${others ? ` · ${others} other decision${others === 1 ? '' : 's'} waiting` : ''}</p></div><div class="list" style="margin-top:10px">${reqsForMe.slice(0, 3).map(r => `<div class="list-row" data-page="approvals" style="cursor:pointer"><div class="list-main"><strong>${__pr23Esc(r.title)}</strong><span>${__pr23Esc(r.id)} · ${__pr23Esc(r.department || r.entity)}${r.amount != null ? ` · ${money(r.amount)}` : ''}</span></div>${status(r.status)}</div>`).join('')}<div class="list-row" data-page="approvals" style="cursor:pointer"><div class="list-main"><strong>Open the approval list</strong><span>Every decision waiting on you</span></div></div></div></div>`);
+
+  const range = state.dashSpendRangeV23 || 'quarter';
+  const start = __pr23RangeStart(range);
+  const inRange = (state.orders || []).filter(o => String(o.rawStatus || '').toUpperCase() !== 'CANCELLED' && (!start || (o.orderDate && new Date(o.orderDate) >= start)));
+  const byDept = new Map();
+  for (const o of inRange) {
+    const k = o.entity && o.entity !== '—' ? o.entity : 'No department';
+    byDept.set(k, (byDept.get(k) || 0) + (Number(o.amount) || 0));
+  }
+  const rows = [...byDept.entries()].filter(e => e[1] > 0).sort((a, b) => b[1] - a[1]);
+  const max = Math.max(1, ...rows.map(r => r[1]));
+  const total = rows.reduce((t, r) => t + r[1], 0);
+  const select = `<select data-dash-range aria-label="Date range">${__PR23_SPEND_RANGES.map(([v, t]) => `<option value="${v}"${v === range ? ' selected' : ''}>${t}</option>`).join('')}</select>`;
+  const chart = !__pr23Can('orders.view')
+    ? '<p class="muted">Your role does not read purchase orders, so spend is not shown.</p>'
+    : rows.length
+      ? `<div class="bars" data-dash-spend>${rows.map(([d, v]) => `<div class="bar-row" title="${__pr23Esc(d)}: ${__pr23Cents(v)}"><span>${__pr23Esc(d)}</span><div class="bar-track"><div class="bar-fill" style="width:${Math.round((v / max) * 100)}%"></div></div><b>${money(v)}</b></div>`).join('')}</div><p class="muted" style="margin:8px 0 0">${__pr23Cents(total)} ordered on ${inRange.length} purchase order${inRange.length === 1 ? '' : 's'}${start ? ` since ${__pr23DayLabel(start)}` : ''}.</p>`
+      : `<p class="muted">No purchase order was placed ${range === 'all' ? 'yet' : 'in this period'}.</p>`;
+  const spend = card('Spend by department', 'Purchase order value by the department that asked for it. Hover a bar for the exact amount.', `<div class="card-body"><div style="margin-bottom:10px">${select}</div>${chart}</div>`);
+
+  const flagged = __pr23FlaggedInvoices();
+  const reviewBody = !__pr23Can('invoices.view')
+    ? '<div class="list-row"><div class="list-main"><strong>Not in your role</strong><span>Your role does not read supplier invoices.</span></div></div>'
+    : flagged.length
+      ? flagged.slice(0, 5).map(i => `<div class="list-row" data-page="invoices" style="cursor:pointer"><div class="list-main"><strong>${__pr23Esc(i.id)}</strong><span>${__pr23Esc(__pr23FlagLabels(i).join(' · '))}</span></div>${status('Review')}</div>`).join('') + (flagged.length > 5 ? `<div class="list-row" data-page="invoices" style="cursor:pointer"><div class="list-main"><span>and ${flagged.length - 5} more</span></div></div>` : '')
+      : '<div class="list-row"><div class="list-main"><strong>Nothing to review</strong><span>Every open invoice matches its order, its receipts and the supplier\'s document.</span></div></div>';
+  const review = card('Invoices to review', 'Flagged, with the reason', `<div class="card-body list" data-dash-review>${reviewBody}</div>`);
+
+  const recent = [...(state.orders || [])].sort((a, b) => String(b.orderDate || '').localeCompare(String(a.orderDate || ''))).slice(0, 6);
+  const poBody = !__pr23Can('orders.view')
+    ? '<div class="card-body"><p class="muted">Your role does not read purchase orders.</p></div>'
+    : recent.length
+      ? table(['PO', 'Vendor', 'Ordered', 'Amount', 'Status', ''], recent.map(o => `<tr><td><strong>${__pr23Esc(o.id)}</strong></td><td>${__pr23Esc(o.vendor)}</td><td>${__pr23DayLabel(o.orderDate)}</td><td class="money">${money(o.amount)}</td><td>${status(o.status)}</td><td>${__pr23SmallButton('Quick view', 'preview-po-v6', o.id, 'eye')}</td></tr>`))
+      : '<div class="card-body"><p class="muted">No purchase order has been raised yet.</p></div>';
+  const pos = card('Recent purchase orders', 'The latest orders and where each stands', poBody);
+
+  return `<div class="grid three" style="margin-bottom:14px">${awaiting}${spend}${review}</div><div style="margin-bottom:14px" data-dash-recent-pos>${pos}</div>`;
+}
+
+__pr23On(document, 'change', event => {
+  const select = event.target && event.target.closest && event.target.closest('[data-dash-range]');
+  if (!select) return;
+  state.dashSpendRangeV23 = select.value;
+  render();
+}, true);
+
 // ---------------------------------------------------------------- purchase order register filters
 
 /** "13 Sep 2026", or an em dash when there is no date. */
@@ -2141,7 +2227,7 @@ function dashboardPage(){
  const approvals=__pr23Live()?(state.approvalPromptsV6||[]).length:state.requisitions.filter(x=>/Pending|review/i.test(x.status)).length;
  return `<div class="page">${pageHead('Procurement operations','Command Centre','Enterprise-wide procurement activity, annual plan execution, sourcing, fulfilment and accounting hand-offs.',btn('New record','new-menu','primary','plus')+btn('Activity','activity-menu','','more'))}${filterBar()}
  <div class="grid kpis">${kpi('Approved plan',money(8240000),'FY 2026 consolidated budget','plan','plan')}${kpi('Committed spend',money(5120000),'62.1% of approved plan','order','orders')}${kpi('Open tenders','8','5 require action this week','tender','tenders')}${kpi('Pending approvals',approvals,'Across PR, PO and awards','approve','approvals')}${kpi('Vendors','482','31 due for compliance review','vendor','vendors')}${kpi('AP exposure',money(2480000),'Approved and pending invoices','account','accounts')}</div>
- <div class="grid two" style="margin-bottom:14px">${card('Plan, commitment and actual spend','Click any month to inspect entity, category and transaction detail',`<div class="card-body">${lineChart('spend-trend')}<div class="legend"><span><i style="background:#55536f"></i>Committed spend</span><span><i style="background:#11866f"></i>Actual spend</span></div></div>`,btn('View analysis','analytics','small'))}${card('Procurement cycle status','Interactive pipeline distribution',`<div class="card-body donut-wrap">${__pr23Live()?__pr23CycleDonutHtml():'<div class="donut chart-click" data-chart="cycle-status"><div class="donut-center"><strong>287</strong><span>active records</span></div></div>'}</div>`)}</div>
+ ${__pr23Live()?__pr23DashboardSrdHtml():''}<div class="grid two" style="margin-bottom:14px">${card('Plan, commitment and actual spend','Click any month to inspect entity, category and transaction detail',`<div class="card-body">${lineChart('spend-trend')}<div class="legend"><span><i style="background:#55536f"></i>Committed spend</span><span><i style="background:#11866f"></i>Actual spend</span></div></div>`,btn('View analysis','analytics','small'))}${card('Procurement cycle status','Interactive pipeline distribution',`<div class="card-body donut-wrap">${__pr23Live()?__pr23CycleDonutHtml():'<div class="donut chart-click" data-chart="cycle-status"><div class="donut-center"><strong>287</strong><span>active records</span></div></div>'}</div>`)}</div>
  <div class="grid three">${card('Spend by category','Share of managed spend',`<div class="card-body">${bars([['Technology',84],['Medical',73],['Agriculture',61],['Fleet',49],['Facilities',38]],'category-spend')}</div>`)}${card('My approval queue','Time-sensitive decisions',`<div class="card-body list">${__pr23Live()?__pr23MyQueueHtml():state.requisitions.slice(0,4).map(r=>`<div class="list-row" data-record="requisition" data-id="${r.id}"><div class="list-main"><strong>${r.title}</strong><span>${r.id} · ${r.entity} · ${money(r.amount)}</span></div>${status(r.status)}</div>`).join('')}</div>`)}${card('Control and system activity','Exceptions, documents and accounting hand-offs',`<div class="card-body list">${__pr23Live()?__pr23ControlActivity():`<div class="list-row" data-page="invoices"><div class="list-main"><strong>Invoice price variance</strong><span>INV-98430 blocked at 2.4%</span></div>${status('Blocked')}</div><div class="list-row" data-page="accounts"><div class="list-main"><strong>Asset transfer queue</strong><span>2 GRNs awaiting accounting classification</span></div>${status('Pending')}</div><div class="list-row" data-page="vendors"><div class="list-main"><strong>ITF263 expiry review</strong><span>31 vendors need updated tax clearance</span></div>${status('Review')}</div><div class="list-row" data-page="reports"><div class="list-main"><strong>ZPPB statutory report</strong><span>July dataset is ready to preview</span></div>${status('Ready')}</div>`}</div>`)}</div></div>`
 }
 function planPage(){

@@ -550,6 +550,8 @@ export async function loadProcurementV23LiveData(): Promise<ProcurementV23LivePa
   const reviewReasons = (inv: any): string[] => {
     const money2 = (v: any) => Number(v).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
     const out: string[] = []
+    // SRD §7: "PO Not Found" is a reason to review; an invoice with no order has nothing to be matched against.
+    if (String(inv.matchingStatus ?? "").toUpperCase() === "NO_PO") out.push("No purchase order: the invoice is not linked to an order, so nothing was matched")
     for (const f of Array.isArray(inv.aiDiscrepancies?.flags) ? inv.aiDiscrepancies.flags : []) {
       if (f?.type === "LINE_NOT_ON_PO") out.push(`"${f.itemName}" is not on the purchase order`)
       else if (f?.type === "PRICE_OVER_PO") out.push(`"${f.itemName}" is invoiced at ${money2(f.invoiceUnitPrice)}; the order says ${money2(f.poUnitPrice)}`)

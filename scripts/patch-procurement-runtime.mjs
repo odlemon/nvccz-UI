@@ -1804,6 +1804,20 @@ s = replaceUnique(
 )
 
 // ---------------------------------------------------------------------------
+// 60. The Command Centre carries the SRD dashboard's four cards
+// ---------------------------------------------------------------------------
+// SRD §7 Procurement Dashboard: Awaiting My Approval (a large count, linked to the list), Recent POs (status and a
+// quick view), Spend by Department over a selectable date range (exact amount on hover), and Invoices to Review (a brief
+// reason each). They lead the live Command Centre, from the records (__pr23DashboardSrdHtml).
+s = replaceUnique(
+  s,
+  "<div class=\"grid two\" style=\"margin-bottom:14px\">${card('Plan, commitment and actual spend'",
+  "${__pr23Live()?__pr23DashboardSrdHtml():''}<div class=\"grid two\" style=\"margin-bottom:14px\">${card('Plan, commitment and actual spend'",
+  "command centre -> SRD dashboard cards",
+  "${__pr23Live()?__pr23DashboardSrdHtml():''}",
+)
+
+// ---------------------------------------------------------------------------
 // 43. A filed document previews as itself
 // ---------------------------------------------------------------------------
 // Found by the UI census as Accounts Payable: previewing, downloading, editing or versioning the RFQ pack threw
