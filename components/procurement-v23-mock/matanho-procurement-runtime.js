@@ -210,7 +210,11 @@ function __pr23Kpi(label, value, sub) {
   const live = __pr23Live();
   if (!live) return [value, sub];
   const known = live.kpis && live.kpis[label];
+  // Until the first live load lands (the host sets access with it) no card has a figure yet: show the dash and say it is
+  // loading, rather than leaving every card out and popping them in, and do not record them as having no source.
+  const loaded = Boolean(live.access);
   const hide = () => {
+    if (!loaded) return ['—', 'Loading live figures…'];
     try { (window.__pr23HiddenKpis = window.__pr23HiddenKpis || {})[label] = (known && known.sub) || 'no live source'; } catch (e) {}
     return [__PR23_HIDDEN_KPI, ''];
   };
