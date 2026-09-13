@@ -1404,6 +1404,123 @@ s = replaceUnique(
 )
 
 // ---------------------------------------------------------------------------
+// 45. Tax-clearance days count from today, not the design's fixed date
+// ---------------------------------------------------------------------------
+// Found by the cycle-eight screen review: the Vendor Registry called a clearance 35 days from expiry "Valid" while
+// its doughnut counted it as expiring. taxRuleV6 counted days from the design's frozen 1 August 2026, so expiry
+// status, reminders and the withholding rule ran six weeks stale. A live session counts from now.
+s = replaceUnique(
+  s,
+  "const daysUntilV6 = value => Math.ceil((new Date(value).getTime() - todayV6.getTime()) / 86400000);",
+  "const daysUntilV6 = value => Math.ceil((new Date(value).getTime() - (__pr23Live() ? Date.now() : todayV6.getTime())) / 86400000);",
+  "tax clearance -> days counted from today",
+  "(__pr23Live() ? Date.now() : todayV6.getTime())",
+)
+
+// ---------------------------------------------------------------------------
+// 46. Vendor Registry: name and contact, not the database id
+// ---------------------------------------------------------------------------
+// Found by the cycle-eight screen review: the first column printed each vendor's database id (cmtzc7u8s02j…), the
+// contact line read "— | email" (vendors carry no country), every Currency cell was a dash (vendors carry none) and
+// an unrated vendor read "— / 5".
+s = replaceUnique(
+  s,
+  "table(['Vendor ID','Vendor','Category','BP number','Currency','Tax clearance','Document gaps','Rating','Status','Actions'],rows)",
+  "table(__pr23Live()?['Vendor','Contact','Category','BP number','Tax clearance','Document gaps','Rating','Status','Actions']:['Vendor ID','Vendor','Category','BP number','Currency','Tax clearance','Document gaps','Rating','Status','Actions'],rows)",
+  "vendor registry -> live columns",
+  "table(__pr23Live()?['Vendor','Contact',",
+)
+s = replaceUnique(
+  s,
+  "<td><strong class=\"link\">${esc(v.id)}</strong></td><td><strong>${esc(v.name)}</strong><br><span class=\"muted\">${esc(v.country)} | ${esc(v.email)}</span></td>",
+  "${__pr23Live()?`<td><strong class=\"link\">${esc(v.name)}</strong></td><td>${esc(v.contact)}<br><span class=\"muted\">${esc([v.email,v.phone].filter(x=>x&&x!=='—').join(' · ')||'—')}</span></td>`:`<td><strong class=\"link\">${esc(v.id)}</strong></td><td><strong>${esc(v.name)}</strong><br><span class=\"muted\">${esc(v.country)} | ${esc(v.email)}</span></td>`}",
+  "vendor registry -> name and contact cells",
+  "<td>${esc(v.contact)}<br><span class=\"muted\">${esc([v.email,v.phone]",
+)
+s = replaceUnique(
+  s,
+  "<td>${esc(v.bp)}</td><td>${esc(v.currency)}</td>",
+  "<td>${esc(v.bp)}</td>${__pr23Live()?'':`<td>${esc(v.currency)}</td>`}",
+  "vendor registry -> no currency column",
+  "<td>${esc(v.bp)}</td>${__pr23Live()?'':",
+)
+s = replaceUnique(
+  s,
+  "<td>${v.rating} / 5</td><td>${status(v.status)}</td><td><div class=\"actions\">${smallAction('Open','open-vendor-v6',v.id)}",
+  "<td>${__pr23Live()&&(v.rating==null||v.rating==='—')?'<span class=\"muted\">Not rated</span>':`${v.rating} / 5`}</td><td>${status(v.status)}</td><td><div class=\"actions\">${smallAction('Open','open-vendor-v6',v.id)}",
+  "vendor registry -> an unrated vendor says so",
+  "(v.rating==null||v.rating==='—')?'<span class=\"muted\">Not rated</span>'",
+)
+
+// ---------------------------------------------------------------------------
+// 47. Contracts & Awards: an award has no contract number
+// ---------------------------------------------------------------------------
+// Found by the cycle-eight screen review: an award awaiting its contract showed its purchase order number in the
+// Contract column, so the register read as four contracts, three of them numbered like orders.
+s = replaceUnique(
+  s,
+  "<td><strong class=\"link\">${esc(c.id)}</strong></td><td><strong>${esc(c.title)}</strong><br><span class=\"muted\">${esc(c.tender)}</span></td>",
+  "${__pr23Live()&&c.kind==='award'?`<td><span class=\"muted\">Not yet contracted</span></td><td><strong>${esc(c.title)}</strong><br><span class=\"muted\">Award on ${esc(c.tender)} · ${esc(c.id)}</span></td>`:`<td><strong class=\"link\">${esc(c.id)}</strong></td><td><strong>${esc(c.title)}</strong><br><span class=\"muted\">${esc(c.tender)}</span></td>`}",
+  "contracts -> an award shows no contract number",
+  "Not yet contracted</span></td><td><strong>${esc(c.title)}",
+)
+
+// ---------------------------------------------------------------------------
+// 48. Document Vault: a template is not a vendor submission
+// ---------------------------------------------------------------------------
+// Found by the cycle-eight screen review: the "Request for Quotation" sourcing template was captioned "Vendor-submitted
+// original · read-only" — its name matched the vendor-document pattern ("quotation").
+s = replaceUnique(
+  s,
+  "const text = [doc.name,doc.type,doc.folder,doc.owner,doc.source,doc.provenance].filter(Boolean).join(' ');",
+  "if (__pr23Live() && /template/i.test(String(doc.type || '') + ' ' + String(doc.folder || ''))) return false; const text = [doc.name,doc.type,doc.folder,doc.owner,doc.source,doc.provenance].filter(Boolean).join(' ');",
+  "document vault -> templates are not vendor submissions",
+  "/template/i.test(String(doc.type || '') + ' ' + String(doc.folder || ''))",
+)
+
+// ---------------------------------------------------------------------------
+// 49. Audit & Compliance shows the latest 50 events
+// ---------------------------------------------------------------------------
+// Found by the cycle-eight screen review: every loaded event (up to 200) was one table, an 8,000-pixel page. The page
+// shows the latest 50 and says so; the export carries the rest.
+s = replaceUnique(
+  s,
+  "const rows=(__pr23Live()?(state.auditEventsLive||[]):[",
+  "const rows=(__pr23Live()?(state.auditEventsLive||[]).slice(0,50):[",
+  "audit -> latest 50 events on the page",
+  "(state.auditEventsLive||[]).slice(0,50)",
+)
+s = replaceUnique(
+  s,
+  "card('Immutable audit event stream','Every status change records user ID, timestamp, previous value, new value and reason',",
+  "card('Immutable audit event stream',__pr23Live()?__pr23AuditStreamNote():'Every status change records user ID, timestamp, previous value, new value and reason',",
+  "audit -> the card says how much it shows",
+  "__pr23Live()?__pr23AuditStreamNote():",
+)
+
+// ---------------------------------------------------------------------------
+// 50. Invoices & 3-Way Match works for a role that cannot see RFQs
+// ---------------------------------------------------------------------------
+// Found by the cycle-eight screen review as Accounts Payable: the page lists match sources from the RFQs, which that
+// role cannot read, so it showed an empty "Select a tender" card and no invoice. Such a role picks from its
+// purchase orders' sources instead (__pr23MatchSources), and the match workspace resolves them.
+s = replaceUnique(
+  s,
+  "const candidates=state.tenders.filter(t=>t.bids>0 || /Award|Evaluation|opening/i.test(t.stage));",
+  "const candidates=(__pr23Live()&&!state.tenders.length)?__pr23MatchSources():state.tenders.filter(t=>t.bids>0 || /Award|Evaluation|opening/i.test(t.stage));",
+  "invoice match -> order sources for roles without RFQs",
+  "(__pr23Live()&&!state.tenders.length)?__pr23MatchSources():",
+)
+s = replaceEvery(
+  s,
+  "const t=state.tenders.find(x=>x.id===id)||state.tenders[0];",
+  "const t=state.tenders.find(x=>x.id===id)||(__pr23Live()&&!state.tenders.length?__pr23MatchSources().find(x=>x.id===id):null)||state.tenders[0];",
+  "tender workspaces -> resolve an order source",
+  "__pr23MatchSources().find(x=>x.id===id)",
+  3,
+)
+
+// ---------------------------------------------------------------------------
 // 43. A filed document previews as itself
 // ---------------------------------------------------------------------------
 // Found by the UI census as Accounts Payable: previewing, downloading, editing or versioning the RFQ pack threw

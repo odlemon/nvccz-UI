@@ -110,7 +110,13 @@ try {
   }
 
   const deletedIds = [vendorIds, reqIds, rfqIds, quoteIds, poIds, grnIds, invoiceIds, intakeIds, planIds, contractIds, docIds, cbIds, journalIds].flat()
-  const auditCount = await prisma.auditLog.count({ where: { entityId: { in: deletedIds } } })
+  // RFQ creations are audited against the RFQ number (entityType "RFQ") with the RFQ's id in newValues, so matching
+  // on entityId alone left every removed test RFQ's "Create RFQ" row in the Internal Auditor's trail.
+  const rfqAuditIds = (await prisma.auditLog.findMany({ where: { entityType: "RFQ" }, select: { id: true, newValues: true } }))
+    .filter((a) => rfqIds.includes(a.newValues?.procurementRfqId))
+    .map((a) => a.id)
+  const auditWhere = { OR: [{ entityId: { in: deletedIds } }, { id: { in: rfqAuditIds } }] }
+  const auditCount = await prisma.auditLog.count({ where: auditWhere })
   const notifCount = await prisma.notification.count({ where: { relatedEntityId: { in: deletedIds } } })
   console.log(`audit rows about them: ${auditCount} · notifications about them: ${notifCount}`)
 
@@ -147,7 +153,7 @@ try {
       await del("vendorKyc", () => tx.vendorKycDocument.deleteMany({ where: { vendorId: { in: vendorIds } } }))
       await del("vendorAttachments", () => tx.vendorDocumentAttachment.deleteMany({ where: { vendorId: { in: vendorIds } } }))
       await del("vendors", () => tx.vendor.deleteMany({ where: { id: { in: vendorIds } } }))
-      await del("auditRows", () => tx.auditLog.deleteMany({ where: { entityId: { in: deletedIds } } }))
+      await del("auditRows", () => tx.auditLog.deleteMany({ where: auditWhere }))
       await del("notifications", () => tx.notification.deleteMany({ where: { relatedEntityId: { in: deletedIds } } }))
       return out
     },

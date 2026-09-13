@@ -23,6 +23,7 @@ import {
 } from "@/lib/procurement-v23/actions"
 import { getAuthToken } from "@/lib/utils/cookies"
 import "@/components/procurement-v23-mock/procurement-v23.css"
+import "@/components/procurement-v23-mock/procurement-v23-live.css"
 
 type RuntimeApi = {
   setPage: (page: string) => void
@@ -187,6 +188,12 @@ export function ProcurementV23App() {
         if (pathnameRef.current !== path) router.push(path)
       },
     })
+    // A role without the Command Centre is sent on to the first page it can open (the bridge picks it). Replaced,
+    // not pushed, so Back does not land on the Command Centre only to be sent on again.
+    ;(window as unknown as { __PR23_REPLACE__?: (page: string) => void }).__PR23_REPLACE__ = (page: string) => {
+      const path = PR23_PAGE_TO_PATH[page]
+      if (path && pathnameRef.current !== path) router.replace(path)
+    }
 
     // The runtime rendered its vendored demo dataset synchronously. Replace it before the
     // browser paints, so no demo record is ever shown as if it were the organisation's.

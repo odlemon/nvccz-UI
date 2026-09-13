@@ -61,13 +61,30 @@ function __pr23NoData(message) {
  * from its quotations, then the receipts and invoices raised against those orders.
  */
 function __pr23MatchChain(tenderId) {
-  const orders = (state.orders || []).filter(o => o.rfq === tenderId);
+  // An order raised without an RFQ is its own source.
+  const orders = (state.orders || []).filter(o => o.rfq === tenderId || (!o.rfq && o.id === tenderId));
   const poIds = new Set(orders.map(o => o.id));
   const grns = (state.grns || []).filter(g => poIds.has(g.po));
   const invoices = (state.invoices || []).filter(i => poIds.has(i.po));
   const label = invoices.length ? 'Invoice received' : orders.length ? 'Awaiting invoice' : 'No purchase order yet';
   const tone = invoices.length ? 'green' : orders.length ? 'amber' : 'blue';
   return { orders, grns, invoices, label, tone };
+}
+
+/**
+ * Invoice-match sources for a role that cannot see RFQs (Accounts Payable): the RFQ each order was awarded from,
+ * or the order itself where it was raised directly, named from what was requisitioned. Without these the
+ * Invoices page showed Accounts Payable an empty "Select a tender" card and no invoice at all.
+ */
+function __pr23MatchSources() {
+  const seen = new Map();
+  for (const o of state.orders || []) {
+    if (String(o.rawStatus || '').toUpperCase() === 'CANCELLED') continue;
+    const id = o.rfq || o.id;
+    if (seen.has(id)) continue;
+    seen.set(id, { id, recordId: id, title: o.sourceTitle || `Purchase order ${o.id}`, entity: o.entity || '—', method: o.rfq ? 'Request for quotation' : 'Purchase order', bids: 0, stage: 'Awarded', close: '—', value: null });
+  }
+  return [...seen.values()];
 }
 
 /** [label, count, colour] segments -> a conic-gradient; grey when there is nothing to show. */
@@ -1185,10 +1202,25 @@ function __pr23PageAllowed(page) {
   return !grants || grants.some(__pr23Can);
 }
 
+/** The audit card's line, saying how much of the loaded trail the page shows. */
+function __pr23AuditStreamNote() {
+  const n = (state.auditEventsLive || []).length;
+  return n > 50
+    ? `The latest 50 of ${n} loaded events, newest first: what was done, to which record, by whom and when.`
+    : 'Every recorded procurement action, newest first: what was done, to which record, by whom and when.';
+}
+
 /** Said instead of a page of empty registers, which reads as "nothing exists" rather than "not yours". */
 function __pr23NoAccessHtml(page) {
   const title = __PR23_PAGE_TITLES[page] || 'This page';
   const open = Object.keys(__PR23_PAGE_TITLES).filter(p => p !== page && __pr23PageAllowed(p));
+  // The module opens on the Command Centre. A role without it goes on to the first page its menu offers; the host
+  // replaces the history entry, so Back does not return to a page that would only send it on again.
+  if (page === 'dashboard' && open.length && typeof window !== 'undefined' && typeof window.__PR23_REPLACE__ === 'function' && !window.__pr23Redirecting) {
+    window.__pr23Redirecting = true;
+    setTimeout(() => { window.__pr23Redirecting = false; }, 3000);
+    setTimeout(() => window.__PR23_REPLACE__(open[0]), 0);
+  }
   const links = open.map(p => `<div class="list-row" data-page="${p}" style="cursor:pointer"><div class="list-main"><strong>${__pr23Esc(__PR23_PAGE_TITLES[p])}</strong><span>Open</span></div></div>`).join('');
   return `<div class="page">${pageHead('Procurement access', title, `Your role does not include ${title}. Procurement access is granted on your role in Admin → Roles.`, '')}${card('Pages your role can open', 'Choose where to go', `<div class="card-body list">${links}</div>`)}</div>`;
 }
@@ -1249,7 +1281,24 @@ function __pr23LiveBars(items, id) {
   let rows = [];
   let unit = 'share';
   if (/supplier/i.test(key)) rows = group(orders, o => o.vendor, o => o.amount);
-  else if (/category|entity|spend/i.test(key)) rows = group(orders, o => o.entity, o => o.amount);
+  else if (/plan-execution/i.test(key)) {
+    // Committed value against each department's approved plan budget for this year. It was each department's
+    // share of all commitments, so a single department read 100% under "percentage of approved plan".
+    const year = new Date().getFullYear();
+    const budget = new Map();
+    for (const p of state.plans || []) {
+      if (String(p.rawStatus || '').toUpperCase() !== 'APPROVED') continue;
+      if (p.fiscalYear && !String(p.fiscalYear).includes(String(year))) continue;
+      const k = p.department || p.entity;
+      if (k) budget.set(k, (budget.get(k) || 0) + (Number(p.budget) || 0));
+    }
+    const committed = k => orders.filter(o => o.entity === k && (!o.orderDate || new Date(o.orderDate).getFullYear() === year)).reduce((t, o) => t + (Number(o.amount) || 0), 0);
+    rows = [...budget.entries()].filter(e => e[1] > 0).map(([k, b]) => [k, Math.round((committed(k) / b) * 100)]).sort((a, b) => b[1] - a[1]).slice(0, 6);
+    unit = 'percent';
+  }
+  // Spend by category groups on the requisition's sourcing category; it grouped on department before.
+  else if (/category/i.test(key)) rows = group(orders, o => o.spendCategory, o => o.amount);
+  else if (/entity|spend/i.test(key)) rows = group(orders, o => o.entity, o => o.amount);
   else if (/bid|score/i.test(key)) {
     const t = state.evaluationTender;
     rows = (state.quotationsLive || []).filter(q => (!t || q.rfq === t) && q.evaluationScore != null).map(q => [q.vendor, Number(q.evaluationScore)]).slice(0, 6);
@@ -1269,8 +1318,8 @@ function __pr23LiveBars(items, id) {
   const total = rows.reduce((t, r) => t + r[1], 0) || 1;
   const max = Math.max(...rows.map(r => r[1])) || 1;
   return `<div class="bars" data-chart="${__pr23Esc(key)}">${rows.map(([label, v]) => {
-    const width = unit === 'score' ? Math.max(0, Math.min(100, v)) : Math.round((v / (unit === 'share' ? total : max)) * 100);
-    const shown = unit === 'share' ? `${Math.round((v / total) * 100)}%` : String(Math.round(v));
+    const width = unit === 'score' || unit === 'percent' ? Math.max(0, Math.min(100, v)) : Math.round((v / (unit === 'share' ? total : max)) * 100);
+    const shown = unit === 'share' ? `${Math.round((v / total) * 100)}%` : unit === 'percent' ? `${v}%` : String(Math.round(v));
     return `<div class="bar-row"><span>${__pr23Esc(label)}</span><div class="bar-track"><div class="bar-fill" style="width:${width}%"></div></div><b>${shown}</b></div>`;
   }).join('')}</div>`;
 }
@@ -1283,6 +1332,8 @@ function __pr23LiveLine(id) {
     const t = d ? new Date(d) : null;
     return t && !Number.isNaN(t.getTime()) && t.getFullYear() === year ? t.getMonth() : -1;
   };
+  // Report runs and downloads are not logged, so a report-usage chart has nothing to draw; it drew spend.
+  if (/report/i.test(key)) return __pr23NoData('Report runs and downloads are not logged yet.');
   const isMoney = !/invoice|match/i.test(key);
   const series = [];
   if (isMoney) {
@@ -1318,9 +1369,13 @@ function __pr23LiveLine(id) {
   const fmt = v => (isMoney ? (v >= 1e6 ? `$${(v / 1e6).toFixed(1)}m` : v >= 1e3 ? `$${Math.round(v / 1e3)}k` : `$${Math.round(v)}`) : String(Math.round(v)));
   const grid = [0, 0.5, 1].map(f => `<line x1="52" x2="700" y1="${y(max * f).toFixed(1)}" y2="${y(max * f).toFixed(1)}" stroke="#e5e7eb"/><text x="4" y="${(y(max * f) + 4).toFixed(1)}" font-size="11" fill="#64748b">${fmt(max * f)}</text>`).join('');
   const axis = months.map((m, i) => `<text x="${(x(i) - 10).toFixed(1)}" y="280" font-size="11" fill="#64748b">${m}</text>`).join('');
-  const lines = series.map(([name, color, vals]) =>
-    `<path d="${vals.map((v, i) => `${i ? 'L' : 'M'} ${x(i).toFixed(1)} ${y(v).toFixed(1)}`).join(' ')}" fill="none" stroke="${color}" stroke-width="2.5"/>` +
-    vals.map((v, i) => (v ? `<circle cx="${x(i).toFixed(1)}" cy="${y(v).toFixed(1)}" r="3.5" fill="${color}"><title>${name}, ${months[i]}: ${fmt(v)}</title></circle>` : '')).join('')).join('');
+  // The rest of the year has not happened: the lines stop at this month instead of falling to zero.
+  const upTo = new Date().getMonth();
+  const lines = series.map(([name, color, all]) => {
+    const vals = all.slice(0, upTo + 1);
+    return `<path d="${vals.map((v, i) => `${i ? 'L' : 'M'} ${x(i).toFixed(1)} ${y(v).toFixed(1)}`).join(' ')}" fill="none" stroke="${color}" stroke-width="2.5"/>` +
+      vals.map((v, i) => (v ? `<circle cx="${x(i).toFixed(1)}" cy="${y(v).toFixed(1)}" r="3.5" fill="${color}"><title>${name}, ${months[i]}: ${fmt(v)}</title></circle>` : '')).join('');
+  }).join('');
   return `<div class="chart" data-chart="${__pr23Esc(key)}"><svg viewBox="0 0 740 300" preserveAspectRatio="xMidYMid meet" role="img" aria-label="${__pr23Esc(series.map(s => s[0]).join(' and '))} by month, ${year}">${grid}${axis}${lines}</svg></div>`;
 }
 

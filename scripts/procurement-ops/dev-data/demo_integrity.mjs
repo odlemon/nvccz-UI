@@ -70,6 +70,13 @@ check(contracts.length === 1 && contracts[0].status === "ACTIVE", "one active co
 const journals = await rows("fin", "/accounting/journal-entries?limit=50")
 check(!journals.some((j) => /UAT|Storyline/.test(String(j.description))), "no test postings left in the ledger", String(journals.filter((j) => /UAT|Storyline/.test(String(j.description))).length))
 
+// The audit trail names only records that exist: a removed record keeps its raw id as its label, and an RFQ row
+// (written against the RFQ number) names a number some RFQ still has. Tidied by dev_audit_tidy.mjs.
+const audit = await rows("mgr", "/procurement/audit-events?limit=500")
+const rfqNumbers = new Set(rfqs.map((r) => r.rfqNumber))
+const orphans = audit.filter((a) => (a.entityType === "RFQ" ? !rfqNumbers.has(a.entityId) : !a.entityLabel))
+check(audit.length > 0 && !orphans.length, "the audit trail names only records that exist", orphans.length ? `${orphans.length} orphaned, e.g. ${orphans.slice(0, 3).map((a) => `${a.action} ${a.entityType} ${a.entityId}`).join("; ")}` : `${audit.length} rows`)
+
 const failed = results.filter((x) => !x).length
 console.log(`=== RESULT === demo dataset ${failed ? `NOT intact (${failed} check${failed === 1 ? "" : "s"} failed)` : "intact"} · ${results.length - failed}/${results.length}`)
 process.exit(failed ? 1 : 0)

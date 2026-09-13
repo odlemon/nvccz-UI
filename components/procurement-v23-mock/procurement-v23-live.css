@@ -1,0 +1,27 @@
+/*
+ * Host overrides on the vendored stylesheet. procurement-v23.css comes out of scripts/extract-procurement-v23.mjs and
+ * would lose hand edits on the next extract, so corrections to it live here, imported after it.
+ */
+
+/*
+ * Table cells wrapped at any character ("Operation s", "$10,40 0"): overflow-wrap:anywhere lets a column shrink below
+ * its longest word. break-word still breaks a string too long for the cell, but sizes columns to whole words.
+ */
+.procurement-v23-root table td,
+.procurement-v23-root table th {
+  overflow-wrap: break-word;
+}
+
+/* Doughnut legends built as rows (the Command Centre's cycle status) ran the label into its figure: "Planning25%". */
+.procurement-v23-root .donut-legend-v6 > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 12px;
+}
+.procurement-v23-root .donut-legend-v6 > div > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}

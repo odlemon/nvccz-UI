@@ -326,19 +326,21 @@ export async function loadProcurementV23LiveData(): Promise<ProcurementV23LivePa
     const bids = (quotesByRfq.get(t.procurementRfqId ?? t.id) ?? []).filter((q) => String(q.status).toUpperCase() !== "DRAFT")
     const awarded = bids.some((q) => String(q.status).toUpperCase() === "ACCEPTED")
     const closed = t.closingAt ? new Date(t.closingAt).getTime() < now : false
+    // An RFQ carries no category or estimate of its own; the requisition it was raised from carries both.
+    const source = t.requisitionId ? reqById.get(String(t.requisitionId)) : undefined
     return {
       id: t.rfqNumber ?? t.id,
       recordId: t.procurementRfqId ?? t.id,
       title: t.title ?? DASH,
       entity: departmentOfRequisition(t.requisitionId),
-      category: DASH,
-      // An RFQ carries no estimated value; the quotations carry prices, shown in evaluation.
-      value: null,
+      category: source?.sourcingCategory ? titleCase(source.sourcingCategory) : DASH,
+      // The requester's estimate; the quotations carry the prices, shown in evaluation.
+      value: num(source?.totalAmount) || null,
       stage: awarded ? "Awarded" : bids.length ? "Evaluation" : closed ? "Closed" : "Published",
       close: fmtDate(t.closingAt),
       bids: bids.length,
-      // An RFQ invites named vendors, which is a restricted process unless publicly listed.
-      method: t.visibility === "PUBLIC_LISTING" ? "Open tender" : "Restricted tender",
+      // An RFQ invites named vendors; it is an open tender only when publicly listed.
+      method: t.visibility === "PUBLIC_LISTING" ? "Open tender" : "Request for quotation",
       owner: personName(t.createdBy),
       requisition: t.requisition?.requisitionNumber ?? null,
       rawStatus: t.status,
@@ -388,6 +390,12 @@ export async function loadProcurementV23LiveData(): Promise<ProcurementV23LivePa
     asset: false,
     currency: o.currency?.code ?? null,
     requisition: o.requisition?.requisitionNumber ?? null,
+    // What was bought and its category, from the requisition: the invoice match names its sources with it for
+    // roles that cannot open RFQs, and spend by category groups on it.
+    sourceTitle: o.requisition?.title ?? null,
+    spendCategory: o.requisitionId && reqById.get(String(o.requisitionId))?.sourcingCategory
+      ? titleCase(reqById.get(String(o.requisitionId))?.sourcingCategory)
+      : null,
     quotation: o.quotation?.quotationNumber ?? null,
     // The RFQ this order was awarded from, which links it into the invoice match chain.
     rfq: o.quotation?.rfqNumber ?? null,
@@ -843,7 +851,8 @@ export async function loadProcurementV23LiveData(): Promise<ProcurementV23LivePa
       record: g.grnNumber ?? g.id,
       title: `Inspect and accept receipt against ${g.purchaseOrder?.poNumber ?? "PO"}`,
       entity: departmentOfRequisition(g.purchaseOrder?.requisitionId),
-      amount: null,
+      // The receipt's value as the Receiving register shows it.
+      amount: grnsView.find((x) => x.id === (g.grnNumber ?? g.id))?.value || null,
       waitingOn: "Procurement Manager",
       since: firstDate(g.receivedDate, g.createdAt),
       page: "receiving",
@@ -898,6 +907,11 @@ export async function loadProcurementV23LiveData(): Promise<ProcurementV23LivePa
     ProcurementDocument: "document",
     VendorInvoiceIntake: "invoice reading",
   }
+  // RFQ rows are written against the RFQ number rather than its id; name the RFQ the way other rows name theirs.
+  const rfqAuditLabel = (number: unknown) => {
+    const t = tendersView.find((x) => x.id === number)
+    return t ? `${t.id} · ${t.title}` : null
+  }
   const auditEventsLive = auditRows.map((a) => {
     const act = String(a.action ?? "")
     const cls = /APPROVE|REJECT|BLACKLIST|PAYMENT|SEND|SCORE/.test(act)
@@ -913,7 +927,7 @@ export async function loadProcurementV23LiveData(): Promise<ProcurementV23LivePa
     return [
       `AUD-${String(a.id).slice(-8).toUpperCase()}`,
       `${titleCase(act)} ${AUDIT_ENTITY[a.entityType] ?? titleCase(a.entityType)}`,
-      a.entityLabel ?? a.entityId ?? DASH,
+      a.entityLabel ?? (a.entityType === "RFQ" ? rfqAuditLabel(a.entityId) : null) ?? a.entityId ?? DASH,
       a.actorName ?? "System",
       when,
       cls,
@@ -1205,7 +1219,14 @@ export async function loadProcurementV23LiveData(): Promise<ProcurementV23LivePa
   const orNull = (n: number) => n || null
   const navCounts: Record<string, number | null> = {
     approvals: orNull(prompts.length),
-    requisitions: orNull(reqStatus("PENDING_APPROVAL")),
+    // What the page opens on for this user: requisitions awaiting their decision or, with none to decide, their
+    // own requests still in approval. Counting every pending requisition put a badge over a manager's empty queue.
+    requisitions: orNull(
+      requisitionsView.filter((r) => String(r.rawStatus).toUpperCase() === "PENDING_APPROVAL" && r.awaitingMe).length ||
+        requisitionsView.filter(
+          (r) => String(r.rawStatus).toUpperCase() === "PENDING_APPROVAL" && Boolean(access?.userId) && r.requestedById === access?.userId,
+        ).length,
+    ),
     tenders: orNull(openRfqs.length),
     evaluation: orNull(tendersView.filter((t) => t.stage === "Evaluation").length),
     orders: orNull(countBy(orders, (o) => String(o.status).toUpperCase() === "SENT" && !o.vendorAcknowledgedAt)),
