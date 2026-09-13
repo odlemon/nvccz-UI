@@ -277,8 +277,13 @@ for (const [email, role] of USERS) {
   page.on("dialog", (d) => { w.dialogs.push(`${d.type()}: ${d.message().slice(0, 160)}`); d.dismiss().catch(() => {}) })
   context.on("page", async (p) => {
     if (p === page) return
+    // Recorded the moment the tab opens. Waiting for it to load first recorded a slow external page (the vendor
+    // portal) after the probe had read its effects, so a working "Vendor portal" read as having no visible effect.
+    // The list is held by reference: a load that finishes after reset() updates this probe's entry, not the next's.
+    const list = w.popups
+    const i = list.push(p.url() || "about:blank") - 1
     await p.waitForLoadState("domcontentloaded").catch(() => {})
-    w.popups.push(p.url())
+    list[i] = p.url() || list[i]
     await p.close().catch(() => {})
   })
 
