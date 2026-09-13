@@ -1978,6 +1978,56 @@ function __pr23NoAccessHtml(page) {
   return `<div class="page">${pageHead('Procurement access', title, `Your role does not include ${title}. Procurement access is granted on your role in Admin → Roles.`, '')}${card('Pages your role can open', 'Choose where to go', `<div class="card-body list">${links}</div>`)}</div>`;
 }
 
+// ---------------------------------------------------------------- controls with no backend are not offered
+
+/**
+ * A live session does not offer a control that would save nothing. The host names those actions
+ * (window.__pr23IsUnconnected, lib/procurement-v23/actions.ts hasNoBackend): openers for what is not built, and steps
+ * with no backend. They used to answer "not connected" after the click; they are now removed from pages, modals, drawers
+ * and menus as those render. A modal or drawer left with a form and nothing to save says so and is recorded in
+ * window.__pr23DeadEnds, so the census can name the opener that still leads there.
+ */
+const __PR23_CONTROL_SELECTOR = 'button[data-action], a[data-action], [role="menuitem"][data-action]';
+
+function __pr23SweepUnconnected(node) {
+  const isUnconnected = typeof window !== 'undefined' && window.__pr23IsUnconnected;
+  if (typeof isUnconnected !== 'function' || !__pr23Live() || !node || node.nodeType !== 1) return 0;
+  const controls = node.matches(__PR23_CONTROL_SELECTOR) ? [node] : [...node.querySelectorAll(__PR23_CONTROL_SELECTOR)];
+  let removed = 0;
+  for (const el of controls) {
+    if (isUnconnected(el.dataset.action)) {
+      el.remove();
+      removed += 1;
+    }
+  }
+  return removed;
+}
+
+function __pr23CheckDeadEnds() {
+  for (const [layerSel, bodySel, footSel, titleSel] of [['#modalLayer', '#modalBody', '#modalFoot', '#modalTitle'], ['#drawerLayer', '#drawerBody', '#drawerFoot', '#drawerTitle']]) {
+    const layer = document.querySelector(layerSel);
+    const body = document.querySelector(bodySel);
+    const foot = document.querySelector(footSel);
+    if (!layer || !layer.classList.contains('open') || !body || !foot || body.querySelector('[data-pr23-dead-end]')) continue;
+    const actions = [...foot.querySelectorAll('button, a')].filter(b => !/close|cancel/i.test(b.dataset.action || '') && !/^(cancel|close|back)$/i.test((b.textContent || '').trim()));
+    const form = body.querySelector('input:not([type="search"]), select, textarea');
+    if (actions.length || !form) continue;
+    const title = (document.querySelector(titleSel) || {}).textContent || '';
+    body.insertAdjacentHTML('afterbegin', '<div class="notice" data-pr23-dead-end style="margin-bottom:12px"><div><strong>Nothing here can be saved</strong><p>This form has no backend in this system, so nothing entered here is kept.</p></div></div>');
+    window.__pr23DeadEnds = window.__pr23DeadEnds || [];
+    window.__pr23DeadEnds.push({ title, page: state.page, at: new Date().toISOString() });
+  }
+}
+
+if (typeof window !== 'undefined' && typeof MutationObserver !== 'undefined' && !window.__pr23SweepObserver) {
+  window.__pr23SweepObserver = new MutationObserver(records => {
+    let removed = 0;
+    for (const record of records) for (const node of record.addedNodes) removed += __pr23SweepUnconnected(node);
+    if (removed || records.some(r => r.target && r.target.closest && r.target.closest('#modalLayer, #drawerLayer'))) __pr23CheckDeadEnds();
+  });
+  window.__pr23SweepObserver.observe(document.documentElement, { childList: true, subtree: true });
+}
+
 // ---------------------------------------------------------------- Analytics: pipeline, spend, matching, cash and insights
 
 function __pr23Days(n) {

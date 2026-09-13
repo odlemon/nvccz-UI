@@ -279,6 +279,15 @@ const NOT_BUILT_OPENERS: Record<string, string> = {
   "request-vendor-docs-v6": "Requesting documents from vendors is not connected yet. Ask the vendor by mail, then file what they send in the Document Vault.",
 }
 
+/**
+ * True for a control a live session does not offer at all: an opener for something not built, or a step that would save
+ * nothing. The bridge removes these from pages, modals and drawers as they render (window.__pr23IsUnconnected), so no
+ * control answers "not connected" after the click. A role's missing permission is not this: those still explain.
+ */
+export function hasNoBackend(action: string): boolean {
+  return Boolean(NOT_BUILT_OPENERS[action]) || isUnconnectedWrite(action)
+}
+
 /** The refusal to show for an opener the signed-in role cannot complete, or null to let it open. */
 export function refusedOpener(action: string, live: ProcurementV23LivePayload | null): string | null {
   if (NOT_BUILT_OPENERS[action]) return NOT_BUILT_OPENERS[action]

@@ -16,6 +16,7 @@ import {
 } from "@/lib/procurement-v23/live-loaders"
 import {
   handleProcurementV23Action,
+  hasNoBackend,
   isUnconnectedWrite,
   LIVE_ACTIONS,
   refusedOpener,
@@ -195,6 +196,8 @@ export function ProcurementV23App() {
       const path = PR23_PAGE_TO_PATH[page]
       if (path && pathnameRef.current !== path) router.replace(path)
     }
+    // Controls with no backend are not offered: the bridge removes them as they render, by this rule.
+    ;(window as unknown as { __pr23IsUnconnected?: (action: string) => boolean }).__pr23IsUnconnected = hasNoBackend
     // Requisition lines suggest items bought before as they are typed (SRD §3); the bridge renders, the host fetches.
     ;(window as unknown as { __pr23LineSuggestions?: (q: string) => Promise<unknown[]> }).__pr23LineSuggestions = (q: string) =>
       requisitionLineSuggestions(q).catch(() => [])
