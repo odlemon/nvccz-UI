@@ -97,7 +97,7 @@ const navGroups=[
  ['Fulfil & Account',[['orders','Purchase Orders','order',''],['receiving','Receiving & Inspection','receive','9'],['invoices','Invoices & 3-Way Match','invoice','12'],['intake','AI Invoice Capture','invoice',''],['accounts','Accounts & Asset Transfers','account','4']]],
  ['Documents & Control',[['documents','Document Vault','document',''],['reports','Reports Vault','report',''],['audit','Audit & Compliance','audit',''],['settings','Configuration & RBAC','settings','']]]
 ];
-const state={page:(typeof initialPage==='string'&&initialPage)?initialPage:'dashboard',entity:'group',year:'FY 2026',expanded:(typeof window==='undefined'||window.innerWidth>780),filters:{period:'FY 2026',category:'All categories',status:'All statuses',currency:'USD'},planStatus:'Draft',planVersion:'v1.0',evaluationTender:null,accountTab:'journals',settingsTab:'rbac',theme:'light',
+const state={page:(typeof initialPage==='string'&&initialPage)?initialPage:'dashboard',entity:'group',year:'FY 2026',expanded:(typeof window==='undefined'||!window.matchMedia||!window.matchMedia('(max-width: 780px)').matches),filters:{period:'FY 2026',category:'All categories',status:'All statuses',currency:'USD'},planStatus:'Draft',planVersion:'v1.0',evaluationTender:null,accountTab:'journals',settingsTab:'rbac',theme:'light',
  plans:[
   {id:'PLAN-26-GRP',name:'FY 2026 Group Procurement Plan',entity:'Group Consolidated',budget:8240000,committed:5120000,status:'Under review',version:'v1.4',owner:'Group Procurement'},
   {id:'PLAN-26-KAR',name:'Kariba FY 2026 CAPEX Plan',entity:'Kariba Agro Limited',budget:1860000,committed:920000,status:'Approved',version:'v1.2',owner:'P. Mlambo'},

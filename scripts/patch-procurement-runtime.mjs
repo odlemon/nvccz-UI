@@ -1404,6 +1404,22 @@ s = replaceUnique(
 )
 
 // ---------------------------------------------------------------------------
+// 52. Narrow screens are decided by the stylesheet's media query, not innerWidth
+// ---------------------------------------------------------------------------
+// Found in cycle eight: a requester opening the module on a phone is sent on from the Command Centre to the Approval
+// Centre, and that page opened with the full menu over it. Traced on dev: the second runtime read window.innerWidth
+// as 784 on a 390px phone — while the route transition runs, content overflows and the mobile layout viewport widens,
+// so step 44's check thought it was a tablet. The media query the stylesheet uses measures the device width and does
+// not move with overflowing content.
+s = replaceUnique(
+  s,
+  "expanded:(typeof window==='undefined'||window.innerWidth>780),",
+  "expanded:(typeof window==='undefined'||!window.matchMedia||!window.matchMedia('(max-width: 780px)').matches),",
+  "narrow screens -> decided by the 780px media query",
+  "expanded:(typeof window==='undefined'||!window.matchMedia||!window.matchMedia('(max-width: 780px)').matches),",
+)
+
+// ---------------------------------------------------------------------------
 // 45. Tax-clearance days count from today, not the design's fixed date
 // ---------------------------------------------------------------------------
 // Found by the cycle-eight screen review: the Vendor Registry called a clearance 35 days from expiry "Valid" while
