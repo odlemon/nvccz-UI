@@ -1346,6 +1346,28 @@ s = replaceUnique(
 )
 
 // ---------------------------------------------------------------------------
+// 39-40. A page opened from another page keeps the sub-view it was opened on
+// ---------------------------------------------------------------------------
+// Found by the UI census: Reports "Manage all templates" set the Report Templates folder and moved to Documents; the
+// route change remounted the module and the new runtime opened the vault root. The navigation hook now stashes the
+// destination page's sub-view (__pr23StashCarry), and the next runtime takes it before its first render can
+// overwrite it and applies it before opening its initial page.
+s = replaceUnique(
+  s,
+  "window.__PROCUREMENT_V23_NAV__ = runtimeOptions.onNavigate || (() => {});",
+  "const __pr23Incoming = window.__pr23Carry || null; window.__pr23Carry = null; window.__PROCUREMENT_V23_NAV__ = (page) => { try { __pr23StashCarry(page); } catch (_) { window.__pr23Carry = null; } (runtimeOptions.onNavigate || (() => {}))(page); };",
+  "navigation hook -> stash the destination page's sub-view",
+  "const __pr23Incoming = window.__pr23Carry || null;",
+)
+s = replaceUnique(
+  s,
+  "if(initialPage&&supportedPages.has(initialPage))requestAnimationFrame(()=>navigateV14(initialPage));",
+  "if(initialPage&&supportedPages.has(initialPage)){try{__pr23ApplyCarry(initialPage,__pr23Incoming)}catch(_){}requestAnimationFrame(()=>navigateV14(initialPage));}",
+  "initial page -> opens on the carried sub-view",
+  "__pr23ApplyCarry(initialPage,__pr23Incoming)",
+)
+
+// ---------------------------------------------------------------------------
 // 35. The browser tab carries no build label
 // ---------------------------------------------------------------------------
 // Found on dev: the tab read "Matanho Procurement & Tender Management - V23" (each layer set its own version).

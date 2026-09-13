@@ -7,7 +7,7 @@ import {
 } from "@/components/client-design-mock/runtime-auth";
 export function startProcurementV23Runtime(rootEl, runtimeOptions = {}) {
   const initialPage = runtimeOptions.initialPage || 'dashboard';
-  window.__PROCUREMENT_V23_NAV__ = runtimeOptions.onNavigate || (() => {});
+  const __pr23Incoming = window.__pr23Carry || null; window.__pr23Carry = null; window.__PROCUREMENT_V23_NAV__ = (page) => { try { __pr23StashCarry(page); } catch (_) { window.__pr23Carry = null; } (runtimeOptions.onNavigate || (() => {}))(page); };
   window.__MATANHO_CONFIG__ = Object.assign(
     { API_BASE_URL: '/api/v1', MOCK_MODE: true, environment: 'preview' },
     window.__MATANHO_CONFIG__ || {}
@@ -595,6 +595,37 @@ function __pr23OrgName() {
  */
 function __pr23Title(fixture) {
   return __pr23Live() ? 'Procurement & Tender Management' : fixture;
+}
+
+/**
+ * The sub-view each page opens on when another page sends the person there. Every route change remounts the
+ * module (RouteTransition keys the page on its pathname), so "Manage all templates" on Reports showed the Report
+ * Templates folder for a moment and then the Document Vault root. Only the destination page's own keys travel,
+ * so a sidebar click still opens a page fresh.
+ */
+const __PR23_CARRY = {
+  documents: ['documentFolder'],
+  vendors: ['vendorDetail'],
+  evaluation: ['evaluationTender'],
+  invoices: ['matchTender'],
+  quotations: ['quotationTender'],
+  approvals: ['approvalTabV6'],
+  analytics: ['analysisContext', 'analyticsTitle'],
+};
+
+/** Called with every navigation the host hears about; keeps what the next runtime needs for that page. */
+function __pr23StashCarry(page) {
+  const keys = __PR23_CARRY[page];
+  if (!keys) { window.__pr23Carry = null; return; }
+  const values = {};
+  for (const k of keys) if (state[k] != null) values[k] = state[k];
+  window.__pr23Carry = Object.keys(values).length ? { page, values: JSON.parse(JSON.stringify(values)) } : null;
+}
+
+/** Applied once, before the new runtime opens its first page. */
+function __pr23ApplyCarry(page, carry) {
+  if (!carry || carry.page !== page) return;
+  Object.assign(state, carry.values);
 }
 
 /**
@@ -4830,7 +4861,7 @@ window.MatanhoProcurement=Object.freeze({version:'8.0.0',navigate,render,getStat
     safeToast('Request could not be completed',message,'warning');
   });
 
-  if(initialPage&&supportedPages.has(initialPage))requestAnimationFrame(()=>navigateV14(initialPage));
+  if(initialPage&&supportedPages.has(initialPage)){try{__pr23ApplyCarry(initialPage,__pr23Incoming)}catch(_){}requestAnimationFrame(()=>navigateV14(initialPage));}
 
   document.title=__pr23Title('Matanho Procurement & Tender Management - V18');
   window.MatanhoProcurementUI=Object.freeze({
