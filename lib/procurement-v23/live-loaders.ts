@@ -158,7 +158,8 @@ function invoiceStatus(inv: ProcurementRecord): string {
   const s = String(inv.status ?? "").toUpperCase()
   const pay = String(inv.paymentStatus ?? "").toUpperCase()
   if (pay === "PAID" || s === "PAID") return "Paid"
-  if (s === "APPROVED") return "Approved"
+  // An exact match approved without a person says so (SRD §6.6), so nobody believes Finance looked at it.
+  if (s === "APPROVED") return String(inv.approvalSource ?? "").toUpperCase() === "AUTOMATIC" ? "Approved automatically" : "Approved"
   if (s === "REJECTED") return "Blocked"
   if (s === "DRAFT" || s === "PENDING" || s === "PENDING_APPROVAL") return "Pending approval"
   return titleCase(s)

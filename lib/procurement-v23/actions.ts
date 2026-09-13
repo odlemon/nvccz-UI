@@ -46,6 +46,7 @@ import {
   rejectRequisition,
   scoreQuotation,
   saveApprovalMatrix,
+  saveInvoiceAutoApproval,
   sendPurchaseOrder,
   submitRequisition,
   updateRequisition,
@@ -86,6 +87,7 @@ export const LIVE_ACTIONS = [
   "submit-pr",
   "save-pr",
   "save-approval-matrix-v23",
+  "save-invoice-auto-approval-v23",
   "save-pr-v11",
   "submit-pr-v11",
   "approve-pr-v11",
@@ -476,6 +478,23 @@ export async function handleProcurementV23Action(
           handled: true,
           reload: true,
           message: `Approval route saved with ${steps.length} step${steps.length === 1 ? "" : "s"}. It applies to requisitions submitted from now on.`,
+        }
+      }
+
+      case "save-invoice-auto-approval-v23": {
+        if (!live.access?.isPrivileged) {
+          return { handled: true, error: "Only an administrator or the Chief Financial Officer can change automatic invoice approval." }
+        }
+        const enabled = Boolean(document.querySelector<HTMLInputElement>('#invoiceAutoApprovalFormV23 [name="enabled"]')?.checked)
+        const limitText = val('#invoiceAutoApprovalFormV23 [name="limit"]')
+        const saved = await saveInvoiceAutoApproval({ enabled, limit: limitText === "" ? null : Number(limitText) })
+        const limit = saved.limit != null ? ` up to $${saved.limit.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : ""
+        return {
+          handled: true,
+          reload: true,
+          message: saved.enabled
+            ? `Invoices that match exactly are now approved automatically${limit}.`
+            : "Automatic approval is off: every invoice waits for a person to approve it.",
         }
       }
 

@@ -543,13 +543,25 @@ function __pr23ApprovalMatrixHtml() {
     table(heads, rows.length ? rows : ['<tr><td colspan="4" class="muted">No route is set. Each requisition is decided by the head of its department, or its deputy.</td></tr>']),
     m.canEdit ? __pr23ActionButton('Edit route', 'edit-approval-matrix-v23', '', 'primary', 'settings') : '',
   );
+  const auto = m.invoiceAutoApproval || { enabled: false, limit: null };
+  const autoState = auto.enabled
+    ? `On${auto.limit != null ? `, for invoices up to ${__pr23Cents(auto.limit)}` : ', with no limit'}.`
+    : 'Off: every invoice waits for a person to approve it.';
+  const autoBody = m.canEdit
+    ? `<form id="invoiceAutoApprovalFormV23" onsubmit="return false" style="display:flex;gap:14px;align-items:flex-end;flex-wrap:wrap;padding:14px 16px"><label style="display:flex;gap:8px;align-items:center"><input type="checkbox" name="enabled"${auto.enabled ? ' checked' : ''}> Approve an invoice automatically when it matches exactly</label><label style="display:flex;flex-direction:column;gap:4px;font-size:12px">Only up to this total ($)<input name="limit" type="number" min="0" step="0.01" placeholder="No limit" value="${auto.limit != null ? __pr23Esc(auto.limit) : ''}" style="width:160px"></label>${__pr23ActionButton('Save', 'save-invoice-auto-approval-v23', '', 'primary', 'approve')}</form><p class="muted" style="margin:0;padding:0 16px 14px">Now: ${__pr23Esc(autoState)}</p>`
+    : `<p style="margin:0;padding:14px 16px">${__pr23Esc(autoState)}</p>`;
+  const autoCard = card(
+    'Invoices that match exactly',
+    'Approved without a person only when the three-way match is exact with no flag, the supplier\'s own document was read and agrees with the capture, and the total is within the limit. Anything else waits for Finance.',
+    autoBody,
+  );
   const overrides = (m.departmentRoutes || []).map(d => card(`${d.department} has its own route`, `${d.name}: requisitions from ${d.department} follow this instead of the route above.`, table(heads, __pr23MatrixRowsHtml(d.steps))));
   const decisions = card(
     'Decided by permission',
     'Not routed in steps: a role that holds the permission makes the decision. Permissions are granted per role in Admin, Roles.',
     table(['Decision', 'Permission', 'Roles holding it'], (m.permissionDecisions || []).map(d => `<tr><td><strong>${__pr23Esc(d.label)}</strong></td><td><code>${__pr23Esc(d.permission)}</code></td><td>${d.roles.length ? d.roles.map(r => `${__pr23Esc(r.name)} <span class="muted">(${r.people} ${r.people === 1 ? 'person' : 'people'})</span>`).join('<br>') : '<span class="muted">No role holds it</span>'}</td></tr>`)),
   );
-  return notice + route + overrides.join('') + decisions;
+  return notice + route + overrides.join('') + autoCard + decisions;
 }
 
 function __pr23MatrixStepRowHtml(step, index) {

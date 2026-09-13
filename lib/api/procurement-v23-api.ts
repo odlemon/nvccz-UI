@@ -554,8 +554,12 @@ export type ApprovalMatrixStep = {
   people: string[]
 }
 
+export type InvoiceAutoApproval = { enabled: boolean; limit: number | null; updatedAt: string | null }
+
 export type ApprovalMatrix = {
   canEdit: boolean
+  /** SRD §6.6: whether an exactly matching invoice, its document agreeing, is approved without a person. */
+  invoiceAutoApproval: InvoiceAutoApproval
   configId: string | null
   updatedAt: string | null
   steps: ApprovalMatrixStep[]
@@ -587,6 +591,11 @@ export async function getApprovalMatrix(): Promise<ApprovalMatrix> {
  */
 export async function saveApprovalMatrix(steps: ApprovalMatrixStepInput[]): Promise<ApprovalMatrix> {
   return unwrapData(await apiClient.put<ApiResponse<ApprovalMatrix>>("/procurement/approval-matrix", { steps }))
+}
+
+/** PUT /procurement/invoice-auto-approval {enabled, limit}: administrator or CFO. A null limit means no limit. */
+export async function saveInvoiceAutoApproval(body: { enabled: boolean; limit: number | null }): Promise<InvoiceAutoApproval> {
+  return unwrapData(await apiClient.put<ApiResponse<InvoiceAutoApproval>>("/procurement/invoice-auto-approval", body))
 }
 
 // ---------------------------------------------------------------------------
