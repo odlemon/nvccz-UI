@@ -763,13 +763,78 @@ now waits for the grants (nvccz-new, next commit). A person sees the same brief 
 later navigations reuse the loaded grants.
 
 **Seen, not changed:**
-- **No company profile on dev.** `GET /company-profile` answers 404, so generated documents carry the organisation's
-  name and no address or registration numbers. Set one up before a demo (data, not code).
-- **Group queue repeats My approvals.** A live session only knows the approvals waiting on the signed-in person, so
-  both tabs list the same prompts. Showing others' queues needs a backend read that does not exist yet.
+- ~~No company profile on dev~~ — set up; see the next section.
+- ~~Group queue repeats My approvals~~ — redesigned; see the next section.
 - **perf.sysadmin and payroll.cfo cannot sign in on dev.** Their passwords were not reset for this cycle; the
   eight other roles cover the storyline.
 - The only other failed request on every page is `/_vercel/insights/script.js` (dev is not hosted on Vercel).
+
+### Dev data, company profile, Approval Centre and accounting — 13 September 2026 (owner's instruction, dev only)
+
+The owner asked for the Group queue to be fixed, a company profile, the dev data cleaned and replaced with realistic
+data, and procurement tested together with accounting. Production was not touched.
+
+**Backup first.** `arcus_dev` was dumped before anything was deleted:
+`/var/www/projects/arcus/backups/arcus_dev-20260913-063341-pre-procurement-cleanup.sql.gz` (gzip integrity checked).
+
+**Test data removed.** Every procurement record on dev was test data. Removed in one transaction, children first, with
+the accounting postings they had created: 11 vendors, 116 requisitions, 45 RFQs, 92 quotations, 67 purchase orders,
+32 GRNs (52 lines), 33 invoices, 16 AI capture readings, 25 plans, 14 contracts, 16 vault documents, 14 cashbook
+entries, 28 journal entries, and the 1,045 audit rows about them. Nothing outside procurement pointed at those rows
+(expenses, sales invoices, statements, reconciliations, contra entries and fund disbursements were all checked first).
+
+**Company profile and people.** The profile names Matanho Investment Management (Private) Limited, procurement@matanho.com,
+matanho.com and the Harare head office, so letterheads carry it. Registration and tax numbers are left empty on purpose:
+they must come from the organisation, not be invented. The eight demo personas keep their logins and now show realistic
+names (Procurement Manager Tafadzwa Moyo, Procurement Officer Rumbidzai Chikwanha, Buyer Tinotenda Marufu, Requester
+Kudakwashe Ncube, Accounts Payable Chipo Mlambo, Operations head Farai Mutasa, Finance Manager Blessing Sibanda,
+Internal Auditor Rutendo Dube) instead of "Proc Manager" and "Payroll FinanceManager".
+
+**Demo dataset, built through the API** as the person who does each step, with the mail guard on:
+- 9 fictional vendors in five categories (example.com mailboxes), with realistic tax clearance dates — one expiring in 12 days.
+  The API refused a vendor with an expired clearance, a real rule, so none is seeded that way.
+- FY 2026 Operations plan approved by Finance; FY 2027 plan submitted and waiting on Finance.
+- Laptops: requisition → RFQ (2 bids, scored) → award → PO → GRN accepted → invoice approved → paid; the expense journal
+  posted to the ledger.
+- Stationery: received; the invoice waits on Finance. Generator and HVAC maintenance: PO open, 12-month contract active.
+- Boardroom furniture: the receipt waits on inspection. Network upgrade: two scored bids, award waiting on the Procurement
+  Manager. Welcome packs: RFQ open, no bids yet.
+- Requisitions in every other state: approved awaiting sourcing, two pending approval, a draft, one rejected with a reason.
+- Three vault documents (plan and maintenance agreement approved, RFQ pack under review).
+
+It was then spread over the past four months in business order — 51 records and their 86 audit rows — and dated
+documents renumbered to their day (`REQ_20260913_0001` → `REQ_20260806_0001`), with the 71 copies of those numbers
+(quotations, contract, journals, cashbook entry, vault document, audit values) following. The API's next number for a
+day is one past the highest suffix for that day, so numbering is unaffected.
+
+The tooling is in `scripts/procurement-ops/dev-data/` (nvccz-new `bba6bda`, `aa76463`) with a README: inventory,
+cleanup (test-named records by default, `--all` to rebuild from nothing), profile and personas, dataset, backdating.
+
+**Approval Centre** (nvccz-new `3c80409`, `4f9c686`). "Awaiting me" is a grid of decision cards, oldest first, with
+Review, Approve and Reject on each card; "All open approvals" is a table of every requisition, award, receipt, invoice
+and plan still open in the registers the role can read, with who it waits on and for how long. The KPIs count the same
+records. The eSignature and Delegations tabs (sample envelopes and people, no backend) are gone from a live session.
+
+**Suites kept off the demo** (nvccz-new `aa76463`). Several steps took the first record in a state — the first draft
+invoice, the first receipt waiting on inspection, the first vault document, any submitted plan, the second order in AI
+capture's list — which on dev are now demo records. Each takes a UAT record, arranging one where it did before. After a
+regression run, the cleanup removes what the suites created and leaves the demo.
+
+**Procurement and accounting, checked as the Finance Manager:**
+
+| Accounting page | What it shows of procurement |
+|---|---|
+| Journal Entries, General Ledger | The laptop invoice's posted expense journal (`EXP-…-INV_20260822_0001`) and its bank payment (`CB-2BGSVFW9`), USD 11,577.72 — correct. |
+| Payables & Payments | **Was wrong.** Open commitments USD 118,600 and a sourcing pipeline of USD 1,988,000 across "3 active RFQs", with the Purchase orders and Quotations & sourcing tabs listing TechNova Solutions, AfriCloud Infrastructure and other sample records: the page read the runtime's own arrays, which nothing replaced. Procurement's supplier invoices did not appear at all (the page read only accounting's purchase-invoice bills). **Fixed in the next commit:** the loader reads procurement's orders, RFQs, quotations and invoices; the Purchase orders tab, open commitments and the pipeline come from them; procurement invoices sit beside accounting's bills (awaiting approval reads Review, approved reads Approved, paid reads Paid); the Sourcing intelligence figures are counted from the RFQs beside them. A role without procurement access sees none (a 403 is not an error). |
+| Cash & Liquidity | Cash at bank is computed from posted journal lines (dev's bank shows a net credit). The register lists cashbook batches only, so a procurement payment — a single cashbook entry — is not listed there. Not changed. |
+
+**Decision owed (accounting policy).** A procurement invoice reaches the ledger only when it is paid:
+`ProcurementService.approveProcurementInvoice` posts nothing ("accounting entries will be created when invoice is
+PAID"), and payment posts the expense (Dr expense and VAT, Cr AP) and the bank payment (Dr AP, Cr bank) together. So an
+approved, unpaid supplier invoice is not a liability in the general ledger, trial balance or balance sheet. The platform
+already has an accrual path — accounting bills (`PurchaseInvoice`, `POST /procurement/purchase-orders/:id/convert-to-bill`,
+and AI capture's intake-to-bill). Recommendation: recognise the bill when Finance approves the invoice and settle it at
+payment. That changes what is posted and when, so it needs the accountant's sign-off before it is built.
 
 ---
 
