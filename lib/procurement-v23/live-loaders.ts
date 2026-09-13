@@ -794,6 +794,92 @@ export async function loadProcurementV23LiveData(): Promise<ProcurementV23LivePa
     }
   }
 
+  // ----------------------------------------------------------------- every open approval
+  // The Approval Centre's "All open approvals": each approval still open in the registers this role can read,
+  // whoever it waits on, oldest first. "Awaiting me" (the prompts above) is the subset this person can decide.
+  const mineIds = new Set(prompts.map((p) => String(p.id)))
+  const firstDate = (...ds: unknown[]) => {
+    for (const d of ds) if (d && !Number.isNaN(new Date(String(d)).getTime())) return new Date(String(d)).toISOString()
+    return null
+  }
+  const approvalGroup: Record<string, unknown>[] = []
+  const open = (p: Record<string, unknown>) => approvalGroup.push({ ...p, mine: mineIds.has(String(p.id)) })
+  for (const r of requisitionRows.filter((x) => String(x.status).toUpperCase() === "PENDING_APPROVAL")) {
+    open({
+      id: `PR-${r.requisitionNumber ?? r.id}`,
+      type: "Purchase requisition",
+      record: r.requisitionNumber ?? r.id,
+      title: r.title ?? DASH,
+      entity: r.department ?? DASH,
+      amount: num(r.totalAmount) || null,
+      waitingOn: r.department ? `Head of ${r.department}` : "Department head",
+      since: firstDate(r.submittedAt, r.updatedAt, r.createdAt),
+      page: "requisitions",
+    })
+  }
+  for (const t of rfqs) {
+    const all = quotesByRfq.get(t.procurementRfqId ?? t.id) ?? []
+    const bids = all.filter((q) => ["SUBMITTED", "UNDER_REVIEW"].includes(String(q.status).toUpperCase()))
+    if (!bids.length || all.some((q) => String(q.status).toUpperCase() === "ACCEPTED")) continue
+    const lowest = [...bids].sort((a, b) => (num(a.totalAmount) ?? Infinity) - (num(b.totalAmount) ?? Infinity))[0]
+    open({
+      id: `AWARD-${t.rfqNumber ?? t.id}`,
+      type: "Tender award",
+      record: t.rfqNumber ?? t.id,
+      title: `Award to ${lowest.companyName || lowest.vendorName || "vendor"}`,
+      entity: departmentOfRequisition(t.requisitionId),
+      amount: num(lowest.totalAmount),
+      waitingOn: "Procurement Manager",
+      since: firstDate(...bids.map((q) => q.submittedAt).sort()),
+      page: "evaluation",
+    })
+  }
+  for (const g of grns.filter((x) => String(x.status).toUpperCase() === "RECEIVED")) {
+    open({
+      id: `RECEIPT-${g.grnNumber ?? g.id}`,
+      type: "Goods receipt",
+      record: g.grnNumber ?? g.id,
+      title: `Inspect and accept receipt against ${g.purchaseOrder?.poNumber ?? "PO"}`,
+      entity: departmentOfRequisition(g.purchaseOrder?.requisitionId),
+      amount: null,
+      waitingOn: "Procurement Manager",
+      since: firstDate(g.receivedDate, g.createdAt),
+      page: "receiving",
+    })
+  }
+  for (const inv of invoices.filter((x) => ["DRAFT", "PENDING", "PENDING_APPROVAL"].includes(String(x.status).toUpperCase()))) {
+    open({
+      id: `INVOICE-${inv.invoiceNumber ?? inv.id}`,
+      type: "Invoice",
+      record: inv.invoiceNumber ?? inv.id,
+      title: `Approve ${inv.vendor?.name ?? "vendor"} invoice for payment`,
+      entity: DASH,
+      amount: num(inv.totalAmount),
+      waitingOn: "Finance Manager",
+      since: firstDate(inv.createdAt, inv.invoiceDate),
+      page: "invoices",
+    })
+  }
+  for (const p of plansView.filter((x) => x.rawStatus === "SUBMITTED")) {
+    const raw = planRows.find((x) => x.id === p.recordId)
+    open({
+      id: `PLAN-${p.id}`,
+      type: "Procurement plan",
+      record: p.id,
+      title: `Approve ${p.name}`,
+      entity: p.entity,
+      amount: p.budget,
+      waitingOn: "Finance Manager",
+      since: firstDate(raw?.submittedAt, raw?.updatedAt, raw?.createdAt),
+      page: "plan",
+    })
+  }
+  // A decision offered to this person that no register above lists (a department head's own queue).
+  for (const p of prompts) {
+    if (!approvalGroup.some((g) => g.id === p.id)) approvalGroup.push({ ...p, mine: true, waitingOn: "You", since: null, page: "approvals" })
+  }
+  approvalGroup.sort((a, b) => String(a.since ?? "9").localeCompare(String(b.since ?? "9")))
+
   // ----------------------------------------------------------------- audit trail
   // The audit page renders tuples: [id, event, record, actor, time, class].
   const AUDIT_ENTITY: Record<string, string> = {
@@ -1079,6 +1165,7 @@ export async function loadProcurementV23LiveData(): Promise<ProcurementV23LivePa
     grns: grnsView,
     invoices: invoicesView,
     approvalPromptsV6: prompts,
+    approvalGroupV23: approvalGroup,
     currentUserV6: { name: access?.name ?? DASH, role: access?.roleName ?? DASH },
     auditEventsLive,
     complianceReminderSettingsV7: NO_REMINDER_AUTOMATION,
@@ -1156,7 +1243,7 @@ const NO_REMINDER_AUTOMATION = {
 /** What the runtime is hydrated with before the first live load lands: no demo records at all. */
 export const EMPTY_PROCUREMENT_HYDRATE: Record<string, unknown> = {
   ...Object.fromEntries(
-    ["requisitions", "tenders", "vendors", "orders", "grns", "invoices", "approvalPromptsV6", "auditEventsLive", "quotationsLive", "plans", "planItems", "documents", "journals", ...NO_BACKEND_YET].map((k) => [k, []]),
+    ["requisitions", "tenders", "vendors", "orders", "grns", "invoices", "approvalPromptsV6", "approvalGroupV23", "auditEventsLive", "quotationsLive", "plans", "planItems", "documents", "journals", ...NO_BACKEND_YET].map((k) => [k, []]),
   ),
   complianceReminderSettingsV7: NO_REMINDER_AUTOMATION,
   evaluationLive: {},

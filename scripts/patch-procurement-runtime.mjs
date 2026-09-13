@@ -1368,6 +1368,27 @@ s = replaceUnique(
 )
 
 // ---------------------------------------------------------------------------
+// 41-42. Approval Centre: what waits on me, and every open approval
+// ---------------------------------------------------------------------------
+// The vendored page rendered the same prompts as cards and again as a table, its Group queue was the same list
+// again, and eSignature and Delegations showed sample envelopes and people. A live session renders
+// __pr23ApprovalsPageHtml from approvalPromptsV6 and the loaders' approvalGroupV23.
+s = replaceUnique(
+  s,
+  "'evaluationLive','letterhead'];",
+  "'evaluationLive','letterhead','approvalGroupV23'];",
+  "hydrate() -> every open approval",
+  "'letterhead','approvalGroupV23'];",
+)
+s = replaceUnique(
+  s,
+  "function approvalsPageV6(){",
+  "function approvalsPageV6(){if(__pr23Live())return __pr23ApprovalsPageHtml();",
+  "approval centre -> live page",
+  "function approvalsPageV6(){if(__pr23Live())return __pr23ApprovalsPageHtml();",
+)
+
+// ---------------------------------------------------------------------------
 // 35. The browser tab carries no build label
 // ---------------------------------------------------------------------------
 // Found on dev: the tab read "Matanho Procurement & Tender Management - V23" (each layer set its own version).

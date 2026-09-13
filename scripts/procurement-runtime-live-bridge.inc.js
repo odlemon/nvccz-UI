@@ -455,6 +455,54 @@ function __pr23ApplyCarry(page, carry) {
   Object.assign(state, carry.values);
 }
 
+// ---------------------------------------------------------------- approval centre
+
+function __pr23Waiting(iso) {
+  if (!iso) return '—';
+  const days = Math.floor((Date.now() - new Date(iso).getTime()) / 86400000);
+  return days <= 0 ? 'Today' : days === 1 ? '1 day' : `${days} days`;
+}
+
+/**
+ * The Approval Centre in a live session. "Awaiting me" lists the decisions this person can take, with Review,
+ * Approve and Reject; "All open approvals" lists every approval still open in the registers the role can read,
+ * with who it waits on and for how long. The vendored page repeated the same prompts as cards and again as a
+ * table, its Group queue was the same list again, and its eSignature and Delegations tabs showed sample
+ * envelopes and people for features that have no backend.
+ */
+function __pr23ApprovalsPageHtml() {
+  const mine = (state.approvalPromptsV6 || []).filter(a => a.status !== 'Approved' && a.status !== 'Rejected');
+  const all = state.approvalGroupV23 || [];
+  const byId = new Map(all.map(g => [g.id, g]));
+  const tab = state.approvalTabV6 === 'group' ? 'group' : 'mine';
+  const value = xs => xs.reduce((t, a) => t + (Number(a.amount) || 0), 0);
+  const oldest = all.reduce((m, g) => (g.since && (!m || g.since < m) ? g.since : m), null);
+  const cash = v => (v ? money(v) : '—');
+  const tabs = `<div class="settings-tabs-v5"><button class="tab ${tab === 'mine' ? 'active' : ''}" data-action="approval-tab-v6" data-id="mine">Awaiting me <span class="nav-count" style="display:inline-grid">${mine.length}</span></button><button class="tab ${tab === 'group' ? 'active' : ''}" data-action="approval-tab-v6" data-id="group">All open approvals <span class="nav-count" style="display:inline-grid">${all.length}</span></button></div>`;
+  let content;
+  if (tab === 'mine') {
+    const rows = mine.map(a => {
+      const g = byId.get(a.id) || {};
+      return `<tr><td><strong>${__pr23Esc(a.record)}</strong></td><td>${__pr23Esc(a.type)}</td><td><strong>${__pr23Esc(a.title)}</strong><br><span class="muted">${__pr23Esc(a.reason || '')}</span></td><td>${__pr23Esc(a.entity)}</td><td>${cash(a.amount)}</td><td>${__pr23Waiting(g.since)}</td><td><div class="actions">${smallAction('Review', 'open-approval-v6', a.id, 'eye')}${smallAction('Approve', 'approve-prompt-v6', a.id, 'approve')}${smallAction('Reject', 'reject-prompt-v6', a.id)}</div></td></tr>`;
+    });
+    content = rows.length
+      ? table(['Record', 'Type', 'Decision', 'Department', 'Value', 'Waiting', 'Actions'], rows)
+      : '<div class="notice"><div><strong>Nothing is waiting on you</strong><p>A decision appears here as soon as it is submitted to you.</p></div></div>';
+  } else {
+    const rows = all.map(g => `<tr><td><strong>${__pr23Esc(g.record)}</strong></td><td>${__pr23Esc(g.type)}</td><td><strong>${__pr23Esc(g.title)}</strong></td><td>${__pr23Esc(g.entity)}</td><td>${cash(g.amount)}</td><td>${g.mine ? status('Awaiting me') : __pr23Esc(g.waitingOn)}</td><td>${__pr23Waiting(g.since)}</td><td><div class="actions">${g.mine ? smallAction('Review', 'open-approval-v6', g.id, 'eye') : smallAction('Open register', 'nav-v6', g.page, 'arrow')}</div></td></tr>`);
+    content = rows.length
+      ? table(['Record', 'Type', 'Approval', 'Department', 'Value', 'Waiting on', 'Open for', ''], rows)
+      : '<div class="notice"><div><strong>No approval is open</strong><p>Every submitted requisition, award, receipt, invoice and plan has been decided.</p></div></div>';
+  }
+  const kpis = [
+    kpi('Waiting on me', String(mine.length), mine.length ? `${cash(value(mine))} in value` : 'Nothing to decide', 'approve'),
+    kpi('Open approvals', String(all.length), 'In the registers you can read', 'audit'),
+    kpi('Waiting on others', String(all.filter(g => !g.mine).length), 'Visible here, decided elsewhere', 'vendor'),
+    kpi('Longest open', __pr23Waiting(oldest), oldest ? `Since ${new Date(oldest).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}` : 'No open approvals', 'account'),
+  ].join('');
+  return `<div class="page">${pageHead('Decision workflow', 'Approval Centre', 'Decisions waiting on you, and every approval still open across procurement.', actionV6('Export register', 'export-approvals-v6', '', '', 'download'))}<div class="grid kpis">${kpis}</div><section class="card">${tabs}<div class="settings-pane">${content}</div></section></div>`;
+}
+
 /**
  * The runtime's entity list, for a live session. Twenty selects and labels read the module-level
  * `entities` fixture (Matanho Holdings, Kariba Agro Limited, Lumina Health Group...), which no live record
