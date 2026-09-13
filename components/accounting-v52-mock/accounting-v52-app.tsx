@@ -10,6 +10,7 @@ import { startAccountingV52Runtime } from "@/components/accounting-v52-mock/mata
 import { ACCOUNTING_V52_SHELL_HTML } from "@/components/accounting-v52-mock/shell"
 import { loadAc52Scopes, scopesForAc52Page, type Ac52DataScope } from "@/lib/accounting-v52/live-loaders"
 import { handleAccountingV52Action } from "@/lib/accounting-v52/actions"
+import { toast } from "sonner"
 import type { Ac52Account } from "@/lib/accounting-v52/types"
 import "@/components/accounting-v52-mock/accounting-v52.css"
 
@@ -159,6 +160,9 @@ export function AccountingV52App() {
       void handleAccountingV52Action({ action, payload }).then(async (result) => {
         busyRef.current = false
         if (result.error) {
+          // The runtime’s commitError/commitSuccess look for handlers that live in another of its closures, so on their own they
+          // showed nothing: every Accounting write was silent, success or failure. Say it here as well.
+          toast.error(result.error)
           runtime.commitError?.(new Error(result.error))
           return
         }
@@ -198,11 +202,13 @@ export function AccountingV52App() {
           // Say the bill is paid (and close the Pay dialog) as soon as the payment is recorded, then reload the six
           // registers it touches behind the message. Waiting for them first left the dialog open with no word for over
           // two minutes on dev, after the payment had already been made.
+          toast.success(meta.title, { description: result.message })
           runtime.commitSuccess?.(meta.title, result.message, meta.scopes[0])
           await ensurePageDataRef.current?.(pathToAc52Page(pathnameRef.current))
           return
         }
         await ensurePageDataRef.current?.(pathToAc52Page(pathnameRef.current))
+        toast.success(meta.title, { description: result.message })
         runtime.commitSuccess?.(meta.title, result.message, meta.scopes[0])
       })
     }
