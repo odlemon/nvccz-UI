@@ -3752,7 +3752,7 @@ window.MatanhoProcurement=Object.freeze({version:'8.0.0',navigate,render,getStat
     if (ref && typeof ref === 'object') return ref;
     const id = String(ref || 'DOC-DRAFT');
     const found = docArraysV11().find(d => d && d.id === id);
-    if (!found) return generatedDocumentV11(id);
+    if (!found) return generatedDocumentV11(id); if (__pr23Live() && found.fileUrl) return found;
     const plainContentV11 = String(found.content || '').replace(/<[^>]*>/g,' ').replace(/\s+/g,' ').trim();
     const documentIdentityV11 = `${found.type || ''} ${found.name || ''}`;
     const isRecognisedActualV11 = /annual plan|tender pack|evaluation|purchase order|purchase contract|management report|statutory|supplier performance|plan vs actual|internal motivation|purchase requisition|vendor compliance|tax clearance|company profile/i.test(documentIdentityV11);

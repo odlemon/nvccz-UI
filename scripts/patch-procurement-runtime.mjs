@@ -1389,6 +1389,22 @@ s = replaceUnique(
 )
 
 // ---------------------------------------------------------------------------
+// 43. A filed document previews as itself
+// ---------------------------------------------------------------------------
+// Found by the UI census as Accounts Payable: previewing, downloading, editing or versioning the RFQ pack threw
+// "Cannot read properties of undefined (reading 'id')". A document of a recognised type (tender pack, annual plan…)
+// was rebuilt by generatedDocumentV11 from its related record, which looks the tender up — and a role that cannot
+// see RFQs has none. Even where it did not throw, a document someone uploaded was shown generated text in place of
+// the stored file. In a live session a document with a stored file is shown as it was filed.
+s = replaceUnique(
+  s,
+  "    if (!found) return generatedDocumentV11(id);",
+  "    if (!found) return generatedDocumentV11(id); if (__pr23Live() && found.fileUrl) return found;",
+  "document vault -> a filed document previews as itself",
+  "if (__pr23Live() && found.fileUrl) return found;",
+)
+
+// ---------------------------------------------------------------------------
 // 35. The browser tab carries no build label
 // ---------------------------------------------------------------------------
 // Found on dev: the tab read "Matanho Procurement & Tender Management - V23" (each layer set its own version).
