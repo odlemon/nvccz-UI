@@ -153,6 +153,8 @@ export async function createRequisition(body: {
   priority?: string
   justification?: string
   sourcingCategory?: string
+  /** SRD §7 "Project/Cost Center"; omitted or null for none. */
+  projectId?: string | null
   /** unitPrice is the requester's estimate; the backend keeps it internal and never copies it onto an RFQ. */
   items: { itemName: string; description?: string; quantity: number; unit?: string; unitPrice?: number }[]
 }): Promise<ProcurementRecord> {
@@ -169,7 +171,7 @@ export async function submitRequisition(id: string): Promise<ProcurementRecord> 
  */
 export async function updateRequisition(
   id: string,
-  body: { title?: string; justification?: string | null; sourcingCategory?: string | null },
+  body: { title?: string; justification?: string | null; sourcingCategory?: string | null; projectId?: string | null },
 ): Promise<ProcurementRecord> {
   return unwrapData(await apiClient.put<ApiResponse<ProcurementRecord>>(`/procurement/requisitions/${encodeURIComponent(id)}`, body))
 }
@@ -307,6 +309,8 @@ export async function captureProcurementInvoice(body: {
   documentType?: string
   /** The intake holding the reading already made of that document, so it is not read twice. */
   readingIntakeId?: string
+  /** Captured and flagged for review in one step, with why (SRD §7 Invoice Processing). */
+  reviewNote?: string
   items: { itemName: string; description?: string; quantity: number; unitPrice: number; unit?: string }[]
 }): Promise<ProcurementRecord> {
   return unwrapData(await apiClient.post<ApiResponse<ProcurementRecord>>("/procurement/invoices", body))
@@ -346,6 +350,15 @@ export type InvoiceExtraction = {
   /** Below the confidence threshold: the operator is told to check every field. */
   lowConfidence: boolean
   threshold: number
+  /**
+   * The document as page images with the read values' positions (SRD §7 Invoice Processing). Null when it could not be
+   * rendered; `note` says why a file type cannot be shown.
+   */
+  preview?: {
+    pages: { image: string; width: number; height: number }[]
+    highlights: { field: string; label: string; page: number; left: number; top: number; width: number; height: number }[]
+    note: string | null
+  } | null
 }
 
 /**
@@ -358,6 +371,31 @@ export async function extractInvoiceForCapture(form: FormData): Promise<InvoiceE
   return unwrapData(
     await apiClient.postFormData<ApiResponse<InvoiceExtraction>>("/procurement/suite06/extract-for-capture", form),
   )
+}
+
+/** POST /procurement/invoices/:id/flag {note}: SRD §7 "Flag for Review" on an open invoice. */
+export async function flagProcurementInvoice(id: string, note: string): Promise<ProcurementRecord> {
+  return unwrapData(await apiClient.post<ApiResponse<ProcurementRecord>>(`/procurement/invoices/${encodeURIComponent(id)}/flag`, { note }))
+}
+
+export type RequisitionProject = { id: string; name: string; clientName: string | null; projectType: string | null; status: string }
+
+/** GET /procurement/requisition-projects: what a requisition can be charged to (SRD §7 "Project/Cost Center"). */
+export const listRequisitionProjects = () => list("/procurement/requisition-projects") as Promise<RequisitionProject[]>
+
+export type RequisitionLineSuggestion = {
+  itemName: string
+  unit: string | null
+  lastPrice: number | null
+  lastOrdered: string | null
+  lastPo: string | null
+  standardCost: number | null
+  vendors: { id: string; name: string; orders: number; lastPrice: number | null; source: "orders" | "inventory" }[]
+}
+
+/** GET /procurement/requisitions/line-suggestions?q=: items bought before, their last price and vendors (SRD §3). */
+export async function requisitionLineSuggestions(q: string): Promise<RequisitionLineSuggestion[]> {
+  return list(`/procurement/requisitions/line-suggestions?q=${encodeURIComponent(q)}`) as Promise<RequisitionLineSuggestion[]>
 }
 
 export async function approveProcurementInvoice(id: string, isTaxable = true): Promise<ProcurementRecord> {

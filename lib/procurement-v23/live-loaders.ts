@@ -30,6 +30,7 @@ import {
   listQuotations,
   listRequisitions,
   listRequisitionsAwaitingMyApproval,
+  listRequisitionProjects,
   listRfqs,
   listBanks,
   listProcurementContracts,
@@ -231,6 +232,8 @@ export async function loadProcurementV23LiveData(): Promise<ProcurementV23LivePa
 
   // Who decides a requisition, step by step (Configuration, Approval matrix). Started now, awaited with the rest.
   const approvalMatrixLoad = safe("approval-matrix", getApprovalMatrix, null)
+  // The projects a requisition can be charged to, for the requisition form.
+  const projectsLoad = safe("requisition-projects", listRequisitionProjects, [] as ProcurementRecord[])
   const access = await safe<ProcurementAccess | null>("me/access", getMyProcurementAccess, null)
   const accessUnavailable = access === null && errors.some((e) => e.source === "me/access")
   const perms = new Set(access?.permissions ?? [])
@@ -352,6 +355,9 @@ export async function loadProcurementV23LiveData(): Promise<ProcurementV23LivePa
     // Each step, who decides it, when it applies and who decided it: the requester tracks it, the approver sees it.
     approvalRoute: (r.approvalRoute as ApprovalRoute | null | undefined) ?? null,
     createdAt: r.createdAt ?? null,
+    // SRD §7 "Project/Cost Center": the project the requisition is charged to, by id and by name.
+    projectId: r.projectId ?? null,
+    project: r.project?.name ?? null,
     items: (r.items ?? []).map((i: any) => ({ itemName: i.itemName, quantity: num(i.quantity), unit: i.unit ?? null, unitPrice: num(i.unitPrice) || null })),
   }))
 
@@ -551,6 +557,7 @@ export async function loadProcurementV23LiveData(): Promise<ProcurementV23LivePa
     const money2 = (v: any) => Number(v).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
     const out: string[] = []
     // SRD §7: "PO Not Found" is a reason to review; an invoice with no order has nothing to be matched against.
+    if (inv.reviewNote) out.push(`Flagged for review: ${inv.reviewNote}`)
     if (String(inv.matchingStatus ?? "").toUpperCase() === "NO_PO") out.push("No purchase order: the invoice is not linked to an order, so nothing was matched")
     for (const f of Array.isArray(inv.aiDiscrepancies?.flags) ? inv.aiDiscrepancies.flags : []) {
       if (f?.type === "LINE_NOT_ON_PO") out.push(`"${f.itemName}" is not on the purchase order`)
@@ -587,6 +594,7 @@ export async function loadProcurementV23LiveData(): Promise<ProcurementV23LivePa
     reading: readingOf(inv),
     readingSentence: readingSentence(inv),
     reviewReasons: reviewReasons(inv),
+    reviewNote: inv.reviewNote ?? null,
     journal: inv.journalEntry?.referenceNumber ?? null,
     journalStatus: inv.journalEntry?.status ?? null,
     // For the monthly charts: when it was invoiced, and when it was paid.
@@ -1505,6 +1513,7 @@ export async function loadProcurementV23LiveData(): Promise<ProcurementV23LivePa
   }
 
   const approvalMatrix = await approvalMatrixLoad
+  const requisitionProjects = (await projectsLoad).map((p) => ({ id: String(p.id), name: String(p.name ?? DASH), clientName: p.clientName ?? null }))
 
   const hydrate: Record<string, unknown> = {
     requisitions: requisitionsView,
@@ -1517,6 +1526,7 @@ export async function loadProcurementV23LiveData(): Promise<ProcurementV23LivePa
     approvalGroupV23: approvalGroup,
     approvalMatrixV23: approvalMatrix,
     analyticsV23,
+    requisitionProjectsV23: requisitionProjects,
     currentUserV6: { name: access?.name ?? DASH, role: access?.roleName ?? DASH },
     auditEventsLive,
     complianceReminderSettingsV7: NO_REMINDER_AUTOMATION,
@@ -1607,4 +1617,5 @@ export const EMPTY_PROCUREMENT_HYDRATE: Record<string, unknown> = {
   evaluationLive: {},
   approvalMatrixV23: null,
   analyticsV23: null,
+  requisitionProjectsV23: [],
 }

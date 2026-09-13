@@ -22,6 +22,7 @@ import {
   NOT_YET_LIVE_ACTIONS,
 } from "@/lib/procurement-v23/actions"
 import { getAuthToken } from "@/lib/utils/cookies"
+import { requisitionLineSuggestions } from "@/lib/api/procurement-v23-api"
 import "@/components/procurement-v23-mock/procurement-v23.css"
 import "@/components/procurement-v23-mock/procurement-v23-live.css"
 
@@ -194,6 +195,9 @@ export function ProcurementV23App() {
       const path = PR23_PAGE_TO_PATH[page]
       if (path && pathnameRef.current !== path) router.replace(path)
     }
+    // Requisition lines suggest items bought before as they are typed (SRD §3); the bridge renders, the host fetches.
+    ;(window as unknown as { __pr23LineSuggestions?: (q: string) => Promise<unknown[]> }).__pr23LineSuggestions = (q: string) =>
+      requisitionLineSuggestions(q).catch(() => [])
 
     // The runtime rendered its vendored demo dataset synchronously. Replace it before the
     // browser paints, so no demo record is ever shown as if it were the organisation's.

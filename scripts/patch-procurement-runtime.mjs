@@ -1407,7 +1407,16 @@ s = replaceUnique(
   "'approvalGroupV23','approvalMatrixV23'];",
   "'approvalGroupV23','approvalMatrixV23','analyticsV23'];",
   "hydrate() -> analytics",
+  // The requisition projects step below extends this tail, so the marker stops before its end.
+  "'approvalMatrixV23','analyticsV23'",
+)
+// The requisition form's Project / cost centre list (state.requisitionProjectsV23).
+s = replaceUnique(
+  s,
   "'approvalMatrixV23','analyticsV23'];",
+  "'approvalMatrixV23','analyticsV23','requisitionProjectsV23'];",
+  "hydrate() -> requisition projects",
+  "'analyticsV23','requisitionProjectsV23'];",
 )
 
 // ---------------------------------------------------------------------------
@@ -1840,6 +1849,34 @@ s = replaceUnique(
   "function analyticsPageV5(){if(__pr23Live())return __pr23AnalyticsHtml();",
   "analytics -> live page",
   "function analyticsPageV5(){if(__pr23Live())return __pr23AnalyticsHtml();",
+)
+
+// ---------------------------------------------------------------------------
+// 62. A requisition names its project or cost centre
+// ---------------------------------------------------------------------------
+// SRD §7 Purchase Requisition Form: "Project/Cost Center (a searchable dropdown menu)". The New requisition form, the
+// requester's edit form and the requisition view carry it (__pr23RequisitionProjectField); the lines on the New
+// requisition form suggest items bought before as they are typed (bridge, SRD §3).
+s = replaceUnique(
+  s,
+  "__pr23RequisitionEntityField()+__pr23RequisitionDepartmentField()",
+  "__pr23RequisitionEntityField()+__pr23RequisitionDepartmentField()+__pr23RequisitionProjectField()",
+  "new requisition -> project / cost centre",
+  "__pr23RequisitionDepartmentField()+__pr23RequisitionProjectField()",
+)
+s = replaceUnique(
+  s,
+  "<div class=\"field span2\"><label>Requirement title</label><input name=\"title\" value=\"${escV11(r.title)}\" required></div>",
+  "<div class=\"field span2\"><label>Requirement title</label><input name=\"title\" value=\"${escV11(r.title)}\" required></div>${__pr23Live()?__pr23RequisitionProjectField(r.projectId,'span2'):''}",
+  "edit requisition -> project / cost centre",
+  "${__pr23Live()?__pr23RequisitionProjectField(r.projectId,'span2'):''}",
+)
+s = replaceUnique(
+  s,
+  "<div><span>Category</span><strong>${escV11(r.category)}</strong></div>",
+  "<div><span>Category</span><strong>${escV11(r.category)}</strong></div>${__pr23Live()?`<div><span>Project</span><strong>${escV11(r.project||'None')}</strong></div>`:''}",
+  "requisition view -> project / cost centre",
+  "<div><span>Project</span><strong>${escV11(r.project||'None')}</strong></div>",
 )
 
 // ---------------------------------------------------------------------------

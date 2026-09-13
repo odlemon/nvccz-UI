@@ -88,6 +88,8 @@ export const LIVE_ACTIONS = [
   "save-pr",
   "save-approval-matrix-v23",
   "save-invoice-auto-approval-v23",
+  "confirm-capture-approve-invoice-v23",
+  "confirm-capture-flag-invoice-v23",
   "save-pr-v11",
   "submit-pr-v11",
   "approve-pr-v11",
@@ -375,6 +377,7 @@ export async function handleProcurementV23Action(
           priority: "MEDIUM",
           justification: val('#prForm [name="motivation"]') || undefined,
           sourcingCategory: val('#prForm [name="category"]') || undefined,
+          projectId: val('#prForm [name="project"]') || undefined,
           items: lines,
         })
         const number = created?.requisitionNumber ?? "The requisition"
@@ -412,7 +415,11 @@ export async function handleProcurementV23Action(
         if (form && !form.reportValidity()) return { handled: true }
         const title = val('#editPrFormV11 [name="title"]')
         if (!title) return { handled: true, error: "A requirement title is required." }
-        await updateRequisition(r.recordId, { title, justification: val('#editPrFormV11 [name="justification"]') || null })
+        await updateRequisition(r.recordId, {
+          title,
+          justification: val('#editPrFormV11 [name="justification"]') || null,
+          ...(document.querySelector('#editPrFormV11 [name="project"]') ? { projectId: val('#editPrFormV11 [name="project"]') || null } : {}),
+        })
         if (action === "save-pr-v11") {
           closeRuntimeOverlay()
           return { handled: true, reload: true, message: `${r.id} saved.` }
@@ -850,8 +857,16 @@ export async function handleProcurementV23Action(
       }
 
       // ----------------------------------------------------------- invoice capture
-      case "confirm-capture-invoice-v5": {
+      case "confirm-capture-invoice-v5":
+      case "confirm-capture-approve-invoice-v23":
+      case "confirm-capture-flag-invoice-v23": {
         if (!has("intake.manage")) return refuse("capturing supplier invoices")
+        // The invoice processing screen (SRD §7) saves, saves and approves, or saves and flags for review.
+        const flagging = action === "confirm-capture-flag-invoice-v23"
+        const approving = action === "confirm-capture-approve-invoice-v23"
+        const reviewNote = flagging ? val("#invoiceReviewNoteV23") : ""
+        if (flagging && !reviewNote) return { handled: true, error: "Say why the invoice needs review before flagging it." }
+        if (approving && !has("invoices.approve")) return refuse("approving invoices")
         const form = document.querySelector<HTMLFormElement>("#invoiceCaptureV23")
         if (!form) return { handled: true, error: "Open Capture invoice again; the capture form is not on screen." }
         if (!form.reportValidity()) return { handled: true }
@@ -887,14 +902,23 @@ export async function handleProcurementV23Action(
           documentPath: reading?.documentUrl,
           documentType: reading?.documentType,
           readingIntakeId: reading?.intakeId ?? undefined,
+          reviewNote: reviewNote || undefined,
           items,
         })
         ;(window as unknown as { __pr23ClearReading?: () => void }).__pr23ClearReading?.()
+        const captured = invoice?.invoiceNumber ?? "The invoice"
+        if (approving && invoice?.id) {
+          await approveProcurementInvoice(invoice.id, true)
+          closeRuntimeOverlay()
+          return { handled: true, reload: true, message: `${captured} captured against ${po.id} and approved for payment.` }
+        }
         closeRuntimeOverlay()
         return {
           handled: true,
           reload: true,
-          message: `${invoice?.invoiceNumber ?? "The invoice"} captured against ${po.id} and sent to Finance for approval.`,
+          message: flagging
+            ? `${captured} captured against ${po.id} and flagged for review: ${reviewNote}`
+            : `${captured} captured against ${po.id} and sent to Finance for approval.`,
         }
       }
 

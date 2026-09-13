@@ -520,7 +520,7 @@ function __pr23RequisitionDocument(pr, isMotivation) {
     owner: pr.owner,
     status: pr.status,
     date: date((route && route.submittedAt) || pr.createdAt),
-    content: `<h1>${title}: ${__pr23Esc(pr.title)}</h1><p class="doc-lead-v11">Raised by ${__pr23Esc(pr.owner)} for ${__pr23Esc(department)}${pr.createdAt ? ` on ${__pr23Esc(date(pr.createdAt))}` : ''}.</p><table><tbody><tr><th>Requisition reference</th><td>${__pr23Esc(pr.id)}</td><th>Request source</th><td>${__pr23Esc(pr.type)}</td></tr><tr><th>Department</th><td>${__pr23Esc(department)}</td><th>Category</th><td>${__pr23Esc(pr.category)}</td></tr><tr><th>Estimated value</th><td>${pr.amount != null ? __pr23Cents(pr.amount) : 'Not estimated'}</td><th>Current status</th><td>${__pr23Esc(pr.status)}</td></tr></tbody></table><h2>1. What is needed</h2>${lines ? `<table><thead><tr><th>Item</th><th>Quantity</th><th>Unit</th><th>Unit estimate</th><th>Line estimate</th></tr></thead><tbody>${lines}</tbody></table>` : '<p>No lines are recorded.</p>'}<h2>2. Justification</h2><p>${pr.justification ? __pr23Esc(pr.justification) : 'The requester gave no justification.'}</p><h2>3. Approval</h2>${approval}`,
+    content: `<h1>${title}: ${__pr23Esc(pr.title)}</h1><p class="doc-lead-v11">Raised by ${__pr23Esc(pr.owner)} for ${__pr23Esc(department)}${pr.createdAt ? ` on ${__pr23Esc(date(pr.createdAt))}` : ''}.</p><table><tbody><tr><th>Requisition reference</th><td>${__pr23Esc(pr.id)}</td><th>Request source</th><td>${__pr23Esc(pr.type)}</td></tr><tr><th>Department</th><td>${__pr23Esc(department)}</td><th>Category</th><td>${__pr23Esc(pr.category)}</td></tr><tr><th>Project / cost centre</th><td colspan="3">${__pr23Esc(pr.project || 'None')}</td></tr><tr><th>Estimated value</th><td>${pr.amount != null ? __pr23Cents(pr.amount) : 'Not estimated'}</td><th>Current status</th><td>${__pr23Esc(pr.status)}</td></tr></tbody></table><h2>1. What is needed</h2>${lines ? `<table><thead><tr><th>Item</th><th>Quantity</th><th>Unit</th><th>Unit estimate</th><th>Line estimate</th></tr></thead><tbody>${lines}</tbody></table>` : '<p>No lines are recorded.</p>'}<h2>2. Justification</h2><p>${pr.justification ? __pr23Esc(pr.justification) : 'The requester gave no justification.'}</p><h2>3. Approval</h2>${approval}`,
   };
 }
 
@@ -935,7 +935,7 @@ function __pr23TaxTreatmentLabel(t, rate) {
 }
 
 /** What the model read, field by field, with its own confidence beside each one. */
-function __pr23ExtractionHtml(result) {
+function __pr23ExtractionHtml(result, inline) {
   const p = (result && result.payload) || {};
   const lines = Array.isArray(p.lines) ? p.lines : [];
   const pct = Math.round(Number(p.overallConfidence || 0) * 100);
@@ -944,9 +944,9 @@ function __pr23ExtractionHtml(result) {
   const field = (label, value, key) => {
     const c = fc[key] == null ? null : Math.round(Number(fc[key]) * 100);
     const shown = (value == null || value === '') ? 'Not found' : value;
-    return `<div class="list-row"><div class="list-main"><strong>${__pr23Esc(shown)}</strong><span>${__pr23Esc(label)}${c == null ? '' : ` · ${c}% confidence`}</span></div>${c == null ? '' : status(c >= threshold ? 'Ready' : 'Review')}</div>`;
+    return `<div class="list-row" data-read-field="${__pr23Esc(key)}"><div class="list-main"><strong>${__pr23Esc(shown)}</strong><span>${__pr23Esc(label)}${c == null ? '' : ` · ${c}% confidence`}</span></div>${c == null ? '' : status(c >= threshold ? 'Ready' : 'Review')}</div>`;
   };
-  const rows = lines.map(l => `<tr><td>${__pr23Esc(l.description)}</td><td>${Number(l.quantity) || 0}</td><td>${__pr23Money2(l.unitPrice, p.currencyCode)}</td><td>${__pr23Money2(l.lineTotal, p.currencyCode)}</td></tr>`);
+  const rows = lines.map((l, i) => `<tr data-read-field="line${i + 1}"><td>${__pr23Esc(l.description)}</td><td>${Number(l.quantity) || 0}</td><td>${__pr23Money2(l.unitPrice, p.currencyCode)}</td><td>${__pr23Money2(l.lineTotal, p.currencyCode)}</td></tr>`);
   const total = lines.reduce((t, l) => t + (Number(l.lineTotal) || 0), 0);
   const banner = (result && result.lowConfidence)
     ? `<div class="notice"><div><strong>Below the confidence threshold</strong><p>Read at ${pct}%, under the ${threshold}% mark. Check every field against the PDF before saving.</p></div></div>`
@@ -955,7 +955,7 @@ function __pr23ExtractionHtml(result) {
     ? `Filed as ${__pr23Esc(result.intake.intakeNumber)} in the intake register.`
     : 'Not filed: without a purchase order the vendor is unknown, so this reading is not kept.';
   // The figures printed on the invoice beside what its lines add up to, and any figure that does not add up.
-  const printed = (label, v) => `<div class="list-row"><div class="list-main"><strong>${v == null ? 'Not found' : __pr23Esc(__pr23Money2(v, p.currencyCode))}</strong><span>${__pr23Esc(label)}</span></div></div>`;
+  const printed = (label, v, key) => `<div class="list-row" data-read-field="${key}"><div class="list-main"><strong>${v == null ? 'Not found' : __pr23Esc(__pr23Money2(v, p.currencyCode))}</strong><span>${__pr23Esc(label)}</span></div></div>`;
   const checks = Array.isArray(p.checks) ? p.checks : [];
   const checksHtml = checks.length
     ? `<div class="notice" style="margin-top:12px"><div><strong>Figures to check</strong><p>${checks.map(c => __pr23Esc(c.message)).join('<br>')}</p></div></div>`
@@ -965,10 +965,87 @@ function __pr23ExtractionHtml(result) {
     : '';
   return `${banner}${ocrNote}<div class="list" style="margin-top:12px">${field('Supplier', p.supplierName, 'supplierName')}${field('Supplier tax number', p.supplierTaxNumber, 'supplierTaxNumber')}${field('Invoice number', p.invoiceNumber, 'invoiceNumber')}${field('Invoice date', p.invoiceDate, 'invoiceDate')}${field('Due date', p.dueDate, 'dueDate')}${field('Purchase order quoted', p.purchaseOrderReference, 'purchaseOrderReference')}${field('Currency', p.currencyCode, 'currencyCode')}${field('Tax treatment', __pr23TaxTreatmentLabel(p.taxTreatment, p.taxRate), 'taxTreatment')}</div>
     ${lines.length ? table(['Description', 'Quantity', 'Unit price', 'Line total'], rows) : '<p class="muted" style="margin-top:12px">No invoice lines could be read.</p>'}
-    <div class="list" style="margin-top:12px">${printed('Subtotal printed on the invoice', p.subtotal)}${printed(`VAT printed on the invoice${p.taxRate != null ? ` (${p.taxRate}%)` : ''}`, p.taxAmount)}${printed('Total printed on the invoice', p.totalAmount)}</div>${checksHtml}
+    <div class="list" style="margin-top:12px">${printed('Subtotal printed on the invoice', p.subtotal, 'subtotal')}${printed(`VAT printed on the invoice${p.taxRate != null ? ` (${p.taxRate}%)` : ''}`, p.taxAmount, 'taxAmount')}${printed('Total printed on the invoice', p.totalAmount, 'totalAmount')}</div>${checksHtml}
     <p class="muted" style="margin-top:8px">${lines.length ? `Lines total ${__pr23Money2(total, p.currencyCode)} before tax. ` : ''}${filed}</p>
-    <div style="margin-top:12px">${btn('Capture this invoice', 'capture-invoice-v5', 'primary', 'invoice')}</div>`;
+    ${inline ? '' : `<div style="margin-top:12px">${btn('Capture this invoice', 'capture-invoice-v5', 'primary', 'invoice')}</div>`}`;
 }
+
+/**
+ * SRD §7 Invoice Processing Screen, left panel: the uploaded invoice in high resolution, zoom and pan, with each value
+ * the reading extracted highlighted where it was found on the page (InvoiceDocumentPreviewService). Hovering a field in
+ * the right panel lights its box.
+ */
+function __pr23DocViewerHtml(preview, documentUrl) {
+  const pages = (preview && preview.pages) || [];
+  const open = documentUrl ? ` <a href="${__pr23Esc(documentUrl)}" target="_blank" rel="noopener">Open the file</a>` : '';
+  if (!pages.length) {
+    const note = preview && preview.note ? preview.note : 'The document could not be shown here.';
+    return `<div class="notice"><div><strong>Document</strong><p>${__pr23Esc(note)}${open}</p></div></div>`;
+  }
+  const highlights = preview.highlights || [];
+  const pageHtml = pages.map((p, i) => `<div class="pr23-doc-page" style="position:relative;margin:0 auto 12px;width:calc(var(--pr23-zoom, 1) * 100%)"><img src="${p.image}" alt="Invoice page ${i + 1}" draggable="false" style="display:block;width:100%;height:auto;user-select:none">${highlights.filter(h => h.page === i && p.width && p.height).map(h => `<span class="pr23-hl" data-hl-field="${__pr23Esc(h.field)}" title="${__pr23Esc(h.label)}" style="position:absolute;left:${((h.left / p.width) * 100).toFixed(3)}%;top:${((h.top / p.height) * 100).toFixed(3)}%;width:${((h.width / p.width) * 100).toFixed(3)}%;height:${((h.height / p.height) * 100).toFixed(3)}%;background:rgba(250,204,21,.28);outline:2px solid rgba(202,138,4,.85);border-radius:3px"></span>`).join('')}</div>`).join('');
+  return `<div class="pr23-doc-viewer"><div style="display:flex;gap:6px;align-items:center;margin-bottom:8px;flex-wrap:wrap"><button type="button" class="btn small" data-doc-zoom="out" aria-label="Zoom out">−</button><button type="button" class="btn small" data-doc-zoom="fit">Fit</button><button type="button" class="btn small" data-doc-zoom="in" aria-label="Zoom in">+</button><span class="muted" style="font-size:12px" data-doc-zoom-label>100%</span><span class="muted" style="font-size:12px;margin-left:auto" data-doc-found>${highlights.length} value${highlights.length === 1 ? '' : 's'} found on the page.${open}</span></div><div data-doc-scroll tabindex="0" aria-label="Invoice document: drag to pan" style="height:640px;overflow:auto;border:1px solid var(--line, #e5e7eb);border-radius:10px;background:#f1f5f9;cursor:grab;padding:10px">${pageHtml}</div></div>`;
+}
+
+/** SRD §7 Invoice Processing Screen: the document on the left; the capture form and what was read on the right. */
+function __pr23ProcessingHtml(result) {
+  const orders = __pr23AiCaptureOrders();
+  const poId = __pr23LastExtractionPo;
+  let form;
+  if (poId && orders.some(o => o.recordId === poId)) {
+    const iso = d => d.toISOString().slice(0, 10);
+    const options = orders.map(o => `<option value="${__pr23Esc(o.recordId)}"${o.recordId === poId ? ' selected' : ''}>${__pr23Esc(o.id)} · ${__pr23Esc(o.vendor)}</option>`).join('');
+    const canApprove = __pr23Can('invoices.approve') && __pr23Can('intake.manage');
+    form = `<form id="invoiceCaptureV23" class="form-grid" onsubmit="return false"><div class="field"><label>Purchase order</label><select name="po" id="invoicePoV23">${options}</select></div><div class="field"><label>Invoice date</label><input type="date" name="invoiceDate" value="${iso(new Date())}" required></div><div class="field"><label>Due date</label><input type="date" name="dueDate" value="${iso(new Date(Date.now() + 30 * 86400000))}"></div><div class="field full"><label>Invoice lines</label><div id="invoiceLinesV23">${__pr23InvoiceLinesHtml(poId)}</div></div><div class="field full"><label>Why it needs review (for Flag for review)</label><textarea id="invoiceReviewNoteV23" rows="2" placeholder="For example: the chair price is above what was agreed"></textarea></div></form><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">${btn('Save invoice', 'confirm-capture-invoice-v5', 'primary', 'invoice')}${canApprove ? btn('Save and approve', 'confirm-capture-approve-invoice-v23', '', 'approve') : ''}${btn('Flag for review', 'confirm-capture-flag-invoice-v23', '', 'audit')}</div>${canApprove ? '' : '<p class="muted" style="margin-top:6px">Approving is Finance\'s: a saved invoice goes to them, and a flagged one goes to its reviewers with your reason.</p>'}`;
+  } else {
+    form = `<div class="notice"><div><strong>No purchase order chosen</strong><p>Choose the order above and read the invoice again to capture it here, or capture it by hand.</p></div></div><div style="margin-top:12px">${btn('Capture this invoice', 'capture-invoice-v5', 'primary', 'invoice')}</div>`;
+  }
+  return `<div class="grid two" style="gap:14px;align-items:start"><div>${__pr23DocViewerHtml(result.preview, result.documentUrl)}</div><div><div data-processing-form>${form}</div><div style="height:14px"></div><div><strong>What was read</strong><p class="muted" style="margin:2px 0 8px">Hover a field to find it on the document.</p>${__pr23ExtractionHtml(result, true)}</div></div></div>`;
+}
+
+__pr23On(document, 'click', event => {
+  const control = event.target && event.target.closest && event.target.closest('[data-doc-zoom]');
+  if (!control) return;
+  event.preventDefault();
+  event.stopImmediatePropagation();
+  const viewer = control.closest('.pr23-doc-viewer');
+  const scroll = viewer && viewer.querySelector('[data-doc-scroll]');
+  if (!scroll) return;
+  const current = Number(scroll.style.getPropertyValue('--pr23-zoom') || 1);
+  const next = control.dataset.docZoom === 'in' ? Math.min(3, current + 0.25) : control.dataset.docZoom === 'out' ? Math.max(0.5, current - 0.25) : 1;
+  scroll.style.setProperty('--pr23-zoom', String(next));
+  const label = viewer.querySelector('[data-doc-zoom-label]');
+  if (label) label.textContent = `${Math.round(next * 100)}%`;
+}, true);
+
+let __pr23Pan = null;
+__pr23On(document, 'mousedown', event => {
+  const scroll = event.target && event.target.closest && event.target.closest('[data-doc-scroll]');
+  if (!scroll || event.button !== 0) return;
+  __pr23Pan = { scroll, x: event.clientX, y: event.clientY, left: scroll.scrollLeft, top: scroll.scrollTop };
+  scroll.style.cursor = 'grabbing';
+  event.preventDefault();
+}, true);
+__pr23On(document, 'mousemove', event => {
+  if (!__pr23Pan) return;
+  __pr23Pan.scroll.scrollLeft = __pr23Pan.left - (event.clientX - __pr23Pan.x);
+  __pr23Pan.scroll.scrollTop = __pr23Pan.top - (event.clientY - __pr23Pan.y);
+}, true);
+__pr23On(document, 'mouseup', () => {
+  if (!__pr23Pan) return;
+  __pr23Pan.scroll.style.cursor = 'grab';
+  __pr23Pan = null;
+}, true);
+// A field read beside the document lights its box on the page.
+__pr23On(document, 'mouseover', event => {
+  const field = event.target && event.target.closest && event.target.closest('[data-read-field]');
+  document.querySelectorAll('.pr23-hl[data-active]').forEach(h => { h.removeAttribute('data-active'); h.style.background = 'rgba(250,204,21,.28)'; });
+  if (!field) return;
+  document.querySelectorAll(`.pr23-hl[data-hl-field="${CSS.escape(field.dataset.readField)}"]`).forEach(h => {
+    h.setAttribute('data-active', 'true');
+    h.style.background = 'rgba(37,99,235,.30)';
+  });
+}, true);
 
 /** The page: upload on the left of the flow, what was read below it, then the capture form. */
 function __pr23AiCapturePage() {
@@ -993,7 +1070,7 @@ function __pr23AiCapturePage() {
     btn('Capture by hand', 'capture-invoice-v5', '', 'invoice'),
   )}
     ${card('Upload the invoice', 'One invoice at a time', upload)}
-    ${card('What was read', 'Check each field against the PDF before saving', result)}</div>`;
+    ${card('Invoice processing', 'The document beside what was read: check each field, then save, approve or flag it for review', result)}</div>`;
 }
 
 /** Carry the reading into the capture form: the invoice date, and unit prices where the lines line up. */
@@ -1038,7 +1115,10 @@ if (typeof window !== 'undefined') {
     const po = document.querySelector('#aiInvoicePoV23');
     __pr23LastExtractionPo = po && po.value ? po.value : null;
     const box = document.querySelector('#aiInvoiceResultV23');
-    if (box) box.innerHTML = __pr23ExtractionHtml(result || {});
+    if (box) {
+      box.innerHTML = __pr23ProcessingHtml(result || {});
+      __pr23PrefillCaptureFromExtraction();
+    }
   };
   /**
    * The document and reading a capture for this order should carry: the last reading, when it was made for this order
@@ -1361,7 +1441,121 @@ function __pr23PrLinesTbody() {
   return `<tbody id="prLinesV23">${__pr23PrLineRowHtml()}</tbody><tfoot><tr><td colspan="5"><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">${btn('Add line', 'add-pr-line-v23', '', 'plus')}${btn('Remove last line', 'remove-pr-line-v23')}<span class="muted" id="prLinesTotalV23" style="margin-left:auto">Estimated total —</span></div></td></tr></tfoot>`;
 }
 
+/**
+ * SRD §7 requisition form "Project/Cost Center (a searchable dropdown menu)": the projects register, searched by typing.
+ * A requisition may be raised without one.
+ */
+function __pr23RequisitionProjectField(selected, cls) {
+  const projects = state.requisitionProjectsV23 || [];
+  if (!projects.length) {
+    return formField('Project / cost centre', '<p class="muted" style="margin:0">No project is registered yet (projects are kept in Accounting), so the requisition is raised without one.</p>', cls || '');
+  }
+  const options = ['<option value="">No project / cost centre</option>']
+    .concat(projects.map(p => `<option value="${__pr23Esc(p.id)}"${p.id === selected ? ' selected' : ''}>${__pr23Esc(p.name)}${p.clientName ? ` · ${__pr23Esc(p.clientName)}` : ''}</option>`))
+    .join('');
+  return formField('Project / cost centre', `<input type="search" data-project-search placeholder="Search projects" aria-label="Search projects" style="margin-bottom:6px"><select name="project">${options}</select>`, cls || '');
+}
+
+__pr23On(document, 'input', event => {
+  const search = event.target && event.target.closest && event.target.closest('[data-project-search]');
+  if (!search) return;
+  const select = search.parentElement && search.parentElement.querySelector('select[name="project"]');
+  if (!select) return;
+  const q = search.value.trim().toLowerCase();
+  let first = null;
+  [...select.options].forEach(o => {
+    const show = !o.value || !q || o.textContent.toLowerCase().includes(q);
+    o.hidden = !show;
+    if (show && o.value && !first) first = o;
+  });
+  if (q && first) select.value = first.value;
+}, true);
+
+/**
+ * SRD §3: "as the user adds line items, the form will perform real-time lookups to suggest pre-approved vendors and
+ * standard item costs". Typing an item asks the host (GET /procurement/requisitions/line-suggestions) for items bought
+ * before; choosing one fills the name, unit and estimate and says where the figure came from.
+ */
+let __pr23SuggestTimer = null;
+function __pr23SuggestBox(input) {
+  const cell = input.parentElement;
+  let box = cell.querySelector('.pr23-suggest');
+  if (!box) {
+    cell.style.position = 'relative';
+    cell.insertAdjacentHTML('beforeend', '<div class="pr23-suggest" role="listbox" style="position:absolute;z-index:40;left:0;top:100%;min-width:320px;max-width:460px;background:var(--panel, #fff);border:1px solid var(--line, #e5e7eb);border-radius:10px;box-shadow:0 10px 30px rgba(15,23,42,.14);padding:4px;display:none"></div>');
+    box = cell.querySelector('.pr23-suggest');
+  }
+  return box;
+}
+__pr23On(document, 'input', event => {
+  const input = event.target && event.target.closest && event.target.closest('#prLinesV23 [name="item"]');
+  if (!input) return;
+  clearTimeout(__pr23SuggestTimer);
+  const q = input.value.trim();
+  const box = __pr23SuggestBox(input);
+  if (q.length < 2 || typeof window.__pr23LineSuggestions !== 'function') {
+    box.style.display = 'none';
+    return;
+  }
+  __pr23SuggestTimer = setTimeout(async () => {
+    let items = [];
+    try {
+      items = await window.__pr23LineSuggestions(q);
+    } catch (e) {
+      items = [];
+    }
+    if (input.value.trim() !== q) return;
+    if (!items.length) {
+      box.innerHTML = '<div class="muted" style="padding:8px 10px;font-size:12px">Not bought before. Enter your own estimate.</div>';
+      box.style.display = 'block';
+      return;
+    }
+    window.__pr23SuggestItems = items;
+    box.innerHTML = items.map((s, i) => `<button type="button" data-pr-suggest="${i}" style="display:block;width:100%;text-align:left;padding:8px 10px;border:0;background:none;border-radius:8px;cursor:pointer"><strong>${__pr23Esc(s.itemName)}</strong><br><span class="muted" style="font-size:12px">${[s.lastPrice != null ? `last ${__pr23Cents(s.lastPrice)}${s.lastPo ? ` on ${__pr23Esc(s.lastPo)}` : ''}` : '', s.standardCost != null ? `standard cost ${__pr23Cents(s.standardCost)}` : '', (s.vendors || []).length ? `from ${s.vendors.map(v => __pr23Esc(v.name)).join(', ')}` : ''].filter(Boolean).join(' · ')}</span></button>`).join('');
+    box.style.display = 'block';
+  }, 250);
+}, true);
+__pr23On(document, 'click', event => {
+  const pick = event.target && event.target.closest && event.target.closest('[data-pr-suggest]');
+  if (!pick) {
+    document.querySelectorAll('.pr23-suggest').forEach(b => { if (!b.contains(event.target)) b.style.display = 'none'; });
+    return;
+  }
+  event.preventDefault();
+  event.stopImmediatePropagation();
+  const s = (window.__pr23SuggestItems || [])[Number(pick.dataset.prSuggest)];
+  const row = pick.closest('[data-pr-line]');
+  if (!s || !row) return;
+  row.querySelector('[name="item"]').value = s.itemName;
+  const uom = row.querySelector('[name="uom"]');
+  if (uom && s.unit) {
+    const match = [...uom.options].find(o => o.textContent.toLowerCase() === String(s.unit).toLowerCase());
+    if (match) uom.value = match.value;
+  }
+  const price = row.querySelector('[name="price"]');
+  const estimate = s.lastPrice != null ? s.lastPrice : s.standardCost;
+  if (price && estimate != null && !price.value) price.value = Number(estimate).toFixed(2);
+  const text = [
+    s.lastPrice != null ? `Last ordered at ${__pr23Cents(s.lastPrice)}${s.lastOrdered ? ` on ${__pr23DayLabel(s.lastOrdered)}` : ''}${s.lastPo ? ` (${s.lastPo})` : ''}` : null,
+    s.standardCost != null ? `standard cost ${__pr23Cents(s.standardCost)}` : null,
+    (s.vendors || []).length ? `supplied by ${s.vendors.map(v => v.name).join(', ')}` : null,
+  ].filter(Boolean).join('; ');
+  let hint = row.nextElementSibling && row.nextElementSibling.matches('[data-pr-hint]') ? row.nextElementSibling : null;
+  if (!hint) {
+    row.insertAdjacentHTML('afterend', '<tr data-pr-hint><td colspan="5" class="muted" style="font-size:12px;padding-top:0"></td></tr>');
+    hint = row.nextElementSibling;
+  }
+  hint.firstElementChild.textContent = text;
+  const box = pick.closest('.pr23-suggest');
+  if (box) box.style.display = 'none';
+  __pr23PrLinesRecalc();
+}, true);
+
 function __pr23PrLinesRecalc() {
+  // A hint belongs to the line above it; one left behind by a removed line goes too.
+  document.querySelectorAll('#prLinesV23 [data-pr-hint]').forEach(h => {
+    if (!h.previousElementSibling || !h.previousElementSibling.matches('[data-pr-line]')) h.remove();
+  });
   const rows = [...document.querySelectorAll('#prLinesV23 [data-pr-line]')];
   let sum = 0;
   let priced = 0;
@@ -1695,6 +1889,7 @@ function __pr23RangeStart(range) {
 function __pr23FlagLabels(inv) {
   const labels = [];
   const add = l => { if (!labels.includes(l)) labels.push(l); };
+  if (inv.reviewNote) add('Flagged by a reviewer');
   if (/no purchase order/i.test(inv.match || '')) add('No purchase order');
   for (const f of inv.matchFlags || []) {
     const t = String((f && f.type) || '');
