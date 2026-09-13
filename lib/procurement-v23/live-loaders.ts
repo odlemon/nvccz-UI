@@ -211,7 +211,12 @@ export async function loadProcurementV23LiveData(): Promise<ProcurementV23LivePa
   const accessUnavailable = access === null && errors.some((e) => e.source === "me/access")
   const perms = new Set(access?.permissions ?? [])
   const has = (p: string) => perms.has(`procurement.${p}`)
+  // Whether an empty register means "none exist" or "not yours to see": a KPI that says "No procurement plan has been
+  // approved yet" to Accounts Payable, who cannot read plans, states something false.
+  const plansVisible = has("plans.view") || has("plans.manage") || has("plans.approve")
   const isDeptApprover = access?.departmentRole === "HEAD" || access?.departmentRole === "DEPUTY"
+  // The organisation's requisitions load only for these; anyone else sees just their own.
+  const allRequisitionsVisible = has("requisitions.view") || isDeptApprover
 
   const [
     allRequisitions,
@@ -989,7 +994,7 @@ export async function loadProcurementV23LiveData(): Promise<ProcurementV23LivePa
           value: money(approvedBudget),
           sub: `${approvedPlans.length} approved plan${approvedPlans.length === 1 ? "" : "s"} (${[...new Set(approvedPlans.map((p) => p.fiscalYear).filter(Boolean))].join(", ") || "no fiscal year"})`,
         }
-      : unknown("No procurement plan has been approved yet"),
+      : unknown(plansVisible ? "No procurement plan has been approved yet" : "Procurement plans are not visible to your role"),
     "Committed spend": { value: money(committed), sub: `${liveOrders.length} purchase order${liveOrders.length === 1 ? "" : "s"}, not cancelled` },
     "Open tenders": { value: openRfqs.length, sub: `${tendersView.filter((t) => t.stage === "Evaluation").length} with quotations in` },
     Vendors: { value: vendorsView.length, sub: `${vendorsView.filter((v) => v.isBlacklisted).length} blacklisted` },
@@ -998,7 +1003,7 @@ export async function loadProcurementV23LiveData(): Promise<ProcurementV23LivePa
     "Approved for sourcing": { value: reqStatus("APPROVED"), sub: "Approved and not yet sent to RFQ" },
     "Returned drafts": { value: reqStatus("DRAFT") + reqStatus("REJECTED"), sub: "Drafts and rejected requests" },
     "Median approval time": medianDays === null
-      ? unknown("No requisition has been approved yet")
+      ? unknown(allRequisitionsVisible ? "No requisition has been approved yet" : "Your role sees only its own requisitions")
       : {
           value:
             medianDays < 1 / 24
@@ -1144,10 +1149,10 @@ export async function loadProcurementV23LiveData(): Promise<ProcurementV23LivePa
     "Actual spend": { value: money(paidTotal), sub: `${paidInvoices.length} paid invoice${paidInvoices.length === 1 ? "" : "s"}` },
     Remaining: yearBudget > 0
       ? { value: money(yearBudget - yearCommitted), sub: `FY ${thisYear} approved plan budgets less FY ${thisYear} commitments` }
-      : unknown(`No approved plan covers FY ${thisYear}`),
+      : unknown(plansVisible ? `No approved plan covers FY ${thisYear}` : "Procurement plans are not visible to your role"),
     Variance: yearBudget > 0
       ? { value: `${Math.round((yearCommitted / yearBudget) * 1000) / 10}%`, sub: `FY ${thisYear} commitments as a share of its approved plan budgets` }
-      : unknown(`No approved plan covers FY ${thisYear}`),
+      : unknown(plansVisible ? `No approved plan covers FY ${thisYear}` : "Procurement plans are not visible to your role"),
     Forecast: unknown("Spend forecasting is not available"),
     "Technical threshold": unknown("No scoring threshold is configured for RFQs"),
     "Potential savings": { value: money(savings), sub: "Accepted quotation against the highest bid, across awarded RFQs" },
