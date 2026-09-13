@@ -66,6 +66,20 @@ try {
   await page.goto(`${BASE}/procurement-v23/vendors`, { waitUntil: "domcontentloaded", timeout: LOAD })
   const row = page.locator("#workspace table tbody tr", { hasText: target.name }).first()
   await row.waitFor({ timeout: LOAD })
+
+  // The compliance chips and their filter count the same vendors: "Expired / missing" is no tax clearance on file or one
+  // already past (the filter once read the row chip "Missing" and showed none of the vendors its chip counted).
+  const vendors = await get("/accounting/vendors")
+  const expiredOrMissing = vendors.filter((v) => !v.taxClearanceExpiryDate || new Date(v.taxClearanceExpiryDate).getTime() < Date.now()).length
+  const expiredChip = page.locator('[data-action="vendor-compliance-filter-v6"][data-id="Expired"]').first()
+  if (await expiredChip.count()) {
+    await expiredChip.click()
+    const said = await page.waitForFunction(() => [...document.querySelectorAll("[data-sonner-toast], #toasts .toast")].map((t) => t.innerText).find((t) => /vendors have expired or missing tax clearance/.test(t)) || null, null, { timeout: 15000 }).then((h) => h.jsonValue()).catch(() => null)
+    const shownRows = await page.$$eval("#workspace table tbody tr", (trs) => trs.filter((t) => t.querySelector(".vendor-doc-chip-v6") && t.style.display !== "none").length)
+    check(new RegExp(`^[^0-9]*${expiredOrMissing} of ${vendors.length} vendors`).test((said || "").replace(/\s+/g, " ").replace(/^.*?(\d+ of \d+ vendors)/, "$1")) && shownRows === expiredOrMissing, "the Expired / missing filter shows the vendors its chip counts", `${said ? said.replace(/\s+/g, " ") : "no toast"} · ${shownRows} rows shown · API ${expiredOrMissing} of ${vendors.length}`)
+    await expiredChip.click()
+    await page.waitForTimeout(500)
+  } else check(false, "the Expired / missing filter shows the vendors its chip counts", "no compliance chip on the registry")
   await row.locator("td").first().click()
   const opened = await page.waitForFunction(() => /Item prices over time/.test(document.querySelector("#workspace")?.innerText || ""), null, { timeout: 60000 }).then(() => true).catch(() => false)
   check(opened, "the vendor's row opens its profile with the history")
