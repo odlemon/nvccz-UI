@@ -250,6 +250,10 @@ const NOT_BUILT_OPENERS: Record<string, string> = {
   "send-doc-v11": "Sending documents by email is not connected yet. Download the PDF and send it from your mail.",
   "send-document": "Sending documents by email is not connected yet. Download the PDF and send it from your mail.",
   "vendor-portal-v6": "Vendors fill this in on the vendor portal, from the link in their RFQ or document request.",
+  // Related record offered the sample TN-2026-014, PO-2026-0584 and CTR-2026-081.
+  "message-vendor-v6": "Vendor messaging is not connected yet. Contact the vendor from your mail for now.",
+  // Its Send request was refused, and the form proposed a due date already past (5 Aug 2026).
+  "request-vendor-docs-v6": "Requesting documents from vendors is not connected yet. Ask the vendor by mail, then file what they send in the Document Vault.",
 }
 
 /** The refusal to show for an opener the signed-in role cannot complete, or null to let it open. */
