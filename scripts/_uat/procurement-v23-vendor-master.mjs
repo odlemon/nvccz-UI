@@ -79,9 +79,11 @@ try {
 
   const ws = await page.locator("#workspace").innerText()
   check(!/Vendor communications and received documents|Compliance document register|Automated compliance reminders/.test(ws), "no messaging card, sample document register or reminder automation")
-  const gone = ["request-vendor-docs-v6", "message-vendor-v6", "vendor-portal-v6", "send-vendor-reminder-v6"]
+  // "Open vendor portal" stays: it opens the vendor portal in a new tab (the Vendor Registry's own button opens its
+  // registration page).
+  const gone = ["request-vendor-docs-v6", "message-vendor-v6", "send-vendor-reminder-v6"]
   const offered = await page.$$eval("#workspace [data-action]", (els) => els.map((e) => e.dataset.action))
-  check(gone.every((a) => !offered.includes(a)), "no Request documents, Send message, Open vendor portal or Send compliance reminder", gone.filter((a) => offered.includes(a)).join(", "))
+  check(gone.every((a) => !offered.includes(a)), "no Request documents, Send message or Send compliance reminder", gone.filter((a) => offered.includes(a)).join(", "))
 
   await page.locator('#workspace [data-action="edit-vendor-v6"]').first().click()
   await page.waitForSelector("#vendorEditFormV23", { timeout: 30000 })

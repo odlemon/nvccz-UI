@@ -76,6 +76,11 @@ try {
     await page.fill("#accountNumber-0", `4410${Date.now().toString().slice(-8)}`)
     await page.fill("#branchCode-0", "4101")
     await page.selectOption("#currencyCode-0", "USD")
+    // The backend refuses a bank account without a SWIFT/BIC code, so the form must say so before sending anything.
+    await page.getByRole("button", { name: /Submit Registration/ }).click()
+    const refused = await page.waitForFunction(() => /SWIFT\/BIC code is required|Please complete bank details/i.test(document.body.innerText), null, { timeout: 15000 }).then(() => true).catch(() => false)
+    check(refused && !/Upload KYC Documents/.test(await page.evaluate(() => document.body.innerText)), "without a SWIFT/BIC code the form refuses to submit and says why")
+    await page.fill("#swiftCode-0", "CBZKZWHA")
     await page.screenshot({ path: path.join(OUT, "vendor-self-registration-form.png"), fullPage: false }).catch(() => {})
     await page.getByRole("button", { name: /Submit Registration/ }).click()
     const kyc = await page.waitForFunction(() => /Upload KYC Documents/.test(document.body.innerText), null, { timeout: 90000 }).then(() => true).catch(() => false)
@@ -151,7 +156,7 @@ try {
   console.log("\n== a second self-registration is declined")
   const reg = await api("POST", "/public/vendor-registration", null, {
     companyName: SECOND, name: SECOND, email: `uat-selfreg-declined-${RUN}@vendors.example.test`, contactPerson: "Nyasha Dube", phoneNumber: "+263772440099", industry: "Catering",
-    banks: [{ bankName: "Stanbic", accountName: SECOND, accountNumber: `9120${Date.now().toString().slice(-8)}`, branchCode: "3101", currencyCode: "USD" }],
+    banks: [{ bankName: "Stanbic", accountName: SECOND, accountNumber: `9120${Date.now().toString().slice(-8)}`, branchCode: "3101", currencyCode: "USD", swiftCode: "SBICZWHX" }],
   })
   check(reg.status === 201 || reg.status === 200, "the portal's registration API accepts it", `${reg.status} ${reg.json?.message ?? ""}`)
   const second = await vendorByName(mgr, SECOND)

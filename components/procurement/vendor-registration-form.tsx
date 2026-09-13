@@ -591,12 +591,18 @@ export function VendorRegistrationForm() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor={`swiftCode-${index}`}>SWIFT Code</Label>
+                  <Label htmlFor={`swiftCode-${index}`}>SWIFT / BIC Code *</Label>
+                  {/* Required: the API refuses a vendor bank account without a SWIFT/BIC code (payments need it), so a
+                      form that called it optional let vendors reach the last step only to be refused. */}
                   <Controller
                     name={`banks.${index}.swiftCode` as const}
                     control={control}
+                    rules={{ required: 'SWIFT/BIC code is required so payments reach the account' }}
                     render={({ field }) => (
-                      <Input {...field} id={`swiftCode-${index}`} placeholder="2121" />
+                      <div>
+                        <Input {...field} id={`swiftCode-${index}`} placeholder="CBZKZWHA" className={errors.banks?.[index]?.swiftCode ? 'border-red-500' : ''} />
+                        {errors.banks?.[index]?.swiftCode && <p className="text-sm text-red-500 mt-1">{errors.banks[index]?.swiftCode?.message}</p>}
+                      </div>
                     )}
                   />
                 </div>

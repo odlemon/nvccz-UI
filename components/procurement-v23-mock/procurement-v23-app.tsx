@@ -161,7 +161,10 @@ export function ProcurementV23App() {
           toast.error("The vendor portal address is not set for this environment.")
           return
         }
-        window.open(`${base}/vendor-portal/register`, "_blank", "noopener,noreferrer")
+        // The registry's own button (no vendor) is the link for new vendors: the registration page. A vendor profile's
+        // "Open vendor portal" opens the portal itself.
+        const target = control.dataset.id ? "/vendor-portal" : "/vendor-portal/register"
+        window.open(`${base}${target}`, "_blank", "noopener,noreferrer")
         return
       }
       const refusal = refusedOpener(action, liveRef.current)
