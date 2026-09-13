@@ -133,19 +133,33 @@ try {
 
   await page.screenshot({ path: path.join(OUT, "ai-capture-read.png"), fullPage: true })
 
-  const capture = page.locator('#aiInvoiceResultV23 [data-action="capture-invoice-v5"]')
-  if (await capture.count()) {
-    await capture.first().click()
-    await page.waitForSelector("#invoiceCaptureV23", { timeout: LOAD })
-    await page.waitForTimeout(800)
-    const modal = (await page.locator("#invoiceCaptureV23").textContent())?.trim() || ""
-    const date = await page.locator('#invoiceCaptureV23 [name="invoiceDate"]').inputValue()
-    record("capture form says it was prefilled", /Prefilled from the read invoice/i.test(modal), modal.slice(0, 90))
+  // SRD §7 Invoice Processing Screen: the document beside the fields, with what was read highlighted on it.
+  const images = await page.locator("#aiInvoiceResultV23 [data-doc-scroll] img").count()
+  record("the document is shown beside the fields", images > 0, `${images} page image(s)`)
+  const boxes = await page.locator("#aiInvoiceResultV23 .pr23-hl").count()
+  record("values read are highlighted on the document", boxes >= 3, `${boxes} highlight(s)`)
+  record("the invoice number is found on the page", (await page.locator('#aiInvoiceResultV23 .pr23-hl[data-hl-field="invoiceNumber"]').count()) > 0)
+  await page.locator('#aiInvoiceResultV23 [data-read-field="invoiceNumber"]').first().hover().catch(() => {})
+  record("hovering a read field lights its box", (await page.locator(".pr23-hl[data-active]").count()) > 0)
+  await page.locator('#aiInvoiceResultV23 [data-doc-zoom="in"]').first().click().catch(() => {})
+  record("the viewer zooms", /125%/.test((await page.locator("#aiInvoiceResultV23 [data-doc-zoom-label]").first().textContent().catch(() => "")) || ""))
+
+  if (testPo) {
+    const form = page.locator("#aiInvoiceResultV23 #invoiceCaptureV23")
+    record("the capture form sits beside the document", (await form.count()) > 0)
+    const text = (await form.first().textContent().catch(() => "")) || ""
+    const date = await page.locator('#aiInvoiceResultV23 #invoiceCaptureV23 [name="invoiceDate"]').inputValue().catch(() => "")
+    record("capture form says it was prefilled", /Prefilled from the read invoice/i.test(text), text.slice(0, 90))
     record("the invoice date came from the document", date === EXPECT.date, `expected ${EXPECT.date} · date "${date}"`)
-    await page.screenshot({ path: path.join(OUT, "ai-capture-prefilled-form.png"), fullPage: true })
+    record(
+      "it offers Save invoice and Flag for review",
+      (await page.locator('#aiInvoiceResultV23 [data-action="confirm-capture-invoice-v5"]').count()) > 0 &&
+        (await page.locator('#aiInvoiceResultV23 [data-action="confirm-capture-flag-invoice-v23"]').count()) > 0,
+    )
   } else {
-    record("capture form opens from the reading", false, "no Capture this invoice button")
+    record("without an order chosen, capture by hand is offered", (await page.locator('#aiInvoiceResultV23 [data-action="capture-invoice-v5"]').count()) > 0)
   }
+  await page.screenshot({ path: path.join(OUT, "ai-capture-processing.png"), fullPage: true })
 
   record("no page errors", errors.length === 0, errors.slice(0, 2).join(" | ") || "none")
 } finally {
