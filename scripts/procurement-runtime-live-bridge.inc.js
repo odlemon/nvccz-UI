@@ -481,12 +481,14 @@ function __pr23ApprovalsPageHtml() {
   const tabs = `<div class="settings-tabs-v5"><button class="tab ${tab === 'mine' ? 'active' : ''}" data-action="approval-tab-v6" data-id="mine">Awaiting me <span class="nav-count" style="display:inline-grid">${mine.length}</span></button><button class="tab ${tab === 'group' ? 'active' : ''}" data-action="approval-tab-v6" data-id="group">All open approvals <span class="nav-count" style="display:inline-grid">${all.length}</span></button></div>`;
   let content;
   if (tab === 'mine') {
-    const rows = mine.map(a => {
+    // Decision cards, oldest first, with their buttons on the card: a table row's buttons fold into a menu.
+    const ordered = [...mine].sort((a, b) => String((byId.get(a.id) || {}).since || '9').localeCompare(String((byId.get(b.id) || {}).since || '9')));
+    const cards = ordered.map(a => {
       const g = byId.get(a.id) || {};
-      return `<tr><td><strong>${__pr23Esc(a.record)}</strong></td><td>${__pr23Esc(a.type)}</td><td><strong>${__pr23Esc(a.title)}</strong><br><span class="muted">${__pr23Esc(a.reason || '')}</span></td><td>${__pr23Esc(a.entity)}</td><td>${cash(a.amount)}</td><td>${__pr23Waiting(g.since)}</td><td><div class="actions">${smallAction('Review', 'open-approval-v6', a.id, 'eye')}${smallAction('Approve', 'approve-prompt-v6', a.id, 'approve')}${smallAction('Reject', 'reject-prompt-v6', a.id)}</div></td></tr>`;
+      return `<article class="approval-prompt-v6 ${String(a.priority || 'normal').toLowerCase()}"><div style="display:flex;justify-content:space-between;gap:8px"><span class="eyebrow">${__pr23Esc(a.type)}</span><span class="muted">${__pr23Esc(a.record)}</span></div><h4>${__pr23Esc(a.title)}</h4><p>${__pr23Esc(a.reason || '')}</p><div class="approval-facts-v6"><div><span>Department</span><strong>${__pr23Esc(a.entity)}</strong></div><div><span>Value</span><strong>${cash(a.amount)}</strong></div><div><span>Waiting</span><strong>${__pr23Waiting(g.since)}</strong></div><div><span>Decision by</span><strong>${__pr23Esc(a.role)}</strong></div></div><div class="actions">${smallAction('Review', 'open-approval-v6', a.id, 'eye')}${smallAction('Approve', 'approve-prompt-v6', a.id, 'approve')}${smallAction('Reject', 'reject-prompt-v6', a.id)}</div></article>`;
     });
-    content = rows.length
-      ? table(['Record', 'Type', 'Decision', 'Department', 'Value', 'Waiting', 'Actions'], rows)
+    content = cards.length
+      ? `<div class="approval-prompt-grid-v6">${cards.join('')}</div>`
       : '<div class="notice"><div><strong>Nothing is waiting on you</strong><p>A decision appears here as soon as it is submitted to you.</p></div></div>';
   } else {
     const rows = all.map(g => `<tr><td><strong>${__pr23Esc(g.record)}</strong></td><td>${__pr23Esc(g.type)}</td><td><strong>${__pr23Esc(g.title)}</strong></td><td>${__pr23Esc(g.entity)}</td><td>${cash(g.amount)}</td><td>${g.mine ? status('Awaiting me') : __pr23Esc(g.waitingOn)}</td><td>${__pr23Waiting(g.since)}</td><td><div class="actions">${g.mine ? smallAction('Review', 'open-approval-v6', g.id, 'eye') : smallAction('Open register', 'nav-v6', g.page, 'arrow')}</div></td></tr>`);
