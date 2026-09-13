@@ -1243,6 +1243,68 @@ s = replaceUnique(
   "__pr23RequisitionEntityField()+__pr23RequisitionDepartmentField()",
 )
 
+// ---------------------------------------------------------------------------
+// 29. Preview vendor form shows no fixture vendor or bid
+// ---------------------------------------------------------------------------
+// Found by the UI census: the preview named "TechNova Solutions" with a 1,280,000 bid against TN-2026-014,
+// and offered Save draft / Seal & submit buttons that save nothing. arguments[0] is the id actually passed;
+// the default parameter would turn a missing id into the fixture tender.
+s = replaceUnique(
+  s,
+  "function vendorBidPreview(id='TN-2026-014'){",
+  "function vendorBidPreview(id='TN-2026-014'){if(__pr23Live())return __pr23VendorBidPreview(arguments[0]);",
+  "vendor bid preview -> no fixture vendor, tender or bid",
+  "if(__pr23Live())return __pr23VendorBidPreview(arguments[0]);",
+)
+
+// ---------------------------------------------------------------------------
+// 30-34. No fixture company in entity, owner and letterhead choices
+// ---------------------------------------------------------------------------
+// Found by the UI census: Create tender / RFx, Edit record, Build procurement report and the letterhead
+// selects offered Matanho Holdings, Matanho Capital Management, Kariba Agro Limited, Lumina Health Group,
+// Kudu Logistics and Nyanga Hospitality, and a record with no owner showed "Group Procurement".
+s = replaceUnique(
+  s,
+  "if(payload.entity) state.entity=payload.entity;",
+  "if(typeof __pr23SyncEntities==='function')__pr23SyncEntities();if(payload.entity) state.entity=payload.entity;",
+  "hydrate -> entity list is the organisation's",
+  "__pr23SyncEntities();if(payload.entity)",
+)
+s = replaceUnique(
+  s,
+  "esc(r.owner||'Group Procurement')",
+  "esc(r.owner||(__pr23Live()?'':'Group Procurement'))",
+  "edit record -> no invented owner",
+  "esc(r.owner||(__pr23Live()?'':'Group Procurement'))",
+)
+s = replaceEvery(
+  s,
+  "<option>Matanho Group Procurement</option>",
+  "<option>'+__pr23LetterheadOption()+'</option>",
+  "letterhead selects -> the organisation's letterhead",
+  "<option>'+__pr23LetterheadOption()+'</option>",
+  3,
+)
+for (const fixture of [
+  "<option>Group Consolidated</option><option>Matanho Holdings</option><option>All investees</option>",
+  "<option>Group Consolidated</option><option>All investees</option><option>Matanho Holdings</option>",
+]) {
+  s = replaceUnique(
+    s,
+    `formField('Entity','<select>${fixture}</select>')`,
+    `formField('Entity','<select>'+__pr23ReportEntityOptions('${fixture}')+'</select>')`,
+    "report builder entity -> the organisation",
+    `__pr23ReportEntityOptions('${fixture}')`,
+  )
+}
+s = replaceUnique(
+  s,
+  "<select name=\"scope\"><option>Group Consolidated</option>${entities.slice(1)",
+  "<select name=\"scope\">${__pr23Live()?'':'<option>Group Consolidated</option>'}${entities.slice(1)",
+  "access request scope -> no Group Consolidated in a live session",
+  "<select name=\"scope\">${__pr23Live()?'':'<option>Group Consolidated</option>'}",
+)
+
 console.log(`\n${applied} applied, ${skipped} already in place, ${missed} missed`)
 if (missed) {
   console.error("One or more patches did not find their anchor. The runtime is NOT fully patched.")

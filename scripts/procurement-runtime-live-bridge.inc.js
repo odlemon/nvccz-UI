@@ -411,9 +411,59 @@ function __pr23GrnModal() {
   );
 }
 
+/** The organisation named on generated documents; the letterhead comes from its company profile. */
+function __pr23OrgName() {
+  return (state.letterhead && state.letterhead.company) || 'Your organisation';
+}
+
+/**
+ * The runtime's entity list, for a live session. Twenty selects and labels read the module-level
+ * `entities` fixture (Matanho Holdings, Kariba Agro Limited, Lumina Health Group...), which no live record
+ * carries. It is replaced in place, so every one of them offers "All entities" and the organisation.
+ * Called by hydrate before it renders.
+ */
+function __pr23SyncEntities() {
+  if (!__pr23Live()) return;
+  const org = __pr23OrgName();
+  if (entities.length === 2 && entities[1][1] === org) return;
+  entities.splice(0, entities.length, ['group', 'All entities'], ['org', org]);
+  const select = document.getElementById('entitySelect');
+  if (select) {
+    select.innerHTML = entities.map(x => `<option value="${x[0]}">${__pr23Esc(x[1])}</option>`).join('');
+    select.value = entities.some(x => x[0] === state.entity) ? state.entity : 'group';
+  }
+}
+
+/** A letterhead choice named for the organisation, not "Matanho Group Procurement". */
+function __pr23LetterheadOption() {
+  return __pr23Live() ? __pr23Esc(`${__pr23OrgName()} letterhead`) : 'Matanho Group Procurement';
+}
+
+/** The report builders' Entity choices. */
+function __pr23ReportEntityOptions(fixture) {
+  return __pr23Live() ? `<option>All entities</option><option>${__pr23Esc(__pr23OrgName())}</option>` : fixture;
+}
+
+/**
+ * What an invited vendor is asked for, without the fixture's vendor, bid price and terms. The runtime's
+ * preview filled in "TechNova Solutions", a 1,280,000 bid, 12 weeks and 36 months against TN-2026-014.
+ * Vendors submit on the vendor portal from their own link, so this preview has nothing to save.
+ */
+function __pr23VendorBidPreview(id) {
+  const tender = id ? (state.tenders || []).find(t => t.id === id) : null;
+  const reference = tender ? `${tender.id} · ${tender.title}` : (id || 'Set by the vendor\'s invitation link');
+  const field = (label, html, cls) => formField(label, html, cls);
+  openModal(
+    'Vendor Bid Submission Form',
+    'What an invited vendor sees on the vendor portal',
+    `<div class="notice" style="margin-bottom:14px"><div><strong>Unique vendor link · expires at the closing date</strong><p>The vendor and the tender are fixed by the invitation link, so a vendor cannot submit for another.</p></div></div><div class="form-grid">${field('Vendor', '<input value="The invited vendor\'s registered name" readonly>')}${field('Tender', `<input value="${__pr23Esc(reference)}" readonly>`)}${field('Technical response', '<textarea placeholder="Response to the mandatory and scored criteria" disabled></textarea>', 'full')}${field('Bid currency', '<select disabled><option>USD</option><option>ZiG</option><option>ZAR</option></select>')}${field('Total bid price', '<input type="number" placeholder="Entered by the vendor" disabled>')}${field('Delivery period', '<input placeholder="Entered by the vendor" disabled>')}${field('Warranty / support', '<input placeholder="Entered by the vendor" disabled>')}${field('Declarations', '<label><input type="checkbox" disabled> The bid is accurate and all conflicts are disclosed.</label>', 'full')}</div>`,
+    btn('Close', 'close-overlay'),
+  );
+}
+
 // ---------------------------------------------------------------- invoice capture
 
-const __PR23_INVOICEABLE = ['SENT', 'ACKNOWLEDGED', 'APPROVED', 'PARTIALLY_RECEIVED', 'PARTIALLY_DELIVERED', 'DELIVERED'];
+const __PR23_INVOICEABLE =['SENT', 'ACKNOWLEDGED', 'APPROVED', 'PARTIALLY_RECEIVED', 'PARTIALLY_DELIVERED', 'DELIVERED'];
 
 function __pr23InvoiceLinesHtml(poRecordId) {
   const o = (state.orders || []).find(x => x.recordId === poRecordId);
