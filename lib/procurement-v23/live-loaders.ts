@@ -1186,6 +1186,14 @@ export async function loadProcurementV23LiveData(): Promise<ProcurementV23LivePa
     Prequalified: { value: vendorsView.filter((v) => v.status === "Prequalified").length, sub: "Valid tax clearance on file" },
     "Compliance review": { value: vendorsView.filter((v) => v.status === "Compliance review").length, sub: "Tax clearance not yet verified" },
     Blacklisted: { value: vendorsView.filter((v) => v.isBlacklisted).length, sub: "Excluded from invitations" },
+    // The design computes these from records procurement does not keep, so in a live session they could only read 0 and
+    // imply the feature exists (found by the cycle ten census). Left out.
+    "Inbound messages": hidden("Vendor messaging is not connected"),
+    "Pending compliance requests": hidden("Document requests to vendors are not recorded"),
+    "Missing documents": hidden("Vendor compliance documents are not recorded in procurement"),
+    "Awaiting signature": hidden("eSignature is not connected"),
+    "Asset purchases": hidden("Purchase order lines are not classified as fixed assets"),
+    "Report templates": hidden("Report templates are fixed exports and are not edited here"),
     // Audit
     "Events today": has("audit.view")
       ? {
