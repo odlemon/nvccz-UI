@@ -752,6 +752,9 @@ Checked by hand in a browser: Create tender offers only the organisation; Previe
 offers only Close; a contract preview carries its own agreement (`CTR-2026-0010`); the tab reads "Procurement &
 Tender Management"; Edit default letterhead opens in 81 ms; no page errors.
 
+**Verified on dev `121413d` (after round 6):** dataset rebuilt (58 mails held), actions 17/17, workflows 15/15,
+AI capture 13/13, sidebar navigation 8/8 roles on the first pass, storyline 20/20.
+
 The Procurement Manager's first sidebar-navigation run timed out on AI Invoice Capture and passed 17/17 on the
 rerun. The suite read the sidebar before the role's grants had loaded: until they land (a few seconds on a cold
 first load) every page is listed, and AI Invoice Capture then disappears for a role without the grant. The suite
