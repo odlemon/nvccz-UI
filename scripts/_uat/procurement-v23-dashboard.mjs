@@ -65,7 +65,7 @@ try {
   const page = await context.newPage()
   const errors = []
   page.on("pageerror", (e) => errors.push(String(e.message || e)))
-  await page.goto(`${BASE}/procurement-v23`, { waitUntil: "domcontentloaded", timeout: LOAD })
+  await page.goto(`${BASE}/procurement`, { waitUntil: "domcontentloaded", timeout: LOAD })
   await page.waitForSelector("[data-dash-awaiting]", { timeout: LOAD })
   await page.waitForTimeout(3000)
 

@@ -118,7 +118,7 @@ async function step(label, fn) {
 await step("W1 Requester saves a draft, edits it and submits it", async (open, label) => {
   const email = "proc.requester@nts.local"
   const title = `UAT WF draft ${RUN}`
-  const { page, errors } = await open(email, "/procurement-v23/requisitions")
+  const { page, errors } = await open(email, "/procurement/requisitions")
   await page.click('[data-action="create-requisition"]')
   await page.waitForSelector("#prForm")
   // Category is required (cycle seven): choose the first real one; option 0 is "Choose a category".
@@ -160,7 +160,7 @@ await step("W1 Requester saves a draft, edits it and submits it", async (open, l
 await step("W2 Operations head rejects a requisition with a reason", async (open, label) => {
   const head = "perf.deptmgr@nts.local"
   const pr = await arrangeRequisition(`UAT WF reject ${RUN}`)
-  const { page, errors } = await open(head, "/procurement-v23/requisitions")
+  const { page, errors } = await open(head, "/procurement/requisitions")
   const offered = await rowMenu(page, pr.requisitionNumber)
   // A department head decides from the Review modal: Reject or return, or Approve requisition.
   if (!offered.includes("review-pr-v11")) return record(false, label, `${pr.requisitionNumber}: no Review control (menu: ${offered.filter((a) => /pr|reject|approve|review/.test(a)).join(", ")})${suffix(errors)}`)
@@ -186,7 +186,7 @@ await step("W3 Requester corrects a rejected requisition and resubmits it", asyn
   // Only one this suite rejected (W2, "UAT WF …"): dev also carries the demo dataset, whose records are not the suite's to change.
   const pr = list(await api(email, "/procurement/requisitions/my")).find((r) => r.status === "REJECTED" && String(r.title).startsWith("UAT WF"))
   if (!pr) return record(false, label, "no rejected UAT WF requisition — W2 rejects one")
-  const { page, errors } = await open(email, "/procurement-v23/requisitions")
+  const { page, errors } = await open(email, "/procurement/requisitions")
   const offered = await rowMenu(page, pr.requisitionNumber)
   const editAction = ["edit-pr-v11", "resubmit-pr-v11", "edit-record-v5"].find((a) => offered.includes(a))
   if (!editAction) return record(false, label, `${pr.requisitionNumber} REJECTED: its row offers no way to correct or resubmit (menu: ${offered.filter((a) => /pr|edit|submit|view/.test(a)).join(", ")})${suffix(errors)}`)
@@ -228,7 +228,7 @@ for (const decision of ["approve", "reject"]) {
       pending = [made.data]
     }
     const grn = pending[0]
-    const { page, errors } = await open(email, "/procurement-v23/approvals")
+    const { page, errors } = await open(email, "/procurement/approvals")
     const id = `RECEIPT-${grn.grnNumber}`
     if (decision === "approve") {
       const control = `[data-action="approve-prompt-v6"][data-id="${id}"]`
@@ -269,7 +269,7 @@ await step("W5 Finance Manager approves a captured invoice (Approval Centre)", a
     if (cap.status !== 201) return record(false, label, `could not arrange an invoice: ${cap.status} ${cap.message}`)
     draft = cap.data
   }
-  const { page, errors } = await open(finance, "/procurement-v23/approvals")
+  const { page, errors } = await open(finance, "/procurement/approvals")
   const control = `[data-action="approve-prompt-v6"][data-id="INVOICE-${draft.invoiceNumber}"]`
   if (!(await visible(page, control))) return record(false, label, `no approve control for INVOICE-${draft.invoiceNumber}${suffix(errors)}`)
   await page.click(control)
@@ -294,7 +294,7 @@ await step("W6a Procurement Officer saves a purchase order as a draft, then send
   const officer = "proc.officer@nts.local"
   const pr = await arrangeRequisition(`UAT WF PO draft ${RUN}`, { approve: true })
   const vendor = await mailableVendor(officer)
-  const { page, errors } = await open(officer, "/procurement-v23/purchase-orders")
+  const { page, errors } = await open(officer, "/procurement/purchase-orders")
   const saveToast = await draftPoThroughForm(page, pr, vendor.id)
   const po = list(await api(officer, "/procurement/purchase-orders")).find((p) => p.requisitionId === pr.id)
   if (po?.status !== "DRAFT") return record(false, label, `save draft -> ${po?.status ?? "no PO"} · "${saveToast}"${suffix(errors)}`)
@@ -311,7 +311,7 @@ await step("W6b Procurement Officer sends two draft purchase orders with Send se
   const officer = "proc.officer@nts.local"
   const vendor = await mailableVendor(officer)
   const prs = [await arrangeRequisition(`UAT WF bulk 1 ${RUN}`, { approve: true }), await arrangeRequisition(`UAT WF bulk 2 ${RUN}`, { approve: true })]
-  const { page, errors } = await open(officer, "/procurement-v23/purchase-orders")
+  const { page, errors } = await open(officer, "/procurement/purchase-orders")
   for (const pr of prs) {
     await draftPoThroughForm(page, pr, vendor.id)
     await page.waitForTimeout(1500)
@@ -336,7 +336,7 @@ await step("W7 Procurement Manager terminates an active contract", async (open, 
   // A contract the suites created ("UAT …" / "Storyline …"): dev's demo contract is not the suite's to terminate.
   const active = list(await api(email, "/procurement/contracts")).find((c) => c.status === "ACTIVE" && /^(UAT|Storyline)\b/.test(String(c.title)))
   if (!active) return record(false, label, "no active UAT contract to terminate — actions and the storyline each create one")
-  const { page, errors } = await open(email, "/procurement-v23/contracts")
+  const { page, errors } = await open(email, "/procurement/contracts")
   const offered = await rowMenu(page, active.contractNumber)
   if (!offered.includes("edit-contract-v6")) return record(false, label, `${active.contractNumber}: no open/edit control (menu: ${offered.filter((a) => /contract/.test(a)).join(", ")})${suffix(errors)}`)
   await page.click(`[data-action="edit-contract-v6"][data-id="${active.contractNumber}"]`)
@@ -354,7 +354,7 @@ await step("W8 Finance rejects a plan; its author adds a line and resubmits", as
   const finance = "payroll.finmgr@nts.local"
   const name = `UAT WF plan ${RUN}`
   {
-    const { page } = await open(author, "/procurement-v23/plan")
+    const { page } = await open(author, "/procurement/plan")
     await page.click('[data-action="create-plan-v5"]')
     await page.waitForSelector("#planFormV23")
     await page.fill('#planFormV23 [name="name"]', name)
@@ -370,7 +370,7 @@ await step("W8 Finance rejects a plan; its author adds a line and resubmits", as
   const submitted = await apiCall(author, "POST", `/procurement/plans/${plan.id}/submit`)
   if (submitted.status >= 300) return record(false, label, `could not arrange submission: ${submitted.status} ${submitted.message}`)
   {
-    const { page, errors } = await open(finance, "/procurement-v23/approvals")
+    const { page, errors } = await open(finance, "/procurement/approvals")
     const id = `PLAN-${plan.planNumber}`
     if (!(await visible(page, `[data-action="open-approval-v6"][data-id="${id}"]`))) return record(false, label, `no review control for ${id}${suffix(errors)}`)
     await page.click(`[data-action="open-approval-v6"][data-id="${id}"]`)
@@ -383,7 +383,7 @@ await step("W8 Finance rejects a plan; its author adds a line and resubmits", as
     const rejected = list(await api(finance, "/procurement/plans")).find((p) => p.id === plan.id)
     if (rejected?.status !== "REJECTED") return record(false, label, `reject -> ${rejected?.status} · "${toast}"${suffix(errors)}`)
   }
-  const { page, errors } = await open(author, "/procurement-v23/plan")
+  const { page, errors } = await open(author, "/procurement/plan")
   await page.click('[data-action="add-plan-item"] >> nth=0')
   if (!(await visible(page, "#planItemFormV23"))) return record(false, label, `REJECTED ok; Add plan item opened no form${suffix(errors)}`)
   await page.selectOption('#planItemFormV23 [name="plan"]', { label: new RegExp(plan.planNumber) }).catch(async () => {
@@ -420,7 +420,7 @@ await step("W9 Procurement Officer uploads a new version of a vault document", a
   const doc = list(await api(email, "/procurement/documents")).find((d) => /^(UAT|Storyline)\b/.test(String(d.name)))
   if (!doc) return record(false, label, "no UAT vault document — actions step 17 files one")
   const display = `DOC-${String(doc.id).slice(-6).toUpperCase()}`
-  const { page, errors } = await open(email, "/procurement-v23/documents")
+  const { page, errors } = await open(email, "/procurement/documents")
   const row = page.locator("table tbody tr", { hasText: doc.name }).first()
   await row.waitFor()
   await row.locator('[data-action="doc-menu-v11"], [data-action="row-actions-v16"]').first().click()
@@ -440,7 +440,7 @@ await step("W9 Procurement Officer uploads a new version of a vault document", a
 await step("N1 A requisition without a title is refused and nothing is saved", async (open, label) => {
   const email = "proc.requester@nts.local"
   const before = list(await api(email, "/procurement/requisitions/my")).length
-  const { page, errors } = await open(email, "/procurement-v23/requisitions")
+  const { page, errors } = await open(email, "/procurement/requisitions")
   await page.click('[data-action="create-requisition"]')
   await page.waitForSelector("#prForm")
   // Category is required (cycle seven): choose the first real one; option 0 is "Choose a category".
@@ -461,7 +461,7 @@ await step("N2 A plan's author cannot approve their own plan", async (open, labe
   const ours = plans.filter((p) => /^(UAT|Storyline)\b/.test(String(p.name)))
   const submitted = ours.find((p) => p.status === "SUBMITTED" && p.createdById === me) ?? ours.find((p) => p.status === "SUBMITTED")
   if (!submitted) return record(false, label, "no submitted plan — W8 resubmits one")
-  const { page, errors } = await open(author, "/procurement-v23/approvals")
+  const { page, errors } = await open(author, "/procurement/approvals")
   const control = `[data-action="approve-prompt-v6"][data-id="PLAN-${submitted.planNumber}"]`
   const offered = await visible(page, control, 6000)
   let toast = ""
@@ -477,7 +477,7 @@ await step("N3 A payment without proof of payment is refused", async (open, labe
   const ap = "proc.ap@nts.local"
   const target = list(await api(ap, "/procurement/invoices")).find((i) => i.status === "APPROVED" && !["PAID", "PARTIALLY_PAID"].includes(i.paymentStatus))
   if (!target) return record(false, label, "no approved unpaid invoice — W5 approves one")
-  const { page, errors } = await open(ap, "/procurement-v23/invoices")
+  const { page, errors } = await open(ap, "/procurement/invoices")
   await page.click('[data-action="record-payment-v23"]')
   await page.waitForSelector("#paymentFormV23")
   await page.selectOption("#paymentInvoiceV23", target.id)
@@ -489,7 +489,7 @@ await step("N3 A payment without proof of payment is refused", async (open, labe
 })
 
 await step("N4 A Buyer is not offered purchase order creation", async (open, label) => {
-  const { page, errors } = await open("proc.buyer@nts.local", "/procurement-v23/purchase-orders")
+  const { page, errors } = await open("proc.buyer@nts.local", "/procurement/purchase-orders")
   const shown = await visible(page, '[data-action="create-po-v6"]', 5000)
   let toast = ""
   if (shown) {

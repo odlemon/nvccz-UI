@@ -200,7 +200,7 @@ export function ProcurementV23App() {
       shellHtml: PROCUREMENT_V23_SHELL_HTML,
       initialPage,
       onNavigate: (page: string) => {
-        const path = PR23_PAGE_TO_PATH[page] || "/procurement-v23"
+        const path = PR23_PAGE_TO_PATH[page] || "/procurement"
         if (pathnameRef.current !== path) router.push(path)
       },
     })

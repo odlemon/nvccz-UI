@@ -50,7 +50,7 @@ try {
   const page = await context.newPage()
   const errors = []
   page.on("pageerror", (e) => errors.push(String(e.message || e)))
-  await page.goto(`${BASE}/procurement-v23/intake`, { waitUntil: "domcontentloaded", timeout: LOAD })
+  await page.goto(`${BASE}/procurement/intake`, { waitUntil: "domcontentloaded", timeout: LOAD })
   await page.waitForSelector("#aiInvoiceCaptureV23", { timeout: LOAD })
   await page.waitForFunction(() => [...document.querySelectorAll("#aiInvoicePoV23 option")].some((o) => /PO_20260908_0004/.test(o.textContent || "")), null, { timeout: LOAD })
   const po = await page.$$eval("#aiInvoicePoV23 option", (os) => os.find((o) => /PO_20260908_0004/.test(o.textContent || ""))?.value)
@@ -87,7 +87,7 @@ try {
   }
   check(Boolean(alerted), "the Finance Manager is alerted with the reason", alerted?.title)
 
-  await page.goto(`${BASE}/procurement-v23/invoices`, { waitUntil: "domcontentloaded", timeout: LOAD })
+  await page.goto(`${BASE}/procurement/invoices`, { waitUntil: "domcontentloaded", timeout: LOAD })
   check(await page.waitForFunction(({ n, t }) => document.body.innerText.includes(n) && document.body.innerText.includes(t), { n: invoice?.invoiceNumber ?? "none", t: note }, { timeout: LOAD }).then(() => true).catch(() => false), "Invoices to review lists it with the reason")
 
   const empty = await fetch(`${API}/procurement/invoices/${invoice?.id}/flag`, { method: "POST", headers: { ...ap.auth, "Content-Type": "application/json" }, body: JSON.stringify({ note: "  " }) })

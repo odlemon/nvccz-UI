@@ -4499,11 +4499,11 @@ function arPage(){const t=V28.arTab;const total=arInvoices.reduce((s,x)=>s+x.ope
 // through the backend of the bill it pays.
 
 const AC52_PROC_PATHS = {
-  invoices: '/procurement-v23/invoices',
-  orders: '/procurement-v23/purchase-orders',
-  intake: '/procurement-v23/intake',
-  evaluation: '/procurement-v23/evaluation',
-  vendors: '/procurement-v23/vendors',
+  invoices: '/procurement/invoices',
+  orders: '/procurement/purchase-orders',
+  intake: '/procurement/intake',
+  evaluation: '/procurement/evaluation',
+  vendors: '/procurement/vendors',
 };
 
 function ac52Cents(v) {
@@ -4726,7 +4726,7 @@ function ac52LiveApPayConfirm(id) {
 function ac52LiveApClick(a, id) {
   if (a === 'aplive-pay') return ac52LiveApPayModal(id);
   if (a === 'aplive-pay-confirm') return ac52LiveApPayConfirm(id);
-  if (a === 'aplive-go') return window.location.assign(AC52_PROC_PATHS[id] || '/procurement-v23');
+  if (a === 'aplive-go') return window.location.assign(AC52_PROC_PATHS[id] || '/procurement');
 }
 /* END_AC52_PAYABLES_LIVE */
 function apPage(){if(window.__AC52_LIVE__)return ac52LiveApPage();const t=V28.apTab,total=apBills.reduce((s,x)=>s+x.open,0);const apNow=new Date();const apAge={cur:0,b30:0,b60:0,b90:0,b90p:0};apBills.forEach(x=>{if(!(x.open>0))return;const d=new Date(x.due),days=isNaN(d.getTime())?0:Math.floor((apNow-d)/86400000);if(days<=0)apAge.cur+=x.open;else if(days<=30)apAge.b30+=x.open;else if(days<=60)apAge.b60+=x.open;else if(days<=90)apAge.b90+=x.open;else apAge.b90p+=x.open});const apCum30=apAge.cur+apAge.b30,apCum60=apCum30+apAge.b60,apCum90=apCum60+apAge.b90+apAge.b90p,apLiqMax=Math.max(apCum90,1);const apDueSoon=apBills.filter(x=>{const d=new Date(x.due),days=isNaN(d.getTime())?999:Math.floor((d-apNow)/86400000);return x.open>0&&days>=0&&days<=7}).reduce((s,x)=>s+x.open,0);const apReadyToPay=apBills.filter(x=>x.open>0&&(x.status==='Due'||x.status==='Approved')).reduce((s,x)=>s+x.open,0);const apMatchExceptions=apBills.filter(x=>x.match&&x.match!=='—'&&/Exception|Mismatch/i.test(x.match)).length;const apCommitments=apPOs.reduce((s,x)=>s+Math.max(0,Number(x.commitment||0)-Number(x.invoiced||0)),0);const apSourcing=rfqs.reduce((s,x)=>s+(Number(x.value)||0),0);window.__ac52HealthMetrics=Object.assign(window.__ac52HealthMetrics||{},{ap:{paymentReadiness:total>0?Math.round(apReadyToPay/total*100):0,vendorControls:apVendors.length?Math.round(apVendors.filter(x=>x.kyc==='Current').length/apVendors.length*100):100}});let body='';

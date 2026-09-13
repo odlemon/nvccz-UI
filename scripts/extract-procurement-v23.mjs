@@ -289,23 +289,23 @@ console.log("runtime", fs.statSync(path.join(OUT_DIR, "matanho-procurement-runti
 console.log("nav bridge", rt.includes("__PROCUREMENT_V23_NAV__"))
 
 const pages = [
-  ["dashboard", "/procurement-v23", "Command Centre"],
-  ["plan", "/procurement-v23/plan", "Annual Procurement Plan"],
-  ["approvals", "/procurement-v23/approvals", "Approval Centre"],
-  ["requisitions", "/procurement-v23/requisitions", "Purchase Requisitions"],
-  ["tenders", "/procurement-v23/tenders", "Tenders & RFx"],
-  ["evaluation", "/procurement-v23/evaluation", "Bid Evaluation"],
-  ["vendors", "/procurement-v23/vendors", "Vendor Registry"],
-  ["contracts", "/procurement-v23/contracts", "Contracts & Awards"],
-  ["orders", "/procurement-v23/purchase-orders", "Purchase Orders"],
-  ["receiving", "/procurement-v23/goods-received", "Receiving & Inspection"],
-  ["invoices", "/procurement-v23/invoices", "Invoices & 3-Way Match"],
-  ["accounts", "/procurement-v23/accounts", "Accounts & Asset Transfers"],
-  ["documents", "/procurement-v23/documents", "Document Vault"],
-  ["reports", "/procurement-v23/reports", "Reports Vault"],
-  ["audit", "/procurement-v23/audit", "Audit & Compliance"],
-  ["settings", "/procurement-v23/settings", "Configuration & RBAC"],
-  ["analytics", "/procurement-v23/analytics", "Analytics"],
+  ["dashboard", "/procurement", "Command Centre"],
+  ["plan", "/procurement/plan", "Annual Procurement Plan"],
+  ["approvals", "/procurement/approvals", "Approval Centre"],
+  ["requisitions", "/procurement/requisitions", "Purchase Requisitions"],
+  ["tenders", "/procurement/tenders", "Tenders & RFx"],
+  ["evaluation", "/procurement/evaluation", "Bid Evaluation"],
+  ["vendors", "/procurement/vendors", "Vendor Registry"],
+  ["contracts", "/procurement/contracts", "Contracts & Awards"],
+  ["orders", "/procurement/purchase-orders", "Purchase Orders"],
+  ["receiving", "/procurement/goods-received", "Receiving & Inspection"],
+  ["invoices", "/procurement/invoices", "Invoices & 3-Way Match"],
+  ["accounts", "/procurement/accounts", "Accounts & Asset Transfers"],
+  ["documents", "/procurement/documents", "Document Vault"],
+  ["reports", "/procurement/reports", "Reports Vault"],
+  ["audit", "/procurement/audit", "Audit & Compliance"],
+  ["settings", "/procurement/settings", "Configuration & RBAC"],
+  ["analytics", "/procurement/analytics", "Analytics"],
 ]
 
 const navTs = `/** Procurement V23 page id → Next path */
@@ -319,9 +319,9 @@ export const PR23_PATH_TO_PAGE: Record<string, string> = Object.fromEntries(
 
 export function pathToPr23Page(pathname: string): string {
   if (pathname in PR23_PATH_TO_PAGE) return PR23_PATH_TO_PAGE[pathname]
-  if (pathname.startsWith('/procurement-v23/')) {
-    const seg = pathname.replace('/procurement-v23/', '').split('/')[0]
-    const hit = Object.entries(PR23_PAGE_TO_PATH).find(([, p]) => p === '/procurement-v23/' + seg)
+  if (pathname.startsWith('/procurement/')) {
+    const seg = pathname.replace('/procurement/', '').split('/')[0]
+    const hit = Object.entries(PR23_PAGE_TO_PATH).find(([, p]) => p === '/procurement/' + seg)
     if (hit) return hit[0]
   }
   return 'dashboard'

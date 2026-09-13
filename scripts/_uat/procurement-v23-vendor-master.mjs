@@ -59,7 +59,7 @@ const openProfile = async (email) => {
   const page = await context.newPage()
   const errors = []
   page.on("pageerror", (e) => errors.push(String(e.message || e)))
-  await page.goto(`${BASE}/procurement-v23/vendors`, { waitUntil: "domcontentloaded", timeout: LOAD })
+  await page.goto(`${BASE}/procurement/vendors`, { waitUntil: "domcontentloaded", timeout: LOAD })
   const row = page.locator("#workspace table tbody tr", { hasText: NAME }).first()
   await row.waitFor({ timeout: LOAD })
   await row.locator("td").first().click()

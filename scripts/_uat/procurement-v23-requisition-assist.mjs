@@ -52,7 +52,7 @@ try {
   const page = await context.newPage()
   const errors = []
   page.on("pageerror", (e) => errors.push(String(e.message || e)))
-  await page.goto(`${BASE}/procurement-v23/requisitions`, { waitUntil: "domcontentloaded", timeout: LOAD })
+  await page.goto(`${BASE}/procurement/requisitions`, { waitUntil: "domcontentloaded", timeout: LOAD })
   await page.waitForSelector("#nav .nav-item", { timeout: LOAD })
   await page.waitForTimeout(4000)
   await page.locator('[data-action="create-requisition"]').first().click()

@@ -69,10 +69,10 @@ try {
   const errors = []
   page.on("pageerror", (e) => errors.push(String(e.message || e)))
 
-  // Deliberately NOT the dashboard. Opening the page from /procurement-v23 is the one route where a
+  // Deliberately NOT the dashboard. Opening the page from /procurement is the one route where a
   // missing path mapping cannot bite, because the host skips the router push when the path already
   // matches. Cycle six shipped without a path for `intake`, and this test passed anyway.
-  await page.goto(`${BASE}/procurement-v23/invoices`, { waitUntil: "domcontentloaded", timeout: LOAD })
+  await page.goto(`${BASE}/procurement/invoices`, { waitUntil: "domcontentloaded", timeout: LOAD })
   await page.waitForSelector("#nav .nav-item", { timeout: LOAD })
   await page.waitForTimeout(2500)
 
@@ -91,7 +91,7 @@ try {
   const url = page.url()
   record(
     "it stays open, and the address bar follows it",
-    settledHeading === "AI Invoice Capture" && /\/procurement-v23\/intake$/.test(url),
+    settledHeading === "AI Invoice Capture" && /\/procurement\/intake$/.test(url),
     `heading "${settledHeading}" at ${url.replace(/^https?:\/\/[^/]+/, "")}`,
   )
 

@@ -102,7 +102,7 @@ try {
   // ------------------------------------------------------------------ the CFO sets the route in the UI
   console.log("\n== the CFO sets a two-level route in Configuration, Approval matrix")
   {
-    const { context, page, errors } = await openAs(cfo, "/procurement-v23/settings")
+    const { context, page, errors } = await openAs(cfo, "/procurement/settings")
     await page.waitForFunction(() => document.querySelector('[data-action="settings-tab"][data-id="approvals"]'), null, { timeout: LOAD })
     await page.waitForTimeout(3000)
     await page.locator('[data-action="settings-tab"][data-id="approvals"]').first().click()
@@ -175,7 +175,7 @@ try {
   // ------------------------------------------------------------------ the department head decides step 1
   console.log("\n== the department head approves A and B from the Approval Centre")
   {
-    const { context, page, errors } = await openAs(head, "/procurement-v23/requisitions")
+    const { context, page, errors } = await openAs(head, "/procurement/requisitions")
     // Row buttons fold into a row-actions menu, and clicking the row opens its primary action (Review, for an approver).
     const rowA = page.locator("#workspace table tbody tr", { hasText: A.number })
     await rowA.first().waitFor({ timeout: LOAD })
@@ -189,7 +189,7 @@ try {
     await context.close()
   }
   {
-    const { context, page, errors } = await openAs(head, "/procurement-v23/approvals")
+    const { context, page, errors } = await openAs(head, "/procurement/approvals")
     const cardA = page.locator(".approval-prompt-v6", { hasText: A.number })
     await cardA.first().waitFor({ timeout: LOAD })
     check(/Step 1 of 2 · Head of Operations/.test(await cardA.first().innerText()), "A's card says it is step 1 of 2, decided by the head of Operations")
@@ -218,7 +218,7 @@ try {
   // ------------------------------------------------------------------ the Finance Manager decides step 2
   console.log("\n== the Finance Manager approves A")
   {
-    const { context, page, errors } = await openAs(finmgr, "/procurement-v23/approvals")
+    const { context, page, errors } = await openAs(finmgr, "/procurement/approvals")
     const cardA = page.locator(".approval-prompt-v6", { hasText: A.number })
     await cardA.first().waitFor({ timeout: LOAD })
     check(/Step 2 of 2 · Finance Manager/.test(await cardA.first().innerText()), "A's card says step 2 of 2, the Finance Manager")
@@ -246,7 +246,7 @@ try {
   // ------------------------------------------------------------------ the requester's view
   console.log("\n== the requester sees the route and the motivation document from the record")
   {
-    const { context, page, errors } = await openAs(requester, "/procurement-v23/requisitions")
+    const { context, page, errors } = await openAs(requester, "/procurement/requisitions")
     const rowView = page.locator("#workspace table tbody tr", { hasText: A.number })
     await rowView.first().waitFor({ timeout: LOAD })
     await rowView.first().click()
@@ -258,7 +258,7 @@ try {
     const docText = await page.evaluate(() => document.body.innerText)
     check(!/01 Aug 2026/.test(docText) && !/continuity of operations/i.test(docText), "and none of the template's date or stock justification")
     await page.screenshot({ path: path.join(OUT, "motivation-document.png"), fullPage: true })
-    await page.goto(`${BASE}/procurement-v23/settings`, { waitUntil: "domcontentloaded", timeout: LOAD })
+    await page.goto(`${BASE}/procurement/settings`, { waitUntil: "domcontentloaded", timeout: LOAD })
     await page.waitForFunction(() => document.querySelector('[data-action="settings-tab"][data-id="approvals"]'), null, { timeout: LOAD })
     await page.locator('[data-action="settings-tab"][data-id="approvals"]').first().click()
     check(await waitForText(page, /Only an administrator or the Chief Financial Officer can change the route/, 30000), "the requester reads the matrix and is told who can change it")

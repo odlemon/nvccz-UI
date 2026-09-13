@@ -64,7 +64,7 @@ try {
   page.on("pageerror", (e) => errors.push(String(e.message || e)))
   const text = () => page.evaluate(() => document.body.innerText)
 
-  await page.goto(`${BASE}/procurement-v23/analytics`, { waitUntil: "domcontentloaded", timeout: LOAD })
+  await page.goto(`${BASE}/procurement/analytics`, { waitUntil: "domcontentloaded", timeout: LOAD })
   await page.waitForFunction(() => /Spend, Cash & Insights/.test(document.body.innerText), null, { timeout: LOAD })
   await page.waitForTimeout(4000)
   let t = await text()

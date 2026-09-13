@@ -3,7 +3,7 @@
  *
  *   node scripts/_uat/procurement-v23-storyline.mjs [--base=https://dev.matanho.com] [--out=dir]
  *
- * The same twenty steps as design-refs/procurement-v23/PROCUREMENT_TEST_WALKTHROUGH.md: plan, requisition
+ * The same twenty steps as design-refs/procurement/PROCUREMENT_TEST_WALKTHROUGH.md: plan, requisition
  * (draft, return, correct, approve), RFQ, vendor quotations through the portal page, scoring, award, PO,
  * goods received and inspected, AI invoice capture, invoice approval, payment, journal posting, contract,
  * document versions, audit trail — plus the refusals along the way. Every page is reached from the sidebar
@@ -48,12 +48,12 @@ const LINES = [
   { itemName: "Lever Arch Files", quantity: 25, unit: "Each", price: 3.8 },
 ]
 const PAGE_PATHS = {
-  dashboard: "/procurement-v23", plan: "/procurement-v23/plan", approvals: "/procurement-v23/approvals",
-  requisitions: "/procurement-v23/requisitions", tenders: "/procurement-v23/tenders", quotations: "/procurement-v23/quotations",
-  evaluation: "/procurement-v23/evaluation", vendors: "/procurement-v23/vendors", contracts: "/procurement-v23/contracts",
-  orders: "/procurement-v23/purchase-orders", receiving: "/procurement-v23/goods-received", invoices: "/procurement-v23/invoices",
-  intake: "/procurement-v23/intake", accounts: "/procurement-v23/accounts", documents: "/procurement-v23/documents",
-  audit: "/procurement-v23/audit", settings: "/procurement-v23/settings",
+  dashboard: "/procurement", plan: "/procurement/plan", approvals: "/procurement/approvals",
+  requisitions: "/procurement/requisitions", tenders: "/procurement/tenders", quotations: "/procurement/quotations",
+  evaluation: "/procurement/evaluation", vendors: "/procurement/vendors", contracts: "/procurement/contracts",
+  orders: "/procurement/purchase-orders", receiving: "/procurement/goods-received", invoices: "/procurement/invoices",
+  intake: "/procurement/intake", accounts: "/procurement/accounts", documents: "/procurement/documents",
+  audit: "/procurement/audit", settings: "/procurement/settings",
 }
 
 // ------------------------------------------------------------------ API

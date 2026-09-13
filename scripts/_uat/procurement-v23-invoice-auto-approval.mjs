@@ -144,7 +144,7 @@ try {
     const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } })
     await seedAuth(context, BASE, "proc.ap@nts.local", "staff")
     const page = await context.newPage()
-    await page.goto(`${BASE}/procurement-v23/invoices`, { waitUntil: "domcontentloaded", timeout: LOAD })
+    await page.goto(`${BASE}/procurement/invoices`, { waitUntil: "domcontentloaded", timeout: LOAD })
     await page.waitForSelector("#nav .nav-item", { timeout: LOAD })
     // The page lists match sources; the invoice is in the workspace of the source its order belongs to.
     const cardSel = '[data-action="select-match-tender-v5"]'
@@ -153,7 +153,7 @@ try {
     const cardCount = await page.locator(cardSel).count()
     for (let i = 0; i < cardCount && !rowText; i++) {
       if (!(await page.locator(cardSel).count())) {
-        await page.goto(`${BASE}/procurement-v23/invoices`, { waitUntil: "domcontentloaded", timeout: LOAD })
+        await page.goto(`${BASE}/procurement/invoices`, { waitUntil: "domcontentloaded", timeout: LOAD })
         await page.waitForSelector(cardSel, { timeout: LOAD })
       }
       const card = page.locator(cardSel).nth(i)

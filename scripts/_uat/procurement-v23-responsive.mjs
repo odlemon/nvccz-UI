@@ -14,9 +14,9 @@ const list = (v) => (v || "").split(",").map((s) => s.trim()).filter(Boolean)
 const OUT = path.resolve(arg("out") || ".procurement-responsive")
 const USERS = list(arg("users")).length ? list(arg("users")) : ["proc.mgr@nts.local", "proc.requester@nts.local"]
 const PAGES = [
-  ["dashboard", "/procurement-v23"], ["approvals", "/procurement-v23/approvals"], ["requisitions", "/procurement-v23/requisitions"],
-  ["tenders", "/procurement-v23/tenders"], ["vendors", "/procurement-v23/vendors"], ["orders", "/procurement-v23/purchase-orders"],
-  ["invoices", "/procurement-v23/invoices"], ["documents", "/procurement-v23/documents"], ["audit", "/procurement-v23/audit"],
+  ["dashboard", "/procurement"], ["approvals", "/procurement/approvals"], ["requisitions", "/procurement/requisitions"],
+  ["tenders", "/procurement/tenders"], ["vendors", "/procurement/vendors"], ["orders", "/procurement/purchase-orders"],
+  ["invoices", "/procurement/invoices"], ["documents", "/procurement/documents"], ["audit", "/procurement/audit"],
 ].filter(([id]) => !list(arg("pages")).length || list(arg("pages")).includes(id))
 const WIDTHS = [["tablet", 768, 1024], ["phone", 390, 844]]
 const LOAD = Number(process.env.UAT_LOAD_TIMEOUT_MS || 180000)

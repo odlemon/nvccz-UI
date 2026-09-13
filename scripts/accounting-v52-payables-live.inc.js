@@ -9,11 +9,11 @@
 // through the backend of the bill it pays.
 
 const AC52_PROC_PATHS = {
-  invoices: '/procurement-v23/invoices',
-  orders: '/procurement-v23/purchase-orders',
-  intake: '/procurement-v23/intake',
-  evaluation: '/procurement-v23/evaluation',
-  vendors: '/procurement-v23/vendors',
+  invoices: '/procurement/invoices',
+  orders: '/procurement/purchase-orders',
+  intake: '/procurement/intake',
+  evaluation: '/procurement/evaluation',
+  vendors: '/procurement/vendors',
 };
 
 function ac52Cents(v) {
@@ -236,5 +236,5 @@ function ac52LiveApPayConfirm(id) {
 function ac52LiveApClick(a, id) {
   if (a === 'aplive-pay') return ac52LiveApPayModal(id);
   if (a === 'aplive-pay-confirm') return ac52LiveApPayConfirm(id);
-  if (a === 'aplive-go') return window.location.assign(AC52_PROC_PATHS[id] || '/procurement-v23');
+  if (a === 'aplive-go') return window.location.assign(AC52_PROC_PATHS[id] || '/procurement');
 }

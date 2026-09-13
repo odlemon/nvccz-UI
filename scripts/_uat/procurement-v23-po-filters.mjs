@@ -32,7 +32,7 @@ try {
   const page = await context.newPage()
   const errors = []
   page.on("pageerror", (e) => errors.push(String(e.message || e)))
-  await page.goto(`${BASE}/procurement-v23/purchase-orders`, { waitUntil: "domcontentloaded", timeout: LOAD })
+  await page.goto(`${BASE}/procurement/purchase-orders`, { waitUntil: "domcontentloaded", timeout: LOAD })
   await page.waitForSelector("#poFiltersV23", { timeout: LOAD })
   const rows = () => page.$$eval("#workspace table tbody tr", (trs) => trs.filter((t) => !t.classList.contains("pr23-empty-row")).map((t) => t.innerText.replace(/\s+/g, " ")))
   await page.waitForFunction((n) => document.querySelectorAll("#workspace table tbody tr:not(.pr23-empty-row)").length >= n, orders.length, { timeout: LOAD }).catch(() => {})
