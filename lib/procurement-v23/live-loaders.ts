@@ -1303,6 +1303,207 @@ export async function loadProcurementV23LiveData(): Promise<ProcurementV23LivePa
     "Immutable records": unknown("Record immutability is not attested yet"),
   }
 
+  // ----------------------------------------------------------------- analytics: cash requirements and insights
+  // SRD §4 Finance Manager: outstanding orders and invoices, committed spend for the month, and the cash they will need.
+  // SRD §2 insights: unusual spending, vendor on-time delivery and cost per item over time, top-spending departments, the
+  // most reliable vendors, and items bought above their estimate. Every figure comes from the registers loaded above;
+  // an amount whose due date, delivery date or vendor payment terms is missing is reported as "timing unknown", not
+  // placed by a guess.
+  const DAY = 86400000
+  const today0 = new Date()
+  today0.setHours(0, 0, 0, 0)
+  const up = (v: unknown) => String(v ?? "").toUpperCase()
+  const monthKey = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`
+  const validDate = (v: unknown) => {
+    if (!v) return null
+    const d = new Date(String(v))
+    return Number.isNaN(d.getTime()) ? null : d
+  }
+  const termsDays = (vendorId: unknown): number | null => {
+    const v = vendors.find((x) => x.id === vendorId)
+    const m = String(v?.paymentTerms ?? "").match(/\d+/)
+    return m ? Number(m[0]) : null
+  }
+  const deptOf = (o: any) => {
+    const d = departmentOfRequisition(o.requisitionId)
+    return d === DASH ? "No department" : d
+  }
+  const invoicedByPo = new Map<string, number>()
+  const paidByPo = new Map<string, number>()
+  for (const i of invoices) {
+    if (!i.purchaseOrderId || up(i.status) === "REJECTED") continue
+    invoicedByPo.set(i.purchaseOrderId, (invoicedByPo.get(i.purchaseOrderId) ?? 0) + (num(i.totalAmount) ?? 0))
+    if (up(i.paymentStatus) === "PAID") paidByPo.set(i.purchaseOrderId, (paidByPo.get(i.purchaseOrderId) ?? 0) + (num(i.totalAmount) ?? 0))
+  }
+
+  const cashMonths = [0, 1, 2].map((k) => {
+    const d = new Date(today0.getFullYear(), today0.getMonth() + k, 1)
+    return { key: monthKey(d), label: d.toLocaleDateString("en-GB", { month: "long", year: "numeric" }), invoices: 0, orders: 0 }
+  })
+  const cash = { overdue: { invoices: 0, orders: 0 }, later: { invoices: 0, orders: 0 }, unknown: { invoices: 0, orders: 0 } }
+  const place = (when: Date | null, amount: number, kind: "invoices" | "orders") => {
+    if (!amount) return
+    if (!when) cash.unknown[kind] += amount
+    else if (when.getTime() < today0.getTime()) cash.overdue[kind] += amount
+    else {
+      const m = cashMonths.find((b) => b.key === monthKey(when))
+      if (m) m[kind] += amount
+      else cash.later[kind] += amount
+    }
+  }
+  const unpaidInvoices = invoices.filter(
+    (i) => ["APPROVED", "DRAFT", "PENDING", "PENDING_APPROVAL"].includes(up(i.status)) && !["PAID", "PARTIALLY_PAID"].includes(up(i.paymentStatus)),
+  )
+  for (const i of unpaidInvoices) {
+    const terms = termsDays(i.vendorId)
+    const invoiced = validDate(i.invoiceDate)
+    // Due date as printed; otherwise the invoice date plus the vendor's payment terms.
+    const when = validDate(i.dueDate) ?? (invoiced && terms != null ? new Date(invoiced.getTime() + terms * DAY) : null)
+    place(when, num(i.totalAmount) ?? 0, "invoices")
+  }
+  let openCommitments = 0
+  for (const o of liveOrders.filter((x) => ["APPROVED", "SENT", "ACKNOWLEDGED", "PARTIALLY_DELIVERED", "DELIVERED"].includes(up(x.status)))) {
+    const remaining = Math.max(0, (num(o.totalAmount) ?? 0) - (invoicedByPo.get(o.id) ?? 0))
+    if (remaining < 0.005) continue
+    openCommitments += remaining
+    const delivery = validDate(o.expectedDeliveryDate)
+    const terms = termsDays(o.vendorId)
+    // Not yet invoiced: invoiced on delivery (today, if the delivery date has passed) and paid on the vendor's terms.
+    const when = delivery && terms != null ? new Date(Math.max(delivery.getTime(), today0.getTime()) + terms * DAY) : null
+    place(when, remaining, "orders")
+  }
+  const monthStart = new Date(today0.getFullYear(), today0.getMonth(), 1)
+  const committedThisMonth = liveOrders
+    .filter((o) => (validDate(o.orderDate ?? o.createdAt) ?? new Date(0)) >= monthStart)
+    .reduce((t, o) => t + (num(o.totalAmount) ?? 0), 0)
+
+  const quarterStart = new Date(today0.getFullYear(), Math.floor(today0.getMonth() / 3) * 3, 1)
+  const deptQuarter = new Map<string, { amount: number; orders: number }>()
+  const deptMonthly = new Map<string, Map<string, number>>()
+  for (const o of liveOrders) {
+    const d = validDate(o.orderDate ?? o.createdAt)
+    if (!d) continue
+    const dept = deptOf(o)
+    const amount = num(o.totalAmount) ?? 0
+    if (d >= quarterStart) {
+      const e = deptQuarter.get(dept) ?? { amount: 0, orders: 0 }
+      e.amount += amount
+      e.orders += 1
+      deptQuarter.set(dept, e)
+    }
+    const m = deptMonthly.get(dept) ?? new Map<string, number>()
+    m.set(monthKey(d), (m.get(monthKey(d)) ?? 0) + amount)
+    deptMonthly.set(dept, m)
+  }
+  const previousMonths = [1, 2, 3].map((k) => monthKey(new Date(today0.getFullYear(), today0.getMonth() - k, 1)))
+  const unusualSpending: { department: string; thisMonth: number; average: number; ratio: number }[] = []
+  for (const [department, m] of deptMonthly) {
+    const thisMonth = m.get(monthKey(today0)) ?? 0
+    const average = previousMonths.reduce((t, k) => t + (m.get(k) ?? 0), 0) / previousMonths.length
+    if (thisMonth > 0 && average > 0 && thisMonth > average * 2) {
+      unusualSpending.push({ department, thisMonth, average, ratio: Math.round((thisMonth / average) * 10) / 10 })
+    }
+  }
+
+  const vendorPerformance = vendors
+    .map((v) => {
+      const h = vendorHistory(v.id)
+      return {
+        vendor: v.name ?? DASH,
+        orders: h.orders.length,
+        receiptsTimed: h.receiptsTimed,
+        onTime: h.receiptsOnTime,
+        onTimePct: h.receiptsTimed ? Math.round((h.receiptsOnTime / h.receiptsTimed) * 100) : null,
+        invoices: h.invoices.length,
+        flagged: h.invoices.filter((i) => i.flagged).length,
+        items: h.items,
+      }
+    })
+    .filter((v) => v.orders > 0)
+  const costPerItem = vendorPerformance.flatMap((v) =>
+    v.items
+      .filter((it) => it.orders > 1 && it.first && it.last && it.first !== it.last)
+      .map((it) => ({ vendor: v.vendor, item: it.item, first: it.first, last: it.last, orders: it.orders, changePct: Math.round(((it.last - it.first) / it.first) * 1000) / 10 })),
+  )
+
+  const overEstimate = new Map<string, { item: string; times: number; worstPct: number; estimate: number; ordered: number }>()
+  for (const o of liveOrders) {
+    const req = o.requisitionId ? reqById.get(String(o.requisitionId)) : undefined
+    if (!req) continue
+    for (const it of o.items ?? []) {
+      const key = String(it.itemName ?? "").trim().toLowerCase()
+      const est = (req.items ?? []).find((ri: any) => String(ri.itemName ?? "").trim().toLowerCase() === key)
+      const estimate = num(est?.unitPrice)
+      const ordered = num(it.unitPrice)
+      if (!key || !estimate || !ordered || ordered <= estimate) continue
+      const pct = Math.round(((ordered - estimate) / estimate) * 1000) / 10
+      const cur = overEstimate.get(key) ?? { item: String(it.itemName), times: 0, worstPct: 0, estimate, ordered }
+      cur.times += 1
+      if (pct >= cur.worstPct) Object.assign(cur, { worstPct: pct, estimate, ordered })
+      overEstimate.set(key, cur)
+    }
+  }
+
+  const ageDays = (v: unknown) => {
+    const d = validDate(v)
+    return d ? Math.max(0, Math.floor((Date.now() - d.getTime()) / DAY)) : null
+  }
+  const stage = (label: string, owner: string, rows: any[], dateOf: (r: any) => unknown) => {
+    const ages = rows.map((r) => ageDays(dateOf(r))).filter((a): a is number => a != null).sort((a, b) => a - b)
+    return { label, owner, count: rows.length, median: ages.length ? ages[Math.floor(ages.length / 2)] : null, oldest: ages.length ? ages[ages.length - 1] : null }
+  }
+  const rfqBids = (t: any) => (quotesByRfq.get(t.procurementRfqId ?? t.id) ?? []).filter((q) => ["SUBMITTED", "UNDER_REVIEW"].includes(up(q.status)))
+  const rfqAwarded = (t: any) => (quotesByRfq.get(t.procurementRfqId ?? t.id) ?? []).some((q) => up(q.status) === "ACCEPTED")
+  const pipeline = [
+    stage("Requisitions awaiting approval", "The approvers on each requisition's route", requisitionRows.filter((r) => up(r.status) === "PENDING_APPROVAL"), (r) => r.submittedAt ?? r.updatedAt ?? r.createdAt),
+    stage("Approved requisitions not yet sourced", "Procurement desk", requisitionRows.filter((r) => up(r.status) === "APPROVED"), (r) => r.approvedAt ?? r.updatedAt),
+    stage("RFQs waiting for quotations", "Invited vendors", rfqs.filter((t) => !rfqAwarded(t) && !rfqBids(t).length && up(t.status) !== "CANCELLED"), (t) => t.createdAt),
+    stage("Quotations to evaluate and award", "Procurement Manager", rfqs.filter((t) => !rfqAwarded(t) && rfqBids(t).length > 0), (t) => t.closingAt ?? t.createdAt),
+    stage("Orders not yet delivered", "Vendors", liveOrders.filter((o) => ["APPROVED", "SENT", "ACKNOWLEDGED", "PARTIALLY_DELIVERED"].includes(up(o.status))), (o) => o.orderDate ?? o.createdAt),
+    stage("Receipts awaiting inspection", "Procurement Manager", grns.filter((g) => up(g.status) === "RECEIVED"), (g) => g.receivedDate ?? g.createdAt),
+    stage("Invoices awaiting approval", "Finance Manager", invoices.filter((i) => ["DRAFT", "PENDING", "PENDING_APPROVAL"].includes(up(i.status))), (i) => i.createdAt),
+    stage("Approved invoices not yet paid", "Accounts Payable", invoices.filter((i) => up(i.status) === "APPROVED" && up(i.paymentStatus) !== "PAID"), (i) => i.approvedAt ?? i.updatedAt),
+  ]
+
+  const categories = new Map<string, { category: string; orders: number; committed: number; invoiced: number; paid: number }>()
+  for (const o of liveOrders) {
+    const src = o.requisitionId ? reqById.get(String(o.requisitionId))?.sourcingCategory : null
+    const category = src ? titleCase(src) : "Uncategorised"
+    const e = categories.get(category) ?? { category, orders: 0, committed: 0, invoiced: 0, paid: 0 }
+    e.orders += 1
+    e.committed += num(o.totalAmount) ?? 0
+    e.invoiced += invoicedByPo.get(o.id) ?? 0
+    e.paid += paidByPo.get(o.id) ?? 0
+    categories.set(category, e)
+  }
+
+  const analyticsV23 = {
+    ordersVisible: has("orders.view"),
+    invoicesVisible: has("invoices.view"),
+    cash: {
+      overdue: cash.overdue,
+      months: cashMonths,
+      later: cash.later,
+      unknown: cash.unknown,
+      approvedUnpaid: unpaidInvoices.filter((i) => up(i.status) === "APPROVED").reduce((t, i) => t + (num(i.totalAmount) ?? 0), 0),
+      awaitingApproval: unpaidInvoices.filter((i) => up(i.status) !== "APPROVED").reduce((t, i) => t + (num(i.totalAmount) ?? 0), 0),
+      partPaid: invoices.filter((i) => up(i.paymentStatus) === "PARTIALLY_PAID").length,
+      openCommitments,
+      committedThisMonth,
+    },
+    topDepartments: [...deptQuarter.entries()].map(([department, e]) => ({ department, ...e })).sort((a, b) => b.amount - a.amount).slice(0, 6),
+    unusualSpending: unusualSpending.sort((a, b) => b.ratio - a.ratio),
+    reliableVendors: vendorPerformance
+      .map(({ items, ...v }) => v)
+      .sort((a, b) => (b.onTimePct ?? -1) - (a.onTimePct ?? -1) || a.flagged / Math.max(1, a.invoices) - b.flagged / Math.max(1, b.invoices) || b.orders - a.orders)
+      .slice(0, 8),
+    costPerItem: costPerItem.sort((a, b) => Math.abs(b.changePct) - Math.abs(a.changePct)).slice(0, 10),
+    overEstimate: [...overEstimate.values()].sort((a, b) => b.times - a.times || b.worstPct - a.worstPct).slice(0, 10),
+    duplicates: invoices.filter((i) => ["DRAFT", "PENDING", "PENDING_APPROVAL"].includes(up(i.status)) && (i.aiDiscrepancies?.flags ?? []).some((f: any) => f?.type === "POSSIBLE_DUPLICATE")).length,
+    pipeline,
+    categories: [...categories.values()].sort((a, b) => b.committed - a.committed),
+  }
+
   const approvalMatrix = await approvalMatrixLoad
 
   const hydrate: Record<string, unknown> = {
@@ -1315,6 +1516,7 @@ export async function loadProcurementV23LiveData(): Promise<ProcurementV23LivePa
     approvalPromptsV6: prompts,
     approvalGroupV23: approvalGroup,
     approvalMatrixV23: approvalMatrix,
+    analyticsV23,
     currentUserV6: { name: access?.name ?? DASH, role: access?.roleName ?? DASH },
     auditEventsLive,
     complianceReminderSettingsV7: NO_REMINDER_AUTOMATION,
@@ -1404,4 +1606,5 @@ export const EMPTY_PROCUREMENT_HYDRATE: Record<string, unknown> = {
   complianceReminderSettingsV7: NO_REMINDER_AUTOMATION,
   evaluationLive: {},
   approvalMatrixV23: null,
+  analyticsV23: null,
 }

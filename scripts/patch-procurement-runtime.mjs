@@ -1398,7 +1398,16 @@ s = replaceUnique(
   "'letterhead','approvalGroupV23'];",
   "'letterhead','approvalGroupV23','approvalMatrixV23'];",
   "hydrate() -> the approval matrix",
+  // The analytics step below extends this tail, so the marker stops before its end.
+  "'approvalGroupV23','approvalMatrixV23'",
+)
+// Analytics reads the cash requirements and insights the loaders compute (state.analyticsV23).
+s = replaceUnique(
+  s,
   "'approvalGroupV23','approvalMatrixV23'];",
+  "'approvalGroupV23','approvalMatrixV23','analyticsV23'];",
+  "hydrate() -> analytics",
+  "'approvalMatrixV23','analyticsV23'];",
 )
 
 // ---------------------------------------------------------------------------
@@ -1815,6 +1824,22 @@ s = replaceUnique(
   "${__pr23Live()?__pr23DashboardSrdHtml():''}<div class=\"grid two\" style=\"margin-bottom:14px\">${card('Plan, commitment and actual spend'",
   "command centre -> SRD dashboard cards",
   "${__pr23Live()?__pr23DashboardSrdHtml():''}",
+)
+
+// ---------------------------------------------------------------------------
+// 61. Analytics is drawn from the records
+// ---------------------------------------------------------------------------
+// The vendored Analytics page kept a live hero over sample panels: a 287-record funnel, sample cycle drivers, owners and
+// queues, a sample category register, an owner workload, an invoice exception register and a report delivery log. A live
+// session renders __pr23AnalyticsHtml, which adds what SRD §4 and §2 ask of it: the cash supplier obligations will need,
+// top-spending departments, unusual spending, the most reliable vendors, cost per item over time, items bought above
+// their estimate and possible duplicate invoices.
+s = replaceUnique(
+  s,
+  "function analyticsPageV5(){",
+  "function analyticsPageV5(){if(__pr23Live())return __pr23AnalyticsHtml();",
+  "analytics -> live page",
+  "function analyticsPageV5(){if(__pr23Live())return __pr23AnalyticsHtml();",
 )
 
 // ---------------------------------------------------------------------------

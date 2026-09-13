@@ -1611,6 +1611,73 @@ function __pr23NoAccessHtml(page) {
   return `<div class="page">${pageHead('Procurement access', title, `Your role does not include ${title}. Procurement access is granted on your role in Admin → Roles.`, '')}${card('Pages your role can open', 'Choose where to go', `<div class="card-body list">${links}</div>`)}</div>`;
 }
 
+// ---------------------------------------------------------------- Analytics: pipeline, spend, matching, cash and insights
+
+function __pr23Days(n) {
+  return n == null ? '—' : `${n} day${n === 1 ? '' : 's'}`;
+}
+
+/**
+ * The live Analytics page, by the context a chart click or the sidebar opens it with. The vendored page drew a sample
+ * funnel (287 records), sample queues and owners, sample category and exception registers and a report delivery log
+ * around one live figure. Every panel here comes from state.analyticsV23 (live-loaders) or the registers.
+ */
+function __pr23AnalyticsHtml() {
+  const a = state.analyticsV23 || {};
+  const context = state.analysisContext || 'spend-trend';
+  const back = __pr23ActionButton('Back to dashboard', 'go-dashboard-v5', '', '', 'arrow');
+  const none = text => `<div class="card-body"><p class="muted">${__pr23Esc(text)}</p></div>`;
+
+  if (/cycle-status/.test(context)) {
+    const stages = a.pipeline || [];
+    const max = Math.max(1, ...stages.map(s => s.count));
+    const funnel = stages.map(s => `<div class="funnel-step" style="width:${Math.max(24, Math.round((s.count / max) * 100))}%"><span>${__pr23Esc(s.label)}</span><strong>${s.count}</strong></div>`).join('');
+    const rows = stages.map(s => `<tr><td><strong>${__pr23Esc(s.label)}</strong></td><td>${s.count}</td><td>${__pr23Days(s.median)}</td><td>${__pr23Days(s.oldest)}</td><td>${__pr23Esc(s.owner)}</td></tr>`);
+    return `<div class="page">${pageHead('Cycle analysis', 'Procurement Pipeline & Cycle Status', 'Where open records wait in the procurement cycle, how long they have waited, and who acts next.', back)}${__pr23AnalysisHero('cycle')}<div class="grid two" style="margin-bottom:14px">${card('Open records by stage', 'Counted from the registers your role can read.', `<div class="card-body funnel">${funnel}</div>`)}${card('How long they have waited', 'Days since each record reached its stage. No service level is set, so none is marked late.', table(['Stage', 'Open', 'Median wait', 'Longest wait', 'Acts next'], rows))}</div></div>`;
+  }
+
+  if (/category-spend|report-domains/.test(context)) {
+    const rows = (a.categories || []).map(c => `<tr><td><strong>${__pr23Esc(c.category)}</strong></td><td>${c.orders}</td><td class="money">${__pr23Cents(c.committed)}</td><td class="money">${__pr23Cents(c.invoiced)}</td><td class="money">${__pr23Cents(c.paid)}</td><td class="money">${__pr23Cents(Math.max(0, c.committed - c.invoiced))}</td></tr>`);
+    return `<div class="page">${pageHead('Category intelligence', 'Category Spend & Supplier Concentration', 'What each category has committed, invoiced and paid, and how concentrated spend is by vendor.', back)}${__pr23AnalysisHero('category')}<div class="grid two" style="margin-bottom:14px">${card('Spend by category', 'Share of order value, by the requisition\'s sourcing category.', `<div class="card-body">${__pr23LiveBars([], 'category-spend')}</div>`)}${card('Supplier concentration', 'Share of order value by vendor.', `<div class="card-body">${__pr23LiveBars([], 'supplier-concentration')}</div>`)}</div>${card('Category register', 'Orders by sourcing category: committed, invoiced, paid and still to be invoiced.', a.ordersVisible ? table(['Category', 'Orders', 'Committed', 'Invoiced', 'Paid', 'Not yet invoiced'], rows.length ? rows : ['<tr><td colspan="6" class="muted">No purchase order has been raised yet.</td></tr>']) : none('Your role does not read purchase orders.'))}</div>`;
+  }
+
+  if (/invoice|match|exception/.test(context)) {
+    const open = (state.invoices || []).filter(i => ['DRAFT', 'PENDING', 'PENDING_APPROVAL'].includes(String(i.rawStatus || '').toUpperCase()) && (i.match !== 'Matched' || (i.reviewReasons || []).length));
+    const rows = open.map(i => {
+      const sourceId = __pr23InvoiceSourceId(i);
+      return `<tr><td><strong>${__pr23Esc(i.id)}</strong><br><span class="muted">${__pr23Esc(i.vendor)}</span></td><td>${__pr23Esc(i.po)}</td><td class="money">${__pr23Cents(i.amount)}</td><td>${status(i.match)}</td><td>${__pr23Esc(__pr23FlagLabels(i).join(' · ') || 'Waiting for receipt')}</td><td>${sourceId ? __pr23SmallButton('Open match', 'select-match-tender-v5', sourceId, 'arrow') : ''}</td></tr>`;
+    });
+    return `<div class="page">${pageHead('Invoice control', 'Three-Way Match & Exceptions', 'How supplier invoices match their orders and receipts, and every open invoice that does not.', back)}${__pr23AnalysisHero('exceptions')}<div class="grid two" style="margin-bottom:14px">${card('Match results by month', 'Invoices matched and not matched, by invoice date.', `<div class="card-body">${__pr23LiveLine('invoice-match')}</div>`)}${card('Exception cause', 'Why invoices were flagged, by the match flag raised.', `<div class="card-body">${__pr23LiveBars([], 'invoice-exception')}</div>`)}</div>${card('Invoice exception register', 'Open invoices not fully matched, with the reason.', a.invoicesVisible ? table(['Invoice', 'Purchase order', 'Amount', 'Match', 'Reason', ''], rows.length ? rows : ['<tr><td colspan="6" class="muted">Every open invoice is matched.</td></tr>']) : none('Your role does not read supplier invoices.'))}</div>`;
+  }
+
+  if (/report/.test(context)) {
+    return `<div class="page">${pageHead('Reporting', 'Report Usage', 'Which reports are run and delivered.', back)}${card('Not recorded', 'Report runs and downloads are not logged', `<div class="card-body list"><div class="list-row" data-page="reports" style="cursor:pointer"><div class="list-main"><strong>Open the Reports Vault</strong><span>Reports are generated from the live registers when they are opened or downloaded.</span></div></div></div>`)}</div>`;
+  }
+
+  // Spend, cash requirements and insights (the sidebar's Analytics, and the spend charts).
+  const c = a.cash || { months: [], overdue: {}, later: {}, unknown: {} };
+  const cashRow = (label, b) => {
+    const inv = Number((b && b.invoices) || 0);
+    const ord = Number((b && b.orders) || 0);
+    return `<tr><td><strong>${__pr23Esc(label)}</strong></td><td class="money">${__pr23Cents(inv)}</td><td class="money">${__pr23Cents(ord)}</td><td class="money"><strong>${__pr23Cents(inv + ord)}</strong></td></tr>`;
+  };
+  const cashTable = table(['When', 'Supplier invoices', 'Orders not yet invoiced', 'Cash required'], [cashRow('Overdue', c.overdue), ...(c.months || []).map(m => cashRow(m.label, m)), cashRow('Later', c.later), cashRow('Timing unknown', c.unknown)]);
+  const cashCard = card('Cash requirements', 'Supplier invoices by due date, and orders not yet invoiced by delivery date plus the vendor\'s payment terms.', `${a.ordersVisible || a.invoicesVisible ? cashTable : none('Your role reads neither purchase orders nor supplier invoices.')}<div class="card-body list"><div class="list-row"><div class="list-main"><strong>${__pr23Cents(c.approvedUnpaid)}</strong><span>Approved invoices not yet paid</span></div></div><div class="list-row"><div class="list-main"><strong>${__pr23Cents(c.awaitingApproval)}</strong><span>Invoices awaiting approval</span></div></div><div class="list-row"><div class="list-main"><strong>${__pr23Cents(c.openCommitments)}</strong><span>Ordered, not yet invoiced</span></div></div><div class="list-row"><div class="list-main"><strong>${__pr23Cents(c.committedThisMonth)}</strong><span>Committed this month</span></div></div><p class="muted" style="margin:8px 0 0">An invoice without a due date is placed by its invoice date and the vendor's payment terms; an order by its expected delivery date and those terms. Where either is missing, the amount is under Timing unknown.${c.partPaid ? ` ${c.partPaid} part-paid invoice${c.partPaid === 1 ? ' is' : 's are'} left out: no balance is recorded for ${c.partPaid === 1 ? 'it' : 'them'}.` : ''}</p></div>`);
+
+  const topRows = (a.topDepartments || []).map(d => `<tr><td><strong>${__pr23Esc(d.department)}</strong></td><td>${d.orders}</td><td class="money">${__pr23Cents(d.amount)}</td></tr>`);
+  const top = card('Top-spending departments', 'Order value this quarter.', a.ordersVisible ? table(['Department', 'Orders', 'Ordered'], topRows.length ? topRows : ['<tr><td colspan="3" class="muted">No order was placed this quarter.</td></tr>']) : none('Your role does not read purchase orders.'));
+  const unusual = card('Unusual spending', 'A department that ordered more than twice its monthly average of the three months before.', `<div class="card-body list">${(a.unusualSpending || []).length ? a.unusualSpending.map(u => `<div class="list-row"><div class="list-main"><strong>${__pr23Esc(u.department)}</strong><span>${__pr23Cents(u.thisMonth)} this month against an average of ${__pr23Cents(u.average)}: ${u.ratio} times</span></div>${status('Review')}</div>`).join('') : `<div class="list-row"><div class="list-main"><strong>Nothing unusual</strong><span>${a.ordersVisible ? 'No department ordered more than twice its recent monthly average this month.' : 'Your role does not read purchase orders.'}</span></div></div>`}</div>`);
+  const vendorRows = (a.reliableVendors || []).map(v => `<tr><td><strong>${__pr23Esc(v.vendor)}</strong></td><td>${v.orders}</td><td>${v.onTimePct == null ? '<span class="muted">No dated receipt</span>' : `${v.onTimePct}% <span class="muted">(${v.onTime} of ${v.receiptsTimed})</span>`}</td><td>${v.invoices ? `${v.flagged} of ${v.invoices}` : '—'}</td></tr>`);
+  const reliable = card('Most reliable vendors', 'Receipts on or before the order\'s expected delivery date, and invoices flagged for review.', table(['Vendor', 'Orders', 'Delivered on time', 'Invoices flagged'], vendorRows.length ? vendorRows : ['<tr><td colspan="4" class="muted">No vendor has an order yet.</td></tr>']));
+  const priceRows = (a.costPerItem || []).map(p => `<tr><td>${__pr23Esc(p.item)}<br><span class="muted">${__pr23Esc(p.vendor)}</span></td><td class="money">${__pr23Cents(p.first)}</td><td class="money">${__pr23Cents(p.last)}</td><td>${p.changePct > 0 ? '+' : ''}${p.changePct}%</td><td>${p.orders}</td></tr>`);
+  const prices = card('Cost per item over time', 'Items ordered from the same vendor more than once whose unit price changed.', table(['Item', 'First price', 'Latest price', 'Change', 'Orders'], priceRows.length ? priceRows : ['<tr><td colspan="5" class="muted">No item has been ordered twice from one vendor at a different price.</td></tr>']));
+  const overRows = (a.overEstimate || []).map(o => `<tr><td><strong>${__pr23Esc(o.item)}</strong></td><td>${o.times}</td><td class="money">${__pr23Cents(o.estimate)}</td><td class="money">${__pr23Cents(o.ordered)}</td><td>+${o.worstPct}%</td></tr>`);
+  const over = card('Items bought above their estimate', 'Order unit price against the unit estimate on the requisition it came from.', table(['Item', 'Times', 'Estimate', 'Ordered at', 'Most over'], overRows.length ? overRows : ['<tr><td colspan="5" class="muted">No item was ordered above its requisition estimate.</td></tr>']));
+  const dupes = card('Possible duplicate invoices', 'Open invoices the duplicate check flagged.', `<div class="card-body list"><div class="list-row" data-page="invoices" style="cursor:pointer"><div class="list-main"><strong>${a.duplicates || 0}</strong><span>${a.duplicates ? 'Open invoice' + (a.duplicates === 1 ? '' : 's') + ' to check against the invoice each may repeat' : 'No open invoice is flagged as a possible duplicate'}</span></div>${status(a.duplicates ? 'Review' : 'Ready')}</div></div>`);
+
+  return `<div class="page">${pageHead('Procurement analytics', 'Spend, Cash & Insights', 'Commitments against plan, the cash supplier obligations will need, and what the records show about departments, vendors and prices.', back)}${__pr23AnalysisHero('spend')}<div class="grid two" style="margin-bottom:14px">${card('Plan, commitment and actual spend', 'Orders placed and invoices paid, by month.', `<div class="card-body">${__pr23LiveLine('spend-trend')}</div>`)}${cashCard}</div><div class="grid three" style="margin-bottom:14px">${top}${unusual}${dupes}</div><div class="grid two" style="margin-bottom:14px">${reliable}${prices}</div>${over}</div>`;
+}
+
 // ---------------------------------------------------------------- Command Centre: the SRD §7 dashboard cards
 
 const __PR23_SPEND_RANGES = [['month', 'This month'], ['quarter', 'This quarter'], ['year', 'This year'], ['12m', 'Last 12 months'], ['all', 'All time']];
