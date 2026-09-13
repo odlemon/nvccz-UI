@@ -922,7 +922,8 @@ export function adaptAc52ProcurementBills(rows: any[]): Ac52ApBill[] {
       const paid = String(r.paymentStatus).toUpperCase() === 'PAID'
       const approved = String(r.status).toUpperCase() === 'APPROVED'
       return {
-        id: r.id,
+        // The register's Bill column shows this: the invoice number, not a database id.
+        id: r.invoiceNumber || r.id,
         vendor: r.vendor?.name || 'Unknown vendor',
         invoice: r.invoiceNumber,
         date: PROC_DAY(r.invoiceDate),

@@ -765,7 +765,8 @@ export async function loadProcurementV23LiveData(): Promise<ProcurementV23LivePa
           type: "Invoice",
           record: inv.invoiceNumber ?? inv.id,
           title: `Approve ${inv.vendor?.name ?? "vendor"} invoice for payment`,
-          entity: DASH,
+          // The department whose requisition the order was raised from.
+          entity: departmentOfRequisition(orders.find((o) => o.id === inv.purchaseOrderId)?.requisitionId),
           amount: num(inv.totalAmount),
           role: "Finance Manager",
           reason: `Against ${inv.purchaseOrder?.poNumber ?? "no purchase order"}; three-way match ${matchLabel(inv.matchingStatus).toLowerCase()}.`,
@@ -813,7 +814,8 @@ export async function loadProcurementV23LiveData(): Promise<ProcurementV23LivePa
       entity: r.department ?? DASH,
       amount: num(r.totalAmount) || null,
       waitingOn: r.department ? `Head of ${r.department}` : "Department head",
-      since: firstDate(r.submittedAt, r.updatedAt, r.createdAt),
+      // Not updatedAt: any later edit would restart the clock.
+      since: firstDate(r.submittedAt, r.createdAt),
       page: "requisitions",
     })
   }
@@ -853,7 +855,7 @@ export async function loadProcurementV23LiveData(): Promise<ProcurementV23LivePa
       type: "Invoice",
       record: inv.invoiceNumber ?? inv.id,
       title: `Approve ${inv.vendor?.name ?? "vendor"} invoice for payment`,
-      entity: DASH,
+      entity: departmentOfRequisition(orders.find((o) => o.id === inv.purchaseOrderId)?.requisitionId),
       amount: num(inv.totalAmount),
       waitingOn: "Finance Manager",
       since: firstDate(inv.createdAt, inv.invoiceDate),

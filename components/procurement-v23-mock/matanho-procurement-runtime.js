@@ -644,7 +644,9 @@ function __pr23ActionButton(label, action, id = '', kind = '', ico = '') {
 
 function __pr23Waiting(iso) {
   if (!iso) return '—';
-  const days = Math.floor((Date.now() - new Date(iso).getTime()) / 86400000);
+  // Calendar days in Harare (UTC+2): something from yesterday afternoon has waited 1 day, not "Today".
+  const day = t => Math.floor((t + 2 * 3600000) / 86400000);
+  const days = day(Date.now()) - day(new Date(iso).getTime());
   return days <= 0 ? 'Today' : days === 1 ? '1 day' : `${days} days`;
 }
 
@@ -681,10 +683,11 @@ function __pr23ApprovalsPageHtml() {
       ? table(['Record', 'Type', 'Approval', 'Department', 'Value', 'Waiting on', 'Open for', ''], rows)
       : '<div class="notice"><div><strong>No approval is open</strong><p>Every submitted requisition, award, receipt, invoice and plan has been decided.</p></div></div>';
   }
+  // Three cards fill the KPI row; a fourth sat alone on a second row.
+  const others = all.filter(g => !g.mine).length;
   const kpis = [
     kpi('Waiting on me', String(mine.length), mine.length ? `${cash(value(mine))} in value` : 'Nothing to decide', 'approve'),
-    kpi('Open approvals', String(all.length), 'In the registers you can read', 'audit'),
-    kpi('Waiting on others', String(all.filter(g => !g.mine).length), 'Visible here, decided elsewhere', 'vendor'),
+    kpi('Open approvals', String(all.length), others ? `${others} waiting on someone else` : 'Every one is yours to decide', 'audit'),
     kpi('Longest open', __pr23Waiting(oldest), oldest ? `Since ${new Date(oldest).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}` : 'No open approvals', 'account'),
   ].join('');
   return `<div class="page">${pageHead('Decision workflow', 'Approval Centre', 'Decisions waiting on you, and every approval still open across procurement.', __pr23ActionButton('Export register', 'export-approvals-v6', '', '', 'download'))}<div class="grid kpis">${kpis}</div><section class="card">${tabs}<div class="settings-pane">${content}</div></section></div>`;
