@@ -144,6 +144,40 @@ function __pr23VendorCompliance() {
   return { gradient: __pr23Gradient(segments), pct: Object.fromEntries(__pr23Percentages(segments).map(s => [s[0], s[1]])) };
 }
 
+/**
+ * SRD §3 and §2: a vendor's history on its profile — purchase orders placed, invoices received and flagged, receipts
+ * against the order's delivery date, and what each item has cost over time. Built from the registers already loaded
+ * (`v.history`, live-loaders); a register the role cannot read says so instead of reading as empty.
+ */
+function __pr23VendorHistoryCard(v) {
+  const h = v && v.history;
+  if (!h) return '';
+  const canOrders = __pr23Can('orders.view');
+  const canInvoices = __pr23Can('invoices.view');
+  const spend = h.orders.reduce((t, o) => t + (Number(o.amount) || 0), 0);
+  const flagged = h.invoices.filter(i => i.flagged).length;
+  const onTime = h.receiptsTimed ? `${Math.round((h.receiptsOnTime / h.receiptsTimed) * 100)}%` : '—';
+  const kpis = `<div class="grid kpis" style="margin-bottom:14px">`
+    + kpi('Purchase orders', canOrders ? h.orders.length : '—', canOrders ? `${money(spend)} ordered, not cancelled` : 'Orders are not visible to your role', 'order')
+    + kpi('Invoices received', canInvoices ? h.invoices.length : '—', canInvoices ? `${flagged} flagged for review` : 'Invoices are not visible to your role', 'invoice')
+    + kpi('On-time delivery', onTime, h.receiptsTimed ? `${h.receiptsOnTime} of ${h.receiptsTimed} receipts by the order's delivery date` : 'No receipt against a delivery date yet', 'receive')
+    + `</div>`;
+  const orderRows = h.orders.slice(0, 8).map(o => `<tr><td><strong>${__pr23Esc(o.id)}</strong></td><td>${__pr23Esc(o.date)}</td><td class="money">${money(o.amount)}</td><td>${status(o.status)}</td></tr>`);
+  const invoiceRows = h.invoices.slice(0, 8).map(i => `<tr><td><strong>${__pr23Esc(i.id)}</strong>${i.supplierRef ? `<br><span class="muted">Supplier ref ${__pr23Esc(i.supplierRef)}</span>` : ''}</td><td>${__pr23Esc(i.date)}</td><td class="money">${money(i.amount)}</td><td>${status(i.match)}</td><td>${i.flagged ? status('Flagged') : status(i.status)}</td></tr>`);
+  const itemRows = h.items.slice(0, 10).map(it => {
+    const change = it.first ? ((it.last - it.first) / it.first) * 100 : 0;
+    return `<tr><td>${__pr23Esc(it.item)}</td><td>${it.orders}</td><td class="money">${money(it.first)}</td><td class="money">${money(it.last)}</td><td>${it.orders > 1 ? `${change > 0 ? '+' : ''}${change.toFixed(1)}%` : '—'}</td></tr>`;
+  });
+  const none = text => `<div class="card-body"><p class="muted">${text}</p></div>`;
+  return kpis
+    + card('Purchase orders', 'Every order placed with this vendor, newest first', canOrders ? (orderRows.length ? table(['Order', 'Date', 'Amount', 'Status'], orderRows) : none('No purchase order has been placed with this vendor.')) : none('Purchase orders are not visible to your role.'))
+    + '<div style="height:14px"></div>'
+    + card('Invoices received', 'With the three-way match and whether the invoice was flagged', canInvoices ? (invoiceRows.length ? table(['Invoice', 'Date', 'Amount', 'Match', 'Status'], invoiceRows) : none('No invoice has been received from this vendor.')) : none('Invoices are not visible to your role.'))
+    + '<div style="height:14px"></div>'
+    + card('Item prices over time', 'Unit price on this vendor\'s orders, first and latest', canOrders ? (itemRows.length ? table(['Item', 'Orders', 'First price', 'Latest price', 'Change'], itemRows) : none('No priced order line yet.')) : none('Purchase orders are not visible to your role.'))
+    + '<div style="height:14px"></div>';
+}
+
 /** Open invoices flagged for review (match flags, possible duplicates, the supplier's document disagreeing). */
 function __pr23FlaggedInvoices() {
   return (state.invoices || []).filter(i => ['DRAFT', 'PENDING', 'PENDING_APPROVAL'].includes(String(i.rawStatus || '').toUpperCase()) && (i.reviewReasons || []).length);

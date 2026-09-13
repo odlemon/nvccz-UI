@@ -354,6 +354,53 @@ export async function loadProcurementV23LiveData(): Promise<ProcurementV23LivePa
   })
 
   // ----------------------------------------------------------------- vendors
+  // SRD §3: each vendor's history — purchase orders, invoices received and those flagged, receipts against the order's
+  // delivery date, and what each item has cost across its orders.
+  const vendorHistory = (vendorId: string) => {
+    const vOrders = orders
+      .filter((o) => o.vendorId === vendorId && String(o.status).toUpperCase() !== "CANCELLED")
+      .sort((a, b) => String(b.orderDate ?? b.createdAt).localeCompare(String(a.orderDate ?? a.createdAt)))
+    const poIds = new Set(vOrders.map((o) => o.id))
+    const vGrns = grns.filter((g) => poIds.has(g.purchaseOrderId ?? g.purchaseOrder?.id))
+    const timed = vGrns.filter((g) => g.receivedDate && g.purchaseOrder?.expectedDeliveryDate)
+    const receiptsOnTime = timed.filter((g) => new Date(g.receivedDate).getTime() <= new Date(g.purchaseOrder.expectedDeliveryDate).getTime()).length
+    const vInvoices = invoices
+      .filter((i) => i.vendorId === vendorId)
+      .sort((a, b) => String(b.invoiceDate ?? b.createdAt).localeCompare(String(a.invoiceDate ?? a.createdAt)))
+    const flagged = (i: any) => (Array.isArray(i.aiDiscrepancies?.flags) && i.aiDiscrepancies.flags.length > 0) || i.ocrData?.comparison?.agrees === false
+    const byItem = new Map<string, { item: string; prices: number[] }>()
+    for (const o of [...vOrders].reverse()) {
+      for (const it of o.items ?? []) {
+        const key = String(it.itemName ?? "").trim().toLowerCase()
+        const price = num(it.unitPrice)
+        if (!key || !price || price <= 0) continue
+        const entry = byItem.get(key) ?? { item: String(it.itemName), prices: [] as number[] }
+        entry.prices.push(price)
+        byItem.set(key, entry)
+      }
+    }
+    return {
+      orders: vOrders.map((o) => ({
+        id: o.poNumber ?? o.id,
+        date: fmtDate(o.orderDate ?? o.createdAt),
+        amount: num(o.totalAmount),
+        status: PO_STATUS[String(o.status).toUpperCase()] ?? titleCase(o.status),
+      })),
+      invoices: vInvoices.map((i) => ({
+        id: i.invoiceNumber ?? i.id,
+        date: fmtDate(i.invoiceDate),
+        amount: num(i.totalAmount),
+        status: invoiceStatus(i),
+        match: matchLabel(i.matchingStatus),
+        flagged: flagged(i),
+        supplierRef: i.ocrData?.supplierInvoiceNumber ?? null,
+      })),
+      receipts: vGrns.length,
+      receiptsTimed: timed.length,
+      receiptsOnTime,
+      items: [...byItem.values()].map((e) => ({ item: e.item, orders: e.prices.length, first: e.prices[0], last: e.prices[e.prices.length - 1] })),
+    }
+  }
   const vendorsView = vendors.map((v) => ({
     id: v.id,
     recordId: v.id,
@@ -378,6 +425,7 @@ export async function loadProcurementV23LiveData(): Promise<ProcurementV23LivePa
     complianceDocs: [],
     whtRate: null,
     isBlacklisted: Boolean(v.isBlacklisted),
+    history: vendorHistory(v.id),
   }))
 
   // ----------------------------------------------------------------- purchase orders

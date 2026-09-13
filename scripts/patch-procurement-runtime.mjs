@@ -1642,6 +1642,35 @@ s = replaceEvery(
 )
 
 // ---------------------------------------------------------------------------
+// 55. The vendor profile carries the vendor's history
+// ---------------------------------------------------------------------------
+// SRD §3: a vendor profile tracks past POs, the invoices received and any flagged discrepancies, a complete performance
+// history. The profile showed company details, the tax rule, compliance documents and messages only. It now leads its
+// registers with orders, invoices (flagged or not), on-time delivery and item prices over time (__pr23VendorHistoryCard).
+// The header printed the database id and a blank country, and an unrated vendor read "— / 5", as the registry did.
+s = replaceUnique(
+  s,
+  "pageHead('Vendor profile',v.name,`${v.id} | ${v.category} | ${v.country}`,",
+  "pageHead('Vendor profile',v.name,__pr23Live()?[v.bp,v.category,v.email].filter(x=>x&&x!=='—').join(' | '):`${v.id} | ${v.category} | ${v.country}`,",
+  "vendor profile -> header without the database id",
+  "__pr23Live()?[v.bp,v.category,v.email].filter(x=>x&&x!=='—').join(' | '):",
+)
+s = replaceUnique(
+  s,
+  "kpi('Vendor rating',`${v.rating} / 5`,'Historical delivery and quality','vendor')",
+  "kpi('Vendor rating',__pr23Live()&&(v.rating==null||v.rating==='—')?'Not rated':`${v.rating} / 5`,'Historical delivery and quality','vendor')",
+  "vendor profile -> an unrated vendor says so",
+  "kpi('Vendor rating',__pr23Live()&&(v.rating==null||v.rating==='—')?'Not rated':",
+)
+s = replaceUnique(
+  s,
+  "${card('Vendor communications and received documents',",
+  "${__pr23Live()?__pr23VendorHistoryCard(v):''}${card('Vendor communications and received documents',",
+  "vendor profile -> orders, invoices, delivery and prices",
+  "${__pr23Live()?__pr23VendorHistoryCard(v):''}",
+)
+
+// ---------------------------------------------------------------------------
 // 43. A filed document previews as itself
 // ---------------------------------------------------------------------------
 // Found by the UI census as Accounts Payable: previewing, downloading, editing or versioning the RFQ pack threw

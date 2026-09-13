@@ -29,10 +29,31 @@ const WAIT = Number(process.env.UAT_EXTRACT_TIMEOUT_MS || 180000)
 const LOAD = Number(process.env.UAT_LOAD_TIMEOUT_MS || 90000)
 
 if (!PDF || !fs.existsSync(PDF)) {
-  console.error("Pass the path to a PDF invoice as the first argument.")
+  console.error("Pass the path to an invoice (a PDF, a scan or a photo) as the first argument.")
   process.exit(1)
 }
 fs.mkdirSync(OUT, { recursive: true })
+
+// What a correct reading of this file shows. The fixtures under fixtures/invoices carry their truth in truth.json; the
+// original fixture's values are the default. Checks hard-coded to the original failed every other invoice.
+const money2 = (n) => `$${Number(n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+const escapeRe = (s) => String(s).replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+const TRUTH = (() => {
+  try {
+    return JSON.parse(fs.readFileSync(path.join(path.dirname(PDF), "truth.json"), "utf8"))[path.basename(PDF)] ?? null
+  } catch {
+    return null
+  }
+})()
+const EXPECT = TRUTH
+  ? {
+      invoiceNumber: TRUTH.invoiceNumber,
+      lineText: TRUTH.lines[0].description,
+      cents: [money2(TRUTH.lines[0].unitPrice), money2(TRUTH.lines[0].lineTotal)],
+      date: TRUTH.invoiceDate,
+      ocr: !/text PDF/i.test(TRUTH.kind),
+    }
+  : { invoiceNumber: "INV-SW-4471", lineText: "A4 Bond Paper", cents: ["$6.50", "$260.00"], date: "2026-09-08", ocr: false }
 
 const results = []
 const record = (name, ok, detail) => {
@@ -101,13 +122,14 @@ try {
   await page.waitForTimeout(1200)
 
   const read = (await page.locator("#aiInvoiceResultV23").textContent())?.trim() || ""
-  record("the invoice number was read", /INV-SW-4471/.test(read), read.match(/INV-[A-Z0-9-]+/)?.[0] || "not found")
+  record("the invoice number was read", new RegExp(escapeRe(EXPECT.invoiceNumber)).test(read), `expected ${EXPECT.invoiceNumber} · ${new RegExp(escapeRe(EXPECT.invoiceNumber)).test(read) ? "found" : "not found"}`)
   record("a confidence figure is shown", /\d+% confidence/.test(read), read.match(/\d+% confidence/)?.[0] || "none")
-  record("invoice lines were read", /A4 Bond Paper/i.test(read), /A4 Bond Paper/i.test(read) ? "line descriptions present" : "no lines")
+  record("invoice lines were read", new RegExp(escapeRe(EXPECT.lineText), "i").test(read), `expected "${EXPECT.lineText}"`)
   record("the reading was filed", /Filed as VIN-/.test(read) || /Not filed/.test(read), read.match(/Filed as (VIN-[0-9-]+)/)?.[1] || "not filed")
   // The runtime's money() rounds to whole dollars, which showed a $6.50 unit price as "$7" on the
   // one screen meant for comparing figures with the PDF.
-  record("amounts are shown to the cent", /\$6\.50/.test(read) && /\$260\.00/.test(read), read.match(/\$[\d,]+\.\d{2}/g)?.slice(0, 4).join(" ") || "no cent amounts found")
+  record("amounts are shown to the cent", EXPECT.cents.every((c) => read.includes(c)), `expected ${EXPECT.cents.join(" and ")} · read ${read.match(/\$[\d,]+\.\d{2}/g)?.slice(0, 4).join(" ") || "no cent amounts"}`)
+  if (EXPECT.ocr) record("a scan or photo is said to be read with OCR", /Read from a scan or photo/i.test(read), /Read from a scan or photo/i.test(read) ? "OCR note shown" : "no OCR note")
 
   await page.screenshot({ path: path.join(OUT, "ai-capture-read.png"), fullPage: true })
 
@@ -119,7 +141,7 @@ try {
     const modal = (await page.locator("#invoiceCaptureV23").textContent())?.trim() || ""
     const date = await page.locator('#invoiceCaptureV23 [name="invoiceDate"]').inputValue()
     record("capture form says it was prefilled", /Prefilled from the read invoice/i.test(modal), modal.slice(0, 90))
-    record("the invoice date came from the PDF", date === "2026-09-08", `date "${date}"`)
+    record("the invoice date came from the document", date === EXPECT.date, `expected ${EXPECT.date} · date "${date}"`)
     await page.screenshot({ path: path.join(OUT, "ai-capture-prefilled-form.png"), fullPage: true })
   } else {
     record("capture form opens from the reading", false, "no Capture this invoice button")
