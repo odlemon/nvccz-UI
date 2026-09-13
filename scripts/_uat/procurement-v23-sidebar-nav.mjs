@@ -124,9 +124,12 @@ try {
 
   await page.goto(`${BASE}${PATHS[START] || PATHS.vendors}`, { waitUntil: "domcontentloaded", timeout: LOAD })
   await page.waitForSelector("#nav .nav-item", { timeout: LOAD })
+  // Until the role's grants load, the sidebar lists every page. Reading it earlier on a slow first load offered
+  // AI Invoice Capture to the Procurement Manager, and the click then waited for an entry the grants had removed.
+  await page.waitForFunction(() => Boolean(window.__pr23Live && window.__pr23Live.access), null, { timeout: LOAD }).catch(() => {})
   await page.waitForTimeout(SETTLE)
 
-  const offered = await page.$$eval("#nav .nav-item[data-page]", (els) => [...new Set(els.map((e) => e.dataset.page))])
+  const offered =await page.$$eval("#nav .nav-item[data-page]", (els) => [...new Set(els.map((e) => e.dataset.page))])
   // The start page goes last, so it too is opened from somewhere else.
   const order = offered.filter((p) => p !== START).concat(offered.includes(START) ? [START] : [])
   const targets = order.filter((p) => PATHS[p] && (!ONLY.length || ONLY.includes(p)))
