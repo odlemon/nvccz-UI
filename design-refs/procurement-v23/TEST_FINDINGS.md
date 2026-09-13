@@ -453,6 +453,174 @@ here so the next person does not "fix" it by moving it and breaking both modules
 
 ---
 
+## Cycles nine to fourteen — SRD completion, the "nothing half built" sweep and the move to /procurement, 13 September 2026 (dev only)
+
+Dev only; nothing was deployed to production. Mail guard on for every write run (outbound mail blocked). Each run ends
+with `dev_cleanup_procurement.mjs --apply` and `demo_integrity.mjs`.
+
+### Deployed to dev
+
+| Cycle | API | UI | Migrations |
+|---|---|---|---|
+| nine | `a086977` invoice viewer and highlights, flag for review, requisition project, line suggestions | `0796fbc` | `procurement_invoices.review_note`, `purchase_requisitions.project_id` (+ index) |
+| ten | `fbe5a01` vendor create/update permissions, authz probe | `892857f` | none |
+| eleven | unchanged | `4b15cec` Budget check column out, immediate pay confirmation, KPI cards, compliance filter | none |
+| twelve | `dc224d5` vendor self-registration decline, review queue guard and audit, `/procurement` notification links | `f4ff8be` module moved to `/procurement` (legacy to `/procurement-legacy`, redirects), self-registration review, Accounting messages | none |
+| thirteen | unchanged | `c0bac67` vendor portal requires SWIFT/BIC; portal buttons | none |
+| fourteen | unchanged | `9e8acbd` vendor self-registrations as decision cards | none |
+
+### Found and fixed
+
+1. **Dates read two ways on one page.** en-GB's short month is "Sept" on newer ICU and "Sep" on older, so a vendor
+   profile showed an order "30 Aug 2026" beside an invoice "08 Sept 2026". Loaders, bridge and the Accounting audit now
+   spell the month out ("13 Sep 2026"). The PO filters check caught it.
+2. **Accounting V52 drew its dialogs, drawers and profile menu unstyled.** Every Accounting style is scoped to
+   `.accounting-v52-root`, but the runtime appends its focus, drawer, modal and deep layers, its toolbar and its profile
+   menu (with the prototype user "Tariro Moyo") to `<body>`, and Payables' Pay dialog did the same. They rendered below
+   the page; the sidebar covered the dialog's Pay button. The profile menu is not installed in a live session; the host
+   moves every other layer into the root as it is added; the Pay dialog is inserted there. Found by the Payables UAT
+   (the Pay click was intercepted by the sidebar toggle).
+3. **Any staff account could create or change a vendor, and the plain update could blacklist one.** `POST` and `PUT
+   /accounting/vendors` only required a staff sign-in, and `PUT` accepted `isBlacklisted` and `registrationStatus`
+   without `procurement.vendors.approve`. Both now need `procurement.vendors.manage`; the blacklist and registration
+   fields also need approval rights; each change is audited with old and new values. The authz probe asserts it.
+4. **Vendor master could not be edited.** Edit profile opened the prototype's form (country, currency, status, WHT rate —
+   none stored) whose Save was refused. It now offers only the stored fields (name, contact, email, phone, address,
+   payment terms, tax clearance) and saves them; the Company profile card shows phone, address and payment terms.
+5. **Controls that opened a form nobody could save.** An audit of every control the census met that `actions.ts` did
+   not name found openers whose only save was refused (CSV line import, internal notes, evaluation criteria, report
+   builder and schedules, quotation import, record upload and generic edit, document and template editors, vendor
+   invites, bid-form preview, record history, "Send compliance reminder") and two terminal steps that announced success
+   without saving ("Validate import: 12 line items passed", the report builder's sample preview). None is offered in a
+   live session; Vendor Registry's reminder automation card, the profile's messaging card and its sample compliance
+   register are not shown; New record's Annual plan opens the live plan form.
+6. **KPI cards with no source.** Cards for features procurement does not record (withholding tax, eSignature,
+   committees, board packs, report schedules...) and fixture figures no loader answers showed "—" with "No live source".
+   They are left out; the census lists them per page.
+7. **A filter bar with nothing to filter.** On a page with no register row its Apply answered "This page has no register
+   to filter". It is not shown there.
+8. **Test clean-up that did not clean up.** The invoice-processing UAT passed its invoice ids to the delete script joined
+   by commas, which the script read as no ids; the auto-approval UAT's approved invoices were refused by the same script.
+   Ids are now separate arguments and `--approved-unpaid` removes a test's own approved, unpaid, unposted invoices
+   (still never a paid or posted one). Found by the demo integrity check (four supplier invoices where the demo has two).
+9. **A check that could not fail.** The AI capture UAT passed "the reading was filed" on either "Filed as VIN-…" or "Not
+   filed". A reading without a purchase order is deliberately not kept (the vendor is unknown), so the check now requires
+   exactly that message.
+10. **A Budget check column with nothing behind it.** Requisitions are not budget-checked (the loaders set the budget to a
+    dash), yet both requisition registers carried a Budget check column and the requisition view a Budget line, reading
+    "—" on every requisition. Not shown in a live session (`971d420`). Found reading the requisition assist screenshot.
+11. **A payment made from Accounting said nothing for over two minutes.** The Accounting host reloaded the six registers a
+    payment touches before showing "paid", so the payment went through (invoice PAID, journal and bank reference recorded)
+    while the person saw no confirmation. The confirmation now comes first (`c3cf673`). Found by the Payables UAT, which
+    now times it.
+12. **KPI cards that could only read zero, and cards that popped in.** Six cards were computed by the design from records
+    procurement does not keep (vendor inbound messages, pending compliance requests, missing documents; contracts awaiting
+    signature; asset purchases; editable report templates) and read 0 as if the feature existed; they are left out
+    (`668ce17`). Separately, before the first live load every fixture figure counted as sourceless, so cards were left out
+    and then appeared; they now show "Loading live figures…" until the loaders answer (`c1d6877`). Found by the census.
+13. **A compliance chip whose filter showed none of the vendors it counted.** Vendor Registry's chips counted a vendor
+    with no tax clearance on file as "Expired / missing" (31%), but the filter read each row's chip, which said "Missing",
+    so choosing the chip showed no vendor while "Under review 0%" showed four. Both now use one classification
+    (`4b15cec`); the vendor history UAT clicks the chip and compares the rows with the API. Found in the census toasts of
+    the Procurement Manager and Officer.
+14. **A vendor that registered itself could not be reviewed.** Vendors register on the vendor portal (its own domain,
+    no invitation) and wait in PENDING_REVIEW, but the Vendor Registry never showed that queue: they appeared as
+    ordinary vendors, with no way to approve or decline, and "Vendor portal" was hidden as not built. The registry now
+    marks them "Awaiting review" and lists them under "Self-registrations awaiting review" with their bank accounts and
+    documents; a role that approves vendors approves or declines with a reason, and the vendor is emailed either way
+    (new decline route, audited; approval audited). The review queue needed only a staff sign-in and returned each
+    vendor's portal upload token: it now needs vendor view rights and omits the token. "Vendor portal" opens the
+    registration page in a new tab. Backend `5d7f106`, UI `a9ca03c`; UAT `procurement-v23-vendor-self-registration.mjs`
+    (PENDING cycle twelve).
+15. **Every Accounting V52 write was silent.** The runtime's `commitSuccess` and `commitError` call handlers defined in
+    another of its closures, so neither showed anything: a supplier payment, a chart-of-accounts change or a journal
+    submission never said whether it worked. Confirmed on dev by calling `commitSuccess` directly (no error, no message).
+    The host now shows each result as a toast (`6086abf`). Found by the Payables UAT.
+16. **Procurement moved to `/procurement`.** At the owner's request the module left `/procurement-v23`: the frozen legacy
+    pages moved unchanged to `/procurement-legacy`, and `/procurement-v23/...` redirects (308) to `/procurement/...`, so
+    links in notifications and emails already sent still open. Notification links from the API use the new paths.
+    UI `f4ff8be`, API `dc224d5` (PENDING cycle twelve).
+
+17. **The vendor portal called a required field optional.** The self-registration form marked SWIFT code optional and
+    sent nothing when it was blank, but the API refuses a vendor bank account without one ("requires Branch Code,
+    SWIFT/BIC code, and Currency to ensure payment success"): a vendor who trusted the form was refused at the last step.
+    The form now requires it and says why (`361dfa5`). Found by the vendor self-registration UAT on dev (6/12 in cycle
+    twelve: nothing after the refused submission could exist), confirmed by posting the form's payload to the API.
+18. **A probe row that could not run.** The authz probe's new "list vendor self-registrations" row passed a `null` body on
+    a GET, so fetch threw before any request and every cell read `-1`. Fixed (`3bc06ac`); re-run on dev: every asserted
+    cell matched the policy.
+
+19. **A decision hidden behind a menu.** The review queue for vendor self-registrations was a table, and the module folds a
+    table row's buttons into its ⋯ menu, so Approve and Decline were a click away and the self-registration UAT waited for
+    a button that was not on the page (the officer's "offers no Approve" check passed only because nothing was shown).
+    Each registration is now a decision card, as in the Approval Centre, with Open profile and — for a role that approves
+    vendors — Approve and Decline in view (`9e8acbd`). A row click could not have approved a vendor: the row's click
+    action is chosen from non-mutating labels, and "Open profile" always ranked first.
+
+### Cycle thirteen results (UI `c0bac67`: SWIFT/BIC required on the vendor portal)
+
+| Suite | Result |
+|---|---|
+| vendor self-registration | 12/13 — the portal refuses a registration without SWIFT/BIC and accepts it with one; the vendor waits in PENDING_REVIEW with its bank account counted and no token exposed, is not invitable; the requester cannot list the queue; the officer sees it and cannot decide (API 403); the manager's Approve was folded into a row menu (item 19) |
+| vendor master | 18/18 |
+| cleanup | nothing left behind |
+| demo integrity | 18/18 |
+
+### Cycle twelve results (API `dc224d5`, UI `f4ff8be`)
+
+| Suite | Result |
+|---|---|
+| vendor self-registration | 6/12 — SWIFT required by the API but optional in the form (item 17); re-run in cycle thirteen: PENDING |
+| vendor master | 17/18 — the UAT still expected the profile's "Open vendor portal" gone; it now opens the portal (UAT updated) |
+| vendor history (incl. compliance filter) | 11/11 |
+| requisition assist (project, suggestions, no Budget check column) | 14/14 |
+| procure-to-pay flow | completed |
+| Accounting Payables (pay from Accounting, confirmation straight away) | 23/23 |
+| authz probe | every asserted cell matched the policy (after the probe fix, item 18) |
+| sidebar navigation at `/procurement` | 17/17 pages, openers 10/10 |
+| census, Procurement Manager, at `/procurement` | 0 dead ends, 0 "not connected", 0 page errors, 0 failed calls. Four controls with no visible effect: the three benign ones seen before, and "Vendor portal", whose new tab opens with `noopener` and so is not seen by the census (the self-registration UAT checks that tab) |
+| demo integrity after cleanup | 18/18 (the two records restored at the owner's request read as the demo expects) |
+
+### A manual decision on the demo dataset (not a defect)
+
+After cycle eleven, `demo_integrity.mjs` reported 16/18: the FY 2027 plan read APPROVED (expected SUBMITTED) and the
+projector requisition REQ_20260911_0008 read REJECTED (expected PENDING_APPROVAL). The audit trail shows both decisions
+made by the **Admin NTS** account at 19:21 CAT, nine seconds apart, while no suite was running (cycle eleven was still
+deploying its UI) and while dev was open for manual use; no suite signs in as Admin NTS. No code changed either record.
+`scripts/procurement-ops/dev-data/dev_restore_demo_decisions.mjs` (`09ce17f`) puts both back if the owner wants the demo
+storyline restored — its dry run: the requisition and its one approval request reopened (two approval rows back to
+PENDING), the plan back to SUBMITTED, one decision notification removed; audit rows kept. The owner chose to restore:
+applied on dev at 20:10 and read back through the API (requisition PENDING_APPROVAL, plan SUBMITTED).
+
+### Census, cycle ten (UI `892857f`)
+
+Procurement Manager, every control operated on 19 pages: **0 dead ends, 0 controls answering "not connected", 0 page
+errors, 0 controls that could not be operated, 0 failed load calls.** The six success messages seen were live filters
+reporting what they matched. Three controls had no visible effect and are benign (Command Centre while on it, Preview
+tender pack on an empty form, Clear with no filter set). 23 KPI cards were left out without a live figure; each is either
+a feature procurement does not have (eSignature, delegations, board votes, SLAs, contract variations and obligations,
+regulatory exports, bank-change tracking) or an older layer's card whose live equivalent is on the same page ("Waiting
+on me", "Contract value", on-time delivery, the analytics tables). Other roles: PENDING.
+
+### Results
+
+| Suite | Cycle nine | Cycle ten |
+|---|---|---|
+| dashboard | 9/9 | — |
+| analytics (cash, insights) | 14/14 | — |
+| PO filters | 11/11 | 11/11 |
+| invoice auto-approval | 20/20 | — |
+| AI capture, scanned PDF | 18/18 | 18/18 (stricter filing check) |
+| AI capture, photo | 18/18 | 18/18 |
+| invoice processing (viewer, flag) | 11/11 | — |
+| requisition assist | 12/13 (project display check) | 12/13 (the check clicked a row that opens nothing; fixed in the UAT) |
+| vendor history | 10/10 | 10/10 |
+| vendor master | — | 18/18 |
+| Accounting Payables | 14/16 (Pay dialog) | 21/22 (paid, journal and reference recorded; the confirmation waited for a reload) |
+| authz probe | — | every asserted cell matched the policy |
+| census, four roles (19 pages each) | — | 0 dead ends, 0 "not connected", 0 page errors, 0 failed calls |
+| demo integrity after cleanup | 18/18 | 18/18 |
+
 ## Cycle eight — full browser test, 13 September 2026 (dev)
 
 The owner asked for the whole module to be tested from the browser, phase by phase, fixing and re-testing without
