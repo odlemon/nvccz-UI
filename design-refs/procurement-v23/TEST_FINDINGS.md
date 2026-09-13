@@ -756,6 +756,17 @@ Tender Management"; Edit default letterhead opens in 81 ms; no page errors.
 **Verified on dev `121413d` (after round 6):** dataset rebuilt (58 mails held), actions 17/17, workflows 15/15,
 AI capture 13/13, sidebar navigation 8/8 roles on the first pass, storyline 20/20.
 
+**Verified on dev `8a81936` and `5072202` (rounds 7–8, the Approval Centre fix, accounting Payables and the polish):**
+- In a browser, 15/15 on each build: the Approval Centre renders for the Procurement Manager and Finance Manager
+  with decision cards that carry Approve, and all open approvals with who they wait on; accounting Payables shows
+  procurement's orders, open RFQs and supplier bills and no sample record; no page errors.
+- Regression on `8a81936`: actions 17/17, workflows 14/15 (W8's race, then 1/1 once fixed in `f7cd03c`), AI
+  capture 13/13, sidebar navigation 8/8 roles on the first pass. The storyline's step 14 timed out waiting for the
+  page while `5072202` was being swapped in; it is re-run on its own below.
+- After each run the cleanup removed what the suites had created (on that run: 4 vendors, 13 requisitions, 5 RFQs,
+  10 quotations, 8 purchase orders, 4 GRNs, 3 invoices, 1 reading, 3 plans, 2 contracts, 2 documents, 1 cashbook
+  entry and 2 journals, with 125 audit rows), and the demo integrity check read 17/17.
+
 The Procurement Manager's first sidebar-navigation run timed out on AI Invoice Capture and passed 17/17 on the
 rerun. The suite read the sidebar before the role's grants had loaded: until they land (a few seconds on a cold
 first load) every page is listed, and AI Invoice Capture then disappears for a role without the grant. The suite
@@ -834,6 +845,11 @@ was meant (the backslash was lost on the way into the files), so they could neve
 `5334700`:** real word boundaries, checked against UAT and demo names; W7 terminates only a contract the suites
 created.
 
+On the regression run against `8a81936` workflows W8 failed once: it read its plan straight after clicking Submit,
+while the "Line added" toast was still on screen, and saw REJECTED; the plan was SUBMITTED a second later (the API
+shows it updated at that moment, and no other plan changed). A race in the suite, not the module. **Fix — nvccz-new
+`f7cd03c`:** the step polls the plan's status for up to 20 seconds.
+
 **Suites kept off the demo** (nvccz-new `aa76463`). Several steps took the first record in a state — the first draft
 invoice, the first receipt waiting on inspection, the first vault document, any submitted plan, the second order in AI
 capture's list — which on dev are now demo records. Each takes a UAT record, arranging one where it did before. After a
@@ -844,7 +860,7 @@ regression run, the cleanup removes what the suites created and leaves the demo.
 | Accounting page | What it shows of procurement |
 |---|---|
 | Journal Entries, General Ledger | The laptop invoice's posted expense journal (`EXP-…-INV_20260822_0001`) and its bank payment (`CB-2BGSVFW9`), USD 11,577.72 — correct. |
-| Payables & Payments | **Was wrong.** Open commitments USD 118,600 and a sourcing pipeline of USD 1,988,000 across "3 active RFQs", with the Purchase orders and Quotations & sourcing tabs listing TechNova Solutions, AfriCloud Infrastructure and other sample records: the page read the runtime's own arrays, which nothing replaced. Procurement's supplier invoices did not appear at all (the page read only accounting's purchase-invoice bills). **Fixed in the next commit:** the loader reads procurement's orders, RFQs, quotations and invoices; the Purchase orders tab, open commitments and the pipeline come from them; procurement invoices sit beside accounting's bills (awaiting approval reads Review, approved reads Approved, paid reads Paid); the Sourcing intelligence figures are counted from the RFQs beside them. A role without procurement access sees none (a 403 is not an error). |
+| Payables & Payments | **Was wrong.** Open commitments USD 118,600 and a sourcing pipeline of USD 1,988,000 across "3 active RFQs", with the Purchase orders and Quotations & sourcing tabs listing TechNova Solutions, AfriCloud Infrastructure and other sample records: the page read the runtime's own arrays, which nothing replaced. Procurement's supplier invoices did not appear at all (the page read only accounting's purchase-invoice bills). **Fixed — nvccz-new `a44bed9`, verified in a browser on dev `8a81936` (15/15 checks: no sample commitments, pipeline or vendors; the Purchase orders, Quotations & sourcing and Supplier bills tabs show procurement's records; no page errors), polished in `63b7ca7` (a bill is referenced by its invoice number; the date filter covers the last 90 days):** the loader reads procurement's orders, RFQs, quotations and invoices; the Purchase orders tab, open commitments and the pipeline come from them; procurement invoices sit beside accounting's bills (awaiting approval reads Review, approved reads Approved, paid reads Paid); the Sourcing intelligence figures are counted from the RFQs beside them. A role without procurement access sees none (a 403 is not an error). |
 | Cash & Liquidity | Cash at bank is computed from posted journal lines (dev's bank shows a net credit). The register lists cashbook batches only, so a procurement payment — a single cashbook entry — is not listed there. Not changed. |
 
 **Decision owed (accounting policy).** A procurement invoice reaches the ledger only when it is paid:
