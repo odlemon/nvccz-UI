@@ -219,7 +219,7 @@ bank accounts and documents. The Officer sees **Open profile** only (no Approve 
 Click **Save draft**. **Expect:** saved as **Draft**.
 
 On the row open **⋯** → **Edit request** → click **Submit for approval**.
-**Expect:** `REQ_… submitted to the Operations department head for approval.` Status **Pending Head of Operations**.
+**Expect:** `REQ_… submitted for approval: Head of Operations (Nyasha K, Farai Mutasa).` Status **Pending Head of Operations**.
 
 **Negative check:** **New requisition** with everything empty → **Submit for approval** is refused and nothing is saved.
 
@@ -248,7 +248,7 @@ Click **Confirm decision**.
 | Requirement title | `UAT Stationery restock - Operations office (pens confirmed)` |
 
 Click **Submit for approval**.
-**Expect:** `REQ_… corrected and resubmitted to the Operations department head.`
+**Expect:** `REQ_… corrected and resubmitted for approval: Head of Operations (Nyasha K, Farai Mutasa).`
 
 ## 9. The department head approves
 
