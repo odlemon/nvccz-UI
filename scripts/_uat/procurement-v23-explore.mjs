@@ -203,7 +203,10 @@ function OVERLAY() {
 
 async function locate(page, c) {
   if (c.kind === "action") {
-    const all = page.locator(`[data-action=${q(c.action)}]${c.id ? `[data-id=${q(c.id)}]` : ""} >> visible=true`)
+    // A control in a form is looked for in that form. The page behind it can carry the same action (a card's
+    // Delegate under the approval modal), and that one is covered, so clicking it timed out.
+    const scope = c.where === "modal" ? "#modalLayer.open " : c.where === "drawer" ? "#drawerLayer.open " : ""
+    const all = page.locator(`${scope}[data-action=${q(c.action)}]${c.id ? `[data-id=${q(c.id)}]` : ""} >> visible=true`)
     // Several controls can share an action (a backdrop, an ×, a Cancel); aim at the labelled one.
     if (c.label) {
       const labelled = all.filter({ hasText: c.label })
@@ -228,6 +231,9 @@ async function operate(page, c) {
     await el.fill("zz-no-such-record", { timeout: 5000 })
     return el.press("Enter")
   }
+  // Scrolled into view first: a row actions menu closes on scroll, and the click's own scroll closed it as it opened.
+  await el.scrollIntoViewIfNeeded({ timeout: 5000 }).catch(() => {})
+  await page.waitForTimeout(120)
   return el.click({ timeout: 5000 })
 }
 
@@ -304,6 +310,12 @@ for (const [email, role] of USERS) {
         await page.waitForTimeout(450)
       }
       const before = await page.evaluate(SNAP)
+      // A tab or view that is already the selected one has nothing to change.
+      const wasSelected =
+        target.kind === "action" &&
+        (await (await locate(page, target))
+          .evaluate((el) => el.classList.contains("active") || el.getAttribute("aria-selected") === "true" || el.getAttribute("aria-pressed") === "true")
+          .catch(() => false))
       reset()
       await operate(page, target)
       if (target.kind === "nav") await page.waitForFunction((p) => location.pathname !== p, before.url.split("?")[0], { timeout: 4000 }).catch(() => {})
@@ -319,7 +331,13 @@ for (const [email, role] of USERS) {
       if (after.drawer && after.drawer !== before.drawer) out.effect.push(`opens drawer "${after.drawer}"`)
       if (!after.modal && before.modal) out.effect.push("closes the modal")
       if (!after.drawer && before.drawer) out.effect.push("closes the drawer")
-      for (const t of after.toasts.filter((t) => !before.toasts.includes(t))) out.effect.push(`toast "${t}"`)
+      // Counted, not matched by text: a second identical refusal while the first is still showing is a refusal too.
+      const shown = new Map()
+      for (const t of before.toasts) shown.set(t, (shown.get(t) || 0) + 1)
+      for (const t of after.toasts) {
+        if (shown.get(t)) shown.set(t, shown.get(t) - 1)
+        else out.effect.push(`toast "${t}"`)
+      }
       for (const d of w.downloads) out.effect.push(`download ${d}`)
       for (const p of w.popups) out.effect.push(`new tab ${p}`)
       for (const d of w.dialogs) out.effect.push(`dialog ${d}`)
@@ -339,6 +357,7 @@ for (const [email, role] of USERS) {
         }
       }
       if (!out.effect.length && after.hash !== before.hash) out.effect.push("changes the page in place")
+      if (!out.effect.length && wasSelected) out.effect.push("already selected")
       if (!out.effect.length) out.effect.push("NO VISIBLE EFFECT")
       for (const e of w.errors) out.effect.push(`ERROR ${e}`)
     } catch (e) {
