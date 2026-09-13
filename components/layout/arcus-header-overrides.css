@@ -1501,3 +1501,33 @@ html.dark [data-arcus-shared-topbar] button,
     padding-left: 92px !important;
   }
 }
+
+/* ── Loading state on submit controls (project convention: loading state on write actions) ──
+   procurement-v23-app.tsx's single click dispatcher (handleProcurementV23Action) adds this class
+   to whatever [data-action] control was clicked for as long as its API call is in flight, so a
+   slow save/approve/send reads as "working" instead of looking like the click did nothing. Dims
+   the whole control rather than hiding its text/icon -- button markup varies (icon + bare text
+   node, no wrapping span), and opacity works for any of it without special-casing. */
+.procurement-v23-root [data-action].pr23-busy {
+  position: relative !important;
+  pointer-events: none !important;
+  opacity: 0.55 !important;
+}
+.procurement-v23-root [data-action].pr23-busy::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 14px;
+  height: 14px;
+  margin: -7px 0 0 -7px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: pr23-busy-spin 0.6s linear infinite;
+}
+@keyframes pr23-busy-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

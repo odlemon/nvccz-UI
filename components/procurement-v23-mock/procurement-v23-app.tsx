@@ -184,6 +184,10 @@ export function ProcurementV23App() {
       event.stopImmediatePropagation()
       if (busyRef.current) return
       busyRef.current = true
+      // A loading ring on the clicked control itself while its API call is in flight (a save,
+      // approve, send — anything routed through this dispatcher), so a slow response reads as
+      // "working" rather than "did that do anything?" (see project conventions: loading state).
+      control.classList.add("pr23-busy")
 
       void handleProcurementV23Action({ action, dataset: { ...control.dataset } }, { live: liveRef.current })
         .then((result) => {
@@ -195,6 +199,7 @@ export function ProcurementV23App() {
         .catch((err) => toast.error(err?.message ?? "Procurement action failed"))
         .finally(() => {
           busyRef.current = false
+          control.classList.remove("pr23-busy")
         })
     }
     window.addEventListener("click", onClick, true)
