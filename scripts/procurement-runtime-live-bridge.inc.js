@@ -144,9 +144,43 @@ function __pr23VendorCompliance() {
   return { gradient: __pr23Gradient(segments), pct: Object.fromEntries(__pr23Percentages(segments).map(s => [s[0], s[1]])) };
 }
 
+/** Open invoices flagged for review (match flags, possible duplicates, the supplier's document disagreeing). */
+function __pr23FlaggedInvoices() {
+  return (state.invoices || []).filter(i => ['DRAFT', 'PENDING', 'PENDING_APPROVAL'].includes(String(i.rawStatus || '').toUpperCase()) && (i.reviewReasons || []).length);
+}
+
+/** The match source an invoice belongs to: its order's RFQ, or the order itself when raised directly. */
+function __pr23InvoiceSourceId(inv) {
+  const order = (state.orders || []).find(o => o.id === inv.po);
+  return order ? (order.rfq || order.id) : '';
+}
+
+/**
+ * SRD §7 "Invoices to review": each open invoice the three-way match, the duplicate check or the reading of the
+ * supplier's document flagged, with why, and a way into its match.
+ */
+function __pr23InvoicesToReviewCard() {
+  const flagged = __pr23FlaggedInvoices();
+  const rows = flagged.map(i => {
+    const reasons = i.reviewReasons.slice(0, 3).map(r => `<li>${__pr23Esc(r)}</li>`).join('')
+      + (i.reviewReasons.length > 3 ? `<li class="muted">and ${i.reviewReasons.length - 3} more</li>` : '');
+    const sourceId = __pr23InvoiceSourceId(i);
+    const openMatch = sourceId ? __pr23SmallButton('Open match', 'select-match-tender-v5', sourceId, 'arrow') : '';
+    return `<tr><td><strong>${__pr23Esc(i.id)}</strong><br><span class="muted">${__pr23Esc(i.vendor)}</span></td><td>${__pr23Esc(i.po)}</td><td class="money">${money(i.amount)}</td><td><ul style="margin:0;padding-left:16px">${reasons}</ul></td><td>${openMatch}</td></tr>`;
+  });
+  const body = rows.length
+    ? table(['Invoice', 'Purchase order', 'Amount', 'Why it needs review', ''], rows)
+    : '<div class="card-body"><p class="muted">No open invoice is flagged: each matches its order, its receipts and the supplier\'s document.</p></div>';
+  return `${card('Invoices to review', 'Flagged by the three-way match, the duplicate check or the reading of the supplier\'s document', body)}<div style="height:14px"></div>`;
+}
+
 /** Command-centre attention list, derived from the records rather than the fixture's four rows. */
 function __pr23ControlActivity() {
   const rows = [];
+  // SRD §7: invoices to review, each with the first reason it was flagged.
+  for (const i of __pr23FlaggedInvoices().slice(0, 3)) {
+    rows.push(['invoices', `${i.id} needs review`, `${i.vendor}: ${i.reviewReasons[0]}${i.reviewReasons.length > 1 ? ` (+${i.reviewReasons.length - 1} more)` : ''}`, 'Review']);
+  }
   const pendingInvoices = (state.invoices || []).filter(i => i.status === 'Pending approval').length;
   if (pendingInvoices) rows.push(['invoices', 'Invoices awaiting approval', `${pendingInvoices} captured and not yet approved`, 'Pending']);
   const inspection = (state.grns || []).filter(g => g.rawStatus === 'RECEIVED').length;

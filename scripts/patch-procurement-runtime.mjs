@@ -47,7 +47,8 @@ function must(cond, msg) {
 
 /** Replace `find` with `repl` once. Treats an already-patched file as success. */
 function replaceOnce(src, find, repl, label, alreadyMarker) {
-  if (alreadyMarker && src.includes(alreadyMarker)) {
+  // A later step may rewrite an earlier step's output; any of its markers means the step is in place.
+  if (alreadyMarker && [].concat(alreadyMarker).some((m) => src.includes(m))) {
     console.log(`  skip (already)  ${label}`)
     skipped += 1
     return src
@@ -182,7 +183,8 @@ s = replaceOnce(
 
 /** Replace a string that must occur exactly once — a second occurrence means the wrong target. */
 function replaceUnique(src, find, repl, label, alreadyMarker) {
-  if (alreadyMarker && src.includes(alreadyMarker)) {
+  // A later step may rewrite an earlier step's output; any of its markers means the step is in place.
+  if (alreadyMarker && [].concat(alreadyMarker).some((m) => src.includes(m))) {
     console.log(`  skip (already)  ${label}`)
     skipped += 1
     return src
@@ -261,7 +263,8 @@ s = replaceUnique(
   "<span>OCR confidence</span><strong>93.7%</strong>",
   "<span>OCR confidence</span><strong>${__pr23Live()?'—':'93.7%'}</strong>",
   "invoice match workspace: OCR confidence -> not recorded",
-  "<strong>${__pr23Live()?'—':'93.7%'}</strong>",
+  // Step 53 turns this into the document-reading line.
+  ["<strong>${__pr23Live()?'—':'93.7%'}</strong>", "__pr23Esc(__pr23ReadingLabel(inv))"],
 )
 
 // ---------------------------------------------------------------------------
@@ -774,7 +777,8 @@ s = replaceUnique(
 
 /** Replace every occurrence of `find`; the runtime is known to hold exactly `expected` of them. */
 function replaceEvery(src, find, repl, label, alreadyMarker, expected) {
-  if (alreadyMarker && src.includes(alreadyMarker)) {
+  // A later step may rewrite an earlier step's output; any of its markers means the step is in place.
+  if (alreadyMarker && [].concat(alreadyMarker).some((m) => src.includes(m))) {
     console.log(`  skip (already)  ${label}`)
     skipped += 1
     return src
@@ -1540,7 +1544,8 @@ s = replaceUnique(
   "const candidates=state.tenders.filter(t=>t.bids>0 || /Award|Evaluation|opening/i.test(t.stage));",
   "const candidates=(__pr23Live()&&!state.tenders.length)?__pr23MatchSources():state.tenders.filter(t=>t.bids>0 || /Award|Evaluation|opening/i.test(t.stage));",
   "invoice match -> order sources for roles without RFQs",
-  "(__pr23Live()&&!state.tenders.length)?__pr23MatchSources():",
+  // Step 54 widens this to every role.
+  ["(__pr23Live()&&!state.tenders.length)?__pr23MatchSources():", "...__pr23MatchSources().filter(x=>!state.tenders.some(t=>t.id===x.id))]"],
 )
 s = replaceEvery(
   s,
@@ -1604,6 +1609,37 @@ for (const [label, key] of [
     `__PR23_SUPPORT_LABELS.${key}:'${label}'`,
   )
 }
+
+// ---------------------------------------------------------------------------
+// 54. Invoices to review, and every invoice reachable from its match source
+// ---------------------------------------------------------------------------
+// SRD §7 asks for a list of the invoices flagged for review with the reason for each. The API now flags possible
+// duplicates and a supplier document that disagrees with the capture, and alerts reviewers; the Invoices page lists
+// those invoices above the match sources (__pr23InvoicesToReviewCard). Step 50 offered order-based sources only to a
+// role that sees no RFQs, so an invoice against a purchase order raised directly (no RFQ) had no source card for anyone
+// else: those sources are now listed for every role, and the workspace resolves them.
+s = replaceUnique(
+  s,
+  "${card('Select a tender or procurement source',",
+  "${__pr23Live()?__pr23InvoicesToReviewCard():''}${card('Select a tender or procurement source',",
+  "invoices page -> invoices to review",
+  "${__pr23Live()?__pr23InvoicesToReviewCard():''}",
+)
+s = replaceUnique(
+  s,
+  "const candidates=(__pr23Live()&&!state.tenders.length)?__pr23MatchSources():state.tenders.filter(t=>t.bids>0 || /Award|Evaluation|opening/i.test(t.stage));",
+  "const candidates=__pr23Live()?[...state.tenders.filter(t=>t.bids>0 || /Award|Evaluation|opening/i.test(t.stage)),...__pr23MatchSources().filter(x=>!state.tenders.some(t=>t.id===x.id))]:state.tenders.filter(t=>t.bids>0 || /Award|Evaluation|opening/i.test(t.stage));",
+  "invoice match -> order sources for every role",
+  "...__pr23MatchSources().filter(x=>!state.tenders.some(t=>t.id===x.id))]",
+)
+s = replaceEvery(
+  s,
+  "const t=state.tenders.find(x=>x.id===id)||(__pr23Live()&&!state.tenders.length?__pr23MatchSources().find(x=>x.id===id):null)||state.tenders[0];",
+  "const t=state.tenders.find(x=>x.id===id)||(__pr23Live()?__pr23MatchSources().find(x=>x.id===id):null)||state.tenders[0];",
+  "tender workspaces -> resolve an order source for every role",
+  "(__pr23Live()?__pr23MatchSources().find(x=>x.id===id):null)||state.tenders[0];",
+  3,
+)
 
 // ---------------------------------------------------------------------------
 // 43. A filed document previews as itself

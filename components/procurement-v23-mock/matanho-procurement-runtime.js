@@ -317,9 +317,43 @@ function __pr23VendorCompliance() {
   return { gradient: __pr23Gradient(segments), pct: Object.fromEntries(__pr23Percentages(segments).map(s => [s[0], s[1]])) };
 }
 
+/** Open invoices flagged for review (match flags, possible duplicates, the supplier's document disagreeing). */
+function __pr23FlaggedInvoices() {
+  return (state.invoices || []).filter(i => ['DRAFT', 'PENDING', 'PENDING_APPROVAL'].includes(String(i.rawStatus || '').toUpperCase()) && (i.reviewReasons || []).length);
+}
+
+/** The match source an invoice belongs to: its order's RFQ, or the order itself when raised directly. */
+function __pr23InvoiceSourceId(inv) {
+  const order = (state.orders || []).find(o => o.id === inv.po);
+  return order ? (order.rfq || order.id) : '';
+}
+
+/**
+ * SRD §7 "Invoices to review": each open invoice the three-way match, the duplicate check or the reading of the
+ * supplier's document flagged, with why, and a way into its match.
+ */
+function __pr23InvoicesToReviewCard() {
+  const flagged = __pr23FlaggedInvoices();
+  const rows = flagged.map(i => {
+    const reasons = i.reviewReasons.slice(0, 3).map(r => `<li>${__pr23Esc(r)}</li>`).join('')
+      + (i.reviewReasons.length > 3 ? `<li class="muted">and ${i.reviewReasons.length - 3} more</li>` : '');
+    const sourceId = __pr23InvoiceSourceId(i);
+    const openMatch = sourceId ? __pr23SmallButton('Open match', 'select-match-tender-v5', sourceId, 'arrow') : '';
+    return `<tr><td><strong>${__pr23Esc(i.id)}</strong><br><span class="muted">${__pr23Esc(i.vendor)}</span></td><td>${__pr23Esc(i.po)}</td><td class="money">${money(i.amount)}</td><td><ul style="margin:0;padding-left:16px">${reasons}</ul></td><td>${openMatch}</td></tr>`;
+  });
+  const body = rows.length
+    ? table(['Invoice', 'Purchase order', 'Amount', 'Why it needs review', ''], rows)
+    : '<div class="card-body"><p class="muted">No open invoice is flagged: each matches its order, its receipts and the supplier\'s document.</p></div>';
+  return `${card('Invoices to review', 'Flagged by the three-way match, the duplicate check or the reading of the supplier\'s document', body)}<div style="height:14px"></div>`;
+}
+
 /** Command-centre attention list, derived from the records rather than the fixture's four rows. */
 function __pr23ControlActivity() {
   const rows = [];
+  // SRD §7: invoices to review, each with the first reason it was flagged.
+  for (const i of __pr23FlaggedInvoices().slice(0, 3)) {
+    rows.push(['invoices', `${i.id} needs review`, `${i.vendor}: ${i.reviewReasons[0]}${i.reviewReasons.length > 1 ? ` (+${i.reviewReasons.length - 1} more)` : ''}`, 'Review']);
+  }
   const pendingInvoices = (state.invoices || []).filter(i => i.status === 'Pending approval').length;
   if (pendingInvoices) rows.push(['invoices', 'Invoices awaiting approval', `${pendingInvoices} captured and not yet approved`, 'Pending']);
   const inspection = (state.grns || []).filter(g => g.rawStatus === 'RECEIVED').length;
@@ -2412,7 +2446,7 @@ window.MatanhoProcurement=Object.freeze({version:'8.0.0',navigate,render,getStat
       ${card('Select a tender or RFQ','Quotation comparison is always tied to the selected sourcing event and its approved evaluation criteria.',`<div class="source-card-grid card-body">${candidates.map((t,i)=>`<button class="source-card" data-action="select-quotation-tender-v5" data-id="${t.id}"><div class="source-top"><span class="status ${/Evaluation|opening/i.test(t.stage)?'amber':'blue'}">${esc(t.stage)}</span><span class="muted">${esc(t.id)}</span></div><h3>${esc(t.title)}</h3><p>${esc(t.entity)} · ${esc(t.method)}</p><div class="source-meta"><div><span>Responses</span><strong>${t.bids}</strong></div><div><span>Estimate</span><strong>${money(t.value)}</strong></div><div><span>Closing</span><strong>${esc(t.close)}</strong></div></div></button>`).join('')}</div>`)}</div>`;
   }
   function quotationWorkspaceV5(id){
-    const t=state.tenders.find(x=>x.id===id)||(__pr23Live()&&!state.tenders.length?__pr23MatchSources().find(x=>x.id===id):null)||state.tenders[0];
+    const t=state.tenders.find(x=>x.id===id)||(__pr23Live()?__pr23MatchSources().find(x=>x.id===id):null)||state.tenders[0];
     const vendors=[
       {name:'TechNova Solutions',price:t.value*.91,score:92,delivery:'8 weeks',terms:'30 days',tech:94,commercial:96,warranty:'36 months'},
       {name:'CloudWorks Africa',price:t.value*.88,score:86,delivery:'10 weeks',terms:'45 days',tech:88,commercial:93,warranty:'24 months'},
@@ -2435,13 +2469,13 @@ window.MatanhoProcurement=Object.freeze({version:'8.0.0',navigate,render,getStat
   function quotationsPageV5(){return state.quotationTender?quotationWorkspaceV5(state.quotationTender):quotationSelectionPageV5()}
 
   function matchSelectionPageV5(){
-    const candidates=(__pr23Live()&&!state.tenders.length)?__pr23MatchSources():state.tenders.filter(t=>t.bids>0 || /Award|Evaluation|opening/i.test(t.stage));
+    const candidates=__pr23Live()?[...state.tenders.filter(t=>t.bids>0 || /Award|Evaluation|opening/i.test(t.stage)),...__pr23MatchSources().filter(x=>!state.tenders.some(t=>t.id===x.id))]:state.tenders.filter(t=>t.bids>0 || /Award|Evaluation|opening/i.test(t.stage));
     return `<div class="page">${pageHead('Invoice automation','Invoices & 3-Way Match','Choose the actual tender or sourcing event first. The system will then show the linked purchase orders, goods received notes, invoices and match exceptions for that event.',actionButton('Upload invoice','upload-invoice-v5','','primary','plus')+actionButton('Capture invoice','capture-invoice-v5','','','invoice')+actionButton('Record payment','record-payment-v23','','','account')+actionButton('AI invoice capture','run-ocr-v5'))}${filterBar()}
       <div class="grid kpis">${kpi('Invoices captured','186','OCR confidence 93.7%','invoice')}${kpi('Matched','102','Ready for approval or AP','approve')}${kpi('Exceptions','15','Price, quantity or missing GRN','audit')}${kpi('WHT required','6','30% where ITF263 missing','account')}${kpi('VAT input',money(286400),'Extracted for tax accounting','account')}${kpi('Invoice exposure',money(2480000),'Approved and pending','account')}</div>
-      ${card('Select a tender or procurement source','Each match workspace is isolated to the selected tender, its award, purchase order, GRN and invoice chain.',`<div class="source-card-grid card-body">${candidates.map((t,i)=>`<button class="source-card" data-action="select-match-tender-v5" data-id="${t.id}"><div class="source-top">${(()=>{const c=__pr23Live()?__pr23MatchChain(t.id):null;return c?`<span class="status ${c.tone}">${c.label}</span>`:`<span class="status ${i===0?'green':'amber'}">${i===0?'Invoice received':'Awaiting invoice'}</span>`})()}<span class="muted">${t.id}</span></div><h3>${esc(t.title)}</h3><p>${esc(t.entity)} · ${esc(t.method)}</p><div class="source-meta"><div><span>Linked POs</span><strong>${__pr23Live()?__pr23MatchChain(t.id).orders.length:i+1}</strong></div><div><span>GRNs</span><strong>${__pr23Live()?__pr23MatchChain(t.id).grns.length:(i===0?1:0)}</strong></div><div><span>Invoices</span><strong>${__pr23Live()?__pr23MatchChain(t.id).invoices.length:(i===0?2:1)}</strong></div></div></button>`).join('')}</div>`)}</div>`;
+      ${__pr23Live()?__pr23InvoicesToReviewCard():''}${card('Select a tender or procurement source','Each match workspace is isolated to the selected tender, its award, purchase order, GRN and invoice chain.',`<div class="source-card-grid card-body">${candidates.map((t,i)=>`<button class="source-card" data-action="select-match-tender-v5" data-id="${t.id}"><div class="source-top">${(()=>{const c=__pr23Live()?__pr23MatchChain(t.id):null;return c?`<span class="status ${c.tone}">${c.label}</span>`:`<span class="status ${i===0?'green':'amber'}">${i===0?'Invoice received':'Awaiting invoice'}</span>`})()}<span class="muted">${t.id}</span></div><h3>${esc(t.title)}</h3><p>${esc(t.entity)} · ${esc(t.method)}</p><div class="source-meta"><div><span>Linked POs</span><strong>${__pr23Live()?__pr23MatchChain(t.id).orders.length:i+1}</strong></div><div><span>GRNs</span><strong>${__pr23Live()?__pr23MatchChain(t.id).grns.length:(i===0?1:0)}</strong></div><div><span>Invoices</span><strong>${__pr23Live()?__pr23MatchChain(t.id).invoices.length:(i===0?2:1)}</strong></div></div></button>`).join('')}</div>`)}</div>`;
   }
   function matchWorkspaceV5(id){
-    const t=state.tenders.find(x=>x.id===id)||(__pr23Live()&&!state.tenders.length?__pr23MatchSources().find(x=>x.id===id):null)||state.tenders[0];
+    const t=state.tenders.find(x=>x.id===id)||(__pr23Live()?__pr23MatchSources().find(x=>x.id===id):null)||state.tenders[0];
     const __chain=__pr23Live()?__pr23MatchChain(t.id):null;
     const po=__chain?(__chain.orders[0]||{id:'—',vendor:'No purchase order yet',amount:null,delivery:'—'}):state.orders[Math.abs(state.tenders.indexOf(t))%state.orders.length];
     const grn=__chain?(__chain.grns[0]||{id:'—',item:'Not received',value:null,status:'Not received',asset:false}):(state.grns.find(g=>g.po===po.id)||state.grns[0]);
@@ -3771,7 +3805,7 @@ window.MatanhoProcurement=Object.freeze({version:'8.0.0',navigate,render,getStat
   };
 
   const quotationDatasetV7=id=>{
-    const t=state.tenders.find(x=>x.id===id)||(__pr23Live()&&!state.tenders.length?__pr23MatchSources().find(x=>x.id===id):null)||state.tenders[0];
+    const t=state.tenders.find(x=>x.id===id)||(__pr23Live()?__pr23MatchSources().find(x=>x.id===id):null)||state.tenders[0];
     return {t,vendors:[
       {name:'TechNova Solutions',price:t.value*.91,delivery:8,terms:30,warranty:36,tech:94,commercial:96,readiness:88,support:91,risk:89,score:92},
       {name:'CloudWorks Africa',price:t.value*.88,delivery:10,terms:45,warranty:24,tech:88,commercial:93,readiness:82,support:84,risk:87,score:86},

@@ -143,6 +143,44 @@ try {
     check(diffs.some((d) => d.field === "purchaseOrder"), "the reading says the document quotes another order", diffs.filter((d) => d.field === "purchaseOrder").map((d) => d.message).join(""))
   }
 
+  // ------------------------------------------------------------------ D. the same supplier invoice captured twice
+  console.log("\n== D. the supplier's PDF from A is captured a second time")
+  if (created[0]) {
+    const d = await upload("msasa-boardroom.pdf", "application/pdf")
+    const dRes = await fetch(`${API}/procurement/invoices`, {
+      method: "POST",
+      headers: { ...ap, "Content-Type": "application/json" },
+      body: JSON.stringify({ purchaseOrderId: po.id, vendorId: po.vendorId, invoiceDate: "2026-09-13", currencyId: po.currencyId, documentPath: d.url, documentType: "PDF", items: lines }),
+    })
+    const dInv = (await dRes.json().catch(() => ({})))?.data
+    if (dInv?.id) created.push(dInv.id)
+    check(dRes.status === 201 && dInv?.id, "the second capture is accepted (a person decides)", `${dRes.status} ${dInv?.invoiceNumber ?? ""}`)
+    if (dInv?.id) {
+      const { inv } = await waitForReading(dInv.id)
+      const dup = (inv?.aiDiscrepancies?.flags || []).find((f) => f.type === "POSSIBLE_DUPLICATE")
+      check(Boolean(dup) && dup.otherInvoiceId === created[0], "it is flagged as a possible duplicate of the first", dup ? `${dup.otherInvoiceNumber}: ${dup.reason}` : JSON.stringify(inv?.aiDiscrepancies?.flags ?? []))
+      check(String(inv?.matchingStatus).toUpperCase() === "DISCREPANCY", "its match status is a discrepancy", String(inv?.matchingStatus))
+    }
+  }
+
+  // ------------------------------------------------------------------ alerts reach a reviewer
+  console.log("\n== alerts: a reviewer is told, in the app, why each flagged invoice needs review")
+  {
+    const ids = new Set(created.slice(1))
+    let found = []
+    const started = Date.now()
+    while (Date.now() - started < 60000) {
+      const j = await (await fetch(`${API}/homepage/notifications?limit=50`, { headers: ap })).json().catch(() => ({}))
+      const list = (j?.data?.notifications ?? j?.data ?? j?.notifications ?? []).filter?.((n) => n.type === "PROCUREMENT_INVOICE_FLAGGED") ?? []
+      found = list.filter((n) => ids.has(n.relatedEntityId))
+      if (found.length >= Math.min(2, ids.size)) break
+      await new Promise((r) => setTimeout(r, 5000))
+    }
+    check(found.length >= Math.min(2, ids.size), "Accounts Payable has an in-app alert for the flagged invoices", `${found.length} of ${ids.size} · ${found.map((n) => n.title).join(" | ")}`)
+    const sample = found[0]
+    check(Boolean(sample?.data?.path) && Array.isArray(sample?.data?.reasons) && sample.data.reasons.length > 0, "each alert links to the invoices page and lists its reasons", sample ? `${sample.data.path} · ${sample.data.reasons.slice(0, 2).join(" | ")}` : "none")
+  }
+
   // ------------------------------------------------------------------ re-read on demand
   if (created[0]) {
     console.log("\n== reading again on demand")

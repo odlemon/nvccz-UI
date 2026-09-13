@@ -467,6 +467,22 @@ export async function loadProcurementV23LiveData(): Promise<ProcurementV23LivePa
       ? `The supplier's document${ref} agrees with the captured invoice.`
       : `The supplier's document${ref} differs from the capture: ${r.differences.slice(0, 3).join("; ")}${r.differences.length > 3 ? ` and ${r.differences.length - 3} more` : ""}.`
   }
+  // Why an invoice needs review, in the words its alert uses (API ProcurementInvoiceAlertService.reasonsFor): the
+  // three-way match's flags, a possible duplicate, and where the supplier's document disagrees with the capture.
+  const reviewReasons = (inv: any): string[] => {
+    const money2 = (v: any) => Number(v).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    const out: string[] = []
+    for (const f of Array.isArray(inv.aiDiscrepancies?.flags) ? inv.aiDiscrepancies.flags : []) {
+      if (f?.type === "LINE_NOT_ON_PO") out.push(`"${f.itemName}" is not on the purchase order`)
+      else if (f?.type === "PRICE_OVER_PO") out.push(`"${f.itemName}" is invoiced at ${money2(f.invoiceUnitPrice)}; the order says ${money2(f.poUnitPrice)}`)
+      else if (f?.type === "QTY_OVER_ORDERED") out.push(`"${f.itemName}" invoices ${f.invoicedQty}; the order has ${f.orderedQty}`)
+      else if (f?.type === "QTY_OVER_RECEIVED") out.push(`"${f.itemName}" invoices ${f.invoicedQty}; receipts accepted ${f.acceptedQty}`)
+      else if (f?.type === "POSSIBLE_DUPLICATE") out.push(`Possible duplicate of ${f.otherInvoiceNumber}: ${f.reason}`)
+    }
+    const r = readingOf(inv)
+    if (r?.status === "READ" && r.agrees === false) out.push(...r.differences.map((d: string) => `Supplier's document: ${d}`))
+    return out
+  }
   const invoicesView = invoices.map((inv) => ({
     id: inv.invoiceNumber ?? inv.id,
     recordId: inv.id,
@@ -490,6 +506,7 @@ export async function loadProcurementV23LiveData(): Promise<ProcurementV23LivePa
     matchFlags: Array.isArray(inv.aiDiscrepancies?.flags) ? inv.aiDiscrepancies.flags : [],
     reading: readingOf(inv),
     readingSentence: readingSentence(inv),
+    reviewReasons: reviewReasons(inv),
     journal: inv.journalEntry?.referenceNumber ?? null,
     journalStatus: inv.journalEntry?.status ?? null,
     // For the monthly charts: when it was invoiced, and when it was paid.
