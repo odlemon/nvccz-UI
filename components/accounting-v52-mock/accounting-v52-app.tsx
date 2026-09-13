@@ -73,6 +73,20 @@ export function AccountingV52App() {
     })
     apiRef.current = runtime
 
+    // Every Accounting style is scoped to .accounting-v52-root, but the runtime appends its drawers, focus and deep
+    // views, toolbar and menus to <body>, where they rendered unstyled below the page (and the sidebar covered
+    // Payables' Pay button). Keep each of them inside the module root, as it is added.
+    const belongsInRoot = (node: Element) =>
+      /^v\d+[A-Z]/.test(node.id) || Array.from(node.classList).some((c) => /^v\d+-/.test(c))
+    const adoptRuntimeLayers = () => {
+      for (const child of Array.from(document.body.children)) {
+        if (child.tagName !== "SCRIPT" && belongsInRoot(child)) el.appendChild(child)
+      }
+    }
+    adoptRuntimeLayers()
+    const bodyObserver = new MutationObserver(adoptRuntimeLayers)
+    bodyObserver.observe(document.body, { childList: true })
+
     ensurePageDataRef.current = async (page: string) => {
       const plan = scopesForAc52Page(page)
       // Three call sites reach this on a single cold load — the mount call below, the

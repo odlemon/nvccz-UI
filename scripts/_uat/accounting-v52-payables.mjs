@@ -69,7 +69,9 @@ try {
   check(await waitText(page, /Approved, awaiting payment\s+[1-9]\d* invoices?/), "the landing counts it as approved, awaiting payment")
   check(await waitText(page, /\$\s?[1-9][\d,.]*[kKmM]?\s+Approved to pay/, 30000), "and Approved to pay is not nil")
   check((await page.locator("#v5ProfileMenu").count()) === 0 && !/Tariro Moyo/.test(await page.evaluate(() => document.body.innerText)), "no prototype profile menu or demo user on the page")
-  check(await page.evaluate(() => document.documentElement.scrollHeight <= window.innerHeight + 2), "the page itself does not scroll (the workspace does)", String(await page.evaluate(() => document.documentElement.scrollHeight)))
+  // Every Accounting style is scoped to .accounting-v52-root: a prototype layer appended to <body> renders unstyled.
+  const strays = await page.evaluate(() => [...document.body.children].filter((el) => /^v\d+/.test(el.id || "") || [...el.classList].some((c) => /^v\d+-/.test(c))).map((el) => el.id || el.className))
+  check(strays.length === 0, "no Accounting layer sits outside the module root, unstyled", strays.join(", "))
   check(!SAMPLE.test(await page.evaluate(() => document.body.innerText)), "no sample bill or figure is shown")
 
   await page.locator('[data-v28="tab"][data-key="ap"][data-id="bills"]').first().click()

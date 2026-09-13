@@ -88,7 +88,34 @@ try {
   const row = page.locator("#workspace table tbody tr", { hasText: draft?.requisitionNumber ?? "none" })
   if (await row.count()) {
     await row.first().click()
-    check(await page.waitForFunction((n) => document.body.innerText.includes(n), project.name, { timeout: 30000 }).then(() => true).catch(() => false), "the requisition names its project")
+    // A draft's row opens the requester's edit form, where the project is the chosen option of its select; the view
+    // prints it as text. Either is what the person sees, and the detail says which one was open.
+    const seen = await page
+      .waitForFunction(
+        (n) => {
+          const layer = document.querySelector("#modalLayer.open, #drawerLayer.open")
+          const scope = layer || document.querySelector("#workspace")
+          const select = scope?.querySelector('select[name="project"]')
+          const chosen = select && select.selectedIndex >= 0 ? select.options[select.selectedIndex].textContent : ""
+          if (chosen.includes(n)) return `edit form, chosen option "${chosen.trim()}"`
+          const text = scope?.innerText || ""
+          const m = text.match(/Project[\s:]*([^\n]+)/)
+          if (text.includes(n)) return `view text "${(m?.[1] || n).trim()}"`
+          return null
+        },
+        project.name,
+        { timeout: 30000 },
+      )
+      .then((h) => h.jsonValue())
+      .catch(() => null)
+    const opened = await page.evaluate(() => {
+      const layer = document.querySelector("#modalLayer.open, #drawerLayer.open")
+      const title = layer?.querySelector("#modalTitle, #drawerTitle")?.textContent?.trim()
+      const select = layer?.querySelector('select[name="project"]')
+      return `${title || "no modal or drawer"}${select ? `; project select shows "${select.options[select.selectedIndex]?.textContent?.trim()}"` : ""}`
+    })
+    await page.screenshot({ path: path.join(OUT, "requisition-assist-opened.png"), fullPage: false }).catch(() => {})
+    check(Boolean(seen), "the requisition names its project", seen || `not shown · opened: ${opened}`)
   } else {
     check(false, "the requisition names its project", "row not found")
   }
