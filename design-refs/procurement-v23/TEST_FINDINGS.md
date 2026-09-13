@@ -766,6 +766,25 @@ AI capture 13/13, sidebar navigation 8/8 roles on the first pass, storyline 20/2
 - After each run the cleanup removed what the suites had created (on that run: 4 vendors, 13 requisitions, 5 RFQs,
   10 quotations, 8 purchase orders, 4 GRNs, 3 invoices, 1 reading, 3 plans, 2 contracts, 2 documents, 1 cashbook
   entry and 2 journals, with 125 audit rows), and the demo integrity check read 17/17.
+- On `5072202`, with the test dataset rebuilt first: **storyline 20/20** (step 14, AI capture, passes: its earlier
+  timeout was the container swap). Cleanup, then demo integrity 17/17.
+
+**Census on `5072202` — Accounts Payable, Finance Manager, Internal Auditor** (the last three roles; it never clicks a
+live write, and the demo integrity check read 17/17 before and after it):
+- **Document Vault, Accounts Payable — real.** Preview, Download PDF, Edit document and Upload new version on the RFQ
+  pack threw `Cannot read properties of undefined (reading 'id')`. A document of a recognised type (tender pack,
+  annual plan…) was rebuilt by `generatedDocumentV11` from its related record, which looks the tender up, and a role
+  that cannot see RFQs has none; where it did not throw, an uploaded document was shown generated text instead of its
+  stored file. **Fix — nvccz-new `e393b63`:** in a live session a document with a stored file previews as it was filed.
+  Verified on dev `e393b63` as Accounts Payable and the Procurement Manager: the RFQ pack's preview shows its folder,
+  version and related record (`RFQ_20260808_0001`), an "Open the stored file" link to the uploaded PDF, and the
+  organisation's letterhead from the company profile; Download PDF, Edit document and Upload new version raise no
+  error. (The check first reported the link missing: it read only the first 300 characters of the preview, and the
+  link sits at 378.) On the same build the Approval Centre and Payables checks read 15/15 and demo integrity 17/17.
+- **Vendor Registry "Vendor portal" could not be clicked (all three) — not a defect.** The button is visible and
+  clickable (a trial click passes; it raises the not-connected refusal); the census's previous refusal toast, shown
+  top-right, covered the page-head button for a few seconds.
+- Expected, as before: Command Centre clicked while on it, Clear with no filter set, a status select inside a form.
 
 The Procurement Manager's first sidebar-navigation run timed out on AI Invoice Capture and passed 17/17 on the
 rerun. The suite read the sidebar before the role's grants had loaded: until they land (a few seconds on a cold
