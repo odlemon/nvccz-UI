@@ -2151,6 +2151,13 @@ const __PR23_TRIM_FORMS = [
     sub: 'File the document in a folder. It is reviewed before it is approved, and a new version can be uploaded later.',
   },
   {
+    // The version endpoint takes the file only: it numbers the version itself and puts it under review. The form's
+    // "New version" (v1.1 where the result is v2.0), "Review status" (offering Approved) and change summary were dropped.
+    form: '#uploadVersionFormV11',
+    names: ['version', 'status', 'note'],
+    labels: /(?!)/,
+  },
+  {
     form: '#rejectPrFormV11',
     names: [],
     labels: /^Notify requester/,
