@@ -107,6 +107,8 @@ export function ProcurementV23App() {
         access: payload.access,
         // The accounts a payment can be made from, for the bridge's Record payment form.
         banks: payload.banks ?? [],
+        // The currencies an RFQ can be quoted in, for the bridge's tender builder.
+        currencies: payload.currencies ?? [],
       }
       // The requisitions page opens on the approver queue only for someone who approves
       // requisitions. The runtime decided it from its demo user's role; after the first hydrate of

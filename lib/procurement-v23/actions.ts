@@ -308,6 +308,9 @@ const NOT_BUILT_OPENERS: Record<string, string> = {
   "edit-doc-v11": "Controlled documents are not edited here. Upload a new version from the Document Vault.",
   "edit-approval-doc-v13": "Approval documents are generated from the record and are not edited here.",
   "upload-version": "Upload a new version from the Document Vault.",
+  // Previewed a sample tender pack (pass mark, committee, email subject, "edit and send it from the Document Vault")
+  // built from fields the RFQ does not store.
+  "preview-tender-v13": "The RFQ is sent from the form. Vendors see its lines and closing date in their quotation form.",
 }
 
 /**
@@ -489,11 +492,13 @@ export async function handleProcurementV23Action(
         const form = document.querySelector<HTMLFormElement>("#rejectPrFormV11")
         if (form && !form.reportValidity()) return { handled: true }
         const decision = val('#rejectPrFormV11 [name="decision"]')
+        const category = val('#rejectPrFormV11 [name="category"]')
         const reason = val('#rejectPrFormV11 [name="reason"]')
         if (!reason) return { handled: true, error: "A reason is required to reject a requisition." }
         // The backend has one outcome, REJECTED, which the requester can correct and resubmit.
-        // "Return" and "request information" are recorded in the reason rather than invented as states.
-        await rejectRequisition(r.recordId, decision && decision !== "Reject requisition" ? `${decision}: ${reason}` : reason)
+        // "Return" and "request information", and the reason category, are recorded in the reason rather than invented as states.
+        const explained = category && category !== "Other" ? `${category}. ${reason}` : reason
+        await rejectRequisition(r.recordId, decision && decision !== "Reject requisition" ? `${decision}: ${explained}` : explained)
         closeRuntimeOverlay()
         return { handled: true, reload: true, message: `${r.id} returned to the requester with your reason.` }
       }
@@ -841,6 +846,7 @@ export async function handleProcurementV23Action(
         const lines = [...form.querySelectorAll<HTMLTableRowElement>("#rfxLinesV13 tr")]
           .map((row) => ({
             itemName: (row.querySelector<HTMLInputElement>('[name="lineDescription"]')?.value ?? "").trim(),
+            description: (row.querySelector<HTMLInputElement>('[name="lineSpec"]')?.value ?? "").trim() || undefined,
             unit: row.querySelector<HTMLSelectElement>('[name="lineUom"]')?.value || undefined,
             quantity: Number(row.querySelector<HTMLInputElement>('[name="lineQty"]')?.value || 0),
           }))
@@ -866,6 +872,7 @@ export async function handleProcurementV23Action(
           rfqDeadline: close ? new Date(close).toISOString() : undefined,
           items: lines.length ? lines : undefined,
           visibility: String(fd.get("method")) === "Open tender" ? "PUBLIC_LISTING" : "INVITED_ONLY",
+          reportingCurrencyCode: String(fd.get("currency") ?? "").trim().toUpperCase() || undefined,
           // The backend weighs price against everything else: commercial is price, and
           // technical, delivery and risk together are the non-price share.
           priceWeight: commercial / 100,

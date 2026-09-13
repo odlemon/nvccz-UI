@@ -2123,12 +2123,103 @@ function __pr23DropIdleFilterBar() {
   if (!hasRows) bar.closest('.filterbar').remove();
 }
 
+/**
+ * A live form keeps only what is saved. The vendored tender builder, document upload and requisition return asked for
+ * owners, timetables, committees, eSignature, reminders, file slots, access rules, retention and letterheads that no
+ * backend stores, prefilled with sample text; a person filling them in would believe they had set something. Each
+ * form is trimmed as it renders, and its headings say what is left.
+ */
+const __PR23_TRIM_FORMS = [
+  {
+    form: '#tenderFormV13',
+    names: ['entity', 'value', 'costCenter', 'owner', 'budgetOwner', 'contractOwner', 'issueDate', 'clarification', 'briefing', 'validity', 'opening', 'lateRule', 'passMark', 'emailSubject', 'sendTiming', 'message'],
+    labels: /^(Submission currency|Clarification contact|Submission channel|Technical schedule|Pricing template|Draft contract|Other supporting files|Minimum responsive bids|Evaluation committee|Final award authority|Mandatory compliance|Scored technical criteria|Committee conflict declarations|eSignature|Reminder schedule)\b/,
+    sections: [
+      [/^1\./, '1. Source and title', "The approved requisition this RFQ buys for. Its category decides which vendors can be invited."],
+      [/^2\./, '2. Closing date', 'Vendors can submit a quotation until this date and time.'],
+      [/^3\./, '3. Lines and scope', "Lines are copied from the requisition; add a line only for a requirement it does not list."],
+      [/^4\./, '4. Evaluation weights', 'Commercial weight is the share given to price; technical, delivery and risk together are the rest. They must total 100%.'],
+      [/^5\./, '5. Vendors invited', 'Each vendor invited is emailed its own link to the quotation form.'],
+      [/^6\./, null],
+    ],
+  },
+  {
+    form: '#uploadDocumentFormV5',
+    names: ['owner', 'version'],
+    labels: /^(Read access|Write access|Retention|Letterhead)\b/,
+    blank: { name: ['New procurement document', 'e.g. Stationery RFQ pack'], description: ['Describe the document and its relationship to the procurement record.', 'What the document is and which record it belongs to'] },
+    sub: 'File the document in a folder. It is reviewed before it is approved, and a new version can be uploaded later.',
+  },
+  {
+    form: '#rejectPrFormV11',
+    names: [],
+    labels: /^Notify requester/,
+    blank: { reason: ['Please revise the supporting motivation, specification and budget evidence before resubmission.', 'Say what the requester must change or explain'] },
+  },
+];
+
+function __pr23TrimLiveForms() {
+  if (!__pr23Live()) return;
+  for (const spec of __PR23_TRIM_FORMS) {
+    const form = document.querySelector(spec.form);
+    if (!form) continue;
+    if (!form.hasAttribute('data-pr23-trimmed')) {
+      form.setAttribute('data-pr23-trimmed', '');
+      for (const control of [...form.querySelectorAll('input, select, textarea')]) {
+        const wrap = control.closest('.field') || control.closest('label');
+        if (!wrap || !form.contains(wrap) || wrap.classList.contains('invitation-option-v13') || wrap.classList.contains('vendor-target-v13')) continue;
+        const label = wrap.matches('label') ? wrap : wrap.querySelector('label');
+        const first = label && label.firstChild && label.firstChild.nodeType === 3 ? label.firstChild.textContent : (label ? label.textContent : '');
+        if ((control.name && spec.names.includes(control.name)) || spec.labels.test(String(first || '').trim())) wrap.remove();
+      }
+      for (const [name, [was, hint]] of Object.entries(spec.blank || {})) {
+        const el = form.querySelector(`[name="${name}"]`);
+        if (el && el.value.trim() === was) { el.value = ''; el.placeholder = hint; }
+      }
+      for (const section of form.querySelectorAll('section')) {
+        const h3 = section.querySelector('h3');
+        const rule = (spec.sections || []).find(([re]) => h3 && re.test(h3.textContent.trim()));
+        if (!rule) continue;
+        if (!rule[1]) { section.remove(); continue; }
+        h3.textContent = rule[1];
+        const p = h3.parentElement && h3.parentElement.querySelector('p');
+        if (p) p.textContent = rule[2];
+      }
+      if (spec.sub) { const sub = document.querySelector('#modalSub'); if (sub) sub.textContent = spec.sub; }
+      // The RFQ's currency: only those set up in Accounting (the vendored list offered ZAR, which dev does not have).
+      const currencies = ((__pr23Live() || {}).currencies || []);
+      const currency = spec.form === '#tenderFormV13' && form.querySelector('select[name="currency"]');
+      if (currency && currencies.length) {
+        const keep = currency.value.toUpperCase();
+        currency.innerHTML = currencies.map(c => `<option value="${__pr23Esc(c.code)}"${c.code.toUpperCase() === keep ? ' selected' : ''}>${__pr23Esc(c.code)} · ${__pr23Esc(c.name)}</option>`).join('');
+      }
+    }
+    // RFQ lines: no column stores an estimate or a delivery location per line; the specification is the line's description.
+    if (spec.form === '#tenderFormV13') {
+      const table = form.querySelector('#rfxLinesV13') && form.querySelector('#rfxLinesV13').closest('table');
+      if (table && !table.hasAttribute('data-pr23-trimmed')) {
+        table.setAttribute('data-pr23-trimmed', '');
+        for (const th of [...table.querySelectorAll('thead th')]) {
+          const t = th.textContent.trim();
+          if (t === 'Estimate' || t === 'Delivery location') th.remove();
+          if (t === 'Specification reference') th.textContent = 'Specification';
+        }
+      }
+      for (const cell of [...form.querySelectorAll('#rfxLinesV13 [name="lineEstimate"], #rfxLinesV13 [name="lineDelivery"]')]) cell.closest('td').remove();
+      for (const spec of form.querySelectorAll('#rfxLinesV13 [name="lineSpec"]')) {
+        if (spec.value === 'See technical schedule') { spec.value = ''; spec.placeholder = 'e.g. 80gsm, white'; }
+      }
+      for (const note of form.querySelectorAll('#rfxLinesV13 td[colspan="7"]')) note.setAttribute('colspan', '5');
+    }
+  }
+}
+
 if (typeof window !== 'undefined' && typeof MutationObserver !== 'undefined' && !window.__pr23SweepObserver) {
   window.__pr23SweepObserver = new MutationObserver(records => {
     let removed = 0;
     for (const record of records) for (const node of record.addedNodes) removed += __pr23SweepUnconnected(node);
     if (removed || records.some(r => r.target && r.target.closest && r.target.closest('#modalLayer, #drawerLayer'))) __pr23CheckDeadEnds();
-    if (records.some(r => r.addedNodes.length)) __pr23DropIdleFilterBar();
+    if (records.some(r => r.addedNodes.length)) { __pr23DropIdleFilterBar(); __pr23TrimLiveForms(); }
   });
   window.__pr23SweepObserver.observe(document.documentElement, { childList: true, subtree: true });
 }

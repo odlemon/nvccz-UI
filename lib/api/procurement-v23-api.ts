@@ -204,12 +204,19 @@ export async function createRfq(body: {
   deliveryAddress?: string
   specialRequirements?: string
   visibility?: "INVITED_ONLY" | "PUBLIC_LISTING"
+  /** USD, ZiG or ZAR: the currency vendors quote in. The API resolves it to the currency's id. */
+  reportingCurrencyCode?: string
   /** 0-1 each; the evaluation weighting of price against everything else. */
   priceWeight?: number
   technicalWeight?: number
   items?: { itemName: string; description?: string; quantity: number; unit?: string }[]
 }): Promise<ProcurementRecord> {
   return unwrapData(await apiClient.post<ApiResponse<ProcurementRecord>>("/procurement/rfq", body))
+}
+
+/** GET /procurement/currencies: the active currencies an RFQ can be quoted in ({code, name}). */
+export async function listProcurementCurrencies(): Promise<ProcurementRecord[]> {
+  return unwrapData(await apiClient.get<ApiResponse<ProcurementRecord[]>>("/procurement/currencies"))
 }
 
 /** The award. Accepting a quotation raises its purchase order. */
