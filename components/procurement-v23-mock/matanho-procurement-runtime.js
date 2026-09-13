@@ -2048,11 +2048,25 @@ function __pr23CheckDeadEnds() {
   }
 }
 
+/**
+ * The shared filter bar (period, category, status) filters the rows of the page's registers (__pr23ApplyTableFilters).
+ * On a page with no register row at all its Apply could only answer "This page has no register to filter", so a live
+ * page without one does not show the bar.
+ */
+function __pr23DropIdleFilterBar() {
+  if (!__pr23Live()) return;
+  const bar = document.querySelector('#workspace .filterbar [data-filter="period"]');
+  if (!bar) return;
+  const hasRows = [...document.querySelectorAll('#workspace table tbody tr')].some(r => !r.classList.contains('pr23-empty-row') && !r.querySelector('.pr23-empty-row'));
+  if (!hasRows) bar.closest('.filterbar').remove();
+}
+
 if (typeof window !== 'undefined' && typeof MutationObserver !== 'undefined' && !window.__pr23SweepObserver) {
   window.__pr23SweepObserver = new MutationObserver(records => {
     let removed = 0;
     for (const record of records) for (const node of record.addedNodes) removed += __pr23SweepUnconnected(node);
     if (removed || records.some(r => r.target && r.target.closest && r.target.closest('#modalLayer, #drawerLayer'))) __pr23CheckDeadEnds();
+    if (records.some(r => r.addedNodes.length)) __pr23DropIdleFilterBar();
   });
   window.__pr23SweepObserver.observe(document.documentElement, { childList: true, subtree: true });
 }
