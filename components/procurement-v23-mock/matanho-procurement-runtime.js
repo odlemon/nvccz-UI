@@ -590,6 +590,14 @@ function __pr23OrgName() {
 }
 
 /**
+ * The browser tab's title. Each vendored layer set "Matanho Procurement & Tender Management - V13/V18/V20/V23",
+ * so the tab showed an internal build label, and named Matanho on every deployment.
+ */
+function __pr23Title(fixture) {
+  return __pr23Live() ? 'Procurement & Tender Management' : fixture;
+}
+
+/**
  * The runtime's entity list, for a live session. Twenty selects and labels read the module-level
  * `entities` fixture (Matanho Holdings, Kariba Agro Limited, Lumina Health Group...), which no live record
  * carries. It is replaced in place, so every one of them offers "All entities" and the organisation.
@@ -4143,7 +4151,7 @@ window.MatanhoProcurement=Object.freeze({version:'8.0.0',navigate,render,getStat
     if(action==='create-send-tender-v13'){const d=collectTenderV13();if(!d)return;const t=saveTenderRecordV13(d,true);closeOverlay();state.page='tenders';render();return toast('Tender published and invitations sent',`${t.id} was sent to ${d.vendors.length} vendor${d.vendors.length===1?'':'s'} using unique secure bid forms.`)}
     if(action==='create-send-tender-from-preview-v13'){const d=state.tenderDraftV13;if(!d)return tenderModalV13();const t=saveTenderRecordV13(d,true);closeOverlay();state.page='tenders';render();return toast('Tender published and invitations sent',`${t.id} was sent to ${d.vendors.length} vendor${d.vendors.length===1?'':'s'} using unique secure bid forms.`)}
   },true);
-  document.title='Matanho Procurement & Tender Management - V13';
+  document.title=__pr23Title('Matanho Procurement & Tender Management - V13');
   window.MatanhoProcurementV13=Object.freeze({version:'13.0.0',openApproval:openApprovalV13,createTender:tenderModalV13,getState:()=>structuredClone(state)});
 })();
 
@@ -4399,7 +4407,7 @@ window.MatanhoProcurement=Object.freeze({version:'8.0.0',navigate,render,getStat
   if(workspace)observer.observe(workspace,{subtree:true,childList:true});
   __pr23On(window, 'resize',closeMenu,{passive:true});
   __pr23On(window, 'scroll',closeMenu,{passive:true,capture:true});
-  document.title='Matanho Procurement & Tender Management - V18';
+  document.title=__pr23Title('Matanho Procurement & Tender Management - V18');
   scheduleEnhance();
   const api=Object.freeze({version:VERSION,enhance,closeMenu});
   window.MatanhoProcurementV18=api;
@@ -4824,7 +4832,7 @@ window.MatanhoProcurement=Object.freeze({version:'8.0.0',navigate,render,getStat
 
   if(initialPage&&supportedPages.has(initialPage))requestAnimationFrame(()=>navigateV14(initialPage));
 
-  document.title='Matanho Procurement & Tender Management - V18';
+  document.title=__pr23Title('Matanho Procurement & Tender Management - V18');
   window.MatanhoProcurementUI=Object.freeze({
     version:VERSION,
     pages:[...supportedPages],
@@ -4914,7 +4922,7 @@ window.MatanhoProcurement=Object.freeze({version:'8.0.0',navigate,render,getStat
     const original=handlers[name];if(typeof original!=='function')return;handlers[name]=a=>{const result=original(a);queueMicrotask(freezeAuditEntriesV20);return result;};
   });
   requestAnimationFrame(enhanceAuditV20);
-  document.title='Matanho Procurement & Tender Management - V20';
+  document.title=__pr23Title('Matanho Procurement & Tender Management - V20');
   window.MatanhoProcurementV20=Object.freeze({version:VERSION,openAuditEvent:openAuditEventV20,getVendorAuditTrail:vendorId=>structuredClone((state.vendorAuditTrailV19||[]).filter(x=>x.vendorId===vendorId)),isAuditEventImmutable:()=>true});
   try{if(window.MatanhoProcurementUI){window.MatanhoProcurementUIV20=Object.freeze({...window.MatanhoProcurementUI,version:VERSION,openAuditEvent:openAuditEventV20});}}catch(_){/* existing frozen bridge retained */}
 })();
@@ -4987,7 +4995,7 @@ window.MatanhoProcurement=Object.freeze({version:'8.0.0',navigate,render,getStat
   const observer=new MutationObserver(()=>requestAnimationFrame(stripRestrictedActionsV21));
   if(workspace)observer.observe(workspace,{subtree:true,childList:true});
   requestAnimationFrame(stripRestrictedActionsV21);
-  document.title='Matanho Procurement & Tender Management - V23';
+  document.title=__pr23Title('Matanho Procurement & Tender Management - V23');
   window.MatanhoProcurementV21=Object.freeze({version:VERSION,refreshActionGovernance:stripRestrictedActionsV21});
 })();
 

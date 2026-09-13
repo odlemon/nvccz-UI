@@ -1305,6 +1305,22 @@ s = replaceUnique(
   "<select name=\"scope\">${__pr23Live()?'':'<option>Group Consolidated</option>'}",
 )
 
+// ---------------------------------------------------------------------------
+// 35. The browser tab carries no build label
+// ---------------------------------------------------------------------------
+// Found on dev: the tab read "Matanho Procurement & Tender Management - V23" (each layer set its own version).
+for (const [version, count] of [["13", 1], ["18", 2], ["20", 1], ["23", 1]]) {
+  const title = `Matanho Procurement & Tender Management - V${version}`
+  s = replaceEvery(
+    s,
+    `document.title='${title}';`,
+    `document.title=__pr23Title('${title}');`,
+    `tab title V${version} -> no build label`,
+    `__pr23Title('${title}')`,
+    count,
+  )
+}
+
 console.log(`\n${applied} applied, ${skipped} already in place, ${missed} missed`)
 if (missed) {
   console.error("One or more patches did not find their anchor. The runtime is NOT fully patched.")

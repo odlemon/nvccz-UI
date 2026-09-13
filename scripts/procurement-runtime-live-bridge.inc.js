@@ -417,6 +417,14 @@ function __pr23OrgName() {
 }
 
 /**
+ * The browser tab's title. Each vendored layer set "Matanho Procurement & Tender Management - V13/V18/V20/V23",
+ * so the tab showed an internal build label, and named Matanho on every deployment.
+ */
+function __pr23Title(fixture) {
+  return __pr23Live() ? 'Procurement & Tender Management' : fixture;
+}
+
+/**
  * The runtime's entity list, for a live session. Twenty selects and labels read the module-level
  * `entities` fixture (Matanho Holdings, Kariba Agro Limited, Lumina Health Group...), which no live record
  * carries. It is replaced in place, so every one of them offers "All entities" and the organisation.
