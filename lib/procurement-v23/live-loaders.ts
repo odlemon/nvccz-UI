@@ -31,6 +31,7 @@ import {
   listRequisitions,
   listRequisitionsAwaitingMyApproval,
   listRequisitionProjects,
+  listPendingVendorRegistrations,
   listRfqs,
   listBanks,
   listProcurementContracts,
@@ -191,6 +192,7 @@ function matchLabel(v: unknown): string {
 }
 
 function vendorStatus(v: ProcurementRecord): string {
+  if (String(v.registrationStatus ?? "").toUpperCase() === "PENDING_REVIEW") return "Awaiting review"
   if (v.isBlacklisted) return "Blacklisted"
   const tax = String(v.taxComplianceStatus ?? "").toUpperCase()
   // ACTIVE is what the backend sets when a valid ITF263 expiry is on file.
@@ -247,6 +249,8 @@ export async function loadProcurementV23LiveData(): Promise<ProcurementV23LivePa
   const approvalMatrixLoad = safe("approval-matrix", getApprovalMatrix, null)
   // The projects a requisition can be charged to, for the requisition form.
   const projectsLoad = safe("requisition-projects", listRequisitionProjects, [] as ProcurementRecord[])
+  // Vendors who registered themselves on the vendor portal and wait for staff review (procurement.vendors.view).
+  const registrationsLoad = safe("vendor-registrations", listPendingVendorRegistrations, [] as ProcurementRecord[])
   const access = await safe<ProcurementAccess | null>("me/access", getMyProcurementAccess, null)
   const accessUnavailable = access === null && errors.some((e) => e.source === "me/access")
   const perms = new Set(access?.permissions ?? [])
@@ -1535,6 +1539,18 @@ export async function loadProcurementV23LiveData(): Promise<ProcurementV23LivePa
   }
 
   const approvalMatrix = await approvalMatrixLoad
+  const vendorRegistrations = (await registrationsLoad).map((v) => ({
+    id: String(v.id),
+    name: String(v.name ?? DASH),
+    email: v.email ?? DASH,
+    contact: v.contactPerson ?? DASH,
+    phone: v.phone ?? DASH,
+    category: v.category ? titleCase(v.category) : DASH,
+    taxExpiry: v.taxClearanceExpiryDate ? fmtDate(v.taxClearanceExpiryDate) : null,
+    registeredAt: fmtDate(v.createdAt),
+    banks: num(v._count?.banks) ?? 0,
+    documents: num(v._count?.kycDocuments) ?? 0,
+  }))
   const requisitionProjects = (await projectsLoad).map((p) => ({ id: String(p.id), name: String(p.name ?? DASH), clientName: p.clientName ?? null }))
 
   const hydrate: Record<string, unknown> = {
@@ -1549,6 +1565,7 @@ export async function loadProcurementV23LiveData(): Promise<ProcurementV23LivePa
     approvalMatrixV23: approvalMatrix,
     analyticsV23,
     requisitionProjectsV23: requisitionProjects,
+    vendorRegistrationsV23: vendorRegistrations,
     currentUserV6: { name: access?.name ?? DASH, role: access?.roleName ?? DASH },
     auditEventsLive,
     complianceReminderSettingsV7: NO_REMINDER_AUTOMATION,
@@ -1640,4 +1657,5 @@ export const EMPTY_PROCUREMENT_HYDRATE: Record<string, unknown> = {
   approvalMatrixV23: null,
   analyticsV23: null,
   requisitionProjectsV23: [],
+  vendorRegistrationsV23: [],
 }

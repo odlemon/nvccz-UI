@@ -532,6 +532,22 @@ export async function updateVendor(id: string, body: Record<string, unknown>): P
   return unwrapData(await apiClient.put<ApiResponse<ProcurementRecord>>(`/accounting/vendors/${encodeURIComponent(id)}`, body))
 }
 
+/**
+ * Vendors who registered themselves on the vendor portal and wait for staff review
+ * (GET /accounting/vendors/pending-review, procurement.vendors.view).
+ */
+export const listPendingVendorRegistrations = () => list("/accounting/vendors/pending-review")
+
+/** Approve a self-registration: the vendor becomes active and is emailed (procurement.vendors.approve). */
+export async function approveVendorRegistration(id: string): Promise<ProcurementRecord> {
+  return unwrapData(await apiClient.put<ApiResponse<ProcurementRecord>>(`/accounting/vendors/${encodeURIComponent(id)}/approve-registration`, {}))
+}
+
+/** Decline a self-registration with a reason: the vendor is deactivated and emailed (procurement.vendors.approve). */
+export async function declineVendorRegistration(id: string, reason: string): Promise<ProcurementRecord> {
+  return unwrapData(await apiClient.put<ApiResponse<ProcurementRecord>>(`/accounting/vendors/${encodeURIComponent(id)}/decline-registration`, { reason }))
+}
+
 export async function blacklistVendor(id: string, blacklistReason: string): Promise<ProcurementRecord> {
   return unwrapData(
     await apiClient.post<ApiResponse<ProcurementRecord>>(`/accounting/vendors/${encodeURIComponent(id)}/blacklist`, { blacklistReason }),

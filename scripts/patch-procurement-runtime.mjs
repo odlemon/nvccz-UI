@@ -1426,7 +1426,16 @@ s = replaceUnique(
   "'approvalMatrixV23','analyticsV23'];",
   "'approvalMatrixV23','analyticsV23','requisitionProjectsV23'];",
   "hydrate() -> requisition projects",
-  "'analyticsV23','requisitionProjectsV23'];",
+  // The vendor registrations step below extends this tail, so the marker stops before its end.
+  "'analyticsV23','requisitionProjectsV23'",
+)
+// Vendor Registry: self-registrations awaiting review (state.vendorRegistrationsV23).
+s = replaceUnique(
+  s,
+  "'approvalMatrixV23','analyticsV23','requisitionProjectsV23'];",
+  "'approvalMatrixV23','analyticsV23','requisitionProjectsV23','vendorRegistrationsV23'];",
+  "hydrate() -> vendor self-registrations",
+  "'requisitionProjectsV23','vendorRegistrationsV23'];",
 )
 
 // ---------------------------------------------------------------------------
@@ -1724,6 +1733,14 @@ s = replaceUnique(
   "handlers['edit-vendor-v6']=a=>{if(__pr23Live())return __pr23VendorEditModal(a.dataset.id);",
   "vendor profile -> edit opens the live vendor form",
   "if(__pr23Live())return __pr23VendorEditModal(a.dataset.id);",
+)
+// 55h. Vendor Registry: vendors who registered on the vendor portal wait for review here (approve or decline).
+s = replaceUnique(
+  s,
+  "actionV6('Run reminders','run-compliance-reminders-v6','','','mail'))}${filterBar()}",
+  "actionV6('Run reminders','run-compliance-reminders-v6','','','mail'))}${filterBar()}${__pr23Live()?__pr23VendorRegistrationsCard():''}",
+  "vendor registry -> self-registrations awaiting review",
+  "${__pr23Live()?__pr23VendorRegistrationsCard():''}",
 )
 // 55c. New record's "Annual plan" opened the base plan modal, whose Create is refused; the plan page's own create is live.
 s = replaceUnique(

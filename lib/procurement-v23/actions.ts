@@ -51,6 +51,8 @@ import {
   submitRequisition,
   updateRequisition,
   updateVendor,
+  approveVendorRegistration,
+  declineVendorRegistration,
 } from "@/lib/api/procurement-v23-api"
 import type { ProcurementV23LivePayload } from "@/lib/procurement-v23/live-loaders"
 
@@ -100,6 +102,8 @@ export const LIVE_ACTIONS = [
   "register-vendor-confirm",
   "register-vendor-confirm-v6",
   "save-vendor-profile-v23",
+  "approve-vendor-registration-v23",
+  "confirm-decline-vendor-registration-v23",
   "send-po-v6",
   "create-send-tender-v13",
   "create-send-tender-from-preview-v13",
@@ -279,7 +283,6 @@ const NOT_BUILT_OPENERS: Record<string, string> = {
   // Vault and preview "Send": prefilled procurement.approver@matanho.africa and toasted "Document sent".
   "send-doc-v11": "Sending documents by email is not connected yet. Download the PDF and send it from your mail.",
   "send-document": "Sending documents by email is not connected yet. Download the PDF and send it from your mail.",
-  "vendor-portal-v6": "Vendors fill this in on the vendor portal, from the link in their RFQ or document request.",
   // Related record offered the sample TN-2026-014, PO-2026-0584 and CTR-2026-081.
   "message-vendor-v6": "Vendor messaging is not connected yet. Contact the vendor from your mail for now.",
   // Its Send request was refused, and the form proposed a due date already past (5 Aug 2026).
@@ -654,6 +657,29 @@ export async function handleProcurementV23Action(
           reload: true,
           message: `${created?.name ?? name} registered${cleared ? " with a valid tax clearance" : " and placed in compliance review"}.${bankTyped ? " Bank details were not saved here; Finance records them." : ""}`,
         }
+      }
+
+      case "approve-vendor-registration-v23": {
+        // A vendor that registered itself on the vendor portal (Vendor Registry, self-registrations awaiting review).
+        if (!has("vendors.approve")) return refuse("approving vendor registrations")
+        const reg = rows("vendorRegistrationsV23").find((x) => x.id === detail.dataset.id)
+        if (!reg) return { handled: true, error: "That registration is no longer awaiting review. Refresh and try again." }
+        await approveVendorRegistration(String(reg.id))
+        return { handled: true, reload: true, message: `${reg.name} is approved: an active vendor that can be invited to RFQs, and emailed to say so.` }
+      }
+
+      case "confirm-decline-vendor-registration-v23": {
+        if (!has("vendors.approve")) return refuse("declining vendor registrations")
+        const F = "#declineVendorRegistrationFormV23"
+        const form = document.querySelector<HTMLFormElement>(F)
+        if (form && !form.reportValidity()) return { handled: true }
+        const reg = rows("vendorRegistrationsV23").find((x) => x.id === val(`${F} [name="vendorId"]`))
+        if (!reg) return { handled: true, error: "That registration is no longer awaiting review. Refresh and try again." }
+        const reason = val(`${F} [name="reason"]`)
+        if (!reason) return { handled: true, error: "Say why the registration is declined; the vendor is told." }
+        await declineVendorRegistration(String(reg.id), reason)
+        closeRuntimeOverlay()
+        return { handled: true, reload: true, message: `${reg.name}: registration declined, and the vendor emailed the reason.` }
       }
 
       case "save-vendor-profile-v23": {

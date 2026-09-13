@@ -94,9 +94,9 @@ try {
     // project as text; Edit request shows it as the chosen option of its select. Either is what the person sees.
     await row.first().locator('[data-action="row-actions-v16"]').first().click()
     await page.waitForTimeout(500)
-    const viewItem = page.locator(`[data-action="view-pr-v11"][data-id="${draft?.requisitionNumber}"] >> visible=true`).first()
-    if (await viewItem.count()) await viewItem.click()
-    else await page.locator('[data-action="view-pr-v11"] >> visible=true').first().click().catch(() => {})
+    // A draft is still editable, so its menu offers Edit request (edit-pr-v11) rather than View (view-pr-v11).
+    const menuItem = page.locator(`:is([data-action="view-pr-v11"], [data-action="edit-pr-v11"])[data-id="${draft?.requisitionNumber}"] >> visible=true`).first()
+    if (await menuItem.count()) await menuItem.click()
     await page.waitForTimeout(800)
     // The detail below says which one was open.
     const seen = await page

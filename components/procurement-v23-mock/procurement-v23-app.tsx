@@ -24,6 +24,7 @@ import {
 } from "@/lib/procurement-v23/actions"
 import { getAuthToken } from "@/lib/utils/cookies"
 import { requisitionLineSuggestions } from "@/lib/api/procurement-v23-api"
+import { VENDOR_PORTAL_EXTERNAL_URL } from "@/lib/portal/config"
 import "@/components/procurement-v23-mock/procurement-v23.css"
 import "@/components/procurement-v23-mock/procurement-v23-live.css"
 
@@ -150,6 +151,19 @@ export function ProcurementV23App() {
       const control = (event.target as Element | null)?.closest?.("[data-action]") as HTMLElement | null
       if (!control) return
       const action = control.dataset.action || ""
+      // Vendor Registry "Vendor portal": vendors register themselves on the vendor portal, which runs on its own domain.
+      // Opened in a new tab, in the click itself so no pop-up blocker stops it.
+      if (action === "vendor-portal" || action === "vendor-portal-v6") {
+        event.preventDefault()
+        event.stopImmediatePropagation()
+        const base = VENDOR_PORTAL_EXTERNAL_URL.replace(/\/+$/, "")
+        if (!base) {
+          toast.error("The vendor portal address is not set for this environment.")
+          return
+        }
+        window.open(`${base}/vendor-portal/register`, "_blank", "noopener,noreferrer")
+        return
+      }
       const refusal = refusedOpener(action, liveRef.current)
       if (refusal) {
         event.preventDefault()
