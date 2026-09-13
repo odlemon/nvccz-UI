@@ -1274,6 +1274,27 @@ function __pr23SupportDocument(a, kind) {
   };
 }
 
+/**
+ * The tender award decision paper from the records, in a live session. The vendored memorandum named "TechNova
+ * Solutions" as the selected bidder unless one had been picked in the browser, scored three sample bidders, said the
+ * bids were "opened under committee control" and showed the sample CFO as having signed on 1 August.
+ */
+function __pr23AwardMemo(a, t) {
+  const e = __pr23Esc;
+  const rfq = (t && t.id) || a.record;
+  const quotes = (state.quotationsLive || []).filter(q => q.rfq === rfq && q.rawStatus !== 'DRAFT')
+    .sort((x, y) => (x.amount ?? Infinity) - (y.amount ?? Infinity));
+  const winner = String(a.title || '').replace(/^Award to\s+/i, '') || (quotes[0] && quotes[0].vendor) || '—';
+  const pair = cells => `<tr>${cells.map(([k, v]) => `<th>${e(k)}</th><td>${v}</td>`).join('')}</tr>`;
+  const rows = quotes.map((q, i) => `<tr><td>${e(q.vendor)}</td><td>${e(q.id)}</td><td>${money(q.amount)}</td><td>${q.evaluationScore == null ? 'Not scored' : e(q.evaluationScore)}</td><td>${i + 1}</td></tr>`).join('');
+  return `<h1>Tender Award Approval Memorandum</h1><p class="doc-lead">Award decision for ${e((t && t.title) || a.record)}.</p>`
+    + `<table><tbody>${pair([['RFQ reference', e(rfq)], ['Department', e((t && t.entity) || a.entity || '—')]])}${pair([['Method', e((t && t.method) || '—')], ['Closing date', e((t && t.close) || '—')]])}${pair([['Requisition estimate', money(t && t.value)], ['Recommended bidder', e(winner)]])}${pair([['Proposed award value', money(a.amount)], ['Approval role', e(a.role || '—')]])}</tbody></table>`
+    + `<h2>1. Quotations received</h2>${quotes.length ? `<p>${quotes.length} quotation${quotes.length === 1 ? ' was' : 's were'} submitted through the vendors' invitation links, ranked here by total.</p><table><thead><tr><th>Vendor</th><th>Quotation</th><th>Total</th><th>Evaluation score</th><th>Rank by total</th></tr></thead><tbody>${rows}</tbody></table>` : '<p>No submitted quotation is recorded for this RFQ.</p>'}`
+    + `<h2>2. Basis of the recommendation</h2><p>${e(a.reason || 'The lowest total submitted.')}</p>`
+    + `<h2>3. Decision requested</h2><p>Approve the award to <strong>${e(winner)}</strong> for <strong>${money(a.amount)}</strong>. Approving accepts the quotation and raises the purchase order; rejecting leaves the RFQ in evaluation.</p>`
+    + `<h2>4. Before approving</h2><ul><li>The vendor's tax clearance and company documents on the Vendor Registry are current.</li><li>No conflict of interest is known to the approver.</li></ul>`;
+}
+
 /** Said instead of a page of empty registers, which reads as "nothing exists" rather than "not yours". */
 function __pr23NoAccessHtml(page) {
   const title = __PR23_PAGE_TITLES[page] || 'This page';

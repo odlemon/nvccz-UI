@@ -65,7 +65,9 @@ export default function RootLayout({
             />
           </AuthProvider>
         </StoreProvider>
-        <Analytics />
+        {/* Vercel Analytics serves /_vercel/insights/script.js only on Vercel. Self-hosted, that path answers with
+            an HTML page, and every page threw "Unexpected token '<'" loading it. */}
+        {process.env.VERCEL ? <Analytics /> : null}
       </body>
     </html>
   )

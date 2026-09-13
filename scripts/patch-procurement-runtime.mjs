@@ -1543,6 +1543,23 @@ s = replaceUnique(
   "approval decision paper -> dated today",
   "date:__pr23Live()?__pr23Today():'02 Aug 2026',approvalId:a.id,",
 )
+// Found by the round-two check on dev: the award decision paper was still the vendored memorandum ("TechNova Solutions",
+// three sample bidders, the sample CFO "Signed 01 Aug 2026"), and every paper's footer read "Generated 02 Aug 2026".
+s = replaceUnique(
+  s,
+  "if(type.includes('tender award')){",
+  "if(type.includes('tender award')){if(__pr23Live())return __pr23AwardMemo(a,tenderByRecordV13(a.record));",
+  "award decision paper -> built from the RFQ and its quotations",
+  "if(__pr23Live())return __pr23AwardMemo(a,tenderByRecordV13(a.record));",
+)
+s = replaceEvery(
+  s,
+  "<span>Generated 02 Aug 2026</span>",
+  "<span>Generated ${__pr23Live()?__pr23Today():'02 Aug 2026'}</span>",
+  "document footers -> generated today",
+  "<span>Generated ${__pr23Live()?__pr23Today():'02 Aug 2026'}</span>",
+  2,
+)
 for (const [label, key] of [
   ["Budget availability and funding confirmation", "budget"],
   ["Evaluation or technical recommendation", "evaluation"],
