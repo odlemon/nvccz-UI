@@ -85,11 +85,20 @@ try {
   check(Number(draft?.items?.[0]?.unitPrice) === 2750, "and the estimate from the suggestion", String(draft?.items?.[0]?.unitPrice))
 
   await page.waitForTimeout(4000)
+  // Requisitions are not budget-checked, so no register column may claim a budget check.
+  const heads = await page.$$eval("#workspace table thead th", (ths) => ths.map((t) => t.innerText.trim()))
+  check(heads.length > 0 && !heads.some((h) => /budget check/i.test(h)), "the register has no Budget check column", heads.join(", "))
   const row = page.locator("#workspace table tbody tr", { hasText: draft?.requisitionNumber ?? "none" })
   if (await row.count()) {
-    await row.first().click()
-    // A draft's row opens the requester's edit form, where the project is the chosen option of its select; the view
-    // prints it as text. Either is what the person sees, and the detail says which one was open.
+    // The requester's register opens nothing on a row click: its actions are in the row's ⋯ menu. View prints the
+    // project as text; Edit request shows it as the chosen option of its select. Either is what the person sees.
+    await row.first().locator('[data-action="row-actions-v16"]').first().click()
+    await page.waitForTimeout(500)
+    const viewItem = page.locator(`[data-action="view-pr-v11"][data-id="${draft?.requisitionNumber}"] >> visible=true`).first()
+    if (await viewItem.count()) await viewItem.click()
+    else await page.locator('[data-action="view-pr-v11"] >> visible=true').first().click().catch(() => {})
+    await page.waitForTimeout(800)
+    // The detail below says which one was open.
     const seen = await page
       .waitForFunction(
         (n) => {

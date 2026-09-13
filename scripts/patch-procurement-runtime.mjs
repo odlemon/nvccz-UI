@@ -1943,6 +1943,44 @@ s = replaceUnique(
   "<div><span>Project</span><strong>${escV11(r.project||'None')}</strong></div>",
 )
 
+// 62b. Requisitions are not budget-checked (live-loaders sets budget to a dash: the backend has no budget check), so the
+// registers' Budget check column and the view's Budget line read "—" on every requisition. Not shown in a live session.
+s = replaceUnique(
+  s,
+  "'Estimate','Budget check','Status','Owner'",
+  "'Estimate',...(__pr23Live()?[]:['Budget check']),'Status','Owner'",
+  "requisition register -> no Budget check column when live",
+  "'Estimate',...(__pr23Live()?[]:['Budget check']),'Status','Owner'",
+)
+s = replaceUnique(
+  s,
+  "'Estimate','Budget check','Status','Action'",
+  "'Estimate',...(__pr23Live()?[]:['Budget check']),'Status','Action'",
+  "my requisitions -> no Budget check column when live",
+  "'Estimate',...(__pr23Live()?[]:['Budget check']),'Status','Action'",
+)
+s = replaceUnique(
+  s,
+  "<td>${/Warning/.test(r.budget)?status(r.budget):`<span style=\"color:var(--green)\">${r.budget}</span>`}</td>",
+  "${__pr23Live()?'':`<td>${/Warning/.test(r.budget)?status(r.budget):`<span style=\"color:var(--green)\">${r.budget}</span>`}</td>`}",
+  "requisition register -> no budget cell when live",
+  "${__pr23Live()?'':`<td>${/Warning/.test(r.budget)?status(r.budget):`<span style=\"color:var(--green)\">${r.budget}</span>`}</td>`}",
+)
+s = replaceUnique(
+  s,
+  "<td>${/Warning/.test(r.budget)?status(r.budget):`<span style=\"color:var(--green)\">${escV11(r.budget)}</span>`}</td>",
+  "${__pr23Live()?'':`<td>${/Warning/.test(r.budget)?status(r.budget):`<span style=\"color:var(--green)\">${escV11(r.budget)}</span>`}</td>`}",
+  "my requisitions -> no budget cell when live",
+  "${__pr23Live()?'':`<td>${/Warning/.test(r.budget)?status(r.budget):`<span style=\"color:var(--green)\">${escV11(r.budget)}</span>`}</td>`}",
+)
+s = replaceUnique(
+  s,
+  "<div><span>Budget</span><strong>${esc(r.budget)}</strong></div>",
+  "${__pr23Live()?'':`<div><span>Budget</span><strong>${esc(r.budget)}</strong></div>`}",
+  "requisition view -> no Budget line when live",
+  "${__pr23Live()?'':`<div><span>Budget</span><strong>${esc(r.budget)}</strong></div>`}",
+)
+
 // ---------------------------------------------------------------------------
 // 43. A filed document previews as itself
 // ---------------------------------------------------------------------------
