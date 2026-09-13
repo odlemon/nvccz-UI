@@ -400,6 +400,24 @@ export function adaptAc52ApBills(rows: PurchaseInvoice[]): Ac52ApBill[] {
     match: '—',
     status: apBillStatusLabel(r.status, r.paymentStatus),
     journal: r.journalEntry?.referenceNumber || '',
+    source: 'accounting' as const,
+    recordId: r.id,
+    currency: (r as any).currency?.code || 'USD',
+    // PurchaseInvoiceService.payInvoice pays a submitted (POSTED) credit bill that is not yet paid.
+    payable: r.status === 'POSTED' && (r as any).paymentMethod === 'CREDIT' && r.paymentStatus !== 'PAID' && (Number(r.outstandingAmount) || 0) > 0,
+    subtotal: (r as any).subtotal != null ? Number((r as any).subtotal) : null,
+    tax: (r as any).taxAmount != null ? Number((r as any).taxAmount) : null,
+    approval:
+      r.paymentStatus === 'PAID'
+        ? 'Paid'
+        : r.status === 'POSTED'
+          ? 'Submitted in Accounting'
+          : r.status === 'DRAFT'
+            ? 'Draft in Accounting, not yet submitted'
+            : String(r.status || '—'),
+    paidOn: (r as any).paymentDate ? String((r as any).paymentDate).slice(0, 10) : null,
+    paymentReference: (r as any).paymentReference ?? null,
+    documentUrl: null,
   }))
 }
 
@@ -919,8 +937,19 @@ export function adaptAc52ProcurementBills(rows: any[]): Ac52ApBill[] {
   return rows
     .filter((r) => String(r.status).toUpperCase() !== 'REJECTED')
     .map((r) => {
-      const paid = String(r.paymentStatus).toUpperCase() === 'PAID'
+      const pay = String(r.paymentStatus).toUpperCase()
+      const paid = pay === 'PAID'
+      const partPaid = pay === 'PARTIALLY_PAID'
       const approved = String(r.status).toUpperCase() === 'APPROVED'
+      // Per-line result of the three-way match (ProcurementInvoiceMatchService), keyed by line number.
+      const detail = new Map<number, any>((r.aiDiscrepancies?.lines ?? []).map((l: any) => [Number(l.line), l]))
+      const approver = [r.approvedBy?.firstName, r.approvedBy?.lastName].filter(Boolean).join(' ')
+      const approval =
+        approved || paid || partPaid
+          ? String(r.approvalSource).toUpperCase() === 'AUTOMATIC'
+            ? `Approved automatically on ${PROC_DAY(r.approvedAt)}: an exact match with the order, and the supplier's document agrees`
+            : `Approved${approver ? ` by ${approver}` : ''}${r.approvedAt ? ` on ${PROC_DAY(r.approvedAt)}` : ''}`
+          : 'Waiting for approval in procurement'
       return {
         // The register's Bill column shows this: the invoice number, not a database id.
         id: r.invoiceNumber || r.id,
@@ -934,8 +963,34 @@ export function adaptAc52ProcurementBills(rows: any[]): Ac52ApBill[] {
         gross: PROC_NUM(r.totalAmount),
         open: paid ? 0 : PROC_NUM(r.totalAmount),
         match: procurementMatchLabel(r.matchingStatus),
-        status: paid ? 'Paid' : approved ? 'Approved' : 'Review',
-        journal: '',
+        status: paid ? 'Paid' : partPaid ? 'Part paid' : approved ? 'Approved' : 'Review',
+        journal: r.journalEntry?.referenceNumber || '',
+        source: 'procurement' as const,
+        recordId: r.id,
+        currency: r.currency?.code || 'USD',
+        // Paid in full, as procurement pays it: a part-paid invoice records no balance to pay again, so it is not offered.
+        payable: approved && !paid && !partPaid,
+        subtotal: r.subtotal != null ? PROC_NUM(r.subtotal) : null,
+        tax: r.taxAmount != null ? PROC_NUM(r.taxAmount) : null,
+        approval,
+        paidOn: r.paymentDate ? PROC_DAY(r.paymentDate) : null,
+        paymentReference: r.paymentReference ?? null,
+        documentUrl: r.documentPath || null,
+        lines: (r.items ?? []).map((i: any, idx: number) => {
+          const d = detail.get(idx + 1)
+          const qty = PROC_NUM(i.quantity)
+          const price = PROC_NUM(i.unitPrice)
+          return {
+            item: i.itemName,
+            qty,
+            price,
+            amount: i.totalPrice != null ? PROC_NUM(i.totalPrice) : qty * price,
+            poPrice: d?.poUnitPrice != null ? PROC_NUM(d.poUnitPrice) : null,
+            accepted: d?.acceptedQty != null ? PROC_NUM(d.acceptedQty) : null,
+            result:
+              d?.status === 'MATCHED' ? 'Matched' : d?.status === 'VARIANCE' ? 'Variance' : d?.status === 'UNMATCHED' ? 'Not on the order' : 'Not matched yet',
+          }
+        }),
       }
     })
 }
@@ -972,7 +1027,28 @@ export function adaptAc52ApPOs(orders: any[], invoices: any[]): Ac52ApPO[] {
                 : s === 'DRAFT'
                   ? 'Draft'
                   : s.charAt(0) + s.slice(1).toLowerCase().replace(/_/g, ' ')
-      return { id: o.poNumber || o.id, vendor: o.vendor?.name || '—', date: PROC_DAY(o.orderDate || o.createdAt), commitment, received, invoiced, status, owner: '—' }
+      return {
+        id: o.poNumber || o.id,
+        vendor: o.vendor?.name || '—',
+        date: PROC_DAY(o.orderDate || o.createdAt),
+        commitment,
+        received,
+        invoiced,
+        status,
+        owner: '—',
+        recordId: o.id,
+        requisition: o.requisition?.requisitionNumber ?? null,
+        quotation: o.quotation?.quotationNumber ?? null,
+        delivery: PROC_DAY(o.expectedDeliveryDate),
+        lines: (o.items ?? []).map((i: any) => ({
+          item: i.itemName,
+          unit: i.unit || '—',
+          ordered: PROC_NUM(i.quantity),
+          received: PROC_NUM(i.quantityReceived),
+          price: PROC_NUM(i.unitPrice),
+          amount: i.totalPrice != null ? PROC_NUM(i.totalPrice) : PROC_NUM(i.quantity) * PROC_NUM(i.unitPrice),
+        })),
+      }
     })
 }
 
@@ -987,6 +1063,7 @@ export function adaptAc52ApRfqs(rfqs: any[], quotations: any[]): Ac52ApRfq[] {
       const scores = bids.map((q) => Number(q.technicalScoreJson?.evaluation?.score)).filter((n) => Number.isFinite(n))
       return {
         id: r.rfqNumber || r.id,
+        recordId: rid,
         title: r.title || '—',
         close: PROC_DAY(r.closingAt),
         bids: bids.length,

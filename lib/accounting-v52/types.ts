@@ -101,6 +101,22 @@ export type Ac52ApBill = {
   match: string
   status: string
   journal: string
+  /** Where the bill is recorded: a procurement supplier invoice, or a bill captured in Accounting. */
+  source?: 'procurement' | 'accounting'
+  /** The backend id a payment is made against (the Bill column shows the invoice number). */
+  recordId?: string
+  currency?: string
+  /** Approved and not yet paid: in the payment queue. */
+  payable?: boolean
+  subtotal?: number | null
+  tax?: number | null
+  /** Who approved it and when, or what it is waiting for. */
+  approval?: string
+  paidOn?: string | null
+  paymentReference?: string | null
+  /** The supplier's own document, when one was filed with the invoice. */
+  documentUrl?: string | null
+  lines?: { item: string; qty: number; price: number; amount: number; poPrice: number | null; accepted: number | null; result: string }[]
 }
 
 /** A procurement purchase order as the v28 Payables page's Purchase orders tab reads it (apPOs). */
@@ -113,6 +129,12 @@ export type Ac52ApPO = {
   invoiced: number
   status: string
   owner: string
+  recordId?: string
+  requisition?: string | null
+  quotation?: string | null
+  /** Expected delivery date. */
+  delivery?: string
+  lines?: { item: string; unit: string; ordered: number; received: number; price: number; amount: number }[]
 }
 
 /** An open procurement RFQ as the v28 Payables page's Quotations & sourcing tab reads it (rfqs). */
@@ -125,6 +147,7 @@ export type Ac52ApRfq = {
   stage: string
   leader: string
   score: number | string
+  recordId?: string
 }
 
 /** Shape the runtime's v28-layer apVendors array expects. */
@@ -448,6 +471,8 @@ export type Ac52HydratePayload = {
     apVendors?: Ac52ApVendor[]
     apPOs?: Ac52ApPO[]
     apRfqs?: Ac52ApRfq[]
+    /** Active bank and cash accounts a supplier payment can be made from (Payables). */
+    apBanks?: Ac52Bank[]
     arInvoices?: Ac52ArInvoice[]
     arCustomers?: Ac52ArCustomer[]
     claims?: Ac52Claim[]

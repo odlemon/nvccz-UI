@@ -265,11 +265,16 @@ export async function loadAc52Scopes(scopes: Ac52DataScope[]): Promise<Ac52Hydra
   }
 
   if (wanted.includes('payables')) {
-    const [billsRes, vendorsRes, procurement] = await Promise.all([
+    const [billsRes, vendorsRes, procurement, banksRes] = await Promise.all([
       settle(accountingApi.getPurchaseInvoices({ limit: 200 }), 'purchaseInvoices', errors),
       settle(accountingApi.getVendors({ limit: 200 }), 'vendors', errors),
       loadProcurementForPayables(errors),
+      // The accounts a supplier payment can be made from, for Pay bill.
+      settle(cashbookApi.getCashbookBanks(), 'cashbookBanks', errors),
     ])
+    if (Array.isArray(banksRes?.data)) {
+      data.apBanks = adaptAc52Banks((banksRes!.data as any[]).filter((b) => b.isActive !== false) as any)
+    }
     const bills = Array.isArray(billsRes?.data?.invoices) ? billsRes!.data!.invoices : []
     // Supplier invoices captured in procurement are payables too: they sit beside accounting's own bills.
     if (Array.isArray(billsRes?.data?.invoices) || procurement.invoices.length) {

@@ -52,6 +52,8 @@ export function AccountingV52App() {
     // to the root route before the runtime ever shows the real page. Ignore nav
     // calls that don't match initialPage until we've seen one that does.
     let hasSettledOnInitialPage = initialPage === "overview"
+    // Pages patched for live data (scripts/patch-accounting-v52-runtime.mjs) render the records instead of samples.
+    ;(window as any).__AC52_LIVE__ = true
     const runtime = startAccountingV52Runtime(el, {
       shellHtml: ACCOUNTING_V52_SHELL_HTML,
       initialPage,
@@ -128,7 +130,7 @@ export function AccountingV52App() {
       const ce = event as CustomEvent
       const detail = ce.detail || {}
       const action = String(detail.action || "")
-      const LIVE_ACTIONS = new Set(["coa-save", "upload-document", "close-task-complete", "timesheet-approve", "timesheet-return", "create-tax-pack", "approval-decision", "journal-submit"])
+      const LIVE_ACTIONS = new Set(["coa-save", "upload-document", "close-task-complete", "timesheet-approve", "timesheet-return", "create-tax-pack", "approval-decision", "journal-submit", "ap-pay-bill"])
       if (!LIVE_ACTIONS.has(action)) return
       event.preventDefault()
       if (busyRef.current) return
@@ -167,6 +169,8 @@ export function AccountingV52App() {
           // book an investment, or apply a CoA change — invalidate broadly rather than guess which.
           "approval-decision": { scopes: [...JOURNAL_DEPENDENT_SCOPES, "coa", "payables", "investments"], title: "Approval processed" },
           "journal-submit": { scopes: JOURNAL_DEPENDENT_SCOPES, title: "Journal submitted" },
+          // A supplier payment posts a journal and a cashbook entry, and reduces the bill (and the procurement invoice).
+          "ap-pay-bill": { scopes: ["payables", ...JOURNAL_DEPENDENT_SCOPES], title: "Supplier payment" },
         }
         const meta = ACTION_SCOPE[action] || { scopes: ["coa"] as Ac52DataScope[], title: "Updated" }
         // Drop the in-flight entry too, not just the loaded flag: a fetch issued before this
