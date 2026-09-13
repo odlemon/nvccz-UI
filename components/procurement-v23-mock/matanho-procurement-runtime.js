@@ -827,8 +827,20 @@ function __pr23Money2(n, currencyCode) {
   }
 }
 
-function __pr23TaxTreatmentLabel(t) {
-  if (t === 'VAT_15') return 'VAT 15%';
+/** The invoice match panel's line for what the LLM read from the supplier's document. */
+function __pr23ReadingLabel(inv) {
+  const r = inv && inv.reading;
+  if (!r) return inv && inv.id && inv.id !== '—' ? 'No supplier document' : '—';
+  if (r.status === 'PENDING') return 'Being read';
+  if (r.status !== 'READ') return 'Could not be read';
+  if (r.agrees) return r.fromOcr ? 'Agrees with the capture (scan)' : 'Agrees with the capture';
+  const n = (r.differences || []).length;
+  return `${n} difference${n === 1 ? '' : 's'} from the capture`;
+}
+
+function __pr23TaxTreatmentLabel(t, rate) {
+  // Zimbabwe's standard rate is 15.5%; the reader reports the rate printed rather than assuming 15%.
+  if (t === 'VAT_15') return rate != null ? `VAT ${rate}%` : 'VAT at the standard rate';
   if (t === 'ZERO_RATED') return 'Zero rated';
   if (t === 'EXEMPT') return 'Exempt';
   return 'Not determined';
@@ -854,8 +866,18 @@ function __pr23ExtractionHtml(result) {
   const filed = (result && result.intake && result.intake.intakeNumber)
     ? `Filed as ${__pr23Esc(result.intake.intakeNumber)} in the intake register.`
     : 'Not filed: without a purchase order the vendor is unknown, so this reading is not kept.';
-  return `${banner}<div class="list" style="margin-top:12px">${field('Invoice number', p.invoiceNumber, 'invoiceNumber')}${field('Invoice date', p.invoiceDate, 'invoiceDate')}${field('Currency', p.currencyCode, 'currencyCode')}${field('Tax treatment', __pr23TaxTreatmentLabel(p.taxTreatment), 'taxTreatment')}</div>
+  // The figures printed on the invoice beside what its lines add up to, and any figure that does not add up.
+  const printed = (label, v) => `<div class="list-row"><div class="list-main"><strong>${v == null ? 'Not found' : __pr23Esc(__pr23Money2(v, p.currencyCode))}</strong><span>${__pr23Esc(label)}</span></div></div>`;
+  const checks = Array.isArray(p.checks) ? p.checks : [];
+  const checksHtml = checks.length
+    ? `<div class="notice" style="margin-top:12px"><div><strong>Figures to check</strong><p>${checks.map(c => __pr23Esc(c.message)).join('<br>')}</p></div></div>`
+    : '';
+  const ocrNote = p.readFromOcr
+    ? '<div class="notice" style="margin-top:12px"><div><strong>Read from a scan or photo</strong><p>The text was recovered with OCR before the model read it. Check every figure against the document with extra care.</p></div></div>'
+    : '';
+  return `${banner}${ocrNote}<div class="list" style="margin-top:12px">${field('Supplier', p.supplierName, 'supplierName')}${field('Supplier tax number', p.supplierTaxNumber, 'supplierTaxNumber')}${field('Invoice number', p.invoiceNumber, 'invoiceNumber')}${field('Invoice date', p.invoiceDate, 'invoiceDate')}${field('Due date', p.dueDate, 'dueDate')}${field('Purchase order quoted', p.purchaseOrderReference, 'purchaseOrderReference')}${field('Currency', p.currencyCode, 'currencyCode')}${field('Tax treatment', __pr23TaxTreatmentLabel(p.taxTreatment, p.taxRate), 'taxTreatment')}</div>
     ${lines.length ? table(['Description', 'Quantity', 'Unit price', 'Line total'], rows) : '<p class="muted" style="margin-top:12px">No invoice lines could be read.</p>'}
+    <div class="list" style="margin-top:12px">${printed('Subtotal printed on the invoice', p.subtotal)}${printed(`VAT printed on the invoice${p.taxRate != null ? ` (${p.taxRate}%)` : ''}`, p.taxAmount)}${printed('Total printed on the invoice', p.totalAmount)}</div>${checksHtml}
     <p class="muted" style="margin-top:8px">${lines.length ? `Lines total ${__pr23Money2(total, p.currencyCode)} before tax. ` : ''}${filed}</p>
     <div style="margin-top:12px">${btn('Capture this invoice', 'capture-invoice-v5', 'primary', 'invoice')}</div>`;
 }
@@ -870,19 +892,19 @@ function __pr23AiCapturePage() {
     .concat(orders.map(o => `<option value="${__pr23Esc(o.recordId)}">${__pr23Esc(o.id)} · ${__pr23Esc(o.vendor)}</option>`))
     .join('');
   const upload = `<div class="card-body"><form id="aiInvoiceCaptureV23" class="form-grid">
-      <div class="field full"><label>Supplier invoice (PDF)</label><input type="file" name="document" accept="application/pdf,.pdf" required></div>
+      <div class="field full"><label>Supplier invoice (PDF, scan or photo)</label><input type="file" name="document" accept="application/pdf,.pdf,image/png,image/jpeg,image/webp,image/tiff,.png,.jpg,.jpeg,.webp,.tif,.tiff" required></div>
       <div class="field full"><label>Purchase order</label><select id="aiInvoicePoV23">${options}</select></div>
     </form>
-    <p class="muted" style="margin-top:8px">The PDF has to carry selectable text; a photograph or a flat scan cannot be read. Naming the purchase order identifies the vendor, keeps the reading on record, and teaches the model that vendor's layout.</p>
+    <p class="muted" style="margin-top:8px">A PDF with selectable text is read directly; a scan or a photo is read with OCR first, which takes a little longer and needs extra checking. Naming the purchase order identifies the vendor, keeps the reading on record, and teaches the model that vendor's layout.</p>
     <div style="margin-top:12px">${btn('Read the invoice', 'confirm-extract-invoice-v23', 'primary', 'invoice')}</div></div>`;
-  const result = `<div class="card-body" id="aiInvoiceResultV23"><p class="muted">Nothing read yet. Upload a PDF above and its invoice number, date, currency and lines appear here for checking.</p></div>`;
+  const result = `<div class="card-body" id="aiInvoiceResultV23"><p class="muted">Nothing read yet. Upload the invoice above and its supplier, invoice number, dates, lines and totals appear here for checking.</p></div>`;
   return `<div class="page">${pageHead(
     'Accounts payable',
     'AI Invoice Capture',
-    'Reads the supplier’s invoice PDF and hands the fields to the capture form. Every figure stays yours to check before anything is saved.',
+    'Reads the supplier’s invoice — a PDF, a scan or a photo — and hands the fields to the capture form. Every figure stays yours to check before anything is saved.',
     btn('Capture by hand', 'capture-invoice-v5', '', 'invoice'),
   )}
-    ${card('Upload the invoice', 'One PDF at a time', upload)}
+    ${card('Upload the invoice', 'One invoice at a time', upload)}
     ${card('What was read', 'Check each field against the PDF before saving', result)}</div>`;
 }
 
@@ -929,6 +951,24 @@ if (typeof window !== 'undefined') {
     __pr23LastExtractionPo = po && po.value ? po.value : null;
     const box = document.querySelector('#aiInvoiceResultV23');
     if (box) box.innerHTML = __pr23ExtractionHtml(result || {});
+  };
+  /**
+   * The document and reading a capture for this order should carry: the last reading, when it was made for this order
+   * or before any order was chosen. Its intake is reused only when it was filed for this order's vendor.
+   */
+  window.__pr23ReadingFor = function (poRecordId) {
+    const r = __pr23LastExtraction;
+    if (!r || !r.documentUrl) return null;
+    if (__pr23LastExtractionPo && poRecordId && __pr23LastExtractionPo !== poRecordId) return null;
+    return {
+      documentUrl: r.documentUrl,
+      documentType: /\.pdf(\?|#|$)/i.test(String(r.documentUrl)) ? 'PDF' : 'IMAGE',
+      intakeId: r.intake && r.intake.id && __pr23LastExtractionPo === poRecordId ? r.intake.id : null,
+    };
+  };
+  window.__pr23ClearReading = function () {
+    __pr23LastExtraction = null;
+    __pr23LastExtractionPo = null;
   };
 }
 
@@ -2413,7 +2453,7 @@ window.MatanhoProcurement=Object.freeze({version:'8.0.0',navigate,render,getStat
       <div class="match-triptych" style="margin-bottom:14px">
         <section class="match-panel"><div class="match-head"><strong>Purchase Order</strong>${status('Controlled')}</div><div class="match-body"><div class="match-lines"><div class="match-line"><span>PO number</span><strong>${po.id}</strong></div><div class="match-line"><span>Vendor</span><strong>${esc(po.vendor)}</strong></div><div class="match-line"><span>Order value</span><strong>${money(po.amount)}</strong></div><div class="match-line"><span>Delivery date</span><strong>${esc(po.delivery)}</strong></div></div><div class="actions" style="margin-top:12px">${smallAction('Preview','preview-document',po.id,'eye')}${smallAction('Edit','edit-record-v5',po.id)}</div></div></section>
         <section class="match-panel"><div class="match-head"><strong>Goods Received Note</strong>${status(grn.status)}</div><div class="match-body"><div class="match-lines"><div class="match-line"><span>GRN number</span><strong>${grn.id}</strong></div><div class="match-line"><span>Received item</span><strong>${esc(grn.item)}</strong></div><div class="match-line"><span>Accepted value</span><strong>${money(grn.value)}</strong></div><div class="match-line"><span>Classification</span><strong>${grn.asset?'Fixed asset candidate':'Inventory / expense'}</strong></div></div><div class="actions" style="margin-top:12px">${smallAction('Preview','preview-document',grn.id,'eye')}${smallAction('Edit','edit-record-v5',grn.id)}</div></div></section>
-        <section class="match-panel"><div class="match-head"><strong>Supplier Invoice</strong>${status(inv.match)}</div><div class="match-body"><div class="match-lines"><div class="match-line"><span>Invoice number</span><strong>${inv.id}</strong></div><div class="match-line"><span>Captured total</span><strong>${money(inv.amount)}</strong></div><div class="match-line"><span>Tax treatment</span><strong>${esc(inv.tax)}</strong></div><div class="match-line"><span>OCR confidence</span><strong>${__pr23Live()?'—':'93.7%'}</strong></div></div><div class="actions" style="margin-top:12px">${smallAction('Preview','preview-invoice-v5',inv.id,'eye')}</div></div></section>
+        <section class="match-panel"><div class="match-head"><strong>Supplier Invoice</strong>${status(inv.match)}</div><div class="match-body"><div class="match-lines"><div class="match-line"><span>Invoice number</span><strong>${inv.id}</strong></div><div class="match-line"><span>Captured total</span><strong>${money(inv.amount)}</strong></div><div class="match-line"><span>Tax treatment</span><strong>${esc(inv.tax)}</strong></div><div class="match-line"><span>${__pr23Live()?'Document reading':'OCR confidence'}</span><strong>${__pr23Live()?__pr23Esc(__pr23ReadingLabel(inv)):'93.7%'}</strong></div></div><div class="actions" style="margin-top:12px">${smallAction('Preview','preview-invoice-v5',inv.id,'eye')}</div></div></section>
       </div>
       <div class="grid two" style="margin-bottom:14px">${card('Match outcome trend','Click a point for a month-specific match register.',`<div class="card-body">${lineChart('invoice-match')}</div>`)}${card('Exception causes','Click a cause for the underlying invoice and variance records.',`<div class="card-body">${bars([['Price variance',72],['Missing GRN',54],['Quantity variance',43],['Duplicate invoice',24],['Tax exception',18]],'invoice-exceptions')}</div>`)}</div>
       ${card('Invoice register for selected procurement chain','OCR output, match result, tax treatment, approval and accounting hand-off.',table(['Invoice','Vendor','PO','Amount','Match result','Tax','Status',''],rows))}</div>`;

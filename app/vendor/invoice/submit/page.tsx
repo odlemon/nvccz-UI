@@ -244,7 +244,7 @@ export default function VendorInvoiceSubmissionPage() {
         dueDate: dueDate?.toISOString(),
         currencyId: po.currency?.id,
         documentPath,
-        documentType: documentPath ? 'PDF' : undefined,
+        documentType: documentPath ? (/\.pdf$/i.test(documentFile?.name || '') ? 'PDF' : 'IMAGE') : undefined,
         items,
       })
       if (!res?.success) throw new Error(res?.message || 'Failed to submit invoice')
@@ -559,18 +559,18 @@ export default function VendorInvoiceSubmissionPage() {
                   <p className="text-xs text-gray-500">The invoice is dated the day you submit it.</p>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="invoice-pdf">Invoice PDF (optional)</Label>
+                  <Label htmlFor="invoice-pdf">Your invoice document (optional)</Label>
                   <label
                     htmlFor="invoice-pdf"
                     className="flex h-11 items-center gap-2 rounded-full border border-dashed border-gray-300 px-4 text-sm text-gray-600 cursor-pointer hover:bg-gray-50"
                   >
                     <Upload className="w-4 h-4" />
-                    <span className="truncate">{documentFile ? documentFile.name : 'Attach your invoice (PDF, up to 15 MB)'}</span>
+                    <span className="truncate">{documentFile ? documentFile.name : 'Attach your invoice: a PDF, or a scan or photo (up to 15 MB)'}</span>
                   </label>
                   <input
                     id="invoice-pdf"
                     type="file"
-                    accept="application/pdf,.pdf"
+                    accept="application/pdf,.pdf,image/png,image/jpeg,image/webp,image/tiff,.png,.jpg,.jpeg,.webp,.tif,.tiff"
                     className="sr-only"
                     onChange={(e) => setDocumentFile(e.target.files?.[0] || null)}
                   />

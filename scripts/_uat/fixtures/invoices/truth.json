@@ -1,0 +1,346 @@
+{
+  "msasa-boardroom.pdf": {
+    "supplier": "Msasa Contract Furniture (Pvt) Ltd",
+    "invoiceNumber": "MCF-INV-10482",
+    "invoiceDate": "2026-09-13",
+    "currency": "USD",
+    "purchaseOrder": "PO_20260908_0004",
+    "lines": [
+      {
+        "description": "Boardroom table, 12-seater, oak veneer",
+        "quantity": 1,
+        "unitPrice": 2750.0,
+        "lineTotal": 2750.0
+      },
+      {
+        "description": "Boardroom chair, mesh back, chrome base",
+        "quantity": 12,
+        "unitPrice": 295.0,
+        "lineTotal": 3540.0
+      }
+    ],
+    "subtotal": 6290.0,
+    "taxAmount": 974.95,
+    "total": 7264.95,
+    "kind": "text PDF",
+    "layout": "classic"
+  },
+  "sable-hvac-quarter.pdf": {
+    "supplier": "Sable Facilities Management (Pvt) Ltd",
+    "invoiceNumber": "SFM/2026/0917",
+    "invoiceDate": "2026-09-12",
+    "currency": "USD",
+    "purchaseOrder": "PO_20260903_0003",
+    "lines": [
+      {
+        "description": "Generator and HVAC preventive maintenance - quarter 1 visit (September 2026)",
+        "quantity": 1,
+        "unitPrice": 2600.0,
+        "lineTotal": 2600.0
+      }
+    ],
+    "subtotal": 2600.0,
+    "taxAmount": 403.0,
+    "total": 3003.0,
+    "kind": "text PDF",
+    "layout": "service"
+  },
+  "jacaranda-toner-variance.pdf": {
+    "supplier": "Jacaranda Office Supplies (Pvt) Ltd",
+    "invoiceNumber": "JOS-24117",
+    "invoiceDate": "2026-09-11",
+    "currency": "USD",
+    "purchaseOrder": "PO_20260830_0002",
+    "lines": [
+      {
+        "description": "Toner cartridge for HP LaserJet M404",
+        "quantity": 12,
+        "unitPrice": 89.0,
+        "lineTotal": 1068.0
+      },
+      {
+        "description": "Lever arch file, A4",
+        "quantity": 60,
+        "unitPrice": 3.2,
+        "lineTotal": 192.0
+      }
+    ],
+    "subtotal": 1260.0,
+    "taxAmount": 195.3,
+    "total": 1455.3,
+    "kind": "text PDF",
+    "layout": "amount-first"
+  },
+  "kopje-multipage.pdf": {
+    "supplier": "Kopje Office Furniture (Pvt) Ltd",
+    "invoiceNumber": "KOF 3391",
+    "invoiceDate": "2026-09-10",
+    "currency": "USD",
+    "purchaseOrder": null,
+    "lines": [
+      {
+        "description": "Visitor chair, fabric - black",
+        "quantity": 4,
+        "unitPrice": 85.0,
+        "lineTotal": 340.0
+      },
+      {
+        "description": "Task chair, mesh - grey",
+        "quantity": 6,
+        "unitPrice": 145.0,
+        "lineTotal": 870.0
+      },
+      {
+        "description": "Filing cabinet, 4-drawer - charcoal",
+        "quantity": 3,
+        "unitPrice": 210.0,
+        "lineTotal": 630.0
+      },
+      {
+        "description": "Desk pedestal, 3-drawer - walnut",
+        "quantity": 5,
+        "unitPrice": 120.0,
+        "lineTotal": 600.0
+      },
+      {
+        "description": "Bookcase, 5-shelf - oak",
+        "quantity": 2,
+        "unitPrice": 165.0,
+        "lineTotal": 330.0
+      },
+      {
+        "description": "Meeting table, round 1.2m - white",
+        "quantity": 1,
+        "unitPrice": 380.0,
+        "lineTotal": 380.0
+      },
+      {
+        "description": "Coat stand - black",
+        "quantity": 3,
+        "unitPrice": 38.5,
+        "lineTotal": 115.5
+      },
+      {
+        "description": "Whiteboard, 1.8m x 1.2m - grey",
+        "quantity": 2,
+        "unitPrice": 142.0,
+        "lineTotal": 284.0
+      },
+      {
+        "description": "Notice board, cork - charcoal",
+        "quantity": 4,
+        "unitPrice": 46.0,
+        "lineTotal": 184.0
+      },
+      {
+        "description": "Monitor arm, single - walnut",
+        "quantity": 8,
+        "unitPrice": 54.0,
+        "lineTotal": 432.0
+      },
+      {
+        "description": "Footrest, adjustable - oak",
+        "quantity": 6,
+        "unitPrice": 29.0,
+        "lineTotal": 174.0
+      },
+      {
+        "description": "Desk lamp, LED - white",
+        "quantity": 10,
+        "unitPrice": 32.5,
+        "lineTotal": 325.0
+      },
+      {
+        "description": "Waste bin, steel - black",
+        "quantity": 12,
+        "unitPrice": 14.0,
+        "lineTotal": 168.0
+      },
+      {
+        "description": "Cable tray, under-desk - grey",
+        "quantity": 10,
+        "unitPrice": 18.0,
+        "lineTotal": 180.0
+      },
+      {
+        "description": "Reception sofa, 2-seater - charcoal",
+        "quantity": 1,
+        "unitPrice": 640.0,
+        "lineTotal": 640.0
+      },
+      {
+        "description": "Side table - walnut",
+        "quantity": 2,
+        "unitPrice": 95.0,
+        "lineTotal": 190.0
+      },
+      {
+        "description": "Storage locker, 6-door - oak",
+        "quantity": 2,
+        "unitPrice": 310.0,
+        "lineTotal": 620.0
+      },
+      {
+        "description": "Mobile pedestal - white",
+        "quantity": 4,
+        "unitPrice": 115.0,
+        "lineTotal": 460.0
+      },
+      {
+        "description": "Standing desk converter - black",
+        "quantity": 3,
+        "unitPrice": 225.0,
+        "lineTotal": 675.0
+      },
+      {
+        "description": "Acoustic screen, 1.6m - grey",
+        "quantity": 6,
+        "unitPrice": 175.0,
+        "lineTotal": 1050.0
+      },
+      {
+        "description": "Lectern - charcoal",
+        "quantity": 1,
+        "unitPrice": 260.0,
+        "lineTotal": 260.0
+      },
+      {
+        "description": "Stacking chair - walnut",
+        "quantity": 20,
+        "unitPrice": 42.0,
+        "lineTotal": 840.0
+      },
+      {
+        "description": "Folding table, 1.8m - oak",
+        "quantity": 4,
+        "unitPrice": 88.0,
+        "lineTotal": 352.0
+      },
+      {
+        "description": "Magazine rack - white",
+        "quantity": 2,
+        "unitPrice": 36.0,
+        "lineTotal": 72.0
+      },
+      {
+        "description": "Key cabinet, 50 hooks - black",
+        "quantity": 1,
+        "unitPrice": 72.0,
+        "lineTotal": 72.0
+      },
+      {
+        "description": "Shredder, cross-cut - grey",
+        "quantity": 2,
+        "unitPrice": 189.0,
+        "lineTotal": 378.0
+      },
+      {
+        "description": "Safe, fire-rated - charcoal",
+        "quantity": 1,
+        "unitPrice": 520.0,
+        "lineTotal": 520.0
+      },
+      {
+        "description": "Printer stand - walnut",
+        "quantity": 3,
+        "unitPrice": 64.0,
+        "lineTotal": 192.0
+      },
+      {
+        "description": "Umbrella stand - oak",
+        "quantity": 2,
+        "unitPrice": 27.5,
+        "lineTotal": 55.0
+      },
+      {
+        "description": "Wall clock - white",
+        "quantity": 6,
+        "unitPrice": 19.5,
+        "lineTotal": 117.0
+      }
+    ],
+    "subtotal": 11505.5,
+    "taxAmount": 1783.35,
+    "total": 13288.85,
+    "kind": "text PDF",
+    "layout": "multipage"
+  },
+  "msasa-boardroom-scanned.pdf": {
+    "supplier": "Msasa Contract Furniture (Pvt) Ltd",
+    "invoiceNumber": "MCF-INV-10482",
+    "invoiceDate": "2026-09-13",
+    "currency": "USD",
+    "purchaseOrder": "PO_20260908_0004",
+    "lines": [
+      {
+        "description": "Boardroom table, 12-seater, oak veneer",
+        "quantity": 1,
+        "unitPrice": 2750.0,
+        "lineTotal": 2750.0
+      },
+      {
+        "description": "Boardroom chair, mesh back, chrome base",
+        "quantity": 12,
+        "unitPrice": 295.0,
+        "lineTotal": 3540.0
+      }
+    ],
+    "subtotal": 6290.0,
+    "taxAmount": 974.95,
+    "total": 7264.95,
+    "kind": "scanned PDF (no text layer)",
+    "layout": "classic"
+  },
+  "jacaranda-photo.png": {
+    "supplier": "Jacaranda Office Supplies (Pvt) Ltd",
+    "invoiceNumber": "JOS-24117",
+    "invoiceDate": "2026-09-11",
+    "currency": "USD",
+    "purchaseOrder": "PO_20260830_0002",
+    "lines": [
+      {
+        "description": "Toner cartridge for HP LaserJet M404",
+        "quantity": 12,
+        "unitPrice": 89.0,
+        "lineTotal": 1068.0
+      },
+      {
+        "description": "Lever arch file, A4",
+        "quantity": 60,
+        "unitPrice": 3.2,
+        "lineTotal": 192.0
+      }
+    ],
+    "subtotal": 1260.0,
+    "taxAmount": 195.3,
+    "total": 1455.3,
+    "kind": "phone photo",
+    "layout": "amount-first"
+  },
+  "jacaranda-photo.jpg": {
+    "supplier": "Jacaranda Office Supplies (Pvt) Ltd",
+    "invoiceNumber": "JOS-24117",
+    "invoiceDate": "2026-09-11",
+    "currency": "USD",
+    "purchaseOrder": "PO_20260830_0002",
+    "lines": [
+      {
+        "description": "Toner cartridge for HP LaserJet M404",
+        "quantity": 12,
+        "unitPrice": 89.0,
+        "lineTotal": 1068.0
+      },
+      {
+        "description": "Lever arch file, A4",
+        "quantity": 60,
+        "unitPrice": 3.2,
+        "lineTotal": 192.0
+      }
+    ],
+    "subtotal": 1260.0,
+    "taxAmount": 195.3,
+    "total": 1455.3,
+    "kind": "phone photo",
+    "layout": "amount-first"
+  }
+}

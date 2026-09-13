@@ -793,14 +793,24 @@ export async function handleProcurementV23Action(
         if (items.some((l) => !(l.unitPrice > 0))) return { handled: true, error: "Every invoiced line needs a unit price above zero." }
         const invoiceDate = val('#invoiceCaptureV23 [name="invoiceDate"]')
         const dueDate = val('#invoiceCaptureV23 [name="dueDate"]')
+        // The supplier's document read on AI Invoice Capture goes with the invoice, and its reading is reused, when it
+        // was read for this order (or before any order was chosen). Captures made from a reading used to drop the PDF.
+        const reading =
+          (window as unknown as {
+            __pr23ReadingFor?: (po: string) => { documentUrl: string; documentType: string; intakeId: string | null } | null
+          }).__pr23ReadingFor?.(poId) ?? null
         const invoice = await captureProcurementInvoice({
           purchaseOrderId: poId,
           vendorId: String(po.vendorId),
           invoiceDate: new Date(invoiceDate).toISOString(),
           dueDate: dueDate ? new Date(dueDate).toISOString() : undefined,
           currencyId: po.currencyId ?? undefined,
+          documentPath: reading?.documentUrl,
+          documentType: reading?.documentType,
+          readingIntakeId: reading?.intakeId ?? undefined,
           items,
         })
+        ;(window as unknown as { __pr23ClearReading?: () => void }).__pr23ClearReading?.()
         closeRuntimeOverlay()
         return {
           handled: true,
@@ -819,10 +829,10 @@ export async function handleProcurementV23Action(
         if (!form.reportValidity()) return { handled: true }
         const file = form.querySelector<HTMLInputElement>('[name="document"]')?.files?.[0]
         if (!file) return { handled: true, error: "Attach the supplier's invoice PDF first." }
-        if (!/\.pdf$/i.test(file.name)) {
+        if (!/\.(pdf|png|jpe?g|webp|tiff?)$/i.test(file.name)) {
           return {
             handled: true,
-            error: "The invoice has to be a PDF. A photograph or a scan has to be saved as a PDF carrying selectable text before it can be read.",
+            error: "Upload the invoice as a PDF, or as a scan or photo (PNG, JPEG, WEBP or TIFF).",
           }
         }
         const fd = new FormData()
@@ -835,7 +845,7 @@ export async function handleProcurementV23Action(
         if (!lineCount && !result.payload?.invoiceNumber) {
           return {
             handled: true,
-            error: "Nothing could be read from that PDF — most likely a scan with no text layer. Capture this invoice by hand.",
+            error: "Nothing could be read from that document. Check it is the supplier's invoice, or capture it by hand.",
           }
         }
         // The runtime owns the page's DOM, so the bridge does the filling in.

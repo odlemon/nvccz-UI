@@ -1400,7 +1400,22 @@ s = replaceUnique(
   "year:'FY 2026',expanded:true,",
   "year:'FY 2026',expanded:(typeof window==='undefined'||window.innerWidth>780),",
   "narrow screens -> menu starts collapsed",
-  "expanded:(typeof window==='undefined'||window.innerWidth>780)",
+  // Step 52 rewrites this check with a media query, so either form counts as already in place.
+  "year:'FY 2026',expanded:(typeof window==='undefined'||",
+)
+
+// ---------------------------------------------------------------------------
+// 53. The invoice match panel shows what the LLM read from the supplier's document
+// ---------------------------------------------------------------------------
+// Invoices that arrive with a document are now read by the LLM and compared with the capture (API
+// ProcurementInvoiceReadingService). The Supplier Invoice panel's "OCR confidence" line, a dash in a live session since
+// step 17, says what that reading found.
+s = replaceUnique(
+  s,
+  "<span>OCR confidence</span><strong>${__pr23Live()?'—':'93.7%'}</strong>",
+  "<span>${__pr23Live()?'Document reading':'OCR confidence'}</span><strong>${__pr23Live()?__pr23Esc(__pr23ReadingLabel(inv)):'93.7%'}</strong>",
+  "invoice match panel -> document reading",
+  "__pr23Esc(__pr23ReadingLabel(inv))",
 )
 
 // ---------------------------------------------------------------------------

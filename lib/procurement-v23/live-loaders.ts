@@ -442,6 +442,31 @@ export async function loadProcurementV23LiveData(): Promise<ProcurementV23LivePa
   })
 
   // ----------------------------------------------------------------- invoices
+  // What the LLM read from the supplier's document, compared with the invoice as captured (ProcurementInvoiceReadingService).
+  const readingOf = (inv: any) => {
+    const o = inv.ocrData
+    if (!o || typeof o !== "object" || !o.status) {
+      return inv.documentPath ? { status: "PENDING", agrees: null, differences: [] as string[], supplierInvoiceNumber: null, fromOcr: false, message: null } : null
+    }
+    return {
+      status: String(o.status),
+      agrees: typeof o.comparison?.agrees === "boolean" ? o.comparison.agrees : null,
+      differences: Array.isArray(o.comparison?.differences) ? o.comparison.differences.map((d: any) => String(d?.message ?? "")) : ([] as string[]),
+      supplierInvoiceNumber: o.supplierInvoiceNumber ?? null,
+      fromOcr: Boolean(o.fromOcr),
+      message: o.message ?? null,
+    }
+  }
+  const readingSentence = (inv: any) => {
+    const r = readingOf(inv)
+    if (!r) return "No supplier document is attached."
+    if (r.status === "PENDING") return "The supplier's document is being read."
+    if (r.status !== "READ") return `The supplier's document could not be read${r.message ? `: ${r.message}` : ""}.`
+    const ref = r.supplierInvoiceNumber ? ` (supplier's invoice ${r.supplierInvoiceNumber})` : ""
+    return r.agrees
+      ? `The supplier's document${ref} agrees with the captured invoice.`
+      : `The supplier's document${ref} differs from the capture: ${r.differences.slice(0, 3).join("; ")}${r.differences.length > 3 ? ` and ${r.differences.length - 3} more` : ""}.`
+  }
   const invoicesView = invoices.map((inv) => ({
     id: inv.invoiceNumber ?? inv.id,
     recordId: inv.id,
@@ -463,6 +488,8 @@ export async function loadProcurementV23LiveData(): Promise<ProcurementV23LivePa
       !["PAID", "PARTIALLY_PAID"].includes(String(inv.paymentStatus ?? "").toUpperCase()),
     outstanding: num(inv.totalAmount),
     matchFlags: Array.isArray(inv.aiDiscrepancies?.flags) ? inv.aiDiscrepancies.flags : [],
+    reading: readingOf(inv),
+    readingSentence: readingSentence(inv),
     journal: inv.journalEntry?.referenceNumber ?? null,
     journalStatus: inv.journalEntry?.status ?? null,
     // For the monthly charts: when it was invoiced, and when it was paid.
@@ -783,7 +810,8 @@ export async function loadProcurementV23LiveData(): Promise<ProcurementV23LivePa
           entity: departmentOfRequisition(orders.find((o) => o.id === inv.purchaseOrderId)?.requisitionId),
           amount: num(inv.totalAmount),
           role: "Finance Manager",
-          reason: `Against ${inv.purchaseOrder?.poNumber ?? "no purchase order"}; three-way match ${matchLabel(inv.matchingStatus).toLowerCase()}.`,
+          // The approver sees what the LLM read from the supplier's own document beside the capture.
+          reason: `Against ${inv.purchaseOrder?.poNumber ?? "no purchase order"}; three-way match ${matchLabel(inv.matchingStatus).toLowerCase()}. ${readingSentence(inv)}`,
         }),
       )
     }

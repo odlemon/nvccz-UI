@@ -302,6 +302,11 @@ export async function captureProcurementInvoice(body: {
   invoiceDate: string
   dueDate?: string
   currencyId?: string
+  /** The supplier's document (from AI Invoice Capture); the API reads it with the LLM and compares it with the capture. */
+  documentPath?: string
+  documentType?: string
+  /** The intake holding the reading already made of that document, so it is not read twice. */
+  readingIntakeId?: string
   items: { itemName: string; description?: string; quantity: number; unitPrice: number; unit?: string }[]
 }): Promise<ProcurementRecord> {
   return unwrapData(await apiClient.post<ApiResponse<ProcurementRecord>>("/procurement/invoices", body))
@@ -314,6 +319,18 @@ export type ExtractedInvoice = {
   invoiceNumber: string | null
   invoiceDate: string | null
   currencyCode: string | null
+  dueDate?: string | null
+  supplierName?: string | null
+  supplierTaxNumber?: string | null
+  purchaseOrderReference?: string | null
+  subtotal?: number | null
+  taxRate?: number | null
+  taxAmount?: number | null
+  totalAmount?: number | null
+  /** Figures that do not add up, or a total that could not be read. */
+  checks?: { code: string; message: string }[]
+  /** The text came from OCR of a scan or photo. */
+  readFromOcr?: boolean
   lines: ExtractedInvoiceLine[]
   taxTreatment?: "VAT_15" | "ZERO_RATED" | "EXEMPT" | "UNKNOWN"
   fieldConfidence?: Record<string, number>
