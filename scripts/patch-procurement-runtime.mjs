@@ -1391,6 +1391,14 @@ s = replaceUnique(
   "approval centre -> live page",
   "function approvalsPageV6(){if(__pr23Live())return __pr23ApprovalsPageHtml();",
 )
+// Configuration's Approval matrix tab reads the requisition route the loaders fetch (GET /procurement/approval-matrix).
+s = replaceUnique(
+  s,
+  "'letterhead','approvalGroupV23'];",
+  "'letterhead','approvalGroupV23','approvalMatrixV23'];",
+  "hydrate() -> the approval matrix",
+  "'approvalGroupV23','approvalMatrixV23'];",
+)
 
 // ---------------------------------------------------------------------------
 // 44. Tablets and phones open on the icon rail, not the full menu over the page
@@ -1668,6 +1676,79 @@ s = replaceUnique(
   "${__pr23Live()?__pr23VendorHistoryCard(v):''}${card('Vendor communications and received documents',",
   "vendor profile -> orders, invoices, delivery and prices",
   "${__pr23Live()?__pr23VendorHistoryCard(v):''}",
+)
+
+// ---------------------------------------------------------------------------
+// 56. A requisition shows its approval route
+// ---------------------------------------------------------------------------
+// SRD §3 and §7: approval follows rules (a larger requisition needs a further level) and the requester tracks where a
+// request is. The review and view modals showed the estimate and the status only; they now show each step of the
+// route, who decides it, when it applies and who decided it when (__pr23ApprovalRouteHtml).
+s = replaceUnique(
+  s,
+  "${smallV11('Preview motivation','preview-doc-v11',`MOT-${r.id}`,'eye')}</div>`;",
+  "${smallV11('Preview motivation','preview-doc-v11',`MOT-${r.id}`,'eye')}</div>${__pr23Live()?__pr23ApprovalRouteHtml(r.approvalRoute):''}`;",
+  "requisition modal -> approval route",
+  "${__pr23Live()?__pr23ApprovalRouteHtml(r.approvalRoute):''}",
+)
+
+// ---------------------------------------------------------------------------
+// 57. A requisition's motivation document is the requester's own
+// ---------------------------------------------------------------------------
+// "Preview motivation" rendered a template as a controlled document: dated 01 Aug 2026 whatever the requisition, a
+// "budget check" no backend performs, and a stock business justification in place of what the requester wrote. A live
+// session builds it from the record: lines, the requester's justification, and the approval route
+// (__pr23RequisitionDocument). The notice no longer promises supporting evidence that is not stored.
+s = replaceUnique(
+  s,
+  "const isMotivation = ref.startsWith('MOT-');",
+  "const isMotivation = ref.startsWith('MOT-'); if (__pr23Live()) return __pr23RequisitionDocument(pr, isMotivation);",
+  "requisition document -> built from the record",
+  "if (__pr23Live()) return __pr23RequisitionDocument(pr, isMotivation);",
+)
+s = replaceUnique(
+  s,
+  "<strong>Internal motivation and supporting evidence</strong><p>Open the actual controlled motivation document before making a decision.</p>",
+  "<strong>${__pr23Live()?'Internal motivation':'Internal motivation and supporting evidence'}</strong><p>${__pr23Live()?'The lines, justification and approval route of this requisition, as one document.':'Open the actual controlled motivation document before making a decision.'}</p>",
+  "requisition modal -> motivation notice says what the document is",
+  "${__pr23Live()?'Internal motivation':'Internal motivation and supporting evidence'}",
+)
+
+// ---------------------------------------------------------------------------
+// 58. The requisition forms offer only what is saved
+// ---------------------------------------------------------------------------
+// The New requisition form offered an Attachment and a Request source (Internal, Investee, Subsidiary), and the edit
+// form offered Supporting documents. None reached the backend: files were dropped (the document vault takes uploads
+// from procurement.documents.manage only, which a requester does not hold) and the source was never sent, so an
+// "Investee" request was filed as an internal one. The SRD's requisition form (§7) is requester, department, lines and
+// justification; a live session shows those, and the subtitle no longer promises a budget check no backend performs.
+s = replaceUnique(
+  s,
+  "${formField('Request source','<select name=\"type\"><option>Internal</option><option>Investee</option><option>Subsidiary</option></select>')}",
+  "${__pr23Live()?'':formField('Request source','<select name=\"type\"><option>Internal</option><option>Investee</option><option>Subsidiary</option></select>')}",
+  "new requisition -> no request source that is not saved",
+  "${__pr23Live()?'':formField('Request source',",
+)
+s = replaceUnique(
+  s,
+  "${formField('Attachment','<input type=\"file\" accept=\".pdf,.doc,.docx,.xlsx,.csv\">','full')}",
+  "${__pr23Live()?'':formField('Attachment','<input type=\"file\" accept=\".pdf,.doc,.docx,.xlsx,.csv\">','full')}",
+  "new requisition -> no attachment that is not saved",
+  "${__pr23Live()?'':formField('Attachment',",
+)
+s = replaceUnique(
+  s,
+  "<div class=\"field span2\"><label>Supporting documents</label><input type=\"file\" multiple accept=\".pdf,.doc,.docx,.xlsx,.csv\"></div>",
+  "${__pr23Live()?'':'<div class=\"field span2\"><label>Supporting documents</label><input type=\"file\" multiple accept=\".pdf,.doc,.docx,.xlsx,.csv\"></div>'}",
+  "edit requisition -> no supporting documents that are not saved",
+  "${__pr23Live()?'':'<div class=\"field span2\"><label>Supporting documents</label>",
+)
+s = replaceUnique(
+  s,
+  "openModal('New purchase requisition','Create an internal, investee or subsidiary request with line items, budget check and approval routing.',",
+  "openModal('New purchase requisition',__pr23Live()?'Raise a request with its lines and justification. It is routed for approval when you submit it.':'Create an internal, investee or subsidiary request with line items, budget check and approval routing.',",
+  "new requisition -> subtitle promises only what happens",
+  "__pr23Live()?'Raise a request with its lines and justification.",
 )
 
 // ---------------------------------------------------------------------------

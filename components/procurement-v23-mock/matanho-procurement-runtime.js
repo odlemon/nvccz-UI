@@ -616,16 +616,197 @@ function __pr23NotificationsHtml() {
  * an invented role matrix whose toggles saved nothing. It now shows the signed-in role's real
  * procurement permissions and where to change them.
  */
+/** Configuration's two views: the signed-in person's procurement permissions, and the requisition approval matrix. */
+function __pr23SettingsTabsHtml(tab) {
+  return `<div class="settings-tabs-v5" style="margin-bottom:14px"><button class="tab ${tab === 'permissions' ? 'active' : ''}" data-action="settings-tab" data-id="permissions">Your permissions</button><button class="tab ${tab === 'approvals' ? 'active' : ''}" data-action="settings-tab" data-id="approvals">Approval matrix</button></div>`;
+}
+
 function __pr23SettingsPageHtml() {
+  const head = pageHead('Configuration', 'Configuration, RBAC and Access', 'Procurement roles, permissions and user assignments are managed centrally in Admin, so one change applies across every module.', '<a class="btn primary" href="/admin">Open Admin</a>');
+  // "Approval matrix" on the Approval Centre opens this tab (the runtime sets settingsTab to 'approvals').
+  if (state.settingsTab === 'approvals') return `<div class="page">${head}${__pr23SettingsTabsHtml('approvals')}${__pr23ApprovalMatrixHtml()}</div>`;
   const access = (__pr23Live() || {}).access || {};
   const grants = (access.permissions || []).map(p => String(p).replace('procurement.', ''));
   const rows = grants.map(g => `<tr><td><strong>${__pr23Esc(g)}</strong></td><td>${status('Granted')}</td></tr>`);
   const dept = access.department ? `${access.department}${access.departmentRole ? ` · ${access.departmentRole}` : ''}` : 'No department';
-  return `<div class="page">${pageHead('Configuration', 'Configuration, RBAC and Access', 'Procurement roles, permissions and user assignments are managed centrally in Admin, so one change applies across every module.', '<a class="btn primary" href="/admin">Open Admin</a>')}
+  return `<div class="page">${head}${__pr23SettingsTabsHtml('permissions')}
  <div class="notice" style="margin-bottom:14px"><div><strong>Managed in Admin → Roles</strong><p>Each procurement action has its own permission, for example procurement.orders.manage to raise purchase orders or procurement.rfq.award to award a tender. Grant or remove them on a role in Admin; the change applies the next time the module loads.</p></div></div>
  <div class="grid kpis">${kpi('Your role', __pr23Esc(access.roleName || '—'), __pr23Esc(dept), 'settings')}${kpi('Procurement permissions', grants.length, 'Granted to your role', 'approve')}</div>
  ${card('Your procurement permissions', 'What your role can do in this module', table(['Permission', 'Status'], rows.length ? rows : ['<tr><td colspan="2" class="muted">Your role holds no procurement permissions. You can still raise and track your own requisitions.</td></tr>']))}</div>`;
 }
+
+// ---------------------------------------------------------------- approval matrix and routes
+
+/** A figure to the cent, for amount conditions ("above $10,000.00"). */
+function __pr23Cents(v) {
+  return `$${Number(v || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+/**
+ * A requisition's approval route: each step, who decides it, when it applies, and who decided it when. The requester
+ * tracks the request with it and the approver sees where it stands, so neither has to ask.
+ */
+function __pr23ApprovalRouteHtml(route) {
+  if (!__pr23Live()) return '';
+  if (!route || !route.steps || !route.steps.length) {
+    return '<div class="notice" style="margin-top:14px"><div><strong>Approval route</strong><p>No approval route is recorded for this requisition. It is decided by the head or deputy head of its department.</p></div></div>';
+  }
+  const label = { APPROVED: 'Approved', REJECTED: 'Rejected', WAITING: 'Waiting', UPCOMING: 'Not yet', NOT_REACHED: 'Not reached' };
+  const when = iso => (iso ? new Date(iso).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false }) : '');
+  const rows = route.steps.map(s => {
+    const people = (s.approvers || []).map(p => p.name).join(', ');
+    const decided = s.decidedBy
+      ? `${__pr23Esc(s.decidedBy)}${s.onBehalfOf ? ` <span class="muted">for ${__pr23Esc(s.onBehalfOf)}</span>` : ''}<br><span class="muted">${__pr23Esc(when(s.decidedAt))}</span>${s.status === 'REJECTED' && s.comments ? `<br><span class="muted">${__pr23Esc(s.comments)}</span>` : ''}`
+      : `<span class="muted">${s.status === 'NOT_REACHED' ? 'Not needed after the rejection' : `Can decide: ${__pr23Esc(people)}`}</span>`;
+    return `<tr><td>${s.position}</td><td><strong>${__pr23Esc(s.who)}</strong>${s.aboveAmount != null ? `<br><span class="muted">Above ${__pr23Cents(s.aboveAmount)}</span>` : ''}</td><td>${status(label[s.status] || s.status)}</td><td>${decided}</td></tr>`;
+  });
+  const summary = route.waitingOn
+    ? `Waiting on step ${route.currentPosition} of ${route.totalSteps}: ${route.waitingOn.who}`
+    : route.status === 'APPROVED'
+      ? `Approved through ${route.totalSteps === 1 ? 'its one step' : `all ${route.totalSteps} steps`}`
+      : route.status === 'REJECTED' ? 'Rejected' : '';
+  return `<div style="margin-top:14px"><div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap;margin-bottom:6px"><strong>Approval route</strong><span class="muted">${__pr23Esc(summary)}</span></div>${__pr23LinesTable(['Step', 'Approver', 'Status', 'Decided by'], rows)}</div>`;
+}
+
+/**
+ * A requisition as a document, built from the record. The runtime's version was a template: dated 01 Aug 2026 whatever
+ * the requisition, with a budget check no backend performs and a stock justification in place of the requester's own.
+ */
+function __pr23RequisitionDocument(pr, isMotivation) {
+  const date = iso => (iso ? new Date(iso).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—');
+  const route = pr.approvalRoute;
+  const stepStatus = { APPROVED: 'Approved', REJECTED: 'Rejected', WAITING: 'Waiting', UPCOMING: 'Not yet', NOT_REACHED: 'Not reached' };
+  const lines = (pr.items || []).map(i => {
+    const line = i.unitPrice != null && i.quantity != null ? Number(i.unitPrice) * Number(i.quantity) : null;
+    return `<tr><td>${__pr23Esc(i.itemName)}</td><td>${i.quantity == null ? '—' : __pr23Esc(i.quantity)}</td><td>${__pr23Esc(i.unit || '—')}</td><td>${i.unitPrice != null ? __pr23Cents(i.unitPrice) : 'Not estimated'}</td><td>${line != null ? __pr23Cents(line) : '—'}</td></tr>`;
+  }).join('');
+  const approval = route && route.steps && route.steps.length
+    ? `<table><thead><tr><th>Step</th><th>Approver</th><th>Status</th><th>Decided</th></tr></thead><tbody>${route.steps.map(s => `<tr><td>${s.position}</td><td>${__pr23Esc(s.who)}${s.aboveAmount != null ? ` (above ${__pr23Cents(s.aboveAmount)})` : ''}</td><td>${__pr23Esc(stepStatus[s.status] || s.status)}</td><td>${s.decidedBy ? `${__pr23Esc(s.decidedBy)}, ${__pr23Esc(date(s.decidedAt))}` : '—'}</td></tr>`).join('')}</tbody></table>`
+    : `<p>${String(pr.rawStatus || '').toUpperCase() === 'DRAFT' ? 'Not yet submitted for approval.' : 'No approval route is recorded; the head of its department decides it.'}</p>`;
+  const title = isMotivation ? 'Internal motivation' : 'Purchase requisition';
+  const department = pr.department || pr.entity;
+  return {
+    id: isMotivation ? `MOT-${pr.id}` : pr.id,
+    name: `${title} - ${pr.title}`,
+    type: title,
+    version: 'From the record',
+    owner: pr.owner,
+    status: pr.status,
+    date: date((route && route.submittedAt) || pr.createdAt),
+    content: `<h1>${title}: ${__pr23Esc(pr.title)}</h1><p class="doc-lead-v11">Raised by ${__pr23Esc(pr.owner)} for ${__pr23Esc(department)}${pr.createdAt ? ` on ${__pr23Esc(date(pr.createdAt))}` : ''}.</p><table><tbody><tr><th>Requisition reference</th><td>${__pr23Esc(pr.id)}</td><th>Request source</th><td>${__pr23Esc(pr.type)}</td></tr><tr><th>Department</th><td>${__pr23Esc(department)}</td><th>Category</th><td>${__pr23Esc(pr.category)}</td></tr><tr><th>Estimated value</th><td>${pr.amount != null ? __pr23Cents(pr.amount) : 'Not estimated'}</td><th>Current status</th><td>${__pr23Esc(pr.status)}</td></tr></tbody></table><h2>1. What is needed</h2>${lines ? `<table><thead><tr><th>Item</th><th>Quantity</th><th>Unit</th><th>Unit estimate</th><th>Line estimate</th></tr></thead><tbody>${lines}</tbody></table>` : '<p>No lines are recorded.</p>'}<h2>2. Justification</h2><p>${pr.justification ? __pr23Esc(pr.justification) : 'The requester gave no justification.'}</p><h2>3. Approval</h2>${approval}`,
+  };
+}
+
+function __pr23MatrixRowsHtml(steps) {
+  return (steps || []).map(s => `<tr><td>${s.stepNumber}</td><td><strong>${__pr23Esc(s.who)}</strong></td><td>${s.aboveAmount != null ? `Only above ${__pr23Cents(s.aboveAmount)}` : 'Every requisition'}</td><td>${(s.people || []).length ? s.people.map(p => `<div>${__pr23Esc(p)}</div>`).join('') : '<span class="muted">Nobody holds this step, so requisitions reaching it are refused at submission</span>'}</td></tr>`);
+}
+
+/** Configuration, Approval matrix: the requisition route in force, and the decisions made by permission instead. */
+function __pr23ApprovalMatrixHtml() {
+  const m = state.approvalMatrixV23;
+  if (!m) {
+    return '<div class="notice"><div><strong>The approval matrix could not be loaded</strong><p>Refresh the page. If it still does not load, the procurement service is not answering.</p></div></div>';
+  }
+  const heads = ['Step', 'Approver', 'Applies to', 'Held today by'];
+  const notice = `<div class="notice" style="margin-bottom:14px"><div><strong>How the route works</strong><p>A submitted requisition goes through the steps in order, and any one person on a step decides it. A step with an amount applies only when the requisition's estimated total is above it, so a larger requisition needs a further level. A requisition is refused at submission when a step that applies has nobody to decide it. A change applies to requisitions submitted afterwards; one already waiting keeps the route it was given.${m.canEdit ? '' : ' Only an administrator or the Chief Financial Officer can change the route.'}</p></div></div>`;
+  const rows = __pr23MatrixRowsHtml(m.steps);
+  const route = card(
+    'Requisition approval route',
+    m.updatedAt ? `Last changed ${new Date(m.updatedAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}` : 'Who approves a purchase requisition',
+    table(heads, rows.length ? rows : ['<tr><td colspan="4" class="muted">No route is set. Each requisition is decided by the head of its department, or its deputy.</td></tr>']),
+    m.canEdit ? __pr23ActionButton('Edit route', 'edit-approval-matrix-v23', '', 'primary', 'settings') : '',
+  );
+  const overrides = (m.departmentRoutes || []).map(d => card(`${d.department} has its own route`, `${d.name}: requisitions from ${d.department} follow this instead of the route above.`, table(heads, __pr23MatrixRowsHtml(d.steps))));
+  const decisions = card(
+    'Decided by permission',
+    'Not routed in steps: a role that holds the permission makes the decision. Permissions are granted per role in Admin, Roles.',
+    table(['Decision', 'Permission', 'Roles holding it'], (m.permissionDecisions || []).map(d => `<tr><td><strong>${__pr23Esc(d.label)}</strong></td><td><code>${__pr23Esc(d.permission)}</code></td><td>${d.roles.length ? d.roles.map(r => `${__pr23Esc(r.name)} <span class="muted">(${r.people} ${r.people === 1 ? 'person' : 'people'})</span>`).join('<br>') : '<span class="muted">No role holds it</span>'}</td></tr>`)),
+  );
+  return notice + route + overrides.join('') + decisions;
+}
+
+function __pr23MatrixStepRowHtml(step, index) {
+  const m = state.approvalMatrixV23 || {};
+  const s = step || { kind: 'DEPARTMENT_HEAD', department: null, deputy: false, roleCode: null, userId: null, aboveAmount: null };
+  const opt = (value, text, selected) => `<option value="${__pr23Esc(value)}"${selected ? ' selected' : ''}>${__pr23Esc(text)}</option>`;
+  const kinds = [['DEPARTMENT_HEAD', 'Department head'], ['ROLE', 'Role'], ['USER', 'Named person']].map(([v, t]) => opt(v, t, s.kind === v)).join('');
+  const departments = opt('', "The requester's department", !s.department) + (m.departments || []).map(d => opt(d, d, s.department === d)).join('');
+  const headOrDeputy = opt('HEAD', 'Head, or deputy if none', !s.deputy) + opt('DEPUTY', 'Deputy head', !!s.deputy);
+  const roles = opt('', 'Choose a role', !s.roleCode) + (m.roles || []).map(r => opt(r.code, `${r.name} (${r.people} ${r.people === 1 ? 'person' : 'people'})`, s.roleCode === r.code)).join('');
+  const people = opt('', 'Choose a person', !s.userId) + (m.people || []).map(p => opt(p.id, [p.name, p.role, p.department].filter(Boolean).join(' · '), s.userId === p.id)).join('');
+  const hide = k => (s.kind === k ? '' : ' hidden');
+  const cell = 'style="padding:6px 8px;vertical-align:middle"';
+  return `<tr data-matrix-step><td ${cell} data-matrix-position>${index + 1}</td><td ${cell}><select name="kind" aria-label="Who decides">${kinds}</select></td><td ${cell}><span data-kind="DEPARTMENT_HEAD"${hide('DEPARTMENT_HEAD')}><select name="department" aria-label="Department">${departments}</select> <select name="deputy" aria-label="Head or deputy">${headOrDeputy}</select></span><span data-kind="ROLE"${hide('ROLE')}><select name="roleCode" aria-label="Role">${roles}</select></span><span data-kind="USER"${hide('USER')}><select name="userId" aria-label="Person">${people}</select></span></td><td ${cell}><input name="aboveAmount" type="number" min="0" step="0.01" placeholder="Every requisition" aria-label="Only above this amount" value="${s.aboveAmount != null ? __pr23Esc(s.aboveAmount) : ''}" style="width:140px"></td><td ${cell}><button class="btn small" type="button" data-action="remove-matrix-step-v23">Remove</button></td></tr>`;
+}
+
+/** Step numbers follow the rows; step 1 applies to every requisition, so its amount is cleared and locked. */
+function __pr23MatrixRenumber() {
+  const rows = [...document.querySelectorAll('#approvalMatrixFormV23 [data-matrix-step]')];
+  rows.forEach((row, i) => {
+    const position = row.querySelector('[data-matrix-position]');
+    if (position) position.textContent = String(i + 1);
+    const amount = row.querySelector('[name="aboveAmount"]');
+    if (amount) {
+      amount.disabled = i === 0;
+      if (i === 0) amount.value = '';
+      amount.title = i === 0 ? 'Step 1 applies to every requisition' : '';
+    }
+    const remove = row.querySelector('[data-action="remove-matrix-step-v23"]');
+    if (remove) remove.hidden = rows.length === 1;
+  });
+}
+
+function __pr23ApprovalMatrixModal() {
+  const m = state.approvalMatrixV23;
+  if (!m || !m.canEdit) {
+    if (typeof toast === 'function') toast('Not permitted', 'Only an administrator or the Chief Financial Officer can change the approval matrix.');
+    return;
+  }
+  const steps = m.steps.length ? m.steps : [null];
+  const rows = steps.map((s, i) => __pr23MatrixStepRowHtml(s, i)).join('');
+  const th = ['Step', 'Who decides', 'Which', 'Only above ($)', ''].map(h => `<th style="padding:6px 8px;text-align:left;font-size:11px;letter-spacing:.04em;text-transform:uppercase;white-space:nowrap">${h}</th>`).join('');
+  openModal(
+    'Edit requisition approval route',
+    'Who approves a purchase requisition, step by step',
+    `<form id="approvalMatrixFormV23" onsubmit="return false"><p class="muted" style="margin:0 0 10px">Steps run in order, and any one person on a step decides it. Leave the amount empty for a step that applies to every requisition. The route applies to requisitions submitted after you save.</p><div style="overflow-x:auto;max-width:100%"><table style="width:100%;min-width:0;border-collapse:collapse;font-size:13px"><thead><tr>${th}</tr></thead><tbody>${rows}</tbody></table></div><div style="margin-top:10px"><button class="btn small" type="button" data-action="add-matrix-step-v23">Add step</button></div></form>`,
+    btn('Cancel', 'close-overlay') + btn('Save route', 'save-approval-matrix-v23', 'primary'),
+  );
+  __pr23MatrixRenumber();
+}
+
+// The route editor's own controls stay in the page: capture phase, and the click ends here.
+__pr23On(document, 'click', event => {
+  const control = event.target && event.target.closest && event.target.closest('[data-action="edit-approval-matrix-v23"], [data-action="add-matrix-step-v23"], [data-action="remove-matrix-step-v23"]');
+  if (!control) return;
+  event.preventDefault();
+  event.stopImmediatePropagation();
+  const act = control.dataset.action;
+  if (act === 'edit-approval-matrix-v23') {
+    __pr23ApprovalMatrixModal();
+    return;
+  }
+  const body = document.querySelector('#approvalMatrixFormV23 tbody');
+  if (!body) return;
+  if (act === 'add-matrix-step-v23') {
+    const count = body.querySelectorAll('[data-matrix-step]').length;
+    if (count >= 6) {
+      if (typeof toast === 'function') toast('Six steps at most', 'A route can have at most six steps.');
+      return;
+    }
+    body.insertAdjacentHTML('beforeend', __pr23MatrixStepRowHtml(null, count));
+  } else {
+    const row = control.closest('[data-matrix-step]');
+    if (row && body.querySelectorAll('[data-matrix-step]').length > 1) row.remove();
+  }
+  __pr23MatrixRenumber();
+}, true);
+
+__pr23On(document, 'change', event => {
+  const select = event.target && event.target.closest && event.target.closest('#approvalMatrixFormV23 [name="kind"]');
+  if (!select) return;
+  const row = select.closest('[data-matrix-step]');
+  if (row) row.querySelectorAll('[data-kind]').forEach(el => { el.hidden = el.dataset.kind !== select.value; });
+}, true);
 
 // ---------------------------------------------------------------- goods received
 
@@ -776,7 +957,7 @@ function __pr23ApprovalsPageHtml() {
     kpi('Open approvals', String(all.length), others ? `${others} waiting on someone else` : 'Every one is yours to decide', 'audit'),
     kpi('Longest open', __pr23Waiting(oldest), oldest ? `Since ${new Date(oldest).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}` : 'No open approvals', 'account'),
   ].join('');
-  return `<div class="page">${pageHead('Decision workflow', 'Approval Centre', 'Decisions waiting on you, and every approval still open across procurement.', __pr23ActionButton('Export register', 'export-approvals-v6', '', '', 'download'))}<div class="grid kpis">${kpis}</div><section class="card">${tabs}<div class="settings-pane">${content}</div></section></div>`;
+  return `<div class="page">${pageHead('Decision workflow', 'Approval Centre', 'Decisions waiting on you, and every approval still open across procurement.', __pr23ActionButton('Approval matrix', 'approval-matrix', '', '', 'settings') + __pr23ActionButton('Export register', 'export-approvals-v6', '', '', 'download'))}<div class="grid kpis">${kpis}</div><section class="card">${tabs}<div class="settings-pane">${content}</div></section></div>`;
 }
 
 /**
@@ -2052,7 +2233,7 @@ function previewReport(id){const r=state.reports.find(x=>x.id===id)||state.repor
 function formField(label,input,full=''){return `<div class="field ${full}"><label>${label}</label>${input}</div>`}
 function createPlanModal(){openModal('Create annual procurement plan','Create the plan header, then add requirements and submit through the approval workflow.',`<form id="planForm" class="form-grid">${formField('Plan name','<input name="name" required value="FY 2027 Procurement Plan">')}${formField('Entity',`<select name="entity">${entities.map(x=>`<option>${x[1]}</option>`).join('')}</select>`)}${formField('Financial year','<select name="year"><option>FY 2027</option><option>FY 2026</option></select>')}${formField('Currency','<select name="currency"><option>USD</option><option>ZiG</option><option>ZAR</option></select>')}${formField('Budget ceiling','<input name="budget" type="number" required value="1000000">')}${formField('Plan owner','<input name="owner" value="Group Procurement">')}${formField('Planning assumptions','<textarea name="notes">Capture strategic priorities, demand assumptions and known funding constraints.</textarea>','full')}</form>`,btn('Save draft','save-plan')+btn('Create & add items','create-plan-confirm','primary'))}
 function addPlanItemModal(){if(__pr23Live())return __pr23PlanItemModal();openModal('Add procurement plan item','Budget validation and sourcing method are captured before submission.',`<form id="planItemForm" class="form-grid">${formField('Requirement','<input name="description" required>','full')}${formField('Entity',`<select name="entity">${entities.slice(1).map(x=>`<option>${x[1]}</option>`).join('')}</select>`)}${formField('Category','<select name="category"><option>Technology</option><option>Medical</option><option>Agriculture</option><option>Fleet</option><option>Facilities</option></select>')}${formField('Quarter','<select name="quarter"><option>Q1</option><option>Q2</option><option>Q3</option><option>Q4</option></select>')}${formField('Sourcing method','<select name="method"><option>Open tender</option><option>Restricted tender</option><option>Competitive quotations</option><option>Framework</option></select>')}${formField('Estimated budget','<input name="budget" type="number" required>')}${formField('Cost centre','<input name="cost" value="CC-1001">')}${formField('Business justification','<textarea name="notes"></textarea>','full')}</form>`,btn('Save item','save-plan-item','primary'))}
-function requisitionModal(){openModal('New purchase requisition','Create an internal, investee or subsidiary request with line items, budget check and approval routing.',`<form id="prForm" class="form-grid">${formField('Request source','<select name="type"><option>Internal</option><option>Investee</option><option>Subsidiary</option></select>')}${__pr23Live()?__pr23RequisitionEntityField()+__pr23RequisitionDepartmentField():formField('Entity',`<select name="entity">${entities.slice(1).map(x=>`<option>${x[1]}</option>`).join('')}</select>`)+formField('Department / cost centre','<select name="cost"><option>IT & Digital / CC-1001</option><option>Finance / CC-1002</option><option>Operations / CC-2001</option></select>')}${(__pr23Live()?formField('Category','<select name="category" required>'+__pr23RequisitionCategoryOptions()+'</select>'):formField('Category','<select name="category"><option>Technology</option><option>Medical</option><option>Agriculture</option><option>Facilities</option><option>Fleet</option></select>'))}${formField('Requirement title','<input name="title" required>','full')}<div class="field full"><label>Line items</label><div class="table-wrap"><table style="min-width:650px"><thead><tr><th>Item</th><th>UOM</th><th>Qty</th><th>Unit estimate</th><th>Total</th></tr></thead>${__pr23Live()?__pr23PrLinesTbody():`<tbody><tr><td><input name="item" required></td><td><select name="uom"><option>Each</option><option>Box</option><option>Lot</option><option>Month</option></select></td><td><input name="qty" type="number" value="1"></td><td><input name="price" type="number" value="1000"></td><td>$1,000</td></tr></tbody>`}</table></div></div>${formField('Internal motivation','<textarea name="motivation" required></textarea>','full')}${formField('Attachment','<input type="file" accept=".pdf,.doc,.docx,.xlsx,.csv">','full')}<div class="field full"><div class="notice"><div><strong>Live budget check</strong>${__pr23Live()?__pr23BudgetNotice():'<p>Remaining budget: $86,400. The request will warn or block according to the cost-centre control.</p>'}</div></div></div></form>`,btn('Save draft','save-pr')+btn('Submit for approval','submit-pr','primary'))}
+function requisitionModal(){openModal('New purchase requisition',__pr23Live()?'Raise a request with its lines and justification. It is routed for approval when you submit it.':'Create an internal, investee or subsidiary request with line items, budget check and approval routing.',`<form id="prForm" class="form-grid">${__pr23Live()?'':formField('Request source','<select name="type"><option>Internal</option><option>Investee</option><option>Subsidiary</option></select>')}${__pr23Live()?__pr23RequisitionEntityField()+__pr23RequisitionDepartmentField():formField('Entity',`<select name="entity">${entities.slice(1).map(x=>`<option>${x[1]}</option>`).join('')}</select>`)+formField('Department / cost centre','<select name="cost"><option>IT & Digital / CC-1001</option><option>Finance / CC-1002</option><option>Operations / CC-2001</option></select>')}${(__pr23Live()?formField('Category','<select name="category" required>'+__pr23RequisitionCategoryOptions()+'</select>'):formField('Category','<select name="category"><option>Technology</option><option>Medical</option><option>Agriculture</option><option>Facilities</option><option>Fleet</option></select>'))}${formField('Requirement title','<input name="title" required>','full')}<div class="field full"><label>Line items</label><div class="table-wrap"><table style="min-width:650px"><thead><tr><th>Item</th><th>UOM</th><th>Qty</th><th>Unit estimate</th><th>Total</th></tr></thead>${__pr23Live()?__pr23PrLinesTbody():`<tbody><tr><td><input name="item" required></td><td><select name="uom"><option>Each</option><option>Box</option><option>Lot</option><option>Month</option></select></td><td><input name="qty" type="number" value="1"></td><td><input name="price" type="number" value="1000"></td><td>$1,000</td></tr></tbody>`}</table></div></div>${formField('Internal motivation','<textarea name="motivation" required></textarea>','full')}${__pr23Live()?'':formField('Attachment','<input type="file" accept=".pdf,.doc,.docx,.xlsx,.csv">','full')}<div class="field full"><div class="notice"><div><strong>Live budget check</strong>${__pr23Live()?__pr23BudgetNotice():'<p>Remaining budget: $86,400. The request will warn or block according to the cost-centre control.</p>'}</div></div></div></form>`,btn('Save draft','save-pr')+btn('Submit for approval','submit-pr','primary'))}
 function vendorModal(){openModal('Register vendor','Zimbabwe vendor controls include duplicate BP/VAT validation, mandatory bank details, currency and tax clearance.',`<form id="vendorForm" class="form-grid">${formField('Legal name','<input name="name" required>')}${formField('Category','<select name="category"><option>Technology</option><option>Medical</option><option>Facilities</option><option>Fleet</option></select>')}${formField('BP number','<input name="bp" required>')}${formField('VAT number','<input name="vat" required>')}${formField('Bank','<input name="bank" required>')}${formField('Branch code','<input name="branch" required>')}${formField('Default currency','<select name="currency"><option>USD</option><option>ZiG</option><option>ZAR</option></select>')}${formField('ITF263 expiry','<input name="itf" type="date">')}${formField('Certificate of incorporation','<input type="file">')}${formField('CR14 / current company extract','<input type="file">')}</form>`,btn('Cancel','close-overlay')+btn('Validate & register','register-vendor-confirm','primary'))}
 function inviteVendorsModal(){const eligible=state.vendors.filter(v=>v.status!=='Blacklisted');openModal('Invite vendors to bid','Only category-eligible, non-blacklisted suppliers are available. The system emails a unique secure bid-form link.',`<div class="notice" style="margin-bottom:14px"><span class="kpi-icon">${icon('mail')}</span><div><strong>Secure system-generated bid form</strong><p>Each vendor receives an individual expiring link. Submissions are timestamped, sealed and cannot be edited after closing.</p></div></div><div class="list">${eligible.map(v=>`<label class="list-row"><input type="checkbox" checked> <div class="list-main"><strong>${v.name}</strong><span>${v.category} · ${v.currency} · ${v.status}</span></div><span>${v.rating}/5</span></label>`).join('')}</div>`,btn('Preview vendor form','vendor-bid-preview')+btn(`Email ${eligible.length} invitations`,'send-invitations','primary','mail'))}
 function vendorBidPreview(id='TN-2026-014'){if(__pr23Live())return __pr23VendorBidPreview(arguments[0]);openModal('Vendor Bid Submission Form',`${id} · secure external form preview`,`<div class="notice" style="margin-bottom:14px"><div><strong>Unique vendor link · expires at tender close</strong><p>Vendor identity and tender reference are locked by the invitation token.</p></div></div><div class="form-grid">${formField('Vendor','<input value="TechNova Solutions" readonly>')}${formField('Tender','<input value="'+id+'" readonly>')}${formField('Technical response','<textarea placeholder="Structured response to mandatory and scored criteria"></textarea>','full')}${formField('Bid currency','<select><option>USD</option><option>ZiG</option><option>ZAR</option></select>')}${formField('Total bid price','<input type="number" value="1280000">')}${formField('Delivery period','<input value="12 weeks">')}${formField('Warranty / support','<input value="36 months">')}${formField('Commercial schedule','<input type="file" accept=".xlsx,.csv,.pdf">','full')}${formField('Declarations','<label><input type="checkbox"> I declare the bid is accurate and disclose all conflicts.</label>','full')}${formField('Authorised signature','<input placeholder="Type authorised signatory name">','full')}</div>`,btn('Save draft','vendor-save-draft')+btn('Seal & submit bid','vendor-submit-bid','primary','signature'))}
@@ -3933,7 +4114,7 @@ window.MatanhoProcurement=Object.freeze({version:'8.0.0',navigate,render,getStat
     const prId = ref.startsWith('MOT-') ? ref.slice(4) : ref;
     const pr = state.requisitions.find(r => r.id === prId);
     if (pr) {
-      const isMotivation = ref.startsWith('MOT-');
+      const isMotivation = ref.startsWith('MOT-'); if (__pr23Live()) return __pr23RequisitionDocument(pr, isMotivation);
       return {
         id: ref,
         name: isMotivation ? `Internal Motivation - ${pr.title}` : `Purchase Requisition - ${pr.title}`,
@@ -4173,7 +4354,7 @@ window.MatanhoProcurement=Object.freeze({version:'8.0.0',navigate,render,getStat
   function viewPrV11(id, mode='view') {
     const r = state.requisitions.find(x => x.id === id); if (!r) return;
     const editable = mode === 'edit';
-    const fields = editable ? `<form id="editPrFormV11" class="dense-form-grid"><div class="field span2"><label>Requirement title</label><input name="title" value="${escV11(r.title)}" required></div>${__pr23Live()?'':`<div class="field"><label>Category</label><select name="category"><option>${escV11(r.category)}</option><option>Technology</option><option>Medical</option><option>Agriculture</option><option>Facilities</option><option>Fleet</option></select></div><div class="field"><label>Estimated value</label><input name="amount" type="number" value="${Number(r.amount)}" required></div>`}<div class="field span2"><label>Business justification</label><textarea name="justification">${__pr23Live()?escV11(r.justification||''):'The requirement supports approved departmental operations and service-delivery objectives. Procurement should validate the specification and sourcing route before commitment.'}</textarea></div><div class="field span2"><label>Supporting documents</label><input type="file" multiple accept=".pdf,.doc,.docx,.xlsx,.csv"></div></form>` : `<div class="source-meta"><div><span>Entity</span><strong>${escV11(r.entity)}</strong></div><div><span>Source</span><strong>${escV11(r.type)}</strong></div><div><span>Category</span><strong>${escV11(r.category)}</strong></div><div><span>Estimate</span><strong>${money(r.amount)}</strong></div><div><span>Budget check</span><strong>${escV11(r.budget)}</strong></div><div><span>Status</span><strong>${escV11(r.status)}</strong></div></div><div class="notice" style="margin-top:14px"><span class="kpi-icon">${icon('document')}</span><div><strong>Internal motivation and supporting evidence</strong><p>Open the actual controlled motivation document before making a decision.</p></div>${smallV11('Preview motivation','preview-doc-v11',`MOT-${r.id}`,'eye')}</div>`;
+    const fields = editable ? `<form id="editPrFormV11" class="dense-form-grid"><div class="field span2"><label>Requirement title</label><input name="title" value="${escV11(r.title)}" required></div>${__pr23Live()?'':`<div class="field"><label>Category</label><select name="category"><option>${escV11(r.category)}</option><option>Technology</option><option>Medical</option><option>Agriculture</option><option>Facilities</option><option>Fleet</option></select></div><div class="field"><label>Estimated value</label><input name="amount" type="number" value="${Number(r.amount)}" required></div>`}<div class="field span2"><label>Business justification</label><textarea name="justification">${__pr23Live()?escV11(r.justification||''):'The requirement supports approved departmental operations and service-delivery objectives. Procurement should validate the specification and sourcing route before commitment.'}</textarea></div>${__pr23Live()?'':'<div class="field span2"><label>Supporting documents</label><input type="file" multiple accept=".pdf,.doc,.docx,.xlsx,.csv"></div>'}</form>` : `<div class="source-meta"><div><span>Entity</span><strong>${escV11(r.entity)}</strong></div><div><span>Source</span><strong>${escV11(r.type)}</strong></div><div><span>Category</span><strong>${escV11(r.category)}</strong></div><div><span>Estimate</span><strong>${money(r.amount)}</strong></div><div><span>Budget check</span><strong>${escV11(r.budget)}</strong></div><div><span>Status</span><strong>${escV11(r.status)}</strong></div></div><div class="notice" style="margin-top:14px"><span class="kpi-icon">${icon('document')}</span><div><strong>${__pr23Live()?'Internal motivation':'Internal motivation and supporting evidence'}</strong><p>${__pr23Live()?'The lines, justification and approval route of this requisition, as one document.':'Open the actual controlled motivation document before making a decision.'}</p></div>${smallV11('Preview motivation','preview-doc-v11',`MOT-${r.id}`,'eye')}</div>${__pr23Live()?__pr23ApprovalRouteHtml(r.approvalRoute):''}`;
     let foot = actionV11('Preview motivation','preview-doc-v11',`MOT-${r.id}`,'','eye');
     if (mode === 'edit') foot += actionV11(__pr23Live()?'Save draft':'Save changes','save-pr-v11',r.id,__pr23Live()?'':'primary','document') + (__pr23Live()?actionV11('Save and submit','submit-pr-v11',r.id,'primary','approve'):'');
     if (mode === 'approve') foot += actionV11('Reject or return','reject-pr-v11',r.id,'danger') + actionV11('Approve requisition','approve-pr-v11',r.id,'primary','approve');
@@ -5120,7 +5301,7 @@ window.MatanhoProcurement=Object.freeze({version:'8.0.0',navigate,render,getStat
 
   function hydrate(payload={}){
     if(typeof state==='undefined') throw new Error('The procurement state store is not available.');
-    const allowed=['entities','plans','requisitions','tenders','vendors','orders','invoices','documents','reports','approvals','notifications','roles','accessRequests','planItems','grns','journals','assets','approvalPromptsV6','contractsV6','signatureEnvelopesV6','vendorMessagesV6','vendorRequestsV6','planActualsV6','departmentBudgetsV6','rbacUsersV6','vendorAuditTrailV19','quotationNormalisationsV19','complianceReminderLogV7','complianceReminderSettingsV7','auditEventsLive','prViewV11','quotationsLive','evaluationLive','letterhead','approvalGroupV23'];
+    const allowed=['entities','plans','requisitions','tenders','vendors','orders','invoices','documents','reports','approvals','notifications','roles','accessRequests','planItems','grns','journals','assets','approvalPromptsV6','contractsV6','signatureEnvelopesV6','vendorMessagesV6','vendorRequestsV6','planActualsV6','departmentBudgetsV6','rbacUsersV6','vendorAuditTrailV19','quotationNormalisationsV19','complianceReminderLogV7','complianceReminderSettingsV7','auditEventsLive','prViewV11','quotationsLive','evaluationLive','letterhead','approvalGroupV23','approvalMatrixV23'];
     for(const key of allowed){
       if(Object.prototype.hasOwnProperty.call(payload,key)) state[key]=structuredClone(payload[key]);
     }

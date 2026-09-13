@@ -17,6 +17,7 @@
  *     backend stands behind it — so a live session never shows a demo record as if it were ours.
  */
 import {
+  getApprovalMatrix,
   getCompanyProfile,
   getMyProcurementAccess,
   getProcurementDashboard,
@@ -35,6 +36,7 @@ import {
   listProcurementDocuments,
   listProcurementPlans,
   listVendors,
+  type ApprovalRoute,
   type ProcurementAccess,
   type ProcurementRecord,
 } from "@/lib/api/procurement-v23-api"
@@ -204,9 +206,30 @@ const NO_BACKEND_YET = [
   "complianceReminderLogV7",
 ] as const
 
+/** "Step 2 of 2 · Finance Manager": the step a requisition waits on, or just who decides a one-step route. */
+function routeStepLabel(route: ApprovalRoute | null | undefined): string | null {
+  if (!route?.waitingOn || route.currentPosition == null) return null
+  return route.totalSteps > 1 ? `Step ${route.currentPosition} of ${route.totalSteps} · ${route.waitingOn.who}` : route.waitingOn.who
+}
+
+/** Where a requisition stands on its route, for the approver deciding it: what is approved, and what follows. */
+function routeSentence(route: ApprovalRoute | null | undefined): string | null {
+  if (!route?.steps?.length) return null
+  const done = route.steps
+    .filter((s) => s.status === "APPROVED")
+    .map((s) => `${s.who} approved it${s.decidedBy ? ` (${s.decidedBy})` : ""}.`)
+  const next = route.steps
+    .filter((s) => s.status === "UPCOMING")
+    .map((s) => (s.aboveAmount != null ? `${s.who}, as it is above ${money(s.aboveAmount)}` : s.who))
+  const after = next.length ? `After this step: ${next.join(", then ")}.` : route.totalSteps > 1 ? "This is the last step." : ""
+  return [...done, after].filter(Boolean).join(" ") || null
+}
+
 export async function loadProcurementV23LiveData(): Promise<ProcurementV23LivePayload> {
   errors.length = 0
 
+  // Who decides a requisition, step by step (Configuration, Approval matrix). Started now, awaited with the rest.
+  const approvalMatrixLoad = safe("approval-matrix", getApprovalMatrix, null)
   const access = await safe<ProcurementAccess | null>("me/access", getMyProcurementAccess, null)
   const accessUnavailable = access === null && errors.some((e) => e.source === "me/access")
   const perms = new Set(access?.permissions ?? [])
@@ -242,7 +265,9 @@ export async function loadProcurementV23LiveData(): Promise<ProcurementV23LivePa
       : Promise.resolve([] as ProcurementRecord[]),
     // Everyone raises requisitions, so everyone sees their own, drafts included.
     safe("requisitions/my", listMyRequisitions, [] as ProcurementRecord[]),
-    isDeptApprover
+    // Anyone can be an approver on a step of a requisition's route (a department head, a role, a named person), so
+    // everyone asks what waits on them. A privileged role decides every pending requisition, taken from the register.
+    access && !access.isPrivileged
       ? safe("requisitions/pending-approval", listRequisitionsAwaitingMyApproval, [] as ProcurementRecord[])
       : Promise.resolve([] as ProcurementRecord[]),
     has("rfq.view") ? safe("rfq", listRfqs, [] as ProcurementRecord[]) : Promise.resolve([] as ProcurementRecord[]),
@@ -292,14 +317,11 @@ export async function loadProcurementV23LiveData(): Promise<ProcurementV23LivePa
   // ----------------------------------------------------------------- requisitions
   // Requisitions the caller can decide: a department head's own queue, or every pending one for a
   // privileged role. The approver view lists only these, never another department's requests.
-  const decidableIds = new Set(
-    (isDeptApprover
-      ? awaitingMe
-      : access?.isPrivileged
-        ? requisitionRows.filter((r) => String(r.status).toUpperCase() === "PENDING_APPROVAL")
-        : []
-    ).map((r) => r.id),
-  )
+  // Since the approval route is enforced, "mine" means this person approves the step the requisition is at.
+  const pendingForDecision = access?.isPrivileged
+    ? requisitionRows.filter((r) => String(r.status).toUpperCase() === "PENDING_APPROVAL")
+    : awaitingMe
+  const decidableIds = new Set(pendingForDecision.map((r) => r.id))
   const requisitionsView = requisitionRows.map((r) => ({
     id: r.requisitionNumber ?? r.id,
     recordId: r.id,
@@ -322,6 +344,9 @@ export async function loadProcurementV23LiveData(): Promise<ProcurementV23LivePa
     requestedById: r.requestedById ?? null,
     // Prefills the requester's edit form with what they wrote, not the runtime's sample motivation.
     justification: r.justification ?? null,
+    // Each step, who decides it, when it applies and who decided it: the requester tracks it, the approver sees it.
+    approvalRoute: (r.approvalRoute as ApprovalRoute | null | undefined) ?? null,
+    createdAt: r.createdAt ?? null,
     items: (r.items ?? []).map((i: any) => ({ itemName: i.itemName, quantity: num(i.quantity), unit: i.unit ?? null, unitPrice: num(i.unitPrice) || null })),
   }))
 
@@ -795,12 +820,7 @@ export async function loadProcurementV23LiveData(): Promise<ProcurementV23LivePa
   })
   const prompts: Record<string, unknown>[] = []
 
-  const pendingReqs = isDeptApprover
-    ? awaitingMe
-    : access?.isPrivileged
-      ? requisitionRows.filter((r) => String(r.status).toUpperCase() === "PENDING_APPROVAL")
-      : []
-  for (const r of pendingReqs) {
+  for (const r of pendingForDecision) {
     prompts.push(
       prompt({
         id: `PR-${r.requisitionNumber ?? r.id}`,
@@ -811,8 +831,8 @@ export async function loadProcurementV23LiveData(): Promise<ProcurementV23LivePa
         title: r.title ?? DASH,
         entity: r.department ?? DASH,
         amount: num(r.totalAmount) || null,
-        role: "Department head",
-        reason: r.justification || "Requisition submitted for department approval.",
+        role: routeStepLabel(r.approvalRoute) ?? "Department head",
+        reason: [routeSentence(r.approvalRoute), r.justification || "Requisition submitted for approval."].filter(Boolean).join(" "),
       }),
     )
   }
@@ -920,7 +940,11 @@ export async function loadProcurementV23LiveData(): Promise<ProcurementV23LivePa
       title: r.title ?? DASH,
       entity: r.department ?? DASH,
       amount: num(r.totalAmount) || null,
-      waitingOn: r.department ? `Head of ${r.department}` : "Department head",
+      waitingOn: r.approvalRoute?.waitingOn
+        ? `${routeStepLabel(r.approvalRoute)} (${r.approvalRoute.waitingOn.approvers.map((p: { name: string }) => p.name).join(", ")})`
+        : r.department
+          ? `Head of ${r.department}`
+          : "Department head",
       // Not updatedAt: any later edit would restart the clock.
       since: firstDate(r.submittedAt, r.createdAt),
       page: "requisitions",
@@ -1272,6 +1296,8 @@ export async function loadProcurementV23LiveData(): Promise<ProcurementV23LivePa
     "Immutable records": unknown("Record immutability is not attested yet"),
   }
 
+  const approvalMatrix = await approvalMatrixLoad
+
   const hydrate: Record<string, unknown> = {
     requisitions: requisitionsView,
     tenders: tendersView,
@@ -1281,6 +1307,7 @@ export async function loadProcurementV23LiveData(): Promise<ProcurementV23LivePa
     invoices: invoicesView,
     approvalPromptsV6: prompts,
     approvalGroupV23: approvalGroup,
+    approvalMatrixV23: approvalMatrix,
     currentUserV6: { name: access?.name ?? DASH, role: access?.roleName ?? DASH },
     auditEventsLive,
     complianceReminderSettingsV7: NO_REMINDER_AUTOMATION,
@@ -1369,4 +1396,5 @@ export const EMPTY_PROCUREMENT_HYDRATE: Record<string, unknown> = {
   ),
   complianceReminderSettingsV7: NO_REMINDER_AUTOMATION,
   evaluationLive: {},
+  approvalMatrixV23: null,
 }

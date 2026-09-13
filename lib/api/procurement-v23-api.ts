@@ -510,6 +510,85 @@ export async function unblacklistVendor(id: string): Promise<ProcurementRecord> 
 
 export const listApprovalConfigs = () => list("/procurement-approval-configs")
 
+/** One step of a requisition's approval route, as the requisition endpoints attach it (`approvalRoute`). */
+export type ApprovalRouteStep = {
+  position: number
+  stepNumber: number
+  name: string
+  kind: "DEPARTMENT_HEAD" | "ROLE" | "USER"
+  who: string
+  /** The step applies only above this total; null for every requisition. */
+  aboveAmount: number | null
+  approvers: { id: string; name: string }[]
+  status: "APPROVED" | "REJECTED" | "WAITING" | "UPCOMING" | "NOT_REACHED"
+  decidedBy: string | null
+  decidedById: string | null
+  /** Set when an administrator decided a step assigned to someone else. */
+  onBehalfOf: string | null
+  decidedAt: string | null
+  comments: string | null
+}
+
+export type ApprovalRoute = {
+  requestId: string
+  status: string
+  submittedAt: string
+  totalSteps: number
+  currentPosition: number | null
+  waitingOn: { who: string; approvers: { id: string; name: string }[] } | null
+  steps: ApprovalRouteStep[]
+}
+
+export type ApprovalMatrixStep = {
+  stepNumber: number
+  name: string
+  kind: "DEPARTMENT_HEAD" | "ROLE" | "USER"
+  who: string
+  aboveAmount: number | null
+  /** A fixed department; null means the requester's own department. */
+  department: string | null
+  deputy: boolean
+  roleCode: string | null
+  userId: string | null
+  /** Who holds the step today. */
+  people: string[]
+}
+
+export type ApprovalMatrix = {
+  canEdit: boolean
+  configId: string | null
+  updatedAt: string | null
+  steps: ApprovalMatrixStep[]
+  departmentRoutes: { department: string; name: string; steps: ApprovalMatrixStep[] }[]
+  departments: string[]
+  roles: { code: string; name: string; people: number }[]
+  /** Staff who can be named on a step; only returned to someone who can edit. */
+  people: { id: string; name: string; role: string | null; department: string | null }[]
+  permissionDecisions: { label: string; permission: string; roles: { name: string; people: number }[] }[]
+}
+
+export type ApprovalMatrixStepInput = {
+  kind: "DEPARTMENT_HEAD" | "ROLE" | "USER"
+  department?: string | null
+  deputy?: boolean
+  roleCode?: string | null
+  userId?: string | null
+  aboveAmount?: number | null
+}
+
+/** GET /procurement/approval-matrix: the requisition route in force. Every member of staff may read it. */
+export async function getApprovalMatrix(): Promise<ApprovalMatrix> {
+  return unwrapData(await apiClient.get<ApiResponse<ApprovalMatrix>>("/procurement/approval-matrix"))
+}
+
+/**
+ * PUT /procurement/approval-matrix {steps}: replaces the route. Administrator or CFO only; it applies to requisitions
+ * submitted from then on, and ones already waiting keep the route they were given.
+ */
+export async function saveApprovalMatrix(steps: ApprovalMatrixStepInput[]): Promise<ApprovalMatrix> {
+  return unwrapData(await apiClient.put<ApiResponse<ApprovalMatrix>>("/procurement/approval-matrix", { steps }))
+}
+
 // ---------------------------------------------------------------------------
 // Audit
 // ---------------------------------------------------------------------------

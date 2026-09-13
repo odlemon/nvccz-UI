@@ -45,11 +45,29 @@ import {
   rejectQuotation,
   rejectRequisition,
   scoreQuotation,
+  saveApprovalMatrix,
   sendPurchaseOrder,
   submitRequisition,
   updateRequisition,
 } from "@/lib/api/procurement-v23-api"
 import type { ProcurementV23LivePayload } from "@/lib/procurement-v23/live-loaders"
+
+/** Who a requisition now waits on, from the route the API returns with it: "step 2 of 2, Finance Manager (Blessing Sibanda)". */
+function routeNext(rec: Record<string, any> | null | undefined): string | null {
+  const route = rec?.approvalRoute
+  if (!route?.waitingOn) return null
+  const names = (route.waitingOn.approvers ?? []).map((p: { name: string }) => p.name).join(", ")
+  const step = route.totalSteps > 1 ? `step ${route.currentPosition} of ${route.totalSteps}, ` : ""
+  return `${step}${route.waitingOn.who}${names ? ` (${names})` : ""}`
+}
+
+/** An approval that completes a step but not the route says where the requisition went next. */
+function approvedMessage(id: string, rec: Record<string, any> | null | undefined): string {
+  const next = routeNext(rec)
+  return String(rec?.status ?? "").toUpperCase() === "PENDING_APPROVAL" && next
+    ? `${id} approved at your step. It now waits for ${next}.`
+    : `${id} approved.`
+}
 
 export type ProcurementActionDetail = {
   action: string
@@ -67,6 +85,7 @@ export type ProcurementActionResult = {
 export const LIVE_ACTIONS = [
   "submit-pr",
   "save-pr",
+  "save-approval-matrix-v23",
   "save-pr-v11",
   "submit-pr-v11",
   "approve-pr-v11",
@@ -361,12 +380,20 @@ export async function handleProcurementV23Action(
           closeRuntimeOverlay()
           return { handled: true, reload: true, message: `${number} saved as a draft.` }
         }
-        await submitRequisition(created.id)
+        let submitted: Record<string, any>
+        try {
+          submitted = await submitRequisition(created.id)
+        } catch (err) {
+          // The requisition exists as a draft by now; say so, or the requester raises it a second time.
+          closeRuntimeOverlay()
+          return { handled: true, reload: true, error: `${number} was saved as a draft but not submitted: ${errorText(err, "the submission failed")}` }
+        }
         closeRuntimeOverlay()
+        const next = routeNext(submitted)
         return {
           handled: true,
           reload: true,
-          message: `${number} submitted to the ${department} department head for approval.`,
+          message: next ? `${number} submitted for approval: ${next}.` : `${number} submitted for approval.`,
         }
       }
 
@@ -388,22 +415,23 @@ export async function handleProcurementV23Action(
           closeRuntimeOverlay()
           return { handled: true, reload: true, message: `${r.id} saved.` }
         }
-        await submitRequisition(r.recordId)
+        const submitted = await submitRequisition(r.recordId)
         closeRuntimeOverlay()
-        const head = r.department ? `the ${r.department} department head` : "the department head"
+        const next = routeNext(submitted)
+        const verb = raw === "REJECTED" ? "corrected and resubmitted" : "submitted"
         return {
           handled: true,
           reload: true,
-          message: raw === "REJECTED" ? `${r.id} corrected and resubmitted to ${head}.` : `${r.id} submitted to ${head} for approval.`,
+          message: next ? `${r.id} ${verb} for approval: ${next}.` : `${r.id} ${verb} for approval.`,
         }
       }
 
       case "approve-pr-v11": {
         const r = byDisplayId("requisitions", detail.dataset.id)
         if (!r) return { handled: true, error: "That requisition is no longer in your register. Refresh and try again." }
-        await approveRequisition(r.recordId)
+        const decided = await approveRequisition(r.recordId)
         closeRuntimeOverlay()
-        return { handled: true, reload: true, message: `${r.id} approved.` }
+        return { handled: true, reload: true, message: approvedMessage(r.id, decided) }
       }
 
       case "confirm-reject-pr-v11": {
@@ -421,14 +449,46 @@ export async function handleProcurementV23Action(
         return { handled: true, reload: true, message: `${r.id} returned to the requester with your reason.` }
       }
 
+      // ----------------------------------------------------------- approval matrix
+      case "save-approval-matrix-v23": {
+        if (!live.access?.isPrivileged) {
+          return { handled: true, error: "Only an administrator or the Chief Financial Officer can change the approval matrix." }
+        }
+        const stepRows = [...document.querySelectorAll<HTMLElement>("#approvalMatrixFormV23 [data-matrix-step]")]
+        if (!stepRows.length) return { handled: true, error: "The route needs at least one step." }
+        const steps = stepRows.map((row) => {
+          const field = (n: string) =>
+            ((row.querySelector(`[name="${n}"]`) as HTMLInputElement | HTMLSelectElement | null)?.value ?? "").trim()
+          const kind = field("kind") as "DEPARTMENT_HEAD" | "ROLE" | "USER"
+          const above = field("aboveAmount")
+          return {
+            kind,
+            department: kind === "DEPARTMENT_HEAD" ? field("department") || null : null,
+            deputy: kind === "DEPARTMENT_HEAD" && field("deputy") === "DEPUTY",
+            roleCode: kind === "ROLE" ? field("roleCode") || null : null,
+            userId: kind === "USER" ? field("userId") || null : null,
+            aboveAmount: above === "" ? null : Number(above),
+          }
+        })
+        await saveApprovalMatrix(steps)
+        closeRuntimeOverlay()
+        return {
+          handled: true,
+          reload: true,
+          message: `Approval route saved with ${steps.length} step${steps.length === 1 ? "" : "s"}. It applies to requisitions submitted from now on.`,
+        }
+      }
+
       // ----------------------------------------------------------- approval centre
       case "approve-prompt-v6": {
         const p = rows("approvalPromptsV6").find((x) => x.id === detail.dataset.id)
         if (!p) return { handled: true, error: "That approval is no longer pending. Refresh and try again." }
         switch (p.kind) {
-          case "requisition":
-            await approveRequisition(p.targetId)
-            break
+          case "requisition": {
+            const decided = await approveRequisition(p.targetId)
+            closeRuntimeOverlay()
+            return { handled: true, reload: true, message: approvedMessage(String(p.record ?? p.id), decided) }
+          }
           case "award":
             if (!has("rfq.award")) return refuse("awarding quotations")
             await acceptQuotation(p.targetId, val("#approvalCommentV6") || undefined)

@@ -118,7 +118,11 @@ try {
   const auditWhere = { OR: [{ entityId: { in: deletedIds } }, { id: { in: rfqAuditIds } }] }
   const auditCount = await prisma.auditLog.count({ where: auditWhere })
   const notifCount = await prisma.notification.count({ where: { relatedEntityId: { in: deletedIds } } })
-  console.log(`audit rows about them: ${auditCount} · notifications about them: ${notifCount}`)
+  // A requisition's approval requests name it by entityId only (no foreign key), so deleting the requisition left them
+  // behind: 158 pending requests on dev pointed at requisitions that no longer existed.
+  const approvalRequestWhere = { stageType: "PURCHASE_REQUISITION", entityId: { in: reqIds } }
+  const approvalRequestCount = await prisma.approvalRequest.count({ where: approvalRequestWhere })
+  console.log(`audit rows about them: ${auditCount} · notifications about them: ${notifCount} · approval requests: ${approvalRequestCount}`)
 
   if (!APPLY) {
     console.log("dry run: nothing deleted (pass --apply)")
@@ -145,6 +149,8 @@ try {
       await del("purchaseOrders", () => tx.purchaseOrder.deleteMany({ where: { id: { in: poIds } } }))
       await del("quotations", () => tx.vendorQuotation.deleteMany({ where: { id: { in: quoteIds } } }))
       await del("rfqs", () => tx.procurementRfq.deleteMany({ where: { id: { in: rfqIds } } }))
+      // Approver rows go with their request (onDelete: Cascade).
+      await del("approvalRequests", () => tx.approvalRequest.deleteMany({ where: approvalRequestWhere }))
       await del("requisitions", () => tx.purchaseRequisition.deleteMany({ where: { id: { in: reqIds } } }))
       await del("plans", () => tx.procurementPlan.deleteMany({ where: { id: { in: planIds } } }))
       await del("contracts", () => tx.procurementContract.deleteMany({ where: { id: { in: contractIds } } }))

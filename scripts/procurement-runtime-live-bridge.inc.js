@@ -443,16 +443,197 @@ function __pr23NotificationsHtml() {
  * an invented role matrix whose toggles saved nothing. It now shows the signed-in role's real
  * procurement permissions and where to change them.
  */
+/** Configuration's two views: the signed-in person's procurement permissions, and the requisition approval matrix. */
+function __pr23SettingsTabsHtml(tab) {
+  return `<div class="settings-tabs-v5" style="margin-bottom:14px"><button class="tab ${tab === 'permissions' ? 'active' : ''}" data-action="settings-tab" data-id="permissions">Your permissions</button><button class="tab ${tab === 'approvals' ? 'active' : ''}" data-action="settings-tab" data-id="approvals">Approval matrix</button></div>`;
+}
+
 function __pr23SettingsPageHtml() {
+  const head = pageHead('Configuration', 'Configuration, RBAC and Access', 'Procurement roles, permissions and user assignments are managed centrally in Admin, so one change applies across every module.', '<a class="btn primary" href="/admin">Open Admin</a>');
+  // "Approval matrix" on the Approval Centre opens this tab (the runtime sets settingsTab to 'approvals').
+  if (state.settingsTab === 'approvals') return `<div class="page">${head}${__pr23SettingsTabsHtml('approvals')}${__pr23ApprovalMatrixHtml()}</div>`;
   const access = (__pr23Live() || {}).access || {};
   const grants = (access.permissions || []).map(p => String(p).replace('procurement.', ''));
   const rows = grants.map(g => `<tr><td><strong>${__pr23Esc(g)}</strong></td><td>${status('Granted')}</td></tr>`);
   const dept = access.department ? `${access.department}${access.departmentRole ? ` · ${access.departmentRole}` : ''}` : 'No department';
-  return `<div class="page">${pageHead('Configuration', 'Configuration, RBAC and Access', 'Procurement roles, permissions and user assignments are managed centrally in Admin, so one change applies across every module.', '<a class="btn primary" href="/admin">Open Admin</a>')}
+  return `<div class="page">${head}${__pr23SettingsTabsHtml('permissions')}
  <div class="notice" style="margin-bottom:14px"><div><strong>Managed in Admin → Roles</strong><p>Each procurement action has its own permission, for example procurement.orders.manage to raise purchase orders or procurement.rfq.award to award a tender. Grant or remove them on a role in Admin; the change applies the next time the module loads.</p></div></div>
  <div class="grid kpis">${kpi('Your role', __pr23Esc(access.roleName || '—'), __pr23Esc(dept), 'settings')}${kpi('Procurement permissions', grants.length, 'Granted to your role', 'approve')}</div>
  ${card('Your procurement permissions', 'What your role can do in this module', table(['Permission', 'Status'], rows.length ? rows : ['<tr><td colspan="2" class="muted">Your role holds no procurement permissions. You can still raise and track your own requisitions.</td></tr>']))}</div>`;
 }
+
+// ---------------------------------------------------------------- approval matrix and routes
+
+/** A figure to the cent, for amount conditions ("above $10,000.00"). */
+function __pr23Cents(v) {
+  return `$${Number(v || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+/**
+ * A requisition's approval route: each step, who decides it, when it applies, and who decided it when. The requester
+ * tracks the request with it and the approver sees where it stands, so neither has to ask.
+ */
+function __pr23ApprovalRouteHtml(route) {
+  if (!__pr23Live()) return '';
+  if (!route || !route.steps || !route.steps.length) {
+    return '<div class="notice" style="margin-top:14px"><div><strong>Approval route</strong><p>No approval route is recorded for this requisition. It is decided by the head or deputy head of its department.</p></div></div>';
+  }
+  const label = { APPROVED: 'Approved', REJECTED: 'Rejected', WAITING: 'Waiting', UPCOMING: 'Not yet', NOT_REACHED: 'Not reached' };
+  const when = iso => (iso ? new Date(iso).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false }) : '');
+  const rows = route.steps.map(s => {
+    const people = (s.approvers || []).map(p => p.name).join(', ');
+    const decided = s.decidedBy
+      ? `${__pr23Esc(s.decidedBy)}${s.onBehalfOf ? ` <span class="muted">for ${__pr23Esc(s.onBehalfOf)}</span>` : ''}<br><span class="muted">${__pr23Esc(when(s.decidedAt))}</span>${s.status === 'REJECTED' && s.comments ? `<br><span class="muted">${__pr23Esc(s.comments)}</span>` : ''}`
+      : `<span class="muted">${s.status === 'NOT_REACHED' ? 'Not needed after the rejection' : `Can decide: ${__pr23Esc(people)}`}</span>`;
+    return `<tr><td>${s.position}</td><td><strong>${__pr23Esc(s.who)}</strong>${s.aboveAmount != null ? `<br><span class="muted">Above ${__pr23Cents(s.aboveAmount)}</span>` : ''}</td><td>${status(label[s.status] || s.status)}</td><td>${decided}</td></tr>`;
+  });
+  const summary = route.waitingOn
+    ? `Waiting on step ${route.currentPosition} of ${route.totalSteps}: ${route.waitingOn.who}`
+    : route.status === 'APPROVED'
+      ? `Approved through ${route.totalSteps === 1 ? 'its one step' : `all ${route.totalSteps} steps`}`
+      : route.status === 'REJECTED' ? 'Rejected' : '';
+  return `<div style="margin-top:14px"><div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;flex-wrap:wrap;margin-bottom:6px"><strong>Approval route</strong><span class="muted">${__pr23Esc(summary)}</span></div>${__pr23LinesTable(['Step', 'Approver', 'Status', 'Decided by'], rows)}</div>`;
+}
+
+/**
+ * A requisition as a document, built from the record. The runtime's version was a template: dated 01 Aug 2026 whatever
+ * the requisition, with a budget check no backend performs and a stock justification in place of the requester's own.
+ */
+function __pr23RequisitionDocument(pr, isMotivation) {
+  const date = iso => (iso ? new Date(iso).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—');
+  const route = pr.approvalRoute;
+  const stepStatus = { APPROVED: 'Approved', REJECTED: 'Rejected', WAITING: 'Waiting', UPCOMING: 'Not yet', NOT_REACHED: 'Not reached' };
+  const lines = (pr.items || []).map(i => {
+    const line = i.unitPrice != null && i.quantity != null ? Number(i.unitPrice) * Number(i.quantity) : null;
+    return `<tr><td>${__pr23Esc(i.itemName)}</td><td>${i.quantity == null ? '—' : __pr23Esc(i.quantity)}</td><td>${__pr23Esc(i.unit || '—')}</td><td>${i.unitPrice != null ? __pr23Cents(i.unitPrice) : 'Not estimated'}</td><td>${line != null ? __pr23Cents(line) : '—'}</td></tr>`;
+  }).join('');
+  const approval = route && route.steps && route.steps.length
+    ? `<table><thead><tr><th>Step</th><th>Approver</th><th>Status</th><th>Decided</th></tr></thead><tbody>${route.steps.map(s => `<tr><td>${s.position}</td><td>${__pr23Esc(s.who)}${s.aboveAmount != null ? ` (above ${__pr23Cents(s.aboveAmount)})` : ''}</td><td>${__pr23Esc(stepStatus[s.status] || s.status)}</td><td>${s.decidedBy ? `${__pr23Esc(s.decidedBy)}, ${__pr23Esc(date(s.decidedAt))}` : '—'}</td></tr>`).join('')}</tbody></table>`
+    : `<p>${String(pr.rawStatus || '').toUpperCase() === 'DRAFT' ? 'Not yet submitted for approval.' : 'No approval route is recorded; the head of its department decides it.'}</p>`;
+  const title = isMotivation ? 'Internal motivation' : 'Purchase requisition';
+  const department = pr.department || pr.entity;
+  return {
+    id: isMotivation ? `MOT-${pr.id}` : pr.id,
+    name: `${title} - ${pr.title}`,
+    type: title,
+    version: 'From the record',
+    owner: pr.owner,
+    status: pr.status,
+    date: date((route && route.submittedAt) || pr.createdAt),
+    content: `<h1>${title}: ${__pr23Esc(pr.title)}</h1><p class="doc-lead-v11">Raised by ${__pr23Esc(pr.owner)} for ${__pr23Esc(department)}${pr.createdAt ? ` on ${__pr23Esc(date(pr.createdAt))}` : ''}.</p><table><tbody><tr><th>Requisition reference</th><td>${__pr23Esc(pr.id)}</td><th>Request source</th><td>${__pr23Esc(pr.type)}</td></tr><tr><th>Department</th><td>${__pr23Esc(department)}</td><th>Category</th><td>${__pr23Esc(pr.category)}</td></tr><tr><th>Estimated value</th><td>${pr.amount != null ? __pr23Cents(pr.amount) : 'Not estimated'}</td><th>Current status</th><td>${__pr23Esc(pr.status)}</td></tr></tbody></table><h2>1. What is needed</h2>${lines ? `<table><thead><tr><th>Item</th><th>Quantity</th><th>Unit</th><th>Unit estimate</th><th>Line estimate</th></tr></thead><tbody>${lines}</tbody></table>` : '<p>No lines are recorded.</p>'}<h2>2. Justification</h2><p>${pr.justification ? __pr23Esc(pr.justification) : 'The requester gave no justification.'}</p><h2>3. Approval</h2>${approval}`,
+  };
+}
+
+function __pr23MatrixRowsHtml(steps) {
+  return (steps || []).map(s => `<tr><td>${s.stepNumber}</td><td><strong>${__pr23Esc(s.who)}</strong></td><td>${s.aboveAmount != null ? `Only above ${__pr23Cents(s.aboveAmount)}` : 'Every requisition'}</td><td>${(s.people || []).length ? s.people.map(p => `<div>${__pr23Esc(p)}</div>`).join('') : '<span class="muted">Nobody holds this step, so requisitions reaching it are refused at submission</span>'}</td></tr>`);
+}
+
+/** Configuration, Approval matrix: the requisition route in force, and the decisions made by permission instead. */
+function __pr23ApprovalMatrixHtml() {
+  const m = state.approvalMatrixV23;
+  if (!m) {
+    return '<div class="notice"><div><strong>The approval matrix could not be loaded</strong><p>Refresh the page. If it still does not load, the procurement service is not answering.</p></div></div>';
+  }
+  const heads = ['Step', 'Approver', 'Applies to', 'Held today by'];
+  const notice = `<div class="notice" style="margin-bottom:14px"><div><strong>How the route works</strong><p>A submitted requisition goes through the steps in order, and any one person on a step decides it. A step with an amount applies only when the requisition's estimated total is above it, so a larger requisition needs a further level. A requisition is refused at submission when a step that applies has nobody to decide it. A change applies to requisitions submitted afterwards; one already waiting keeps the route it was given.${m.canEdit ? '' : ' Only an administrator or the Chief Financial Officer can change the route.'}</p></div></div>`;
+  const rows = __pr23MatrixRowsHtml(m.steps);
+  const route = card(
+    'Requisition approval route',
+    m.updatedAt ? `Last changed ${new Date(m.updatedAt).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}` : 'Who approves a purchase requisition',
+    table(heads, rows.length ? rows : ['<tr><td colspan="4" class="muted">No route is set. Each requisition is decided by the head of its department, or its deputy.</td></tr>']),
+    m.canEdit ? __pr23ActionButton('Edit route', 'edit-approval-matrix-v23', '', 'primary', 'settings') : '',
+  );
+  const overrides = (m.departmentRoutes || []).map(d => card(`${d.department} has its own route`, `${d.name}: requisitions from ${d.department} follow this instead of the route above.`, table(heads, __pr23MatrixRowsHtml(d.steps))));
+  const decisions = card(
+    'Decided by permission',
+    'Not routed in steps: a role that holds the permission makes the decision. Permissions are granted per role in Admin, Roles.',
+    table(['Decision', 'Permission', 'Roles holding it'], (m.permissionDecisions || []).map(d => `<tr><td><strong>${__pr23Esc(d.label)}</strong></td><td><code>${__pr23Esc(d.permission)}</code></td><td>${d.roles.length ? d.roles.map(r => `${__pr23Esc(r.name)} <span class="muted">(${r.people} ${r.people === 1 ? 'person' : 'people'})</span>`).join('<br>') : '<span class="muted">No role holds it</span>'}</td></tr>`)),
+  );
+  return notice + route + overrides.join('') + decisions;
+}
+
+function __pr23MatrixStepRowHtml(step, index) {
+  const m = state.approvalMatrixV23 || {};
+  const s = step || { kind: 'DEPARTMENT_HEAD', department: null, deputy: false, roleCode: null, userId: null, aboveAmount: null };
+  const opt = (value, text, selected) => `<option value="${__pr23Esc(value)}"${selected ? ' selected' : ''}>${__pr23Esc(text)}</option>`;
+  const kinds = [['DEPARTMENT_HEAD', 'Department head'], ['ROLE', 'Role'], ['USER', 'Named person']].map(([v, t]) => opt(v, t, s.kind === v)).join('');
+  const departments = opt('', "The requester's department", !s.department) + (m.departments || []).map(d => opt(d, d, s.department === d)).join('');
+  const headOrDeputy = opt('HEAD', 'Head, or deputy if none', !s.deputy) + opt('DEPUTY', 'Deputy head', !!s.deputy);
+  const roles = opt('', 'Choose a role', !s.roleCode) + (m.roles || []).map(r => opt(r.code, `${r.name} (${r.people} ${r.people === 1 ? 'person' : 'people'})`, s.roleCode === r.code)).join('');
+  const people = opt('', 'Choose a person', !s.userId) + (m.people || []).map(p => opt(p.id, [p.name, p.role, p.department].filter(Boolean).join(' · '), s.userId === p.id)).join('');
+  const hide = k => (s.kind === k ? '' : ' hidden');
+  const cell = 'style="padding:6px 8px;vertical-align:middle"';
+  return `<tr data-matrix-step><td ${cell} data-matrix-position>${index + 1}</td><td ${cell}><select name="kind" aria-label="Who decides">${kinds}</select></td><td ${cell}><span data-kind="DEPARTMENT_HEAD"${hide('DEPARTMENT_HEAD')}><select name="department" aria-label="Department">${departments}</select> <select name="deputy" aria-label="Head or deputy">${headOrDeputy}</select></span><span data-kind="ROLE"${hide('ROLE')}><select name="roleCode" aria-label="Role">${roles}</select></span><span data-kind="USER"${hide('USER')}><select name="userId" aria-label="Person">${people}</select></span></td><td ${cell}><input name="aboveAmount" type="number" min="0" step="0.01" placeholder="Every requisition" aria-label="Only above this amount" value="${s.aboveAmount != null ? __pr23Esc(s.aboveAmount) : ''}" style="width:140px"></td><td ${cell}><button class="btn small" type="button" data-action="remove-matrix-step-v23">Remove</button></td></tr>`;
+}
+
+/** Step numbers follow the rows; step 1 applies to every requisition, so its amount is cleared and locked. */
+function __pr23MatrixRenumber() {
+  const rows = [...document.querySelectorAll('#approvalMatrixFormV23 [data-matrix-step]')];
+  rows.forEach((row, i) => {
+    const position = row.querySelector('[data-matrix-position]');
+    if (position) position.textContent = String(i + 1);
+    const amount = row.querySelector('[name="aboveAmount"]');
+    if (amount) {
+      amount.disabled = i === 0;
+      if (i === 0) amount.value = '';
+      amount.title = i === 0 ? 'Step 1 applies to every requisition' : '';
+    }
+    const remove = row.querySelector('[data-action="remove-matrix-step-v23"]');
+    if (remove) remove.hidden = rows.length === 1;
+  });
+}
+
+function __pr23ApprovalMatrixModal() {
+  const m = state.approvalMatrixV23;
+  if (!m || !m.canEdit) {
+    if (typeof toast === 'function') toast('Not permitted', 'Only an administrator or the Chief Financial Officer can change the approval matrix.');
+    return;
+  }
+  const steps = m.steps.length ? m.steps : [null];
+  const rows = steps.map((s, i) => __pr23MatrixStepRowHtml(s, i)).join('');
+  const th = ['Step', 'Who decides', 'Which', 'Only above ($)', ''].map(h => `<th style="padding:6px 8px;text-align:left;font-size:11px;letter-spacing:.04em;text-transform:uppercase;white-space:nowrap">${h}</th>`).join('');
+  openModal(
+    'Edit requisition approval route',
+    'Who approves a purchase requisition, step by step',
+    `<form id="approvalMatrixFormV23" onsubmit="return false"><p class="muted" style="margin:0 0 10px">Steps run in order, and any one person on a step decides it. Leave the amount empty for a step that applies to every requisition. The route applies to requisitions submitted after you save.</p><div style="overflow-x:auto;max-width:100%"><table style="width:100%;min-width:0;border-collapse:collapse;font-size:13px"><thead><tr>${th}</tr></thead><tbody>${rows}</tbody></table></div><div style="margin-top:10px"><button class="btn small" type="button" data-action="add-matrix-step-v23">Add step</button></div></form>`,
+    btn('Cancel', 'close-overlay') + btn('Save route', 'save-approval-matrix-v23', 'primary'),
+  );
+  __pr23MatrixRenumber();
+}
+
+// The route editor's own controls stay in the page: capture phase, and the click ends here.
+__pr23On(document, 'click', event => {
+  const control = event.target && event.target.closest && event.target.closest('[data-action="edit-approval-matrix-v23"], [data-action="add-matrix-step-v23"], [data-action="remove-matrix-step-v23"]');
+  if (!control) return;
+  event.preventDefault();
+  event.stopImmediatePropagation();
+  const act = control.dataset.action;
+  if (act === 'edit-approval-matrix-v23') {
+    __pr23ApprovalMatrixModal();
+    return;
+  }
+  const body = document.querySelector('#approvalMatrixFormV23 tbody');
+  if (!body) return;
+  if (act === 'add-matrix-step-v23') {
+    const count = body.querySelectorAll('[data-matrix-step]').length;
+    if (count >= 6) {
+      if (typeof toast === 'function') toast('Six steps at most', 'A route can have at most six steps.');
+      return;
+    }
+    body.insertAdjacentHTML('beforeend', __pr23MatrixStepRowHtml(null, count));
+  } else {
+    const row = control.closest('[data-matrix-step]');
+    if (row && body.querySelectorAll('[data-matrix-step]').length > 1) row.remove();
+  }
+  __pr23MatrixRenumber();
+}, true);
+
+__pr23On(document, 'change', event => {
+  const select = event.target && event.target.closest && event.target.closest('#approvalMatrixFormV23 [name="kind"]');
+  if (!select) return;
+  const row = select.closest('[data-matrix-step]');
+  if (row) row.querySelectorAll('[data-kind]').forEach(el => { el.hidden = el.dataset.kind !== select.value; });
+}, true);
 
 // ---------------------------------------------------------------- goods received
 
@@ -603,7 +784,7 @@ function __pr23ApprovalsPageHtml() {
     kpi('Open approvals', String(all.length), others ? `${others} waiting on someone else` : 'Every one is yours to decide', 'audit'),
     kpi('Longest open', __pr23Waiting(oldest), oldest ? `Since ${new Date(oldest).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}` : 'No open approvals', 'account'),
   ].join('');
-  return `<div class="page">${pageHead('Decision workflow', 'Approval Centre', 'Decisions waiting on you, and every approval still open across procurement.', __pr23ActionButton('Export register', 'export-approvals-v6', '', '', 'download'))}<div class="grid kpis">${kpis}</div><section class="card">${tabs}<div class="settings-pane">${content}</div></section></div>`;
+  return `<div class="page">${pageHead('Decision workflow', 'Approval Centre', 'Decisions waiting on you, and every approval still open across procurement.', __pr23ActionButton('Approval matrix', 'approval-matrix', '', '', 'settings') + __pr23ActionButton('Export register', 'export-approvals-v6', '', '', 'download'))}<div class="grid kpis">${kpis}</div><section class="card">${tabs}<div class="settings-pane">${content}</div></section></div>`;
 }
 
 /**
