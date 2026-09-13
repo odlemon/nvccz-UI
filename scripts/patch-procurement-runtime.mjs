@@ -1319,6 +1319,33 @@ s = replaceUnique(
 )
 
 // ---------------------------------------------------------------------------
+// 37. Register vendor names no sample internal owner
+// ---------------------------------------------------------------------------
+// Found by the UI census: "Internal owner" was prefilled "Nyasha Moyo | Group Procurement" for everyone. The input
+// has no name, so nothing reads it; a live session leaves it for the person registering the vendor.
+s = replaceUnique(
+  s,
+  "formField('Internal owner','<input value=\"Nyasha Moyo | Group Procurement\">')",
+  "formField('Internal owner',__pr23Live()?'<input placeholder=\"Staff member responsible for this vendor\">':'<input value=\"Nyasha Moyo | Group Procurement\">')",
+  "register vendor -> no sample internal owner",
+  "__pr23Live()?'<input placeholder=\"Staff member responsible for this vendor\">'",
+)
+
+// ---------------------------------------------------------------------------
+// 38. Contract, purchase order and award previews show their own content
+// ---------------------------------------------------------------------------
+// Found by the UI census: Preview on a contract, a purchase order, an award report, an approval record and a tax
+// clause passed the document itself to previewDocV6, which looks documents up by id. The lookup fell through to
+// its blank "Controlled Procurement Document" and the header read "[object Object] | v1.0 | Draft".
+s = replaceUnique(
+  s,
+  "function docByIdV6(id){",
+  "function docByIdV6(id){if(id&&typeof id==='object')return {type:'Controlled document',version:'v1.0',status:'Draft',...id};",
+  "document preview -> a passed document is shown, not looked up",
+  "function docByIdV6(id){if(id&&typeof id==='object')",
+)
+
+// ---------------------------------------------------------------------------
 // 35. The browser tab carries no build label
 // ---------------------------------------------------------------------------
 // Found on dev: the tab read "Matanho Procurement & Tender Management - V23" (each layer set its own version).

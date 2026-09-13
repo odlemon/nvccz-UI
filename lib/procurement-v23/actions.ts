@@ -246,6 +246,9 @@ const NOT_BUILT_OPENERS: Record<string, string> = {
   "create-delegation-v6": "Approval delegation is not connected yet.",
   "delegate-approval-v6": "Approval delegation is not connected yet. The assigned approver decides this approval.",
   "send-approval-doc-v13": "Sending documents by email is not connected yet. Download the PDF and send it from your mail.",
+  // Vault and preview "Send": prefilled procurement.approver@matanho.africa and toasted "Document sent".
+  "send-doc-v11": "Sending documents by email is not connected yet. Download the PDF and send it from your mail.",
+  "send-document": "Sending documents by email is not connected yet. Download the PDF and send it from your mail.",
   "vendor-portal-v6": "Vendors fill this in on the vendor portal, from the link in their RFQ or document request.",
 }
 
