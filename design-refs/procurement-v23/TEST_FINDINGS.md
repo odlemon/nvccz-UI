@@ -533,6 +533,21 @@ recorded; **Quotation comparison** — the RFQ's submitted quotations, lowest fi
 (and "not applicable" otherwise); **Conflict of interest declaration** — says none is recorded. The decision paper is
 dated today.
 
+Round-two check on dev after deploying `9e9a458` (`_tmp-v23-cycle8-round2-check.mjs`): **11/17**. Passing: the goods
+receipt's value, the support documents' labels, Accounts Payable's source cards, and the vendor form (title,
+organisation, the vendor's details, the lines, the closing date). Still wrong, and fixed next:
+
+- **The award decision paper** was still the vendored memorandum — step 51 replaced the supporting documents, not the
+  paper itself: "TechNova Solutions" as the selected bidder, three sample bidders' scores, bids "opened under committee
+  control", and an approval table showing the sample CFO "Tinashe Chaka — Signed — 01 Aug 2026". Now built from the
+  records (`__pr23AwardMemo`): the RFQ, its submitted quotations ranked by total with their evaluation scores, the basis
+  of the recommendation, and what approving does. Requisition, receipt, invoice and plan approvals use the generic
+  decision paper, which carries no sample content.
+- **Every paper's footer** read "Generated 02 Aug 2026" — a literal in two renderers; now today's date.
+- **The vendor form's page error** "Unexpected token '<'" was not the form: the root layout renders Vercel Analytics,
+  whose `/_vercel/insights/script.js` answers with an HTML page on a self-hosted server — so every page in every portal
+  logged it. `<Analytics />` now renders only on Vercel builds.
+
 ### Phase 5 — the invited vendor's quotation form was blank
 
 Found by the cross-module check, as Jacaranda Office Supplies opening its invitation link for `RFQ_20260912_0006`: the
