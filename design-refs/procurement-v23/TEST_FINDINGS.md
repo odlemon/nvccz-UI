@@ -548,6 +548,16 @@ organisation, the vendor's details, the lines, the closing date). Still wrong, a
   whose `/_vercel/insights/script.js` answers with an HTML page on a self-hosted server — so every page in every portal
   logged it. `<Analytics />` now renders only on Vercel builds.
 
+### The requester's phone opened with the menu over the page
+
+The tablet and phone re-check on `9e9a458` was 31/36: four phone pages whose head buttons run into a sideways-scrolling
+row (the design's phone layout, accepted in cycle seven), and the requester on a phone, where "Export register" was
+covered. A browser trace showed why. The requester opening `/procurement-v23` is sent on to the Approval Centre
+(`9e9a458`), and that page opened with the full 278px menu over it. Nothing clicked it open: the second runtime read
+`window.innerWidth` as **784** on a 390px phone, because content overflows during the route transition and the mobile
+layout viewport widens. So step 44's `innerWidth > 780` thought it was a tablet. Step 52 decides with
+`matchMedia('(max-width: 780px)')`, the stylesheet's own breakpoint, which measures the device width.
+
 ### Phase 5 — the invited vendor's quotation form was blank
 
 Found by the cross-module check, as Jacaranda Office Supplies opening its invitation link for `RFQ_20260912_0006`: the
