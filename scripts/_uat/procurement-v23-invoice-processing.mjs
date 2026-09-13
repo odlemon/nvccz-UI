@@ -2,7 +2,7 @@
  * The invoice processing screen (SRD §7): read an invoice, check it beside its document, and flag it for review (dev).
  *
  *   NEXT_PUBLIC_API_BASE_URL=https://dev-api.matanho.com/api BASE=https://dev.matanho.com UAT_LOAD_TIMEOUT_MS=180000 \
- *   UAT_DELETE_INVOICES_CMD="python dev_api_node.py dev_delete_invoices.mjs {ids}" \
+ *   UAT_DELETE_INVOICES_CMD="python scripts/procurement-ops/dev-data/dev_api_node.py scripts/procurement-ops/dev-data/dev_delete_invoices.mjs {ids}" \
  *     node scripts/_uat/procurement-v23-invoice-processing.mjs
  *
  * As Accounts Payable, against the demo order PO_20260908_0004 with the supplier's own PDF: the document shows with the
@@ -101,7 +101,7 @@ try {
   await browser.close()
   if (DELETE && created.length) {
     try {
-      execSync(DELETE.replace("{ids}", created.join(",")), { stdio: "pipe", timeout: 300000 })
+      execSync(DELETE.replace("{ids}", created.join(" ")), { stdio: "pipe", timeout: 300000 })
       console.log(`removed ${created.length} test invoice(s)`)
     } catch (e) {
       console.log(`could not remove ${created.join(",")}: ${String(e.message).slice(0, 160)}`)
