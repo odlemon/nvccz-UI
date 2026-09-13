@@ -531,7 +531,7 @@ with `dev_cleanup_procurement.mjs --apply` and `demo_integrity.mjs`.
     (new decline route, audited; approval audited). The review queue needed only a staff sign-in and returned each
     vendor's portal upload token: it now needs vendor view rights and omits the token. "Vendor portal" opens the
     registration page in a new tab. Backend `5d7f106`, UI `a9ca03c`; UAT `procurement-v23-vendor-self-registration.mjs`
-    (PENDING cycle twelve).
+    22/22 in cycle fourteen (after items 17 and 19).
 15. **Every Accounting V52 write was silent.** The runtime's `commitSuccess` and `commitError` call handlers defined in
     another of its closures, so neither showed anything: a supplier payment, a chart-of-accounts change or a journal
     submission never said whether it worked. Confirmed on dev by calling `commitSuccess` directly (no error, no message).
@@ -539,7 +539,8 @@ with `dev_cleanup_procurement.mjs --apply` and `demo_integrity.mjs`.
 16. **Procurement moved to `/procurement`.** At the owner's request the module left `/procurement-v23`: the frozen legacy
     pages moved unchanged to `/procurement-legacy`, and `/procurement-v23/...` redirects (308) to `/procurement/...`, so
     links in notifications and emails already sent still open. Notification links from the API use the new paths.
-    UI `f4ff8be`, API `dc224d5` (PENDING cycle twelve).
+    UI `f4ff8be`, API `dc224d5`; verified in cycle twelve (sidebar navigation 17/17 pages at `/procurement`, census clean
+    there) and the redirect by the self-registration UAT in cycle fourteen.
 
 17. **The vendor portal called a required field optional.** The self-registration form marked SWIFT code optional and
     sent nothing when it was blank, but the API refuses a vendor bank account without one ("requires Branch Code,
@@ -570,7 +571,7 @@ with `dev_cleanup_procurement.mjs --apply` and `demo_integrity.mjs`.
 
 | Suite | Result |
 |---|---|
-| vendor self-registration | 6/12 — SWIFT required by the API but optional in the form (item 17); re-run in cycle thirteen: PENDING |
+| vendor self-registration | 6/12 — SWIFT required by the API but optional in the form (item 17); fixed and re-run in cycles thirteen and fourteen |
 | vendor master | 17/18 — the UAT still expected the profile's "Open vendor portal" gone; it now opens the portal (UAT updated) |
 | vendor history (incl. compliance filter) | 11/11 |
 | requisition assist (project, suggestions, no Budget check column) | 14/14 |
@@ -580,6 +581,14 @@ with `dev_cleanup_procurement.mjs --apply` and `demo_integrity.mjs`.
 | sidebar navigation at `/procurement` | 17/17 pages, openers 10/10 |
 | census, Procurement Manager, at `/procurement` | 0 dead ends, 0 "not connected", 0 page errors, 0 failed calls. Four controls with no visible effect: the three benign ones seen before, and "Vendor portal", whose new tab opens with `noopener` and so is not seen by the census (the self-registration UAT checks that tab) |
 | demo integrity after cleanup | 18/18 (the two records restored at the owner's request read as the demo expects) |
+
+### Cycle fourteen results (UI `9e8acbd`: self-registrations as decision cards)
+
+| Suite | Result |
+|---|---|
+| vendor self-registration | 21/22, then 22/22 — the first run looked the approved vendor up with `?isActive=all`, which the API reads as inactive only (UAT fixed, `7ad30dc`); on re-run every check passed |
+| cleanup | nothing left behind |
+| demo integrity | 18/18 |
 
 ### A manual decision on the demo dataset (not a defect)
 
@@ -600,7 +609,8 @@ reporting what they matched. Three controls had no visible effect and are benign
 tender pack on an empty form, Clear with no filter set). 23 KPI cards were left out without a live figure; each is either
 a feature procurement does not have (eSignature, delegations, board votes, SLAs, contract variations and obligations,
 regulatory exports, bank-change tracking) or an older layer's card whose live equivalent is on the same page ("Waiting
-on me", "Contract value", on-time delivery, the analytics tables). Other roles: PENDING.
+on me", "Contract value", on-time delivery, the analytics tables). Procurement Officer, Accounts Payable and the requester
+(19 pages each): the same, all zero.
 
 ### Results
 
