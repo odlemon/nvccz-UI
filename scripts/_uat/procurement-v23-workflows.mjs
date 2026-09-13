@@ -399,7 +399,14 @@ await step("W8 Finance rejects a plan; its author adds a line and resubmits", as
   await page.waitForSelector('[data-action="submit-plan"]')
   await page.click('[data-action="submit-plan"] >> nth=0')
   const toast = await toasts(page)
-  const after = list(await api(author, "/procurement/plans")).find((p) => p.id === plan.id)
+  // The toast helper can hand back the line's toast still on screen, before the resubmission lands (cycle seven:
+  // the plan read REJECTED here and SUBMITTED a second later). Wait for the status itself.
+  let after = null
+  for (let i = 0; i < 20; i++) {
+    after = list(await api(author, "/procurement/plans")).find((p) => p.id === plan.id)
+    if (after?.status === "SUBMITTED") break
+    await page.waitForTimeout(1000)
+  }
   record(
     after?.status === "SUBMITTED" && (after.items?.length ?? 0) === 2,
     label,
