@@ -828,6 +828,41 @@ html.dark [data-arcus-shared-topbar] button,
 .procurement-v23-root .sidebar .sidebar-foot {
   border-color: #e2e8f0 !important;
 }
+/* Collapse control: the module CSS drew it as a full-width, near-invisible translucent-white
+   bar (background: rgba(255,255,255,.06), color: #cbd4e4) for the dark sidebar this used to be.
+   On the light surface above that reads as a faint, low-contrast rectangle. Values below are
+   Performance's own collapse control (.sidebar-foot / .collapse-btn), copied exactly (measured
+   with getComputedStyle) so this one matches instead of inventing a new style for it. */
+.payroll-v6-root .sidebar .collapse-wrap,
+.procurement-v23-root .sidebar .collapse-wrap {
+  padding: 8px !important;
+  border-top-color: #dfe4ed !important;
+  background: #ffffff !important;
+}
+.payroll-v6-root .sidebar .collapse-btn,
+.procurement-v23-root .sidebar .collapse-btn {
+  width: 100% !important;
+  height: 38px !important;
+  padding: 0 9px !important;
+  background: #f8f9fc !important;
+  border: 1px solid #dfe4ed !important;
+  border-radius: 7px !important;
+  color: #667085 !important;
+  font-weight: 400 !important;
+  font-size: 11px !important;
+  justify-content: flex-start !important;
+}
+.payroll-v6-root .sidebar .collapse-btn:hover,
+.procurement-v23-root .sidebar .collapse-btn:hover {
+  background: #f0ebff !important;
+  color: #5b21ff !important;
+}
+.payroll-v6-root .sidebar .collapse-btn svg,
+.procurement-v23-root .sidebar .collapse-btn svg {
+  width: 18px !important;
+  height: 18px !important;
+  stroke: currentColor !important;
+}
 .payroll-v6-root .sidebar .tenant,
 .procurement-v23-root .sidebar .tenant,
 .payroll-v6-root .sidebar .health,

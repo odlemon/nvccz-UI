@@ -2049,6 +2049,87 @@ for (const [version, count] of [["13", 1], ["18", 2], ["20", 1], ["23", 1]]) {
 }
 
 // ---------------------------------------------------------------------------
+// 36. Sidebar and document logo -> the clean wordmark, not the blurred export
+// ---------------------------------------------------------------------------
+// The vendored LOGO_DATA (sidebar brand mark, and every letterhead/document-preview that reuses it)
+// is a blurred export: a soft grey glow around the letters, visible once the sidebar is expanded.
+// performance-v22's own vendored export of the same logo has no such artifact (it is also the exact
+// asset already committed at public/investee-portal-v8/assets/matanho-logo-transparent.png) — reuse it.
+{
+  const CLEAN_LOGO_PATH = path.join(ROOT, "public/investee-portal-v8/assets/matanho-logo-transparent.png")
+  must(fs.existsSync(CLEAN_LOGO_PATH), `clean logo asset not found at ${CLEAN_LOGO_PATH}`)
+  const cleanLogoDataUri = `data:image/png;base64,${fs.readFileSync(CLEAN_LOGO_PATH).toString("base64")}`
+  const marker = `LOGO_DATA='${cleanLogoDataUri.slice(0, 80)}`
+  const m = s.match(/const LOGO_DATA='data:image\/png;base64,[^']+';/)
+  if (m) {
+    s = replaceUnique(
+      s,
+      m[0],
+      `const LOGO_DATA='${cleanLogoDataUri}';`,
+      "sidebar + document logo -> the clean wordmark (matches performance-v22)",
+      marker,
+    )
+  } else if (!s.includes(marker)) {
+    console.warn("  MISS            sidebar + document logo -> clean wordmark (LOGO_DATA assignment not found)")
+    missed += 1
+  } else {
+    console.log("  skip (already)  sidebar + document logo -> clean wordmark")
+    skipped += 1
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 38. Download PDF/Excel/CSV on a V6 preview -> the same content just previewed
+// ---------------------------------------------------------------------------
+// previewDocV6({id, name, content, ...}) is how POs, contracts, approval decisions, award
+// reports and vendor tax clauses build their preview: a synthetic object with real content,
+// passed straight through (docByIdV6 special-cases typeof id === 'object'). But the footer's
+// Download PDF/Excel/CSV buttons carry only doc.id (a string) as data-id, and clicking one calls
+// docByIdV6(thatId) again -- which, given a string, searches the Document Vault/templates/reports
+// (a PO or contract id is in none of them) and falls through to a generic placeholder with none
+// of the content just shown. Cache the object the first time (the preview call) so the string
+// lookup can find it again.
+{
+  const marker38 = "window.__pr23DocCacheV6[built.id]=built;"
+  if (s.includes(marker38)) {
+    console.log("  skip (already)  docByIdV6 caches a previewed object so its own download buttons find it again")
+    skipped += 1
+  } else {
+    const findV6 = s.match(/function docByIdV6\(id\)\{if\(id&&typeof id==='object'\)return \{type:'Controlled document',version:'v1\.0',status:'Draft',\.\.\.id\};[\s\S]*?\n  \}/)?.[0]
+    must(findV6, "docByIdV6 (step 38's own output) not found to extend for caching")
+    const replV6 = findV6.replace(
+      "if(id&&typeof id==='object')return {type:'Controlled document',version:'v1.0',status:'Draft',...id};",
+      "if(id&&typeof id==='object'){const built={type:'Controlled document',version:'v1.0',status:'Draft',...id};if(built.id){window.__pr23DocCacheV6=window.__pr23DocCacheV6||{};window.__pr23DocCacheV6[built.id]=built;}return built;}\n    if(window.__pr23DocCacheV6&&window.__pr23DocCacheV6[id])return window.__pr23DocCacheV6[id];",
+    )
+    must(replV6 !== findV6, "docByIdV6 replacement text did not change")
+    s = replaceUnique(s, findV6, replV6, "docByIdV6 caches a previewed object so its own download buttons find it again", marker38)
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 39. Download PDF on a V6 preview also -> the same content just previewed
+// ---------------------------------------------------------------------------
+// Step 38 fixed Excel and CSV (both reassigned to use docByIdV6, which now finds the previewed
+// object). PDF was never reassigned alongside them: 'download-document-v5' still calls the older
+// getDoc(id), which does not know about the preview cache and falls through to its own unrelated
+// placeholder ("Procurement Document"), so the PDF ignored the content the preview and the other
+// two downloads now agree on.
+{
+  // Extracted from the live file rather than typed here: this region is CRLF (see
+  // project_runtime_patch_crlf_trap), and a hand-typed \n find silently never matches.
+  const marker39 = "'download-document-v5':a=>exportFile('pdf',docByIdV6(a.dataset.id).name)"
+  if (s.includes(marker39)) {
+    console.log("  skip (already)  PDF download (V6 preview) -> docByIdV6, matching Excel and CSV")
+    skipped += 1
+  } else {
+    const find39 = s.match(/'download-document-xls':a=>exportFile\('xls',docByIdV6\(a\.dataset\.id\)\.name\),\r?\n\s*'download-document-csv':a=>exportFile\('csv',docByIdV6\(a\.dataset\.id\)\.name\)\r?\n\s*\}\);/)?.[0]
+    must(find39, "download-document-xls/csv handler block (step 38's own output) not found to extend for PDF")
+    const repl39 = `${marker39},\n    ` + find39
+    s = replaceUnique(s, find39, repl39, "PDF download (V6 preview) -> docByIdV6, matching Excel and CSV", marker39)
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Scope guard: the bridge may only call what is in its scope
 // ---------------------------------------------------------------------------
 // The bridge is injected at the runtime's top level. Helpers the vendored layers declare inside their own blocks
