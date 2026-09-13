@@ -463,7 +463,7 @@ production is not touched and the dev mail guard stays on.
 |---|---|---|
 | 0 | Preflight: build, mail guard, test data, demo integrity | Clean: working tree at `c2ec9e6`, mail guard on, no leftover test records or processes, demo integrity 17/17 |
 | 1 | Visual review of every page for the 8 roles that sign in (desktop screenshots read by a person), and tablet and phone widths | 152 desktop pages and 36 tablet/phone views read; 16 findings, all fixed in `55016b0` and `0a3ecc2` (below); dev audit trail tidied |
-| 2 | Every control on every page for all 8 roles (census): dead controls, errors, unrefused writes, sample text | pending |
+| 2 | Every control on every page for all 8 roles (census): dead controls, errors, unrefused writes, sample text | On `0a3ecc2`: Procurement Manager, Accounts Payable and Operations head complete (19 pages each). No render failure, failed call or unrefused write. Flags triaged below; one wording fix (`9e9a458`), and the approval support documents found beside it. Remaining roles re-run on the next build |
 | 3 | End-to-end business flows through the UI: storyline, actions, workflows, AI capture | pending |
 | 4 | Permissions and refusals per role | pending |
 | 5 | Cross-module: accounting (journals, ledger, payables, cash), vendor portal, exports and letterheads | Exports and accounting 32/32 on `0a3ecc2`: every export downloads a real file with no sample or test text; Payables agrees with procurement ($2,518 outstanding = the stationery invoice awaiting Finance; $19,277 open commitments = the two uninvoiced POs; $7,421 sourcing pipeline). Vendor portal 2/4: the invited vendor's quotation form was blank (fix below, deploying) |
@@ -499,6 +499,22 @@ fixed with the Accounts Payable source cards naming the supplier where the role 
 phone re-check: the menu no longer covers pages; the requester's "799px sideways scroll" was the closed side drawer
 parked off-screen (the document does not scroll), a false positive of the check, which now measures the viewport.
 
+### Phase 2 — census flags, triaged
+
+| Flag | Verdict |
+|---|---|
+| "Command Centre" in the menu while on the Command Centre: no visible effect | Expected — already on the page |
+| Document Vault "Clear" with no filter set: no visible effect | Expected — nothing to clear |
+| Report template status select "Draft": no visible effect | Expected — takes effect on save |
+| Create tender → "Preview tender pack" on the empty form: no visible effect | Expected — the browser's required-field prompt shows, nothing else changes |
+| Vendor Registry "Vendor portal": could not operate | Known — a not-built opener; its refusal toast covers the button |
+| Document Vault "Download PDF": console CORS error on socket.io | Transient — the dev API container was being recreated; CORS headers for `dev.matanho.com` are correct |
+| Accounts Payable: "No procurement plan has been approved yet", "No approved plan covers FY 2026", "No requisition has been approved yet" | **Wrong** — that role cannot read plans or others' requisitions; now "not visible to your role" (`9e9a458`) |
+
+KPI cards that show "—" all say why (no withholding calculation, no eSignature, report runs not stored…), and every
+success toast without an API call is a refusal, a filter count or a client-side export — none claims work that did
+not happen.
+
 ### Approval support documents were fixtures presented as evidence
 
 Found reading what the census reported the department head opening in a requisition approval. The three supporting
@@ -530,6 +546,16 @@ payload (so even the RFQ id was lost), and no endpoint let a vendor read the RFQ
   quotation this vendor already sent.
 - UI: the form shows what is being bought, prefills the lines and the vendor's details, names the organisation,
   says when the RFQ has closed or the vendor has already quoted (and disables Submit), and reads the token correctly.
+
+The first deploy of the endpoint answered 500 to every invited vendor: it ordered the vendor's earlier quotation by
+`createdAt`, which `VendorQuotation` does not have (it records `submittedAt`); the local Prisma client was stale and
+the typecheck did not see it. Fixed in API `7d7826f`. On dev (`check_vendor_rfq_endpoint.mjs`) **9/9**: an invited vendor
+reads its RFQ, lines without prices, its own details and the organisation's name; no token, an altered token and an
+uninvited vendor are refused (400, 400, 404).
+
+Census harness: the finance manager's run crashed when a call failed during the API container recreate — the
+`requestfailed` handler called `.request()` on what is already the request. Fixed; the internal auditor's run failed
+to sign in during the same recreate. Both are re-run on the next build.
 
 Seen and left: the journal reference `EXP-1789275136052-INV_20260822_0001` is the accounting API's own reference and
 reads the same in Accounting; the Configuration page lists raw permission keys, which is what Admin → Roles uses.

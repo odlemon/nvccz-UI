@@ -269,7 +269,9 @@ for (const [email, role] of USERS) {
     if (/\/api\//.test(u) && !/_next/.test(u)) w.api.push({ method: r.request().method(), path: u.replace(/^https?:\/\/[^/]+/, "").replace(/\?.*$/, ""), status: r.status() })
   })
   page.on("requestfailed", (r) => {
-    if (/\/api\//.test(r.url())) w.api.push({ method: r.request().method(), path: r.url().replace(/^https?:\/\/[^/]+/, "").replace(/\?.*$/, ""), status: `failed ${r.failure()?.errorText || ""}` })
+    // "requestfailed" hands over the Request itself (no .request()); calling it crashed the census whenever a call
+    // failed, as it did while the dev API container was being recreated.
+    if (/\/api\//.test(r.url())) w.api.push({ method: r.method(), path: r.url().replace(/^https?:\/\/[^/]+/, "").replace(/\?.*$/, ""), status: `failed ${r.failure()?.errorText || ""}` })
   })
   page.on("download", (d) => w.downloads.push(d.suggestedFilename()))
   page.on("dialog", (d) => { w.dialogs.push(`${d.type()}: ${d.message().slice(0, 160)}`); d.dismiss().catch(() => {}) })
