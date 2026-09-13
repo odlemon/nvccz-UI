@@ -183,8 +183,9 @@ await step("W2 Operations head rejects a requisition with a reason", async (open
 // ---------------------------------------------------------------- W3 requester corrects a rejected requisition
 await step("W3 Requester corrects a rejected requisition and resubmits it", async (open, label) => {
   const email = "proc.requester@nts.local"
-  const pr = list(await api(email, "/procurement/requisitions/my")).find((r) => r.status === "REJECTED")
-  if (!pr) return record(false, label, "no rejected requisition — W2 rejects one")
+  // Only one this suite rejected (W2, "UAT WF …"): dev also carries the demo dataset, whose records are not the suite's to change.
+  const pr = list(await api(email, "/procurement/requisitions/my")).find((r) => r.status === "REJECTED" && String(r.title).startsWith("UAT WF"))
+  if (!pr) return record(false, label, "no rejected UAT WF requisition — W2 rejects one")
   const { page, errors } = await open(email, "/procurement-v23/requisitions")
   const offered = await rowMenu(page, pr.requisitionNumber)
   const editAction = ["edit-pr-v11", "resubmit-pr-v11", "edit-record-v5"].find((a) => offered.includes(a))
@@ -208,13 +209,16 @@ for (const decision of ["approve", "reject"]) {
   await step(`W4${decision === "approve" ? "a" : "b"} Procurement Manager ${decision}s a goods receipt inspection`, async (open, label) => {
     const email = "proc.mgr@nts.local"
     const officer = "proc.officer@nts.local"
-    let pending = list(await api(email, "/procurement/goods-received-notes")).filter((g) => String(g.status).toUpperCase() === "RECEIVED")
+    // Receipts on test purchase orders only (a UAT vendor): the demo dataset's receipt waiting on inspection stays as it is.
+    const testPos = list(await api(officer, "/procurement/purchase-orders")).filter((o) => /^UAT/.test(String(o.vendor?.name ?? "")))
+    const testPoIds = new Set(testPos.map((o) => o.id))
+    let pending = list(await api(email, "/procurement/goods-received-notes")).filter((g) => String(g.status).toUpperCase() === "RECEIVED" && testPoIds.has(g.purchaseOrderId ?? g.purchaseOrder?.id))
     if (!pending.length) {
       // Each inspection consumes a receipt, so arrange one rather than depend on what an earlier run left.
-      const po = list(await api(officer, "/procurement/purchase-orders")).find(
+      const po = testPos.find(
         (o) => ["SENT", "ACKNOWLEDGED", "PARTIALLY_DELIVERED"].includes(String(o.status).toUpperCase()) && (o.items ?? []).length,
       )
-      if (!po) return record(false, label, "no dispatched purchase order to receive against")
+      if (!po) return record(false, label, "no dispatched UAT purchase order to receive against")
       const made = await apiCall(officer, "POST", "/procurement/goods-received-notes", {
         purchaseOrderId: po.id,
         receivedDate: new Date().toISOString(),
@@ -251,10 +255,12 @@ for (const decision of ["approve", "reject"]) {
 await step("W5 Finance Manager approves a captured invoice (Approval Centre)", async (open, label) => {
   const ap = "proc.ap@nts.local"
   const finance = "payroll.finmgr@nts.local"
-  let draft = list(await api(ap, "/procurement/invoices")).find((i) => i.status === "DRAFT")
+  // A UAT vendor's invoice only: the demo dataset's invoice waiting on Finance stays waiting.
+  const isTestVendor = (name) => /^UAT/.test(String(name ?? ""))
+  let draft = list(await api(ap, "/procurement/invoices")).find((i) => i.status === "DRAFT" && isTestVendor(i.vendor?.name))
   if (!draft) {
-    const po = list(await api(ap, "/procurement/purchase-orders")).find((o) => ["SENT", "ACKNOWLEDGED", "PARTIALLY_DELIVERED", "DELIVERED"].includes(o.status) && (o.items ?? []).length)
-    if (!po) return record(false, label, "no dispatched PO to invoice")
+    const po = list(await api(ap, "/procurement/purchase-orders")).find((o) => ["SENT", "ACKNOWLEDGED", "PARTIALLY_DELIVERED", "DELIVERED"].includes(o.status) && (o.items ?? []).length && isTestVendor(o.vendor?.name))
+    if (!po) return record(false, label, "no dispatched UAT purchase order to invoice")
     const cap = await apiCall(ap, "POST", "/procurement/invoices", {
       purchaseOrderId: po.id, vendorId: po.vendorId, invoiceDate: new Date().toISOString(), dueDate: new Date(Date.now() + 30 * 864e5).toISOString(),
       currencyId: po.currencyId ?? undefined,
@@ -403,8 +409,8 @@ await step("W8 Finance rejects a plan; its author adds a line and resubmits", as
 // ---------------------------------------------------------------- W9 document: upload a new version
 await step("W9 Procurement Officer uploads a new version of a vault document", async (open, label) => {
   const email = "proc.officer@nts.local"
-  const doc = list(await api(email, "/procurement/documents"))[0]
-  if (!doc) return record(false, label, "no vault document — actions step 17 files one")
+  const doc = list(await api(email, "/procurement/documents")).find((d) => /^(UAT|Storyline)/.test(String(d.name)))
+  if (!doc) return record(false, label, "no UAT vault document — actions step 17 files one")
   const display = `DOC-${String(doc.id).slice(-6).toUpperCase()}`
   const { page, errors } = await open(email, "/procurement-v23/documents")
   const row = page.locator("table tbody tr", { hasText: doc.name }).first()
@@ -444,7 +450,8 @@ await step("N2 A plan's author cannot approve their own plan", async (open, labe
   const author = "proc.mgr@nts.local"
   const me = (await api(author, "/procurement/me/access"))?.userId
   const plans = list(await api(author, "/procurement/plans"))
-  const submitted = plans.find((p) => p.status === "SUBMITTED" && p.createdById === me) ?? plans.find((p) => p.status === "SUBMITTED")
+  const ours = plans.filter((p) => /^(UAT|Storyline)/.test(String(p.name)))
+  const submitted = ours.find((p) => p.status === "SUBMITTED" && p.createdById === me) ?? ours.find((p) => p.status === "SUBMITTED")
   if (!submitted) return record(false, label, "no submitted plan — W8 resubmits one")
   const { page, errors } = await open(author, "/procurement-v23/approvals")
   const control = `[data-action="approve-prompt-v6"][data-id="PLAN-${submitted.planNumber}"]`

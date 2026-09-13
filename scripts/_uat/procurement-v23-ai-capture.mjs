@@ -87,7 +87,10 @@ try {
   record("purchase orders are offered", poOptions > 0, `${poOptions} option(s) incl. the no-PO choice`)
 
   await page.setInputFiles('#aiInvoiceCaptureV23 input[name="document"]', PDF)
-  if (poOptions > 1) await page.locator("#aiInvoicePoV23").selectOption({ index: 1 })
+  // A UAT vendor's order only. Dev also carries the demo dataset, and a reading filed against a demo order would stay in it;
+  // with no UAT order offered the invoice is read without one.
+  const testPo = await page.$$eval("#aiInvoicePoV23 option", (os) => os.find((o) => o.value && /UAT/.test(o.textContent || ""))?.value ?? "")
+  if (testPo) await page.locator("#aiInvoicePoV23").selectOption(testPo)
 
   await page.locator('[data-action="confirm-extract-invoice-v23"]').click()
   await page.waitForFunction(

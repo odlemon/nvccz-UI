@@ -11,7 +11,7 @@ import posixpath
 import sys
 from pathlib import Path
 
-SCRIPTS = Path(r"C:\Users\lysp\Downloads\nvccz-new\scripts")
+SCRIPTS = Path(__file__).resolve().parents[2]  # the repo's scripts/ folder
 sys.path.insert(0, str(SCRIPTS))
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")

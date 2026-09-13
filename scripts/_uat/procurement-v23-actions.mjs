@@ -433,8 +433,9 @@ await step("10 Accountant captures the invoice for PO-B (live form)", async (ope
 await step("11 Finance Manager rejects an invoice (Approval Centre)", async (open) => {
   const label = "11 Finance Manager rejects an invoice (Approval Centre)"
   const email = "payroll.finmgr@nts.local"
-  const target = ((await api(email, "/procurement/invoices")) ?? []).find((i) => String(i.status).toUpperCase() === "DRAFT")
-  if (!target) return record(false, label, "no DRAFT invoice to reject — step 10 captures one")
+  // A UAT vendor's invoice only: dev also carries the demo dataset, whose invoice waiting on Finance is not ours to reject.
+  const target = ((await api(email, "/procurement/invoices")) ?? []).find((i) => String(i.status).toUpperCase() === "DRAFT" && /^UAT/.test(String(i.vendor?.name ?? "")))
+  if (!target) return record(false, label, "no DRAFT UAT invoice to reject — step 10 captures one")
   const { page, errors } = await open(email, "/procurement-v23/approvals")
   const id = `INVOICE-${target.invoiceNumber}`
   const review = `[data-action="open-approval-v6"][data-id="${id}"]`
@@ -513,15 +514,16 @@ await step("13 Accountant records payment of an approved invoice (Record payment
   const ap = "proc.ap@nts.local"
   const finance = "payroll.finmgr@nts.local"
   let invoices = (await api(ap, "/procurement/invoices")) ?? []
-  let target = invoices.find((i) => i.status === "APPROVED" && !["PAID", "PARTIALLY_PAID"].includes(i.paymentStatus))
+  const isTestVendor = (name) => /^UAT/.test(String(name ?? ""))
+  let target = invoices.find((i) => i.status === "APPROVED" && !["PAID", "PARTIALLY_PAID"].includes(i.paymentStatus) && isTestVendor(i.vendor?.name))
   if (!target) {
     // Arrange: accounts payable captures an invoice against a dispatched PO if none is waiting,
     // then Finance approves it, so there is one to pay.
-    let draft = invoices.find((i) => i.status === "DRAFT")
+    let draft = invoices.find((i) => i.status === "DRAFT" && isTestVendor(i.vendor?.name))
     if (!draft) {
       const orders = (await api(ap, "/procurement/purchase-orders")) ?? []
-      const po = orders.find((o) => ["SENT", "ACKNOWLEDGED", "PARTIALLY_DELIVERED", "DELIVERED"].includes(o.status) && (o.items ?? []).length)
-      if (!po) return record(false, label, "no dispatched PO to invoice — run the p2p flow first")
+      const po = orders.find((o) => ["SENT", "ACKNOWLEDGED", "PARTIALLY_DELIVERED", "DELIVERED"].includes(o.status) && (o.items ?? []).length && isTestVendor(o.vendor?.name))
+      if (!po) return record(false, label, "no dispatched UAT purchase order to invoice — run the p2p flow first")
       const captured = await apiCall(ap, "POST", "/procurement/invoices", {
         purchaseOrderId: po.id,
         vendorId: po.vendorId,
