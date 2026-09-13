@@ -337,7 +337,11 @@ export async function loadProcurementV23LiveData(): Promise<ProcurementV23LivePa
     amount: num(r.totalAmount) || null,
     // No budget check exists on the backend; nothing is asserted either way.
     budget: DASH,
-    status: REQUISITION_STATUS[String(r.status).toUpperCase()] ?? titleCase(r.status),
+    // A pending requisition names the step it waits on ("Pending Finance Manager"), not always the department head.
+    status:
+      String(r.status).toUpperCase() === "PENDING_APPROVAL" && (r.approvalRoute as ApprovalRoute | null)?.waitingOn
+        ? `Pending ${(r.approvalRoute as ApprovalRoute).waitingOn!.who}`
+        : REQUISITION_STATUS[String(r.status).toUpperCase()] ?? titleCase(r.status),
     rawStatus: r.status,
     owner: personName(r.requestedBy),
     department: r.department ?? null,
