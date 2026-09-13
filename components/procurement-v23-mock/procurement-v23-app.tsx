@@ -109,6 +109,9 @@ export function ProcurementV23App() {
         banks: payload.banks ?? [],
         // The currencies an RFQ can be quoted in, for the bridge's tender builder.
         currencies: payload.currencies ?? [],
+        // The org's departments, for the plan and plan-item Department pickers and an admin's
+        // requisition when they have none of their own.
+        departments: payload.departments ?? [],
       }
       // The requisitions page opens on the approver queue only for someone who approves
       // requisitions. The runtime decided it from its demo user's role; after the first hydrate of

@@ -384,7 +384,9 @@ export async function handleProcurementV23Action(
       case "submit-pr": {
         const form = document.querySelector<HTMLFormElement>("#prForm")
         if (form && !form.reportValidity()) return { handled: true }
-        const department = live.access?.department
+        // An admin has no department of their own but can still raise a requisition, against
+        // whichever department they choose on the form (__pr23RequisitionDepartmentField).
+        const department = live.access?.department || (live.access?.isPrivileged ? val('#prForm [name="cost"]') : "")
         if (!department) {
           return {
             handled: true,
@@ -1073,7 +1075,10 @@ export async function handleProcurementV23Action(
         const recordId = val('#planFormV23 [name="recordId"]')
         const body = {
           name: val('#planFormV23 [name="name"]'),
-          department: val('#planFormV23 [name="department"]') || undefined,
+          department: (() => {
+            const d = val('#planFormV23 [name="department"]')
+            return d && d !== "All departments" ? d : undefined
+          })(),
           fiscalYear: val('#planFormV23 [name="fiscalYear"]') || undefined,
           budget: Number(val('#planFormV23 [name="budget"]') || 0),
           currencyCode: val('#planFormV23 [name="currency"]') || undefined,
@@ -1111,7 +1116,10 @@ export async function handleProcurementV23Action(
           quarter: val('#planItemFormV23 [name="quarter"]') || undefined,
           method: val('#planItemFormV23 [name="method"]') || undefined,
           estimatedValue: Number(val('#planItemFormV23 [name="estimatedValue"]') || 0),
-          department: val('#planItemFormV23 [name="department"]') || undefined,
+          department: (() => {
+            const d = val('#planItemFormV23 [name="department"]')
+            return d && d !== "Same as the plan's" ? d : undefined
+          })(),
         })
         closeRuntimeOverlay()
         const fmt = (n: unknown) => Number(n ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })

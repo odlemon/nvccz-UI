@@ -33,6 +33,7 @@ import {
   listRequisitionProjects,
   listPendingVendorRegistrations,
   listProcurementCurrencies,
+  listDepartments,
   listRfqs,
   listBanks,
   listProcurementContracts,
@@ -67,6 +68,7 @@ export type ProcurementV23LivePayload = {
   /** Bank and cash accounts a payment can be made from; empty without procurement.invoices.pay. */
   banks?: LiveBank[]
   currencies?: { code: string; name: string }[]
+  departments?: string[]
   errors: LoaderError[]
 }
 
@@ -255,6 +257,9 @@ export async function loadProcurementV23LiveData(): Promise<ProcurementV23LivePa
   const registrationsLoad = safe("vendor-registrations", listPendingVendorRegistrations, [] as ProcurementRecord[])
   // The currencies set up in Accounting, for the RFQ builder's Currency (it offered ZAR where none exists).
   const currenciesLoad = safe("currencies", listProcurementCurrencies, [] as ProcurementRecord[])
+  // The org's departments, for the annual plan's Department picker (it was free text) and for an admin
+  // with no department of their own, who still needs to choose one when raising a requisition.
+  const departmentsLoad = safe("departments", listDepartments, [] as ProcurementRecord[])
   const access = await safe<ProcurementAccess | null>("me/access", getMyProcurementAccess, null)
   const accessUnavailable = access === null && errors.some((e) => e.source === "me/access")
   const perms = new Set(access?.permissions ?? [])
@@ -1634,6 +1639,7 @@ export async function loadProcurementV23LiveData(): Promise<ProcurementV23LivePa
       .filter((b) => b.isActive !== false)
       .map((b) => ({ id: String(b.id), name: String(b.name ?? b.id), accountNumber: b.accountNumber ?? null, currencyId: b.currencyId ?? null })),
     currencies: (await currenciesLoad).filter((c) => c?.code).map((c) => ({ code: String(c.code), name: String(c.name ?? c.code) })),
+    departments: (await departmentsLoad).filter((d) => d?.name).map((d) => String(d.name)),
     errors: [...errors],
   }
 }

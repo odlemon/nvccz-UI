@@ -219,6 +219,11 @@ export async function listProcurementCurrencies(): Promise<ProcurementRecord[]> 
   return unwrapData(await apiClient.get<ApiResponse<ProcurementRecord[]>>("/procurement/currencies"))
 }
 
+/** GET /departments: the org's departments ({id, name, ...}), for the plan and plan-item Department pickers. */
+export async function listDepartments(): Promise<ProcurementRecord[]> {
+  return unwrapData(await apiClient.get<ApiResponse<ProcurementRecord[]>>("/departments"))
+}
+
 /** The award. Accepting a quotation raises its purchase order. */
 export async function acceptQuotation(id: string, reviewNotes?: string): Promise<ProcurementRecord> {
   const q = reviewNotes ? `?reviewNotes=${encodeURIComponent(reviewNotes)}` : ""

@@ -564,9 +564,14 @@ function __pr23RequisitionEntityField() {
 function __pr23RequisitionDepartmentField() {
   const live = __pr23Live() || {};
   const dept = live.access && live.access.department;
-  return formField('Department / cost centre', dept
-    ? `<select name="cost" disabled><option>${__pr23Esc(dept)}</option></select>`
-    : '<p class="muted">Your account has no department, so a requisition cannot be raised yet. Ask an administrator to set it.</p>');
+  if (dept) return formField('Department / cost centre', `<select name="cost" disabled><option>${__pr23Esc(dept)}</option></select>`);
+  // An administrator has no department of their own but can still raise a requisition, against
+  // whichever department they choose here (an ordinary account with none is blocked below).
+  if (live.access && live.access.isPrivileged) {
+    const options = (live.departments || []).map(d => `<option>${__pr23Esc(d)}</option>`).join('');
+    return formField('Department / cost centre', `<select name="cost" required><option value="">Choose a department</option>${options}</select>`);
+  }
+  return formField('Department / cost centre', '<p class="muted">Your account has no department, so a requisition cannot be raised yet. Ask an administrator to set it.</p>');
 }
 
 /**
@@ -1506,7 +1511,7 @@ function __pr23PlanModal(planId) {
   openModal(
     plan ? `Edit ${plan.id}` : 'Create annual procurement plan',
     plan ? 'Change the plan header. Lines are added with Add plan item.' : 'Create the plan with its budget and first requirements. It stays a draft until you submit it for budget approval.',
-    `<form id="planFormV23" class="form-grid"><input type="hidden" name="recordId" value="${__pr23Esc(plan ? plan.recordId : '')}"><div class="field full"><label>Plan name</label><input name="name" required value="${__pr23Esc(plan ? plan.name : '')}"></div><div class="field"><label>Department</label><input name="department" value="${__pr23Esc(plan ? plan.department || '' : (live.access && live.access.department) || '')}" placeholder="All departments"></div><div class="field"><label>Financial year</label><select name="fiscalYear">${__pr23Options(plan && plan.fiscalYear && !years.includes(plan.fiscalYear) ? [plan.fiscalYear, ...years] : years, plan ? plan.fiscalYear : years[0])}</select></div><div class="field"><label>Budget ceiling</label><input type="number" name="budget" min="1" step="0.01" required value="${plan ? plan.budget : ''}"></div><div class="field"><label>Currency</label><select name="currency">${__pr23Options(['USD', 'ZiG', 'ZAR'])}</select></div><div class="field full"><label>Planning assumptions</label><textarea name="notes">${__pr23Esc(plan ? plan.notes || '' : '')}</textarea></div>${lines}</form>`,
+    `<form id="planFormV23" class="form-grid"><input type="hidden" name="recordId" value="${__pr23Esc(plan ? plan.recordId : '')}"><div class="field full"><label>Plan name</label><input name="name" required value="${__pr23Esc(plan ? plan.name : '')}"></div><div class="field"><label>Department</label><select name="department">${__pr23Options(['All departments', ...(live.departments || [])], plan ? (plan.department || 'All departments') : ((live.access && live.access.department) || 'All departments'))}</select></div><div class="field"><label>Financial year</label><select name="fiscalYear">${__pr23Options(plan && plan.fiscalYear && !years.includes(plan.fiscalYear) ? [plan.fiscalYear, ...years] : years, plan ? plan.fiscalYear : years[0])}</select></div><div class="field"><label>Budget ceiling</label><input type="number" name="budget" min="1" step="0.01" required value="${plan ? plan.budget : ''}"></div><div class="field"><label>Currency</label><select name="currency">${__pr23Options(['USD', 'ZiG', 'ZAR'])}</select></div><div class="field full"><label>Planning assumptions</label><textarea name="notes">${__pr23Esc(plan ? plan.notes || '' : '')}</textarea></div>${lines}</form>`,
     btn('Cancel', 'close-overlay') + btn('Save draft', 'save-plan-v5') + btn(plan ? 'Save changes' : 'Create plan', 'create-plan-confirm-v5', 'primary'),
   );
 }
@@ -1520,10 +1525,12 @@ function __pr23PlanItemModal() {
   }
   const current = state.planDetail && plans.find(p => p.id === state.planDetail);
   const planOptions = plans.map(p => `<option value="${__pr23Esc(p.recordId)}" ${current && current.recordId === p.recordId ? 'selected' : ''}>${__pr23Esc(p.id)} · ${__pr23Esc(p.name)}</option>`).join('');
+  const live = __pr23Live() || {};
+  const departmentOptions = ["Same as the plan's", ...(live.departments || [])];
   openModal(
     'Add procurement plan item',
     'The estimated value counts against the plan budget when the plan is submitted.',
-    `<form id="planItemFormV23" class="form-grid"><div class="field full"><label>Plan</label><select name="plan" required>${planOptions}</select></div><div class="field full"><label>Requirement</label><input name="description" required></div><div class="field"><label>Category</label><select name="category">${__pr23Options(__PR23_PLAN_CATEGORIES)}</select></div><div class="field"><label>Quarter</label><select name="quarter">${__pr23Options(['Q1', 'Q2', 'Q3', 'Q4'])}</select></div><div class="field"><label>Sourcing method</label><select name="method">${__pr23Options(__PR23_PLAN_METHODS)}</select></div><div class="field"><label>Estimated value</label><input type="number" name="estimatedValue" min="0" step="0.01" required></div><div class="field"><label>Department</label><input name="department" placeholder="The plan's department"></div></form>`,
+    `<form id="planItemFormV23" class="form-grid"><div class="field full"><label>Plan</label><select name="plan" required>${planOptions}</select></div><div class="field full"><label>Requirement</label><input name="description" required></div><div class="field"><label>Category</label><select name="category">${__pr23Options(__PR23_PLAN_CATEGORIES)}</select></div><div class="field"><label>Quarter</label><select name="quarter">${__pr23Options(['Q1', 'Q2', 'Q3', 'Q4'])}</select></div><div class="field"><label>Sourcing method</label><select name="method">${__pr23Options(__PR23_PLAN_METHODS)}</select></div><div class="field"><label>Estimated value</label><input type="number" name="estimatedValue" min="0" step="0.01" required></div><div class="field"><label>Department</label><select name="department">${__pr23Options(departmentOptions)}</select></div></form>`,
     btn('Cancel', 'close-overlay') + btn('Save item', 'save-plan-item', 'primary'),
   );
 }
