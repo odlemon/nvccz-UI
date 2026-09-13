@@ -79,6 +79,17 @@ step(
   "window.__ac52ApBanks = source.apBanks;",
 )
 
+// The prototype's own profile menu names its demo user ("Tariro Moyo") and is appended to <body>, outside the
+// .accounting-v52-root its styles are scoped to. Unstyled, it made every page taller than the window: the page scrolled,
+// the sidebar slid over the content (it took Payables' Pay bill click), and the demo name showed below the fold. The
+// shared topbar carries the signed-in user's own menu, so a live session does not install it.
+step(
+  "profile menu -> not installed in a live session",
+  "function installProfileMenu(){if(document.querySelector('#v5ProfileMenu'))return;",
+  "function installProfileMenu(){if(window.__AC52_LIVE__){document.querySelector('#v5ProfileMenu')?.remove();return}if(document.querySelector('#v5ProfileMenu'))return;",
+  "function installProfileMenu(){if(window.__AC52_LIVE__)",
+)
+
 if (!s.includes("function ac52LiveApClick(")) {
   missed += 1
   console.log("  MISS            live block did not land (ac52LiveApClick not found)")

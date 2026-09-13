@@ -437,9 +437,14 @@ for (const [email, role] of USERS) {
         pr.probes.push(await probe(route, [c, item], pid))
       }
     }
+    // A modal left with a form and nothing to save once the controls with no backend were removed (bridge __pr23DeadEnds).
+    pr.deadEnds = await page.evaluate(() => { const d = window.__pr23DeadEnds || []; window.__pr23DeadEnds = []; return d }).catch(() => [])
+    // KPI cards left out because nothing live answers them (bridge __pr23Kpi), to review page by page.
+    pr.hiddenKpis = await page.evaluate(() => { const h = window.__pr23HiddenKpis || {}; window.__pr23HiddenKpis = {}; return h }).catch(() => ({}))
+    const notConnected = pr.probes.filter((p) => p.effect.some((e) => /not connected/i.test(e))).length
     const flagged = pr.probes.filter((p) => p.effect.some((e) => /^(NO VISIBLE|COULD NOT|ERROR|API WRITE)/.test(e))).length
     const blankKpis = (pr.kpis || []).filter((k) => /No live source/i.test(k)).length
-    console.log(`[${TAG}] ${email} ${pid}: ${pr.tables?.length ?? 0} table(s), ${pr.kpis?.length ?? 0} KPI(s) (${blankKpis} without a source), ${pr.probes.length} probe(s), ${flagged} flagged, load errors ${pr.loadErrors.length}, failed calls ${pr.loadApi.length}`)
+    console.log(`[${TAG}] ${email} ${pid}: ${pr.tables?.length ?? 0} table(s), ${pr.kpis?.length ?? 0} KPI(s) (${blankKpis} without a source), ${pr.probes.length} probe(s), ${flagged} flagged, ${notConnected} not connected, ${pr.deadEnds.length} dead end(s), load errors ${pr.loadErrors.length}, failed calls ${pr.loadApi.length}`)
     save()
   }
   await context.close()

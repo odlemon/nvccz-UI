@@ -65,7 +65,11 @@ try {
   page.on("pageerror", (e) => errors.push(String(e.message || e)))
   await page.goto(`${BASE}/accounting/payables`, { waitUntil: "domcontentloaded", timeout: LOAD })
   check(await waitText(page, /Payables · Procurement to Payment/), "Payables opens for Accounts Payable")
-  check(await waitText(page, new RegExp(target.invoiceNumber)), "the procurement invoice is listed", target.invoiceNumber)
+  // The landing counts the queue; the invoice itself is listed on the Bills and Payment queue tabs below.
+  check(await waitText(page, /Approved, awaiting payment\s+[1-9]\d* invoices?/), "the landing counts it as approved, awaiting payment")
+  check(await waitText(page, /\$\s?[1-9][\d,.]*[kKmM]?\s+Approved to pay/, 30000), "and Approved to pay is not nil")
+  check((await page.locator("#v5ProfileMenu").count()) === 0 && !/Tariro Moyo/.test(await page.evaluate(() => document.body.innerText)), "no prototype profile menu or demo user on the page")
+  check(await page.evaluate(() => document.documentElement.scrollHeight <= window.innerHeight + 2), "the page itself does not scroll (the workspace does)", String(await page.evaluate(() => document.documentElement.scrollHeight)))
   check(!SAMPLE.test(await page.evaluate(() => document.body.innerText)), "no sample bill or figure is shown")
 
   await page.locator('[data-v28="tab"][data-key="ap"][data-id="bills"]').first().click()

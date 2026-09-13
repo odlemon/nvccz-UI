@@ -170,6 +170,16 @@ s = replaceOnce(
   }
 }
 
+// 4b. A card __pr23Kpi leaves out (a feature procurement does not record, or a fixture figure with no live source)
+// renders nothing, instead of a dash that says there is no source.
+s = replaceUnique(
+  s,
+  "{[value,sub]=__pr23Kpi(label,value,sub);return ",
+  "{[value,sub]=__pr23Kpi(label,value,sub);if(value===__PR23_HIDDEN_KPI)return '';return ",
+  "kpi() -> leave out cards with no source",
+  "if(value===__PR23_HIDDEN_KPI)return ''",
+)
+
 // ---------------------------------------------------------------------------
 // 5. Sidebar badge counts
 // ---------------------------------------------------------------------------

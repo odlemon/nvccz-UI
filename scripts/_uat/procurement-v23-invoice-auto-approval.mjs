@@ -3,7 +3,7 @@
  *
  *   API=https://dev-api.matanho.com/api BASE=https://dev.matanho.com UAT_LOAD_TIMEOUT_MS=180000 \
  *   NEXT_PUBLIC_API_BASE_URL=https://dev-api.matanho.com/api \
- *   UAT_DELETE_INVOICES_CMD="python dev_api_node.py dev_delete_invoices.mjs {ids}" \
+ *   UAT_DELETE_INVOICES_CMD="python scripts/procurement-ops/dev-data/dev_api_node.py scripts/procurement-ops/dev-data/dev_delete_invoices.mjs --approved-unpaid {ids}" \
  *     node scripts/_uat/procurement-v23-invoice-auto-approval.mjs
  *
  * SRD §6.6: "If the invoice matches the PO exactly, the AI marks the invoice for Auto-Approval and moves it into the
@@ -146,11 +146,23 @@ try {
     const page = await context.newPage()
     await page.goto(`${BASE}/procurement-v23/invoices`, { waitUntil: "domcontentloaded", timeout: LOAD })
     await page.waitForSelector("#nav .nav-item", { timeout: LOAD })
-    const shown = await page
-      .waitForFunction((n) => { const t = document.body.innerText; return t.includes(n) && /Approved automatically/.test(t) }, twoApproved?.invoiceNumber, { timeout: LOAD })
-      .then(() => true)
-      .catch(() => false)
-    check(shown, "the invoices page shows it as approved automatically")
+    // The page lists match sources; the invoice is in the workspace of the source its order belongs to.
+    const cardSel = '[data-action="select-match-tender-v5"]'
+    await page.waitForFunction((sel) => [...document.querySelectorAll(sel)].some((c) => /Invoice received/.test(c.innerText)), cardSel, { timeout: LOAD }).catch(() => {})
+    let rowText = ""
+    const cardCount = await page.locator(cardSel).count()
+    for (let i = 0; i < cardCount && !rowText; i++) {
+      if (!(await page.locator(cardSel).count())) {
+        await page.goto(`${BASE}/procurement-v23/invoices`, { waitUntil: "domcontentloaded", timeout: LOAD })
+        await page.waitForSelector(cardSel, { timeout: LOAD })
+      }
+      const card = page.locator(cardSel).nth(i)
+      if (!/Invoice received/.test(await card.innerText())) continue
+      await card.click()
+      await page.waitForTimeout(2500)
+      rowText = await page.evaluate((n) => [...document.querySelectorAll("#workspace tr")].map((tr) => tr.innerText.replace(/\s+/g, " ")).find((t) => t.includes(n)) || "", twoApproved?.invoiceNumber)
+    }
+    check(/Approved automatically/.test(rowText), "the invoice's match workspace shows it approved automatically", rowText.slice(0, 200) || "row not found")
     await page.screenshot({ path: path.join(process.env.OUT || ".", "invoice-auto-approved.png"), fullPage: true }).catch(() => {})
   } finally {
     await browser.close()

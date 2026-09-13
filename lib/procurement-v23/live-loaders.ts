@@ -45,7 +45,8 @@ import { IS_CUSTOM_BRAND, ORG_NAME } from "@/lib/branding"
 
 export type LoaderError = { source: string; message: string; status?: number }
 
-export type LiveKpi = { value: string | number; sub: string }
+/** hidden: the figure belongs to a feature the organisation does not have, so the card is not shown at all. */
+export type LiveKpi = { value: string | number; sub: string; hidden?: boolean }
 
 export type LiveBank = { id: string; name: string; accountNumber: string | null; currencyId: string | null }
 
@@ -1076,6 +1077,8 @@ export async function loadProcurementV23LiveData(): Promise<ProcurementV23LivePa
   // Keyed by card label. Where the backend can answer, the figure is computed here and the
   // derivation is in the sub-text; where it cannot, the card says so.
   const unknown = (sub: string): LiveKpi => ({ value: DASH, sub })
+  // A card for something procurement does not record at all (and the SRD does not ask for) is left out, not shown as a dash.
+  const hidden = (sub: string): LiveKpi => ({ value: DASH, sub, hidden: true })
   const countBy = <T,>(rows: T[], test: (r: T) => boolean) => rows.filter(test).length
   const reqStatus = (s: string) => countBy(requisitionRows, (r) => String(r.status).toUpperCase() === s)
   const openRfqs = tendersView.filter((t) => t.stage === "Published" || t.stage === "Evaluation")
@@ -1131,7 +1134,7 @@ export async function loadProcurementV23LiveData(): Promise<ProcurementV23LivePa
     "Open tenders": { value: openRfqs.length, sub: `${tendersView.filter((t) => t.stage === "Evaluation").length} with quotations in` },
     Vendors: { value: vendorsView.length, sub: `${vendorsView.filter((v) => v.isBlacklisted).length} blacklisted` },
     // Requisitions
-    "Budget warnings": unknown("Requisitions are not budget-checked yet"),
+    "Budget warnings": hidden("Requisitions are not budget-checked yet"),
     "Approved for sourcing": { value: reqStatus("APPROVED"), sub: "Approved and not yet sent to RFQ" },
     "Returned drafts": { value: reqStatus("DRAFT") + reqStatus("REJECTED"), sub: "Drafts and rejected requests" },
     "Median approval time": medianDays === null
@@ -1148,13 +1151,13 @@ export async function loadProcurementV23LiveData(): Promise<ProcurementV23LivePa
     "Department isolation": { value: "Enforced", sub: "Department heads see their own department" },
     // Tenders
     "Active tenders": { value: openRfqs.length, sub: "Published or in evaluation" },
-    "Vendor invitations": unknown("Invitation counts are not returned by the RFQ register"),
+    "Vendor invitations": hidden("Invitation counts are not returned by the RFQ register"),
     "Secure submissions": { value: quotations.length, sub: "Quotations received through vendor links" },
     "Closing this week": {
       value: tendersView.filter((t) => t.closingAt && new Date(t.closingAt).getTime() >= now && new Date(t.closingAt).getTime() <= weekAhead).length,
       sub: "RFQs closing in the next 7 days",
     },
-    Clarifications: unknown("Clarifications are not loaded yet"),
+    Clarifications: hidden("Clarifications are not loaded yet"),
     // Evaluation
     "Awaiting evaluation": { value: tendersView.filter((t) => t.stage === "Evaluation").length, sub: "RFQs with quotations and no award" },
     // Receiving
@@ -1199,7 +1202,7 @@ export async function loadProcurementV23LiveData(): Promise<ProcurementV23LivePa
         ? { value: `${Math.round((planned / budget) * 1000) / 10}%`, sub: "Planned lines against plan budgets" }
         : unknown("No plan has a budget yet")
     })(),
-    "Strategic tenders": unknown("Tenders are not linked to plan lines"),
+    "Strategic tenders": hidden("Tenders are not linked to plan lines"),
     "Plan amendments": {
       value: plansView.reduce((t, p) => t + Math.max(0, Number(String(p.version).replace(/[^0-9.]/g, "")) - 1), 0),
       sub: "Resubmissions after rejection",
@@ -1225,7 +1228,7 @@ export async function loadProcurementV23LiveData(): Promise<ProcurementV23LivePa
       ).length,
       sub: "Active contracts ending within 90 days",
     },
-    "Vendor obligations": unknown("Obligations are not tracked on contracts yet"),
+    "Vendor obligations": hidden("Obligations are not tracked on contracts yet"),
     // Cards the full UI census found blank although the records answer them.
     "Pending approvals": { value: prompts.length, sub: "Decisions waiting for you: requisitions, awards, receipts, invoices and plans" },
     "AP exposure": {
@@ -1258,13 +1261,13 @@ export async function loadProcurementV23LiveData(): Promise<ProcurementV23LivePa
       ),
       sub: "Captured or approved and not yet paid",
     },
-    "WHT required": unknown("Withholding tax is not calculated on procurement invoices"),
-    "WHT payable": unknown("Withholding tax is not calculated on procurement invoices"),
+    "WHT required": hidden("Withholding tax is not calculated on procurement invoices"),
+    "WHT payable": hidden("Withholding tax is not calculated on procurement invoices"),
     "Journal queue": { value: journalsView.filter((j) => j.status === "Pending").length, sub: "Payment journals awaiting posting to the ledger" },
-    "Asset transfer queue": unknown("Fixed-asset transfers are not recorded in procurement"),
+    "Asset transfer queue": hidden("Fixed-asset transfers are not recorded in procurement"),
     "Accounting API": { value: "Ledger", sub: "Invoice payments create journals in the accounting ledger" },
     "SoD checks": { value: "Enforced", sub: "Authors cannot approve their own plans; decisions are role-bound" },
-    "eSign coverage": unknown("eSignature is not connected"),
+    "eSign coverage": hidden("eSignature is not connected"),
     "Value in market": {
       value: money(
         sum(
@@ -1285,13 +1288,13 @@ export async function loadProcurementV23LiveData(): Promise<ProcurementV23LivePa
     Variance: yearBudget > 0
       ? { value: `${Math.round((yearCommitted / yearBudget) * 1000) / 10}%`, sub: `FY ${thisYear} commitments as a share of its approved plan budgets` }
       : unknown(plansVisible ? `No approved plan covers FY ${thisYear}` : "Procurement plans are not visible to your role"),
-    Forecast: unknown("Spend forecasting is not available"),
-    "Technical threshold": unknown("No scoring threshold is configured for RFQs"),
+    Forecast: hidden("Spend forecasting is not available"),
+    "Technical threshold": hidden("No scoring threshold is configured for RFQs"),
     "Potential savings": { value: money(savings), sub: "Accepted quotation against the highest bid, across awarded RFQs" },
     "Recommendations due": { value: tendersView.filter((t) => t.stage === "Evaluation").length, sub: "RFQs with quotations and no award" },
     "Recommendations pending": { value: tendersView.filter((t) => t.stage === "Evaluation").length, sub: "RFQs with quotations and no award" },
-    "Committee sessions": unknown("Evaluation committees are not recorded"),
-    "Declarations complete": unknown("Conflict-of-interest declarations are not recorded"),
+    "Committee sessions": hidden("Evaluation committees are not recorded"),
+    "Declarations complete": hidden("Conflict-of-interest declarations are not recorded"),
     "Evaluated value": {
       value: money(sum(quotations.filter((q) => ["SUBMITTED", "UNDER_REVIEW"].includes(String(q.status).toUpperCase())), (q) => q.totalAmount)),
       sub: "Open quotations on RFQs awaiting award",
@@ -1300,15 +1303,15 @@ export async function loadProcurementV23LiveData(): Promise<ProcurementV23LivePa
       value: tendersView.filter((t) => t.bids > 0).length,
       sub: `${tendersView.filter((t) => t.stage === "Evaluation").length} awaiting award`,
     },
-    "Published reports": unknown("Report runs are exported, not stored"),
-    "Scheduled deliveries": unknown("Report schedules are not stored"),
-    "Board packs": unknown("Board packs are not stored"),
-    "Downloads this month": unknown("Report downloads are not logged"),
+    "Published reports": hidden("Report runs are exported, not stored"),
+    "Scheduled deliveries": hidden("Report schedules are not stored"),
+    "Board packs": hidden("Board packs are not stored"),
+    "Downloads this month": hidden("Report downloads are not logged"),
     "Data freshness": { value: "Live", sub: "Registers load from the API when the page opens" },
     // Audit & Compliance: nothing measures these yet, and "no live source" said too little.
-    "Accounting accuracy": unknown("Journal accuracy is not measured in procurement"),
-    "Document retrieval": unknown("Vault retrieval is not measured"),
-    "Immutable records": unknown("Record immutability is not attested yet"),
+    "Accounting accuracy": hidden("Journal accuracy is not measured in procurement"),
+    "Document retrieval": hidden("Vault retrieval is not measured"),
+    "Immutable records": hidden("Record immutability is not attested yet"),
   }
 
   // ----------------------------------------------------------------- analytics: cash requirements and insights

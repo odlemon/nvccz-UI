@@ -1,9 +1,10 @@
 // Remove procurement invoices a test created on the DEV database, by id. Dev only.
 //
-//   python dev_api_node.py dev_delete_invoices.mjs <invoiceId> [<invoiceId> ...]
+//   python dev_api_node.py dev_delete_invoices.mjs [--approved-unpaid] <invoiceId> [<invoiceId> ...]
 //
 // For tests that capture invoices against the demo purchase orders (which the name-based cleanup keeps). Refuses an
-// invoice that was approved, paid or posted, so a demo invoice cannot be removed by mistake.
+// invoice that was approved, paid or posted, so a demo invoice cannot be removed by mistake. --approved-unpaid lets a
+// test remove an invoice it had approved (the auto-approval test does), still never one that is paid or posted.
 import pkg from "@prisma/client"
 const { PrismaClient } = pkg
 const prisma = new PrismaClient()
@@ -22,7 +23,8 @@ try {
     where: { id: { in: ids } },
     select: { id: true, invoiceNumber: true, status: true, paymentStatus: true, journalEntryId: true, cashbookEntryId: true },
   })
-  const blocked = rows.filter((r) => String(r.status).toUpperCase() === "APPROVED" || String(r.paymentStatus).toUpperCase() !== "PENDING" || r.journalEntryId || r.cashbookEntryId)
+  const approvedOk = process.argv.includes("--approved-unpaid")
+  const blocked = rows.filter((r) => (!approvedOk && String(r.status).toUpperCase() === "APPROVED") || String(r.paymentStatus).toUpperCase() !== "PENDING" || r.journalEntryId || r.cashbookEntryId)
   if (blocked.length) {
     console.log(`REFUSED: approved, paid or posted: ${blocked.map((r) => r.invoiceNumber).join(", ")}`)
     process.exit(2)

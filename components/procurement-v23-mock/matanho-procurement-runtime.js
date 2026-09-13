@@ -177,7 +177,7 @@ const money=n=>(n===null||n===undefined||n===''||!Number.isFinite(Number(n)))?'\
 const status=s=>{let c=/approved|matched|ready|accepted|posted|published|prequalified|active|in use/i.test(s)?'green':/blocked|blacklisted|expired|rejected|held|variance/i.test(s)?'red':/pending|review|conditional|clarification|opening|warning|revision/i.test(s)?'amber':'blue';return `<span class="status ${c}">${s}</span>`};
 const btn=(label,action,kind='',ico='')=>`<button class="btn ${kind}" data-action="${action}">${ico?icon(ico):''}${label}</button>`;
 const pageHead=(eyebrow,title,desc,actions='')=>`<div class="page-head"><div><div class="eyebrow">${eyebrow}</div><h1>${title}</h1><p>${desc}</p></div><div class="actions">${actions}</div></div>`;
-const kpi=(label,value,sub,ico='report',page='')=>{[value,sub]=__pr23Kpi(label,value,sub);return `<article class="kpi" ${page?`data-page="${page}"`:''}><div class="kpi-top"><span class="kpi-label">${label}</span><span class="kpi-icon">${icon(ico)}</span></div><div class="kpi-value">${value}</div><div class="kpi-sub">${sub}</div></article>`};
+const kpi=(label,value,sub,ico='report',page='')=>{[value,sub]=__pr23Kpi(label,value,sub);if(value===__PR23_HIDDEN_KPI)return '';return `<article class="kpi" ${page?`data-page="${page}"`:''}><div class="kpi-top"><span class="kpi-label">${label}</span><span class="kpi-icon">${icon(ico)}</span></div><div class="kpi-value">${value}</div><div class="kpi-sub">${sub}</div></article>`};
 const card=(title,sub,body,extra='')=>`<section class="card"><div class="card-head"><div><h3>${title}</h3><p>${sub}</p></div>${extra}</div>${body}</section>`;
 const table=(heads,rows,attrs='')=>`<div class="table-wrap"><table ${attrs}><thead><tr>${heads.map(h=>`<th>${h}</th>`).join('')}</tr></thead><tbody>${(__pr23Live()&&!rows.length)?`<tr><td colspan="${heads.length}" class="pr23-empty-row" style="text-align:center;color:#64748b;padding:18px 12px">No records to show yet.</td></tr>`:rows.join('')}</tbody></table></div>`;
 const options=(vals,current)=>vals.map(v=>`<option ${v===current?'selected':''}>${v}</option>`).join('');
@@ -200,15 +200,22 @@ const __PR23_LITERAL_KPIS = new Set(["AP exposure|$2,480,000","AP liability|$1,2
 /**
  * A KPI card's value and sub-text in a live session:
  *  - a label the loaders can answer gets the live figure and its stated derivation;
- *  - a card whose value is a fixture literal gets an em dash and says there is no source;
+ *  - a card for a feature procurement does not record (known.hidden), or whose value is a fixture literal with no
+ *    live figure, is not shown at all: kpi() renders nothing for __PR23_HIDDEN_KPI;
  *  - a card the runtime computes from state (already live data) passes through untouched.
+ * The labels left out are kept in window.__pr23HiddenKpis for the census.
  */
+const __PR23_HIDDEN_KPI = ' pr23-hidden-kpi';
 function __pr23Kpi(label, value, sub) {
   const live = __pr23Live();
   if (!live) return [value, sub];
   const known = live.kpis && live.kpis[label];
-  if (known) return [known.value, known.sub];
-  if (__PR23_LITERAL_KPIS.has(label + '|' + String(value))) return ['—', 'No live source for this figure yet'];
+  const hide = () => {
+    try { (window.__pr23HiddenKpis = window.__pr23HiddenKpis || {})[label] = (known && known.sub) || 'no live source'; } catch (e) {}
+    return [__PR23_HIDDEN_KPI, ''];
+  };
+  if (known) return known.hidden ? hide() : [known.value, known.sub];
+  if (__PR23_LITERAL_KPIS.has(label + '|' + String(value))) return hide();
   return [value, sub];
 }
 
@@ -2185,10 +2192,12 @@ __pr23On(document, 'change', event => {
 // ---------------------------------------------------------------- purchase order register filters
 
 /** "13 Sep 2026", or an em dash when there is no date. */
+/** "13 Sep 2026". Spelt out here: en-GB's short month is "Sept" on newer ICU and "Sep" on older, so the same page read differently by browser. */
+const __PR23_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 function __pr23DayLabel(iso) {
   if (!iso) return '—';
   const d = new Date(iso);
-  return Number.isNaN(d.getTime()) ? '—' : d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+  return Number.isNaN(d.getTime()) ? '—' : `${String(d.getDate()).padStart(2, '0')} ${__PR23_MONTHS[d.getMonth()]} ${d.getFullYear()}`;
 }
 
 function __pr23OrderFilters() {
