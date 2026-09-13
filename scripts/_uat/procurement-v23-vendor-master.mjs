@@ -80,6 +80,8 @@ try {
     await seedAuth(context, BASE, "proc.officer@nts.local", "staff")
     const page = await context.newPage()
     await page.goto(`${BASE}/procurement/vendors`, { waitUntil: "domcontentloaded", timeout: LOAD })
+    // Saves go to the API once the live session has loaded (as a person would see the register filled in).
+    await page.waitForFunction(() => Boolean(window.__pr23Live && window.__pr23Live.access), null, { timeout: LOAD })
     const register = page.locator('#workspace [data-action="register-vendor"], #workspace [data-action="register-vendor-v6"]').first()
     await register.waitFor({ timeout: LOAD })
     await register.click()
@@ -96,7 +98,8 @@ try {
     await page.fill('#vendorForm [name="vat"]', `VAT-${RUN}`)
     await page.fill('#vendorForm [name="address"]', "18 Fife Avenue, Harare")
     await page.locator('#modalLayer [data-action="register-vendor-confirm"]').first().click()
-    const said = await page.waitForFunction(() => [...document.querySelectorAll("[data-sonner-toast]")].map((t) => t.innerText).find((t) => /registered|could not|refused|required/i.test(t)) || null, null, { timeout: 60000 }).then((h) => h.jsonValue()).catch(() => null)
+    // Whatever the page answers (success or refusal) is kept, so a failure says what it was told.
+    const said = await page.waitForFunction(() => [...document.querySelectorAll("[data-sonner-toast]")].map((t) => t.innerText.trim()).filter(Boolean).join(" | ") || null, null, { timeout: 60000 }).then((h) => h.jsonValue()).catch(() => null)
     check(/registered/i.test(said || ""), "registering says the vendor is registered", said || "no toast")
     let reg
     for (let i = 0; i < 6 && !reg; i++) {
