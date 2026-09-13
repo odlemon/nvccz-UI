@@ -82,7 +82,8 @@ function __pr23MatchSources() {
     if (String(o.rawStatus || '').toUpperCase() === 'CANCELLED') continue;
     const id = o.rfq || o.id;
     if (seen.has(id)) continue;
-    seen.set(id, { id, recordId: id, title: o.sourceTitle || `Purchase order ${o.id}`, entity: o.entity || '—', method: o.rfq ? 'Request for quotation' : 'Purchase order', bids: 0, stage: 'Awarded', close: '—', value: null });
+    // A role that cannot read requisitions has no department for the order; the supplier names the source instead.
+    seen.set(id, { id, recordId: id, title: o.sourceTitle || `Purchase order ${o.id}`, entity: o.entity && o.entity !== '—' ? o.entity : o.vendor || '—', method: o.rfq ? 'Request for quotation' : 'Purchase order', bids: 0, stage: 'Awarded', close: '—', value: null });
   }
   return [...seen.values()];
 }
@@ -1208,6 +1209,69 @@ function __pr23AuditStreamNote() {
   return n > 50
     ? `The latest 50 of ${n} loaded events, newest first: what was done, to which record, by whom and when.`
     : 'Every recorded procurement action, newest first: what was done, to which record, by whom and when.';
+}
+
+/** Today as the procurement documents print dates. */
+function __pr23Today() {
+  return new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
+/** Labels of an approval's supporting documents in a live session (see __pr23SupportDocument). */
+const __PR23_SUPPORT_LABELS = { budget: 'Budget position', evaluation: 'Quotation comparison', conflict: 'Conflict of interest declaration' };
+
+/**
+ * An approval's supporting documents built from the records, in a live session. The vendored ones were fixtures shown
+ * as evidence: a budget "checked against the approved annual plan" by a sample CFO, a bid evaluation of three sample
+ * bidders, a conflict declaration nobody made, all dated 2 August. What the system holds is shown; what it does not
+ * hold is said. Returns { name, content } or null.
+ */
+function __pr23SupportDocument(a, kind) {
+  if (!a) return null;
+  const e = __pr23Esc;
+  const pair = cells => `<tr>${cells.map(([k, v]) => `<th>${e(k)}</th><td>${v}</td>`).join('')}</tr>`;
+  const year = new Date().getFullYear();
+  const type = String(a.type || 'record').toLowerCase();
+  if (kind === 'budget') {
+    const dept = a.entity && a.entity !== '—' ? a.entity : null;
+    const plans = (state.plans || []).filter(p => String(p.rawStatus || '').toUpperCase() === 'APPROVED'
+      && (!p.fiscalYear || String(p.fiscalYear).includes(String(year))) && (!dept || (p.department || p.entity) === dept));
+    const budget = plans.reduce((t, p) => t + (Number(p.budget) || 0), 0);
+    const committed = (state.orders || []).filter(o => String(o.rawStatus || '').toUpperCase() !== 'CANCELLED'
+      && (!dept || o.entity === dept) && (!o.orderDate || new Date(o.orderDate).getFullYear() === year))
+      .reduce((t, o) => t + (Number(o.amount) || 0), 0);
+    const amount = Number(a.amount) || 0;
+    const pct = n => `${Math.round((n / budget) * 100)}%`;
+    const position = budget
+      ? `<p>${e(dept || 'The organisation')} has ${plans.length === 1 ? 'an approved procurement plan' : `${plans.length} approved procurement plans`} for FY ${year} with a budget of ${money(budget)}. Purchase orders committed against it this year total ${money(committed)} (${pct(committed)})${amount ? `; this ${money(amount)} would bring commitments to ${money(committed + amount)} (${pct(committed + amount)})` : ''}.</p>`
+      : `<p>No approved FY ${year} procurement plan is recorded for ${e(dept || 'this department')}, so there is no plan budget to compare this commitment with.</p>`;
+    return {
+      name: __PR23_SUPPORT_LABELS.budget,
+      content: `<h1>Budget position</h1><p class="doc-lead">What the procurement records show about funding for ${e(a.record)}.</p><table><tbody>${pair([['Department', e(dept || '—')], ['Record', e(a.record)]])}${pair([['Requested commitment', amount ? money(amount) : 'No value'], ['Approved plan budget', budget ? money(budget) : 'None recorded']])}</tbody></table><h2>Position against the plan</h2>${position}<h2>Finance confirmation</h2><p>No finance confirmation of funding is recorded for this ${e(type)}: requisitions are not checked against department budgets in this system. The approver confirms that funding is available when deciding.</p>`,
+    };
+  }
+  if (kind === 'evaluation') {
+    const rfq = a.kind === 'award' ? a.record : null;
+    const quotes = rfq ? (state.quotationsLive || []).filter(q => q.rfq === rfq && q.rawStatus !== 'DRAFT') : [];
+    if (!quotes.length) {
+      return { name: __PR23_SUPPORT_LABELS.evaluation, content: `<h1>Quotation comparison</h1><p class="doc-lead">${e(a.record)}</p><p>${rfq ? `No quotations have been submitted for ${e(rfq)}.` : `No quotation comparison applies to a ${e(type)}.`}</p>` };
+    }
+    const rows = [...quotes].sort((x, y) => (x.amount ?? Infinity) - (y.amount ?? Infinity))
+      .map(q => `<tr><td>${e(q.vendor)}</td><td>${e(q.id)}</td><td>${money(q.amount)}</td><td>${q.evaluationScore == null ? 'Not scored' : e(q.evaluationScore)}</td><td>${e(q.status)}</td></tr>`).join('');
+    return {
+      name: __PR23_SUPPORT_LABELS.evaluation,
+      content: `<h1>Quotation comparison</h1><p class="doc-lead">The quotations submitted for ${e(rfq)}, lowest total first.</p><table><thead><tr><th>Vendor</th><th>Quotation</th><th>Total</th><th>Evaluation score</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table><h2>Basis of the recommendation</h2><p>${e(a.reason || 'The lowest total submitted.')}</p>`,
+    };
+  }
+  if (kind === 'conflict') {
+    return {
+      name: __PR23_SUPPORT_LABELS.conflict,
+      content: `<h1>Conflict of interest declaration</h1><p class="doc-lead">${e(a.record)}</p><table><tbody>${pair([['Approver', e(a.approver || '—')], ['Role', e(a.role || '—')]])}</tbody></table><p>No conflict-of-interest declaration is recorded for this approval; declarations are not captured in this system yet. An approver with a conflict should raise it with the Procurement Manager before deciding.</p>`,
+    };
+  }
+  return {
+    name: 'Approval pack index',
+    content: `<h1>Approval pack index</h1><p class="doc-lead">What supports ${e(a.record)}.</p><table><thead><tr><th>Document</th><th>Source</th></tr></thead><tbody><tr><td>${e(a.type || 'Transaction record')}</td><td>The ${e(type)} as recorded</td></tr><tr><td>Budget position</td><td>Approved plans and purchase orders</td></tr><tr><td>Quotation comparison</td><td>${a.kind === 'award' ? 'The submitted quotations' : 'Not applicable'}</td></tr><tr><td>Conflict of interest declaration</td><td>Not recorded</td></tr></tbody></table>`,
+  };
 }
 
 /** Said instead of a page of empty registers, which reads as "nothing exists" rather than "not yours". */

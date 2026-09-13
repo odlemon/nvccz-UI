@@ -15,6 +15,23 @@ import { cn } from '@/lib/utils'
 import { DatePicker } from '@/components/ui/date-picker'
 import { procurementApiV2 } from '@/lib/api/procurement-api-v2'
 
+interface RfqInvitation {
+  organisation: string | null
+  rfqNumber: string
+  title: string
+  description: string | null
+  status: string
+  open: boolean
+  closingAt: string | null
+  deliveryAddress: string | null
+  expectedDeliveryDate: string | null
+  specialRequirements: string | null
+  currencyCode: string | null
+  items: { itemName: string; description: string | null; quantity: number | string | null; unit: string | null }[]
+  vendor: { name: string; email: string | null; contactPerson: string | null; phone: string | null; taxNumber: string | null; address: string | null }
+  submission: { quotationNumber: string; status: string; submittedAt: string | null } | null
+}
+
 interface QuotationItem {
   itemName: string
   description: string
@@ -69,6 +86,8 @@ function RFQRespondContent() {
       warranty: ''
     }
   ])
+  // What the invited vendor is quoting for, read with their link's token: the RFQ, its lines, their own details.
+  const [invitation, setInvitation] = useState<RfqInvitation | null>(null)
 
   useEffect(() => {
     if (!token || !rfqNumber) {
@@ -77,21 +96,63 @@ function RFQRespondContent() {
       return
     }
 
+    // The token is base64url JSON, which atob cannot read as it stands.
+    const payloadBase64 = token.split('.')[0]
     try {
-      const payloadBase64 = token.split('.')[1]
       if (payloadBase64) {
-        const decodedPayload = JSON.parse(atob(payloadBase64))
-        const rId = decodedPayload.r
-        if (rId) {
-          setRequisitionId(rId)
-        }
+        const b64 = payloadBase64.replace(/-/g, '+').replace(/_/g, '/')
+        const decodedPayload = JSON.parse(atob(b64.padEnd(Math.ceil(b64.length / 4) * 4, '=')))
+        if (decodedPayload.r) setRequisitionId(decodedPayload.r)
       }
-    } catch (e) {
-      console.error('Error decoding token:', e)
-    } finally {
-      setIsValidating(false)
+    } catch {
+      // The server verifies the token either way; the id is only a convenience for the submission.
+    }
+
+    let cancelled = false
+    procurementApiV2
+      .getRfqInvitation(token)
+      .then((res) => {
+        const inv = res?.data
+        if (cancelled || !inv) return
+        setInvitation(inv)
+        setCompanyName(inv.vendor?.name || '')
+        setVendorName(inv.vendor?.contactPerson || '')
+        setVendorEmail(inv.vendor?.email || '')
+        setPhoneNumber(inv.vendor?.phone || '')
+        setTaxEIN(inv.vendor?.taxNumber || '')
+        setAddress(inv.vendor?.address || '')
+        if (inv.currencyCode) setCurrencyCode(inv.currencyCode)
+        if (inv.items?.length) {
+          setItems(inv.items.map((line: RfqInvitation['items'][number]) => ({
+            itemName: line.itemName || '',
+            description: line.description || '',
+            quantity: Number(line.quantity) || 1,
+            unit: line.unit || 'pieces',
+            unitPrice: '',
+            specifications: {},
+            brand: '',
+            model: '',
+            warranty: ''
+          })))
+        }
+      })
+      .catch((e: any) => {
+        if (cancelled) return
+        // An expired or altered link cannot submit either, so say so now rather than after the vendor fills it in.
+        if (e?.status === 400 || e?.status === 404) setError(e?.message || 'This quotation link is not valid.')
+      })
+      .finally(() => {
+        if (!cancelled) setIsValidating(false)
+      })
+    return () => {
+      cancelled = true
     }
   }, [token, rfqNumber])
+
+  const organisation = invitation?.organisation || null
+  const closedFor = invitation && !invitation.open ? invitation : null
+  const alreadySubmitted = invitation?.submission || null
+  const fmt = (d?: string | null) => (d ? new Date(d).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : null)
 
   const addItem = () => {
     setItems([...items, {
@@ -239,7 +300,7 @@ function RFQRespondContent() {
               </div>
               <CardTitle className="text-3xl font-bold">Quotation Submitted Successfully!</CardTitle>
               <CardDescription className="text-green-50 text-lg">
-                Thank you for submitting your quotation to Arcus
+                {organisation ? `Thank you for submitting your quotation to ${organisation}` : 'Thank you for submitting your quotation'}
               </CardDescription>
             </CardHeader>
             <CardContent className="p-8 space-y-6">
@@ -325,9 +386,49 @@ function RFQRespondContent() {
           </div>
         </div>
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-normal text-gray-900 mb-2">Submit Quotation to Arcus</h1>
+          <h1 className="text-3xl font-normal text-gray-900 mb-2">{organisation ? `Submit Quotation to ${organisation}` : 'Submit Quotation'}</h1>
           <p className="text-gray-600">RFQ: <Badge variant="outline" className="font-mono">{rfqNumber}</Badge></p>
         </div>
+
+        {invitation && (
+          <Card className="border-l-4 border-l-indigo-500 shadow-none mb-6">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-lg font-medium">{invitation.title}</CardTitle>
+              {invitation.description && <CardDescription className="whitespace-pre-line">{invitation.description}</CardDescription>}
+            </CardHeader>
+            <CardContent className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+              <div>
+                <p className="text-gray-500 flex items-center gap-1"><Calendar className="w-4 h-4" /> Closing date</p>
+                <p className="font-medium">{fmt(invitation.closingAt) || 'Not set'}</p>
+              </div>
+              <div>
+                <p className="text-gray-500 flex items-center gap-1"><Package className="w-4 h-4" /> Delivery required by</p>
+                <p className="font-medium">{fmt(invitation.expectedDeliveryDate) || 'Not set'}</p>
+              </div>
+              <div>
+                <p className="text-gray-500 flex items-center gap-1"><MapPin className="w-4 h-4" /> Deliver to</p>
+                <p className="font-medium">{invitation.deliveryAddress || 'To be confirmed'}</p>
+              </div>
+              {invitation.specialRequirements && (
+                <div className="md:col-span-3">
+                  <p className="text-gray-500">Special requirements</p>
+                  <p className="font-medium whitespace-pre-line">{invitation.specialRequirements}</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
+        {(closedFor || alreadySubmitted) && (
+          <div className="mb-6 flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4 text-amber-900">
+            <AlertCircle className="w-5 h-5 mt-0.5" />
+            <p className="text-sm">
+              {alreadySubmitted
+                ? `Your quotation ${alreadySubmitted.quotationNumber} was received${alreadySubmitted.submittedAt ? ` on ${fmt(alreadySubmitted.submittedAt)}` : ''} and is with the procurement team.`
+                : `This request for quotation is no longer accepting quotations${closedFor?.closingAt ? ` (it closed on ${fmt(closedFor.closingAt)})` : ''}.`}
+            </p>
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Vendor Information */}
@@ -449,7 +550,7 @@ function RFQRespondContent() {
             </CardContent>
           </Card>
 
-          <Button type="submit" disabled={submitting} className="w-full bg-blue-600 hover:bg-blue-700 text-white py-6 rounded-full text-lg font-normal shadow-sm">
+          <Button type="submit" disabled={submitting || Boolean(closedFor) || Boolean(alreadySubmitted)} className="w-full bg-blue-600 hover:bg-blue-700 text-white py-6 rounded-full text-lg font-normal shadow-sm">
             {submitting ? <Loader2 className="animate-spin mr-2" /> : <CheckCircle2 className="mr-2" />}
             Submit Quotation
           </Button>

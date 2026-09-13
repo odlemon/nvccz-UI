@@ -255,7 +255,8 @@ function __pr23MatchSources() {
     if (String(o.rawStatus || '').toUpperCase() === 'CANCELLED') continue;
     const id = o.rfq || o.id;
     if (seen.has(id)) continue;
-    seen.set(id, { id, recordId: id, title: o.sourceTitle || `Purchase order ${o.id}`, entity: o.entity || '—', method: o.rfq ? 'Request for quotation' : 'Purchase order', bids: 0, stage: 'Awarded', close: '—', value: null });
+    // A role that cannot read requisitions has no department for the order; the supplier names the source instead.
+    seen.set(id, { id, recordId: id, title: o.sourceTitle || `Purchase order ${o.id}`, entity: o.entity && o.entity !== '—' ? o.entity : o.vendor || '—', method: o.rfq ? 'Request for quotation' : 'Purchase order', bids: 0, stage: 'Awarded', close: '—', value: null });
   }
   return [...seen.values()];
 }
@@ -1381,6 +1382,69 @@ function __pr23AuditStreamNote() {
   return n > 50
     ? `The latest 50 of ${n} loaded events, newest first: what was done, to which record, by whom and when.`
     : 'Every recorded procurement action, newest first: what was done, to which record, by whom and when.';
+}
+
+/** Today as the procurement documents print dates. */
+function __pr23Today() {
+  return new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
+/** Labels of an approval's supporting documents in a live session (see __pr23SupportDocument). */
+const __PR23_SUPPORT_LABELS = { budget: 'Budget position', evaluation: 'Quotation comparison', conflict: 'Conflict of interest declaration' };
+
+/**
+ * An approval's supporting documents built from the records, in a live session. The vendored ones were fixtures shown
+ * as evidence: a budget "checked against the approved annual plan" by a sample CFO, a bid evaluation of three sample
+ * bidders, a conflict declaration nobody made, all dated 2 August. What the system holds is shown; what it does not
+ * hold is said. Returns { name, content } or null.
+ */
+function __pr23SupportDocument(a, kind) {
+  if (!a) return null;
+  const e = __pr23Esc;
+  const pair = cells => `<tr>${cells.map(([k, v]) => `<th>${e(k)}</th><td>${v}</td>`).join('')}</tr>`;
+  const year = new Date().getFullYear();
+  const type = String(a.type || 'record').toLowerCase();
+  if (kind === 'budget') {
+    const dept = a.entity && a.entity !== '—' ? a.entity : null;
+    const plans = (state.plans || []).filter(p => String(p.rawStatus || '').toUpperCase() === 'APPROVED'
+      && (!p.fiscalYear || String(p.fiscalYear).includes(String(year))) && (!dept || (p.department || p.entity) === dept));
+    const budget = plans.reduce((t, p) => t + (Number(p.budget) || 0), 0);
+    const committed = (state.orders || []).filter(o => String(o.rawStatus || '').toUpperCase() !== 'CANCELLED'
+      && (!dept || o.entity === dept) && (!o.orderDate || new Date(o.orderDate).getFullYear() === year))
+      .reduce((t, o) => t + (Number(o.amount) || 0), 0);
+    const amount = Number(a.amount) || 0;
+    const pct = n => `${Math.round((n / budget) * 100)}%`;
+    const position = budget
+      ? `<p>${e(dept || 'The organisation')} has ${plans.length === 1 ? 'an approved procurement plan' : `${plans.length} approved procurement plans`} for FY ${year} with a budget of ${money(budget)}. Purchase orders committed against it this year total ${money(committed)} (${pct(committed)})${amount ? `; this ${money(amount)} would bring commitments to ${money(committed + amount)} (${pct(committed + amount)})` : ''}.</p>`
+      : `<p>No approved FY ${year} procurement plan is recorded for ${e(dept || 'this department')}, so there is no plan budget to compare this commitment with.</p>`;
+    return {
+      name: __PR23_SUPPORT_LABELS.budget,
+      content: `<h1>Budget position</h1><p class="doc-lead">What the procurement records show about funding for ${e(a.record)}.</p><table><tbody>${pair([['Department', e(dept || '—')], ['Record', e(a.record)]])}${pair([['Requested commitment', amount ? money(amount) : 'No value'], ['Approved plan budget', budget ? money(budget) : 'None recorded']])}</tbody></table><h2>Position against the plan</h2>${position}<h2>Finance confirmation</h2><p>No finance confirmation of funding is recorded for this ${e(type)}: requisitions are not checked against department budgets in this system. The approver confirms that funding is available when deciding.</p>`,
+    };
+  }
+  if (kind === 'evaluation') {
+    const rfq = a.kind === 'award' ? a.record : null;
+    const quotes = rfq ? (state.quotationsLive || []).filter(q => q.rfq === rfq && q.rawStatus !== 'DRAFT') : [];
+    if (!quotes.length) {
+      return { name: __PR23_SUPPORT_LABELS.evaluation, content: `<h1>Quotation comparison</h1><p class="doc-lead">${e(a.record)}</p><p>${rfq ? `No quotations have been submitted for ${e(rfq)}.` : `No quotation comparison applies to a ${e(type)}.`}</p>` };
+    }
+    const rows = [...quotes].sort((x, y) => (x.amount ?? Infinity) - (y.amount ?? Infinity))
+      .map(q => `<tr><td>${e(q.vendor)}</td><td>${e(q.id)}</td><td>${money(q.amount)}</td><td>${q.evaluationScore == null ? 'Not scored' : e(q.evaluationScore)}</td><td>${e(q.status)}</td></tr>`).join('');
+    return {
+      name: __PR23_SUPPORT_LABELS.evaluation,
+      content: `<h1>Quotation comparison</h1><p class="doc-lead">The quotations submitted for ${e(rfq)}, lowest total first.</p><table><thead><tr><th>Vendor</th><th>Quotation</th><th>Total</th><th>Evaluation score</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table><h2>Basis of the recommendation</h2><p>${e(a.reason || 'The lowest total submitted.')}</p>`,
+    };
+  }
+  if (kind === 'conflict') {
+    return {
+      name: __PR23_SUPPORT_LABELS.conflict,
+      content: `<h1>Conflict of interest declaration</h1><p class="doc-lead">${e(a.record)}</p><table><tbody>${pair([['Approver', e(a.approver || '—')], ['Role', e(a.role || '—')]])}</tbody></table><p>No conflict-of-interest declaration is recorded for this approval; declarations are not captured in this system yet. An approver with a conflict should raise it with the Procurement Manager before deciding.</p>`,
+    };
+  }
+  return {
+    name: 'Approval pack index',
+    content: `<h1>Approval pack index</h1><p class="doc-lead">What supports ${e(a.record)}.</p><table><thead><tr><th>Document</th><th>Source</th></tr></thead><tbody><tr><td>${e(a.type || 'Transaction record')}</td><td>The ${e(type)} as recorded</td></tr><tr><td>Budget position</td><td>Approved plans and purchase orders</td></tr><tr><td>Quotation comparison</td><td>${a.kind === 'award' ? 'The submitted quotations' : 'Not applicable'}</td></tr><tr><td>Conflict of interest declaration</td><td>Not recorded</td></tr></tbody></table>`,
+  };
 }
 
 /** Said instead of a page of empty registers, which reads as "nothing exists" rather than "not yours". */
@@ -4190,9 +4254,9 @@ window.MatanhoProcurement=Object.freeze({version:'8.0.0',navigate,render,getStat
 
   function approvalDocumentV13(id){
     const a=approvalBaseV13(id);const override=state.approvalDocumentOverridesV13[id];
-    return {id:a.record,name:a.title,type:a.type,version:override?.version||'Approval copy v1.0',status:a.status,owner:a.approver,date:'02 Aug 2026',approvalId:a.id,content:override?.content||mainApprovalContentV13(a)};
+    return {id:a.record,name:a.title,type:a.type,version:override?.version||'Approval copy v1.0',status:a.status,owner:a.approver,date:__pr23Live()?__pr23Today():'02 Aug 2026',approvalId:a.id,content:override?.content||mainApprovalContentV13(a)};
   }
-  function supportDocumentV13(approvalId,kind){
+  function supportDocumentV13(approvalId,kind){if(__pr23Live()){const __a=approvalBaseV13(approvalId),__d=__pr23SupportDocument(__a,kind),__k=`${approvalId}:${kind}`,__o=state.approvalDocumentOverridesV13[__k];if(__a&&__d)return {id:`${__a.record}-${String(kind).toUpperCase()}`,name:__d.name,type:'Supporting approval document',version:__o?.version||'v1.0',status:__a.status,owner:__a.approver,approvalId:__a.id,storageKey:__k,content:__o?.content||__d.content};}
     const a=approvalBaseV13(approvalId);const key=`${approvalId}:${kind}`;const override=state.approvalDocumentOverridesV13[key];let name='',content='';
     if(kind==='budget'){
       name='Budget Availability and Funding Confirmation';content=`<h1>${name}</h1><p class="doc-lead">Finance control evidence supporting ${e13(a.record)}.</p><table><tbody><tr><th>Entity</th><td>${e13(a.entity)}</td><th>Record</th><td>${e13(a.record)}</td></tr><tr><th>Requested commitment</th><td>${a.amount?money(a.amount):'Non-financial'}</td><th>Budget owner</th><td>Tinashe Chaka, CFO</td></tr><tr><th>Funding source</th><td>Approved operating / capital budget</td><th>Control result</th><td>Within approved ceiling, subject to cash schedule</td></tr></tbody></table><h2>Assessment</h2><p>The requested commitment has been checked against the approved annual plan, department budget and current commitments. Release remains subject to the final delegated approval and payment scheduling.</p><h2>Finance confirmation</h2><p>[Editable finance conclusion, conditions and signature.]</p>`;
@@ -4215,7 +4279,7 @@ window.MatanhoProcurement=Object.freeze({version:'8.0.0',navigate,render,getStat
   function openApprovalV13(id){
     const a=approvalBaseV13(id),doc=approvalDocumentV13(id);
     const chain=a.type==='Annual plan'?['Group Procurement Lead','CFO','CEO']:a.type==='Tender award'?['Evaluation Committee','CFO','CEO']:['Business Owner','Finance Control',a.role];
-    openModal(`Approval - ${a.record}`,`${a.type} | ${a.entity}`,`<div class="approval-review-layout-v13"><div class="approval-document-stage-v13">${paperV13(doc,false)}</div><aside class="approval-side-v13"><section class="approval-side-card-v13"><h3>Decision context</h3><div class="approval-meta-v13"><div><span>Approval role</span><strong>${e13(a.role)}</strong></div><div><span>Approver</span><strong>${e13(a.approver)}</strong></div><div><span>Value</span><strong>${a.amount?money(a.amount):'N/A'}</strong></div><div><span>Due</span><strong>${e13(a.due)}</strong></div></div><p>${e13(a.reason)}</p></section><section class="approval-side-card-v13"><div class="approval-control-note-v13">${icon('approve')}<div><strong>Authority and SoD validation passed</strong><p>Required role, entity scope, amount limit, delegation and creator conflict were checked before this prompt opened.</p></div></div></section><section class="approval-side-card-v13"><h3>Approval sequence</h3><div class="esign-timeline-v6">${chain.map((x,i)=>`<div class="esign-step-v6 ${i===chain.length-1?'current':'done'}"><div class="esign-dot-v6">${i+1}</div><div><strong>${e13(x)}</strong><span>${i===chain.length-1?`Awaiting ${e13(a.approver)}`:'Completed and audit-stamped'}</span></div></div>`).join('')}</div></section><section class="approval-side-card-v13"><h3>Supporting documents</h3><div class="approval-support-v13"><button type="button" data-action="preview-approval-support-v13" data-id="${e13(id)}|budget">${icon('document')}<span>Budget availability and funding confirmation</span></button><button type="button" data-action="preview-approval-support-v13" data-id="${e13(id)}|evaluation">${icon('document')}<span>Evaluation or technical recommendation</span></button><button type="button" data-action="preview-approval-support-v13" data-id="${e13(id)}|conflict">${icon('document')}<span>Conflict and independence declaration</span></button></div></section><section class="approval-side-card-v13"><h3>Approver statement</h3><textarea class="approval-comment-v13" id="approvalCommentV13">I have reviewed the actual document, supporting evidence, budget position, procurement process, conflicts and delegated authority.</textarea></section></aside></div>`,action13('Send document','send-approval-doc-v13',`${id}|main`,'','mail')+action13('Edit document','edit-approval-doc-v13',`${id}|main`,'','document')+action13('Delegate','delegate-approval-v6',id)+action13('Reject / return','reject-approval-v6',id)+action13(a.esign?'Approve & eSign':'Approve','approve-prompt-v6',id,'primary',a.esign?'signature':'approve'));
+    openModal(`Approval - ${a.record}`,`${a.type} | ${a.entity}`,`<div class="approval-review-layout-v13"><div class="approval-document-stage-v13">${paperV13(doc,false)}</div><aside class="approval-side-v13"><section class="approval-side-card-v13"><h3>Decision context</h3><div class="approval-meta-v13"><div><span>Approval role</span><strong>${e13(a.role)}</strong></div><div><span>Approver</span><strong>${e13(a.approver)}</strong></div><div><span>Value</span><strong>${a.amount?money(a.amount):'N/A'}</strong></div><div><span>Due</span><strong>${e13(a.due)}</strong></div></div><p>${e13(a.reason)}</p></section><section class="approval-side-card-v13"><div class="approval-control-note-v13">${icon('approve')}<div><strong>Authority and SoD validation passed</strong><p>Required role, entity scope, amount limit, delegation and creator conflict were checked before this prompt opened.</p></div></div></section><section class="approval-side-card-v13"><h3>Approval sequence</h3><div class="esign-timeline-v6">${chain.map((x,i)=>`<div class="esign-step-v6 ${i===chain.length-1?'current':'done'}"><div class="esign-dot-v6">${i+1}</div><div><strong>${e13(x)}</strong><span>${i===chain.length-1?`Awaiting ${e13(a.approver)}`:'Completed and audit-stamped'}</span></div></div>`).join('')}</div></section><section class="approval-side-card-v13"><h3>Supporting documents</h3><div class="approval-support-v13"><button type="button" data-action="preview-approval-support-v13" data-id="${e13(id)}|budget">${icon('document')}<span>${__pr23Live()?__PR23_SUPPORT_LABELS.budget:'Budget availability and funding confirmation'}</span></button><button type="button" data-action="preview-approval-support-v13" data-id="${e13(id)}|evaluation">${icon('document')}<span>${__pr23Live()?__PR23_SUPPORT_LABELS.evaluation:'Evaluation or technical recommendation'}</span></button><button type="button" data-action="preview-approval-support-v13" data-id="${e13(id)}|conflict">${icon('document')}<span>${__pr23Live()?__PR23_SUPPORT_LABELS.conflict:'Conflict and independence declaration'}</span></button></div></section><section class="approval-side-card-v13"><h3>Approver statement</h3><textarea class="approval-comment-v13" id="approvalCommentV13">I have reviewed the actual document, supporting evidence, budget position, procurement process, conflicts and delegated authority.</textarea></section></aside></div>`,action13('Send document','send-approval-doc-v13',`${id}|main`,'','mail')+action13('Edit document','edit-approval-doc-v13',`${id}|main`,'','document')+action13('Delegate','delegate-approval-v6',id)+action13('Reject / return','reject-approval-v6',id)+action13(a.esign?'Approve & eSign':'Approve','approve-prompt-v6',id,'primary',a.esign?'signature':'approve'));
     setModalClassV13('modal-v13-approval');
   }
 

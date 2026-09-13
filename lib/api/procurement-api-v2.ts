@@ -941,6 +941,14 @@ class ProcurementApiServiceV2 {
   }
 
   /**
+   * What an invited vendor is quoting for (public, token-scoped): the RFQ, its lines, the vendor's own master details,
+   * the buying organisation's name and any quotation they already sent. GET /procurement/vendor-portal/rfq?token=
+   */
+  async getRfqInvitation(token: string): Promise<ProcurementResponse<any>> {
+    return apiClient.get<ProcurementResponse<any>>(`/procurement/vendor-portal/rfq?token=${encodeURIComponent(token)}`)
+  }
+
+  /**
    * Accept a quotation
    * Required Role: PROC_MGR or PROC_OFF
    */

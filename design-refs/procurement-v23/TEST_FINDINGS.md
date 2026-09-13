@@ -453,6 +453,87 @@ here so the next person does not "fix" it by moving it and breaking both modules
 
 ---
 
+## Cycle eight — full browser test, 13 September 2026 (dev)
+
+The owner asked for the whole module to be tested from the browser, phase by phase, fixing and re-testing without
+waiting. Every phase drives real Chromium sessions as the demo personas against dev (staff `e393b63`, API `877d469`);
+production is not touched and the dev mail guard stays on.
+
+| Phase | What | Result |
+|---|---|---|
+| 0 | Preflight: build, mail guard, test data, demo integrity | Clean: working tree at `c2ec9e6`, mail guard on, no leftover test records or processes, demo integrity 17/17 |
+| 1 | Visual review of every page for the 8 roles that sign in (desktop screenshots read by a person), and tablet and phone widths | 152 desktop pages and 36 tablet/phone views read; 16 findings, all fixed in `55016b0` and `0a3ecc2` (below); dev audit trail tidied |
+| 2 | Every control on every page for all 8 roles (census): dead controls, errors, unrefused writes, sample text | pending |
+| 3 | End-to-end business flows through the UI: storyline, actions, workflows, AI capture | pending |
+| 4 | Permissions and refusals per role | pending |
+| 5 | Cross-module: accounting (journals, ledger, payables, cash), vendor portal, exports and letterheads | Exports and accounting 32/32 on `0a3ecc2`: every export downloads a real file with no sample or test text; Payables agrees with procurement ($2,518 outstanding = the stationery invoice awaiting Finance; $19,277 open commitments = the two uninvoiced POs; $7,421 sourcing pipeline). Vendor portal 2/4: the invited vendor's quotation form was blank (fix below, deploying) |
+| 6 | Fix, deploy, re-test until clean | pending |
+
+### Phase 1 — what a person reading the pages found
+
+Read as each role would see them, full-length at 1440px, plus 768px and 390px for two roles. Nothing showed sample
+text or a crash; what follows is what made pages wrong or unprofessional.
+
+| # | Where | Found | Fix |
+|---|---|---|---|
+| 1 | Tablet and phone, every page | The menu opened expanded as a 278px drawer with no backdrop, over the heading, head buttons and first KPIs | `55016b0` step 44: narrow screens start on the icon rail |
+| 2 | Every table | Words broke mid-word as columns squeezed: "Operation s", "$10,40 0" (`overflow-wrap:anywhere` on cells) | `procurement-v23-live.css`: `break-word`, imported after the vendored sheet (which an extract would overwrite) |
+| 3 | Vendor Registry | First column printed database ids (`cmtzc7u8s02j…`); contact line "— \| email"; Currency all dashes; "— / 5" | Step 46: Vendor · Contact (person, email, phone) columns; no currency column; "Not rated" |
+| 4 | Vendor Registry | A clearance 35 days from expiry read "Valid" in the table but "Expiring" in the doughnut | Step 45: `daysUntilV6` counted from the design's frozen 1 Aug 2026; now from today |
+| 5 | Contracts & Awards | Awards awaiting a contract showed their PO number in the Contract column | Step 47: "Not yet contracted", award and order under the description |
+| 6 | Tenders, Invoices, Analytics | Every RFQ read "Restricted tender"; Category and Estimate always "—" | Loader: "Request for quotation" unless publicly listed; category and estimate from the source requisition |
+| 7 | Approval Centre | A goods receipt awaiting inspection showed Value "—" (Receiving showed $6,290) | Loader: the receipt's value |
+| 8 | Sidebar | Purchase Requisitions badge "2" over the Procurement Manager's empty queue (counted every pending requisition) | Loader: requisitions awaiting my decision, else my own in approval |
+| 9 | Command Centre | "Spend by category" listed one bar, "Operations 100%" — grouped by department | Bridge: grouped by the requisition's sourcing category |
+| 10 | Analytics | "Entity plan execution — committed as a percentage of approved plan" read 100%; the header said 18% | Bridge: committed against each department's approved plan budget |
+| 11 | Command Centre, Analytics | Trend lines fell to zero across October–December, months that have not happened | Bridge: lines stop at the current month |
+| 12 | Reports Vault | "Report consumption" drew the spend trend (report runs are not logged) | Bridge: says report runs and downloads are not logged yet |
+| 13 | Invoices & 3-Way Match, Accounts Payable | Empty "Select a tender" card and no invoice: sources came from RFQs, which the role cannot read | Step 50 + `__pr23MatchSources`: sources from its purchase orders; workspaces resolve them |
+| 14 | Requester opening the module | Landed on "Your role does not include Command Centre" | Bridge + host: replaced by the first page the role's menu offers |
+| 15 | Audit & Compliance | 200 rows on one 8,000px page, most "Create RFQ RFQ_20260913_000x" left by test runs (RFQ rows are keyed by number, so cleanup never matched them) | Step 49: latest 50 with a line saying so; RFQ rows named; cleanup removes RFQ rows; `dev_audit_tidy.mjs` removed 57 orphaned rows and re-pointed 7 renumbered demo RFQs; integrity checks the trail |
+| 16 | Document Vault | The "Request for Quotation" template captioned "Vendor-submitted original · read-only" | Step 48: templates are never vendor submissions |
+
+Re-checked on dev after deploying `0a3ecc2` (`_tmp-v23-cycle8-fixes-check.mjs`): 26/27. The goods receipt still read
+"Value —" in the Approval Centre: the card is built from the approval prompt, a second place the value was left null —
+fixed with the Accounts Payable source cards naming the supplier where the role cannot see the department. Tablet and
+phone re-check: the menu no longer covers pages; the requester's "799px sideways scroll" was the closed side drawer
+parked off-screen (the document does not scroll), a false positive of the check, which now measures the viewport.
+
+### Approval support documents were fixtures presented as evidence
+
+Found reading what the census reported the department head opening in a requisition approval. The three supporting
+documents offered beside the decision paper were the design's samples with the record number filled in:
+
+- "Budget availability and funding confirmation" named the sample CFO "Tinashe Chaka" and said the commitment "has been
+  checked against the approved annual plan, department budget and current commitments" — no budget check exists;
+- "Evaluation or technical recommendation" scored three sample bidders (TechNova, NetShield, CloudAxis);
+- "Conflict and independence declaration" read "No conflict declared · SSO + MFA" though nobody declared anything;
+- every paper, the decision paper included, was "Generated 02 Aug 2026".
+
+The census's sample-text check did not see them: they open in a modal from inside a modal. Step 51 builds them from the
+records in a live session (`__pr23SupportDocument`): **Budget position** — the department's approved plan budget,
+commitments this year and where this request would take them, and a plain statement that no finance confirmation is
+recorded; **Quotation comparison** — the RFQ's submitted quotations, lowest first, with evaluation scores, for an award
+(and "not applicable" otherwise); **Conflict of interest declaration** — says none is recorded. The decision paper is
+dated today.
+
+### Phase 5 — the invited vendor's quotation form was blank
+
+Found by the cross-module check, as Jacaranda Office Supplies opening its invitation link for `RFQ_20260912_0006`: the
+form showed the RFQ number and nothing else — no title, no lines, no closing date or delivery terms, the vendor's own
+details unfilled — and was headed "Submit Quotation to Arcus". The page decoded the token's signature as if it were the
+payload (so even the RFQ id was lost), and no endpoint let a vendor read the RFQ with their link.
+
+- API `dc8290e`: `GET /procurement/vendor-portal/rfq?token=` — public and token-scoped like the PO invoice link; only an
+  invited vendor (or anyone on a publicly listed RFQ) can read it. Returns the RFQ, its lines as issued (never
+  prices), closing date and delivery terms, the vendor's master details, the organisation's legal name, and the
+  quotation this vendor already sent.
+- UI: the form shows what is being bought, prefills the lines and the vendor's details, names the organisation,
+  says when the RFQ has closed or the vendor has already quoted (and disables Submit), and reads the token correctly.
+
+Seen and left: the journal reference `EXP-1789275136052-INV_20260822_0001` is the accounting API's own reference and
+reads the same in Accounting; the Configuration page lists raw permission keys, which is what Admin → Roles uses.
+
 ## Cycle seven — demo readiness, 12 September 2026 (dev)
 
 Worked from `HANDOFF_AND_TEST_PLAN.md`, phases 0 → 6.

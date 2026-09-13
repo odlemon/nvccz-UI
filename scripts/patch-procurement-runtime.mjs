@@ -1521,6 +1521,43 @@ s = replaceEvery(
 )
 
 // ---------------------------------------------------------------------------
+// 51. An approval's supporting documents come from the records
+// ---------------------------------------------------------------------------
+// Found in cycle eight, reading what a department head sees when reviewing a requisition: "Budget availability and
+// funding confirmation" named the sample CFO "Tinashe Chaka" and said the commitment "has been checked against the
+// approved annual plan, department budget and current commitments" — no such check exists; the evaluation report
+// scored three sample bidders (TechNova, NetShield, CloudAxis); the conflict declaration read "No conflict declared ·
+// SSO + MFA" though nobody declared anything; every paper was dated 02 Aug 2026. In a live session the documents are
+// built from the records by __pr23SupportDocument, and say plainly what is not recorded.
+s = replaceUnique(
+  s,
+  "function supportDocumentV13(approvalId,kind){",
+  "function supportDocumentV13(approvalId,kind){if(__pr23Live()){const __a=approvalBaseV13(approvalId),__d=__pr23SupportDocument(__a,kind),__k=`${approvalId}:${kind}`,__o=state.approvalDocumentOverridesV13[__k];if(__a&&__d)return {id:`${__a.record}-${String(kind).toUpperCase()}`,name:__d.name,type:'Supporting approval document',version:__o?.version||'v1.0',status:__a.status,owner:__a.approver,approvalId:__a.id,storageKey:__k,content:__o?.content||__d.content};}",
+  "approval support documents -> built from the records",
+  "__d=__pr23SupportDocument(__a,kind)",
+)
+s = replaceUnique(
+  s,
+  "date:'02 Aug 2026',approvalId:a.id,",
+  "date:__pr23Live()?__pr23Today():'02 Aug 2026',approvalId:a.id,",
+  "approval decision paper -> dated today",
+  "date:__pr23Live()?__pr23Today():'02 Aug 2026',approvalId:a.id,",
+)
+for (const [label, key] of [
+  ["Budget availability and funding confirmation", "budget"],
+  ["Evaluation or technical recommendation", "evaluation"],
+  ["Conflict and independence declaration", "conflict"],
+]) {
+  s = replaceUnique(
+    s,
+    label,
+    `\${__pr23Live()?__PR23_SUPPORT_LABELS.${key}:'${label}'}`,
+    `approval support list -> "${label}" labelled for what it holds`,
+    `__PR23_SUPPORT_LABELS.${key}:'${label}'`,
+  )
+}
+
+// ---------------------------------------------------------------------------
 // 43. A filed document previews as itself
 // ---------------------------------------------------------------------------
 // Found by the UI census as Accounts Payable: previewing, downloading, editing or versioning the RFQ pack threw

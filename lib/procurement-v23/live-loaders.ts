@@ -755,7 +755,8 @@ export async function loadProcurementV23LiveData(): Promise<ProcurementV23LivePa
           record: g.grnNumber ?? g.id,
           title: `Inspect and accept receipt against ${g.purchaseOrder?.poNumber ?? "PO"}`,
           entity: departmentOfRequisition(g.purchaseOrder?.requisitionId),
-          amount: null,
+          // The receipt's value as the Receiving register shows it; the Approval Centre card read "Value —".
+          amount: grnsView.find((x) => x.id === (g.grnNumber ?? g.id))?.value || null,
           role: "Procurement Manager",
           reason: `Received ${fmtDate(g.receivedDate)} by ${personName(g.receivedBy)}.`,
         }),
