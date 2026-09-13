@@ -1389,6 +1389,21 @@ s = replaceUnique(
 )
 
 // ---------------------------------------------------------------------------
+// 44. Tablets and phones open on the icon rail, not the full menu over the page
+// ---------------------------------------------------------------------------
+// Found by the cycle-eight responsive check: the runtime started with the menu expanded, and at 780px and below
+// the expanded menu is a fixed 278px drawer with no backdrop, so every page opened with its heading, head buttons
+// and first KPI cards under it. Narrow screens now start collapsed (the 58px icon rail the design has for them);
+// every navigation remounts the runtime, so the menu also closes once a page is chosen.
+s = replaceUnique(
+  s,
+  "year:'FY 2026',expanded:true,",
+  "year:'FY 2026',expanded:(typeof window==='undefined'||window.innerWidth>780),",
+  "narrow screens -> menu starts collapsed",
+  "expanded:(typeof window==='undefined'||window.innerWidth>780)",
+)
+
+// ---------------------------------------------------------------------------
 // 43. A filed document previews as itself
 // ---------------------------------------------------------------------------
 // Found by the UI census as Accounts Payable: previewing, downloading, editing or versioning the RFQ pack threw
