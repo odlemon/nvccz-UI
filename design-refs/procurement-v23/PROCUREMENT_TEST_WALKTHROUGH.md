@@ -470,11 +470,15 @@ There are two ways onto the vendor register: **staff add the vendor** (B2), or *
 1. Go to https://dev.vendor.matanho.com/vendor-portal/register — it opens without any invitation link.
 2. **Company details:** Company name `UAT Self-registered Supplies` · Name · Email `uat-selfreg-1@vendors.example.test`
    · Contact person · Phone number · Industry → **Next**.
-3. **Bank details:** Bank name · Account name · Account number · Branch code · Currency `USD` (SWIFT optional) →
-   **Submit Registration**.
+3. **Bank details:** Bank name · Account name · Account number · Branch code · Currency `USD` · **SWIFT / BIC code**
+   (required, e.g. `CBZKZWHA`) → **Submit Registration**.
 
-**Expect:** the registration is accepted and the page asks for **KYC documents** (certificate of incorporation, CR14,
-bank letter; tax clearance optional). You can upload them here or stop — the registration is already waiting for review.
+**Negative check first:** leave SWIFT / BIC empty and click **Submit Registration** → the form refuses and says
+"`SWIFT/BIC code is required so payments reach the account`"; nothing is registered.
+
+**Expect (with SWIFT filled in):** the registration is accepted and the page asks for **KYC documents** (certificate of
+incorporation, CR14, bank letter; tax clearance optional). You can upload them here or stop — the registration is already
+waiting for review.
 
 ---
 
