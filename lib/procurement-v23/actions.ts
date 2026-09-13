@@ -645,6 +645,7 @@ export async function handleProcurementV23Action(
           email: val(`${formId} [name="email"]`) || undefined,
           phone: val(`${formId} [name="phone"]`) || undefined,
           address: val(`${formId} [name="address"]`) || undefined,
+          paymentTerms: val(`${formId} [name="paymentTerms"]`) || undefined,
           taxClearanceExpiryDate: val(`${formId} [name="taxExpiry"]`) || val(`${formId} [name="itf"]`) || undefined,
         })
         closeRuntimeOverlay()
@@ -695,6 +696,8 @@ export async function handleProcurementV23Action(
         const taxExpiry = val(`${F} [name="taxExpiry"]`)
         const updated = await updateVendor(String(v.recordId), {
           name,
+          // The API normalises it (Office Supplies -> OFFICE_SUPPLIES), the form RFQs match invitations on.
+          category: val(`${F} [name="category"]`) || undefined,
           contactPerson: val(`${F} [name="contact"]`),
           email: val(`${F} [name="email"]`),
           phone: val(`${F} [name="phone"]`),

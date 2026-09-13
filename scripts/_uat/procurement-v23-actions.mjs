@@ -225,21 +225,22 @@ await step("3 Operations member raises a requisition (form)", async (open) => {
 })
 
 // ------------------------------------------------------------------ 4. officer registers a vendor
-await step("4 Procurement Officer registers a vendor (V6 form)", async (open) => {
-  const label = "4 Procurement Officer registers a vendor (V6 form)"
+await step("4 Procurement Officer registers a vendor (live form)", async (open) => {
+  const label = "4 Procurement Officer registers a vendor (live form)"
   const email = "proc.officer@nts.local"
   const name = `UAT P2P V23 Form Vendor ${RUN}`
   const { page, errors } = await open(email, "/procurement/vendors")
   // The live vendor page's header button is register-vendor-v6 (the base page's register-vendor is not rendered).
   await page.click('[data-action="register-vendor-v6"]')
-  const form = "#vendorFormV6, #vendorRegisterFormV6"
+  // Live, it opens the vendor form that saves only what the record keeps (#vendorForm); the prototype's V6 form remains the fallback.
+  const form = "#vendorForm, #vendorFormV6, #vendorRegisterFormV6"
   await page.waitForSelector(form)
-  const formId = (await page.$("#vendorFormV6")) ? "#vendorFormV6" : "#vendorRegisterFormV6"
+  const formId = (await page.$("#vendorForm")) ? "#vendorForm" : (await page.$("#vendorFormV6")) ? "#vendorFormV6" : "#vendorRegisterFormV6"
   const inYear = new Date(Date.now() + 365 * 86400000).toISOString().slice(0, 10)
   const values = {
     name, trading: name, country: "Zimbabwe", bp: `UAT-BP-${RUN}`, vat: `UAT-VAT-${RUN}`,
     contact: "Form Tester", email: `uat.form.${RUN}@vendors.example.test`, phone: "+263771000099",
-    address: "1 Uat Road, Harare", bank: "UAT Bank", branch: "001", accountName: name, accountNumber: "000111222", taxExpiry: inYear,
+    address: "1 Uat Road, Harare", paymentTerms: "30 days from invoice", bank: "UAT Bank", branch: "001", accountName: name, accountNumber: "000111222", taxExpiry: inYear,
   }
   for (const [field, value] of Object.entries(values)) {
     const el = await page.$(`${formId} [name="${field}"]`)
@@ -257,7 +258,7 @@ await step("4 Procurement Officer registers a vendor (V6 form)", async (open) =>
   // Category is required and starts empty (cycle seven): choose the first real one.
   const category = await page.$(`${formId} select[name="category"]`)
   if (category && !(await category.inputValue())) await page.selectOption(`${formId} select[name="category"]`, { index: 1 })
-  await page.click('[data-action="register-vendor-confirm-v6"]')
+  await page.click('#modalLayer [data-action="register-vendor-confirm"], [data-action="register-vendor-confirm-v6"]')
   const toast = await toasts(page)
   const vendor = ((await api(email, "/accounting/vendors")) ?? []).find((v) => v.name === name)
   record(

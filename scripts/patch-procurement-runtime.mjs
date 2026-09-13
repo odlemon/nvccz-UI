@@ -1742,6 +1742,24 @@ s = replaceUnique(
   "vendor registry -> self-registrations awaiting review",
   "${__pr23Live()?__pr23VendorRegistrationsCard():''}",
 )
+// 55i. Register vendor opens the live vendor form: the prototype's had no contact, email or phone, and only four sample
+// categories, none of them a requisition's, so a staff-registered vendor could not be emailed or invited to an RFQ.
+s = replaceUnique(
+  s,
+  "function vendorModal(){openModal('Register vendor',",
+  "function vendorModal(){if(__pr23Live())return __pr23VendorRegisterModal();openModal('Register vendor',",
+  "register vendor -> the live vendor form",
+  "function vendorModal(){if(__pr23Live())return __pr23VendorRegisterModal();",
+)
+// 55j. The header button actually shown is register-vendor-v6, whose form required bank, branch, account and document
+// fields that nothing saved (bank details are Finance's), and whose payment terms had no name. Live, it opens the same form.
+s = replaceUnique(
+  s,
+  "function vendorRegisterModalV6(){",
+  "function vendorRegisterModalV6(){if(__pr23Live())return __pr23VendorRegisterModal();",
+  "register vendor (V6 button) -> the live vendor form",
+  "function vendorRegisterModalV6(){if(__pr23Live())return __pr23VendorRegisterModal();",
+)
 // 55c. New record's "Annual plan" opened the base plan modal, whose Create is refused; the plan page's own create is live.
 s = replaceUnique(
   s,

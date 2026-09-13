@@ -231,6 +231,10 @@ export function VendorRegistrationForm() {
         contactPerson: data.contactPerson,
         phoneNumber: data.phoneNumber,
         industry: data.industry,
+        // The API stores `category` and `phone`: without them a self-registered vendor had no category, so it could never
+        // be invited to an RFQ (invitations match the requisition's category), and no phone.
+        category: data.industry,
+        phone: data.phoneNumber,
         banks: data.banks.map((bank) => ({
           bankName: bank.bankName,
           accountName: bank.accountName,
@@ -457,15 +461,26 @@ export function VendorRegistrationForm() {
           <div className="space-y-2">
             <Label htmlFor="industry" className="flex items-center gap-2">
               <Globe size={18} />
-              Industry *
+              Category *
             </Label>
+            {/* The same categories a requisition is raised under: an RFQ only invites vendors whose category matches the
+                requisition's, so free text ("Services") left a registered vendor that no RFQ could ever invite. */}
             <Controller
               name="industry"
               control={control}
-              rules={{ required: 'Industry is required' }}
+              rules={{ required: 'Choose the category you supply' }}
               render={({ field }) => (
                 <div>
-                  <Input {...field} id="industry" placeholder="Services" className={errors.industry ? 'border-red-500' : ''} />
+                  <select
+                    {...field}
+                    id="industry"
+                    className={`flex h-10 w-full rounded-md border bg-white px-3 py-2 text-sm ${errors.industry ? 'border-red-500' : ''}`}
+                  >
+                    <option value="">Choose a category</option>
+                    {['Office Supplies', 'Furniture', 'Technology', 'Facilities', 'Fleet', 'Medical', 'Agriculture', 'Professional Services'].map((c) => (
+                      <option key={c} value={c}>{c}</option>
+                    ))}
+                  </select>
                   {errors.industry && <p className="text-sm text-red-500 mt-1">{errors.industry.message}</p>}
                 </div>
               )}

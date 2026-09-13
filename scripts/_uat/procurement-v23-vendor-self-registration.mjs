@@ -71,7 +71,8 @@ try {
     await page.fill("#email", `uat-selfreg-${RUN}@vendors.example.test`)
     await page.fill("#contactPerson", "Tatenda Moyo")
     await page.fill("#phoneNumber", "+263772440088")
-    await page.fill("#industry", "Office supplies")
+    // Category, not free text: an RFQ only invites vendors whose category matches the requisition's.
+    await page.selectOption("#industry", "Office Supplies")
     await page.getByRole("button", { name: /^Next$/ }).click()
     await page.waitForSelector("#bankName-0", { timeout: 30000 })
     await page.fill("#bankName-0", "CBZ")
@@ -101,6 +102,7 @@ try {
     if (!first) await new Promise((r) => setTimeout(r, 3000))
   }
   check(first?.registrationStatus === "PENDING_REVIEW" && first?.selfRegistered === true, "it waits in PENDING_REVIEW, marked self-registered", `${first?.registrationStatus} · ${first?.selfRegistered}`)
+  check(first?.category === "OFFICE_SUPPLIES" && first?.phone === "+263772440088", "it keeps the category and phone chosen on the portal", `${first?.category} · ${first?.phone}`)
   check(first && !("selfRegistrationToken" in first) && Number(first?._count?.banks) >= 1, "the review queue counts its bank account and does not expose its portal token", `banks ${first?._count?.banks}`)
   const eligible = (await api("GET", "/accounting/vendors/for-rfq", mgr)).json?.data ?? []
   check(first && !eligible.some((v) => v.id === first.id), "it is not offered for RFQ invitations")
@@ -153,6 +155,8 @@ try {
       await new Promise((r) => setTimeout(r, 3000))
     }
     check(after?.registrationStatus === "ACTIVE" && after?.isActive === true, "the vendor is active", `${after?.registrationStatus} · active ${after?.isActive}`)
+    const invitable = (await api("GET", "/accounting/vendors/for-rfq", mgr)).json?.data ?? []
+    check(invitable.some((v) => v.id === first?.id && v.category === "OFFICE_SUPPLIES"), "once approved it is offered for Office Supplies RFQ invitations")
     check(errors.length === 0, "no page errors", errors.slice(0, 2).join(" | "))
     await page.screenshot({ path: path.join(OUT, "vendor-self-registration-approved.png"), fullPage: false }).catch(() => {})
     await context.close()
@@ -161,7 +165,7 @@ try {
   // ------------------------------------------------------------------ 5. a second vendor is declined with a reason
   console.log("\n== a second self-registration is declined")
   const reg = await api("POST", "/public/vendor-registration", null, {
-    companyName: SECOND, name: SECOND, email: `uat-selfreg-declined-${RUN}@vendors.example.test`, contactPerson: "Nyasha Dube", phoneNumber: "+263772440099", industry: "Catering",
+    companyName: SECOND, name: SECOND, email: `uat-selfreg-declined-${RUN}@vendors.example.test`, contactPerson: "Nyasha Dube", phoneNumber: "+263772440099", industry: "Office Supplies",
     banks: [{ bankName: "Stanbic", accountName: SECOND, accountNumber: `9120${Date.now().toString().slice(-8)}`, branchCode: "3101", currencyCode: "USD", swiftCode: "SBICZWHX" }],
   })
   check(reg.status === 201 || reg.status === 200, "the portal's registration API accepts it", `${reg.status} ${reg.json?.message ?? ""}`)

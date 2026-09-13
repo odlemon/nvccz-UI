@@ -1,12 +1,14 @@
 /**
  * Vendor master data (SRD §3: company name, contact, email, phone, address, payment terms), edited from the vendor's
- * profile on dev. Writes one UAT vendor, which dev_cleanup_procurement.mjs removes (email @vendors.example.test).
+ * profile on dev. Writes two UAT vendors, which dev_cleanup_procurement.mjs removes (email @vendors.example.test).
  *
  *   NEXT_PUBLIC_API_BASE_URL=https://dev-api.matanho.com/api BASE=https://dev.matanho.com UAT_LOAD_TIMEOUT_MS=180000 \
  *     node scripts/_uat/procurement-v23-vendor-master.mjs
  *
+ *   0. the Procurement Officer registers a vendor on Register vendor: the form asks for category, contact, email, phone and
+ *      payment terms, the record keeps them, and the vendor is offered for RFQ invitations;
  *   1. the Procurement Officer registers a vendor through the API; its profile shows phone, payment terms and address;
- *   2. Edit profile offers only what the vendor record keeps, and saving changes the record;
+ *   2. Edit profile offers only what the vendor record keeps (category included), and saving changes the record;
  *   3. the profile offers no control or card with nothing behind it (messaging, document requests, sample register);
  *   4. the Finance Manager, who approves vendors but does not maintain them, is refused Edit profile;
  *   5. the API refuses a blacklist or registration change through the plain update from a role that cannot approve.
@@ -70,6 +72,43 @@ const fieldValue = (page, label) =>
   page.evaluate((l) => [...document.querySelectorAll("#workspace .field")].find((f) => f.querySelector("label")?.innerText.trim() === l)?.querySelector("input,textarea")?.value ?? null, label)
 
 try {
+  // ------------------------------------------------------------------ 0. staff register a vendor
+  console.log("\n== the Procurement Officer registers a vendor")
+  {
+    const STAFF = `UAT staff-registered ${RUN}`
+    const context = await browser.newContext({ viewport: { width: 1440, height: 1000 } })
+    await seedAuth(context, BASE, "proc.officer@nts.local", "staff")
+    const page = await context.newPage()
+    await page.goto(`${BASE}/procurement/vendors`, { waitUntil: "domcontentloaded", timeout: LOAD })
+    const register = page.locator('#workspace [data-action="register-vendor"], #workspace [data-action="register-vendor-v6"]').first()
+    await register.waitFor({ timeout: LOAD })
+    await register.click()
+    await page.waitForSelector("#vendorForm", { timeout: 30000 })
+    const fields = await page.$$eval("#vendorForm [name]", (els) => els.map((e) => e.getAttribute("name")))
+    check(["name", "category", "contact", "email", "phone", "paymentTerms", "bp", "vat", "taxExpiry", "address"].every((n) => fields.includes(n)), "Register vendor asks for contact, email, phone, category and payment terms", fields.join(", "))
+    await page.fill('#vendorForm [name="name"]', STAFF)
+    await page.selectOption('#vendorForm [name="category"]', "Office Supplies")
+    await page.fill('#vendorForm [name="contact"]', "Tendai Chikore")
+    await page.fill('#vendorForm [name="email"]', `uat-staffreg-${RUN}@vendors.example.test`)
+    await page.fill('#vendorForm [name="phone"]', "+263 242 700 330")
+    await page.fill('#vendorForm [name="paymentTerms"]', "30 days from invoice")
+    await page.fill('#vendorForm [name="bp"]', `BP-${RUN}`)
+    await page.fill('#vendorForm [name="vat"]', `VAT-${RUN}`)
+    await page.fill('#vendorForm [name="address"]', "18 Fife Avenue, Harare")
+    await page.locator('#modalLayer [data-action="register-vendor-confirm"]').first().click()
+    const said = await page.waitForFunction(() => [...document.querySelectorAll("[data-sonner-toast]")].map((t) => t.innerText).find((t) => /registered|could not|refused|required/i.test(t)) || null, null, { timeout: 60000 }).then((h) => h.jsonValue()).catch(() => null)
+    check(/registered/i.test(said || ""), "registering says the vendor is registered", said || "no toast")
+    let reg
+    for (let i = 0; i < 6 && !reg; i++) {
+      reg = ((await api("GET", "/accounting/vendors", officer)).json?.data ?? []).find((v) => v.name === STAFF)
+      if (!reg) await new Promise((r) => setTimeout(r, 3000))
+    }
+    check(reg && reg.email === `uat-staffreg-${RUN}@vendors.example.test` && reg.phone === "+263 242 700 330" && reg.category === "OFFICE_SUPPLIES" && reg.paymentTerms === "30 days from invoice", "the vendor record holds its email, phone, category and payment terms", `${reg?.email} · ${reg?.phone} · ${reg?.category} · ${reg?.paymentTerms}`)
+    const invitable = (await api("GET", "/accounting/vendors/for-rfq", officer)).json?.data ?? []
+    check(reg && invitable.some((v) => v.id === reg.id), "a staff-registered vendor is offered for RFQ invitations")
+    await context.close()
+  }
+
   // ------------------------------------------------------------------ 1-3. the officer
   console.log("\n== the Procurement Officer")
   const { context, page, errors } = await openProfile("proc.officer@nts.local")
@@ -88,13 +127,14 @@ try {
   await page.locator('#workspace [data-action="edit-vendor-v6"]').first().click()
   await page.waitForSelector("#vendorEditFormV23", { timeout: 30000 })
   const names = await page.$$eval("#vendorEditFormV23 [name]", (els) => els.map((e) => e.getAttribute("name")))
-  const expected = ["vendorId", "name", "contact", "email", "phone", "paymentTerms", "address", "taxExpiry"]
+  const expected = ["vendorId", "name", "category", "contact", "email", "phone", "paymentTerms", "address", "taxExpiry"]
   check(expected.every((n) => names.includes(n)) && names.length === expected.length, "Edit profile offers only what the vendor record keeps", names.join(", "))
   check((await page.locator('#modalLayer.open [data-action="save-vendor-profile-v23"]').count()) === 1 && !/Nothing here can be saved/.test(await page.locator("#modalLayer").innerText()), "and can be saved")
 
   await page.locator('#vendorEditFormV23 [name="phone"]').fill("+263 242 700 222")
   await page.locator('#vendorEditFormV23 [name="paymentTerms"]').fill("45 days from invoice")
   await page.locator('#vendorEditFormV23 [name="address"]').fill("7 Samora Machel Avenue, Harare")
+  await page.locator('#vendorEditFormV23 [name="category"]').selectOption("Furniture")
   await page.locator('#modalLayer [data-action="save-vendor-profile-v23"]').click()
   const toast = await page.waitForFunction(() => [...document.querySelectorAll("[data-sonner-toast]")].map((t) => t.innerText).find((t) => /updated|could not|refused|permission/i.test(t)) || null, null, { timeout: 60000 }).then((h) => h.jsonValue()).catch(() => null)
   check(/updated/i.test(toast || ""), "saving says the vendor was updated", toast || "no toast")
@@ -105,7 +145,7 @@ try {
     if (after?.phone === "+263 242 700 222") break
     await new Promise((r) => setTimeout(r, 3000))
   }
-  check(after?.phone === "+263 242 700 222" && after?.paymentTerms === "45 days from invoice" && after?.address === "7 Samora Machel Avenue, Harare", "the vendor record holds the new phone, payment terms and address", `${after?.phone} · ${after?.paymentTerms} · ${after?.address}`)
+  check(after?.phone === "+263 242 700 222" && after?.paymentTerms === "45 days from invoice" && after?.address === "7 Samora Machel Avenue, Harare" && after?.category === "FURNITURE", "the vendor record holds the new phone, payment terms, address and category", `${after?.phone} · ${after?.paymentTerms} · ${after?.address}`)
   check(after?.name === NAME && after?.contactPerson === "Rudo Mhlanga", "and keeps what was not changed", `${after?.name} · ${after?.contactPerson}`)
   const shown = await page.waitForFunction(() => [...document.querySelectorAll("#workspace .field")].some((f) => f.querySelector("label")?.innerText.trim() === "Payment terms" && f.querySelector("input")?.value === "45 days from invoice"), null, { timeout: 90000 }).then(() => true).catch(() => false)
   check(shown, "the profile shows the new payment terms after the reload")
