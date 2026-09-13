@@ -143,9 +143,8 @@ async function rowAction(page, rowText, actions, id = rowText) {
 /** An approval prompt's Approve, scrolled into view. */
 async function approvePrompt(page, id) {
   const control = page.locator(`[data-action="approve-prompt-v6"][data-id="${id}"]`).first()
-  await control.waitFor({ state: "attached", timeout: 30000 })
-  await control.scrollIntoViewIfNeeded()
-  await control.click()
+  // A locator click re-resolves the element, so a redraw between finding and clicking it cannot strand the click.
+  await control.click({ timeout: 30000 })
 }
 
 // ------------------------------------------------------------------ steps
@@ -394,13 +393,14 @@ try {
     const { page } = await open(U.officer, "evaluation")
     await page.click(`[data-action="open-evaluation"][data-id="${ctx.rfq.rfqNumber}"]`)
     await page.waitForSelector("[data-score-quote]", { timeout: 30000 })
-    const inputs = await page.$$("[data-score-quote]")
+    const inputs = page.locator("[data-score-quote]")
+    const count = await inputs.count()
     const scores = [80, 70, 75]
-    for (let i = 0; i < inputs.length; i += 1) await inputs[i].fill(String(scores[i % scores.length]))
+    for (let i = 0; i < count; i += 1) await inputs.nth(i).fill(String(scores[i % scores.length]))
     await page.click('[data-action="save-scores"]')
     const t = await toast(page, /scores saved/i)
     const matrix = await api(U.officer, `/procurement/rfqs/${ctx.rfq.procurementRfqId ?? ctx.rfq.id}/comparison-matrix`)
-    return { ok: matrix?.evaluationComplete === true, text: `${inputs.length} bids scored, evaluation complete=${matrix?.evaluationComplete} · "${t}"` }
+    return { ok: matrix?.evaluationComplete === true, text: `${count} bids scored, evaluation complete=${matrix?.evaluationComplete} · "${t}"` }
   })
 
   await step(10, "Procurement Manager awards the winner; a purchase order is raised", ["rfq", "quotes"], async (open) => {

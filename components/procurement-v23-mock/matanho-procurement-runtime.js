@@ -363,7 +363,12 @@ function __pr23VendorCategories() {
 function __pr23CategoryOptions() {
   const categories = __pr23VendorCategories();
   const first = (state.requisitions || []).find(r => r.rawStatus === 'APPROVED');
-  const preset = first && categories.includes(first.category) ? first.category : null;
+  // With no category of its own to follow, open on the category most vendors are registered in, so the builder
+  // lists vendors instead of opening on the alphabetically first category, which may have none.
+  const counts = new Map();
+  for (const v of state.vendors || []) if (v.category && v.category !== '—') counts.set(v.category, (counts.get(v.category) || 0) + 1);
+  const busiest = [...counts.entries()].sort((a, b) => b[1] - a[1])[0];
+  const preset = first && categories.includes(first.category) ? first.category : busiest ? busiest[0] : null;
   return (categories.length ? categories : ['Uncategorised'])
     .map(c => `<option${c === preset ? ' selected' : ''}>${__pr23Esc(c)}</option>`)
     .join('');
@@ -1097,6 +1102,7 @@ __pr23On(document, 'click', event => {
   } else {
     const rows = body.querySelectorAll('[data-pr-line]');
     if (rows.length > 1) rows[rows.length - 1].remove();
+    else if (typeof toast === 'function') toast('At least one line', 'A requisition needs at least one line. Change this one instead.');
   }
   __pr23PrLinesRecalc();
 }, true);
@@ -1112,9 +1118,17 @@ __pr23On(document, 'change', event => {
   if (target && target.name === 'source' && target.closest && target.closest('#tenderFormV13')) {
     const req = (state.requisitions || []).find(r => r.recordId === target.value);
     const category = document.querySelector('#rfxCategoryV13');
-    if (req && category && [...category.options].some(o => o.value === req.category) && category.value !== req.category) {
+    const filter = document.querySelector('#rfxVendorCategoryV13');
+    const hasCategory = Boolean(req && category && [...category.options].some(o => o.value === req.category));
+    if (hasCategory && category.value !== req.category) {
       category.value = req.category;
       category.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+    // A requisition without a category restricts no vendor (the API matches categories only when one is set).
+    const wantFilter = hasCategory ? 'Use tender category' : 'All categories';
+    if (filter && [...filter.options].some(o => o.value === wantFilter) && filter.value !== wantFilter) {
+      filter.value = wantFilter;
+      filter.dispatchEvent(new Event('change', { bubbles: true }));
     }
     return;
   }

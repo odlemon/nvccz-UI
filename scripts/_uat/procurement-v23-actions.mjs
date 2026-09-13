@@ -254,6 +254,9 @@ await step("4 Procurement Officer registers a vendor (V6 form)", async (open) =>
     else if (kind === "date") await el.fill(inYear)
     else if (kind !== "checkbox" && kind !== "select") await el.fill("UAT")
   }
+  // Category is required and starts empty (cycle seven): choose the first real one.
+  const category = await page.$(`${formId} select[name="category"]`)
+  if (category && !(await category.inputValue())) await page.selectOption(`${formId} select[name="category"]`, { index: 1 })
   await page.click('[data-action="register-vendor-confirm-v6"]')
   const toast = await toasts(page)
   const vendor = ((await api(email, "/accounting/vendors")) ?? []).find((v) => v.name === name)

@@ -81,9 +81,19 @@ export function ProcurementV23App() {
     if (!el) return
     let disposed = false
     let hydrated = false
+    let appliedKey = ""
 
     const applyLive = (payload: ProcurementV23LivePayload) => {
       const firstForRuntime = !hydrated
+      // The runtime redraws the whole page on hydrate. A new host shows the last payload at once and the fresh
+      // load lands a few seconds later; when nothing changed, redrawing then only wiped what the person had
+      // started typing (bid scores) and pulled buttons out from under the pointer.
+      const key = JSON.stringify([payload.hydrate, payload.kpis, payload.navCounts, payload.access])
+      if (!firstForRuntime && key === appliedKey) {
+        liveRef.current = payload
+        return
+      }
+      appliedKey = key
       hydrated = true
       liveRef.current = payload
       // Read by the runtime bridge (__pr23Kpi, __pr23NavCount) on the render hydrate triggers.
