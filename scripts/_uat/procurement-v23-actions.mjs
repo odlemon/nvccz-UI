@@ -434,7 +434,7 @@ await step("11 Finance Manager rejects an invoice (Approval Centre)", async (ope
   const label = "11 Finance Manager rejects an invoice (Approval Centre)"
   const email = "payroll.finmgr@nts.local"
   // A UAT vendor's invoice only: dev also carries the demo dataset, whose invoice waiting on Finance is not ours to reject.
-  const target = ((await api(email, "/procurement/invoices")) ?? []).find((i) => String(i.status).toUpperCase() === "DRAFT" && /^UAT/.test(String(i.vendor?.name ?? "")))
+  const target = ((await api(email, "/procurement/invoices")) ?? []).find((i) => String(i.status).toUpperCase() === "DRAFT" && /^UAT\b/.test(String(i.vendor?.name ?? "")))
   if (!target) return record(false, label, "no DRAFT UAT invoice to reject — step 10 captures one")
   const { page, errors } = await open(email, "/procurement-v23/approvals")
   const id = `INVOICE-${target.invoiceNumber}`
@@ -514,7 +514,7 @@ await step("13 Accountant records payment of an approved invoice (Record payment
   const ap = "proc.ap@nts.local"
   const finance = "payroll.finmgr@nts.local"
   let invoices = (await api(ap, "/procurement/invoices")) ?? []
-  const isTestVendor = (name) => /^UAT/.test(String(name ?? ""))
+  const isTestVendor = (name) => /^UAT\b/.test(String(name ?? ""))
   let target = invoices.find((i) => i.status === "APPROVED" && !["PAID", "PARTIALLY_PAID"].includes(i.paymentStatus) && isTestVendor(i.vendor?.name))
   if (!target) {
     // Arrange: accounts payable captures an invoice against a dispatched PO if none is waiting,

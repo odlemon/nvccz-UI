@@ -210,7 +210,7 @@ for (const decision of ["approve", "reject"]) {
     const email = "proc.mgr@nts.local"
     const officer = "proc.officer@nts.local"
     // Receipts on test purchase orders only (a UAT vendor): the demo dataset's receipt waiting on inspection stays as it is.
-    const testPos = list(await api(officer, "/procurement/purchase-orders")).filter((o) => /^UAT/.test(String(o.vendor?.name ?? "")))
+    const testPos = list(await api(officer, "/procurement/purchase-orders")).filter((o) => /^UAT\b/.test(String(o.vendor?.name ?? "")))
     const testPoIds = new Set(testPos.map((o) => o.id))
     let pending = list(await api(email, "/procurement/goods-received-notes")).filter((g) => String(g.status).toUpperCase() === "RECEIVED" && testPoIds.has(g.purchaseOrderId ?? g.purchaseOrder?.id))
     if (!pending.length) {
@@ -256,7 +256,7 @@ await step("W5 Finance Manager approves a captured invoice (Approval Centre)", a
   const ap = "proc.ap@nts.local"
   const finance = "payroll.finmgr@nts.local"
   // A UAT vendor's invoice only: the demo dataset's invoice waiting on Finance stays waiting.
-  const isTestVendor = (name) => /^UAT/.test(String(name ?? ""))
+  const isTestVendor = (name) => /^UAT\b/.test(String(name ?? ""))
   let draft = list(await api(ap, "/procurement/invoices")).find((i) => i.status === "DRAFT" && isTestVendor(i.vendor?.name))
   if (!draft) {
     const po = list(await api(ap, "/procurement/purchase-orders")).find((o) => ["SENT", "ACKNOWLEDGED", "PARTIALLY_DELIVERED", "DELIVERED"].includes(o.status) && (o.items ?? []).length && isTestVendor(o.vendor?.name))
@@ -333,8 +333,9 @@ await step("W6b Procurement Officer sends two draft purchase orders with Send se
 // ---------------------------------------------------------------- W7 contract: terminate an active one
 await step("W7 Procurement Manager terminates an active contract", async (open, label) => {
   const email = "proc.mgr@nts.local"
-  const active = list(await api(email, "/procurement/contracts")).find((c) => c.status === "ACTIVE")
-  if (!active) return record(false, label, "no active contract to terminate")
+  // A contract the suites created ("UAT …" / "Storyline …"): dev's demo contract is not the suite's to terminate.
+  const active = list(await api(email, "/procurement/contracts")).find((c) => c.status === "ACTIVE" && /^(UAT|Storyline)\b/.test(String(c.title)))
+  if (!active) return record(false, label, "no active UAT contract to terminate — actions and the storyline each create one")
   const { page, errors } = await open(email, "/procurement-v23/contracts")
   const offered = await rowMenu(page, active.contractNumber)
   if (!offered.includes("edit-contract-v6")) return record(false, label, `${active.contractNumber}: no open/edit control (menu: ${offered.filter((a) => /contract/.test(a)).join(", ")})${suffix(errors)}`)
@@ -409,7 +410,7 @@ await step("W8 Finance rejects a plan; its author adds a line and resubmits", as
 // ---------------------------------------------------------------- W9 document: upload a new version
 await step("W9 Procurement Officer uploads a new version of a vault document", async (open, label) => {
   const email = "proc.officer@nts.local"
-  const doc = list(await api(email, "/procurement/documents")).find((d) => /^(UAT|Storyline)/.test(String(d.name)))
+  const doc = list(await api(email, "/procurement/documents")).find((d) => /^(UAT|Storyline)\b/.test(String(d.name)))
   if (!doc) return record(false, label, "no UAT vault document — actions step 17 files one")
   const display = `DOC-${String(doc.id).slice(-6).toUpperCase()}`
   const { page, errors } = await open(email, "/procurement-v23/documents")
@@ -450,7 +451,7 @@ await step("N2 A plan's author cannot approve their own plan", async (open, labe
   const author = "proc.mgr@nts.local"
   const me = (await api(author, "/procurement/me/access"))?.userId
   const plans = list(await api(author, "/procurement/plans"))
-  const ours = plans.filter((p) => /^(UAT|Storyline)/.test(String(p.name)))
+  const ours = plans.filter((p) => /^(UAT|Storyline)\b/.test(String(p.name)))
   const submitted = ours.find((p) => p.status === "SUBMITTED" && p.createdById === me) ?? ours.find((p) => p.status === "SUBMITTED")
   if (!submitted) return record(false, label, "no submitted plan — W8 resubmits one")
   const { page, errors } = await open(author, "/procurement-v23/approvals")
