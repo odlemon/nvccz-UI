@@ -1,7 +1,7 @@
 import type { ChartOfAccount } from '@/lib/api/chart-of-accounts-api'
 import type { PurchaseInvoice, Vendor, Invoice, Customer, Expense, InventoryItem, Asset, RecurringJournalTemplate } from '@/lib/api/accounting-api'
 import type { DashboardInstrument } from '@/lib/api/short-term-investments-api'
-import type { Ac52Account, Ac52Journal, Ac52Bank, Ac52ReconciliationLine, Ac52ApBill, Ac52ApVendor, Ac52ArInvoice, Ac52ArCustomer, Ac52Claim, Ac52InventoryItem, Ac52FixedAsset, Ac52Investment, Ac52Approval, Ac52RecurringSchedule, Ac52VaultDocument, Ac52TaxPack, Ac52CloseTask, Ac52CloseTaskV11, Ac52Timesheet, Ac52Project, Ac52AuditEvent, Ac52AccessData } from './types'
+import type { Ac52Account, Ac52Journal, Ac52Bank, Ac52ReconciliationLine, Ac52ApBill, Ac52ApVendor, Ac52ArInvoice, Ac52ArCustomer, Ac52Claim, Ac52InventoryItem, Ac52FixedAsset, Ac52Investment, Ac52Approval, Ac52RecurringSchedule, Ac52VaultDocument, Ac52TaxPack, Ac52CloseTask, Ac52CloseTaskV11, Ac52Timesheet, Ac52Project, Ac52AuditEvent, Ac52AccessData, Ac52ApPO, Ac52ApRfq } from './types'
 import type { AccountingDocument } from '@/lib/api/accounting-documents-api'
 import type { TaxReturnPack } from '@/lib/api/tax-return-pack-api'
 import type { AccountingCloseTask, CloseTaskPerson } from '@/lib/api/accounting-close-tasks-api'
@@ -893,4 +893,106 @@ export function adaptAc52AuditEvents(rows: AuditLogRow[], userRoles: Map<string,
       class: auditEventClass(r.action),
     }
   })
+}
+
+
+// ---------------------------------------------------------------- procurement into Payables
+// Payables shows procurement's records: its supplier invoices beside accounting's own bills, and its purchase
+// orders and open RFQs on the Purchase orders and Quotations & sourcing tabs (which otherwise showed the
+// runtime's sample orders and RFQs, and counted commitments and pipeline from them).
+
+const PROC_NUM = (v: unknown) => (Number.isFinite(Number(v)) ? Number(v) : 0)
+const PROC_DAY = (v: unknown) => (v ? String(v).slice(0, 10) : '—')
+
+function procurementMatchLabel(v: unknown): string {
+  const s = String(v ?? '').toUpperCase()
+  if (s === 'MATCHED') return 'Matched'
+  if (s === 'PENDING' || !s) return 'Match pending'
+  if (s === 'AWAITING_RECEIPT') return 'Awaiting receipt'
+  if (s === 'NO_PO') return 'No purchase order'
+  if (s === 'DISCREPANCY' || s.includes('MISMATCH') || s.includes('VARIANCE') || s.includes('EXCEPTION')) return 'Match exception'
+  return s.charAt(0) + s.slice(1).toLowerCase().replace(/_/g, ' ')
+}
+
+/** A procurement supplier invoice as a Payables bill: open until paid; one awaiting Finance approval reads Review. */
+export function adaptAc52ProcurementBills(rows: any[]): Ac52ApBill[] {
+  return rows
+    .filter((r) => String(r.status).toUpperCase() !== 'REJECTED')
+    .map((r) => {
+      const paid = String(r.paymentStatus).toUpperCase() === 'PAID'
+      const approved = String(r.status).toUpperCase() === 'APPROVED'
+      return {
+        id: r.id,
+        vendor: r.vendor?.name || 'Unknown vendor',
+        invoice: r.invoiceNumber,
+        date: PROC_DAY(r.invoiceDate),
+        due: PROC_DAY(r.dueDate),
+        po: r.purchaseOrder?.poNumber || '—',
+        grn: r.aiDiscrepancies?.grnNumbers?.[0] || '—',
+        project: 'Procurement',
+        gross: PROC_NUM(r.totalAmount),
+        open: paid ? 0 : PROC_NUM(r.totalAmount),
+        match: procurementMatchLabel(r.matchingStatus),
+        status: paid ? 'Paid' : approved ? 'Approved' : 'Review',
+        journal: '',
+      }
+    })
+}
+
+/** Unpaid procurement invoices as vendor balances, in the shape adaptAc52ApVendors sums. */
+export function procurementOutstanding(rows: any[]): { vendorId: string; outstandingAmount: number }[] {
+  return rows
+    .filter((r) => String(r.status).toUpperCase() !== 'REJECTED' && String(r.paymentStatus).toUpperCase() !== 'PAID')
+    .map((r) => ({ vendorId: r.vendorId, outstandingAmount: PROC_NUM(r.totalAmount) }))
+}
+
+/** Live purchase orders: commitment, value received (from received line quantities) and value invoiced. */
+export function adaptAc52ApPOs(orders: any[], invoices: any[]): Ac52ApPO[] {
+  return orders
+    .filter((o) => !['CANCELLED', 'REJECTED'].includes(String(o.status).toUpperCase()))
+    .map((o) => {
+      const commitment = PROC_NUM(o.totalAmount)
+      const subtotal = PROC_NUM(o.subtotal)
+      const receivedNet = (o.items ?? []).reduce((t: number, i: any) => t + PROC_NUM(i.quantityReceived) * PROC_NUM(i.unitPrice), 0)
+      const received = subtotal > 0 ? Math.round((receivedNet * commitment * 100) / subtotal) / 100 : receivedNet
+      const invoiced = invoices
+        .filter((i) => i.purchaseOrderId === o.id && String(i.status).toUpperCase() !== 'REJECTED')
+        .reduce((t, i) => t + PROC_NUM(i.totalAmount), 0)
+      const s = String(o.status).toUpperCase()
+      const status =
+        commitment > 0 && invoiced >= commitment - 0.01
+          ? 'Fully invoiced'
+          : s === 'DELIVERED'
+            ? 'Received'
+            : s === 'PARTIALLY_DELIVERED'
+              ? 'Part received'
+              : s === 'SENT' || s === 'ACKNOWLEDGED'
+                ? 'Sent to vendor'
+                : s === 'DRAFT'
+                  ? 'Draft'
+                  : s.charAt(0) + s.slice(1).toLowerCase().replace(/_/g, ' ')
+      return { id: o.poNumber || o.id, vendor: o.vendor?.name || '—', date: PROC_DAY(o.orderDate || o.createdAt), commitment, received, invoiced, status, owner: '—' }
+    })
+}
+
+/** Open RFQs (not yet awarded or cancelled): bids received, the lowest bid and its vendor, the best evaluation score. */
+export function adaptAc52ApRfqs(rfqs: any[], quotations: any[]): Ac52ApRfq[] {
+  return rfqs
+    .filter((r) => !['AWARDED', 'CANCELLED'].includes(String(r.status).toUpperCase()))
+    .map((r) => {
+      const rid = r.procurementRfqId ?? r.id
+      const bids = quotations.filter((q) => q.procurementRfqId === rid && !['DRAFT', 'WITHDRAWN'].includes(String(q.status).toUpperCase()))
+      const lowest = [...bids].sort((a, b) => PROC_NUM(a.totalAmount) - PROC_NUM(b.totalAmount))[0]
+      const scores = bids.map((q) => Number(q.technicalScoreJson?.evaluation?.score)).filter((n) => Number.isFinite(n))
+      return {
+        id: r.rfqNumber || r.id,
+        title: r.title || '—',
+        close: PROC_DAY(r.closingAt),
+        bids: bids.length,
+        value: lowest ? PROC_NUM(lowest.totalAmount) : 0,
+        stage: bids.length ? 'Comparison' : 'Open',
+        leader: lowest ? lowest.companyName || lowest.vendorName || '—' : '—',
+        score: scores.length ? Math.max(...scores) : '—',
+      }
+    })
 }

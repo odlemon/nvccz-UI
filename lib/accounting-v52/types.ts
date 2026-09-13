@@ -103,6 +103,30 @@ export type Ac52ApBill = {
   journal: string
 }
 
+/** A procurement purchase order as the v28 Payables page's Purchase orders tab reads it (apPOs). */
+export type Ac52ApPO = {
+  id: string
+  vendor: string
+  date: string
+  commitment: number
+  received: number
+  invoiced: number
+  status: string
+  owner: string
+}
+
+/** An open procurement RFQ as the v28 Payables page's Quotations & sourcing tab reads it (rfqs). */
+export type Ac52ApRfq = {
+  id: string
+  title: string
+  close: string
+  bids: number
+  value: number
+  stage: string
+  leader: string
+  score: number | string
+}
+
 /** Shape the runtime's v28-layer apVendors array expects. */
 export type Ac52ApVendor = {
   id: string
@@ -422,6 +446,8 @@ export type Ac52HydratePayload = {
     reconLines?: unknown[]
     apBills?: Ac52ApBill[]
     apVendors?: Ac52ApVendor[]
+    apPOs?: Ac52ApPO[]
+    apRfqs?: Ac52ApRfq[]
     arInvoices?: Ac52ArInvoice[]
     arCustomers?: Ac52ArCustomer[]
     claims?: Ac52Claim[]

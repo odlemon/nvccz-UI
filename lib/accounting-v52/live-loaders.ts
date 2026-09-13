@@ -1,3 +1,4 @@
+import { listProcurementInvoices, listPurchaseOrders, listQuotations, listRfqs } from '@/lib/api/procurement-v23-api'
 import { chartOfAccountsApi } from '@/lib/api/chart-of-accounts-api'
 import { accountingApi } from '@/lib/api/accounting-api'
 import { cashbookApi } from '@/lib/api/cashbook-api'
@@ -37,6 +38,10 @@ import {
   adaptAc52Projects,
   adaptAc52AuditEvents,
   adaptAc52AccessData,
+  adaptAc52ProcurementBills,
+  procurementOutstanding,
+  adaptAc52ApPOs,
+  adaptAc52ApRfqs,
 } from './adapters'
 import type { Ac52HydratePayload } from './types'
 
@@ -126,6 +131,28 @@ export function scopesForAc52Page(page: string): Ac52ScopePlan {
     default:
       return { primary: [] }
   }
+}
+
+/**
+ * Procurement's purchase orders, RFQs, quotations and supplier invoices, for Payables. A role without procurement
+ * access is refused (403) and simply sees none; any other failure is reported like the accounting reads.
+ */
+async function loadProcurementForPayables(errors: string[]) {
+  const read = (p: Promise<unknown>, label: string): Promise<any[]> =>
+    p.then(
+      (rows) => (Array.isArray(rows) ? rows : []),
+      (err: any) => {
+        if (err?.status !== 403) errors.push(`${label}: ${err?.message || String(err)}`)
+        return []
+      },
+    )
+  const [orders, rfqs, quotations, invoices] = await Promise.all([
+    read(listPurchaseOrders(), 'procurement/purchase-orders'),
+    read(listRfqs(), 'procurement/rfq'),
+    read(listQuotations(), 'vendor-quotations'),
+    read(listProcurementInvoices(), 'procurement/invoices'),
+  ])
+  return { orders, rfqs, quotations, invoices }
 }
 
 function settle<T>(p: Promise<T>, label: string, errors: string[]): Promise<T | null> {
@@ -238,13 +265,22 @@ export async function loadAc52Scopes(scopes: Ac52DataScope[]): Promise<Ac52Hydra
   }
 
   if (wanted.includes('payables')) {
-    const [billsRes, vendorsRes] = await Promise.all([
+    const [billsRes, vendorsRes, procurement] = await Promise.all([
       settle(accountingApi.getPurchaseInvoices({ limit: 200 }), 'purchaseInvoices', errors),
       settle(accountingApi.getVendors({ limit: 200 }), 'vendors', errors),
+      loadProcurementForPayables(errors),
     ])
     const bills = Array.isArray(billsRes?.data?.invoices) ? billsRes!.data!.invoices : []
-    if (Array.isArray(billsRes?.data?.invoices)) data.apBills = adaptAc52ApBills(bills)
-    if (Array.isArray(vendorsRes?.data)) data.apVendors = adaptAc52ApVendors(vendorsRes!.data as any, bills)
+    // Supplier invoices captured in procurement are payables too: they sit beside accounting's own bills.
+    if (Array.isArray(billsRes?.data?.invoices) || procurement.invoices.length) {
+      data.apBills = [...adaptAc52ApBills(bills), ...adaptAc52ProcurementBills(procurement.invoices)]
+    }
+    if (Array.isArray(vendorsRes?.data)) {
+      data.apVendors = adaptAc52ApVendors(vendorsRes!.data as any, [...bills, ...procurementOutstanding(procurement.invoices)] as any)
+    }
+    // Always sent (empty for a role without procurement access), so the sample orders and RFQs never show.
+    data.apPOs = adaptAc52ApPOs(procurement.orders, procurement.invoices)
+    data.apRfqs = adaptAc52ApRfqs(procurement.rfqs, procurement.quotations)
   }
 
   if (wanted.includes('receivables')) {
