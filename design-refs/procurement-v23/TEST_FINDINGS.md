@@ -815,6 +815,25 @@ Review, Approve and Reject on each card; "All open approvals" is a table of ever
 and plan still open in the registers the role can read, with who it waits on and for how long. The KPIs count the same
 records. The eSignature and Delegations tabs (sample envelopes and people, no backend) are gone from a live session.
 
+**The redesign took the Approval Centre down on dev, and why no check caught it.** On `bba6bda` the page showed
+Next's "Application error": `ReferenceError: smallAction is not defined`. The bridge runs at the runtime's top level,
+and `smallAction` and `actionV6` are declared inside its V5/V6 layers, so the new renderer could not reach them. The
+runtime passed `node --check` and the patch script, because both only look at syntax; the regression had just started
+and was stopped (its test records were cleaned). **Fix — nvccz-new `8a81936`:** the bridge renders its own buttons
+with the same markup, and the patch script now refuses to write a runtime whose bridge calls a helper declared only
+inside a layer. Run against the crashed build's runtime, the guard names exactly `smallAction` and `actionV6`; against
+the fixed one, nothing.
+
+Two more things surfaced while stopping that run. Stopping its background task did not stop its child processes: the
+shell scripts and `node` suites kept running for another quarter of an hour, created test records, and workflows W7
+terminated the demo's maintenance contract (it took the first active contract). The processes were found by command
+line and killed, the test records cleaned, and the contract restored to active with the termination's audit row
+removed; the demo integrity check (`scripts/procurement-ops/dev-data/demo_integrity.mjs`) caught it and reads 17/17
+again. And the UAT-only patterns added to the suites in `aa76463` held a literal backspace byte where a word boundary
+was meant (the backslash was lost on the way into the files), so they could never match. **Fix — nvccz-new
+`5334700`:** real word boundaries, checked against UAT and demo names; W7 terminates only a contract the suites
+created.
+
 **Suites kept off the demo** (nvccz-new `aa76463`). Several steps took the first record in a state — the first draft
 invoice, the first receipt waiting on inspection, the first vault document, any submitted plan, the second order in AI
 capture's list — which on dev are now demo records. Each takes a UAT record, arranging one where it did before. After a
