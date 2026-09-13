@@ -104,7 +104,11 @@ try {
   await page.locator("#ac52PayProof").setInputFiles(PROOF)
   await page.screenshot({ path: path.join(OUT, "pay-modal.png"), fullPage: false })
   await page.locator(`[data-v28="aplive-pay-confirm"][data-id="${target.invoiceNumber}"]`).click()
-  check(await waitText(page, new RegExp(`${target.invoiceNumber} paid`), 120000), "the payment is confirmed")
+  // The confirmation is a toast shown for about four seconds, as soon as the payment is recorded.
+  const payClicked = Date.now()
+  const confirmed = await waitText(page, new RegExp(`${target.invoiceNumber} paid`), 120000)
+  check(confirmed && Date.now() - payClicked < 30000, "the payment is confirmed straight away", `${confirmed ? "shown" : "not shown"} after ${Math.round((Date.now() - payClicked) / 1000)} s`)
+  check(!(await page.locator("#v28Overlay").count()), "and the Pay dialog is closed")
 
   let after
   for (let i = 0; i < 12; i++) {

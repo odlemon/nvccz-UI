@@ -194,6 +194,14 @@ export function AccountingV52App() {
           loadedScopesRef.current.delete(scope)
           pendingScopesRef.current.delete(scope)
         }
+        if (action === "ap-pay-bill") {
+          // Say the bill is paid (and close the Pay dialog) as soon as the payment is recorded, then reload the six
+          // registers it touches behind the message. Waiting for them first left the dialog open with no word for over
+          // two minutes on dev, after the payment had already been made.
+          runtime.commitSuccess?.(meta.title, result.message, meta.scopes[0])
+          await ensurePageDataRef.current?.(pathToAc52Page(pathnameRef.current))
+          return
+        }
         await ensurePageDataRef.current?.(pathToAc52Page(pathnameRef.current))
         runtime.commitSuccess?.(meta.title, result.message, meta.scopes[0])
       })
