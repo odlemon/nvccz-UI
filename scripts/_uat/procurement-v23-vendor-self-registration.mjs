@@ -39,10 +39,13 @@ const api = async (method, p, auth, body) => {
   const r = await fetch(API + p, { method, headers: auth || { "Content-Type": "application/json" }, body: body ? JSON.stringify(body) : undefined })
   return { status: r.status, json: await r.json().catch(() => ({})) }
 }
+// GET /accounting/vendors lists active vendors by default and treats any isActive other than "true" as inactive only
+// (so "?isActive=all" missed an approved vendor): look in the active list, the inactive list and the review queue.
 const vendorByName = async (auth, name) => {
-  const all = (await api("GET", "/accounting/vendors?isActive=all", auth)).json?.data ?? []
+  const active = (await api("GET", "/accounting/vendors", auth)).json?.data ?? []
+  const inactive = (await api("GET", "/accounting/vendors?isActive=false", auth)).json?.data ?? []
   const pending = (await api("GET", "/accounting/vendors/pending-review", auth)).json?.data ?? []
-  return [...pending, ...all].find((v) => v.name === name)
+  return [...pending, ...active, ...inactive].find((v) => v.name === name)
 }
 
 const mgr = await login("proc.mgr@nts.local")
