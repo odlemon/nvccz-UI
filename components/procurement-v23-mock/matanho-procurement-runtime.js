@@ -314,16 +314,23 @@ function __pr23DonutLegend(wrap) {
 }
 
 /** Vendor tax-clearance position, from each vendor's ITF263 expiry and review status. */
-function __pr23VendorCompliance() {
+/**
+ * A vendor's tax-clearance bucket, used by both the registry's compliance chips and their filter so the two cannot
+ * disagree: a missing or past expiry is Expired (the chip reads "Expired / missing"), a future expiry still in compliance
+ * review is Review, one within 60 days is Expiring, the rest Valid.
+ */
+function __pr23VendorComplianceBucket(v) {
   const now = Date.now(), soon = now + 60 * 86400000;
+  const exp = v && v.taxExpiry ? new Date(v.taxExpiry).getTime() : null;
+  if (!exp || exp < now) return 'Expired';
+  if (v.status === 'Compliance review') return 'Review';
+  if (exp <= soon) return 'Expiring';
+  return 'Valid';
+}
+
+function __pr23VendorCompliance() {
   const n = { Valid: 0, Expiring: 0, Expired: 0, Review: 0 };
-  for (const v of state.vendors || []) {
-    const exp = v.taxExpiry ? new Date(v.taxExpiry).getTime() : null;
-    if (!exp || exp < now) n.Expired += 1;
-    else if (v.status === 'Compliance review') n.Review += 1;
-    else if (exp <= soon) n.Expiring += 1;
-    else n.Valid += 1;
-  }
+  for (const v of state.vendors || []) n[__pr23VendorComplianceBucket(v)] += 1;
   const segments = [['Valid', n.Valid, '#0f8f78'], ['Expiring', n.Expiring, '#b87518'], ['Expired', n.Expired, '#c54a58'], ['Review', n.Review, '#d9dde5']];
   return { gradient: __pr23Gradient(segments), pct: Object.fromEntries(__pr23Percentages(segments).map(s => [s[0], s[1]])) };
 }
@@ -2560,15 +2567,19 @@ function __pr23VendorComplianceFilter(id) {
   const clearing = state.__pr23VendorFilter === want;
   state.__pr23VendorFilter = clearing ? null : want;
   let shown = 0;
+  // Classified exactly as the chips count them (a vendor with no clearance on file is Expired / missing); the row's own
+  // chip read "Missing" for those, so the Expired filter showed none of the vendors its chip counted.
+  const vendorOf = row => (state.vendors || []).find(v => v.id === row.dataset.id) || (state.vendors || []).find(v => v.name && (row.textContent || '').includes(v.name));
   for (const row of rows) {
+    const v = vendorOf(row);
     const chip = (row.querySelector('.vendor-doc-chip-v6').textContent || '').trim();
-    const match = want === 'Review' ? !['Valid', 'Expiring', 'Expired'].includes(chip) : chip === want;
+    const match = v ? __pr23VendorComplianceBucket(v) === want : (want === 'Review' ? !['Valid', 'Expiring', 'Expired'].includes(chip) : chip === want);
     const keep = clearing || match;
     row.style.display = keep ? '' : 'none';
     if (keep) shown += 1;
   }
   if (clearing) return toast('Compliance filter cleared', `Showing all ${rows.length} vendors.`);
-  const what = want === 'Review' ? 'tax clearance that needs review' : `${want.toLowerCase()} tax clearance`;
+  const what = want === 'Review' ? 'tax clearance that needs review' : want === 'Expired' ? 'expired or missing tax clearance' : `${want.toLowerCase()} tax clearance`;
   return toast('Compliance filter applied', `${shown} of ${rows.length} vendors have ${what}. Choose it again to show all.`);
 }
 
