@@ -112,8 +112,11 @@ try {
     await page.goto(`${BASE}/procurement/vendors`, { waitUntil: "domcontentloaded", timeout: LOAD })
     const card = await page.waitForFunction((n) => /Self-registrations awaiting review/.test(document.body.innerText) && document.body.innerText.includes(n), FIRST, { timeout: LOAD }).then(() => true).catch(() => false)
     check(card, "the Vendor Registry lists it under Self-registrations awaiting review")
-    const regRow = page.locator("#workspace table tbody tr", { hasText: FIRST }).first()
-    check((await regRow.locator('[data-action="approve-vendor-registration-v23"]').count()) === 0, "without approval rights it offers no Approve or Decline")
+    // Each registration is a prompt card with its decisions in view (not a table row, whose actions fold into a ⋯ menu).
+    const regCard = page.locator("#workspace article[data-vendor-registration]", { hasText: FIRST }).first()
+    const cardShown = await regCard.waitFor({ timeout: 30000 }).then(() => true).catch(() => false)
+    check(cardShown && (await regCard.locator('[data-action="open-vendor-v6"]').count()) === 1, "its card offers Open profile")
+    check(cardShown && (await regCard.locator('[data-action="approve-vendor-registration-v23"], [data-action="decline-vendor-registration-v23"]').count()) === 0, "without approval rights it offers no Approve or Decline")
     const portalButton = page.locator('#workspace [data-action="vendor-portal-v6"], #workspace [data-action="vendor-portal"]').first()
     if (await portalButton.count()) {
       const [tab] = await Promise.all([context.waitForEvent("page", { timeout: 30000 }).catch(() => null), portalButton.click()])
