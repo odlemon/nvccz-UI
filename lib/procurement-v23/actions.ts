@@ -235,8 +235,23 @@ const OPENER_GRANTS: Record<string, { grants: string[]; what: string }> = {
   "upload-invoice-v5": { grants: ["intake.manage"], what: "capturing supplier invoices" },
 }
 
+/**
+ * Openers of features with no backend, refused to every role before the form opens. Their final steps
+ * were already refused, but the forms themselves showed the vendored sample people and addresses
+ * (signer "Tendai Moyo · CEO", delegates "Tinashe Chaka · CFO", recipient approver@matanho.co.zw), and
+ * the vendor form preview offered "Submit to Matanho" to staff. Found by the cycle seven census.
+ */
+const NOT_BUILT_OPENERS: Record<string, string> = {
+  "esign-new-v6": "eSignature is not connected yet, so no envelope can be sent from here.",
+  "create-delegation-v6": "Approval delegation is not connected yet.",
+  "delegate-approval-v6": "Approval delegation is not connected yet. The assigned approver decides this approval.",
+  "send-approval-doc-v13": "Sending documents by email is not connected yet. Download the PDF and send it from your mail.",
+  "vendor-portal-v6": "Vendors fill this in on the vendor portal, from the link in their RFQ or document request.",
+}
+
 /** The refusal to show for an opener the signed-in role cannot complete, or null to let it open. */
 export function refusedOpener(action: string, live: ProcurementV23LivePayload | null): string | null {
+  if (NOT_BUILT_OPENERS[action]) return NOT_BUILT_OPENERS[action]
   const rule = OPENER_GRANTS[action]
   const access = live?.access
   if (!rule || !access || access.isPrivileged) return null

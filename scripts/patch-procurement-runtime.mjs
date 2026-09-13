@@ -1306,6 +1306,19 @@ s = replaceUnique(
 )
 
 // ---------------------------------------------------------------------------
+// 36. No fixture vendor submissions in the live Document Vault
+// ---------------------------------------------------------------------------
+// Found by the UI census: with no "Vendor Submissions" folder in the organisation's vault, the runtime pushed
+// its sample documents into the live register (DOC-00201 "GreenGrid Energy · ITF263 Tax Clearance FY2026").
+s = replaceUnique(
+  s,
+  "function ensureVendorSubmissionsFolderV6(){",
+  "function ensureVendorSubmissionsFolderV6(){if(__pr23Live())return;",
+  "vendor submissions folder -> no sample documents in a live vault",
+  "function ensureVendorSubmissionsFolderV6(){if(__pr23Live())return;",
+)
+
+// ---------------------------------------------------------------------------
 // 35. The browser tab carries no build label
 // ---------------------------------------------------------------------------
 // Found on dev: the tab read "Matanho Procurement & Tender Management - V23" (each layer set its own version).
