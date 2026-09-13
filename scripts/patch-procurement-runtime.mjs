@@ -1404,6 +1404,38 @@ for (const [version, count] of [["13", 1], ["18", 2], ["20", 1], ["23", 1]]) {
   )
 }
 
+// ---------------------------------------------------------------------------
+// Scope guard: the bridge may only call what is in its scope
+// ---------------------------------------------------------------------------
+// The bridge is injected at the runtime's top level. Helpers the vendored layers declare inside their own blocks
+// (smallAction, actionV6, actionButton, ...) do not exist there: a bridge page that called smallAction threw
+// "smallAction is not defined" and took the Approval Centre down on dev (cycle seven). Syntax checks cannot see it,
+// so refuse to write a runtime whose bridge calls a helper declared only inside a layer.
+{
+  const b0 = s.indexOf("/* BEGIN_PROCUREMENT_LIVE_BRIDGE */")
+  const b1 = s.indexOf("/* END_PROCUREMENT_LIVE_BRIDGE */")
+  const outside = s.slice(0, b0) + s.slice(b1)
+  const declared = (re) => new Set([...outside.matchAll(re)].map((m) => m[1]))
+  const topLevel = declared(/^(?:function\s+|(?:const|let|var)\s+)([A-Za-z_$][\w$]*)/gm)
+  const nested = declared(/^[ \t]+(?:function\s+|(?:const|let|var)\s+)([A-Za-z_$][\w$]*)\s*(?:=|\()/gm)
+  const bridgeCode = s
+    .slice(b0, b1)
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/^\s*\/\/.*$/gm, "")
+    .replace(/'[^'\n]*'/g, "''")
+    .replace(/"[^"\n]*"/g, '""')
+  const bridgeOwn = new Set([...bridgeCode.matchAll(/(?:function\s+|(?:const|let|var)\s+)([A-Za-z_$][\w$]*)/g)].map((m) => m[1]))
+  const outOfScope = [...new Set([...bridgeCode.matchAll(/(?<![.\w$])([A-Za-z_$][\w$]*)\s*\(/g)].map((m) => m[1]))].filter(
+    (name) => nested.has(name) && !topLevel.has(name) && !bridgeOwn.has(name),
+  )
+  if (outOfScope.length) {
+    console.error(`FATAL: the bridge calls helpers declared only inside a runtime layer (out of its scope): ${outOfScope.join(", ")}`)
+    missed += 1
+  } else {
+    console.log("  scope           bridge calls only what is in its scope")
+  }
+}
+
 console.log(`\n${applied} applied, ${skipped} already in place, ${missed} missed`)
 if (missed) {
   console.error("One or more patches did not find their anchor. The runtime is NOT fully patched.")

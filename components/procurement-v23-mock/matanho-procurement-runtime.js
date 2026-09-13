@@ -630,6 +630,18 @@ function __pr23ApplyCarry(page, carry) {
 
 // ---------------------------------------------------------------- approval centre
 
+/**
+ * Buttons for bridge-rendered pages. The runtime's smallAction and actionButton are declared inside its layers, out
+ * of the bridge's reach: calling them from here threw "smallAction is not defined" and took the Approval Centre down.
+ * Same markup as theirs.
+ */
+function __pr23SmallButton(label, action, id = '', ico = '') {
+  return `<button class="btn small" data-action="${action}" ${id ? `data-id="${__pr23Esc(id)}"` : ''}>${ico ? icon(ico) : ''}${label}</button>`;
+}
+function __pr23ActionButton(label, action, id = '', kind = '', ico = '') {
+  return `<button class="btn ${kind}" data-action="${action}" ${id ? `data-id="${__pr23Esc(id)}"` : ''}>${ico ? icon(ico) : ''}${label}</button>`;
+}
+
 function __pr23Waiting(iso) {
   if (!iso) return '—';
   const days = Math.floor((Date.now() - new Date(iso).getTime()) / 86400000);
@@ -658,13 +670,13 @@ function __pr23ApprovalsPageHtml() {
     const ordered = [...mine].sort((a, b) => String((byId.get(a.id) || {}).since || '9').localeCompare(String((byId.get(b.id) || {}).since || '9')));
     const cards = ordered.map(a => {
       const g = byId.get(a.id) || {};
-      return `<article class="approval-prompt-v6 ${String(a.priority || 'normal').toLowerCase()}"><div style="display:flex;justify-content:space-between;gap:8px"><span class="eyebrow">${__pr23Esc(a.type)}</span><span class="muted">${__pr23Esc(a.record)}</span></div><h4>${__pr23Esc(a.title)}</h4><p>${__pr23Esc(a.reason || '')}</p><div class="approval-facts-v6"><div><span>Department</span><strong>${__pr23Esc(a.entity)}</strong></div><div><span>Value</span><strong>${cash(a.amount)}</strong></div><div><span>Waiting</span><strong>${__pr23Waiting(g.since)}</strong></div><div><span>Decision by</span><strong>${__pr23Esc(a.role)}</strong></div></div><div class="actions">${smallAction('Review', 'open-approval-v6', a.id, 'eye')}${smallAction('Approve', 'approve-prompt-v6', a.id, 'approve')}${smallAction('Reject', 'reject-prompt-v6', a.id)}</div></article>`;
+      return `<article class="approval-prompt-v6 ${String(a.priority || 'normal').toLowerCase()}"><div style="display:flex;justify-content:space-between;gap:8px"><span class="eyebrow">${__pr23Esc(a.type)}</span><span class="muted">${__pr23Esc(a.record)}</span></div><h4>${__pr23Esc(a.title)}</h4><p>${__pr23Esc(a.reason || '')}</p><div class="approval-facts-v6"><div><span>Department</span><strong>${__pr23Esc(a.entity)}</strong></div><div><span>Value</span><strong>${cash(a.amount)}</strong></div><div><span>Waiting</span><strong>${__pr23Waiting(g.since)}</strong></div><div><span>Decision by</span><strong>${__pr23Esc(a.role)}</strong></div></div><div class="actions">${__pr23SmallButton('Review', 'open-approval-v6', a.id, 'eye')}${__pr23SmallButton('Approve', 'approve-prompt-v6', a.id, 'approve')}${__pr23SmallButton('Reject', 'reject-prompt-v6', a.id)}</div></article>`;
     });
     content = cards.length
       ? `<div class="approval-prompt-grid-v6">${cards.join('')}</div>`
       : '<div class="notice"><div><strong>Nothing is waiting on you</strong><p>A decision appears here as soon as it is submitted to you.</p></div></div>';
   } else {
-    const rows = all.map(g => `<tr><td><strong>${__pr23Esc(g.record)}</strong></td><td>${__pr23Esc(g.type)}</td><td><strong>${__pr23Esc(g.title)}</strong></td><td>${__pr23Esc(g.entity)}</td><td>${cash(g.amount)}</td><td>${g.mine ? status('Awaiting me') : __pr23Esc(g.waitingOn)}</td><td>${__pr23Waiting(g.since)}</td><td><div class="actions">${g.mine ? smallAction('Review', 'open-approval-v6', g.id, 'eye') : smallAction('Open register', 'nav-v6', g.page, 'arrow')}</div></td></tr>`);
+    const rows = all.map(g => `<tr><td><strong>${__pr23Esc(g.record)}</strong></td><td>${__pr23Esc(g.type)}</td><td><strong>${__pr23Esc(g.title)}</strong></td><td>${__pr23Esc(g.entity)}</td><td>${cash(g.amount)}</td><td>${g.mine ? status('Awaiting me') : __pr23Esc(g.waitingOn)}</td><td>${__pr23Waiting(g.since)}</td><td><div class="actions">${g.mine ? __pr23SmallButton('Review', 'open-approval-v6', g.id, 'eye') : __pr23SmallButton('Open register', 'nav-v6', g.page, 'arrow')}</div></td></tr>`);
     content = rows.length
       ? table(['Record', 'Type', 'Approval', 'Department', 'Value', 'Waiting on', 'Open for', ''], rows)
       : '<div class="notice"><div><strong>No approval is open</strong><p>Every submitted requisition, award, receipt, invoice and plan has been decided.</p></div></div>';
@@ -675,7 +687,7 @@ function __pr23ApprovalsPageHtml() {
     kpi('Waiting on others', String(all.filter(g => !g.mine).length), 'Visible here, decided elsewhere', 'vendor'),
     kpi('Longest open', __pr23Waiting(oldest), oldest ? `Since ${new Date(oldest).toLocaleDateString('en-GB', { day: '2-digit', month: 'short' })}` : 'No open approvals', 'account'),
   ].join('');
-  return `<div class="page">${pageHead('Decision workflow', 'Approval Centre', 'Decisions waiting on you, and every approval still open across procurement.', actionV6('Export register', 'export-approvals-v6', '', '', 'download'))}<div class="grid kpis">${kpis}</div><section class="card">${tabs}<div class="settings-pane">${content}</div></section></div>`;
+  return `<div class="page">${pageHead('Decision workflow', 'Approval Centre', 'Decisions waiting on you, and every approval still open across procurement.', __pr23ActionButton('Export register', 'export-approvals-v6', '', '', 'download'))}<div class="grid kpis">${kpis}</div><section class="card">${tabs}<div class="settings-pane">${content}</div></section></div>`;
 }
 
 /**
