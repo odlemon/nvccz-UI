@@ -1258,17 +1258,30 @@ export async function handleProcurementV23Action(
         const form = document.querySelector<HTMLFormElement>("#uploadVersionFormV11")
         if (!form) return { handled: true, error: "Open Upload version again; the form is not on screen." }
         if (!form.reportValidity()) return { handled: true }
-        const doc = byDisplayId("documents", detail.dataset.id)
-        if (!doc) {
-          return { handled: true, error: "Only a stored vault document takes a new version; templates and generated records have no stored file." }
-        }
         const file = form.querySelector<HTMLInputElement>('[name="file"]')?.files?.[0]
         if (!file) return { handled: true, error: "Attach the new version's file." }
+        const doc = byDisplayId("documents", detail.dataset.id)
+        if (doc) {
+          const fd = new FormData()
+          fd.append("file", file)
+          const out = await uploadProcurementDocumentVersion(doc.recordId, fd)
+          closeRuntimeOverlay()
+          return { handled: true, reload: true, message: `${doc.name} is now ${out.version}, awaiting review.` }
+        }
+        // This preview is a tender pack, plan, evaluation or other record rendered live from its
+        // own data -- there is no stored file behind it yet to version. Store the upload as the
+        // vault's first document for that record instead of refusing.
+        const name = document.querySelector("#modalTitle")?.textContent?.trim() || detail.dataset.id || "Uploaded document"
         const fd = new FormData()
-        fd.append("file", file)
-        const out = await uploadProcurementDocumentVersion(doc.recordId, fd)
+        fd.append("files", file)
+        fd.append("folder", "General")
+        fd.append("name", name)
+        fd.append("relatedRecord", detail.dataset.id ?? "")
+        const note = val('#uploadVersionFormV11 [name="note"]')
+        if (note) fd.append("description", note)
+        await uploadProcurementDocuments(fd)
         closeRuntimeOverlay()
-        return { handled: true, reload: true, message: `${doc.name} is now ${out.version}, awaiting review.` }
+        return { handled: true, reload: true, message: `${name} filed in the Document Vault, linked to ${detail.dataset.id}.` }
       }
 
       // ------------------------------------------------------------ invoice payment

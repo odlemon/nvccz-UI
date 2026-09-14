@@ -669,6 +669,17 @@ html.dark [data-arcus-shared-topbar] button,
   color: #eef2f8 !important;
 }
 
+/* The Document Vault's "Procurement document control" banner keeps its own dark
+   purple gradient regardless of module theme (see .vault-summary in
+   procurement-v23.css); the shared black-heading reset above made its heading
+   black-on-purple, effectively invisible. Restore the panel's own white. */
+.procurement-v23-root .vault-summary h1,
+.procurement-v23-root .vault-summary h2,
+.procurement-v23-root .vault-summary h3,
+.procurement-v23-root .vault-summary h4 {
+  color: #fff !important;
+}
+
 /* Strong / bold text true black */
 .performance-v22-root strong,
 .performance-v22-root b,

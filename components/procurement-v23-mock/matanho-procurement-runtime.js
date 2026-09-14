@@ -718,7 +718,7 @@ function __pr23SettingsTabsHtml(tab) {
 }
 
 function __pr23SettingsPageHtml() {
-  const head = pageHead('Configuration', 'Configuration, RBAC and Access', 'Procurement roles, permissions and user assignments are managed centrally in Admin, so one change applies across every module.', '<a class="btn primary" href="/admin">Open Admin</a>');
+  const head = pageHead('Configuration', 'Configuration, RBAC and Access', 'Procurement roles, permissions and user assignments are managed centrally in Admin, so one change applies across every module.', '<a class="btn primary" href="/admin" target="_blank" rel="noopener">Open Admin</a>');
   // "Approval matrix" on the Approval Centre opens this tab (the runtime sets settingsTab to 'approvals').
   if (state.settingsTab === 'approvals') return `<div class="page">${head}${__pr23SettingsTabsHtml('approvals')}${__pr23ApprovalMatrixHtml()}</div>`;
   const access = (__pr23Live() || {}).access || {};

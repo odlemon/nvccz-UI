@@ -2141,7 +2141,7 @@ s = replaceUnique(
   `data-record="plan-item" data-id="\${i.id}"><td><strong class="link">\${i.id}</strong><span class="row-tools-inline">\${smallAction('Edit','edit-record-v5',i.id)}`,
   `data-record="plan-item" data-id="\${i.id}"><td><strong class="link">\${i.id}</strong><span class="row-tools-inline">\${smallAction('Edit','edit-plan-item-v23',i.id)}`,
   "plan requirement register: Edit -> the real plan-item form",
-  "smallAction('Edit','edit-plan-item-v23',i.id)}</td><td>",
+  `<span class="row-tools-inline">\${smallAction('Edit','edit-plan-item-v23',i.id)}`,
 )
 s = replaceUnique(
   s,
