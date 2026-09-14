@@ -574,6 +574,11 @@ export async function unblacklistVendor(id: string): Promise<ProcurementRecord> 
   return unwrapData(await apiClient.post<ApiResponse<ProcurementRecord>>(`/accounting/vendors/${encodeURIComponent(id)}/unblacklist`))
 }
 
+/** Soft-delete (deactivate) a vendor; the backend refuses when it has recorded expenses. */
+export async function deleteVendor(id: string): Promise<void> {
+  await apiClient.delete(`/accounting/vendors/${encodeURIComponent(id)}`)
+}
+
 // ---------------------------------------------------------------------------
 // Approval configuration
 // ---------------------------------------------------------------------------

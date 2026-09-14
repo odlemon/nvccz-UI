@@ -37,6 +37,7 @@ import {
   createRequisition,
   createRfq,
   createVendor,
+  deleteVendor,
   extractInvoiceForCapture,
   payProcurementInvoice,
   postJournalEntry,
@@ -103,6 +104,7 @@ export const LIVE_ACTIONS = [
   "register-vendor-confirm",
   "register-vendor-confirm-v6",
   "save-vendor-profile-v23",
+  "delete-vendor-v23",
   "approve-vendor-registration-v23",
   "confirm-decline-vendor-registration-v23",
   "send-po-v6",
@@ -717,6 +719,15 @@ export async function handleProcurementV23Action(
         })
         closeRuntimeOverlay()
         return { handled: true, reload: true, message: `${updated?.name ?? name} updated.` }
+      }
+
+      case "delete-vendor-v23": {
+        if (!has("vendors.manage")) return refuse("removing vendors")
+        const v = byDisplayId("vendors", detail.dataset.id)
+        if (!v) return { handled: true, error: "That vendor is no longer in the registry. Refresh and try again." }
+        if (!window.confirm(`Remove ${v.name} from the vendor registry? This can't be undone from here.`)) return { handled: true }
+        await deleteVendor(String(v.recordId))
+        return { handled: true, reload: true, message: `${v.name} removed from the vendor registry.` }
       }
 
       // ---------------------------------------------------------- purchase orders

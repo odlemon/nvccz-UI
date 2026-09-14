@@ -2180,6 +2180,38 @@ s = replaceUnique(
 )
 
 // ---------------------------------------------------------------------------
+// 42. Vendor Registry: a vendor can be removed, not just edited
+// ---------------------------------------------------------------------------
+// The vendor profile page could be opened and edited but never deleted -- there was no control
+// for it anywhere in the module, though the backend already has a (soft) delete endpoint. Add the
+// button; actions.ts confirms and calls it, gated on vendors.manage like the edit action beside it.
+s = replaceUnique(
+  s,
+  "actionV6('Send message','message-vendor-v6',v.id,'','mail'))}",
+  "actionV6('Send message','message-vendor-v6',v.id,'','mail')+(__pr23Live()?actionV6('Delete vendor','delete-vendor-v23',v.id,'danger'):''))}",
+  "vendor profile: a Delete vendor button beside Edit profile",
+  "actionV6('Delete vendor','delete-vendor-v23',v.id,'danger')",
+)
+
+// ---------------------------------------------------------------------------
+// 43. Import the xlsx library so exports can write a real workbook, not an HTML-as-.xls trick
+// ---------------------------------------------------------------------------
+// __pr23ExportFile (the bridge) needs the XLSX binding, but the bridge is injected inside
+// startProcurementV23Runtime's body, and an import statement is only legal at module top level --
+// so the import goes in the vendored preamble, ahead of the function it's used inside.
+{
+  const marker43 = 'import * as XLSX from "xlsx";'
+  if (s.includes(marker43)) {
+    console.log("  skip (already)  top-level xlsx import for real spreadsheet export")
+    skipped += 1
+  } else {
+    const find43 = s.match(/import \{[\s\S]*?\} from "@\/components\/client-design-mock\/runtime-auth";\r?\n/)?.[0]
+    must(find43, "top-of-file client-design-mock import block not found")
+    s = replaceUnique(s, find43, `${find43}${marker43}\n`, "top-level xlsx import for real spreadsheet export", marker43)
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Scope guard: the bridge may only call what is in its scope
 // ---------------------------------------------------------------------------
 // The bridge is injected at the runtime's top level. Helpers the vendored layers declare inside their own blocks
