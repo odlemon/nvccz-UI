@@ -1569,7 +1569,9 @@ s = replaceUnique(
   "const rows=(__pr23Live()?(state.auditEventsLive||[]):[",
   "const rows=(__pr23Live()?(state.auditEventsLive||[]).slice(0,50):[",
   "audit -> latest 50 events on the page",
-  "(state.auditEventsLive||[]).slice(0,50)",
+  // Step 44 (below) further rewrites this slice into a paginated one; either form means this
+  // step's own job (showing a bounded slice, not the raw 200) is already done.
+  ["(state.auditEventsLive||[]).slice(0,50)", "(state.__pr23AuditPage||0)*50"],
 )
 s = replaceUnique(
   s,
@@ -2210,6 +2212,37 @@ s = replaceUnique(
     s = replaceUnique(s, find43, `${find43}${marker43}\n`, "top-level xlsx import for real spreadsheet export", marker43)
   }
 }
+
+// ---------------------------------------------------------------------------
+// 44. Audit & Compliance: paginate the 200 loaded events instead of hard-capping at 50
+// ---------------------------------------------------------------------------
+// The event stream sliced the loaded 200 events down to the newest 50 with no way to see the
+// other 150 -- "loaded" but genuinely unreachable. Page over what's already loaded, 50 at a time.
+{
+  const marker44 = '__pr23AuditPager((state.auditEventsLive'
+  if (s.includes(marker44)) {
+    console.log("  skip (already)  audit page: paginate the event stream 50 at a time")
+    skipped += 1
+  } else {
+    const find44 = s.match(/function auditPage\(\)\{[\s\S]*?\r?\n\}/)?.[0]
+    must(find44, "auditPage() function not found")
+    let repl44 = find44
+      .replace(".slice(0,50)", ".slice((state.__pr23AuditPage||0)*50,(state.__pr23AuditPage||0)*50+50)")
+      .replace(
+        "table(['Event','Activity','Record','Actor','Timestamp','Classification'],rows))}</div>`",
+        "table(['Event','Activity','Record','Actor','Timestamp','Classification'],rows)+(__pr23Live()?__pr23AuditPager((state.auditEventsLive||[]).length):''))}</div>`",
+      )
+    must(repl44 !== find44 && repl44.includes(marker44), "auditPage patch text did not change as expected")
+    s = replaceUnique(s, find44, repl44, "audit page: paginate the event stream 50 at a time", marker44)
+  }
+}
+s = replaceUnique(
+  s,
+  "'edit-plan-item-v23':a=>__pr23EditPlanItemModal(a.dataset.id),",
+  "'edit-plan-item-v23':a=>__pr23EditPlanItemModal(a.dataset.id),\n    'audit-page-prev':()=>{state.__pr23AuditPage=Math.max(0,(state.__pr23AuditPage||0)-1);render()},\n    'audit-page-next':()=>{const total=(state.auditEventsLive||[]).length;const last=Math.max(0,Math.ceil(total/50)-1);state.__pr23AuditPage=Math.min(last,(state.__pr23AuditPage||0)+1);render()},",
+  "audit-page-prev/next openers registered",
+  "'audit-page-prev':()=>{",
+)
 
 // ---------------------------------------------------------------------------
 // Scope guard: the bridge may only call what is in its scope

@@ -2003,12 +2003,22 @@ function __pr23PageAllowed(page) {
   return !grants || grants.some(__pr23Can);
 }
 
-/** The audit card's line, saying how much of the loaded trail the page shows. */
+/** The audit card's line, saying which slice of the loaded trail the page shows. */
 function __pr23AuditStreamNote() {
   const n = (state.auditEventsLive || []).length;
-  return n > 50
-    ? `The latest 50 of ${n} loaded events, newest first: what was done, to which record, by whom and when.`
-    : 'Every recorded procurement action, newest first: what was done, to which record, by whom and when.';
+  if (n <= 50) return 'Every recorded procurement action, newest first: what was done, to which record, by whom and when.';
+  const page = state.__pr23AuditPage || 0;
+  const from = page * 50 + 1;
+  const to = Math.min(n, from + 49);
+  return `Showing ${from}-${to} of ${n} loaded events, newest first: what was done, to which record, by whom and when.`;
+}
+
+/** Prev/Next over the loaded audit trail, 50 events a page; nothing to page past a single page. */
+function __pr23AuditPager(total) {
+  if (total <= 50) return '';
+  const page = state.__pr23AuditPage || 0;
+  const pages = Math.ceil(total / 50);
+  return `<div class="table-tools" style="justify-content:space-between"><span class="muted">Page ${page + 1} of ${pages}</span><div class="actions">${btn('Previous page', 'audit-page-prev')}${btn('Next page', 'audit-page-next')}</div></div>`;
 }
 
 /** Today as the procurement documents print dates. */
@@ -2933,14 +2943,14 @@ function approvalsPage(){
  return `<div class="page">${pageHead('Delegated authority','Approval Centre','Centralised approvals for plans, requisitions, tenders, contracts, purchase orders, invoices, payments and fixed asset capitalisation.',btn('Approval matrix','approval-matrix')+btn('My delegation','set-delegation'))}${filterBar()}<div class="grid kpis">${kpi('Awaiting me','11','Across 7 workflow types','approve')}${kpi('Within SLA','82%','Target 90%','report')}${kpi('SoD conflicts blocked','3','Creator cannot approve own record','audit')}${kpi('Board vote items','2','Selected approver methodology','vendor')}${kpi('eSign required','6','Final approval documents','signature')}${kpi('Delegations active','4','Time-bound and audited','settings')}</div>${card('Approval queue','Reviewing an item opens its own context; approval is blocked when segregation of duties is violated',table(['Approval','Type','Record','Entity','Amount','Current step','Age','Priority',''],rows))}</div>`
 }
 function auditPage(){
- const rows=(__pr23Live()?(state.auditEventsLive||[]).slice(0,50):[
+ const rows=(__pr23Live()?(state.auditEventsLive||[]).slice((state.__pr23AuditPage||0)*50,(state.__pr23AuditPage||0)*50+50):[
   ['AUD-88291','Vendor bank account changed','VEN-00482 · TechNova Solutions','S. Chikowore','01 Aug 2026 05:11','High priority'],
   ['AUD-88290','Tender bid envelope opened','TN-2026-013 · Committee session','Committee 03','01 Aug 2026 04:46','Controlled'],
   ['AUD-88289','Invoice payment blocked','INV-98430 · 2.4% price variance','AI Match Engine','01 Aug 2026 04:31','Exception'],
   ['AUD-88288','Procurement plan version submitted','PLAN-26-GRP · v1.4','T. Moyo','31 Jul 2026 16:04','Workflow'],
   ['AUD-88287','Fixed asset journal generated','GRN-2026-0219 · MRI Scanner','P2P Accounting API','31 Jul 2026 15:46','System']
  ]).map(a=>`<tr data-record="audit" data-id="${a[0]}"><td><strong class="link">${a[0]}</strong></td><td>${a[1]}</td><td>${a[2]}</td><td>${a[3]}</td><td>${a[4]}</td><td>${status(a[5])}</td></tr>`);
- return `<div class="page">${pageHead('Assurance','Audit & Compliance','Immutable event history, segregation of duties, entity isolation, document UID retrieval, statutory exports and security evidence.',btn('Export audit trail','export-audit','','download')+btn('Run access review','access-review','primary'))}${filterBar()}<div class="grid kpis">${kpi('Events today','1,248','User, system and integration actions','audit')}${kpi('SoD controls','Active','Creator self-approval hard blocked','approve')}${kpi('Entity isolation','Enforced','Investee cross-access denied','settings')}${kpi('Immutable records','100%','Paid invoices can only be voided','document')}${kpi('Document retrieval','100%','PO, invoice and GRN by UID','document')}${kpi('Accounting accuracy','100%','Journal validation target','account')}</div>${card('Immutable audit event stream',__pr23Live()?__pr23AuditStreamNote():'Every status change records user ID, timestamp, previous value, new value and reason',table(['Event','Activity','Record','Actor','Timestamp','Classification'],rows))}</div>`
+ return `<div class="page">${pageHead('Assurance','Audit & Compliance','Immutable event history, segregation of duties, entity isolation, document UID retrieval, statutory exports and security evidence.',btn('Export audit trail','export-audit','','download')+btn('Run access review','access-review','primary'))}${filterBar()}<div class="grid kpis">${kpi('Events today','1,248','User, system and integration actions','audit')}${kpi('SoD controls','Active','Creator self-approval hard blocked','approve')}${kpi('Entity isolation','Enforced','Investee cross-access denied','settings')}${kpi('Immutable records','100%','Paid invoices can only be voided','document')}${kpi('Document retrieval','100%','PO, invoice and GRN by UID','document')}${kpi('Accounting accuracy','100%','Journal validation target','account')}</div>${card('Immutable audit event stream',__pr23Live()?__pr23AuditStreamNote():'Every status change records user ID, timestamp, previous value, new value and reason',table(['Event','Activity','Record','Actor','Timestamp','Classification'],rows)+(__pr23Live()?__pr23AuditPager((state.auditEventsLive||[]).length):''))}</div>`
 }
 function settingsPage(){
  const tabs=`<div class="tabs"><button class="tab ${state.settingsTab==='rbac'?'active':''}" data-action="settings-tab" data-id="rbac">Roles & permissions</button><button class="tab ${state.settingsTab==='approvals'?'active':''}" data-action="settings-tab" data-id="approvals">Approval matrix</button><button class="tab ${state.settingsTab==='integrations'?'active':''}" data-action="settings-tab" data-id="integrations">Integrations</button><button class="tab ${state.settingsTab==='controls'?'active':''}" data-action="settings-tab" data-id="controls">Procurement controls</button></div>`;
@@ -4468,6 +4478,8 @@ window.MatanhoProcurement=Object.freeze({version:'8.0.0',navigate,render,getStat
     'create-po':()=>poModalV6(),
     'edit-po-v6':a=>poModalV6(a.dataset.id),
     'edit-plan-item-v23':a=>__pr23EditPlanItemModal(a.dataset.id),
+    'audit-page-prev':()=>{state.__pr23AuditPage=Math.max(0,(state.__pr23AuditPage||0)-1);render()},
+    'audit-page-next':()=>{const total=(state.auditEventsLive||[]).length;const last=Math.max(0,Math.ceil(total/50)-1);state.__pr23AuditPage=Math.min(last,(state.__pr23AuditPage||0)+1);render()},
     'preview-po-v6':a=>{const o=state.orders.find(x=>x.id===a.dataset.id);const v=state.vendors.find(x=>x.name===o?.vendor);const r=taxRuleV6(v);previewDocV6({id:o.id,name:`Purchase Order ${o.id}`,version:'Issued copy',status:o.status,owner:'Group Procurement',content:`<h1>Purchase Order</h1><p><strong>Supplier:</strong> ${esc(o.vendor)}</p><p><strong>Purchasing entity:</strong> ${esc(o.entity)}</p><p><strong>Order value:</strong> ${money(o.amount)}</p><h2>Order and tax conditions</h2><p>${esc(r.poClause)}</p><h2>Supply requirements</h2><p>The Supplier shall deliver the approved goods or services in accordance with the specifications, delivery dates, warranties and acceptance criteria. No variation is effective unless approved in writing.</p><h2>Payment</h2><p>Payment is subject to receipt, inspection, a valid tax invoice, applicable matching controls and the configured approval workflow.</p>`})},
     'preview-po-form-v6':()=>previewDocV6('TPL-PO-01'),
     'save-po-v6':()=>{const f=$('#poFormV6');if(!f?.reportValidity())return;const d=new FormData(f);let o=state.orders.find(x=>x.id===d.get('id'));if(!o){o={id:'PO-2026-'+String(590+state.orders.length),status:'Draft'};state.orders.unshift(o)}o.vendor=d.get('vendor');o.entity=d.get('entity');o.amount=Number(d.get('amount'));o.delivery=fmtDateV6(d.get('delivery'));o.asset=d.get('classification')==='Fixed asset';closeOverlay();render();toast('Purchase order saved',`${o.id} was saved with the vendor compliance and tax rule snapshot.`)},
