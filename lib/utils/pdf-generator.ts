@@ -96,17 +96,19 @@ const convertOklchToRgb = (element: HTMLElement) => {
   while (node) {
     const htmlElement = node as HTMLElement
     const computedStyle = window.getComputedStyle(htmlElement)
-    
-    // Convert common oklch colors to RGB equivalents
-    const style = htmlElement.style
-    if (style.backgroundColor && style.backgroundColor.includes('oklch')) {
-      style.backgroundColor = '#ffffff' // Default to white
+
+    // html2canvas cannot parse oklch() (Tailwind v4's default color space). Reading the computed
+    // value (not the element's own inline style, which is empty for anything colored via a CSS
+    // class -- i.e. almost everything) and writing it back as an inline override is what actually
+    // neutralizes a class-applied oklch color before html2canvas walks the clone.
+    if (computedStyle.backgroundColor.includes('oklch')) {
+      htmlElement.style.backgroundColor = '#ffffff' // Default to white
     }
-    if (style.color && style.color.includes('oklch')) {
-      style.color = '#000000' // Default to black
+    if (computedStyle.color.includes('oklch')) {
+      htmlElement.style.color = '#000000' // Default to black
     }
-    if (style.borderColor && style.borderColor.includes('oklch')) {
-      style.borderColor = '#e5e7eb' // Default to gray
+    if (computedStyle.borderColor.includes('oklch')) {
+      htmlElement.style.borderColor = '#e5e7eb' // Default to gray
     }
 
     node = walker.nextNode()
