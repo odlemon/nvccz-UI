@@ -515,6 +515,10 @@ export async function addProcurementPlanItem(id: string, body: PlanItemInput): P
   return unwrapData(await apiClient.post<ApiResponse<ProcurementRecord>>(`/procurement/plans/${encodeURIComponent(id)}/items`, body))
 }
 
+export async function updateProcurementPlanItem(id: string, itemId: string, body: Partial<PlanItemInput>): Promise<ProcurementRecord> {
+  return unwrapData(await apiClient.put<ApiResponse<ProcurementRecord>>(`/procurement/plans/${encodeURIComponent(id)}/items/${encodeURIComponent(itemId)}`, body))
+}
+
 export async function submitProcurementPlan(id: string): Promise<ProcurementRecord> {
   return unwrapData(await apiClient.post<ApiResponse<ProcurementRecord>>(`/procurement/plans/${encodeURIComponent(id)}/submit`))
 }

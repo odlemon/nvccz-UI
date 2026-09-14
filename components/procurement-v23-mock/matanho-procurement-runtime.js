@@ -1535,6 +1535,33 @@ function __pr23PlanItemModal() {
   );
 }
 
+/**
+ * Edit an existing plan line. The vendored Edit button on this row (Plan requirement register,
+ * and the plan workspace's own line table) opened editRecordV5, a generic fixture form with no
+ * save action at all -- Preview and Close were the only buttons. This opens the real form instead.
+ */
+function __pr23EditPlanItemModal(id) {
+  const item = (state.planItems || []).find(i => i.id === id || i.recordId === id);
+  if (!item) {
+    if (typeof toast === 'function') toast('Line not found', 'Refresh and try again.');
+    return;
+  }
+  const plan = (state.plans || []).find(p => p.recordId === item.planRecordId);
+  if (plan && !__pr23PlanEditable(plan)) {
+    openModal(item.id, `${plan.name} · ${plan.status}`, `<p class="muted">A plan that is ${__pr23Esc(String(plan.status).toLowerCase())} is not edited. A rejected plan reopens for changes and is resubmitted as a new version.</p>`, btn('Close', 'close-overlay'));
+    return;
+  }
+  const live = __pr23Live() || {};
+  const departmentOptions = ["Same as the plan's", ...(live.departments || [])];
+  const dept = item.entity && item.entity !== 'All departments' ? item.entity : "Same as the plan's";
+  openModal(
+    `Edit ${item.id}`,
+    plan ? `${plan.id} · ${plan.name}` : 'Plan line',
+    `<form id="planItemEditFormV23" class="form-grid"><input type="hidden" name="itemId" value="${__pr23Esc(item.recordId)}"><input type="hidden" name="planId" value="${__pr23Esc(item.planRecordId)}"><div class="field full"><label>Requirement</label><input name="description" required value="${__pr23Esc(item.description)}"></div><div class="field"><label>Category</label><select name="category">${__pr23Options(__PR23_PLAN_CATEGORIES, item.category)}</select></div><div class="field"><label>Quarter</label><select name="quarter">${__pr23Options(['Q1', 'Q2', 'Q3', 'Q4'], item.quarter)}</select></div><div class="field"><label>Sourcing method</label><select name="method">${__pr23Options(__PR23_PLAN_METHODS, item.method)}</select></div><div class="field"><label>Estimated value</label><input type="number" name="estimatedValue" min="0" step="0.01" required value="${Number(item.budget) || 0}"></div><div class="field"><label>Department</label><select name="department">${__pr23Options(departmentOptions, dept)}</select></div></form>`,
+    btn('Cancel', 'close-overlay') + btn('Save changes', 'save-plan-item-edit-v23', 'primary'),
+  );
+}
+
 /** The plan workspace's progress strip, from the plan's real status. */
 function __pr23PlanStrip(p) {
   const s = String(p.rawStatus || '').toUpperCase();
@@ -2228,12 +2255,52 @@ function __pr23TrimLiveForms() {
   }
 }
 
+/**
+ * The vendored "table-tools" search box + up to two selects (Annual Plan, Purchase Requisitions,
+ * Tenders & RFx, Vendor Registry, Document Vault registers) filtered nothing: no name, no id, no
+ * listener -- typing into "Search plans" or choosing an entity/status did nothing to the rows below
+ * it. Wires each one, once, to filter its own table's rows live as they change: the search box by
+ * substring across the row's whole text, each select by its own value also being somewhere in that
+ * text, unless the select is on its first ("All ...") option, which always passes.
+ */
+function __pr23WireTableTools() {
+  document.querySelectorAll('#workspace .table-tools').forEach(tt => {
+    if (tt.dataset.pr23Wired) return;
+    tt.dataset.pr23Wired = '1';
+    const table = tt.parentElement && tt.parentElement.querySelector('table');
+    if (!table) return;
+    const apply = () => {
+      const search = (tt.querySelector('input')?.value || '').trim().toLowerCase();
+      const selects = [...tt.querySelectorAll('select')];
+      const rows = [...table.querySelectorAll('tbody tr')].filter(r => !r.classList.contains('pr23-empty-row') && !r.querySelector('.pr23-empty-row'));
+      let shown = 0;
+      for (const row of rows) {
+        const text = (row.innerText || row.textContent || '').toLowerCase();
+        const keep = (!search || text.includes(search)) && selects.every(sel => sel.selectedIndex === 0 || text.includes(sel.value.toLowerCase()));
+        row.style.display = keep ? '' : 'none';
+        if (keep) shown += 1;
+      }
+      if (!rows.length) return;
+      let note = table.parentElement.querySelector('.pr23-table-tools-note');
+      if (!note) {
+        note = document.createElement('p');
+        note.className = 'muted pr23-table-tools-note';
+        note.style.margin = '8px 0 0';
+        table.closest('.table-wrap')?.insertAdjacentElement('afterend', note) || table.insertAdjacentElement('afterend', note);
+      }
+      note.textContent = (search || selects.some((s) => s.selectedIndex !== 0)) ? `${shown} of ${rows.length} row${rows.length === 1 ? '' : 's'} match.` : '';
+    };
+    tt.querySelector('input')?.addEventListener('input', apply);
+    tt.querySelectorAll('select').forEach(sel => sel.addEventListener('change', apply));
+  });
+}
+
 if (typeof window !== 'undefined' && typeof MutationObserver !== 'undefined' && !window.__pr23SweepObserver) {
   window.__pr23SweepObserver = new MutationObserver(records => {
     let removed = 0;
     for (const record of records) for (const node of record.addedNodes) removed += __pr23SweepUnconnected(node);
     if (removed || records.some(r => r.target && r.target.closest && r.target.closest('#modalLayer, #drawerLayer'))) __pr23CheckDeadEnds();
-    if (records.some(r => r.addedNodes.length)) { __pr23DropIdleFilterBar(); __pr23TrimLiveForms(); }
+    if (records.some(r => r.addedNodes.length)) { __pr23DropIdleFilterBar(); __pr23TrimLiveForms(); __pr23WireTableTools(); }
   });
   window.__pr23SweepObserver.observe(document.documentElement, { childList: true, subtree: true });
 }
@@ -3283,7 +3350,7 @@ window.MatanhoProcurement=Object.freeze({version:'8.0.0',navigate,render,getStat
 
   function planListPageV5(){
     const planRows=state.plans.map(p=>`<tr data-action="open-plan-detail-v5" data-id="${p.id}"><td><strong class="link">${p.id}</strong><span class="row-tools-inline">${smallAction('Edit','edit-plan-v5',p.id)}${smallAction('Preview','preview-document',p.id)}</span><br><span class="muted">${esc(p.name)}</span></td><td>${esc(p.entity)}</td><td class="money">${money(p.budget)}</td><td class="money">${money(p.committed)}</td><td><div class="progress"><span style="width:${Math.min(100,p.committed/p.budget*100)}%"></span></div></td><td>${esc(p.version)}</td><td>${status(p.status)}</td><td>${smallAction('Open','open-plan-detail-v5',p.id,'arrow')}</td></tr>`);
-    const itemRows=state.planItems.map(i=>`<tr data-record="plan-item" data-id="${i.id}"><td><strong class="link">${i.id}</strong><span class="row-tools-inline">${smallAction('Edit','edit-record-v5',i.id)}</span></td><td>${esc(i.description)}</td><td>${esc(i.entity)}</td><td>${esc(i.category)}</td><td>${esc(i.quarter)}</td><td>${esc(i.method)}</td><td class="money">${money(i.budget)}</td><td>${status(i.status)}</td></tr>`);
+    const itemRows=state.planItems.map(i=>`<tr data-record="plan-item" data-id="${i.id}"><td><strong class="link">${i.id}</strong><span class="row-tools-inline">${smallAction('Edit','edit-plan-item-v23',i.id)}</span></td><td>${esc(i.description)}</td><td>${esc(i.entity)}</td><td>${esc(i.category)}</td><td>${esc(i.quarter)}</td><td>${esc(i.method)}</td><td class="money">${money(i.budget)}</td><td>${status(i.status)}</td></tr>`);
     return `<div class="page">${pageHead('Strategy and budget','Annual Procurement Planning','Create granular entity plans, consolidate subsidiary and investee submissions, validate budgets and route the complete plan for approval.',actionButton('Create plan','create-plan-v5','','primary','plus')+actionButton('Add plan item','add-plan-item','','','plus')+actionButton('Submit plan & budget','submit-plan')+actionButton('Import prior year','import-plan'))}${filterBar()}
       <div class="grid kpis">${kpi('Consolidated budget',money(8240000),'7 entities included','plan')}${kpi('Submitted plans','6 of 7','One entity outstanding','approve')}${kpi('Budget coverage','93.6%','Funded planned requirements','report')}${kpi('Strategic tenders','12','Above delegated thresholds','tender')}${kpi('Plan amendments','4','Version history retained','document')}${kpi('Unfunded exposure',money(528000),'Requires budget decision','account')}</div>
       ${card('Procurement plans','Open a plan to edit its assumptions, requirements, funding, approvals and controlled documents.',`<div class="table-tools"><input placeholder="Search plans"><select><option>All entities</option>${entities.slice(1).map(x=>`<option>${x[1]}</option>`).join('')}</select><select><option>All statuses</option><option>Draft</option><option>Under review</option><option>Approved</option></select></div>${table(['Plan','Entity','Budget','Committed','Execution','Version','Status',''],planRows)}`)}
@@ -3292,7 +3359,7 @@ window.MatanhoProcurement=Object.freeze({version:'8.0.0',navigate,render,getStat
   function planDetailPageV5(id){
     const p=state.plans.find(x=>x.id===id)||state.plans[0];
     const items=__pr23Live()?state.planItems.filter(x=>x.planRecordId===p.recordId):state.planItems.filter((x,i)=>x.entity===p.entity||p.entity==='Group Consolidated'||i<3);
-    const rows=items.map(i=>`<tr><td><strong>${i.id}</strong></td><td>${esc(i.description)}</td><td>${esc(i.category)}</td><td>${esc(i.quarter)}</td><td>${esc(i.method)}</td><td>${money(i.budget)}</td><td>${status(i.status)}</td><td>${smallAction('Edit','edit-record-v5',i.id)}</td></tr>`);
+    const rows=items.map(i=>`<tr><td><strong>${i.id}</strong></td><td>${esc(i.description)}</td><td>${esc(i.category)}</td><td>${esc(i.quarter)}</td><td>${esc(i.method)}</td><td>${money(i.budget)}</td><td>${status(i.status)}</td><td>${smallAction('Edit','edit-plan-item-v23',i.id)}</td></tr>`);
     return `<div class="page"><div class="breadcrumbs"><button data-action="back-plan-list-v5">Annual Procurement Plans</button><i>›</i><span>${p.id}</span><i>›</i><strong>${esc(p.name)}</strong></div>
       ${pageHead('Plan workspace',p.name,`${p.entity} · ${p.version} · owned by ${p.owner}`,actionButton('Edit plan','edit-plan-v5',p.id,'primary','document')+actionButton('Add requirement','add-plan-item','','','plus')+actionButton('Preview controlled plan','preview-document',p.id,'','eye')+actionButton('Submit','submit-plan'))}
       ${__pr23Live()?__pr23PlanStrip(p):'<div class="workflow-strip"><div class="workflow-step done"><strong>1. Demand collection</strong><span>Completed by 7 entities</span></div><div class="workflow-step done"><strong>2. Budget validation</strong><span>93.6% funded</span></div><div class="workflow-step current"><strong>3. Procurement review</strong><span>4 items need action</span></div><div class="workflow-step"><strong>4. CFO review</strong><span>Pending</span></div><div class="workflow-step"><strong>5. Committee approval</strong><span>Pending</span></div><div class="workflow-step"><strong>6. Baseline issued</strong><span>Not started</span></div></div>'}
@@ -4393,6 +4460,7 @@ window.MatanhoProcurement=Object.freeze({version:'8.0.0',navigate,render,getStat
     'create-po-v6':()=>poModalV6(),
     'create-po':()=>poModalV6(),
     'edit-po-v6':a=>poModalV6(a.dataset.id),
+    'edit-plan-item-v23':a=>__pr23EditPlanItemModal(a.dataset.id),
     'preview-po-v6':a=>{const o=state.orders.find(x=>x.id===a.dataset.id);const v=state.vendors.find(x=>x.name===o?.vendor);const r=taxRuleV6(v);previewDocV6({id:o.id,name:`Purchase Order ${o.id}`,version:'Issued copy',status:o.status,owner:'Group Procurement',content:`<h1>Purchase Order</h1><p><strong>Supplier:</strong> ${esc(o.vendor)}</p><p><strong>Purchasing entity:</strong> ${esc(o.entity)}</p><p><strong>Order value:</strong> ${money(o.amount)}</p><h2>Order and tax conditions</h2><p>${esc(r.poClause)}</p><h2>Supply requirements</h2><p>The Supplier shall deliver the approved goods or services in accordance with the specifications, delivery dates, warranties and acceptance criteria. No variation is effective unless approved in writing.</p><h2>Payment</h2><p>Payment is subject to receipt, inspection, a valid tax invoice, applicable matching controls and the configured approval workflow.</p>`})},
     'preview-po-form-v6':()=>previewDocV6('TPL-PO-01'),
     'save-po-v6':()=>{const f=$('#poFormV6');if(!f?.reportValidity())return;const d=new FormData(f);let o=state.orders.find(x=>x.id===d.get('id'));if(!o){o={id:'PO-2026-'+String(590+state.orders.length),status:'Draft'};state.orders.unshift(o)}o.vendor=d.get('vendor');o.entity=d.get('entity');o.amount=Number(d.get('amount'));o.delivery=fmtDateV6(d.get('delivery'));o.asset=d.get('classification')==='Fixed asset';closeOverlay();render();toast('Purchase order saved',`${o.id} was saved with the vendor compliance and tax rule snapshot.`)},

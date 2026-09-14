@@ -2130,6 +2130,35 @@ for (const [version, count] of [["13", 1], ["18", 2], ["20", 1], ["23", 1]]) {
 }
 
 // ---------------------------------------------------------------------------
+// 40. A plan line's Edit opens a real form with a save button
+// ---------------------------------------------------------------------------
+// Both places a plan line is listed (the combined Plan requirement register on /procurement/plan,
+// and a single plan's own workspace) wired Edit to editRecordV5, a generic fixture form whose only
+// buttons are Preview and Close -- there was no way to save a change at all. Point both at the new
+// __pr23EditPlanItemModal, and register its opener alongside the other V6 modal openers.
+s = replaceUnique(
+  s,
+  `data-record="plan-item" data-id="\${i.id}"><td><strong class="link">\${i.id}</strong><span class="row-tools-inline">\${smallAction('Edit','edit-record-v5',i.id)}`,
+  `data-record="plan-item" data-id="\${i.id}"><td><strong class="link">\${i.id}</strong><span class="row-tools-inline">\${smallAction('Edit','edit-plan-item-v23',i.id)}`,
+  "plan requirement register: Edit -> the real plan-item form",
+  "smallAction('Edit','edit-plan-item-v23',i.id)}</td><td>",
+)
+s = replaceUnique(
+  s,
+  "<td>${money(i.budget)}</td><td>${status(i.status)}</td><td>${smallAction('Edit','edit-record-v5',i.id)}</td></tr>",
+  "<td>${money(i.budget)}</td><td>${status(i.status)}</td><td>${smallAction('Edit','edit-plan-item-v23',i.id)}</td></tr>",
+  "plan workspace line table: Edit -> the real plan-item form",
+  "${smallAction('Edit','edit-plan-item-v23',i.id)}</td></tr>",
+)
+s = replaceUnique(
+  s,
+  "'edit-po-v6':a=>poModalV6(a.dataset.id),",
+  "'edit-po-v6':a=>poModalV6(a.dataset.id),\n    'edit-plan-item-v23':a=>__pr23EditPlanItemModal(a.dataset.id),",
+  "edit-plan-item-v23 opener registered",
+  "'edit-plan-item-v23':a=>__pr23EditPlanItemModal(a.dataset.id),",
+)
+
+// ---------------------------------------------------------------------------
 // Scope guard: the bridge may only call what is in its scope
 // ---------------------------------------------------------------------------
 // The bridge is injected at the runtime's top level. Helpers the vendored layers declare inside their own blocks

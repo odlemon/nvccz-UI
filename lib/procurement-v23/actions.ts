@@ -25,6 +25,7 @@ import {
   submitProcurementPlan,
   updateProcurementContract,
   updateProcurementPlan,
+  updateProcurementPlanItem,
   uploadProcurementDocumentVersion,
   uploadProcurementDocuments,
   approveGoodsReceivedNote,
@@ -120,6 +121,7 @@ export const LIVE_ACTIONS = [
   "save-plan-v5",
   "create-plan-confirm-v5",
   "save-plan-item",
+  "save-plan-item-edit-v23",
   "submit-plan",
   "save-contract-v6",
   "activate-contract-v23",
@@ -1124,6 +1126,28 @@ export async function handleProcurementV23Action(
         closeRuntimeOverlay()
         const fmt = (n: unknown) => Number(n ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
         return { handled: true, reload: true, message: `Line added to ${plan.planNumber}: ${fmt(plan.plannedValue)} planned against a budget of ${fmt(plan.budget)}.` }
+      }
+
+      case "save-plan-item-edit-v23": {
+        if (!has("plans.manage")) return refuse("changing procurement plans")
+        const form = document.querySelector<HTMLFormElement>("#planItemEditFormV23")
+        if (!form) return { handled: true, error: "Open Edit again; the form is not on screen." }
+        if (!form.reportValidity()) return { handled: true }
+        const itemId = val('#planItemEditFormV23 [name="itemId"]')
+        const planId = val('#planItemEditFormV23 [name="planId"]')
+        const plan = await updateProcurementPlanItem(planId, itemId, {
+          description: val('#planItemEditFormV23 [name="description"]'),
+          category: val('#planItemEditFormV23 [name="category"]') || undefined,
+          quarter: val('#planItemEditFormV23 [name="quarter"]') || undefined,
+          method: val('#planItemEditFormV23 [name="method"]') || undefined,
+          estimatedValue: Number(val('#planItemEditFormV23 [name="estimatedValue"]') || 0),
+          department: (() => {
+            const d = val('#planItemEditFormV23 [name="department"]')
+            return d && d !== "Same as the plan's" ? d : undefined
+          })(),
+        })
+        closeRuntimeOverlay()
+        return { handled: true, reload: true, message: `${plan.planNumber}: line updated.` }
       }
 
       case "submit-plan": {
