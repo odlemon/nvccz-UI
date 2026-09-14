@@ -2287,6 +2287,28 @@ s = replaceUnique(
 )
 
 // ---------------------------------------------------------------------------
+// 48. A tender row's Edit opens a real form (closing date) instead of the dead-end fixture
+// ---------------------------------------------------------------------------
+// enhanceCurrentPageV5 stamps every "data-record" row's Edit button with edit-record-v5 --
+// genericEditRecordV5's only real button is Preview, so this was a dead end for every record
+// type it touches. Tenders are the one named in the bug report; branch just that type to the
+// new real edit form rather than touching the shared injector's behaviour for every other type.
+s = replaceUnique(
+  s,
+  `const tools=document.createElement('span');tools.className='row-tools-inline';tools.innerHTML=\`<button class="text-action" data-action="edit-record-v5" data-id="\${esc(id)}">Edit</button><button class="text-action" data-action="preview-document" data-id="\${esc(id)}">Preview</button>\`;first.append(tools);`,
+  `const editAction=type==='tender'&&__pr23Live()?'edit-tender-v23':'edit-record-v5';const tools=document.createElement('span');tools.className='row-tools-inline';tools.innerHTML=\`<button class="text-action" data-action="\${editAction}" data-id="\${esc(id)}">Edit</button><button class="text-action" data-action="preview-document" data-id="\${esc(id)}">Preview</button>\`;first.append(tools);`,
+  "row Edit button: tenders get the real edit-tender-v23 form",
+  "editAction=type==='tender'",
+)
+s = replaceUnique(
+  s,
+  "'edit-plan-item-v23':a=>__pr23EditPlanItemModal(a.dataset.id),",
+  "'edit-plan-item-v23':a=>__pr23EditPlanItemModal(a.dataset.id),\n    'edit-tender-v23':a=>__pr23EditTenderModal(a.dataset.id),",
+  "edit-tender-v23 opener registered",
+  "'edit-tender-v23':a=>__pr23EditTenderModal(a.dataset.id),",
+)
+
+// ---------------------------------------------------------------------------
 // Scope guard: the bridge may only call what is in its scope
 // ---------------------------------------------------------------------------
 // The bridge is injected at the runtime's top level. Helpers the vendored layers declare inside their own blocks

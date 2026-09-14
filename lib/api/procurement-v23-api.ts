@@ -214,6 +214,11 @@ export async function createRfq(body: {
   return unwrapData(await apiClient.post<ApiResponse<ProcurementRecord>>("/procurement/rfq", body))
 }
 
+/** PATCH /rfqs/:id/closing {newClosingAt}: the only field an already-published RFQ can still change. */
+export async function extendRfqClosing(id: string, newClosingAt: string): Promise<ProcurementRecord> {
+  return unwrapData(await apiClient.patch<ApiResponse<ProcurementRecord>>(`/procurement/rfqs/${encodeURIComponent(id)}/closing`, { newClosingAt }))
+}
+
 /** GET /procurement/currencies: the active currencies an RFQ can be quoted in ({code, name}). */
 export async function listProcurementCurrencies(): Promise<ProcurementRecord[]> {
   return unwrapData(await apiClient.get<ApiResponse<ProcurementRecord[]>>("/procurement/currencies"))

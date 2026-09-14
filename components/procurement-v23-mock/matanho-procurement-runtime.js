@@ -1564,6 +1564,28 @@ function __pr23EditPlanItemModal(id) {
   );
 }
 
+/**
+ * Edit a published tender. The vendored Edit control on a tender row opened editRecordV5, a
+ * generic fixture form whose only working button was Preview -- there was no way to save a
+ * change. The backend only lets an in-flight RFQ change one thing once vendors have been
+ * invited: when it closes (PATCH /rfqs/:id/closing) -- so that's the one field this offers,
+ * rather than pretending the whole record is editable when nothing else would actually save.
+ */
+function __pr23EditTenderModal(id) {
+  const t = (state.tenders || []).find(x => x.id === id || x.recordId === id);
+  if (!t) {
+    if (typeof toast === 'function') toast('Tender not found', 'Refresh and try again.');
+    return;
+  }
+  const closing = t.closingAt ? new Date(t.closingAt).toISOString().slice(0, 16) : '';
+  openModal(
+    `Edit ${t.id}`,
+    t.title || 'Tender',
+    `<form id="editTenderFormV23" class="form-grid"><input type="hidden" name="tenderId" value="${__pr23Esc(t.id)}"><div class="field full"><label>Tender / RFx title</label><input value="${__pr23Esc(t.title || '')}" readonly></div><div class="field"><label>Method</label><input value="${__pr23Esc(t.method || '')}" readonly></div><div class="field"><label>Stage</label><input value="${__pr23Esc(t.stage || '')}" readonly></div><div class="field full"><label>Closing date and time</label><input type="datetime-local" name="closing" required value="${__pr23Esc(closing)}"></div></form><p class="muted" style="margin:10px 0 0">Title, method and scope are set when a tender is sent and are not editable afterwards; the closing date can still change.</p>`,
+    btn('Cancel', 'close-overlay') + btn('Save changes', 'extend-rfq-closing-v23', 'primary'),
+  );
+}
+
 /** The plan workspace's progress strip, from the plan's real status. */
 function __pr23PlanStrip(p) {
   const s = String(p.rawStatus || '').toUpperCase();
@@ -3879,7 +3901,7 @@ window.MatanhoProcurement=Object.freeze({version:'8.0.0',navigate,render,getStat
     document.querySelectorAll('tbody tr[data-record]').forEach(row=>{
       const first=row.querySelector('td');if(!first||first.querySelector('.row-tools-inline'))return;
       const id=row.dataset.id,type=row.dataset.record;if(!id)return;
-      const tools=document.createElement('span');tools.className='row-tools-inline';tools.innerHTML=`<button class="text-action" data-action="edit-record-v5" data-id="${esc(id)}">Edit</button><button class="text-action" data-action="preview-document" data-id="${esc(id)}">Preview</button>`;first.append(tools);
+      const editAction=type==='tender'&&__pr23Live()?'edit-tender-v23':'edit-record-v5';const tools=document.createElement('span');tools.className='row-tools-inline';tools.innerHTML=`<button class="text-action" data-action="${editAction}" data-id="${esc(id)}">Edit</button><button class="text-action" data-action="preview-document" data-id="${esc(id)}">Preview</button>`;first.append(tools);
     });
     document.querySelectorAll('.sidebar,.nav-scroll,.collapse-wrap').forEach(el=>el.style.removeProperty('pointer-events'));
   }
@@ -4500,6 +4522,7 @@ window.MatanhoProcurement=Object.freeze({version:'8.0.0',navigate,render,getStat
     'create-po':()=>poModalV6(),
     'edit-po-v6':a=>poModalV6(a.dataset.id),
     'edit-plan-item-v23':a=>__pr23EditPlanItemModal(a.dataset.id),
+    'edit-tender-v23':a=>__pr23EditTenderModal(a.dataset.id),
     'audit-page-prev':()=>{state.__pr23AuditPage=Math.max(0,(state.__pr23AuditPage||0)-1);render()},
     'audit-page-next':()=>{const total=(state.auditEventsLive||[]).length;const last=Math.max(0,Math.ceil(total/50)-1);state.__pr23AuditPage=Math.min(last,(state.__pr23AuditPage||0)+1);render()},
     'preview-po-v6':a=>{const o=state.orders.find(x=>x.id===a.dataset.id);const v=state.vendors.find(x=>x.name===o?.vendor);const r=taxRuleV6(v);previewDocV6({id:o.id,name:`Purchase Order ${o.id}`,version:'Issued copy',status:o.status,owner:'Group Procurement',content:`<h1>Purchase Order</h1><p><strong>Supplier:</strong> ${esc(o.vendor)}</p><p><strong>Purchasing entity:</strong> ${esc(o.entity)}</p><p><strong>Order value:</strong> ${money(o.amount)}</p><h2>Order and tax conditions</h2><p>${esc(r.poClause)}</p><h2>Supply requirements</h2><p>The Supplier shall deliver the approved goods or services in accordance with the specifications, delivery dates, warranties and acceptance criteria. No variation is effective unless approved in writing.</p><h2>Payment</h2><p>Payment is subject to receipt, inspection, a valid tax invoice, applicable matching controls and the configured approval workflow.</p>`})},

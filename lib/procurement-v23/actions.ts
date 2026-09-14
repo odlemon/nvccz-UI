@@ -38,6 +38,7 @@ import {
   createRfq,
   createVendor,
   deleteVendor,
+  extendRfqClosing,
   extractInvoiceForCapture,
   payProcurementInvoice,
   postJournalEntry,
@@ -105,6 +106,7 @@ export const LIVE_ACTIONS = [
   "register-vendor-confirm-v6",
   "save-vendor-profile-v23",
   "delete-vendor-v23",
+  "extend-rfq-closing-v23",
   "approve-vendor-registration-v23",
   "confirm-decline-vendor-registration-v23",
   "send-po-v6",
@@ -900,6 +902,24 @@ export async function handleProcurementV23Action(
           reload: true,
           message: `${created?.rfqNumber ?? "The RFQ"} sent to ${count} vendor${count === 1 ? "" : "s"}${!lines.length && source ? `, with the lines of ${source.id}` : ""}.`,
         }
+      }
+
+      case "extend-rfq-closing-v23": {
+        // The vendored Edit button on a tender row opened a generic fixture form with no way to
+        // save at all -- the only field a published tender can actually change is when it closes.
+        if (!has("rfq.manage")) return refuse("changing tenders and RFQs")
+        const form = document.querySelector<HTMLFormElement>("#editTenderFormV23")
+        if (!form) return { handled: true, error: "Open Edit again; the form is not on screen." }
+        if (!form.reportValidity()) return { handled: true }
+        const t = byDisplayId("tenders", val('#editTenderFormV23 [name="tenderId"]'))
+        if (!t) return { handled: true, error: "That tender is no longer in the register. Refresh and try again." }
+        const newClosingAt = val('#editTenderFormV23 [name="closing"]')
+        if (new Date(newClosingAt).getTime() <= Date.now()) {
+          return { handled: true, error: "Choose a future closing date and time." }
+        }
+        await extendRfqClosing(t.recordId, new Date(newClosingAt).toISOString())
+        closeRuntimeOverlay()
+        return { handled: true, reload: true, message: `${t.id} closing date updated.` }
       }
 
       // ------------------------------------------------------- evaluation and award
