@@ -2159,6 +2159,27 @@ s = replaceUnique(
 )
 
 // ---------------------------------------------------------------------------
+// 41. Drop the Document Vault's "use the three-dot menu" instructional captions
+// ---------------------------------------------------------------------------
+// Card subtitles telling the user how to operate the table they're looking at -- not content,
+// just narration -- read as clutter once the feature is familiar. The UI should be usable without
+// a caption explaining its own affordances.
+s = replaceUnique(
+  s,
+  "card(`${folder} records`,'Use the three-dot menu for document actions. Clicking a UID opens the actual document preview.',",
+  "card(`${folder} records`,'',",
+  "controlled folder records card: drop the three-dot-menu caption",
+  "card(`${folder} records`,'',",
+)
+s = replaceUnique(
+  s,
+  "card('Recent controlled documents','Use the three-dot menu for actions. Document names and UIDs open the actual preview.',",
+  "card('Recent controlled documents','',",
+  "recent controlled documents card: drop the three-dot-menu caption",
+  "card('Recent controlled documents','',",
+)
+
+// ---------------------------------------------------------------------------
 // Scope guard: the bridge may only call what is in its scope
 // ---------------------------------------------------------------------------
 // The bridge is injected at the runtime's top level. Helpers the vendored layers declare inside their own blocks
