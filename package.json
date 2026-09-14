@@ -88,6 +88,7 @@
     "framer-motion": "^11",
     "geist": "latest",
     "html2canvas": "^1.4.1",
+    "html2canvas-pro": "^2.4.3",
     "input-otp": "1.4.1",
     "jspdf": "^3.0.3",
     "jspdf-autotable": "^5.0.2",

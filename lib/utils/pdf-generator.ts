@@ -1,4 +1,9 @@
-import html2canvas from 'html2canvas'
+// html2canvas itself cannot parse oklch/lab/lch -- it throws "Attempting to parse an unsupported
+// color function" on any element whose computed color resolves to one, which Tailwind v4's
+// Preflight (border-color: oklch(...) on every element by default) makes unavoidable in this app.
+// html2canvas-pro is the actively maintained fork that added support for these color functions,
+// with the same API; convertOklchToRgb below still runs as a belt-and-braces fallback.
+import html2canvas from 'html2canvas-pro'
 import jsPDF from 'jspdf'
 
 export interface PDFGenerationOptions {
@@ -29,12 +34,14 @@ export const generatePDF = async (
     tempContainer.style.height = element.offsetHeight + 'px'
     tempContainer.style.backgroundColor = '#ffffff'
     
-    // Clone the element and convert oklch colors to standard colors
+    // Clone the element and convert oklch colors to standard colors. The clone must be attached
+    // to the document before sanitizing: getComputedStyle on a detached node (not yet appended
+    // anywhere) resolves to initial/empty values, not the classes' actual cascaded oklch colors,
+    // so calling this before attaching silently sanitized nothing.
     const clonedElement = element.cloneNode(true) as HTMLElement
-    convertOklchToRgb(clonedElement)
-    
     tempContainer.appendChild(clonedElement)
     document.body.appendChild(tempContainer)
+    convertOklchToRgb(clonedElement)
 
     // Generate canvas from the temporary container
     const canvas = await html2canvas(tempContainer, {
@@ -92,9 +99,10 @@ const convertOklchToRgb = (element: HTMLElement) => {
     null
   )
 
-  let node = walker.nextNode()
-  while (node) {
-    const htmlElement = node as HTMLElement
+  // TreeWalker.nextNode() only ever advances to a *descendant* of the walker's root -- the root
+  // itself (the element callers actually pass in, e.g. the whole preview panel) is never visited
+  // by the while loop below. Sanitize it explicitly first, then walk everything under it.
+  const sanitizeNode = (htmlElement: HTMLElement) => {
     const computedStyle = window.getComputedStyle(htmlElement)
 
     // html2canvas cannot parse oklch() (Tailwind v4's default color space). Reading the computed
@@ -110,6 +118,14 @@ const convertOklchToRgb = (element: HTMLElement) => {
     if (computedStyle.borderColor.includes('oklch')) {
       htmlElement.style.borderColor = '#e5e7eb' // Default to gray
     }
+  }
+
+  sanitizeNode(element)
+
+  let node = walker.nextNode()
+  while (node) {
+    const htmlElement = node as HTMLElement
+    sanitizeNode(htmlElement)
 
     node = walker.nextNode()
   }
