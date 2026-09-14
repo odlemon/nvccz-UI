@@ -6,6 +6,7 @@ import {
   onClientDesignSessionUser,
 } from "@/components/client-design-mock/runtime-auth";
 import * as XLSX from "xlsx";
+import { generatePDF } from "@/lib/utils/pdf-generator";
 export function startProcurementV23Runtime(rootEl, runtimeOptions = {}) {
   const initialPage = runtimeOptions.initialPage || 'dashboard';
   const __pr23Incoming = window.__pr23Carry || null; window.__pr23Carry = null; window.__PROCUREMENT_V23_NAV__ = (page) => { try { __pr23StashCarry(page); } catch (_) { window.__pr23Carry = null; } (runtimeOptions.onNavigate || (() => {}))(page); };
@@ -2011,6 +2012,27 @@ function __pr23AuditStreamNote() {
   const from = page * 50 + 1;
   const to = Math.min(n, from + 49);
   return `Showing ${from}-${to} of ${n} loaded events, newest first: what was done, to which record, by whom and when.`;
+}
+
+/**
+ * Download a rendered preview (the on-screen letterhead document, exactly as shown) as a real PDF,
+ * instead of the generic register export __pr23ExportFile falls back to for these -- that function
+ * matches a title against a register by keyword, which has nothing to do with the specific record
+ * being previewed. `selector` finds the currently-open preview element in the DOM.
+ */
+async function __pr23DownloadPreviewPdf(selector, title) {
+  const el = document.querySelector(selector);
+  if (!el) {
+    if (typeof toast === 'function') toast('Nothing to download', 'Open the preview again and try downloading.');
+    return;
+  }
+  const base = String(title || 'document').replace(/[^a-z0-9]+/gi, '_').replace(/^_|_$/g, '') || 'document';
+  try {
+    const blob = await generatePDF(el, { filename: base });
+    downloadBlob(blob, `${base}.pdf`);
+  } catch (err) {
+    if (typeof toast === 'function') toast('Download failed', String((err && err.message) || err));
+  }
 }
 
 /** Prev/Next over the loaded audit trail, 50 events a page; nothing to page past a single page. */
@@ -5227,7 +5249,7 @@ window.MatanhoProcurement=Object.freeze({version:'8.0.0',navigate,render,getStat
     if (action === 'confirm-send-doc-v11') { const f=document.querySelector('#sendDocFormV11'); if(!f?.reportValidity()) return; closeOverlay(); toast('Document sent',`${id} was sent with the actual controlled preview, access expiry and an audit trail.`); }
     if (action === 'upload-doc-version-v11') uploadVersionV11(id);
     if (action === 'confirm-upload-version-v11') { const f=document.querySelector('#uploadVersionFormV11'); if(!f?.reportValidity()) return; const d=new FormData(f); let doc=docArraysV11().find(x=>x.id===id); if(!doc){doc=resolveDocumentV11(id);state.documents.unshift(doc)} doc.version=d.get('version');doc.status=d.get('status');doc.date='02 Aug 2026';closeOverlay();render();toast('New version uploaded',`${id} is now ${doc.version} and ${doc.status}.`); }
-    if (action === 'download-doc-v11') { const doc=resolveDocumentV11(id); exportFile(actionEl.dataset.format==='csv'?'csv':actionEl.dataset.format==='xlsx'?'xlsx':'pdf',doc.name); }
+    if (action === 'download-doc-v11') { const doc=resolveDocumentV11(id); const fmt=actionEl.dataset.format==='csv'?'csv':actionEl.dataset.format==='xlsx'?'xlsx':'pdf'; if(fmt==='pdf'&&__pr23Live()){__pr23DownloadPreviewPdf('.document-preview-canvas-v11',doc.name);}else{exportFile(fmt,doc.name);} }
     if (action === 'clear-doc-filter-v11') { ['docSearchV11','docTypeV11','docStatusV11','docOwnerV11'].forEach((key,i)=>{const el=document.getElementById(key);if(el)el.value=i===0?'':i===1?'All types':i===2?'All statuses':'All owners'});applyDocumentFiltersV11(); }
     if (action === 'set-pr-view-v11') { state.prViewV11=id; render(); }
     if (action === 'review-pr-v11') viewPrV11(id,'approve');
@@ -5450,7 +5472,7 @@ window.MatanhoProcurement=Object.freeze({version:'8.0.0',navigate,render,getStat
     }
     if(action==='send-approval-doc-v13'){const [approvalId,kind]=id.split('|');return sendApprovalDocumentV13(approvalId,kind||'main')}
     if(action==='confirm-send-approval-doc-v13'){const form=document.querySelector('#sendApprovalDocFormV13');if(!form?.reportValidity())return;const [approvalId]=id.split('|');closeOverlay();return toast('Actual document sent',`${approvalBaseV13(approvalId).record} was sent with secure access and a delivery audit event.`)}
-    if(action==='download-approval-doc-v13'){const [approvalId,kind]=id.split('|');const doc=(kind||'main')==='main'?approvalDocumentV13(approvalId):supportDocumentV13(approvalId,kind);return exportFile('pdf',doc.name)}
+    if(action==='download-approval-doc-v13'){const [approvalId,kind]=id.split('|');const doc=(kind||'main')==='main'?approvalDocumentV13(approvalId):supportDocumentV13(approvalId,kind);return __pr23Live()?__pr23DownloadPreviewPdf('.approval-document-stage-v13',doc.name):exportFile('pdf',doc.name)}
     if(action==='create-tender') return tenderModalV13();
     if(action==='add-rfx-line-v13') return document.querySelector('#rfxLinesV13')?.insertAdjacentHTML('beforeend',tenderLineRowV13(document.querySelectorAll('#rfxLinesV13 tr').length+1));
     if(action==='remove-rfx-line-v13'){const rows=document.querySelectorAll('#rfxLinesV13 tr');if(rows.length<=1)return toast('At least one line is required','A tender or RFx cannot be issued without a scope line.','warning');return el.closest('tr')?.remove()}

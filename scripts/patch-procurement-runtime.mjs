@@ -2214,6 +2214,21 @@ s = replaceUnique(
 }
 
 // ---------------------------------------------------------------------------
+// 45. Import the shared element-to-PDF renderer for downloads that must match the preview
+// ---------------------------------------------------------------------------
+{
+  const marker45 = 'import { generatePDF } from "@/lib/utils/pdf-generator";'
+  if (s.includes(marker45)) {
+    console.log("  skip (already)  top-level generatePDF import for preview-accurate PDF downloads")
+    skipped += 1
+  } else {
+    const find45 = s.match(/import \* as XLSX from "xlsx";\r?\n/)?.[0]
+    must(find45, "top-level xlsx import (step 43, added just above) not found")
+    s = replaceUnique(s, find45, `${find45}${marker45}\n`, "top-level generatePDF import for preview-accurate PDF downloads", marker45)
+  }
+}
+
+// ---------------------------------------------------------------------------
 // 44. Audit & Compliance: paginate the 200 loaded events instead of hard-capping at 50
 // ---------------------------------------------------------------------------
 // The event stream sliced the loaded 200 events down to the newest 50 with no way to see the
@@ -2242,6 +2257,33 @@ s = replaceUnique(
   "'edit-plan-item-v23':a=>__pr23EditPlanItemModal(a.dataset.id),\n    'audit-page-prev':()=>{state.__pr23AuditPage=Math.max(0,(state.__pr23AuditPage||0)-1);render()},\n    'audit-page-next':()=>{const total=(state.auditEventsLive||[]).length;const last=Math.max(0,Math.ceil(total/50)-1);state.__pr23AuditPage=Math.min(last,(state.__pr23AuditPage||0)+1);render()},",
   "audit-page-prev/next openers registered",
   "'audit-page-prev':()=>{",
+)
+
+// ---------------------------------------------------------------------------
+// 46. Approval support documents (Budget position, evaluation, conflict) download as themselves
+// ---------------------------------------------------------------------------
+// download-approval-doc-v13 threw the actual computed content away and called the generic
+// register export with just the document's title -- "Budget position" matched /budget/i and
+// produced the whole plan-items register, nothing about the specific approval it was opened from.
+s = replaceUnique(
+  s,
+  "if(action==='download-approval-doc-v13'){const [approvalId,kind]=id.split('|');const doc=(kind||'main')==='main'?approvalDocumentV13(approvalId):supportDocumentV13(approvalId,kind);return exportFile('pdf',doc.name)}",
+  "if(action==='download-approval-doc-v13'){const [approvalId,kind]=id.split('|');const doc=(kind||'main')==='main'?approvalDocumentV13(approvalId):supportDocumentV13(approvalId,kind);return __pr23Live()?__pr23DownloadPreviewPdf('.approval-document-stage-v13',doc.name):exportFile('pdf',doc.name)}",
+  "approval document download: render the actual preview, not the register export",
+  "__pr23DownloadPreviewPdf('.approval-document-stage-v13',doc.name)",
+)
+
+// ---------------------------------------------------------------------------
+// 47. Document Vault previews (tender packs, plans, vendor compliance, ...) download as themselves
+// ---------------------------------------------------------------------------
+// Same bug, same fix, for the Document Vault's own preview -- download-doc-v11 also discarded
+// doc.content and asked the generic register export for a title match instead.
+s = replaceUnique(
+  s,
+  "if (action === 'download-doc-v11') { const doc=resolveDocumentV11(id); exportFile(actionEl.dataset.format==='csv'?'csv':actionEl.dataset.format==='xlsx'?'xlsx':'pdf',doc.name); }",
+  "if (action === 'download-doc-v11') { const doc=resolveDocumentV11(id); const fmt=actionEl.dataset.format==='csv'?'csv':actionEl.dataset.format==='xlsx'?'xlsx':'pdf'; if(fmt==='pdf'&&__pr23Live()){__pr23DownloadPreviewPdf('.document-preview-canvas-v11',doc.name);}else{exportFile(fmt,doc.name);} }",
+  "document vault download: render the actual preview, not the register export",
+  "__pr23DownloadPreviewPdf('.document-preview-canvas-v11',doc.name)",
 )
 
 // ---------------------------------------------------------------------------
