@@ -150,8 +150,11 @@ function SharedTopbarInner({ currentModule, moduleActions, hideThemeToggle = fal
       <>
       <header data-arcus-shared-topbar className="h-20 border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-50">
         <div className="flex items-center justify-between h-full px-3 sm:px-6">
-          {/* Left Section - spacer */}
-          <div className="flex items-center gap-4">
+          {/* Left Section - spacer. Reserves room for a mounted "-mock" module's
+              fixed-position nav rail (see client-design-module-shell.tsx), which
+              this header has no other way to know the width of since it's a
+              sibling, not an ancestor, of the rail. */}
+          <div className="flex items-center gap-4" style={{ minWidth: "var(--reserved-sidebar-w, 0px)" }}>
           </div>
 
           {/* Center Section - Search. Tight margins on small screens: at 375px the
