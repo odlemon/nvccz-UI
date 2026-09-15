@@ -6090,6 +6090,7 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
   
   
   
+  
   /* BEGIN_PORTFOLIO_LIVE_BRIDGE */
 function __pv11IsLive() {
     return Boolean(state.liveData) || Boolean(liveOnly) || Boolean(state.dealDetail);
@@ -6492,7 +6493,13 @@ function __pv11IsLive() {
     submitCapitalCall = function() {
       const form = $('#capitalCallForm');
       if (!form?.reportValidity()) return;
-      const data = Object.fromEntries(new FormData(form));
+      // Same bug as submitLP had (FINDING-PV11-004): the wizard's Review step
+      // form has no input fields, so FormData(form) alone here returned {}
+      // for fund/amount/dates on every real submission — silently falling
+      // back to funds[0] and a hardcoded 10% regardless of what the user
+      // actually picked. Merge the wizard's own draft first.
+      const draft = (state.modalWizard && state.modalWizard.draft) || {};
+      const data = { ...draft, ...Object.fromEntries(new FormData(form)) };
       const fundKey = String(data.fund || data.fundId || '');
       const fund = funds.find((f) => f.id === fundKey || f.name === fundKey) || funds[0];
       if (__pv11IsLive() && fund?.id) {

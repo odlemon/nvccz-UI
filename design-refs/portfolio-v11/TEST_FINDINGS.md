@@ -92,14 +92,30 @@ figure exactly if the sum of every *eligible* LP's commitment happens to equal t
 commitment field — in this fund it doesn't (3 eligible LPs sum to $45.5M against a larger fund target),
 so the real total silently comes out ~9% short of what the Review screen confirmed, with no reconciliation,
 warning, or follow-up figure shown anywhere.
-**Severity:** MEDIUM — no data corruption and the backend behaves exactly as its own (legitimate)
-percent-of-commitment design intends, but a Portfolio Manager who explicitly types and confirms "$5M" has
-no way to know the real capital raised was $4.55M unless they independently re-add the per-LP amounts.
-For a financial instrument this is a real, if quiet, correctness gap.
+**Severity:** upgraded HIGH in the Phase 4 correction below (was MEDIUM) — every capital call submitted
+through this wizard was silently created against the wrong fund at a hardcoded 10%, not the one the user
+picked with the amount they typed; not just a quiet rounding gap.
+**Correction, Phase 4 fix pass — this was a bigger bug than first documented:** live-tested the fix attempt
+(the message-improvement fix below) against `scripts/portfolio-runtime-live-bridge.inc.js`'s
+`submitCapitalCall` override — the same override class that shadowed FINDING-PV11-004's first fix. Captured
+the real emitted `api-create-capital-call` event: selecting fund "Arcus Growth Fund V" and typing amount
+`1000000` on the wizard's Details step still produced `fundId:"cmtovuw...` (Wizard Smoke Fund — `funds[0]`,
+not the selected fund) and `callPercent:"10"` (the hardcoded default, not derived from the typed amount) —
+because this override, exactly like `submitLP`'s, reads `Object.fromEntries(new FormData(form))` alone on
+the Review step's fieldless form, with no wizard-draft merge, so `data.fund`/`data.fundId`/`data.amount`
+are **always** empty by the time this runs. The percent-conversion nuance documented above is real and
+still applies once a fund/amount are actually captured, but until this is fixed, the wizard doesn't just
+approximate the total — it silently ignores the fund selection and typed amount entirely, on every single
+submission. Fixed the same way as PV11-004: merge `state.modalWizard.draft` into `data` before use.
 **Suspected area:** `components/portfolio-v11-mock/matanho-portfolio-runtime.js`'s `submitCapitalCall()` —
 either surface the computed percent (and the resulting real total) on the Review step before submission
 instead of echoing the raw typed dollar figure as if it were final, or recompute and show the actual
 resulting total immediately after creation rather than only the originally-typed target.
+
+**FIXED, deployment and live re-verification pending:** merged `state.modalWizard.draft` into the bridge's
+`submitCapitalCall` override (fixes the fund/amount being lost); `lib/portfolio-v11/actions.ts`'s handler
+now sums the created call's real `allocations[].currentCallAmount` and reports the actual total raised
+instead of a generic success message. Not yet re-deployed/re-tested — do that before marking this closed.
 
 ## FINDING-PV11-003
 
