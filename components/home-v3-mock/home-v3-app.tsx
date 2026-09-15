@@ -19,6 +19,8 @@ import {
   syncCoverPreference,
   syncHomeSettings,
   createServiceRequest,
+  requestAppAccess,
+  uploadProfileDocument,
   downloadPayslip,
   uploadWallpapers,
   deleteWallpaper,
@@ -143,6 +145,31 @@ function seedRequestsCache(requests: unknown[] | null) {
   }
 }
 
+/** Same pattern as seedRequestsCache, for the two other hardcoded-literal-fallback arrays. */
+function seedAppAccessRequestsCache(rows: unknown[] | null) {
+  if (!rows) return
+  try {
+    const raw = localStorage.getItem("matanho-hub-state")
+    const parsed = raw ? JSON.parse(raw) : {}
+    parsed.appAccessRequests = rows
+    localStorage.setItem("matanho-hub-state", JSON.stringify(parsed))
+  } catch {
+    // Same reasoning as above.
+  }
+}
+
+function seedProfileDocumentsCache(rows: unknown[] | null) {
+  if (!rows) return
+  try {
+    const raw = localStorage.getItem("matanho-hub-state")
+    const parsed = raw ? JSON.parse(raw) : {}
+    parsed.profileDocuments = rows
+    localStorage.setItem("matanho-hub-state", JSON.stringify(parsed))
+  } catch {
+    // Same reasoning as above.
+  }
+}
+
 type RuntimeApi = {
   setRoute: (
     route: string,
@@ -203,6 +230,8 @@ export function HomeV3App() {
     seedSettingsCache(liveDataRef.current?.cover.data?.settings ?? null)
     seedLeaveBalanceCache(liveDataRef.current?.servicesSummary.data.leaveBalanceDays ?? null)
     seedRequestsCache(liveDataRef.current?.serviceRequests.data ?? null)
+    seedAppAccessRequestsCache(liveDataRef.current?.appAccessRequests.data ?? null)
+    seedProfileDocumentsCache(liveDataRef.current?.profileDocuments.data ?? null)
 
     const live = liveDataRef.current
     const sessionUser = buildHv3SessionUser(user, userDetails)
@@ -303,6 +332,19 @@ export function HomeV3App() {
       const detail = (event as CustomEvent).detail || {}
       void createServiceRequest(detail).then((result) => {
         if (result.error) toast.error(result.error)
+      })
+    }
+    const onAppAccessRequested = (event: Event) => {
+      const detail = (event as CustomEvent).detail || {}
+      void requestAppAccess(detail).then((result) => {
+        if (result.error) toast.error(result.error)
+      })
+    }
+    const onProfileDocumentUploaded = (event: Event) => {
+      const detail = (event as CustomEvent).detail || {}
+      void uploadProfileDocument(detail).then((result) => {
+        if (result.error) toast.error(result.error)
+        else if (result.reload) setTimeout(() => window.location.reload(), 800)
       })
     }
     const onPayslipDownloadRequested = (event: Event) => {
@@ -437,6 +479,8 @@ export function HomeV3App() {
     window.addEventListener("matanho:preferences.wallpaper.updated", onCoverPreferenceUpdated)
     window.addEventListener("matanho:preferences.settings.updated", onSettingsUpdated)
     window.addEventListener("matanho:service.request.created", onServiceRequestCreated)
+    window.addEventListener("matanho:app.access.requested", onAppAccessRequested)
+    window.addEventListener("matanho:profile.document.uploaded", onProfileDocumentUploaded)
     window.addEventListener("matanho:payslip.download.requested", onPayslipDownloadRequested)
     window.addEventListener("matanho:wallpaper.upload.requested", onWallpaperUploadRequested)
     window.addEventListener("matanho:wallpaper.delete.requested", onWallpaperDeleteRequested)
@@ -486,6 +530,8 @@ export function HomeV3App() {
       window.removeEventListener("matanho:preferences.wallpaper.updated", onCoverPreferenceUpdated)
       window.removeEventListener("matanho:preferences.settings.updated", onSettingsUpdated)
       window.removeEventListener("matanho:service.request.created", onServiceRequestCreated)
+      window.removeEventListener("matanho:app.access.requested", onAppAccessRequested)
+      window.removeEventListener("matanho:profile.document.uploaded", onProfileDocumentUploaded)
       window.removeEventListener("matanho:payslip.download.requested", onPayslipDownloadRequested)
       window.removeEventListener("matanho:wallpaper.upload.requested", onWallpaperUploadRequested)
       window.removeEventListener("matanho:wallpaper.delete.requested", onWallpaperDeleteRequested)

@@ -485,3 +485,48 @@ export async function sendAssistantMessage(detail: {
     return { handled: true, error: message }
   }
 }
+
+/**
+ * `app.access.requested` -> POST /api/app-access-requests
+ * Fired by the Apps page's "Request access" flow. A lightweight request record only — approving
+ * one is a manual admin action elsewhere, not something this endpoint does.
+ */
+export async function requestAppAccess(detail: { appId?: string; reason?: string }): Promise<Hv3ActionResult> {
+  const appId = detail?.appId
+  if (!appId) return { handled: false, error: null }
+  try {
+    await apiClient.post("/app-access-requests", { appId, reason: detail.reason })
+    return { handled: true, error: null }
+  } catch (err: any) {
+    const message = err?.message ? String(err.message) : "Failed to submit your access request"
+    console.error("[home-v3] app.access.requested failed:", message)
+    return { handled: true, error: message }
+  }
+}
+
+/**
+ * `profile.document.uploaded` -> POST /api/homepage/documents
+ * Fired by My Profile's "Add document" flow. Same reload-on-success reasoning as
+ * uploadWallpapers: the runtime has no hydrate() API, so the real uploaded row (with its real id
+ * and URL) only replaces the runtime's own optimistic placeholder row after a reload.
+ */
+export async function uploadProfileDocument(detail: {
+  file?: File
+  name?: string
+  category?: string
+}): Promise<Hv3ReloadingActionResult> {
+  const file = detail?.file
+  if (!file || !detail?.name || !detail?.category) return { handled: false, error: null }
+  try {
+    const formData = new FormData()
+    formData.append("file", file)
+    formData.append("name", detail.name)
+    formData.append("category", detail.category)
+    await apiClient.postFormData("/homepage/documents", formData)
+    return { handled: true, error: null, reload: true }
+  } catch (err: any) {
+    const message = err?.message ? String(err.message) : "Failed to upload document"
+    console.error("[home-v3] profile.document.uploaded failed:", message)
+    return { handled: true, error: message }
+  }
+}

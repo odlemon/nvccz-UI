@@ -704,6 +704,64 @@ export async function loadPosts(): Promise<ScopeResult<Hv3Post[]>> {
   )
 }
 
+const APP_ACCESS_STATUS_LABELS: Record<string, string> = {
+  pending: "Pending",
+  approved: "Approved",
+  rejected: "Rejected",
+}
+
+/** `/api/app-access-requests` — the signed-in user's own requests to access another module. */
+export async function loadAppAccessRequests(): Promise<ScopeResult<Hv3AppAccessRequestRow[]>> {
+  return safe<Hv3AppAccessRequestRow[]>(
+    "appAccessRequests",
+    async () => {
+      const res: any = await apiClient.get("/app-access-requests")
+      const rows: any[] = Array.isArray(res?.data) ? res.data : []
+      return rows.map((r) => ({
+        appId: r.appId,
+        reason: r.reason || "",
+        status: APP_ACCESS_STATUS_LABELS[r.status] || r.status,
+        submitted: new Date(r.createdAt).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }),
+      }))
+    },
+    [],
+  )
+}
+export type Hv3AppAccessRequestRow = { appId: string; reason: string; status: string; submitted: string }
+
+function formatFileSize(bytes: number | null | undefined): string {
+  if (!bytes || bytes <= 0) return ""
+  if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
+const PROFILE_DOCUMENT_ICONS: Record<string, string> = {
+  Certification: "learning",
+  Education: "learning",
+  "Profile media": "profile",
+}
+
+/** `/api/homepage/documents` — the signed-in user's own profile documents. */
+export async function loadProfileDocuments(): Promise<ScopeResult<Hv3ProfileDocumentRow[]>> {
+  return safe<Hv3ProfileDocumentRow[]>(
+    "profileDocuments",
+    async () => {
+      const res: any = await apiClient.get("/homepage/documents")
+      const rows: any[] = Array.isArray(res?.data) ? res.data : []
+      return rows.map((d) => ({
+        name: d.name,
+        category: d.category,
+        size: formatFileSize(d.sizeBytes),
+        status: "Uploaded",
+        updated: new Date(d.createdAt).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }),
+        icon: PROFILE_DOCUMENT_ICONS[d.category] || "newsletter",
+      }))
+    },
+    [],
+  )
+}
+export type Hv3ProfileDocumentRow = { name: string; category: string; size: string; status: string; updated: string; icon: string }
+
 /** `/api/newsletters` — active newsletters, newest first. */
 export async function loadNewsletters(): Promise<ScopeResult<Hv3Newsletter[]>> {
   return safe<Hv3Newsletter[]>(
@@ -732,6 +790,8 @@ export async function loadHomeLiveData(selfId?: string | null) {
     cover,
     servicesSummary,
     serviceRequests,
+    appAccessRequests,
+    profileDocuments,
     customWallpapers,
     myCalendarEntries,
     companyEvents,
@@ -748,6 +808,8 @@ export async function loadHomeLiveData(selfId?: string | null) {
     loadCoverPreference(),
     loadServicesSummary(),
     loadServiceRequests(),
+    loadAppAccessRequests(),
+    loadProfileDocuments(),
     loadCustomWallpapers(),
     loadMyCalendarEntries(),
     loadCompanyEvents(),
@@ -765,6 +827,8 @@ export async function loadHomeLiveData(selfId?: string | null) {
     cover,
     servicesSummary,
     serviceRequests,
+    appAccessRequests,
+    profileDocuments,
     customWallpapers,
     myCalendarEntries,
     companyEvents,
