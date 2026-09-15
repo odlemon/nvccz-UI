@@ -1506,7 +1506,7 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
       <section class="metric-grid section-gap">${metrics.map(metricCard).join('')}</section>${view}`;
   }
 
-  function renderFunds() {
+  function renderFunds() { /* patched:distribution-wizard */
     const vintageFilter = state.fundVintageFilter || 'All vintages';
     const strategyFilter = state.fundStrategyFilter || 'All strategies';
     const statusFilter = state.fundStatusFilter || 'All statuses';
@@ -1534,7 +1534,7 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
     const geoColors=['#2475f5','#0ba780','#60a5fa','#f5a623','#0f98b6','#d9475c'];
     const geographies = Object.entries(geoTotals).map(([label,value],index)=>({label,value,color:geoColors[index%geoColors.length],display:`${pct(value/totalCommitment*100)} · ${formatMoney(value)}`}));
     const rows = filteredFunds.map(fund=>`<tr class="clickable" data-action="open-fund" data-id="${fund.id}"><td><div class="company-cell"><span class="company-logo" style="background:linear-gradient(145deg,#6094dc,#0a8f76)">${escapeHTML(fund.id.slice(-1))}</span><span class="table-primary">${escapeHTML(fund.name)}</span></div></td><td>${fund.vintage}</td><td>${escapeHTML(fund.strategy)}</td><td>${fund.currency}</td><td class="text-right">${formatMoney(fund.commitment,fund.currency)}</td><td><div class="inline-progress">${progressBar(fund.called/fund.commitment*100)}<span>${pct(fund.called/fund.commitment*100)}</span></div></td><td class="text-right">${formatMoney(fund.nav,fund.currency)}</td><td class="text-right">${formatMoney(fund.distributed,fund.currency)}</td><td class="text-right positive">${pct(fund.grossIrr)}</td><td class="text-right positive">${pct(fund.netIrr)}</td><td class="text-right">${fund.tvpi.toFixed(2)}x</td><td class="text-right">${fund.dpi.toFixed(2)}x</td><td>${statusPill(fund.status)}</td></tr>`).join('');
-    return `${pageHeader('Funds','Monitor fund-level performance, capital activity and structure across the portfolio.',globalPageActions({extra:button('Create fund','create-fund','primary','plus')}))}
+    return `${pageHeader('Funds','Monitor fund-level performance, capital activity and structure across the portfolio.',globalPageActions({extra:button('Create fund','create-fund','primary','plus')}${button('New distribution','new-distribution','','trend-up')}))}
       ${workspaceFilterBar([{label:'Vintage',action:'fund-vintage-filter',selected:vintageFilter,options:['All vintages',...Array.from(new Set(funds.map(f=>String(f.vintage))))]},{label:'Strategy',action:'fund-strategy-filter',selected:strategyFilter,options:['All strategies',...Array.from(new Set(funds.map(f=>f.strategy)))]},{label:'Status',action:'fund-status-filter',selected:statusFilter,options:['All statuses','Investing','Realising','Closed']},{label:'Currency',action:'fund-currency-filter',selected:currencyFilter,options:['All currencies','USD','ZWG']}])}
       <section class="metric-grid section-gap">
         ${metricCard({label:'Total Commitments',value:formatMoney(totalCommitment),iconName:'dollar',accent:'emerald',foot:'No prior-period data',action:'metric-funds'})}
@@ -2955,6 +2955,7 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
   }
 
   function modalWizardFormId(kind) {
+    if (kind === 'new-distribution') return 'distributionForm';
     if (kind === 'create-term-sheet') return 'createTermSheetForm';
     if (kind === 'create-fund') return 'createFundForm';
     if (kind === 'new-capital-call') return 'capitalCallForm';
@@ -2979,6 +2980,7 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
 
   function renderModalWizard() {
     if (!state.modalWizard) return;
+    if (state.modalWizard.kind === 'new-distribution') return renderDistributionWizard();
     if (state.modalWizard.kind === 'create-term-sheet') return;
     if (state.modalWizard.kind === 'create-fund') return renderCreateFundWizard();
     if (state.modalWizard.kind === 'new-capital-call') return renderCapitalCallWizard();
@@ -3648,6 +3650,7 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
       case 'fund-filters': genericFilterDrawer('Fund filters',['Strategy','Vintage year','Status','Currency','Geography']); break;
       case 'report-filters': genericFilterDrawer('Reporting filters',['Report type','Fund','Owner','Status','Due date']); break;
       case 'lp-filters': genericFilterDrawer('LP filters',['Investor type','Geography','KYC status','Portal status','Commitment size']); break;
+      case 'new-distribution': showDistributionModal(); break;
       case 'create-fund': showCreateFundModal(); break;
       case 'new-report-schedule': showReportScheduleModal(); break;
       case 'company-update': showCompanyUpdateModal(); break;
@@ -3839,6 +3842,74 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
 
   function showCompanyFilters() {
     genericFilterDrawer('Portfolio Company Filters',['Fund','Sector','Investment stage','Health score','Runway','Reporting status','Board date']);
+  }
+
+  function showDistributionModal() {
+    state.modalWizard = { kind: 'new-distribution', step: 0, maxReached: 0, draft: {} };
+    renderDistributionWizard();
+  }
+
+  function renderDistributionWizard() {
+    const wiz = state.modalWizard || { step: 0, draft: {}, maxReached: 0 };
+    const step = Number(wiz.step || 0);
+    wiz.maxReached = Math.max(Number(wiz.maxReached || 0), step);
+    const d = wiz.draft || {};
+    const steps = ['Details', 'Review'];
+    const sourceOptions = ['Dividend', 'Exit Proceeds', 'Interest', 'Other'];
+    const fundOptions = funds.length
+      ? funds.map((f) => '<option value="' + escapeHTML(f.id || f.name) + '">' + escapeHTML(f.name) + '</option>').join('')
+      : '<option value="">No funds available</option>';
+    let body = '';
+    if (step === 0) {
+      body = '<form id="distributionForm"><div class="form-grid">' +
+        '<div class="form-field full"><label class="required">Fund</label><select name="fundId" required><option value="">Select fund</option>' + fundOptions + '</select></div>' +
+        '<div class="form-field"><label class="required">Distribution date</label><input type="date" name="distributionDate" required value="' + escapeHTML(d.distributionDate || '') + '"></div>' +
+        '<div class="form-field"><label class="required">Source</label><select name="source" required>' + addDealSelectOptions(sourceOptions, d.source, 'Select source') + '</select></div>' +
+        '<div class="form-field"><label class="required">Gross amount (USD)</label><input name="grossAmount" type="number" min="0" required placeholder="e.g. 2000000" value="' + escapeHTML(d.grossAmount != null && d.grossAmount !== '' ? String(d.grossAmount) : '') + '"></div>' +
+        '<div class="form-field full"><label>Notes</label><textarea name="notes" placeholder="Context for LPs / fund accounting">' + escapeHTML(d.notes || '') + '</textarea></div>' +
+      '</div></form>';
+    } else {
+      const fundName = (funds.find((f) => String(f.id) === String(d.fundId) || String(f.name) === String(d.fundId)) || {}).name || d.fundId || '-';
+      const rows = [
+        ['Fund', fundName],
+        ['Distribution date', d.distributionDate || '-'],
+        ['Source', d.source || '-'],
+        ['Gross amount', d.grossAmount ? formatMoney(Number(d.grossAmount)) : '-'],
+        ['Notes', d.notes || '-'],
+      ].map((r) => '<div class="info-row"><span>' + escapeHTML(r[0]) + '</span><strong>' + escapeHTML(String(r[1])) + '</strong></div>').join('');
+      body = '<form id="distributionForm"><div class="form-field full">' + card('Review summary', '<div class="info-list">' + rows + '</div>') + '</div><p class="muted small">Declares a live distribution via the fund\'s capital-activity API.</p></form>';
+    }
+    const footer = step === 0
+      ? button('Cancel', 'close-modal') + button('Next', 'wizard-next', 'primary', 'arrow-right')
+      : button('Back', 'wizard-back') + button('Declare distribution', 'submit-distribution', 'primary', 'trend-up');
+    showModal('New distribution', step === 1 ? 'Confirm and declare via API.' : 'Record a capital distribution to LPs.', body, footer, {
+      variant: 'wizard', size: 'lg', eyebrow: 'Distribution', rail: steps, railStep: step, railMax: wiz.maxReached,
+    });
+  }
+
+  function submitDistribution() {
+    const form = $('#distributionForm');
+    if (!form?.reportValidity()) return;
+    captureModalWizardDraft();
+    const data = { ...(state.modalWizard && state.modalWizard.draft ? state.modalWizard.draft : {}), ...Object.fromEntries(new FormData(form)) };
+    const sourceMap = { 'Dividend': 'DIVIDEND', 'Exit Proceeds': 'EXIT_PROCEEDS', 'Interest': 'INTEREST', 'Other': 'OTHER' };
+    if (state.liveData) {
+      emitIntegrationEvent('matanho:before-action', {
+        action: 'api-create-distribution',
+        dataset: {
+          fundId: String(data.fundId || ''),
+          distributionDate: String(data.distributionDate || ''),
+          source: String(sourceMap[data.source] || data.source || 'OTHER'),
+          grossAmount: String(data.grossAmount || ''),
+          notes: String(data.notes || ''),
+        },
+        state: typeof publicSnapshot === 'function' ? publicSnapshot().state : state,
+      }, true);
+      state.modalWizard = null;
+      return;
+    }
+    state.modalWizard = null;
+    closeOverlays(); toast('Distribution recorded', 'Live data required to declare a real distribution.'); render();
   }
 
   function showCreateFundModal() {
@@ -4428,6 +4499,7 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
   const originalHandleAction=handleAction;
   handleAction=function(action,trigger,event){
     switch(action){
+      case 'submit-distribution': submitDistribution(); return;
       case 'submit-create-fund': submitCreateFund(); return;
       case 'submit-report-schedule': submitReportSchedule(); return;
       case 'reset-dashboard-filters': toast('Dashboard filters reset','All funds, USD and the latest as-of date are selected.'); softFocus(trigger.closest('.workspace-filter-bar')); return;
@@ -6082,6 +6154,8 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
     } catch (_) {}
   }
 
+  
+  
   
   
   

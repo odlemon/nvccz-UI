@@ -8,6 +8,7 @@ import { fundraisingApi } from '@/lib/api/fundraising-api'
 import { fundsApi } from '@/lib/api/funds-api'
 import { investmentImplementationApi } from '@/lib/api/investment-implementation-api'
 import { investmentOpsApi } from '@/lib/api/investment-ops-api'
+import { lpFeesApi } from '@/lib/api/lp-fees-distributions-api'
 import { portfolioCompaniesApi } from '@/lib/api/portfolio-companies-api'
 import { stockPickerCashApi } from '@/lib/api/stock-picker-cash-api'
 import { termSheetApi } from '@/lib/api/term-sheet-api'
@@ -332,6 +333,26 @@ export async function handlePortfolioV11Action(detail: {
           ? `Capital call created — actual total ${formattedTotal} across ${allocations.length} LP${allocations.length === 1 ? '' : 's'}`
           : 'Capital call created',
       }
+    }
+
+    if (action === 'api-create-distribution' || action === 'submit-distribution') {
+      const fundId = ds.fundId
+      if (!fundId) return { handled: true, error: 'Fund is required' }
+      if (!ds.distributionDate) return { handled: true, error: 'Distribution date is required' }
+      const grossAmount = Number(ds.grossAmount || 0)
+      if (!grossAmount) return { handled: true, error: 'Gross amount is required' }
+      const allowedSources = ['DIVIDEND', 'EXIT_PROCEEDS', 'INTEREST', 'OTHER'] as const
+      const source = (
+        allowedSources.includes(ds.source as (typeof allowedSources)[number]) ? ds.source : 'OTHER'
+      ) as (typeof allowedSources)[number]
+      await lpFeesApi.declareDistribution(fundId, {
+        distributionDate: ds.distributionDate,
+        source,
+        grossAmount,
+        notes: ds.notes || undefined,
+      })
+      await rehydrate(['funds'])
+      return { handled: true, message: 'Distribution declared' }
     }
 
     if (action === 'api-create-cash-account' || action === 'submit-cash-account') {

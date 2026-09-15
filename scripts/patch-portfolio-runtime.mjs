@@ -419,6 +419,133 @@ s = replaceOnce(
   "deal-hero-status-requires-board",
 )
 
+// 14) FINDING-PV11-005 — capital distribution creation had no UI at all,
+// despite a fully-built, unused backend/API client (lpFeesApi.declareDistribution).
+// New 2-step wizard on the Funds page, mirroring the Create Fund wizard's
+// shape exactly (including its correct draft-merge — no bridge override
+// needed since this is new code, not an existing function being shadowed).
+if (s.includes("/* patched:distribution-wizard */")) {
+  console.log("skip (already)", "distribution-wizard")
+} else {
+  const modalWizardFormIdAnchor = "  function modalWizardFormId(kind) {\r\n    if (kind === 'create-term-sheet') return 'createTermSheetForm';"
+  const showCreateFundModalAnchor = "  function showCreateFundModal() {\r\n    state.modalWizard = { kind: 'create-fund', step: 0, maxReached: 0, draft: {} };\r\n    renderCreateFundWizard();\r\n  }"
+  const renderModalWizardAnchor = "  function renderModalWizard() {\r\n    if (!state.modalWizard) return;\r\n    if (state.modalWizard.kind === 'create-term-sheet') return;"
+  const openCase = "      case 'create-fund': showCreateFundModal(); break;"
+  const submitCase = "      case 'submit-create-fund': submitCreateFund(); return;"
+  const fundsHeaderAnchor = "button('Create fund','create-fund','primary','plus')"
+
+  if (
+    s.includes(modalWizardFormIdAnchor) &&
+    s.includes(showCreateFundModalAnchor) &&
+    s.includes(renderModalWizardAnchor) &&
+    s.includes(openCase) &&
+    s.includes(submitCase) &&
+    s.includes(fundsHeaderAnchor)
+  ) {
+    s = s.replace(
+      modalWizardFormIdAnchor,
+      "  function modalWizardFormId(kind) {\r\n    if (kind === 'new-distribution') return 'distributionForm';\r\n    if (kind === 'create-term-sheet') return 'createTermSheetForm';",
+    )
+    s = s.replace(
+      renderModalWizardAnchor,
+      "  function renderModalWizard() {\r\n    if (!state.modalWizard) return;\r\n    if (state.modalWizard.kind === 'new-distribution') return renderDistributionWizard();\r\n    if (state.modalWizard.kind === 'create-term-sheet') return;",
+    )
+    s = s.replace(
+      showCreateFundModalAnchor,
+      `  function showDistributionModal() {
+    state.modalWizard = { kind: 'new-distribution', step: 0, maxReached: 0, draft: {} };
+    renderDistributionWizard();
+  }
+
+  function renderDistributionWizard() {
+    const wiz = state.modalWizard || { step: 0, draft: {}, maxReached: 0 };
+    const step = Number(wiz.step || 0);
+    wiz.maxReached = Math.max(Number(wiz.maxReached || 0), step);
+    const d = wiz.draft || {};
+    const steps = ['Details', 'Review'];
+    const sourceOptions = ['Dividend', 'Exit Proceeds', 'Interest', 'Other'];
+    const fundOptions = funds.length
+      ? funds.map((f) => '<option value="' + escapeHTML(f.id || f.name) + '">' + escapeHTML(f.name) + '</option>').join('')
+      : '<option value="">No funds available</option>';
+    let body = '';
+    if (step === 0) {
+      body = '<form id="distributionForm"><div class="form-grid">' +
+        '<div class="form-field full"><label class="required">Fund</label><select name="fundId" required><option value="">Select fund</option>' + fundOptions + '</select></div>' +
+        '<div class="form-field"><label class="required">Distribution date</label><input type="date" name="distributionDate" required value="' + escapeHTML(d.distributionDate || '') + '"></div>' +
+        '<div class="form-field"><label class="required">Source</label><select name="source" required>' + addDealSelectOptions(sourceOptions, d.source, 'Select source') + '</select></div>' +
+        '<div class="form-field"><label class="required">Gross amount (USD)</label><input name="grossAmount" type="number" min="0" required placeholder="e.g. 2000000" value="' + escapeHTML(d.grossAmount != null && d.grossAmount !== '' ? String(d.grossAmount) : '') + '"></div>' +
+        '<div class="form-field full"><label>Notes</label><textarea name="notes" placeholder="Context for LPs / fund accounting">' + escapeHTML(d.notes || '') + '</textarea></div>' +
+      '</div></form>';
+    } else {
+      const fundName = (funds.find((f) => String(f.id) === String(d.fundId) || String(f.name) === String(d.fundId)) || {}).name || d.fundId || '-';
+      const rows = [
+        ['Fund', fundName],
+        ['Distribution date', d.distributionDate || '-'],
+        ['Source', d.source || '-'],
+        ['Gross amount', d.grossAmount ? formatMoney(Number(d.grossAmount)) : '-'],
+        ['Notes', d.notes || '-'],
+      ].map((r) => '<div class="info-row"><span>' + escapeHTML(r[0]) + '</span><strong>' + escapeHTML(String(r[1])) + '</strong></div>').join('');
+      body = '<form id="distributionForm"><div class="form-field full">' + card('Review summary', '<div class="info-list">' + rows + '</div>') + '</div><p class="muted small">Declares a live distribution via the fund\\'s capital-activity API.</p></form>';
+    }
+    const footer = step === 0
+      ? button('Cancel', 'close-modal') + button('Next', 'wizard-next', 'primary', 'arrow-right')
+      : button('Back', 'wizard-back') + button('Declare distribution', 'submit-distribution', 'primary', 'trend-up');
+    showModal('New distribution', step === 1 ? 'Confirm and declare via API.' : 'Record a capital distribution to LPs.', body, footer, {
+      variant: 'wizard', size: 'lg', eyebrow: 'Distribution', rail: steps, railStep: step, railMax: wiz.maxReached,
+    });
+  }
+
+  function submitDistribution() {
+    const form = $('#distributionForm');
+    if (!form?.reportValidity()) return;
+    captureModalWizardDraft();
+    const data = { ...(state.modalWizard && state.modalWizard.draft ? state.modalWizard.draft : {}), ...Object.fromEntries(new FormData(form)) };
+    const sourceMap = { 'Dividend': 'DIVIDEND', 'Exit Proceeds': 'EXIT_PROCEEDS', 'Interest': 'INTEREST', 'Other': 'OTHER' };
+    if (state.liveData) {
+      emitIntegrationEvent('matanho:before-action', {
+        action: 'api-create-distribution',
+        dataset: {
+          fundId: String(data.fundId || ''),
+          distributionDate: String(data.distributionDate || ''),
+          source: String(sourceMap[data.source] || data.source || 'OTHER'),
+          grossAmount: String(data.grossAmount || ''),
+          notes: String(data.notes || ''),
+        },
+        state: typeof publicSnapshot === 'function' ? publicSnapshot().state : state,
+      }, true);
+      state.modalWizard = null;
+      return;
+    }
+    state.modalWizard = null;
+    closeOverlays(); toast('Distribution recorded', 'Live data required to declare a real distribution.'); render();
+  }
+
+  function showCreateFundModal() {
+    state.modalWizard = { kind: 'create-fund', step: 0, maxReached: 0, draft: {} };
+    renderCreateFundWizard();
+  }`,
+    )
+    s = s.replace(
+      openCase,
+      "      case 'new-distribution': showDistributionModal(); break;\r\n      case 'create-fund': showCreateFundModal(); break;",
+    )
+    s = s.replace(
+      submitCase,
+      "      case 'submit-distribution': submitDistribution(); return;\r\n      case 'submit-create-fund': submitCreateFund(); return;",
+    )
+    s = s.replace(
+      fundsHeaderAnchor,
+      "button('Create fund','create-fund','primary','plus')}${button('New distribution','new-distribution','','trend-up')",
+    )
+    s = s.replace(
+      "  function renderFunds() {",
+      "  function renderFunds() { /* patched:distribution-wizard */",
+    )
+  } else {
+    console.warn("MISS", "distribution-wizard")
+  }
+}
+
 fs.writeFileSync(RUNTIME, s)
 console.log("patched", RUNTIME, "bytes", Buffer.byteLength(s))
 console.log("OK — re-run after every extract-portfolio-v25.mjs")
