@@ -183,11 +183,26 @@ export async function loadAumSnapshot(): Promise<ScopeResult<Hv3AumSnapshot | nu
   )
 }
 
+export type Hv3CoverPreference = { coverTheme: string; coverWallpaper: string }
+
+/** `/api/homepage/preferences` — the signed-in user's Daily Cover choice (Phase 2). */
+export async function loadCoverPreference(): Promise<ScopeResult<Hv3CoverPreference | null>> {
+  return safe<Hv3CoverPreference | null>(
+    "coverPreference",
+    async () => {
+      const res: any = await apiClient.get("/homepage/preferences")
+      return res?.data ?? null
+    },
+    null,
+  )
+}
+
 export async function loadHomeLiveData() {
-  const [priorities, schedule, aum] = await Promise.all([
+  const [priorities, schedule, aum, cover] = await Promise.all([
     loadMyPriorities(),
     loadUpcomingSchedule(),
     loadAumSnapshot(),
+    loadCoverPreference(),
   ])
-  return { priorities, schedule, aum }
+  return { priorities, schedule, aum, cover }
 }

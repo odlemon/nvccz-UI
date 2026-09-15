@@ -25,3 +25,24 @@ export async function syncPriorityTaskStage(detail: { id?: string; done?: boolea
     return { handled: true, error: message }
   }
 }
+
+/**
+ * `preferences.theme.updated` / `preferences.wallpaper.updated` -> PUT /api/homepage/preferences
+ * Both events carry whichever of {theme, wallpaper} actually changed; `reset-daily-cover` sends
+ * both. The runtime already applies the change locally (and persists it to `matanho-hub-state`)
+ * before this fires, so this call only needs to make it durable server-side.
+ */
+export async function syncCoverPreference(detail: { theme?: string; wallpaper?: string }): Promise<Hv3ActionResult> {
+  const body: { coverTheme?: string; coverWallpaper?: string } = {}
+  if (detail?.theme) body.coverTheme = detail.theme
+  if (detail?.wallpaper) body.coverWallpaper = detail.wallpaper
+  if (!body.coverTheme && !body.coverWallpaper) return { handled: false, error: null }
+  try {
+    await apiClient.put("/homepage/preferences", body)
+    return { handled: true, error: null }
+  } catch (err: any) {
+    const message = err?.message ? String(err.message) : "Failed to save your Daily Cover preference"
+    console.error("[home-v3] preferences update failed:", message)
+    return { handled: true, error: message }
+  }
+}

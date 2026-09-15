@@ -13,8 +13,8 @@ import {
   type Hv3SessionUser,
 } from "@/lib/home-v3-mock/session-user"
 import { startMatanhoRuntime } from "@/components/home-v3-mock/matanho-runtime"
-import { loadHomeLiveData } from "@/lib/home-v3/live-loaders"
-import { syncPriorityTaskStage } from "@/lib/home-v3/actions"
+import { loadHomeLiveData, type Hv3CoverPreference } from "@/lib/home-v3/live-loaders"
+import { syncPriorityTaskStage, syncCoverPreference } from "@/lib/home-v3/actions"
 import { useAppDispatch, useAppSelector } from "@/lib/store"
 import { refreshUserDetails, logoutUser } from "@/lib/store/slices/authSlice"
 import { toast } from "sonner"
@@ -38,6 +38,25 @@ function evictStalePrioritiesCache() {
     localStorage.setItem("matanho-hub-state", JSON.stringify(parsed))
   } catch {
     // Corrupt/absent cache is not this function's problem — the runtime already tolerates it.
+  }
+}
+
+/**
+ * Opposite direction from the eviction above: `state.cover` is built as
+ * `{...hardcodedDefaults, ...(saved.cover||{})}` — it never reads the injected `data` at all, so
+ * the only way to make a real preference the effective one on first mount is to seed it into the
+ * same cache the runtime already treats as authoritative. Only touches `theme`/`wallpaper`,
+ * leaving any other cached `cover.*` keys (style, mood, intention — not wired yet) untouched.
+ */
+function seedCoverPreferenceCache(pref: Hv3CoverPreference | null) {
+  if (!pref) return
+  try {
+    const raw = localStorage.getItem("matanho-hub-state")
+    const parsed = raw ? JSON.parse(raw) : {}
+    parsed.cover = { ...(parsed.cover || {}), theme: pref.coverTheme, wallpaper: pref.coverWallpaper }
+    localStorage.setItem("matanho-hub-state", JSON.stringify(parsed))
+  } catch {
+    // Same reasoning as evictStalePrioritiesCache — worst case the hardcoded default renders.
   }
 }
 
@@ -95,6 +114,7 @@ export function HomeV3App() {
 
     mountedRef.current = true
     evictStalePrioritiesCache()
+    seedCoverPreferenceCache(liveDataRef.current?.cover.data ?? null)
 
     const live = liveDataRef.current
     const sessionUser = buildHv3SessionUser(user, userDetails)
@@ -115,6 +135,7 @@ export function HomeV3App() {
     if (live?.priorities.error) toast.error("Couldn't load your priorities", { description: live.priorities.error })
     if (live?.schedule.error) toast.error("Couldn't load your schedule", { description: live.schedule.error })
     if (live?.aum.error) toast.error("Couldn't load portfolio AUM", { description: live.aum.error })
+    if (live?.cover.error) toast.error("Couldn't load your Daily Cover preference", { description: live.cover.error })
 
     const onPriorityToggled = (event: Event) => {
       const detail = (event as CustomEvent).detail || {}
@@ -122,7 +143,15 @@ export function HomeV3App() {
         if (result.error) toast.error(result.error)
       })
     }
+    const onCoverPreferenceUpdated = (event: Event) => {
+      const detail = (event as CustomEvent).detail || {}
+      void syncCoverPreference(detail).then((result) => {
+        if (result.error) toast.error(result.error)
+      })
+    }
     window.addEventListener("matanho:priorities.task.toggled", onPriorityToggled)
+    window.addEventListener("matanho:preferences.theme.updated", onCoverPreferenceUpdated)
+    window.addEventListener("matanho:preferences.wallpaper.updated", onCoverPreferenceUpdated)
 
     apiRef.current = startMatanhoRuntime(el, {
       data,
@@ -153,6 +182,8 @@ export function HomeV3App() {
     return () => {
       mountedRef.current = false
       window.removeEventListener("matanho:priorities.task.toggled", onPriorityToggled)
+      window.removeEventListener("matanho:preferences.theme.updated", onCoverPreferenceUpdated)
+      window.removeEventListener("matanho:preferences.wallpaper.updated", onCoverPreferenceUpdated)
       delete window.__HOME_V3_PATH__
       apiRef.current?.destroy()
       apiRef.current = null
