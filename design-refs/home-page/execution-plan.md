@@ -395,6 +395,25 @@ Preferences/Documents tabs. (Matanho AI panel moved up and done in Phase 7b, ahe
 **Verify**: settings persist and actually take effect (e.g. a disabled notification type stops arriving);
 full click-through of every element in the Stage 2 inventory with real data, per the Stage 5 standard.
 
+## Phase 9 — Matanho AI panel: real per-source context injection (RAG) — deferred until after Phase 8
+
+Deferred, user-directed follow-up to Phase 7b. The "N sources connected" sidebar toggles (My Work,
+Calendar, Forums, News, People) are currently decorative — Phase 7b wired the panel to a real LLM but
+scoped that pass to "make it respond for real" rather than giving it live access to the user's actual
+data; the system prompt just tells the model honestly that it doesn't have that access. This phase
+closes the gap: retrieve the signed-in user's real tasks/calendar/performance/posts/directory data
+server-side, assemble it into context the model can actually reason over, and make the source toggles
+and the composer's scope selector ("All connected work" / "My work only" / "People and knowledge")
+actually control what's included rather than being inert.
+
+Explicitly deferred until the rest of this module (Phase 8 and any remaining second-pass items) is
+fully done — do not start this before then without the user re-confirming.
+
+**Scope to work out during that phase's own audit** (not designed yet): which sources are cheap enough
+to always include vs. need on-demand retrieval; how the composer's scope selector should narrow
+context; whether per-source toggles gate retrieval or just presentation; token-budget limits so context
+assembly doesn't blow past the LLM's context window for a user with a lot of open tasks/history.
+
 ## Phase 2b — custom wallpaper upload + rotation interval — done, verified live
 
 Added mid-build at the owner's request (design a Windows-lockscreen-style rotating background:
