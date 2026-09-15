@@ -384,16 +384,79 @@ auto-scrolled. Sent a second message in the same thread ("Can you repeat back th
 asked you?") and confirmed the reply correctly quoted the first question back, proving history is
 resent and the model has real continuity across turns, not just single-shot Q&A.
 
-## Phase 8 — Settings, Help & Support, and the second pass
+## Phase 8 — Settings, Help & Support, and the second pass — done, verified live
 
-**Backend**: Settings persists to the same `HomePreference` table (language, timezone, density, the
-notification toggles) rather than a separate store.
-**Frontend**: wire the Settings modal; find out what Help & Support is supposed to do (currently a dead
-click) and either wire or remove it; second-pass check of items not deeply exercised in Stage 1 — Apps
-switcher grid, org/FY/role switchers, My Work's Teams tab, Profile's Experience/Goals/
-Preferences/Documents tabs. (Matanho AI panel moved up and done in Phase 7b, ahead of this pass.)
-**Verify**: settings persist and actually take effect (e.g. a disabled notification type stops arriving);
-full click-through of every element in the Stage 2 inventory with real data, per the Stage 5 standard.
+**Settings**: `home_preferences.settings` was already a reserved-but-unused JSON column (added
+alongside Phase 2b's wallpaper work, never read or written by anything) — no migration needed, just
+extended `GET/PUT /homepage/preferences` to read/write it as an opaque blob. The Settings form's
+submit handler was local-state-only (saved to `localStorage`, toasted a fake success, no
+`emitIntegrationEvent` call at all, unlike its theme/wallpaper/rotation siblings) — now fires
+`preferences.settings.updated`, and `state.settings` is seeded from the real saved value on mount
+(same technique already used for Daily Cover) instead of always starting from the runtime's
+hardcoded defaults.
+
+**Notification-preference enforcement**: the four toggles under Settings' "Notifications" section
+(`calendarAlerts`/`newsDigest`/`forumMentions`/`performanceReminders`) previously did nothing
+server-side — no code anywhere checked them. Added `NotificationPreferenceService
+.filterUsersByNotificationPreference()` and wired it into the five notification-creation call sites
+that map cleanly onto one of the four (new event; new post, split News vs Forums by the post's
+`category` — the same truthy/falsy split the frontend already uses; new newsletter; performance
+review deadline alerts; goal reminders/achievements). A user with no saved preference row — i.e.
+anyone who's never opened Settings — still gets notified (fail open), so this can't silently go
+quiet for the entire existing user base. Deliberately did *not* touch task-assignment notifications
+or any procurement/FP&A/vendor-alert notifications — none of those map to a Settings toggle, and
+gating them would be inventing behavior the UI never promised.
+
+**Help & Support**: dropped two dead elements rather than half-wire them — the search box (no `id`,
+nothing ever read it) and the "How-to guides" card (no `data-service`/`data-action`; no FAQ/help-
+article concept exists anywhere in the schema or backend, and building a small content-authoring
+system for one card felt like exactly the kind of scope this pass shouldn't invent). "IT support",
+which already routes through the real Employee Services request flow from Phase 3, is unchanged.
+
+**Apps grid**: the old `appsView()` was an elaborate, fully-fabricated app marketplace — pinned
+apps, "recently used" with literal hardcoded relative timestamps ("2 hours ago", "Yesterday", ...),
+a full access-request approve/pending workflow with its own modal and drawer, category filters, a
+marketplace callout — none of it backed by any real model, and the real permission system
+(`hasModuleAccess`) is a plain per-module yes/no, not an approval queue, so "request access" had
+nothing real to mean. Replaced with a plain grid sourced from `getSwitcherModules()` +
+`useRolePermissions()` — the exact same real, permission-filtered list the header's own "Modules"
+switcher already uses — dropping the fake sections rather than keeping them as placeholders (same
+call as Phase 7's dropped profile tabs). First pass made every tile open in a new tab; live-tested
+that against the real `AppSwitcherDropdown` and found it was wrong — the real switcher only does
+that for a genuinely external portal (`externalPortalUrl` set), and same-tab-navigates
+(`window.location.href`) for an internal module, since that's just another route in this same
+Next.js app, not a separate app. Fixed to match exactly.
+
+**org/FY/role switchers, the topbar's own Apps icon, and its hardcoded notification badge**: found
+to already be a non-issue rather than something to build or remove — `renderTopbar()`'s entire
+markup (entity/year/role `<select>`s, a second "apps" icon with no click handler at all, a
+notification bell with a literal hardcoded "4") is unconditionally `display:none!important`'d by
+`home-v3-overrides.css` ("Kill the HTML mock topbar under SharedTopbar"), added in an earlier phase
+because the real outer layout's own topbar (search, the real "Modules" switcher, real notification
+count, real user menu) already covers all of it. Confirmed via the live DOM (`getComputedStyle`)
+rather than assumed — the elements exist but have zero rendered size and `visibility:hidden`. No
+code change; noting it here so it isn't mistaken for unfinished work in a future pass.
+
+**My Work's Teams tab**: verify-only, per the plan — confirmed still real (Phase 5's
+`loadTeamRows()`, org-wide task aggregation per person), showing actual people with actual open-task
+counts and progress on a fresh load.
+
+**Known gap, by design**: `language`/`timezone`/`profileVisibility` and the "Improve Matanho" usage-
+analytics toggle now persist for real (round-trip survives a reload) but don't drive any actual
+behavior anywhere in this build — no i18n, no timezone-aware rendering, no analytics pipeline exist
+to hook them into. That's honest persistence of a real user choice, not fake data; it just isn't
+wired to a consequence yet, same as `density`/`saturation`/`glass`/`motion`/`autoHero` already were
+before this phase (those four do drive real CSS).
+
+Verified live: toggled `calendarAlerts` and `forumMentions` off via the real Settings modal,
+confirmed the `PUT /api/homepage/preferences` response echoed the change, reloaded the page fresh
+and confirmed both toggles were still off (real persistence, not optimistic-only). Verified the
+notification-preference filter directly against real users (one with the toggle off, one on, one
+with no preference row at all) — correctly excluded only the one with it explicitly off. Reverted
+the test toggles back afterward. Confirmed the Help & Support modal now shows only the real "IT
+support" card. Confirmed the Apps page renders the same six real modules as the header's "Modules"
+dropdown, and that clicking one same-tab-navigates to the real module (tested Performance
+Management, landed on its real dashboard).
 
 ## Phase 9 — Matanho AI panel: real per-source context injection (RAG) — deferred until after Phase 8
 
