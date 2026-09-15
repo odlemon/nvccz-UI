@@ -3,6 +3,7 @@
  */
 import fs from "fs"
 import path from "path"
+import { spawnSync } from "child_process"
 
 const CLIENT = "C:/Users/lysp/Downloads/Matanho_Investee_Portal_Production_v8"
 const ROOT = "investee-portal-v8-root"
@@ -315,6 +316,21 @@ let rt = injectSignal(runtime)
 fs.writeFileSync(path.join(OUT_DIR, "matanho-investee-portal-runtime.js"), rt)
 console.log("runtime", fs.statSync(path.join(OUT_DIR, "matanho-investee-portal-runtime.js")).size)
 console.log("nav bridge", rt.includes("__INVESTEE_V8_NAV__"))
+
+// Always re-apply hand patches so regenerations stay safe (mirrors
+// extract-portfolio-v25.mjs's T0.1 self-invocation) — a raw extract silently
+// discards the hand-built live-data wiring; see
+// scripts/patch-investee-portal-runtime.mjs for what it restores and why.
+const patch = spawnSync(process.execPath, ["scripts/patch-investee-portal-runtime.mjs"], {
+  encoding: "utf8",
+  cwd: process.cwd(),
+})
+if (patch.stdout) process.stdout.write(patch.stdout)
+if (patch.stderr) process.stderr.write(patch.stderr)
+if (patch.status !== 0) {
+  console.error("patch-investee-portal-runtime.mjs failed — runtime written but unpatched")
+  process.exit(patch.status || 1)
+}
 
 const pages = [
   ["dashboard", "/investee-portal-v8", "Overview"],
