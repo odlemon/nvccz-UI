@@ -9,7 +9,7 @@ as a hypothesis to verify, not a fact.
 | Severity | Open | Fixed locally, not deployed | Deployed and verified |
 |---|---|---|---|
 | CRITICAL | 0 | 0 | 0 |
-| HIGH | 3 | 0 | 1 |
+| HIGH | 4 | 0 | 1 |
 | MEDIUM | 4 | 0 | 0 |
 | LOW | 0 | 0 | 0 |
 
@@ -311,6 +311,50 @@ Confirmed correctly out of this bug's scope (not part of Portfolio V11's own UI,
 `ceo`/`cfo`/`fund_manager`, backing CEO/CFO dashboards this module's sidebar doesn't expose.
 `applicationRoutes.ts`, `boardReviewRoutes.ts`, `fundraisingRoutes.ts`'s relevant routes already use
 `authenticate` only (no gate to fix).
+
+## FINDING-PV11-008
+
+**Page / flow:** Deal Detail → Term Sheet tab → Start board review (Wave 2 — deal-lifecycle actions)
+**Steps to reproduce:** As `admin@nts.com` (portfolio_mgr is blocked earlier in this exact flow by
+FINDING-PV11-007, so this was tested as admin to isolate the mechanics), on a deal with a drafted term
+sheet (`NTS`, walked live through Due Diligence → Term Sheet in this same session) → Start board review →
+attach a PDF investment memorandum → Start review.
+**Expected:** A board review record is created and the deal enters board review.
+**Actual:** The deal's `currentStage` silently advances to `UNDER_BOARD_REVIEW` (confirmed via
+`GET /applications/:id`), but the board review record itself is **never created** —
+`GET /board-reviews/:id` returns 404 "Board review not found" both before and after. The deal is left in a
+stuck, contradictory state: staged as "under board review" with nothing to review, no visible board-review
+UI reachable from that stage (the only path found to retry was clicking "Start board review" again, which
+re-runs the same broken flow).
+**Root cause, traced to source:** `lib/portfolio-v11/actions.ts`'s `submit-start-board-review` handler
+(~line 620) does two sequential calls by design (its own comment explains why: "BE only accepts
+board-review create from UNDER_BOARD_REVIEW, not TERM_SHEET"): first `applicationsApi.changeStage(id,
+{newStage: 'UNDER_BOARD_REVIEW'})` (succeeds, 200), then `boardReviewApi.create(id, document)` — this
+second call is what actually fails, and there's no rollback of the stage change when it does.
+`boardReviewApi.create()` (`lib/api/board-review-api.ts:102-111`) fails because it manually sets
+`headers: {'Content-Type': 'multipart/form-data'}` on a `FormData` body passed through the generic
+`apiClient.post()` — a `fetch` call is supposed to auto-generate `Content-Type: multipart/form-data;
+boundary=...` itself when the body is a `FormData` instance, but only if the caller doesn't set
+Content-Type manually; doing so here produces a boundary-less header, and the backend's multipart parser
+correctly rejects it: `POST /board-reviews/:id` → 400 `{"success":false,"message":"Multipart: Boundary not
+found"}`. Confirmed by contrast: `lib/api/term-sheet-api.ts`'s `create()` (tested working earlier in this
+same session) builds an equivalent `FormData` with a file but calls `apiClient.postFormData(...)` — a
+dedicated helper on `apiClient` that exists precisely to avoid this mistake — instead of `apiClient.post()`
+with a hand-rolled header.
+**Severity:** HIGH — the only UI path to start a board review is broken 100% of the time (any file
+attached triggers the same boundary error), and worse, it's not a clean failure: every attempt leaves the
+deal's stage permanently advanced with no way to undo it from the UI, compounding on retry.
+**Suspected area / fix shape:** `lib/api/board-review-api.ts`'s `create()` — switch to
+`apiClient.postFormData(`/board-reviews/${applicationId}`, formData)`, matching `term-sheet-api.ts`'s
+working pattern exactly. Separately, `actions.ts`'s handler should not treat the stage change as
+fire-and-forget ahead of the record creation that can fail — worth wrapping so a failed `create()` either
+retries against the now-`UNDER_BOARD_REVIEW` stage cleanly (likely already possible once the Content-Type
+fix lands, since the stage change is idempotent) or reports the partial state clearly instead of a generic
+"Request failed" bubble that doesn't explain the deal is now stuck mid-transition.
+**Related, out of this module's scope:** the identical `'Content-Type': 'multipart/form-data'` mistake
+also exists in `lib/api/procurement-api.ts`'s `processInvoicePayment` (Procurement V23, already swept and
+merged) — flagged separately as its own task rather than fixed here, since Procurement is a different,
+already-closed sweep.
 
 ## Format per finding
 ```
