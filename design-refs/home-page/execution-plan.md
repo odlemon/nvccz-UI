@@ -339,14 +339,59 @@ separate `GET` request (not just the optimistic local render) and that the privi
 real, already-existing user record, not a test row created for this phase, so restoring it rather than
 deleting it was the right cleanup.
 
+## Phase 7b — Matanho AI panel: real LLM wiring — done, verified live
+
+Out-of-sequence, user-directed addition between Phase 7 and Phase 8: make the AI panel actually work
+rather than leaving it for the Phase 8 second pass. Requested reuse of the same LLM wiring the
+portfolio module already uses rather than adding anything new.
+
+**Backend**: new `POST /api/assistant/chat` (`src/controllers/AssistantController.ts` +
+`src/routes/assistantRoutes.ts`, authenticated). Thin wrapper over the existing generic
+`LlmChatService.chatCompletion()` — the same service/config (`LLM_API_KEY` / `LLM_API_BASE_URL` /
+`LLM_MODEL`, falling back to the hardcoded DeepSeek default in `src/config/llmGlobals.ts` when unset)
+already used elsewhere. Prepends a system prompt naming the signed-in user and today's date, scoping
+the assistant to the Matanho platform, and telling it to admit honestly when it doesn't have live
+access to the user's actual tasks/calendar/performance/documents rather than inventing details. No
+conversation-thread persistence exists anywhere in the schema, so the client resends a capped slice of
+prior turns (last 20) as history each request; prompt length is capped server-side too.
+
+**Frontend**: `aiRespond()` in the vendored runtime (patched via the new
+`scripts/patch-home-v3-assistant.mjs`, "0 missed") no longer answers synchronously from the old
+keyword-matching `aiAnswerFor()` FAQ bot. It now pushes a "Thinking…" placeholder immediately and fires
+`matanho:assistant.message.sent`; the host (`home-v3-app.tsx`) calls the new `sendAssistantMessage()`
+action (`lib/home-v3/actions.ts`), which posts to `/assistant/chat` with the prompt and mapped history.
+This is the first deliberate exception to this build's "no hydrate() API, so reload after writes"
+pattern: a chat reply has no optimistic placeholder to fall back on and a reload would destroy the
+conversation, so the runtime now exposes a `receiveAssistantReply(text, isError)` method the host calls
+directly to swap the placeholder for the real reply (or an error) in place, no reload. `aiSources()`
+also dropped the fake flat `count:8` "Documents" tile (no document-repository concept exists anywhere
+in this build) and now reflects the real Forums/News/People counts already loaded by Phases 6-7,
+instead of the unused mock fixture arrays.
+
+Known gap, by design: the "N sources connected" sidebar toggles are decorative only — no real
+retrieval/context-injection was built, so toggling a source doesn't actually restrict or expand what
+the assistant can discuss. The system prompt instead tells the model plainly that it doesn't have that
+access. Building real per-source context assembly (RAG over the user's actual tasks/calendar/posts)
+would be a much larger project; this pass was scoped to "make the panel actually respond for real"
+rather than that.
+
+Verified live: confirmed the backend chain end-to-end via a direct authenticated fetch before touching
+the frontend at all (route → controller → `LlmChatService` → DeepSeek → real reply), then through the
+UI — sent "What is Matanho, in one sentence?" from the top composer, confirmed the "Thinking…"
+placeholder appeared immediately, confirmed `POST /api/assistant/chat` fired and returned 200 with a
+real (non-canned) answer, confirmed it replaced the placeholder in place with no reload and the thread
+auto-scrolled. Sent a second message in the same thread ("Can you repeat back the exact question I just
+asked you?") and confirmed the reply correctly quoted the first question back, proving history is
+resent and the model has real continuity across turns, not just single-shot Q&A.
+
 ## Phase 8 — Settings, Help & Support, and the second pass
 
 **Backend**: Settings persists to the same `HomePreference` table (language, timezone, density, the
 notification toggles) rather than a separate store.
 **Frontend**: wire the Settings modal; find out what Help & Support is supposed to do (currently a dead
 click) and either wire or remove it; second-pass check of items not deeply exercised in Stage 1 — Apps
-switcher grid, Matanho AI panel, org/FY/role switchers, My Work's Teams tab, Profile's Experience/Goals/
-Preferences/Documents tabs.
+switcher grid, org/FY/role switchers, My Work's Teams tab, Profile's Experience/Goals/
+Preferences/Documents tabs. (Matanho AI panel moved up and done in Phase 7b, ahead of this pass.)
 **Verify**: settings persist and actually take effect (e.g. a disabled notification type stops arriving);
 full click-through of every element in the Stage 2 inventory with real data, per the Stage 5 standard.
 
