@@ -9,7 +9,7 @@ as a hypothesis to verify, not a fact.
 | Severity | Open | Fixed locally, not deployed | Deployed and verified |
 |---|---|---|---|
 | CRITICAL | 0 | 0 | 0 |
-| HIGH | 1 | 0 | 0 |
+| HIGH | 0 | 0 | 1 |
 | MEDIUM | 1 | 0 | 0 |
 | LOW | 0 | 0 | 0 |
 
@@ -34,6 +34,15 @@ extended to the newer role at all.
 **Severity:** HIGH — blocks a legitimately-granted role from a core part of its own module, wholesale, not
 an edge case.
 **Suspected area:** `nvccz/src/routes/fundRoutes.ts`'s `authorize([...])` lists on every route.
+
+**FIXED and verified live, 15 September 2026** (nvccz `1a19a18`, deployed to dev): added `portfolio_mgr`
+to every route (matching the frontend's "full" grant) and `inv_analyst` to the read-oriented routes
+(list, detail, statistics, documents, industry/status/balance) matching its narrower "write" grant;
+left fund create/update/close as admin + portfolio_mgr only. Verified live: `portfolio.mgr@nts.local`
+and `inv.analyst@nts.local` both now get `GET /funds` → 200 with all 7 real funds; `portfolio.mgr` can
+now reach `POST /funds` (a follow-up 400 was an unrelated Prisma validation issue in the test payload,
+not a permission refusal); a role with no Portfolio grant at all (`proc.mgr@nts.local`) is still
+correctly refused with 403 — the fix is properly scoped, not a blanket opening.
 
 **Update — broader than first written:** `GET /funds` carries the same `authorize(["admin","fund_manager"])`
 gate, confirmed live: as `admin@nts.com` the Funds page correctly lists 7 real funds ($608M called,
