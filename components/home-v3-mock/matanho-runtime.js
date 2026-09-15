@@ -2,6 +2,7 @@
 import { clientDesignSignOut } from "@/components/client-design-mock/runtime-auth";
 export function startMatanhoRuntime(rootEl, options = {}) {
   const initialRoute = options.initialRoute || "home";
+  const initialDetail = options.initialDetail || {};
   window.__HOME_V3_NAV__ = options.onNavigate || (() => {});
   if (typeof options.onSignOut === "function") {
     window.__HOME_V3_SIGN_OUT__ = options.onSignOut;
@@ -127,6 +128,17 @@ export function startMatanhoRuntime(rootEl, options = {}) {
           bio: "Investment leader focused on building disciplined systems, strong teams and durable institutional value.",
         },
   };
+  // Deep-link support: state's own defaults above only ever look at `saved.X` (localStorage) or a
+  // hardcoded literal, never the URL — fine for a pure client mock, wrong now that this runtime can
+  // be (re)mounted directly on a detail URL (e.g. /home/forums/{id}), whether on first page load or
+  // if React remounts it later (e.g. a dependency of the host's mount effect changing). Apply the
+  // host-computed, URL-derived initialDetail on top so the freshly-constructed state matches the
+  // actual URL instead of always starting at the list/library view. Guarded the same way setRoute()
+  // guards selectedNewsletter/newsletterMode — only overrides when a real value is present.
+  if (initialDetail.selectedNews != null) state.selectedNews = initialDetail.selectedNews;
+  if (initialDetail.forumThread != null) state.forumThread = initialDetail.forumThread;
+  if (initialDetail.selectedNewsletter != null) state.selectedNewsletter = initialDetail.selectedNewsletter;
+  if (initialDetail.newsletterMode) state.newsletterMode = initialDetail.newsletterMode;
   state.apps = state.apps.map(a => ({...a, hasAccess: a.hasAccess ?? !['procurement','analytics'].includes(a.id)}));
   state.settings = {...{language:'English (UK)',timezone:'CAT — Harare',density:'comfortable',saturation:118,glass:true,motion:true,autoHero:true,calendarAlerts:true,newsDigest:true,forumMentions:true,performanceReminders:true,profileVisibility:'Organisation',usageAnalytics:true}, ...state.settings};
   const heroScenes = [
