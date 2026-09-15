@@ -96,18 +96,6 @@ function RFQRespondContent() {
       return
     }
 
-    // The token is base64url JSON, which atob cannot read as it stands.
-    const payloadBase64 = token.split('.')[0]
-    try {
-      if (payloadBase64) {
-        const b64 = payloadBase64.replace(/-/g, '+').replace(/_/g, '/')
-        const decodedPayload = JSON.parse(atob(b64.padEnd(Math.ceil(b64.length / 4) * 4, '=')))
-        if (decodedPayload.r) setRequisitionId(decodedPayload.r)
-      }
-    } catch {
-      // The server verifies the token either way; the id is only a convenience for the submission.
-    }
-
     let cancelled = false
     procurementApiV2
       .getRfqInvitation(token)
