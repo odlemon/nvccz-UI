@@ -268,6 +268,7 @@ export function HomeV3App() {
       })),
       teamRows: live?.teamRows.data ?? [],
       performanceOverview: live?.performanceOverview.data ?? null,
+      performanceFeedback: live?.performanceFeedback.data ?? null,
       newsPosts: (live?.posts.data ?? []).filter((p) => !p.category),
       forumPosts: (live?.posts.data ?? []).filter((p) => !!p.category),
       newsletters: live?.newsletters.data ?? [],

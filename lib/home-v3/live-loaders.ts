@@ -625,6 +625,99 @@ export async function loadMyPerformanceOverview(): Promise<ScopeResult<Hv3Perfor
   }
 }
 
+export type Hv3PerformanceFeedbackEntry = {
+  id: string
+  providerName: string
+  providerType: string | null
+  content: string
+  submittedAt: string
+}
+export type Hv3PerformanceFeedback = {
+  available: boolean
+  blockedReason: string | null
+  reviewTitle: string | null
+  reviewPeriod: string | null
+  status: string | null
+  rating: string | null
+  overallScore: number | null
+  strengths: string | null
+  areasForImprovement: string | null
+  managerFeedback: string | null
+  selfFeedback: string | null
+  peerFeedback: string | null
+  stakeholderFeedback: string | null
+  entries: Hv3PerformanceFeedbackEntry[]
+}
+
+/**
+ * `/api/performance-reviews?revieweeId=<self>` — a DIFFERENT backend subsystem from
+ * loadMyPerformanceOverview's `/api/performance/scorecards/user` (continuous KPI tracking vs.
+ * periodic formal review-with-reviewer-feedback; both real, genuinely separate). The list
+ * endpoint's own `include` already embeds up to 3 `reviewFeedback` entries with their provider
+ * per review (verified against the backend service's Prisma query), so no second per-review
+ * fetch is needed — same 404-is-honest-empty-state shape as loadMyPerformanceOverview.
+ */
+export async function loadMyPerformanceFeedback(selfId?: string | null): Promise<ScopeResult<Hv3PerformanceFeedback>> {
+  const empty: Hv3PerformanceFeedback = {
+    available: false,
+    blockedReason: null,
+    reviewTitle: null,
+    reviewPeriod: null,
+    status: null,
+    rating: null,
+    overallScore: null,
+    strengths: null,
+    areasForImprovement: null,
+    managerFeedback: null,
+    selfFeedback: null,
+    peerFeedback: null,
+    stakeholderFeedback: null,
+    entries: [],
+  }
+  if (!selfId) return { data: empty, error: null, empty: true }
+  try {
+    const res: any = await apiClient.get(`/performance-reviews?revieweeId=${selfId}&limit=1`)
+    const review = res?.data?.reviews?.[0]
+    if (!review) {
+      return { data: { ...empty, blockedReason: "No performance review has been opened for you yet." }, error: null, empty: true }
+    }
+    const entries: Hv3PerformanceFeedbackEntry[] = Array.isArray(review.reviewFeedback)
+      ? review.reviewFeedback.map((f: any) => ({
+          id: String(f.id),
+          providerName: f.feedbackProvider ? personName(f.feedbackProvider) : (f.feedbackProviderType || "Reviewer"),
+          providerType: f.feedbackProviderType ?? null,
+          content: String(f.content || ""),
+          submittedAt: f.submittedAt
+            ? new Date(f.submittedAt).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })
+            : "",
+        }))
+      : []
+    return {
+      data: {
+        available: true,
+        blockedReason: null,
+        reviewTitle: review.title || review.reviewPeriod || "Performance review",
+        reviewPeriod: review.reviewPeriod ?? null,
+        status: review.status ?? null,
+        rating: review.rating ?? null,
+        overallScore: review.overallScore != null ? Number(review.overallScore) : null,
+        strengths: review.strengths ?? null,
+        areasForImprovement: review.areasForImprovement ?? null,
+        managerFeedback: review.managerFeedback ?? null,
+        selfFeedback: review.selfFeedback ?? null,
+        peerFeedback: review.peerFeedback ?? null,
+        stakeholderFeedback: review.stakeholderFeedback ?? null,
+        entries,
+      },
+      error: null,
+      empty: false,
+    }
+  } catch (err: any) {
+    const reason = err?.message ? String(err.message) : "No performance review has been opened for you yet."
+    return { data: { ...empty, blockedReason: reason }, error: null, empty: true }
+  }
+}
+
 export type Hv3PostReply = {
   id: string
   content: string
@@ -798,6 +891,7 @@ export async function loadHomeLiveData(selfId?: string | null) {
     myTasks,
     teamRows,
     performanceOverview,
+    performanceFeedback,
     posts,
     newsletters,
     directory,
@@ -816,6 +910,7 @@ export async function loadHomeLiveData(selfId?: string | null) {
     loadMyTasks(selfId),
     loadTeamRows(),
     loadMyPerformanceOverview(),
+    loadMyPerformanceFeedback(selfId),
     loadPosts(),
     loadNewsletters(),
     loadDirectory(),
@@ -835,6 +930,7 @@ export async function loadHomeLiveData(selfId?: string | null) {
     myTasks,
     teamRows,
     performanceOverview,
+    performanceFeedback,
     posts,
     newsletters,
     directory,
