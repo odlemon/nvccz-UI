@@ -24,6 +24,9 @@ import {
   syncRotationInterval,
   createCalendarEntry,
   deleteCalendarEntry,
+  createWorkTask,
+  updateWorkTask,
+  updateWorkTaskProgress,
 } from "@/lib/home-v3/actions"
 import { useAppDispatch, useAppSelector } from "@/lib/store"
 import { refreshUserDetails, logoutUser } from "@/lib/store/slices/authSlice"
@@ -153,11 +156,11 @@ export function HomeV3App() {
 
   useEffect(() => {
     if (isLoading || liveDataRef.current) return
-    void loadHomeLiveData().then((result) => {
+    void loadHomeLiveData(user?.id).then((result) => {
       liveDataRef.current = result
       setLiveDataReady(true)
     })
-  }, [isLoading])
+  }, [isLoading, user?.id])
 
   useEffect(() => {
     if (isLoading || !liveDataReady || mountedRef.current) return
@@ -166,7 +169,7 @@ export function HomeV3App() {
     if (!el) return
 
     mountedRef.current = true
-    evictStaleCacheKeys(["priorities"])
+    evictStaleCacheKeys(["priorities", "workTasks", "workProjects"])
     seedCoverPreferenceCache(liveDataRef.current?.cover.data ?? null)
     seedLeaveBalanceCache(liveDataRef.current?.servicesSummary.data.leaveBalanceDays ?? null)
     seedRequestsCache(liveDataRef.current?.serviceRequests.data ?? null)
@@ -196,6 +199,16 @@ export function HomeV3App() {
       rotationIntervalMinutes: live?.cover.data?.rotationIntervalMinutes ?? 1440,
       myCalendarEntries: live?.myCalendarEntries.data ?? [],
       companyEvents: live?.companyEvents.data ?? [],
+      // workProjects is not a separate entity anywhere server-side (see loadMyTasks's doc
+      // comment) — just the distinct real project names already present on workTasks, so the
+      // runtime's own project cards/filters (which only ever read `.name` off these) stay real.
+      workTasks: live?.myTasks.data ?? [],
+      workProjects: Array.from(new Set((live?.myTasks.data ?? []).map((t) => t.project))).map((name, i) => ({
+        id: `project-${i}`,
+        name,
+      })),
+      teamRows: live?.teamRows.data ?? [],
+      performanceOverview: live?.performanceOverview.data ?? null,
     }
     const initial = parseHv3Location(pathnameRef.current)
 
@@ -213,6 +226,8 @@ export function HomeV3App() {
       toast.error("Couldn't load your calendar", { description: live.myCalendarEntries.error })
     if (live?.companyEvents.error)
       toast.error("Couldn't load company events", { description: live.companyEvents.error })
+    if (live?.myTasks.error) toast.error("Couldn't load your tasks", { description: live.myTasks.error })
+    if (live?.teamRows.error) toast.error("Couldn't load team workload", { description: live.teamRows.error })
 
     const onPriorityToggled = (event: Event) => {
       const detail = (event as CustomEvent).detail || {}
@@ -284,6 +299,28 @@ export function HomeV3App() {
         }
       })
     }
+    const onWorkTaskCreated = (event: Event) => {
+      const detail = (event as CustomEvent).detail || {}
+      void createWorkTask({ ...detail, selfId: user?.id }).then((result) => {
+        if (result.error) toast.error(result.error)
+        else if (result.reload) {
+          toast.success("Task added")
+          setTimeout(() => window.location.reload(), 800)
+        }
+      })
+    }
+    const onWorkTaskUpdated = (event: Event) => {
+      const detail = (event as CustomEvent).detail || {}
+      void updateWorkTask(detail).then((result) => {
+        if (result.error) toast.error(result.error)
+      })
+    }
+    const onWorkTaskProgressUpdated = (event: Event) => {
+      const detail = (event as CustomEvent).detail || {}
+      void updateWorkTaskProgress(detail).then((result) => {
+        if (result.error) toast.error(result.error)
+      })
+    }
     window.addEventListener("matanho:priorities.task.toggled", onPriorityToggled)
     window.addEventListener("matanho:preferences.theme.updated", onCoverPreferenceUpdated)
     window.addEventListener("matanho:preferences.wallpaper.updated", onCoverPreferenceUpdated)
@@ -294,6 +331,9 @@ export function HomeV3App() {
     window.addEventListener("matanho:preferences.rotation.updated", onRotationIntervalUpdated)
     window.addEventListener("matanho:calendar.entry.created", onCalendarEntryCreated)
     window.addEventListener("matanho:calendar.entry.deleted", onCalendarEntryDeleted)
+    window.addEventListener("matanho:work.task.created", onWorkTaskCreated)
+    window.addEventListener("matanho:work.task.updated", onWorkTaskUpdated)
+    window.addEventListener("matanho:work.task.progress.updated", onWorkTaskProgressUpdated)
 
     apiRef.current = startMatanhoRuntime(el, {
       data,
@@ -333,6 +373,9 @@ export function HomeV3App() {
       window.removeEventListener("matanho:preferences.rotation.updated", onRotationIntervalUpdated)
       window.removeEventListener("matanho:calendar.entry.created", onCalendarEntryCreated)
       window.removeEventListener("matanho:calendar.entry.deleted", onCalendarEntryDeleted)
+      window.removeEventListener("matanho:work.task.created", onWorkTaskCreated)
+      window.removeEventListener("matanho:work.task.updated", onWorkTaskUpdated)
+      window.removeEventListener("matanho:work.task.progress.updated", onWorkTaskProgressUpdated)
       delete window.__HOME_V3_PATH__
       apiRef.current?.destroy()
       apiRef.current = null

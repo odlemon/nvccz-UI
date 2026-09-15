@@ -195,3 +195,98 @@ export async function deleteCalendarEntry(detail: { id?: string }): Promise<Hv3R
     return { handled: true, error: message }
   }
 }
+
+/**
+ * `work.task.created` -> POST /api/tasks, self-assigned via `team: [selfId]` (the create-task
+ * modal has no assignee picker — a new task from My Work is always yours). `percentValue: 100`
+ * gives every task a fixed 0-100 target so its `percentValueAchieved` is a plain completion
+ * percentage — required for the achieved amount to ever be visible at all: the API's
+ * applyValueDisplayHardening (taskValueDisplay.ts) nulls monetary/percent achieved fields back
+ * out in every response whenever a task has no positive target, which a bare ad-hoc task never
+ * would otherwise. Reloads on success: the mounted runtime has no hydrate() API, and the id the
+ * runtime would fabricate locally (Date.now()) would go stale the instant any follow-up action
+ * (toggle/edit) tried to PUT it — same reasoning as wallpaper upload and calendar-entry create.
+ */
+export async function createWorkTask(detail: {
+  title?: string
+  project?: string | null
+  dueDate?: string | null
+  priority?: string | null
+  selfId?: string | null
+}): Promise<Hv3ReloadingActionResult> {
+  if (!detail?.title || !detail?.dueDate || !detail?.selfId) return { handled: false, error: null }
+  try {
+    await apiClient.post("/tasks", {
+      title: detail.title,
+      team: [detail.selfId],
+      date: new Date(detail.dueDate).toISOString(),
+      priority: (detail.priority || "medium").toLowerCase(),
+      department: detail.project || undefined,
+      percentValue: 100,
+      percentValueAchieved: 0,
+    })
+    return { handled: true, error: null, reload: true }
+  } catch (err: any) {
+    const message = err?.message ? String(err.message) : "Failed to create task"
+    console.error("[home-v3] work.task.created failed:", message)
+    return { handled: true, error: message }
+  }
+}
+
+/**
+ * `work.task.updated` -> PUT /api/tasks/:id (due date, priority, completion, and — since
+ * TaskService.updateTask previously silently dropped percentValueAchieved even though the
+ * controller and swagger docs already declared it, see the API repo's TaskService.ts — absolute
+ * progress). `percentValue: 100` accompanies every progress write for the same display-hardening
+ * reason documented on createWorkTask above. Optimistic: the runtime already applied the change
+ * locally before this fires.
+ */
+export async function updateWorkTask(detail: {
+  id?: string
+  dueDate?: string | null
+  priority?: string | null
+  progress?: number | null
+  done?: boolean
+}): Promise<Hv3ActionResult> {
+  const id = detail?.id
+  if (!id) return { handled: false, error: null }
+  const body: Record<string, unknown> = {
+    stage: detail.done || detail.progress === 100 ? "completed" : "in_progress",
+  }
+  if (detail.dueDate) body.date = new Date(detail.dueDate).toISOString()
+  if (detail.priority) body.priority = detail.priority.toLowerCase()
+  if (detail.progress != null) {
+    body.percentValue = 100
+    body.percentValueAchieved = detail.progress
+  }
+  try {
+    await apiClient.put(`/tasks/${id}`, body)
+    return { handled: true, error: null }
+  } catch (err: any) {
+    const message = err?.message ? String(err.message) : "Failed to update task"
+    console.error("[home-v3] work.task.updated failed:", message)
+    return { handled: true, error: message }
+  }
+}
+
+/** `work.task.progress.updated` -> PUT /api/tasks/:id — the task row's inline progress dropdown. */
+export async function updateWorkTaskProgress(detail: {
+  id?: string
+  progress?: number
+  done?: boolean
+}): Promise<Hv3ActionResult> {
+  const id = detail?.id
+  if (!id || detail.progress == null) return { handled: false, error: null }
+  try {
+    await apiClient.put(`/tasks/${id}`, {
+      percentValue: 100,
+      percentValueAchieved: detail.progress,
+      stage: detail.done || detail.progress === 100 ? "completed" : "in_progress",
+    })
+    return { handled: true, error: null }
+  } catch (err: any) {
+    const message = err?.message ? String(err.message) : "Failed to update progress"
+    console.error("[home-v3] work.task.progress.updated failed:", message)
+    return { handled: true, error: message }
+  }
+}

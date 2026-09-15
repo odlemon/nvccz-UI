@@ -405,7 +405,225 @@ export async function loadCompanyEvents(): Promise<ScopeResult<Hv3CompanyEvent[]
   )
 }
 
-export async function loadHomeLiveData() {
+export type Hv3Task = {
+  id: string
+  title: string
+  project: string
+  owner: string
+  ownerIds: string[]
+  due: string
+  dueIso: string | null
+  progress: number
+  status: string
+  done: boolean
+  goalTitle: string | null
+}
+
+export type Hv3Person = { id: string; name: string; department: string | null; role: string | null }
+
+export type Hv3TeamRow = { id: string; name: string; role: string | null; openCount: number; progress: number }
+
+export type Hv3PerformanceGoalRow = {
+  id: string
+  title: string
+  weight: number | null
+  score: number | null
+  status: string | null
+}
+
+export type Hv3PerformanceOverview = {
+  available: boolean
+  blockedReason: string | null
+  overallScore: number | null
+  statusLabel: string | null
+  goalCount: number
+  contractTitle: string | null
+  periodLabel: string | null
+  goals: Hv3PerformanceGoalRow[]
+}
+
+function personName(p: any): string {
+  const name = `${p?.firstName || ""} ${p?.lastName || ""}`.trim()
+  return name || p?.email || "Unknown"
+}
+
+/**
+ * `/api/users` — org directory (id -> display name/department/role). Gated to "internal staff",
+ * not admin-only, so this is safe to call for any signed-in employee. Reused by the Teams tab
+ * below and, per Phase 0 §7, this is also the endpoint Phase 7's People directory will read.
+ */
+export async function loadDirectory(): Promise<ScopeResult<Hv3Person[]>> {
+  return safe<Hv3Person[]>(
+    "directory",
+    async () => {
+      const res: any = await apiClient.get("/users")
+      const rows: any[] = Array.isArray(res?.data) ? res.data : []
+      return rows.map((u) => ({
+        id: String(u.id),
+        name: personName(u),
+        department: u.userDepartment ?? null,
+        role: u.role?.name ?? u.departmentRole ?? null,
+      }))
+    },
+    [],
+  )
+}
+
+function formatWorkDue(dateStr: string | null | undefined): { label: string; iso: string | null } {
+  if (!dateStr) return { label: "No date", iso: null }
+  const date = new Date(dateStr)
+  if (Number.isNaN(date.getTime())) return { label: "No date", iso: null }
+  const now = new Date()
+  const isToday = date.toDateString() === now.toDateString()
+  return {
+    // "Today" is load-bearing text, not just display: the runtime's own grouping logic keys off
+    // this exact word (`String(t.due).toLowerCase().includes('today')`) to bucket "Due now".
+    label: isToday ? "Today" : date.toLocaleDateString("en-GB", { day: "numeric", month: "short" }),
+    iso: date.toISOString(),
+  }
+}
+
+/**
+ * `/api/tasks/my` shaped for My Work — fuller than loadMyPriorities's 6-item Home-page slice.
+ * `project` is Task.department (the backend's own existing bucketing field — also used by
+ * `/tasks/statistics`' tasksByDepartment breakdown), not a separate Project entity: none exists
+ * server-side, so "projects" here are real groupings of real tasks, not an independently
+ * persisted, potentially-empty record. `owner` resolves `team` (user id array) to display names.
+ */
+export async function loadMyTasks(selfId?: string | null): Promise<ScopeResult<Hv3Task[]>> {
+  return safe<Hv3Task[]>(
+    "myTasks",
+    async () => {
+      const [tasksRes, dirRes] = await Promise.all([apiClient.get("/tasks/my"), loadDirectory()])
+      const byId = new Map(dirRes.data.map((p) => [p.id, p.name] as const))
+      const tasks: any[] = Array.isArray((tasksRes as any)?.tasks) ? (tasksRes as any).tasks : []
+      return tasks.map((t) => {
+        const teamIds: string[] = Array.isArray(t.team) ? t.team.map(String) : []
+        const owner = teamIds.length
+          ? teamIds.map((id) => (id === selfId ? "You" : byId.get(id) || "Former team member")).join(", ")
+          : "Unassigned"
+        const due = formatWorkDue(t.date)
+        const stage = String(t.stage || "todo")
+        const done = stage === "completed"
+        return {
+          id: String(t.id),
+          title: String(t.title || "Untitled task"),
+          project: String(t.department || "").trim() || "Unassigned",
+          owner,
+          ownerIds: teamIds,
+          due: due.label,
+          dueIso: due.iso,
+          progress: done ? 100 : Math.max(0, Math.min(100, Number(t.percentValueAchieved) || 0)),
+          status: titleCasePriority(t.priority),
+          done,
+          goalTitle: typeof t.goalId === "string" ? t.goalId : (t.goal?.title ?? null),
+        }
+      })
+    },
+    [],
+  )
+}
+
+/**
+ * `/api/tasks` — org-wide (verified live: open to any authenticated user server-side, not
+ * gated to admins the way `/tasks/my`'s all-tasks branch is — see execution-plan.md Phase 5
+ * notes). Used only to build the Teams tab's per-person workload breakdown; `/tasks/my` is
+ * deliberately self-scoped and can't answer "how is my team doing."
+ */
+export async function loadTeamRows(): Promise<ScopeResult<Hv3TeamRow[]>> {
+  return safe<Hv3TeamRow[]>(
+    "teamRows",
+    async () => {
+      const [tasksRes, dirRes] = await Promise.all([apiClient.get("/tasks"), loadDirectory()])
+      const tasks: any[] = Array.isArray((tasksRes as any)?.tasks) ? (tasksRes as any).tasks : []
+      const byPerson = new Map<string, { open: number; progressSum: number; count: number }>()
+      for (const t of tasks) {
+        const teamIds: string[] = Array.isArray(t.team) ? t.team.map(String) : []
+        const done = String(t.stage || "todo") === "completed"
+        const progress = done ? 100 : Math.max(0, Math.min(100, Number(t.percentValueAchieved) || 0))
+        for (const id of teamIds) {
+          const row = byPerson.get(id) || { open: 0, progressSum: 0, count: 0 }
+          if (!done) row.open += 1
+          row.progressSum += progress
+          row.count += 1
+          byPerson.set(id, row)
+        }
+      }
+      return dirRes.data
+        .filter((p) => byPerson.has(p.id))
+        .map((p) => {
+          const row = byPerson.get(p.id)!
+          return {
+            id: p.id,
+            name: p.name,
+            role: p.role,
+            openCount: row.open,
+            progress: row.count ? Math.round(row.progressSum / row.count) : 0,
+          }
+        })
+        .sort((a, b) => b.openCount - a.openCount)
+        .slice(0, 8)
+    },
+    [],
+  )
+}
+
+function adaptGoalRow(raw: any): Hv3PerformanceGoalRow {
+  return {
+    id: String(raw?.id ?? ""),
+    title: String(raw?.goalName ?? raw?.title ?? "Untitled goal"),
+    weight: raw?.weight != null ? Number(raw.weight) : raw?.effectiveWeight != null ? Number(raw.effectiveWeight) : null,
+    score: raw?.weightedScore != null ? Number(raw.weightedScore) : null,
+    status: raw?.rawRatingLabel ?? raw?.status ?? null,
+  }
+}
+
+/**
+ * `/api/performance/scorecards/user` — same endpoint and field paths already verified live by
+ * lib/performance-v22-mock/live-loaders.ts's loadMyScorecard/adaptMyScorecard (PerfMyScorecard /
+ * goalToScoreRow), kept as home-v3's own copy per this module's no-shared-abstraction convention.
+ * Deliberately NOT routed through safe(): a 404 here means "no active performance contract for
+ * this period," the backend's own honest answer, not a load failure.
+ */
+export async function loadMyPerformanceOverview(): Promise<ScopeResult<Hv3PerformanceOverview>> {
+  try {
+    const res: any = await apiClient.get("/performance/scorecards/user")
+    const raw = res?.data
+    const goals: any[] = Array.isArray(raw?.goals) ? raw.goals : []
+    return {
+      data: {
+        available: true,
+        blockedReason: null,
+        overallScore: raw?.scores?.finalScore != null ? Number(raw.scores.finalScore) : null,
+        statusLabel: raw?.scores?.performanceLabel ?? raw?.lifecycle?.phase ?? null,
+        goalCount: goals.length,
+        contractTitle: raw?.contract?.title ?? null,
+        periodLabel: raw?.contract?.periodLabel ?? null,
+        goals: goals.map(adaptGoalRow),
+      },
+      error: null,
+      empty: false,
+    }
+  } catch (err: any) {
+    const reason = err?.message ? String(err.message) : "No active performance contract for this period."
+    return {
+      data: {
+        available: false,
+        blockedReason: reason,
+        overallScore: null,
+        statusLabel: null,
+        goalCount: 0,
+        contractTitle: null,
+        periodLabel: null,
+        goals: [],
+      },
+      error: null,
+      empty: false,
+    }
+  }
+}
+
+export async function loadHomeLiveData(selfId?: string | null) {
   const [
     priorities,
     schedule,
@@ -416,6 +634,9 @@ export async function loadHomeLiveData() {
     customWallpapers,
     myCalendarEntries,
     companyEvents,
+    myTasks,
+    teamRows,
+    performanceOverview,
   ] = await Promise.all([
     loadMyPriorities(),
     loadUpcomingSchedule(),
@@ -426,6 +647,9 @@ export async function loadHomeLiveData() {
     loadCustomWallpapers(),
     loadMyCalendarEntries(),
     loadCompanyEvents(),
+    loadMyTasks(selfId),
+    loadTeamRows(),
+    loadMyPerformanceOverview(),
   ])
   return {
     priorities,
@@ -437,6 +661,9 @@ export async function loadHomeLiveData() {
     customWallpapers,
     myCalendarEntries,
     companyEvents,
+    myTasks,
+    teamRows,
+    performanceOverview,
     pendingExpenses: summarizePendingExpenses(serviceRequests.data),
   }
 }
