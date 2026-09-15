@@ -53,9 +53,11 @@ export const generatePDF = async (
       width: tempContainer.offsetWidth,
       height: tempContainer.offsetHeight,
       ignoreElements: (element) => {
-        // Skip elements that might cause issues
-        return element.classList.contains('no-print') || 
-               element.style.display === 'none'
+        // Skip elements that might cause issues. html2canvas-pro types this callback's
+        // param as the base DOM `Element`, which has no `.style` -- narrow it since in
+        // practice html2canvas only ever passes rendered HTML elements here.
+        return element.classList.contains('no-print') ||
+               (element as HTMLElement).style?.display === 'none'
       }
     })
 
