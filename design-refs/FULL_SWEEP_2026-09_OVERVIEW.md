@@ -8,7 +8,7 @@ every fix verified live, deployed to dev then production, merged to trunk.
 
 | Module | Branch | Docs | Status |
 |---|---|---|---|
-| Portfolio (staff) | `feature/portfolio-v11-live` | [`portfolio-v11/HANDOFF_AND_TEST_PLAN.md`](./portfolio-v11/HANDOFF_AND_TEST_PLAN.md), [`portfolio-v11/TEST_FINDINGS.md`](./portfolio-v11/TEST_FINDINGS.md) | In progress |
+| Portfolio (staff) | `feature/portfolio-v11-live` | [`portfolio-v11/HANDOFF_AND_TEST_PLAN.md`](./portfolio-v11/HANDOFF_AND_TEST_PLAN.md), [`portfolio-v11/TEST_FINDINGS.md`](./portfolio-v11/TEST_FINDINGS.md) | **Done** (Phases 0-5) — merged to `dev`/`master`/`prod`, deployed to production, verified live |
 | Investee Portal (founder) | `feature/investee-portal-v8-live` | `investee-portal-v8/HANDOFF_AND_TEST_PLAN.md`, `investee-portal-v8/TEST_FINDINGS.md` | Not started |
 | LP Portal (LP, full re-sweep) | `feature/lp-portal-resweep-live` | `lp-portal-resweep/HANDOFF_AND_TEST_PLAN.md`, `lp-portal-resweep/TEST_FINDINGS.md` — baseline: [`lp-portal-test-plan.md`](./lp-portal-test-plan.md) (9 Sep 2026, "done to the standard asked") | Not started |
 
