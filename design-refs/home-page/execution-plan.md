@@ -239,18 +239,60 @@ performance rows and the test task afterward. One-line hardcoded default fixed i
 roadmap section used to fall back to a literal `'Southern Africa Expansion'` whenever no project
 filter was active — now falls back to the top real project, or hides the section if there isn't one.
 
-## Phase 6 — News + Newsletters + Forums
+## Phase 6 — News + Newsletters + Forums — done, verified live
 
-**Backend**: Forums on `Post`+`Reply` plus two additive fields (`category`, `isSolved`) — cheapest of the
-three. Newsletters on the existing `Newsletter`/`NewsletterAudienceConfig`/`NewsletterSubscription`/
-`NewsletterTopic` models — mostly wiring. News: default to v1 as an internal-announcements feed on `Post`
-(title/content/author/time), with the wire-service styling (external sources, images, read-time, Market
-Pulse ticker) deferred and reported as a scoping decision at the start of this phase rather than assumed —
-it's a materially bigger build (real editorial content + external market-data integration) than the rest of
-the hub.
-**Frontend**: wire all three list/detail/create flows.
-**Verify**: post a forum discussion + reply, live; publish a newsletter to a real list, appears for
-recipients; News feed shows real posts, not the current static article mocks.
+Shipped close to the original plan, with one scope change made explicit before building rather than
+assumed: **Newsletters' audience-management side was dropped**, not deferred. `NewsletterAudienceConfig`
+exists but is `authorize(["admin"])`-gated (`GET/PUT /newsletters/recipients/config`) — genuinely an
+admin-console concern, not something a regular staff Home page can act on. The mock's "Newsletter lists"
+manager, "Publishing activity" log and a 12-issue readership-analytics chart all had zero real backing
+regardless (no distribution tracking, no open-rate data anywhere in the schema), so they were removed
+rather than left inert. Same treatment for the mock's per-newsletter role simulator (Read only / Editor /
+Publisher) — no such permission model exists server-side (any authenticated user can already call
+`POST /newsletters`), so keeping a fake role gate that implied a restriction the backend doesn't enforce
+would have been its own kind of dishonest UI. The block-based "Studio" editor (Cover / Editor's note /
+Market outlook / Portfolio signals / People spotlight blocks, review comments, governance checklist) is
+gone too — replaced by a plain create form (title, content, optional cover image) matching what
+`POST /newsletters` actually accepts.
+
+**News** was rebuilt as the plain internal-announcements feed the plan's v1 default called for —
+title/content/author/time on the real `Post` model, comments via `Reply`. The mock's wire-service
+styling (multi-source bylines, category badges, hero images, read-time, a live "Market Pulse" ticker,
+a "Sources you follow" list) is gone; none of it has any real data source, and building one (external
+market-data integration, real editorial content) is a materially bigger project the plan already flagged
+as out of scope for this pass.
+
+**Forums** shares the same `Post`/`Reply` table as News — a new nullable `category` column distinguishes
+a News post (`category` null) from a Forum discussion (`category` set to one of five fixed topics,
+matching the page's existing category rail). A new `isSolved` column backs a real, author-gated
+"Mark as solved" toggle. Category pill counts, the "Unanswered"/"My discussions" filters, "Top
+contributors" and "Knowledge that lasts" (recently solved discussions) are all computed from real loaded
+posts — the mock had five hardcoded categories with fake discussion counts and a fabricated seed
+conversation (quotes attributed to real `D.people` names) that's gone entirely.
+
+Two schema-adjacent problems, both fixed, that only surfaced once real ids and a schema change were in
+play:
+- This worktree's Prisma client is generated from the pre-migration schema and can't be regenerated here
+  (junctioned `node_modules` shared with the main checkout — `prisma generate` is off-limits the same way
+  `migrate`/`db push` are). The typed client silently drops any field it doesn't know about, so
+  `category`/`isSolved` needed a small raw-SQL side query on read and a follow-up raw `UPDATE` on
+  create/update in `PostController`, rather than passing through `prisma.post.*` directly.
+- Every "open this item" handler across all three pages (`data-news-open`, `data-forum-open`,
+  `data-newsletter-open`) coerced the clicked element's dataset id through `Number(...)` — correct only
+  for the mock's small integer ids, silently `NaN` for a real cuid, same bug class already fixed for
+  Calendar (Phase 4) and My Work (Phase 5). `nav.ts`'s URL regexes had the same assumption baked in
+  (`\d+`), so a direct link or a refresh on an open article/thread/newsletter fell back to the bare list
+  route. Separately, `Hv3SessionUser` (`D.user` in the runtime) never carried the real user id at all —
+  harmless until this phase needed "is this my own post" checks (the My discussions filter, the
+  author-gated Mark as solved button), which silently failed shut until fixed.
+
+Verified live end to end, each with a real create → real detail view → real reply, then deleted: a News
+post (with a comment), a Forum discussion (category-tagged, marked solved, with a reply — watched the
+category pill count, "Top contributors" and "Knowledge that lasts" all update from the real data), and a
+newsletter (list → reader view). Also caught and fixed live: two `<strong>`+`<span>` empty states that
+rendered on one line instead of stacking (no `display:grid` on the shared `.empty-state` class the way
+`.work-empty-state` has — switched to block-level `<h3>`+`<p>`, matching the pattern already working on
+Performance's own empty state from Phase 5).
 
 ## Phase 7 — People + My Profile
 
