@@ -6088,6 +6088,7 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
   
   
   
+  
   /* BEGIN_PORTFOLIO_LIVE_BRIDGE */
 function __pv11IsLive() {
     return Boolean(state.liveData) || Boolean(liveOnly) || Boolean(state.dealDetail);
@@ -6514,7 +6515,12 @@ function __pv11IsLive() {
     submitLP = function() {
       const form = $('#lpForm');
       if (!form?.reportValidity()) return;
-      const data = Object.fromEntries(new FormData(form));
+      // The wizard's Review step form has no input fields at all — reading
+      // FormData(form) alone here (as this override used to) silently loses
+      // every field typed on the earlier Details/Ownership steps. Merge in
+      // the wizard's own draft first, same as the base submitLP does.
+      const draft = (state.modalWizard && state.modalWizard.draft) || {};
+      const data = { ...draft, ...Object.fromEntries(new FormData(form)) };
       if (__pv11IsLive()) {
         __pv11EmitApi('api-add-lp', {
           name: String(data.name || ''),
@@ -6522,7 +6528,12 @@ function __pv11IsLive() {
           type: String(data.type || 'entity'),
           country: String(data.geography || data.country || 'ZW'),
           amount: String(data.commitment || ''),
-          fundId: String(funds[0]?.id || ''),
+          // Was an unconditional funds[0]?.id fallback — silently attached a
+          // real, arbitrary fund even when the user deliberately left the
+          // fund selector blank (FINDING-PV11-004), and that truthy fundId
+          // then makes the backend require an amount+effectiveDate the
+          // wizard never collects, rejecting every submission either way.
+          fundId: String(data.fundId || ''),
         });
         closeOverlays();
         return;
