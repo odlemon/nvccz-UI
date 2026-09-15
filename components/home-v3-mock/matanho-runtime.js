@@ -376,6 +376,16 @@ export function startMatanhoRuntime(rootEl, options = {}) {
   }
 
 
+  function aumSnapshotMarkup(){
+    const a = D.workdaySnapshot && D.workdaySnapshot.aum;
+    if (!a) {
+      return '<div class="snapshot-time-pane"><div class="snapshot-chart-heading"><div><span class="eyebrow">Portfolio signal</span><strong>Assets under management</strong></div></div><div class="chart-empty-state">Portfolio AUM is unavailable right now.</div></div>';
+    }
+    if (!Array.isArray(a.values) || !a.values.length) {
+      return `<div class="snapshot-time-pane"><div class="snapshot-chart-heading"><div><span class="eyebrow">Portfolio signal</span><strong>Assets under management</strong></div>${a.yoyLabel?`<span class="trend-positive">${esc(a.yoyLabel)}</span>`:''}</div><div class="chart-context"><span>${esc(a.totalLabel||'Not available')}</span><span>No trend history yet</span></div></div>`;
+    }
+    return `<div class="snapshot-time-pane"><div class="snapshot-chart-heading"><div><span class="eyebrow">Portfolio signal</span><strong>Assets under management</strong></div><span class="trend-positive">${esc(a.yoyLabel||'')}</span></div><div class="axis-chart-frame detailed-chart-home">${detailedChartSvg(a.values,{xLabels:a.xLabels||[],yPrefix:'US$',ySuffix:'B',decimals:2,yLabel:'AUM',xLabel:'Month',target:a.target,showValues:false,ariaLabel:'Assets under management, trailing 12 months'})}</div><div class="chart-context"><span>12-month range <strong>${esc(a.rangeLabel||'')}</strong></span><span>Updated today</span></div></div>`;
+  }
   let sessionTimerHandle = null;
   function emitIntegrationEvent(type, payload={}){
     window.dispatchEvent(new CustomEvent(`matanho:${type}`, {detail:{...payload, occurredAt:new Date().toISOString()}}));
@@ -462,21 +472,17 @@ export function startMatanhoRuntime(rootEl, options = {}) {
               <div><span>Balance</span><strong>82%</strong><i class="signal-bar amber"><b style="width:82%"></b></i></div>
             </div>
           </div>
-          <div class="snapshot-time-pane">
-            <div class="snapshot-chart-heading"><div><span class="eyebrow">Portfolio signal</span><strong>Assets under management</strong></div><span class="trend-positive">+16.9% YoY</span></div>
-            <div class="axis-chart-frame detailed-chart-home">${detailedChartSvg([1.06,1.08,1.07,1.11,1.13,1.15,1.14,1.18,1.19,1.21,1.22,1.24],{xLabels:['Aug','Sep','Oct','Nov','Dec','Jan','Feb','Mar','Apr','May','Jun','Jul'],yPrefix:'US$',ySuffix:'B',decimals:2,yLabel:'AUM',xLabel:'Month',target:1.20,showValues:false,ariaLabel:'Assets under management from August to July'})}</div>
-            <div class="chart-context"><span>12-month range <strong>US$1.06B–US$1.24B</strong></span><span>Updated today</span></div>
-          </div>
+          ${aumSnapshotMarkup()}
         </div>
       </section>
       <section class="home-action-grid">
         <article class="card card-pad card-hover home-priority-card">
           <div class="card-title"><div><h3>Today’s Priorities</h3><p>${state.priorities.filter(x=>x.done).length} of ${state.priorities.length} complete</p></div><button class="link-btn" data-nav="my-work">Open My Work ${icon('arrow')}</button></div>
-          ${state.priorities.map(t=>`<div class="task-row"><button class="check-circle ${t.done?'checked':''}" data-priority-toggle="${t.id}">${t.done?icon('check'):''}</button><div class="task-copy"><strong style="${t.done?'text-decoration:line-through;color:var(--muted)':''}">${t.title}</strong><span>${t.meta}</span></div><span class="status-pill ${t.priority.toLowerCase()}">${t.priority}</span></div>`).join('')}
+          ${state.priorities.length?state.priorities.map(t=>`<div class="task-row"><button class="check-circle ${t.done?'checked':''}" data-priority-toggle="${t.id}">${t.done?icon('check'):''}</button><div class="task-copy"><strong style="${t.done?'text-decoration:line-through;color:var(--muted)':''}">${t.title}</strong><span>${t.meta}</span></div><span class="status-pill ${t.priority.toLowerCase()}">${t.priority}</span></div>`).join(''):'<div class="empty-state-row">No open tasks right now.</div>'}
         </article>
         <article class="card card-pad card-hover schedule-card home-schedule-card">
           <div class="card-title"><div><h3>Upcoming Schedule</h3><p>Your next three commitments</p></div><button class="link-btn" data-nav="calendar">View calendar ${icon('arrow')}</button></div>
-          ${D.schedule.map((e,i)=>`<div class="schedule-row" data-event="${e.id}"><div class="date-tile">${e.month}<strong>${e.day}</strong></div><div class="event-copy"><strong>${e.title}</strong><span>${e.time} · ${e.location}</span></div><div class="avatar-stack">${e.people.map((p,j)=>avatar(p,colorByIndex(j))).join('')}</div></div>`).join('')}
+          ${D.schedule.length?D.schedule.map((e,i)=>`<div class="schedule-row" data-event="${e.id}"><div class="date-tile">${e.month}<strong>${e.day}</strong></div><div class="event-copy"><strong>${e.title}</strong><span>${e.time} · ${e.location}</span></div><div class="avatar-stack">${e.people.map((p,j)=>avatar(p,colorByIndex(j))).join('')}</div></div>`).join(''):'<div class="empty-state-row">Nothing on your calendar yet.</div>'}
         </article>
       </section>`;
   }
@@ -1047,7 +1053,7 @@ export function startMatanhoRuntime(rootEl, options = {}) {
     const aiRoute=e.target.closest('[data-ai-open-route]'); if(aiRoute){navigate(aiRoute.dataset.aiOpenRoute);return}
     const aiRecent=e.target.closest('[data-ai-recent]'); if(aiRecent){const item=state.aiRecent.find(x=>x.id===aiRecent.dataset.aiRecent);if(item){state.aiMessages=[];aiRespond(item.prompt)}return}
     const aiSaved=e.target.closest('[data-ai-saved-open]'); if(aiSaved){const item=state.aiSaved[Number(aiSaved.dataset.aiSavedOpen)];if(item){state.aiMode='ask';state.aiMessages=[{role:'user',text:item.prompt||item.title},{role:'assistant',...item}];saveState();render()}return}
-    const pri=e.target.closest('[data-priority-toggle]'); if(pri){const t=state.priorities.find(x=>x.id==pri.dataset.priorityToggle);t.done=!t.done;saveState();render();toast(t.done?'Priority completed.':'Priority reopened.',t.done?'success':'');return}
+    const pri=e.target.closest('[data-priority-toggle]'); if(pri){const t=state.priorities.find(x=>x.id==pri.dataset.priorityToggle);t.done=!t.done;saveState();emitIntegrationEvent('priorities.task.toggled',{id:t.id,done:t.done});render();toast(t.done?'Priority completed.':'Priority reopened.',t.done?'success':'');return}
     const wt=e.target.closest('[data-work-toggle]'); if(wt){e.stopPropagation();const t=state.workTasks.find(x=>x.id==wt.dataset.workToggle);if(t){t.done=!t.done;if(t.done)t.progress=100;saveState();render();toast(t.done?'Task completed.':'Task reopened.',t.done?'success':'')}return}
     const scorecardPerspective=e.target.closest('[data-scorecard-perspective]'); if(scorecardPerspective && !e.target.closest('[data-scorecard-kpi]')){state.scorecardPerspective=scorecardPerspective.dataset.scorecardPerspective;saveState();render();return}
     const scorecardKpi=e.target.closest('[data-scorecard-kpi]'); if(scorecardKpi){const perspective=balancedScorecardData().find(p=>p.id===scorecardKpi.dataset.scorecardPerspective);const kpi=perspective?.kpis[Number(scorecardKpi.dataset.scorecardKpi)];if(kpi)drawer(kpi.name,`<div class="scorecard-drawer-head"><div class="score-ring-large"><strong>${kpi.achievement}</strong><span>Achievement</span></div><div><span class="eyebrow">${perspective.id}</span><h3>${kpi.status}</h3><p>This measure contributes ${kpi.weight}% to the personal scorecard and has ${kpi.evidence} linked evidence items.</p></div></div><div class="scorecard-detail-row"><div><strong>Target</strong><span>Agreed for Q3 2026</span></div><b>${kpi.target}</b></div><div class="scorecard-detail-row"><div><strong>Current result</strong><span>Latest verified value</span></div><b>${kpi.actual}</b></div><div class="scorecard-detail-row"><div><strong>Weighted contribution</strong><span>Achievement × KPI weight</span></div><b>${(kpi.achievement*kpi.weight/100).toFixed(1)}</b></div><button class="primary-btn" style="width:100%;margin-top:18px" data-action="prepare-review">Add evidence or update</button>`);return}
