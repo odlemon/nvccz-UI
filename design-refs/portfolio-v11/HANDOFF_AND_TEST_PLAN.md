@@ -1,0 +1,54 @@
+# Portfolio V11 — handoff and full-sweep test plan
+
+**For:** the next agent picking this up cold · **Goal:** Portfolio module (staff-facing) demo-ready,
+same standard as Procurement V23's completed sweep · **Handoff date:** 15 September 2026
+
+---
+
+## 1. What this is
+
+Arcus / Matanho platform. Portfolio ("client-faithful port," internal id `portfolio-v11`, client package
+version V25) is a vendored runtime script rendered inside a Next.js host, with live data and write
+actions wired to the backend. Real route is `/portfolio` (renamed from `/portfolio-v11`, 308-redirected
+in `middleware.ts`); the module id/folder naming stayed `portfolio-v11` throughout.
+
+| | Path | Notes |
+|---|---|---|
+| Frontend repo | `C:\Users\lysp\Downloads\nvccz-new` | Next.js 14 · GitHub `odlemon/nvccz-UI` · default branch **`dev`** |
+| API repo | `C:\Users\lysp\Downloads\nvccz` | Express + Prisma + MySQL · GitHub `odlemon/nvccz` · default **`master`**, also **`prod`** |
+| Working branch (frontend) | `feature/portfolio-v11-live`, cut from `dev` at `c3422c1` | |
+| Working branch (backend) | not yet created — cut only if a genuine backend change is needed | |
+| Superseded, do not confuse | module id `portfolio-management` (hidden, `path: /portfolio`) — currently wins module-resolution for real `/portfolio/*` routes due to a stale path in `portfolio-v11`'s own modules.ts entry (Phase 2 fix) | |
+
+**Frontend key files**
+- `components/portfolio-v11-mock/matanho-portfolio-runtime.js` — vendored runtime. **Generated — never hand-edit directly.**
+- `scripts/extract-portfolio-v25.mjs` — regenerates the runtime; self-invokes the patch script below.
+- `scripts/patch-portfolio-runtime.mjs` + `scripts/portfolio-runtime-live-bridge.inc.js` — idempotent live-data patch, re-applied after every extraction.
+- `components/portfolio-v11-mock/portfolio-v11-app.tsx` — host; owns page-scoped live-data loading, listens for `matanho:before-action`.
+- `lib/portfolio-v11/actions.ts` — `handlePortfolioV11Action()`, ~50 handled action ids.
+- `lib/portfolio-v11/bootstrap.ts` — `scopesForPage()` / `loadPortfolioV11Scopes()`, the progressive-load engine (governed by `.cursor/rules/portfolio-progressive-loads.mdc`).
+- `lib/portfolio-v11/adapters.ts` — API → view-model shapes, incl. `STAGE_MAP` (Phase 3/4 fix target).
+- `lib/config/modules.ts` — `portfolio-v11` module entry (Phase 2 fix target).
+- `middleware.ts` — `STAFF_PUBLIC_PASS_THROUGH` (`/portfolio` entry, Phase 4 fix target), `routePermissions` (keys Portfolio to literal `'portfolio'`).
+- `lib/portal/config.ts` — `STAFF_PUBLIC_PASS_THROUGH` array itself.
+- `design-refs/portfolio-investee-gap-analysis-and-plan.md` — the Sept 2026 static gap-analysis this sweep is live-verifying. Explicitly says it was written without the dev server running.
+- `design-refs/FULL_SWEEP_2026-09_OVERVIEW.md` — cross-module index (this sweep + Investee Portal + LP Portal re-sweep).
+
+**Test personas:** `admin@nts.com` / `admin123` (god-mode, bypasses all RBAC — not useful for real permission testing). `PORTFOLIO_MGR` / `INV_ANALYST` roleCodes exist in `lib/config/role-permissions.ts` but no user is seeded with them yet — created in Phase 2.
+
+---
+
+## 2. Where everything stands
+
+*Not started — this handoff doc is the Phase 0 scaffold. Update after each phase.*
+
+| Phase | Status |
+|---|---|
+| 0 — Setup & preflight | In progress |
+| 1 — Security gate (FINDING-003) | Not started |
+| 2 — Foundation (module fix, permission alias, personas) | Not started |
+| 3 — Live testing | Not started |
+| 4 — Fixes by severity | Not started |
+| 5 — Merge & deploy | Not started |
+
+See `TEST_FINDINGS.md` for the running defect log.
