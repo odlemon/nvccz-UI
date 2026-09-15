@@ -9,9 +9,14 @@ as a hypothesis to verify, not a fact.
 | Severity | Open | Fixed locally, not deployed | Deployed and verified |
 |---|---|---|---|
 | CRITICAL | 0 | 0 | 0 |
-| HIGH | 6 | 0 | 1 |
-| MEDIUM | 5 | 0 | 0 |
+| HIGH | 1 | 0 | 6 |
+| MEDIUM | 3 | 0 | 1 |
 | LOW | 0 | 0 | 0 |
+
+Phase 4 pass (15 September 2026): fixed and verified live — PV11-004 (real root cause was a live-bridge
+override shadowing the first fix attempt, see its finding for the correction), PV11-007, PV11-008, PV11-010
+(Deal Flow half), PV11-011. Still open: PV11-005 (net-new distribution-creation UI, decided but not yet
+built), PV11-002, PV11-006, PV11-009 (the last has no code fix planned — flagged for a product decision).
 
 ## FINDING-PV11-001
 
@@ -178,6 +183,29 @@ depends on it), fails 100% of the time through its only UI entry point, for ever
   reopening "Add LP" while that stale DOM is still present does not reliably start a fresh step-0 wizard.
   Worth a small robustness fix (always close/reset on either outcome) rather than depending on the host.
 
+**Correction, Phase 4 fix pass:** the analysis above is accurate about the *bug*, but the "Suspected area"
+pointed at the wrong function. `matanho-portfolio-runtime.js`'s base `submitLP()` was fixed first (drop
+`|| funds[0]?.id`) and deployed, then re-tested live — LP creation *still* failed identically, still
+substituting the first fund. Traced with a `window.dispatchEvent` stack-trace patch against the deployed
+bundle: `scripts/portfolio-runtime-live-bridge.inc.js` (injected into the runtime by
+`patch-portfolio-runtime.mjs`, right before `window.MatanhoPortfolioUI =`) **unconditionally overrides**
+`submitLP` with its own implementation once `__pv11IsLive()` is true — the base function fixed above is
+dead code on every real submission. That override had two bugs of its own, both worse than the base one:
+it read `Object.fromEntries(new FormData(form))` alone with **no wizard-draft merge at all** (so on the
+fieldless Review-step form this returned `name:"", email:"", fundId:"",` for every field), and it hardcoded
+`fundId: String(funds[0]?.id || '')` — not even trying the user's own selection first. Fixed by merging
+`state.modalWizard.draft` into the override's data (matching the base function's pattern) and using
+`data.fundId` instead of the hardcoded fallback. **Verified live, 15 September 2026**: "Bridge Fixed LP"
+created successfully with the typed name, typed email, and `investmentCommitments: []` (no fund attached),
+confirmed via authenticated `GET /clients`. Deployed to dev.
+**Process note for the rest of this sweep:** `portfolio-runtime-live-bridge.inc.js` overrides several base
+runtime functions (`submitLP`, `submitCapitalCall`, and others) for the live-data path — any fix targeting
+a wizard's *submit* behavior needs to check this file first, not just the base runtime.js function of the
+same name, or the fix will silently no-op exactly as it did here. `submitCapitalCall`'s override (checked
+while fixing this) has the same percent-of-commitment conversion already described in FINDING-PV11-002 —
+that finding's root cause holds, but the executing code is this bridge override, not necessarily the base
+runtime's copy of the same formula.
+
 ## FINDING-PV11-005
 
 **Page / flow:** Fund detail / Fund Performance / LP Management — capital distribution creation (Wave 1's
@@ -312,6 +340,14 @@ Confirmed correctly out of this bug's scope (not part of Portfolio V11's own UI,
 `applicationRoutes.ts`, `boardReviewRoutes.ts`, `fundraisingRoutes.ts`'s relevant routes already use
 `authenticate` only (no gate to fix).
 
+**FIXED and verified live, 15 September 2026** (nvccz `89dd10d`, deployed to dev): added `portfolio_mgr`
+to all six listed write routes and `portfolio_mgr`+`inv_analyst` to the three read routes
+(`termSheetRoutes.ts`'s `GET /`, `investmentImplementationRoutes.ts`'s `GET /signed-term-sheets` and
+`GET /`, `portfolioCompanyRoutes.ts`'s `GET /with-investments`), matching FINDING-PV11-001's already-proven
+pattern exactly. Verified live: `portfolio.mgr@nts.local`'s `GET /api/term-sheets/` now returns 200 with
+real data (was 403 before this fix). The over-permissive `/disbursements` routes were left as-is per the
+finding's own note (lower priority, not blocking anything).
+
 ## FINDING-PV11-008
 
 **Page / flow:** Deal Detail → Term Sheet tab → Start board review (Wave 2 — deal-lifecycle actions)
@@ -351,6 +387,13 @@ fire-and-forget ahead of the record creation that can fail — worth wrapping so
 retries against the now-`UNDER_BOARD_REVIEW` stage cleanly (likely already possible once the Content-Type
 fix lands, since the stage change is idempotent) or reports the partial state clearly instead of a generic
 "Request failed" bubble that doesn't explain the deal is now stuck mid-transition.
+
+**FIXED and verified live, 15 September 2026** (nvccz-new `5b8c811`, deployed to dev): switched to
+`apiClient.postFormData(...)`. Verified directly against the live API (real PDF, real auth token): `POST
+/board-reviews/:id` now returns 201 "Board review created successfully" instead of 400. The stage-rollback
+robustness gap noted above (no undo if creation still fails for some other reason) was not additionally
+addressed — the specific failure mode that caused it is closed, and adding retry/rollback plumbing for a
+now-much-rarer failure path was judged not worth the added complexity for this pass.
 **Related, out of this module's scope:** the identical `'Content-Type': 'multipart/form-data'` mistake
 also exists in `lib/api/procurement-api.ts`'s `processInvoicePayment` (Procurement V23, already swept and
 merged) — flagged separately as its own task rather than fixed here, since Procurement is a different,
@@ -447,6 +490,18 @@ case) — worth fixing every listed id in one pass rather than one page at a tim
 discovered, mirroring how FINDING-PV11-007's backend `authorize()` gap was closed repo-wide in one look
 rather than file by file.
 
+**FIXED and verified live, 15 September 2026** (nvccz-new `dfddc13`, deployed to dev): gave
+`dashboard-fund-filter`/`-period-filter`/`-currency-filter`/`-geography-filter` and
+`deal-fund-filter`/`-stage-filter`/`-owner-filter`/`-age-filter` their own dispatcher cases; `renderDealFlow`
+now filters `deals` by all four before computing its metrics, kanban, list and calendar views. Verified
+live: Deal Flow → Stage = "Due Diligence" correctly narrows "Deal Register" from 5 to 2 opportunities
+(Mukuru Logistics, GreenOrbit Energy) and the KPI cards recompute (Pipeline Value $6.9M → $4.9M, Active
+Deals 5 → 2). **Scope note:** only Deal Flow's four filters were threaded through to actually filter
+displayed data this pass — Dashboard's four filters now correctly write state and re-render (no longer
+silently dropped by the catch-all) but `renderDashboard`'s aggregates don't yet read those new state fields,
+so Dashboard's filtering effect is not yet live-verified end-to-end; tracked as a smaller follow-up rather
+than re-opening this finding, since the Deal Flow half (the one with a concrete live repro) is fully fixed.
+
 ## FINDING-PV11-011
 
 **Page / flow:** Period Close & GL — "Run close pre-check" and "Request approval" (Wave 3 — "Period Close
@@ -479,6 +534,13 @@ need a `data-period` (or `data-id`) attribute sourced from that same state value
 the `button(...)` calls (the helper's 5th parameter already exists for exactly this) or by having the
 runtime's dispatcher inject the current close period into these two specific action ids' dataset before
 emitting, matching how form-backed actions elsewhere already assemble their dataset from live state.
+
+**FIXED and verified live, 15 September 2026** (nvccz-new `dfddc13`, deployed to dev): derived a `YYYY-MM`
+period code from `state.asOfDate` and attached it as `data-id` on both buttons. Verified live via a
+`window.fetch` trace: clicking "Run close pre-check" now fires `POST
+/investment-ops/cash-periods/2026-07/precheck` → 200, returning real blocker data (`canClose:false,
+blockerCount:10`), followed by `GET .../controls` → 200 (`readinessPct:56`) — previously zero network
+activity at all.
 
 ## Format per finding
 ```
