@@ -19,6 +19,9 @@ import {
   syncCoverPreference,
   createServiceRequest,
   downloadPayslip,
+  uploadWallpapers,
+  deleteWallpaper,
+  syncRotationInterval,
 } from "@/lib/home-v3/actions"
 import { useAppDispatch, useAppSelector } from "@/lib/store"
 import { refreshUserDetails, logoutUser } from "@/lib/store/slices/authSlice"
@@ -187,6 +190,8 @@ export function HomeV3App() {
       // `requests` is NOT read here — unlike priorities/schedule, state.requests' fallback is a
       // hardcoded literal, not `D.requests` (see seedRequestsCache's doc comment). The real data
       // is seeded into localStorage above instead, before the runtime ever reads its cache.
+      customWallpapers: live?.customWallpapers.data ?? [],
+      rotationIntervalMinutes: live?.cover.data?.rotationIntervalMinutes ?? 1440,
     }
     const initial = parseHv3Location(pathnameRef.current)
 
@@ -198,6 +203,8 @@ export function HomeV3App() {
       toast.error("Couldn't load your payroll summary", { description: live.servicesSummary.error })
     if (live?.serviceRequests.error)
       toast.error("Couldn't load your requests", { description: live.serviceRequests.error })
+    if (live?.customWallpapers.error)
+      toast.error("Couldn't load your wallpapers", { description: live.customWallpapers.error })
 
     const onPriorityToggled = (event: Event) => {
       const detail = (event as CustomEvent).detail || {}
@@ -223,11 +230,40 @@ export function HomeV3App() {
         if (result.error) toast.error(result.error)
       })
     }
+    const onWallpaperUploadRequested = (event: Event) => {
+      const detail = (event as CustomEvent).detail || {}
+      void uploadWallpapers(detail).then((result) => {
+        if (result.error) toast.error(result.error)
+        else if (result.reload) {
+          toast.success("Wallpaper uploaded")
+          setTimeout(() => window.location.reload(), 800)
+        }
+      })
+    }
+    const onWallpaperDeleteRequested = (event: Event) => {
+      const detail = (event as CustomEvent).detail || {}
+      void deleteWallpaper(detail).then((result) => {
+        if (result.error) toast.error(result.error)
+        else if (result.reload) {
+          toast.success("Wallpaper removed")
+          setTimeout(() => window.location.reload(), 800)
+        }
+      })
+    }
+    const onRotationIntervalUpdated = (event: Event) => {
+      const detail = (event as CustomEvent).detail || {}
+      void syncRotationInterval(detail).then((result) => {
+        if (result.error) toast.error(result.error)
+      })
+    }
     window.addEventListener("matanho:priorities.task.toggled", onPriorityToggled)
     window.addEventListener("matanho:preferences.theme.updated", onCoverPreferenceUpdated)
     window.addEventListener("matanho:preferences.wallpaper.updated", onCoverPreferenceUpdated)
     window.addEventListener("matanho:service.request.created", onServiceRequestCreated)
     window.addEventListener("matanho:payslip.download.requested", onPayslipDownloadRequested)
+    window.addEventListener("matanho:wallpaper.upload.requested", onWallpaperUploadRequested)
+    window.addEventListener("matanho:wallpaper.delete.requested", onWallpaperDeleteRequested)
+    window.addEventListener("matanho:preferences.rotation.updated", onRotationIntervalUpdated)
 
     apiRef.current = startMatanhoRuntime(el, {
       data,
@@ -262,6 +298,9 @@ export function HomeV3App() {
       window.removeEventListener("matanho:preferences.wallpaper.updated", onCoverPreferenceUpdated)
       window.removeEventListener("matanho:service.request.created", onServiceRequestCreated)
       window.removeEventListener("matanho:payslip.download.requested", onPayslipDownloadRequested)
+      window.removeEventListener("matanho:wallpaper.upload.requested", onWallpaperUploadRequested)
+      window.removeEventListener("matanho:wallpaper.delete.requested", onWallpaperDeleteRequested)
+      window.removeEventListener("matanho:preferences.rotation.updated", onRotationIntervalUpdated)
       delete window.__HOME_V3_PATH__
       apiRef.current?.destroy()
       apiRef.current = null

@@ -101,3 +101,56 @@ export async function downloadPayslip(detail: { payslipId?: string }): Promise<H
     return { handled: true, error: message }
   }
 }
+
+export type Hv3ReloadingActionResult = Hv3ActionResult & { reload?: boolean }
+
+/**
+ * `wallpaper.upload.requested` -> POST /api/homepage/wallpapers (multipart)
+ * On success this reloads the page: the mounted runtime has no hydrate() API (same gap noted
+ * throughout this build — see priorities.task.toggled's own doc comment), so without a reload
+ * an uploaded image would silently not appear in the wallpaper grid until the next unrelated
+ * navigation. A full reload is the honest choice here — better than a "successful" upload the
+ * user can't see.
+ */
+export async function uploadWallpapers(detail: { files?: File[] }): Promise<Hv3ReloadingActionResult> {
+  const files = detail?.files
+  if (!files?.length) return { handled: false, error: null }
+  try {
+    const formData = new FormData()
+    for (const file of files) formData.append("images", file)
+    await apiClient.postFormData("/homepage/wallpapers", formData)
+    return { handled: true, error: null, reload: true }
+  } catch (err: any) {
+    const message = err?.message ? String(err.message) : "Failed to upload wallpaper"
+    console.error("[home-v3] wallpaper.upload.requested failed:", message)
+    return { handled: true, error: message }
+  }
+}
+
+/** `wallpaper.delete.requested` -> DELETE /api/homepage/wallpapers/:id. Same reload reasoning as upload. */
+export async function deleteWallpaper(detail: { id?: string }): Promise<Hv3ReloadingActionResult> {
+  const id = detail?.id
+  if (!id) return { handled: false, error: null }
+  try {
+    await apiClient.delete(`/homepage/wallpapers/${id}`)
+    return { handled: true, error: null, reload: true }
+  } catch (err: any) {
+    const message = err?.message ? String(err.message) : "Failed to remove wallpaper"
+    console.error("[home-v3] wallpaper.delete.requested failed:", message)
+    return { handled: true, error: message }
+  }
+}
+
+/** `preferences.rotation.updated` -> PUT /api/homepage/preferences */
+export async function syncRotationInterval(detail: { intervalMinutes?: number }): Promise<Hv3ActionResult> {
+  const intervalMinutes = detail?.intervalMinutes
+  if (!intervalMinutes) return { handled: false, error: null }
+  try {
+    await apiClient.put("/homepage/preferences", { rotationIntervalMinutes: intervalMinutes })
+    return { handled: true, error: null }
+  } catch (err: any) {
+    const message = err?.message ? String(err.message) : "Failed to save rotation interval"
+    console.error("[home-v3] preferences.rotation.updated failed:", message)
+    return { handled: true, error: message }
+  }
+}

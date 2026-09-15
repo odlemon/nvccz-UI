@@ -187,9 +187,13 @@ export async function loadAumSnapshot(): Promise<ScopeResult<Hv3AumSnapshot | nu
   )
 }
 
-export type Hv3CoverPreference = { coverTheme: string; coverWallpaper: string }
+export type Hv3CoverPreference = {
+  coverTheme: string
+  coverWallpaper: string
+  rotationIntervalMinutes: number
+}
 
-/** `/api/homepage/preferences` — the signed-in user's Daily Cover choice (Phase 2). */
+/** `/api/homepage/preferences` — the signed-in user's Daily Cover choice (Phase 2/2b). */
 export async function loadCoverPreference(): Promise<ScopeResult<Hv3CoverPreference | null>> {
   return safe<Hv3CoverPreference | null>(
     "coverPreference",
@@ -198,6 +202,20 @@ export async function loadCoverPreference(): Promise<ScopeResult<Hv3CoverPrefere
       return res?.data ?? null
     },
     null,
+  )
+}
+
+export type Hv3CustomWallpaper = { id: string; url: string; label: string | null; sortOrder: number }
+
+/** `/api/homepage/wallpapers` — the signed-in user's own uploaded Daily Cover images (Phase 2b). */
+export async function loadCustomWallpapers(): Promise<ScopeResult<Hv3CustomWallpaper[]>> {
+  return safe<Hv3CustomWallpaper[]>(
+    "customWallpapers",
+    async () => {
+      const res: any = await apiClient.get("/homepage/wallpapers")
+      return Array.isArray(res?.data) ? res.data : []
+    },
+    [],
   )
 }
 
@@ -327,13 +345,14 @@ export function summarizePendingExpenses(requests: Hv3ServiceRequestRow[]): { la
 }
 
 export async function loadHomeLiveData() {
-  const [priorities, schedule, aum, cover, servicesSummary, serviceRequests] = await Promise.all([
+  const [priorities, schedule, aum, cover, servicesSummary, serviceRequests, customWallpapers] = await Promise.all([
     loadMyPriorities(),
     loadUpcomingSchedule(),
     loadAumSnapshot(),
     loadCoverPreference(),
     loadServicesSummary(),
     loadServiceRequests(),
+    loadCustomWallpapers(),
   ])
   return {
     priorities,
@@ -342,6 +361,7 @@ export async function loadHomeLiveData() {
     cover,
     servicesSummary,
     serviceRequests,
+    customWallpapers,
     pendingExpenses: summarizePendingExpenses(serviceRequests.data),
   }
 }
