@@ -66,7 +66,19 @@ rendering), keep other keys untouched until their own phase.
 a focus session, reload mid-session, confirm it's still running; AUM tile either shows real data or an
 honest empty state, never a static number; no console errors; no regression to login/session.
 
-## Phase 2 — Daily Cover (`/home/cover`)
+## Phase 2 — Daily Cover (`/home/cover`) — done, verified live
+
+Shipped as planned: `home_preferences` table + `GET/PUT /api/homepage/preferences` (API repo
+`dc27ddc`), theme/wallpaper wired to it (frontend repo `8f01c4b`). No runtime patch needed for
+either direction — `state.cover` already prefers a cached localStorage copy over any hardcoded
+default, so the real preference is seeded into that cache before mount; the runtime already
+emitted `preferences.theme.updated`/`preferences.wallpaper.updated` on every change, a new
+listener just syncs those to the API. Verified with `localStorage` fully cleared before reload
+that the choice still renders — proving it's server-side now, not the client cache the original
+copy claimed but didn't do. Reset back to the Porcelain/auto default on the shared dev DB after
+testing.
+
+## Phase 2 (original plan, for reference)
 
 **Backend**: CRUD on the `HomePreference` table from Phase 1 (theme, wallpaper).
 **Frontend**: each theme/wallpaper click saves via API instead of `cover` in localStorage; Home (Phase 1)
