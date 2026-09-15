@@ -14,6 +14,7 @@ import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { DatePicker } from '@/components/ui/date-picker'
 import { procurementApiV2 } from '@/lib/api/procurement-api-v2'
+import { ORG_NAME, ORG_LOGO_PATH } from '@/lib/branding'
 
 interface RfqInvitation {
   organisation: string | null
@@ -271,8 +272,8 @@ function RFQRespondContent() {
           <div className="flex justify-center mb-8">
             <div className="relative w-48 h-16">
               <Image
-                src="/logo.png"
-                alt="Logo"
+                src={ORG_LOGO_PATH}
+                alt={ORG_NAME}
                 fill
                 className="object-contain"
                 priority
@@ -365,8 +366,8 @@ function RFQRespondContent() {
         <div className="flex justify-center mb-6">
           <div className="relative w-48 h-16">
             <Image
-              src="/logo.png"
-              alt="Logo"
+              src={ORG_LOGO_PATH}
+              alt={ORG_NAME}
               fill
               className="object-contain"
               priority

@@ -2309,6 +2309,19 @@ s = replaceUnique(
 )
 
 // ---------------------------------------------------------------------------
+// P2P chain toolbar: don't offer Capture invoice / Record payment to roles the
+// backend will refuse anyway (INV-2) -- same __pr23Can(...) gate the invoice
+// register's own per-row Record payment button already uses.
+// ---------------------------------------------------------------------------
+s = replaceUnique(
+  s,
+  "actionButton('Capture invoice','capture-invoice-v5',t.id,'','invoice')+actionButton('Record payment','record-payment-v23',t.id,'','account')",
+  "(__pr23Can('intake.manage')?actionButton('Capture invoice','capture-invoice-v5',t.id,'','invoice'):'')+(__pr23Can('invoices.pay')?actionButton('Record payment','record-payment-v23',t.id,'','account'):'')",
+  "P2P chain toolbar: hide Capture invoice / Record payment without the grant",
+  "__pr23Can('intake.manage')?actionButton('Capture invoice'",
+)
+
+// ---------------------------------------------------------------------------
 // Scope guard: the bridge may only call what is in its scope
 // ---------------------------------------------------------------------------
 // The bridge is injected at the runtime's top level. Helpers the vendored layers declare inside their own blocks

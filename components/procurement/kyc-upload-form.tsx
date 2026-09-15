@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Loader2, Upload, FileText, CheckCircle2, AlertCircle } from 'lucide-react'
 import { toast } from 'sonner'
 import { procurementApiV2 } from '@/lib/api/procurement-api-v2'
+import { ORG_NAME } from '@/lib/branding'
 
 interface DocumentSlot {
   code: 'CR14' | 'BANK_LETTER' | 'CERTIFICATE_OF_INCORPORATION' | 'ITF263' | 'OTHER'
@@ -159,7 +160,7 @@ export function KYCUploadForm({ token }: KYCUploadFormProps) {
                 </div>
               </div>
               <CardTitle className="text-3xl font-bold">Submission Complete!</CardTitle>
-              <CardDescription className="text-green-50 text-lg">Thank you for registering with Arcus</CardDescription>
+              <CardDescription className="text-green-50 text-lg">Thank you for registering with {ORG_NAME}</CardDescription>
             </CardHeader>
             <CardContent className="p-8 space-y-6">
               <div className="bg-green-50 border-l-4 border-green-500 p-4 rounded">
