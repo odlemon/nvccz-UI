@@ -294,15 +294,50 @@ rendered on one line instead of stacking (no `display:grid` on the shared `.empt
 `.work-empty-state` has — switched to block-level `<h3>`+`<p>`, matching the pattern already working on
 Performance's own empty state from Phase 5).
 
-## Phase 7 — People + My Profile
+## Phase 7 — People + My Profile — done, verified live
 
-**Backend**: People directory reads existing `Employee`/`User`/`Department` — explicitly not a new table.
-Skills/endorsements and Recognition/badges: only build if you confirm they're wanted as real features:
-default is to ship Profile without those two sub-widgets (rather than a fake-data placeholder) until
-confirmed, per the "no hardcoded data" standard.
-**Frontend**: directory search/filter live; profile tabs live (Overview first, others as found necessary).
-**Verify**: directory search returns real employees across roles; a profile edit persists and is visible to
-another session.
+No new backend needed — `GET/PUT /users`, `GET /users/:id` already covered everything (confirmed:
+`PUT /users/:id` isn't permission-gated the way user *creation* is, so a self-service edit form
+needed no new endpoint, just care about which fields it's allowed to touch — see below).
+
+**People directory**: rebuilt on the real directory (`GET /users`) in place of the static fixture.
+Dropped every column/stat with no real source — hardcoded tiles (128 employees, 32 "available now",
+4 locations, 46 skills), a live-presence status dot, per-row "expertise" chips, and a fabricated
+performance score per colleague (there's no cheap, list-friendly per-person score endpoint; Phase 5's
+own scorecard read is already a heavier single-user call). Search and the department filter are both
+real and state-driven — search used to just hide/show DOM rows with no backing state, which couldn't
+have coordinated with a second filter even if one had existed.
+
+**My Profile**: Overview's three cards that used to carry their own invented numbers ("Recent
+contribution" — a fake 6-month chart; "Current focus" — 3 hardcoded fake projects; "This week" — fake
+per-day availability dots) now reuse real data already loaded elsewhere this build instead — Performance
+(Phase 5), My Work's open tasks, and Calendar's own week computation. The Goals tab reuses the exact
+same `D.performanceOverview` Phase 5 already verified live (real score/weight/status per goal, honest
+empty state), replacing four hardcoded fake goals.
+
+Skills/Recognition dropped per this section's own default. Experience (fake career history, fake
+education, fake professional credentials), Preferences (every field only ever wrote to local state —
+"Edit preferences" had no server call behind it at all) and Documents (fake file list) tabs are
+dropped outright rather than kept as fake placeholders: no real model backs any of the three, and
+"profile tabs live... as found necessary" was this section's own hedge for exactly this call.
+
+Edit profile now actually calls `PUT /users/:id` instead of writing to local state and toasting a fake
+success. Deliberately narrowed to `firstName`/`lastName`/`email` — the same endpoint also accepts
+`department`/`roleCode`/`roleId`, but those are privilege-bearing on the real `User` model (they
+determine what the app lets someone do) and this is a self-service "edit my profile" form, not a
+user-management screen, so it never sends them. Worth flagging since it was found in passing: that
+endpoint has no permission gate at all beyond plain authentication — unlike user *creation*
+(`POST /users`, `manage_users`-gated), any authenticated user could currently update *any other* user's
+name, email, department or role via a direct API call. Pre-existing, not introduced by this build, and
+out of scope for a `/home` module pass to fix — noting it here rather than acting on it.
+
+Verified live: directory search and department filter both against real data (searching "procurement"
+correctly returned exactly the three real Procurement staff, with the department dropdown itself built
+from the real distinct set). Edited the signed-in persona's own name, confirmed the change via a
+separate `GET` request (not just the optimistic local render) and that the privileged fields
+(`department`/`roleCode`/`role`) were untouched by the edit, then reverted the test edit — this was a
+real, already-existing user record, not a test row created for this phase, so restoring it rather than
+deleting it was the right cleanup.
 
 ## Phase 8 — Settings, Help & Support, and the second pass
 
