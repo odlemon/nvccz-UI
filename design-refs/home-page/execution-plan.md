@@ -119,7 +119,50 @@ loading state; My Requests table from real data.
 **Verify**: submit a leave request as a test user, see it land in My Requests with correct status; confirm
 the number reconciles with Payroll's own leave-balance view for the same user.
 
-## Phase 4 — Calendar (`/home/calendar`)
+## Phase 4 — Calendar (`/home/calendar`) — done, verified live
+
+Phase 0 had proposed writing personal events straight onto the existing `Event` model. Building this
+phase surfaced a hazard Phase 0's read-only audit missed: `EventController.createEvent` sends a
+notification to *every user in the system* on creation — correct for the corporate Events app it backs,
+wrong for "block an hour for focus time." Flagged to the user before writing any code; agreed approach
+was a new, deliberately separate `calendar_entries` table (API repo migration + `CalendarEntryController`
+at `/api/calendar-entries`, `git 94aa15d`) so personal entries never fan out a notification, while
+Calendar still reads the real company-wide `Event` model read-only alongside it via the existing
+`GET /api/events`.
+
+Shipped: week view rebuilt from the vendored runtime's hardcoded July-2026 mock entirely off real dates
+— month-mini, week columns, toolbar date, and the event grid all derive from the actual current date
+(verified live showing September 2026 / Mon 14–Sun 20, today the 15th, correctly highlighted). "My
+calendar" (personal `CalendarEntry` rows) and "Company events" (real `Event` rows) render as separate
+toggleable sources over the same grid. Create event persists a real row (`title`, computed `startDate`/
+`endDate` from the date+time fields with a 1-hour default duration, attendees folded into `description`)
+and, since the mounted runtime has no hydrate() API, reloads the page 800ms after a success toast so the
+new entry actually appears rather than silently vanishing until the next unrelated navigation — same
+trade-off used for wallpaper upload/delete in Phase 2b. Selecting an event opens a detail panel with the
+real title/time; personal entries get a working Remove button (`DELETE /api/calendar-entries/:id`, same
+reload-after-toast pattern). Company events (read-only, sourced from the real `Event` model) intentionally
+render without a Remove control.
+
+One real bug caught by code review before it could ship: the vendored runtime's event-click handler did
+`Number(ev.dataset.event)||1`, silently coercing any real UUID event id to `NaN` and falling back to a
+hardcoded id `1` — meaning Remove would have deleted whatever record happened to be `id 1`, not the
+clicked one. Fixed to keep the raw string id; verified live that the DELETE call carries the exact id of
+the clicked event.
+
+Live-verified end to end: created a test event (Wed 16 Sept, 10:00) via the UI, confirmed
+`POST /api/calendar-entries` fired with the correct computed `startDate`/`endDate`
+(`2026-09-16T08:00:00.000Z`–`09:00:00.000Z`, i.e. 10:00–11:00 CAT), confirmed it reloaded into the correct
+day column and time slot, opened its detail panel, clicked Remove, confirmed
+`DELETE /api/calendar-entries/:id` fired with the matching id and the event was gone after reload. No
+orphaned test rows left in the shared dev DB.
+
+Known, expected gap — not a bug: Company events renders empty in this dev environment since
+`GET /api/events` returns 0 rows here; the empty state is honest, not faked. Meeting-intelligence
+fields from the original mock (linked files, decisions pending, attendee-confirmation counts) have no
+backing data on either `CalendarEntry` or `Event` and were dropped from the detail panel rather than
+faked, matching the "scope down honestly" instruction in the original plan below.
+
+## Phase 4 (original plan, for reference)
 
 **Backend**: depends on Phase 0's finding. If a company-events feature already exists, Calendar reads it
 (no new writes needed beyond what already exists); if not, a dedicated range-query endpoint (week/month) +
