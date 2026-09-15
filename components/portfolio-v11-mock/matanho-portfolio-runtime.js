@@ -1534,7 +1534,7 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
     const geoColors=['#2475f5','#0ba780','#60a5fa','#f5a623','#0f98b6','#d9475c'];
     const geographies = Object.entries(geoTotals).map(([label,value],index)=>({label,value,color:geoColors[index%geoColors.length],display:`${pct(value/totalCommitment*100)} · ${formatMoney(value)}`}));
     const rows = filteredFunds.map(fund=>`<tr class="clickable" data-action="open-fund" data-id="${fund.id}"><td><div class="company-cell"><span class="company-logo" style="background:linear-gradient(145deg,#6094dc,#0a8f76)">${escapeHTML(fund.id.slice(-1))}</span><span class="table-primary">${escapeHTML(fund.name)}</span></div></td><td>${fund.vintage}</td><td>${escapeHTML(fund.strategy)}</td><td>${fund.currency}</td><td class="text-right">${formatMoney(fund.commitment,fund.currency)}</td><td><div class="inline-progress">${progressBar(fund.called/fund.commitment*100)}<span>${pct(fund.called/fund.commitment*100)}</span></div></td><td class="text-right">${formatMoney(fund.nav,fund.currency)}</td><td class="text-right">${formatMoney(fund.distributed,fund.currency)}</td><td class="text-right positive">${pct(fund.grossIrr)}</td><td class="text-right positive">${pct(fund.netIrr)}</td><td class="text-right">${fund.tvpi.toFixed(2)}x</td><td class="text-right">${fund.dpi.toFixed(2)}x</td><td>${statusPill(fund.status)}</td></tr>`).join('');
-    return `${pageHeader('Funds','Monitor fund-level performance, capital activity and structure across the portfolio.',globalPageActions({extra:button('Create fund','create-fund','primary','plus')}${button('New distribution','new-distribution','','trend-up')}))}
+    return `${pageHeader('Funds','Monitor fund-level performance, capital activity and structure across the portfolio.',globalPageActions({extra:button('Create fund','create-fund','primary','plus')+button('New distribution','new-distribution','','trend-up')}))}
       ${workspaceFilterBar([{label:'Vintage',action:'fund-vintage-filter',selected:vintageFilter,options:['All vintages',...Array.from(new Set(funds.map(f=>String(f.vintage))))]},{label:'Strategy',action:'fund-strategy-filter',selected:strategyFilter,options:['All strategies',...Array.from(new Set(funds.map(f=>f.strategy)))]},{label:'Status',action:'fund-status-filter',selected:statusFilter,options:['All statuses','Investing','Realising','Closed']},{label:'Currency',action:'fund-currency-filter',selected:currencyFilter,options:['All currencies','USD','ZWG']}])}
       <section class="metric-grid section-gap">
         ${metricCard({label:'Total Commitments',value:formatMoney(totalCommitment),iconName:'dollar',accent:'emerald',foot:'No prior-period data',action:'metric-funds'})}
@@ -6154,6 +6154,7 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
     } catch (_) {}
   }
 
+  
   
   
   

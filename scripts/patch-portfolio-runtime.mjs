@@ -535,7 +535,7 @@ if (s.includes("/* patched:distribution-wizard */")) {
     )
     s = s.replace(
       fundsHeaderAnchor,
-      "button('Create fund','create-fund','primary','plus')}${button('New distribution','new-distribution','','trend-up')",
+      "button('Create fund','create-fund','primary','plus')+button('New distribution','new-distribution','','trend-up')",
     )
     s = s.replace(
       "  function renderFunds() {",
