@@ -1,0 +1,11 @@
+    receiveAssistantReply(text, isError, sourcesUsed) {
+      const idx = state.aiMessages.findIndex(m => m.pending);
+      const promptText = idx > 0 ? (state.aiMessages[idx - 1].text || '') : '';
+      const msg = { role: 'assistant', text: String(text || ''), createdAt: Date.now(), error: !!isError, sources: (!isError && Array.isArray(sourcesUsed) && sourcesUsed.length) ? sourcesUsed : undefined };
+      if (idx !== -1) state.aiMessages[idx] = msg; else state.aiMessages.push(msg);
+      if (!isError) {
+        state.aiRecent = [{ id: `ai-${Date.now()}`, title: String(text || '').slice(0, 60), prompt: promptText, meta: 'Just now' }, ...state.aiRecent].slice(0, 8);
+      }
+      saveState(); render();
+      setTimeout(() => { const thread = document.getElementById('aiConversation'); if (thread) thread.scrollTo({ top: thread.scrollHeight, behavior: 'smooth' }) }, 60);
+    },

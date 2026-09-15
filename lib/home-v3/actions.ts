@@ -441,7 +441,12 @@ export async function updateMyProfile(detail: {
   }
 }
 
-export type Hv3AssistantResult = { handled: boolean; error: string | null; reply?: string }
+export type Hv3AssistantResult = {
+  handled: boolean
+  error: string | null
+  reply?: string
+  sourcesUsed?: string[]
+}
 
 /**
  * `assistant.message.sent` -> POST /api/assistant/chat. Unlike every other action in this file,
@@ -449,10 +454,17 @@ export type Hv3AssistantResult = { handled: boolean; error: string | null; reply
  * real one) and a full-page reload would blow away the conversation — so this is the one action
  * whose result needs to flow back INTO the mounted runtime rather than just a toast. See
  * RuntimeApi.receiveAssistantReply in home-v3-app.tsx / matanho-runtime.d.ts.
+ *
+ * `scope`/`sources` (Phase 9) mirror the composer's scope dropdown and the sidebar's per-source
+ * toggles exactly as the runtime names them — the backend maps them to real data fetches (see
+ * AssistantContextService in the backend repo) and echoes back which sources actually contributed
+ * as `sourcesUsed`, so the reply can show real provenance instead of nothing.
  */
 export async function sendAssistantMessage(detail: {
   prompt?: string
   history?: { role: "user" | "assistant"; content: string }[]
+  scope?: string
+  sources?: Record<string, boolean>
 }): Promise<Hv3AssistantResult> {
   const prompt = detail?.prompt?.trim()
   if (!prompt) return { handled: false, error: null }
@@ -460,10 +472,13 @@ export async function sendAssistantMessage(detail: {
     const res: any = await apiClient.post("/assistant/chat", {
       prompt,
       history: detail.history ?? [],
+      scope: detail.scope,
+      sources: detail.sources,
     })
     const reply = typeof res?.data?.reply === "string" ? res.data.reply : ""
     if (!reply) return { handled: true, error: "The assistant didn't return a response" }
-    return { handled: true, error: null, reply }
+    const sourcesUsed = Array.isArray(res?.data?.sourcesUsed) ? res.data.sourcesUsed : []
+    return { handled: true, error: null, reply, sourcesUsed }
   } catch (err: any) {
     const message = err?.message ? String(err.message) : "Failed to reach the assistant"
     console.error("[home-v3] assistant.message.sent failed:", message)

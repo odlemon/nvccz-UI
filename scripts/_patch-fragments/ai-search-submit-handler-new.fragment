@@ -1,0 +1,1 @@
+    if(e.target.id==='aiSearchForm'){state.aiSearchQuery=String(new FormData(e.target).get('query')||'').trim();saveState();render();return}

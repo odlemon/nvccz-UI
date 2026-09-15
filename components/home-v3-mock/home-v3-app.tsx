@@ -154,7 +154,7 @@ type RuntimeApi = {
     }
   ) => void
   setSessionUser: (user: Hv3SessionUser) => void
-  receiveAssistantReply: (text: string, isError?: boolean) => void
+  receiveAssistantReply: (text: string, isError?: boolean, sourcesUsed?: string[]) => void
   destroy: () => void
 }
 
@@ -429,7 +429,7 @@ export function HomeV3App() {
       const detail = (event as CustomEvent).detail || {}
       void sendAssistantMessage(detail).then((result) => {
         if (result.error) apiRef.current?.receiveAssistantReply(result.error, true)
-        else if (result.reply) apiRef.current?.receiveAssistantReply(result.reply, false)
+        else if (result.reply) apiRef.current?.receiveAssistantReply(result.reply, false, result.sourcesUsed)
       })
     }
     window.addEventListener("matanho:priorities.task.toggled", onPriorityToggled)

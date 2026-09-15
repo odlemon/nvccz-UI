@@ -1,0 +1,2 @@
+    aiContextSources: saved.aiContextSources || {work:true,calendar:true,documents:true,forums:true,news:true,people:true},
+    aiSearchQuery: saved.aiSearchQuery || '',
