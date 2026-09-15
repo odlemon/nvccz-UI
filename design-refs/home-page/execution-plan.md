@@ -458,24 +458,66 @@ support" card. Confirmed the Apps page renders the same six real modules as the 
 dropdown, and that clicking one same-tab-navigates to the real module (tested Performance
 Management, landed on its real dashboard).
 
-## Phase 9 — Matanho AI panel: real per-source context injection (RAG) — deferred until after Phase 8
+## Phase 9 — Matanho AI panel: real per-source context injection (RAG) — done, verified live
 
-Deferred, user-directed follow-up to Phase 7b. The "N sources connected" sidebar toggles (My Work,
-Calendar, Forums, News, People) are currently decorative — Phase 7b wired the panel to a real LLM but
-scoped that pass to "make it respond for real" rather than giving it live access to the user's actual
-data; the system prompt just tells the model honestly that it doesn't have that access. This phase
-closes the gap: retrieve the signed-in user's real tasks/calendar/performance/posts/directory data
-server-side, assemble it into context the model can actually reason over, and make the source toggles
-and the composer's scope selector ("All connected work" / "My work only" / "People and knowledge")
-actually control what's included rather than being inert.
+User-directed follow-up to Phase 7b, done after Phase 8 per the user's own sequencing request. The
+"N sources connected" sidebar toggles and the composer's scope selector ("All connected work" /
+"My work only" / "People and knowledge") existed in the UI since the original design port but had
+zero effect on the real LLM call Phase 7b added — the system prompt just told the model outright it
+had no access to the user's data. This phase closes that gap for five sources: My Work, Calendar,
+Forums, News, People directory.
 
-Explicitly deferred until the rest of this module (Phase 8 and any remaining second-pass items) is
-fully done — do not start this before then without the user re-confirming.
+**Backend**: new `AssistantContextService.buildAssistantContext(userId, scope, sources)` — direct
+Prisma queries (not a vector DB: no document-repository concept exists anywhere in this build, and
+data volumes are modest enough that a handful of capped, formatted queries is the right size for
+the problem). Each source is a small, independently-capped section (open tasks sorted by priority,
+next 14 days of calendar, 6 most recent Forums/News posts each, up to 40 people); `scope` narrows
+which sources are even considered, then each source's own toggle can further exclude it. The
+`AssistantController` injects the assembled text as a second system message and dynamically rewords
+its own access disclaimer to match what was actually included — critically, it distinguishes a
+source that's enabled but genuinely has nothing in it (an honest "you have no open tasks right now"
+answer) from one that's switched off entirely (a real access limitation), rather than conflating the
+two into one blanket "I don't have access" response. The response echoes back which sources actually
+contributed data (`sourcesUsed`) so the frontend can show real provenance.
 
-**Scope to work out during that phase's own audit** (not designed yet): which sources are cheap enough
-to always include vs. need on-demand retrieval; how the composer's scope selector should narrow
-context; whether per-source toggles gate retrieval or just presentation; token-budget limits so context
-assembly doesn't blow past the LLM's context window for a user with a lot of open tasks/history.
+**Frontend**: `aiRespond()` now sends `scope`/`sources` alongside every prompt; `receiveAssistantReply`
+attaches the returned `sourcesUsed` to the message, and the plain-text reply bubble (every real reply
+takes this path — the rich card format was only ever reachable by the old canned responder Phase 7b
+already stopped calling) now shows them as chips, reusing CSS that existed but had been dead since
+that same phase.
+
+**Also fixed, sitting in the exact same sidebar as the now-real toggles**: "Today's context" no
+longer shows a fixed fake "Portfolio review 14:00 · Harare Boardroom" example — it now draws only
+from data already loaded elsewhere (today's schedule, an open priority, a performance goal under
+70%), with an honest empty state when none apply. "Related people" now reads the real directory
+(`D.directory`, injected since Phase 7) instead of the unused static `D.people` fixture, and drops
+the fake live-presence dot Phase 7 already removed everywhere else.
+
+**Also fixed, directly thematic to "search across your sources"**: the Search tab was 5 fully
+hardcoded fake results (a fake .pptx, a fake person, a fake discussion, a fake news headline, a
+fake calendar entry) that a keystroke handler merely hid and showed by substring match — never an
+actual search of anything. Replaced with a real filter over the same real arrays already loaded for
+this build, gated by the same per-source toggles. Search now runs on submit rather than per
+keystroke.
+
+**Also dropped in passing**: the Draft tab's textarea used to pre-fill a specific fake executive-
+update paragraph as though already drafted; it now starts empty like every other field in this
+build, falling back to its existing (previously unreachable) placeholder text.
+
+**Deliberately not built**: real @mention-style forum notifications, semantic/vector search, or any
+new UI surface beyond what already existed — this phase is about making existing, previously-inert
+controls actually work, not adding new ones.
+
+Verified live: direct backend fetch tests first (empty-but-enabled vs. populated vs. all-disabled
+sources, confirming the wording is honest in each case) before touching the frontend. Then through
+the UI — set scope to "People and knowledge", asked "Name a real colleague from the directory and
+their role," got back a real person (Proc Officer — OFFICER, Procurement) with a real "🔒 People
+directory" chip and "Used 1 source" label beneath the reply. Confirmed "Today's context" showed its
+honest empty state for a test user with genuinely zero tasks/calendar entries (checked directly
+against the database, not assumed). Confirmed "Related people" shows real directory rows. Searched
+"proc" in the Search tab and got real directory matches (Proc Buyer, Proc Manager, Proc Officer,
+Proc Payables) with working "Open" navigation to the real People page. Confirmed the Draft tab now
+shows its placeholder instead of a pre-filled fake paragraph.
 
 ## Phase 2b — custom wallpaper upload + rotation interval — done, verified live
 
