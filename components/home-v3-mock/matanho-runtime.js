@@ -1140,7 +1140,27 @@ function servicesView() {
       if(action==='toggle-solved'){const btn=e.target.closest('[data-post-solved]');const id=btn&&btn.dataset.postSolved;const p=(D.forumPosts||[]).find(x=>x.id===id);if(p){p.isSolved=!p.isSolved;render();toast(p.isSolved?'Marked as solved.':'Marked as unsolved.','success');emitIntegrationEvent('post.solved.toggled',{id:p.id,title:p.title,content:p.content,isSolved:p.isSolved})}return}
       if(action==='new-discussion'){modal('Start a discussion',`<form id="discussionForm"><div class="form-grid"><div class="form-field full"><label>Title</label><input class="input-control" name="title" required/></div><div class="form-field full"><label>Topic</label><select class="select-control" name="category">${forumCategories().map(c=>`<option>${esc(c)}</option>`).join('')}</select></div><div class="form-field full"><label>Opening message</label><textarea class="textarea-control" name="body" required rows="5"></textarea></div></div><div class="form-actions"><button class="secondary-btn" type="button" data-action="close-portal">Cancel</button><button class="primary-btn">Publish discussion</button></div></form>`);return}
       if(action==='back-forums'){state.forumThread=null;syncUrl();render();return}
-      if(action==='find-time'){toast('Three shared time windows found for this week.','success');return}
+      if(action==='find-time'){
+        const week=calendarWeekDays();
+        const fmt=m=>`${String(Math.floor(m/60)).padStart(2,'0')}:${String(m%60).padStart(2,'0')}`;
+        const windows=[];
+        for(let d=0;d<5;d++){
+          const dayEvents=combinedWeekEvents().filter(e=>e.dayIndex===d).sort((a,b)=>a.start-b.start);
+          let cursor=8*60;
+          const dayEnd=17*60;
+          dayEvents.forEach(e=>{
+            const evStartMin=e.start.getHours()*60+e.start.getMinutes();
+            const evEndMin=e.end.getHours()*60+e.end.getMinutes();
+            if(evStartMin>cursor+29) windows.push({day:week[d].label,startMin:cursor,endMin:evStartMin});
+            cursor=Math.max(cursor,evEndMin);
+          });
+          if(dayEnd>cursor+29) windows.push({day:week[d].label,startMin:cursor,endMin:dayEnd});
+        }
+        if(!windows.length){toast('No open time found in your calendar this week (08:00–17:00).');return}
+        const first=windows[0];
+        toast(`${windows.length} open window${windows.length===1?'':'s'} in your calendar this week — next: ${esc(first.day)} ${fmt(first.startMin)}–${fmt(first.endMin)}.`,'success');
+        return;
+      }
       if(action==='create-event'){modal('Create event',`<form id="eventForm"><div class="form-grid"><div class="form-field full"><label>Event name</label><input class="input-control" name="title" required/></div><div class="form-field"><label>Date</label><input class="input-control" type="date" name="date"/></div><div class="form-field"><label>Time</label><input class="input-control" type="time" name="time"/></div><div class="form-field full"><label>Attendees</label><input class="input-control" name="attendees" placeholder="Add people or teams"/></div></div><div class="form-actions"><button type="button" class="secondary-btn" data-action="close-portal">Cancel</button><button class="primary-btn">Create event</button></div></form>`);return}
       if(action==='clear-work-filters'){state.workProject='all';state.workFilter='All tasks';state.workSearch='';saveState();render();return}
       
