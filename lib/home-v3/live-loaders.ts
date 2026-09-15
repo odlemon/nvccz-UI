@@ -11,9 +11,13 @@
  * - GET /homepage            -> { success, data: { events: { upcoming } } } — "Upcoming Schedule"
  * - GET /portfolio/dashboard?scope=aum -> { success, data: { aumKpis } } — Workday Snapshot AUM chart
  */
-import { apiClient } from "@/lib/api/api-client"
+import { apiClient, ApiError } from "@/lib/api/api-client"
 
 export type ScopeResult<T> = { data: T; error: string | null; empty: boolean }
+
+function formatUsd(value: number): string {
+  return `US$${value.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+}
 
 async function safe<T>(label: string, fn: () => Promise<T>, fallback: T): Promise<ScopeResult<T>> {
   try {
@@ -197,12 +201,147 @@ export async function loadCoverPreference(): Promise<ScopeResult<Hv3CoverPrefere
   )
 }
 
+export type Hv3PayslipSummary = {
+  id: string
+  periodLabel: string
+  grossLabel: string
+  deductionsLabel: string
+  netLabel: string
+}
+export type Hv3ServicesSummary = {
+  leaveBalanceLabel: string
+  leaveBalanceMeta: string
+  leaveBalanceDays: number | null
+  payslipLabel: string
+  payslipMeta: string
+  latestPayslip: Hv3PayslipSummary | null
+}
+const PAYROLL_NOT_SET_UP: Hv3ServicesSummary = {
+  leaveBalanceLabel: "Not set up",
+  leaveBalanceMeta: "",
+  leaveBalanceDays: null,
+  payslipLabel: "Not set up",
+  payslipMeta: "",
+  latestPayslip: null,
+}
+
+/**
+ * `/api/payroll/employee/leave-balances` + `/api/payroll/employee/payslips` — both 404 with
+ * "Employee record not found" when the signed-in User has no linked Employee row (true for
+ * every seeded test persona tried so far). That's an honest, expected state — self-service
+ * genuinely isn't set up for this account — not a load failure, so it's handled here rather
+ * than through safe()'s error/toast path.
+ */
+export async function loadServicesSummary(): Promise<ScopeResult<Hv3ServicesSummary>> {
+  try {
+    const [balances, payslips]: [any[], any[]] = await Promise.all([
+      apiClient.get<any>("/payroll/employee/leave-balances").then((r: any) => r?.data ?? []),
+      apiClient.get<any>("/payroll/employee/payslips?limit=1").then((r: any) => r?.data ?? []),
+    ])
+    const annual = balances.find((b) => /annual/i.test(b.leaveType)) ?? balances[0] ?? null
+    const payslip = payslips[0] ?? null
+    const latestPayslip: Hv3PayslipSummary | null = payslip
+      ? {
+          id: payslip.id,
+          periodLabel: payslip.payrollRun?.payPeriod || "Latest",
+          grossLabel: formatUsd(Number(payslip.grossPay || 0)),
+          deductionsLabel: formatUsd(Number(payslip.totalDeductions || 0)),
+          netLabel: formatUsd(Number(payslip.netPay || 0)),
+        }
+      : null
+    return {
+      data: {
+        leaveBalanceLabel: annual ? `${Number(annual.balance).toFixed(1)} days` : "No balance recorded",
+        leaveBalanceMeta: annual ? `${annual.leaveType} leave` : "",
+        leaveBalanceDays: annual ? Number(annual.balance) : null,
+        payslipLabel: latestPayslip?.netLabel ?? "No payslips yet",
+        payslipMeta: latestPayslip?.periodLabel ?? "",
+        latestPayslip,
+      },
+      error: null,
+      empty: !annual && !payslip,
+    }
+  } catch (err: any) {
+    if (err instanceof ApiError && err.status === 404) {
+      return { data: PAYROLL_NOT_SET_UP, error: null, empty: true }
+    }
+    const message = err?.message ? String(err.message) : "Failed to load payroll summary"
+    console.error("[home-v3] servicesSummary failed:", message)
+    return { data: PAYROLL_NOT_SET_UP, error: message, empty: false }
+  }
+}
+
+export type Hv3ServiceRequestRow = {
+  id: string
+  service: string
+  submitted: string
+  owner: string
+  status: string
+  next: string
+  type: string
+  amount: number | null
+  rawStatus: string
+}
+
+const STATUS_LABELS: Record<string, string> = {
+  pending: "Pending",
+  in_progress: "In progress",
+  completed: "Completed",
+  rejected: "Rejected",
+}
+
+/** `/api/service-requests` — the signed-in user's own requests (new this phase, see execution-plan.md Phase 3). */
+export async function loadServiceRequests(): Promise<ScopeResult<Hv3ServiceRequestRow[]>> {
+  return safe<Hv3ServiceRequestRow[]>(
+    "serviceRequests",
+    async () => {
+      const res: any = await apiClient.get("/service-requests")
+      const rows: any[] = Array.isArray(res?.data) ? res.data : []
+      return rows.map((r) => ({
+        id: r.id,
+        service: r.summary,
+        submitted: new Date(r.createdAt).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }),
+        owner: "You",
+        status: STATUS_LABELS[r.status] || r.status,
+        next: r.nextAction || "",
+        type: r.type,
+        amount: r.amount == null ? null : Number(r.amount),
+        rawStatus: r.status,
+      }))
+    },
+    [],
+  )
+}
+
+/** Sum of pending expense-type requests, for the Services stat tile. */
+export function summarizePendingExpenses(requests: Hv3ServiceRequestRow[]): { label: string; meta: string } {
+  // "expenses" (plural) matches the Home hub's service-catalog id (lib/home-v3-mock/matanho-data.ts),
+  // not the singular the backend originally (wrongly) validated against — see
+  // ServiceRequestController.ts's MAX_TYPE_LENGTH comment for the same fix on that side.
+  const pendingExpenses = requests.filter((r) => r.type === "expenses" && r.rawStatus === "pending")
+  const total = pendingExpenses.reduce((sum, r) => sum + (r.amount || 0), 0)
+  return {
+    label: formatUsd(total),
+    meta: `${pendingExpenses.length} item${pendingExpenses.length === 1 ? "" : "s"}`,
+  }
+}
+
 export async function loadHomeLiveData() {
-  const [priorities, schedule, aum, cover] = await Promise.all([
+  const [priorities, schedule, aum, cover, servicesSummary, serviceRequests] = await Promise.all([
     loadMyPriorities(),
     loadUpcomingSchedule(),
     loadAumSnapshot(),
     loadCoverPreference(),
+    loadServicesSummary(),
+    loadServiceRequests(),
   ])
-  return { priorities, schedule, aum, cover }
+  return {
+    priorities,
+    schedule,
+    aum,
+    cover,
+    servicesSummary,
+    serviceRequests,
+    pendingExpenses: summarizePendingExpenses(serviceRequests.data),
+  }
 }

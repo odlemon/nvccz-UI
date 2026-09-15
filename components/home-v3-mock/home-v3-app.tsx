@@ -14,7 +14,12 @@ import {
 } from "@/lib/home-v3-mock/session-user"
 import { startMatanhoRuntime } from "@/components/home-v3-mock/matanho-runtime"
 import { loadHomeLiveData, type Hv3CoverPreference } from "@/lib/home-v3/live-loaders"
-import { syncPriorityTaskStage, syncCoverPreference } from "@/lib/home-v3/actions"
+import {
+  syncPriorityTaskStage,
+  syncCoverPreference,
+  createServiceRequest,
+  downloadPayslip,
+} from "@/lib/home-v3/actions"
 import { useAppDispatch, useAppSelector } from "@/lib/store"
 import { refreshUserDetails, logoutUser } from "@/lib/store/slices/authSlice"
 import { toast } from "sonner"
@@ -22,20 +27,25 @@ import "@/components/home-v3-mock/home-v3.css"
 import "@/components/home-v3-mock/home-v3-overrides.css"
 
 /**
- * `state.priorities` in the runtime prefers a cached `matanho-hub-state` localStorage copy over
- * whatever is passed in as initial data (`saved.priorities || D.priorities`) — reasonable for a
- * pure client mock, wrong now that `D.priorities` is real. Evict just that key so the runtime's
- * own fallback picks up the fresh data. `schedule` and `workdaySnapshot` are read directly off
- * `D` (never cached to `state`/localStorage), so they need no such eviction.
+ * `state.priorities` and `state.requests` both prefer a cached `matanho-hub-state` localStorage
+ * copy over whatever is passed in as initial data (`saved.X || D.X`) — reasonable for a pure
+ * client mock, wrong now that both are real. Evict just those keys so the runtime's own
+ * fallback picks up the fresh data. `schedule` and `workdaySnapshot` are read directly off `D`
+ * (never cached to `state`/localStorage), so they need no such eviction.
  */
-function evictStalePrioritiesCache() {
+function evictStaleCacheKeys(keys: string[]) {
   try {
     const raw = localStorage.getItem("matanho-hub-state")
     if (!raw) return
     const parsed = JSON.parse(raw)
-    if (!("priorities" in parsed)) return
-    delete parsed.priorities
-    localStorage.setItem("matanho-hub-state", JSON.stringify(parsed))
+    let changed = false
+    for (const key of keys) {
+      if (key in parsed) {
+        delete parsed[key]
+        changed = true
+      }
+    }
+    if (changed) localStorage.setItem("matanho-hub-state", JSON.stringify(parsed))
   } catch {
     // Corrupt/absent cache is not this function's problem — the runtime already tolerates it.
   }
@@ -56,7 +66,45 @@ function seedCoverPreferenceCache(pref: Hv3CoverPreference | null) {
     parsed.cover = { ...(parsed.cover || {}), theme: pref.coverTheme, wallpaper: pref.coverWallpaper }
     localStorage.setItem("matanho-hub-state", JSON.stringify(parsed))
   } catch {
-    // Same reasoning as evictStalePrioritiesCache — worst case the hardcoded default renders.
+    // Same reasoning as evictStaleCacheKeys — worst case the hardcoded default renders.
+  }
+}
+
+/**
+ * `state.leaveBalance` (a plain number, not an object) follows the same saved-cache-wins
+ * pattern. It's only used inside the "Request leave" modal's own live preview ("you have N days
+ * available") — seeded from the real balance so that preview starts correct; the request-leave
+ * submit flow never writes this back to the server (approval, not submission, should move a
+ * real balance — see actions.ts's createServiceRequest doc comment), so no eviction is needed
+ * on the write side, only this one-time seed on read.
+ */
+function seedLeaveBalanceCache(days: number | null) {
+  if (days == null) return
+  try {
+    const raw = localStorage.getItem("matanho-hub-state")
+    const parsed = raw ? JSON.parse(raw) : {}
+    parsed.leaveBalance = days
+    localStorage.setItem("matanho-hub-state", JSON.stringify(parsed))
+  } catch {
+    // Same reasoning as above.
+  }
+}
+
+/**
+ * `state.requests` follows the exact same hardcoded-literal-fallback pattern as `cover` (not
+ * `saved.requests || D.requests` — the literal four SRV-/LEV- demo rows are inline in the
+ * fallback itself). Evicting the key like priorities/schedule would just expose that literal
+ * again; seed the real array in instead, same technique as seedCoverPreferenceCache.
+ */
+function seedRequestsCache(requests: unknown[] | null) {
+  if (!requests) return
+  try {
+    const raw = localStorage.getItem("matanho-hub-state")
+    const parsed = raw ? JSON.parse(raw) : {}
+    parsed.requests = requests
+    localStorage.setItem("matanho-hub-state", JSON.stringify(parsed))
+  } catch {
+    // Same reasoning as above.
   }
 }
 
@@ -113,8 +161,10 @@ export function HomeV3App() {
     if (!el) return
 
     mountedRef.current = true
-    evictStalePrioritiesCache()
+    evictStaleCacheKeys(["priorities"])
     seedCoverPreferenceCache(liveDataRef.current?.cover.data ?? null)
+    seedLeaveBalanceCache(liveDataRef.current?.servicesSummary.data.leaveBalanceDays ?? null)
+    seedRequestsCache(liveDataRef.current?.serviceRequests.data ?? null)
 
     const live = liveDataRef.current
     const sessionUser = buildHv3SessionUser(user, userDetails)
@@ -129,6 +179,14 @@ export function HomeV3App() {
       priorities: live?.priorities.data ?? [],
       schedule: live?.schedule.data ?? [],
       workdaySnapshot: { aum: live?.aum.data ?? null },
+      servicesSummary: {
+        ...(live?.servicesSummary.data ?? {}),
+        pendingExpensesLabel: live?.pendingExpenses.label,
+        pendingExpensesMeta: live?.pendingExpenses.meta,
+      },
+      // `requests` is NOT read here — unlike priorities/schedule, state.requests' fallback is a
+      // hardcoded literal, not `D.requests` (see seedRequestsCache's doc comment). The real data
+      // is seeded into localStorage above instead, before the runtime ever reads its cache.
     }
     const initial = parseHv3Location(pathnameRef.current)
 
@@ -136,6 +194,10 @@ export function HomeV3App() {
     if (live?.schedule.error) toast.error("Couldn't load your schedule", { description: live.schedule.error })
     if (live?.aum.error) toast.error("Couldn't load portfolio AUM", { description: live.aum.error })
     if (live?.cover.error) toast.error("Couldn't load your Daily Cover preference", { description: live.cover.error })
+    if (live?.servicesSummary.error)
+      toast.error("Couldn't load your payroll summary", { description: live.servicesSummary.error })
+    if (live?.serviceRequests.error)
+      toast.error("Couldn't load your requests", { description: live.serviceRequests.error })
 
     const onPriorityToggled = (event: Event) => {
       const detail = (event as CustomEvent).detail || {}
@@ -149,9 +211,23 @@ export function HomeV3App() {
         if (result.error) toast.error(result.error)
       })
     }
+    const onServiceRequestCreated = (event: Event) => {
+      const detail = (event as CustomEvent).detail || {}
+      void createServiceRequest(detail).then((result) => {
+        if (result.error) toast.error(result.error)
+      })
+    }
+    const onPayslipDownloadRequested = (event: Event) => {
+      const detail = (event as CustomEvent).detail || {}
+      void downloadPayslip(detail).then((result) => {
+        if (result.error) toast.error(result.error)
+      })
+    }
     window.addEventListener("matanho:priorities.task.toggled", onPriorityToggled)
     window.addEventListener("matanho:preferences.theme.updated", onCoverPreferenceUpdated)
     window.addEventListener("matanho:preferences.wallpaper.updated", onCoverPreferenceUpdated)
+    window.addEventListener("matanho:service.request.created", onServiceRequestCreated)
+    window.addEventListener("matanho:payslip.download.requested", onPayslipDownloadRequested)
 
     apiRef.current = startMatanhoRuntime(el, {
       data,
@@ -184,6 +260,8 @@ export function HomeV3App() {
       window.removeEventListener("matanho:priorities.task.toggled", onPriorityToggled)
       window.removeEventListener("matanho:preferences.theme.updated", onCoverPreferenceUpdated)
       window.removeEventListener("matanho:preferences.wallpaper.updated", onCoverPreferenceUpdated)
+      window.removeEventListener("matanho:service.request.created", onServiceRequestCreated)
+      window.removeEventListener("matanho:payslip.download.requested", onPayslipDownloadRequested)
       delete window.__HOME_V3_PATH__
       apiRef.current?.destroy()
       apiRef.current = null
