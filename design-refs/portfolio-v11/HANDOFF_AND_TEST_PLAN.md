@@ -34,17 +34,25 @@ in `middleware.ts`); the module id/folder naming stayed `portfolio-v11` througho
 - `design-refs/portfolio-investee-gap-analysis-and-plan.md` — the Sept 2026 static gap-analysis this sweep is live-verifying. Explicitly says it was written without the dev server running.
 - `design-refs/FULL_SWEEP_2026-09_OVERVIEW.md` — cross-module index (this sweep + Investee Portal + LP Portal re-sweep).
 
-**Test personas:** `admin@nts.com` / `admin123` (god-mode, bypasses all RBAC — not useful for real permission testing). `PORTFOLIO_MGR` / `INV_ANALYST` roleCodes exist in `lib/config/role-permissions.ts` but no user is seeded with them yet — created in Phase 2.
+**Test personas** (all confirmed live 15 Sep 2026 against `dev-api.matanho.com`):
+
+| Account | Password | Portal | Role |
+|---|---|---|---|
+| `admin@nts.com` | `admin123` | staff | god-mode — bypasses all RBAC, not useful for real permission testing |
+| `investee.test@arcus.co.zw` | `admin123` | investee | applicant — **note: `design-refs/portal-test-credentials.md` documents `PortalTest!2026` for this account; that's stale, `admin123` is what actually works** |
+| `lp.test@arcus.co.zw` | `admin123` | lp | MANAGER — same stale-password correction as above |
+| `lp.signatory@example.com` | `Password123!` | lp | SIGNATORY |
+| `lp.viewer@example.com` | `Password123!` | lp | VIEWER |
+
+`PORTFOLIO_MGR` / `INV_ANALYST` roleCodes exist in `lib/config/role-permissions.ts` but no user is seeded with them yet — created in Phase 2.
 
 ---
 
 ## 2. Where everything stands
 
-*Not started — this handoff doc is the Phase 0 scaffold. Update after each phase.*
-
 | Phase | Status |
 |---|---|
-| 0 — Setup & preflight | In progress |
+| 0 — Setup & preflight | **Done** — branch cut from `dev` @ `c3422c1`, docs scaffolded, FINDING-003's backend fix confirmed present and wired (`isExternalPortalUser`/`requireInternalStaffUser` gate `GET/POST /users`), `financial_reports`/`reporting_notification_logs` tables confirmed present on `arcus_dev`, all 5 personas confirmed logging in |
 | 1 — Security gate (FINDING-003) | Not started |
 | 2 — Foundation (module fix, permission alias, personas) | Not started |
 | 3 — Live testing | Not started |
