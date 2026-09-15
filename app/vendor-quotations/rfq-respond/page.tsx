@@ -423,9 +423,9 @@ function RFQRespondContent() {
           <div className="mb-6 flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4 text-amber-900">
             <AlertCircle className="w-5 h-5 mt-0.5" />
             <p className="text-sm">
-              {alreadySubmitted
-                ? `Your quotation ${alreadySubmitted.quotationNumber} was received${alreadySubmitted.submittedAt ? ` on ${fmt(alreadySubmitted.submittedAt)}` : ''} and is with the procurement team.`
-                : `This request for quotation is no longer accepting quotations${closedFor?.closingAt ? ` (it closed on ${fmt(closedFor.closingAt)})` : ''}.`}
+              {closedFor
+                ? `This request for quotation is no longer accepting quotations${closedFor.closingAt ? ` (it closed on ${fmt(closedFor.closingAt)})` : ''}.`
+                : `Your quotation ${alreadySubmitted.quotationNumber} was received${alreadySubmitted.submittedAt ? ` on ${fmt(alreadySubmitted.submittedAt)}` : ''} and is with the procurement team. You can still submit a revised quote below before the RFQ closes.`}
             </p>
           </div>
         )}
@@ -550,9 +550,9 @@ function RFQRespondContent() {
             </CardContent>
           </Card>
 
-          <Button type="submit" disabled={submitting || Boolean(closedFor) || Boolean(alreadySubmitted)} className="w-full bg-blue-600 hover:bg-blue-700 text-white py-6 rounded-full text-lg font-normal shadow-sm">
+          <Button type="submit" disabled={submitting || Boolean(closedFor)} className="w-full bg-blue-600 hover:bg-blue-700 text-white py-6 rounded-full text-lg font-normal shadow-sm">
             {submitting ? <Loader2 className="animate-spin mr-2" /> : <CheckCircle2 className="mr-2" />}
-            Submit Quotation
+            {alreadySubmitted ? 'Submit Revised Quotation' : 'Submit Quotation'}
           </Button>
         </form>
       </div>

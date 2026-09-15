@@ -2618,8 +2618,13 @@ function __pr23ApplyTableFilters() {
   const want = [];
   if (f.status && f.status !== 'All statuses') want.push(f.status);
   if (f.category && f.category !== 'All categories') want.push(f.category);
-  const year = String(f.period || '').match(/\d{4}/);
-  if (year) want.push(year[0]);
+  // Vendor Registry rows carry no date of their own -- the only 4-digit text is an unrelated tax-clearance
+  // expiry, which coincidentally matching (or not) the selected fiscal year hid every vendor regardless of
+  // category/status. Every other page's rows show a genuine record date that this heuristic is meant for.
+  if (state.page !== 'vendors') {
+    const year = String(f.period || '').match(/\d{4}/);
+    if (year) want.push(year[0]);
+  }
   const rows = [...document.querySelectorAll('#workspace table tbody tr')].filter(r => !r.querySelector('.pr23-empty-row'));
   let shown = 0;
   for (const row of rows) {
