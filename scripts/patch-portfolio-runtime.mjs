@@ -126,22 +126,48 @@ s = replaceOnce(
 )
 
 // Companies averages
-s = replaceAllSafe(
+// NOTE: these three guard the divisor by wrapping the exact original
+// expression in a ternary, so the original find text stays intact inside the
+// replacement and would re-match (and re-nest) on every subsequent run —
+// discovered when three script runs in one session produced triple-nested
+// ternaries here. Guard each with an explicit marker instead of relying on
+// replaceAllSafe's plain "does find exist" check.
+// Only the already-guarded shape is matched (this session hand-fixed the
+// runtime's triple-nesting back to single-guarded once, marker included) —
+// a genuinely fresh extraction with no guard at all falls through to MISS
+// here, same as any other patch whose target text has moved; re-check this
+// step specifically the next time extract-portfolio-v25.mjs actually runs.
+function patchOnceMarked(src, marker, find, repl, label) {
+  if (src.includes(marker)) {
+    console.log("skip (already)", label)
+    return src
+  }
+  if (!src.includes(find)) {
+    console.warn("MISS", label)
+    return src
+  }
+  console.log("applied", label)
+  return src.replace(find, repl)
+}
+s = patchOnceMarked(
   s,
-  "sum(companies,c=>c.revenueGrowth)/companies.length",
-  "(companies.length?sum(companies,c=>c.revenueGrowth)/companies.length:0)",
+  "/* patched:companies-growth-nan */",
+  "const avgGrowth = companies.length ? sum(companies,c=>c.revenueGrowth)/companies.length : 0;",
+  "const avgGrowth = companies.length ? sum(companies,c=>c.revenueGrowth)/companies.length : 0; /* patched:companies-growth-nan */",
   "companies-growth-nan",
 )
-s = replaceAllSafe(
+s = patchOnceMarked(
   s,
-  "sum(companies,c=>c.margin)/companies.length",
-  "(companies.length?sum(companies,c=>c.margin)/companies.length:0)",
+  "/* patched:companies-margin-nan */",
+  "const avgMargin = companies.length ? sum(companies,c=>c.margin)/companies.length : 0;",
+  "const avgMargin = companies.length ? sum(companies,c=>c.margin)/companies.length : 0; /* patched:companies-margin-nan */",
   "companies-margin-nan",
 )
-s = replaceAllSafe(
+s = patchOnceMarked(
   s,
-  "sum(companies,c=>c.health)/companies.length",
-  "(companies.length?sum(companies,c=>c.health)/companies.length:0)",
+  "<!--patched:companies-health-nan-->",
+  "${companies.length?Math.round(sum(companies,c=>c.health)/companies.length):0}</strong>",
+  "${companies.length?Math.round(sum(companies,c=>c.health)/companies.length):0}</strong><!--patched:companies-health-nan-->",
   "companies-health-nan",
 )
 s = replaceAllSafe(
@@ -197,6 +223,186 @@ s = replaceAllSafe(
   "envelope?.recipients.map(",
   "(Array.isArray(envelope?.recipients)?envelope.recipients:[]).map(",
   "envelope-opt-recipients-map",
+)
+
+// 10) FINDING-PV11-004 — LP wizard silently defaulted to the first fund in the
+// list whenever the user left "Select fund (optional)" blank, instead of
+// sending no fund at all; the backend then requires amount+effectiveDate for
+// ANY truthy fundId, so a fund-less/commitment-less LP could never be created.
+s = replaceOnce(
+  s,
+  "fundId: String(data.fundId || funds[0]?.id || ''),",
+  "fundId: String(data.fundId || ''),",
+  "lp-wizard-no-fund-fallback",
+)
+
+// 11) FINDING-PV11-010 — Deal Flow's Fund/Stage/Owner/Age filters and
+// Dashboard's Fund/Period/Currency/Geography filters all routed to a shared
+// catch-all dispatcher case that only showed a toast and never touched
+// `state` or re-filtered anything. Give each its own case (Funds page's
+// fund-*-filter cases show the working pattern), then have renderDealFlow
+// actually apply its four filters. Dashboard's fund filter is wired the same
+// way; period/currency/geography are wired to state (so the dispatcher no
+// longer silently drops them) but not yet threaded through renderDashboard's
+// aggregates — tracked as a smaller follow-up, not re-claimed as fixed here.
+s = replaceOnce(
+  s,
+  "case 'dashboard-fund-filter': case 'dashboard-period-filter': case 'dashboard-currency-filter': case 'dashboard-geography-filter': case 'deal-fund-filter': case 'deal-stage-filter': case 'deal-owner-filter': case 'deal-age-filter': toast('Filter updated'",
+  "toast('Filter updated'",
+  "filter-catchall-remove-dashboard-deal-ids",
+)
+// Plain replaceOnce isn't idempotent here: the anchor ('term-version-filter'
+// case) has to stay intact in the output for the switch to keep working, so
+// a naive prepend would still match its own find text on every re-run and
+// duplicate the block. Guard explicitly with a marker comment instead.
+if (s.includes("/* patched:filter-dedicated-cases */")) {
+  console.log("skip (already)", "filter-dedicated-cases")
+} else {
+  const anchor = "case 'term-version-filter': case 'term-status-filter': case 'term-owner-filter':"
+  if (s.includes(anchor)) {
+    s = s.replace(
+      anchor,
+      `/* patched:filter-dedicated-cases */\r\n      case 'dashboard-fund-filter': state.dashboardFundFilter=target.value; render(); break;\r\n      case 'dashboard-period-filter': state.dashboardPeriodFilter=target.value; render(); break;\r\n      case 'dashboard-currency-filter': state.dashboardCurrencyFilter=target.value; render(); break;\r\n      case 'dashboard-geography-filter': state.dashboardGeographyFilter=target.value; render(); break;\r\n      case 'deal-fund-filter': state.dealFundFilter=target.value; render(); break;\r\n      case 'deal-stage-filter': state.dealStageFilter=target.value; render(); break;\r\n      case 'deal-owner-filter': state.dealOwnerFilter=target.value; render(); break;\r\n      case 'deal-age-filter': state.dealAgeFilter=target.value; render(); break;\r\n      ${anchor}`,
+    )
+  } else {
+    console.warn("MISS", "filter-dedicated-cases")
+  }
+}
+// Runtime file uses CRLF line endings — a multi-line find string with plain
+// \n breaks silently MISSes (see project_runtime_patch_crlf_trap in memory),
+// so this is done as single-line replacements instead.
+// Same non-idempotency trap as filter-dedicated-cases: the anchor line has to
+// stay intact in the output, so guard with an explicit marker.
+if (s.includes("/* patched:deal-flow-filter-setup */")) {
+  console.log("skip (already)", "deal-flow-filter-setup")
+} else {
+  const stageColorsLine = "const stageColors = {'Sourcing':'#3b82f6','Screening':'#0ea5a8','Initial Review':'#60a5fa','Investment Committee':'#f59e0b','Due Diligence':'#2563eb','Term Sheet':'#0ea5a8','Portfolio':'#10b981','Rejected':'#ef4444'};"
+  if (s.includes(stageColorsLine)) {
+    s = s.replace(
+      stageColorsLine,
+      `${stageColorsLine} /* patched:deal-flow-filter-setup */\r\n    const dealFundFilter = state.dealFundFilter || 'All Funds';\r\n    const dealStageFilter = state.dealStageFilter || 'All stages';\r\n    const dealOwnerFilter = state.dealOwnerFilter || 'All owners';\r\n    const dealAgeFilter = state.dealAgeFilter || 'All ages';\r\n    const filteredDeals = deals.filter(d =>\r\n      (dealFundFilter==='All Funds' || d.fund===dealFundFilter) &&\r\n      (dealStageFilter==='All stages' || d.stage===dealStageFilter) &&\r\n      (dealOwnerFilter==='All owners' || d.owner===dealOwnerFilter) &&\r\n      (dealAgeFilter==='All ages' || (dealAgeFilter==='0–30 days' ? d.age<=30 : dealAgeFilter==='31–60 days' ? (d.age>=31&&d.age<=60) : d.age>=61))\r\n    );`,
+    )
+  } else {
+    console.warn("MISS", "deal-flow-filter-setup")
+  }
+}
+s = replaceOnce(
+  s,
+  "const pipelineValue=sum(deals,d=>d.amount);",
+  "const pipelineValue=sum(filteredDeals,d=>d.amount);",
+  "deal-flow-pipeline-value",
+)
+s = replaceOnce(
+  s,
+  "const wonDeals=deals.filter(d=>d.stage==='Portfolio');",
+  "const wonDeals=filteredDeals.filter(d=>d.stage==='Portfolio');",
+  "deal-flow-won-deals",
+)
+s = replaceOnce(
+  s,
+  "const lostDeals=deals.filter(d=>d.stage==='Rejected');",
+  "const lostDeals=filteredDeals.filter(d=>d.stage==='Rejected');",
+  "deal-flow-lost-deals",
+)
+s = replaceOnce(
+  s,
+  "deals.filter(d=>!['Portfolio','Rejected'].includes(d.stage)).length",
+  "filteredDeals.filter(d=>!['Portfolio','Rejected'].includes(d.stage)).length",
+  "deal-flow-active-deals",
+)
+s = replaceAllSafe(
+  s,
+  "deals.filter(d=>d.stage==='Due Diligence')",
+  "filteredDeals.filter(d=>d.stage==='Due Diligence')",
+  "deal-flow-dd-metric",
+)
+s = replaceAllSafe(
+  s,
+  "deals.filter(d=>d.stage==='Investment Committee')",
+  "filteredDeals.filter(d=>d.stage==='Investment Committee')",
+  "deal-flow-ic-metric",
+)
+s = replaceOnce(
+  s,
+  "const stageDeals=deals.filter(deal=>deal.stage===stage);",
+  "const stageDeals=filteredDeals.filter(deal=>deal.stage===stage);",
+  "deal-flow-kanban",
+)
+s = replaceOnce(
+  s,
+  '<span class="table-badge">${deals.length} opportunities</span>',
+  '<span class="table-badge">${filteredDeals.length} opportunities</span>',
+  "deal-flow-register-count",
+)
+s = replaceOnce(
+  s,
+  "${deals.map((deal,index)=>`<tr class=\"clickable\" data-action=\"open-deal\"",
+  "${filteredDeals.map((deal,index)=>`<tr class=\"clickable\" data-action=\"open-deal\"",
+  "deal-flow-register-rows",
+)
+s = replaceOnce(
+  s,
+  "const dayDeals=deals.filter((_,idx)=>",
+  "const dayDeals=filteredDeals.filter((_,idx)=>",
+  "deal-flow-calendar",
+)
+s = replaceOnce(
+  s,
+  "action:'deal-fund-filter',selected:'All Funds'",
+  "action:'deal-fund-filter',selected:dealFundFilter",
+  "deal-flow-filter-bar-fund",
+)
+s = replaceOnce(
+  s,
+  "action:'deal-stage-filter',selected:'All stages'",
+  "action:'deal-stage-filter',selected:dealStageFilter",
+  "deal-flow-filter-bar-stage",
+)
+s = replaceOnce(
+  s,
+  "action:'deal-owner-filter',selected:'All owners'",
+  "action:'deal-owner-filter',selected:dealOwnerFilter",
+  "deal-flow-filter-bar-owner",
+)
+s = replaceOnce(
+  s,
+  "action:'deal-age-filter',selected:'All ages'",
+  "action:'deal-age-filter',selected:dealAgeFilter",
+  "deal-flow-filter-bar-age",
+)
+
+// 12) FINDING-PV11-011 — Period Close's "Run close pre-check" and "Request
+// approval" are plain static buttons with no dataset at all, but their
+// actions.ts handlers require ds.period/ds.id and silently no-op (not even a
+// toast) without it. Derive a YYYY-MM period code from state.asOfDate (the
+// same "as of" reference date already used elsewhere) and attach it as
+// data-id, matching the backend's SpCashCloseService.precheck() expectation
+// (`${periodCode}-01` must parse as a date).
+// Same non-idempotency trap: the anchor has to survive in the output.
+if (s.includes("/* patched:period-close-code-var */")) {
+  console.log("skip (already)", "period-close-code-var")
+} else {
+  const anchor = "function renderPeriodClose() {"
+  if (s.includes(anchor)) {
+    s = s.replace(
+      anchor,
+      `${anchor} /* patched:period-close-code-var */\r\n    const closePeriodDate = new Date(state.asOfDate);\r\n    const closePeriodCode = Number.isNaN(closePeriodDate.getTime()) ? '' : \`\${closePeriodDate.getFullYear()}-\${String(closePeriodDate.getMonth()+1).padStart(2,'0')}\`;`,
+    )
+  } else {
+    console.warn("MISS", "period-close-code-var")
+  }
+}
+s = replaceOnce(
+  s,
+  "button('Run close pre-check','run-close-precheck','primary','refresh')",
+  "button('Run close pre-check','run-close-precheck','primary','refresh',`data-id=\"${closePeriodCode}\"`)",
+  "period-close-precheck-data-id",
+)
+s = replaceOnce(
+  s,
+  "button('Request approval','request-close-approval','','user-check')",
+  "button('Request approval','request-close-approval','','user-check',`data-id=\"${closePeriodCode}\"`)",
+  "period-close-approval-data-id",
 )
 
 fs.writeFileSync(RUNTIME, s)
