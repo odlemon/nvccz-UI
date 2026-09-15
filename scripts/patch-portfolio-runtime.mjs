@@ -405,6 +405,20 @@ s = replaceOnce(
   "period-close-approval-data-id",
 )
 
+// 13) FINDING-PV11-006 — Deal Detail's hero status trusted `disbursedAny` on
+// its own, so a deal whose only real lifecycle record is a stray/demo
+// disbursement (no due diligence, term sheet or board review ever run) shows
+// "Disbursed" while its own step tracker (built from the same hasDD/hasTS/
+// hasBoard signals) says everything is "Not started" — self-contradictory.
+// A legitimate disbursement is never reachable without board approval first,
+// so gate on hasBoard too rather than trusting disbursedAny alone.
+s = replaceOnce(
+  s,
+  "isTerminalRejected ? 'Rejected' : disbursedAny ? 'Disbursed' : hasImpl ? 'Approved - Closing' : hasBoard ? 'Board & IC Review' : hasTS ? 'Term Sheet' : hasDD ? 'Due Diligence' : realOutcome ? realOutcome.replace(/_/g,' ') : 'Screening Pending';",
+  "isTerminalRejected ? 'Rejected' : (disbursedAny && hasBoard) ? 'Disbursed' : hasImpl ? 'Approved - Closing' : hasBoard ? 'Board & IC Review' : hasTS ? 'Term Sheet' : hasDD ? 'Due Diligence' : realOutcome ? realOutcome.replace(/_/g,' ') : 'Screening Pending';",
+  "deal-hero-status-requires-board",
+)
+
 fs.writeFileSync(RUNTIME, s)
 console.log("patched", RUNTIME, "bytes", Buffer.byteLength(s))
 console.log("OK — re-run after every extract-portfolio-v25.mjs")

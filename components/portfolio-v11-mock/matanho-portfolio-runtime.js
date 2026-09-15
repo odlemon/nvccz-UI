@@ -1802,7 +1802,7 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
       ['Disbursement', hasImpl ? (disbursedAny ? 'Disbursed' : 'Ready') : 'Locked'],
     ];
     const actions = `${selectControl('Fund',funds.map(f=>f.name),deal.fund,'deal-fund')}${button('Back to Deal Flow','back-to-deals','','arrow-left')}${button('Launch investee portal','open-investee-portal','','external-link',`data-deal-id="${escapeHTML(deal.id)}"`)}${button('Activity','activity-menu','','clock',`data-context="deal" data-id="${deal.id}"`)}`;
-    const heroStatus = isTerminalRejected ? 'Rejected' : disbursedAny ? 'Disbursed' : hasImpl ? 'Approved - Closing' : hasBoard ? 'Board & IC Review' : hasTS ? 'Term Sheet' : hasDD ? 'Due Diligence' : realOutcome ? realOutcome.replace(/_/g,' ') : 'Screening Pending';
+    const heroStatus = isTerminalRejected ? 'Rejected' : (disbursedAny && hasBoard) ? 'Disbursed' : hasImpl ? 'Approved - Closing' : hasBoard ? 'Board & IC Review' : hasTS ? 'Term Sheet' : hasDD ? 'Due Diligence' : realOutcome ? realOutcome.replace(/_/g,' ') : 'Screening Pending';
     const heroStatusTone = isTerminalRejected ? 'danger' : disbursedAny || hasImpl ? 'success' : (realOutcome === 'REJECTED_SCREENING' || realOutcome === 'AUTO_REJECTED') ? 'danger' : 'info';
     return `${pageHeader(`${deal.name} - ${deal.round}`,'Investment application and execution workspace.',actions,heroStatus)}
       <section class="detail-hero"><div class="detail-hero-top"><div class="entity-title"><span class="entity-logo" style="background:linear-gradient(145deg,#23314d,#5e93dd)">${escapeHTML(initials(deal.name))}</span><div><h1>${escapeHTML(deal.name)}</h1><p>${escapeHTML(deal.sector)} · ${escapeHTML(deal.round)} · ${escapeHTML(deal.fund)}</p></div></div>${statusPill(heroStatus,heroStatusTone)}</div><div class="hero-meta"><div class="hero-meta-item"><span>Requested Investment (USD)</span><strong>${formatMoney(deal.amount)}</strong></div><div class="hero-meta-item"><span>Proposed Ownership</span><strong>${proposedOwnership ? escapeHTML(String(proposedOwnership)) + '%' : '—'}</strong></div><div class="hero-meta-item"><span>Pre-Money Valuation</span><strong>${preMoneyValuation ? formatMoney(Number(preMoneyValuation)) : '—'}</strong></div><div class="hero-meta-item"><span>Lead Investor</span><strong>${escapeHTML(deal.fund)}</strong></div><div class="hero-meta-item"><span>AI Screening Score</span><strong>${deal.score}/100</strong></div></div></section>
@@ -6082,6 +6082,7 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
     } catch (_) {}
   }
 
+  
   
   
   

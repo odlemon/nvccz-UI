@@ -305,7 +305,7 @@ export async function handlePortfolioV11Action(detail: {
     ) {
       const fundId = ds.fundId
       if (!fundId) return { handled: true, error: 'Fund is required' }
-      await capitalCallsApi.initiate(fundId, {
+      const res = await capitalCallsApi.initiate(fundId, {
         callPercent: Number(ds.callPercent || 10),
         paymentDueDate:
           ds.paymentDueDate || new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10),
@@ -313,7 +313,25 @@ export async function handlePortfolioV11Action(detail: {
         bankInstructions: ds.bankInstructions || 'Remit per LPA collection account.',
       })
       await rehydrate(['capitalCalls', 'funds'])
-      return { handled: true, message: 'Capital call created' }
+      // The typed "Total amount" is converted client-side into a flat percent of
+      // each LP's own commitment (see FINDING-PV11-002) — it only matches the
+      // typed figure by coincidence, so report what was actually raised instead
+      // of silently implying the target was hit exactly.
+      const allocations = (res as any)?.data?.allocations || []
+      const actualTotal = allocations.reduce(
+        (sum: number, a: any) => sum + (Number(a.currentCallAmount) || 0),
+        0,
+      )
+      const formattedTotal =
+        actualTotal >= 1_000_000
+          ? `$${(actualTotal / 1_000_000).toFixed(2)}M`
+          : `$${Math.round(actualTotal).toLocaleString()}`
+      return {
+        handled: true,
+        message: allocations.length
+          ? `Capital call created — actual total ${formattedTotal} across ${allocations.length} LP${allocations.length === 1 ? '' : 's'}`
+          : 'Capital call created',
+      }
     }
 
     if (action === 'api-create-cash-account' || action === 'submit-cash-account') {
