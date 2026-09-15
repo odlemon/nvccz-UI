@@ -10,7 +10,7 @@ as a hypothesis to verify, not a fact.
 |---|---|---|---|
 | CRITICAL | 0 | 0 | 0 |
 | HIGH | 4 | 0 | 1 |
-| MEDIUM | 4 | 0 | 0 |
+| MEDIUM | 5 | 0 | 0 |
 | LOW | 0 | 0 | 0 |
 
 ## FINDING-PV11-001
@@ -367,6 +367,44 @@ single-call handler shape in `actions.ts:551-558`) was not live-exercised this p
 are already past the pre-DD stage (2 at Board Review, 3 at Due Diligence), so there is no current fixture
 to start DD *from*. Confirmed wired correctly by reading the code; live verification needs either a fresh
 deal walked through screening/shortlisting first, or a new fixture seeded directly at `SHORTLISTED`.
+
+## FINDING-PV11-009
+
+**Page / flow:** Settings & Access Control's role-switcher (`v11IsFullAuthority`) — Wave 3 item from the
+plan: "whether `v11IsFullAuthority()`'s hardcoded `['ceo','admin','cio']` improperly blocks the new real
+roleCodes."
+**Steps to reproduce:** Log in as `portfolio.mgr@nts.local` (a real PORTFOLIO_MGR) and inspect
+`window.MatanhoPortfolioUI.getSnapshot().state.currentRole`.
+**Expected (per the plan's framing):** a real user's actual role should determine `currentRole`, and the
+concern was that `portfolio_mgr`/`inv_analyst` might not be in the `['ceo','admin','cio']` full-authority
+list and so get wrongly restricted.
+**Actual — the opposite problem:** `currentRole` reads `"ceo"` (full mock-authority) for this real
+PORTFOLIO_MGR, live-confirmed. Traced why: `currentRole` is **entirely disconnected from the real logged-in
+user**. `matanho-portfolio-runtime.js:4831-4832` seeds it from `localStorage` only, defaulting to `'ceo'`;
+it is only ever changed by `incoming.activeRole` (line 4888) or the internal "Roles & Access" demo
+role-switcher dropdown (line 5178) — a repo-wide search confirms `activeRole` is never set anywhere in the
+TypeScript host (`portfolio-v11-app.tsx` or any `lib/portfolio-v11/*`), so that code path is dead. This
+whole 7-persona system (`ceo`/`admin`/`cio`/`analyst`/`monitoring`/`legal`/`accounting`,
+`v11IsFullAuthority` gating on the first three) is a **self-contained client-side demo/preview toggle with
+no binding to the real backend role at all** — confirmed by `lib/portfolio-v11/live-loaders.ts:183-211`'s
+own header comment, which independently documents this as intentional ("not a 1:1 mirror of real backend
+Role rows... do not inject new role entries here"). So: no real user is ever blocked by this hardcoded
+list — everyone defaults to full mock-authority — but the toggle is fully real user-facing (switching it
+changes visible nav items and disables write buttons in the UI) with no indication anywhere that it's a
+detached preview rather than the user's actual access level.
+**Severity:** MEDIUM — not a blocker (the plan's specific fear doesn't materialize; actual write access is
+correctly enforced server-side, independent of this), but a real, confusing design smell: a
+`portfolio.mgr@nts.local` user who opens Settings and experiments with "view as Legal" or "view as
+Monitoring & Evaluation" will see write controls vanish/disable across the module with no explanation that
+this is a demo preview rather than a real permission change, and switching back to any of the three
+full-authority personas (not necessarily their own real role) fully restores every control — a false sense
+of both restriction and permission, in either direction.
+**Suspected area / fix shape:** either wire `currentRole` to the real user's role via `matchPersonaId()`
+on load (matching intent, but the `live-loaders.ts` comment explicitly warns against widening this
+mapping's blast radius) or, more conservatively, make the role-switcher's demo nature explicit in its own
+UI (e.g. an "internal preview — does not change your real access" label) so it can't be mistaken for a
+real permission control. Given the explicit warning already in the code against extending this system,
+flagging for a product decision rather than picking a fix unilaterally.
 
 ## Format per finding
 ```
