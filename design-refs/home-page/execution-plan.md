@@ -172,20 +172,72 @@ attendees/agenda where that data exists (agenda/meeting-intelligence fields may 
 scope down honestly rather than fake it if so).
 **Verify**: create an event, reload, see it; confirm visibility is properly attendee-scoped, not global.
 
-## Phase 5 — My Work + Performance (`/home/work` + `/home/performance`)
+## Phase 5 — My Work + Performance (`/home/work` + `/home/performance`) — done, verified live
 
-Grouped because `Task.goalId` already links them, and because the ownership call (#2/#3) affects both
-identically.
+Shipped almost entirely as wiring, per Phase 0's finding — but building it surfaced two real gaps
+Phase 0's read-only audit couldn't have caught:
 
-**Backend**: "my tasks" list/filter/progress-update on the real `Task` table (per Phase 0's team-membership
-convention). Performance: per Phase 0's finding, either point at the existing Performance module's API
-(preferred if it exists — avoids a second source of truth) or, only if nothing exists yet, build a
-minimal personal-scoped read over `PerformanceGoal`/`PerformanceScorecard`/`KPI`.
-**Frontend**: task list/filters/progress (persisting), Overview tab of Performance first; Scorecard/Goals/
-Feedback/Development tabs as a follow-up sub-phase if Overview alone is large (will report before
-splitting further).
-**Verify**: complete a task, confirm project % and linked goal % move together; Performance numbers match
-whatever the source of truth turns out to be, not a second, drifting copy of it.
+1. **No absolute progress-set endpoint existed.** `PUT /tasks/:id/stage` writes
+   `percentValueAchieved`, but *additively* (`addPercentAchieved`, meant for incremental
+   "achievement" postings) — wrong for "set progress to 60%" from a slider. `PUT /tasks/:id`
+   (the general update) looked like the right endpoint — its controller already destructured and
+   forwarded `monetaryValue`/`percentValue`/`monetaryValueAchieved`/`percentValueAchieved` from the
+   request body, and its swagger docs advertised all four — but `UpdateTaskRequest` never declared
+   them and the final `prisma.task.update()` call never spread them into `data`, so they were
+   silently dropped. Fixed in the API repo (`f541599`): added the four fields to the interface and
+   the update call, matching the existing conditional-spread style of every neighboring field.
+2. **A task's `percentValueAchieved` only ever displays when it also has a positive `percentValue`
+   target** — `applyValueDisplayHardening` (taskValueDisplay.ts) nulls both achievement fields back
+   out in every response when there's nothing to compare an achieved value against, which a bare
+   ad-hoc "how far along is this" task never would have. Fixed on the frontend side instead of the
+   backend: every write that sets `percentValueAchieved` now also sends `percentValue: 100`, so a
+   plain task's progress is modeled as "target 100%, achieved N%" — the natural reading of a
+   completion percentage anyway.
+
+**My Work**: all three tabs (My work / Projects / Teams) run off real data. "Projects" are
+department groupings of real tasks, not a separate entity — none exists server-side, and a
+standalone "create project" modal would have saved nothing durable the moment you left the page
+(the same "don't offer a control that saves nothing" rule this codebase already follows elsewhere),
+so it was removed; typing a new project name into the create-task form is how a project starts now.
+"Teams" groups real org-wide tasks (`GET /tasks` — verified open to any authenticated user
+server-side, not gated to admins the way `/tasks/my`'s all-tasks branch is) by real team-member id,
+resolved to names via `GET /users` (the same directory endpoint Phase 7's People page will reuse).
+Create/toggle/complete/edit/inline-progress all persist for real; create reloads after an 800ms
+toast (a fabricated id would go stale the instant a follow-up edit tried to PUT it — same reasoning
+as wallpaper upload and calendar-entry create throughout this build); toggle/edit/inline-progress
+are optimistic, matching the established trade-off. The task-detail modal's Owner field used to be
+a free-text input that silently did nothing on save (real reassignment needs a full team array, not
+a display name) — made read-only pending a proper assignee picker, rather than ship a control that
+looked like it worked and didn't.
+
+**Performance Overview** (and the matching "Performance" mini-card on My Work's right rail): reuses
+the exact `/performance/scorecards/user` field paths already verified live by
+`performance-v22-mock`'s `loadMyScorecard`/`adaptMyScorecard`. The mock's Overview tab was a wall of
+fabricated content with zero real backing — a narrative paragraph, four metric cards with fake
+six-month trend lines, a fake quarter-over-quarter score chart, a fake contribution donut, a fake
+competency breakdown, a fake feedback timeline (borrowing `D.people`'s mock names), a fake
+review-readiness checklist, a fake "next review" footer — none of which the real endpoint has any
+way to answer. Replaced with what the endpoint actually returns: overall score, contract
+title/period, and the real linked-goal list (title/weight/score/status), honest empty state
+otherwise. The old "Balanced scorecard" mini-card (fixed 88/92/84/86 pillar scores) is gone for the
+same reason `performance-v22`'s own department-scorecard adapter already documents: the read shape
+doesn't expose a goal's `scorecardPillar`, so a four-pillar breakdown would be a guess, not a fact.
+Scorecard/Goals/Feedback/Development tabs stay fully mocked, deferred exactly as this plan allowed
+("as a follow-up sub-phase... will report before splitting further") — Overview no longer
+cross-links into them (they'd show a different, fake goal list next to the real one Overview now
+renders, which is a worse inconsistency than not linking).
+
+Verified live end to end: created a real task, edited its progress via both the detail modal's
+slider and the row's inline dropdown, toggled it complete — watched Open/Completed/Average-progress
+tiles, the Projects card, and the roadmap section all move together correctly, then confirmed the
+Teams tab (org-wide, its own snapshot from page load) catches up on next reload, an accepted
+instance of the same optimistic-only trade-off used elsewhere. Seeded a temporary real
+`PerformanceContract` + two `PerformanceGoal` rows (direct Prisma, not the API — no self-service
+contract-creation endpoint exists, and building one is out of scope for a module that only reads
+this data) to verify Overview's populated path, not just its honest-empty path; deleted both test
+performance rows and the test task afterward. One-line hardcoded default fixed in passing: the
+roadmap section used to fall back to a literal `'Southern Africa Expansion'` whenever no project
+filter was active — now falls back to the top real project, or hides the section if there isn't one.
 
 ## Phase 6 — News + Newsletters + Forums
 
