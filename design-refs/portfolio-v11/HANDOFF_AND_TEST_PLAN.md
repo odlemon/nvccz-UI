@@ -44,7 +44,12 @@ in `middleware.ts`); the module id/folder naming stayed `portfolio-v11` througho
 | `lp.signatory@example.com` | `Password123!` | lp | SIGNATORY |
 | `lp.viewer@example.com` | `Password123!` | lp | VIEWER |
 
-`PORTFOLIO_MGR` / `INV_ANALYST` roleCodes exist in `lib/config/role-permissions.ts` but no user is seeded with them yet — created in Phase 2.
+`PORTFOLIO_MGR` / `INV_ANALYST` roleCodes exist in `lib/config/role-permissions.ts` — seeded in Phase 2:
+
+| Account | Password | Role |
+|---|---|---|
+| `portfolio.mgr@nts.local` | `$xW8y1Zf3D8w` | PORTFOLIO_MGR (full access) |
+| `inv.analyst@nts.local` | `Y7Fs9JdS*2MG` | INV_ANALYST (write access) |
 
 ---
 
@@ -54,7 +59,7 @@ in `middleware.ts`); the module id/folder naming stayed `portfolio-v11` througho
 |---|---|
 | 0 — Setup & preflight | **Done** — branch cut from `dev` @ `c3422c1`, docs scaffolded, FINDING-003's backend fix confirmed present and wired (`isExternalPortalUser`/`requireInternalStaffUser` gate `GET/POST /users`), `financial_reports`/`reporting_notification_logs` tables confirmed present on `arcus_dev`, all 5 personas confirmed logging in |
 | 1 — Security gate (FINDING-003) | **Done** — re-verified live, both layers hold, no regression across investee/LP/applicant role types. Detail in `design-refs/uat-three-module/TEST_FINDINGS.md`'s FINDING-003 |
-| 2 — Foundation (module fix, permission alias, personas) | Not started |
+| 2 — Foundation (module fix, permission alias, personas) | **Done** — `modules.ts` path fixed and deployed to dev (`64e7e8e`); verified live via the App Switcher (Portfolio Management tile now correctly highlighted as active — that list excludes superseded modules, so this proves `getModuleByPath` resolves to `portfolio-v11`, not `portfolio-management`). `portfolio` → `portfolio-management` alias added to `MODULE_ID_ALIASES` (groundwork for Phase 4; `STAFF_PUBLIC_PASS_THROUGH` not touched yet). Seeded `portfolio.mgr@nts.local` (PORTFOLIO_MGR) and `inv.analyst@nts.local` (INV_ANALYST), both confirmed logging in and reaching `/portfolio` with real live data. |
 | 3 — Live testing | Not started |
 | 4 — Fixes by severity | Not started |
 | 5 — Merge & deploy | Not started |
