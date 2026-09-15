@@ -221,6 +221,9 @@ calling the already-existing `lpFeesApi.declareDistribution()` — materially la
 in this report, which are all fixes to existing flows. Flagging for a scoping decision rather than building
 unilaterally.
 
+**Decision (15 September 2026):** build it in this same sweep, in Phase 4 alongside the other fixes —
+Portfolio → LP Portal capital flows should work end to end before LP Portal's re-sweep depends on them.
+
 ## Format per finding
 ```
 ID:
