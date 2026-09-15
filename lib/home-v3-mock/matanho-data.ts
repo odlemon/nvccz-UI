@@ -5,6 +5,7 @@ export const MATANHO_DATA = {
     id: '',
     name: 'Fadzai Moyo',
     firstName: 'Fadzai',
+    lastName: 'Moyo',
     role: 'Managing Partner',
     location: 'Harare, Zimbabwe',
     email: 'fadzai.moyo@matanho.co.zw',

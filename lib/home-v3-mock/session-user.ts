@@ -6,6 +6,7 @@ export type Hv3SessionUser = {
   id: string
   name: string
   firstName: string
+  lastName: string
   role: string
   location: string
   email: string
@@ -56,6 +57,7 @@ export function buildHv3SessionUser(
     id,
     name,
     firstName: firstName || name.split(" ")[0] || "User",
+    lastName,
     role,
     location,
     email,

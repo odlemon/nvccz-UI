@@ -390,3 +390,34 @@ export async function createNewsletter(detail: {
     return { handled: true, error: message }
   }
 }
+
+/**
+ * `profile.updated` -> PUT /api/users/:selfId. Deliberately only ever sends firstName/lastName/
+ * email for the signed-in user's own id — the same endpoint accepts department/roleCode/roleId
+ * too (and, per its route registration, isn't permission-gated to admins the way user creation
+ * is), but those are privilege-bearing fields and this is a self-service "edit my profile" form,
+ * not a user-management screen. Reloads on success: the topbar/sidebar identity chip reads the
+ * session user from Redux, not from this runtime's own state, so a live re-render here wouldn't
+ * update it anyway.
+ */
+export async function updateMyProfile(detail: {
+  selfId?: string | null
+  firstName?: string
+  lastName?: string
+  email?: string
+}): Promise<Hv3ReloadingActionResult> {
+  const id = detail?.selfId
+  if (!id || !detail.firstName || !detail.lastName || !detail.email) return { handled: false, error: null }
+  try {
+    await apiClient.put(`/users/${id}`, {
+      firstName: detail.firstName,
+      lastName: detail.lastName,
+      email: detail.email,
+    })
+    return { handled: true, error: null, reload: true }
+  } catch (err: any) {
+    const message = err?.message ? String(err.message) : "Failed to update profile"
+    console.error("[home-v3] profile.updated failed:", message)
+    return { handled: true, error: message }
+  }
+}

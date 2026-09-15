@@ -419,7 +419,7 @@ export type Hv3Task = {
   goalTitle: string | null
 }
 
-export type Hv3Person = { id: string; name: string; department: string | null; role: string | null }
+export type Hv3Person = { id: string; name: string; email: string; department: string | null; role: string | null }
 
 export type Hv3TeamRow = { id: string; name: string; role: string | null; openCount: number; progress: number }
 
@@ -461,6 +461,7 @@ export async function loadDirectory(): Promise<ScopeResult<Hv3Person[]>> {
       return rows.map((u) => ({
         id: String(u.id),
         name: personName(u),
+        email: String(u.email || ""),
         department: u.userDepartment ?? null,
         role: u.role?.name ?? u.departmentRole ?? null,
       }))
@@ -738,6 +739,7 @@ export async function loadHomeLiveData(selfId?: string | null) {
     performanceOverview,
     posts,
     newsletters,
+    directory,
   ] = await Promise.all([
     loadMyPriorities(),
     loadUpcomingSchedule(),
@@ -753,6 +755,7 @@ export async function loadHomeLiveData(selfId?: string | null) {
     loadMyPerformanceOverview(),
     loadPosts(),
     loadNewsletters(),
+    loadDirectory(),
   ])
   return {
     priorities,
@@ -769,6 +772,7 @@ export async function loadHomeLiveData(selfId?: string | null) {
     performanceOverview,
     posts,
     newsletters,
+    directory,
     pendingExpenses: summarizePendingExpenses(serviceRequests.data),
   }
 }
