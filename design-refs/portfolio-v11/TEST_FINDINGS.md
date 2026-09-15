@@ -9,7 +9,7 @@ as a hypothesis to verify, not a fact.
 | Severity | Open | Fixed locally, not deployed | Deployed and verified |
 |---|---|---|---|
 | CRITICAL | 0 | 0 | 0 |
-| HIGH | 4 | 0 | 1 |
+| HIGH | 5 | 0 | 1 |
 | MEDIUM | 5 | 0 | 0 |
 | LOW | 0 | 0 | 0 |
 
@@ -405,6 +405,47 @@ mapping's blast radius) or, more conservatively, make the role-switcher's demo n
 UI (e.g. an "internal preview — does not change your real access" label) so it can't be mistaken for a
 real permission control. Given the explicit warning already in the code against extending this system,
 flagging for a product decision rather than picking a fix unilaterally.
+
+## FINDING-PV11-010
+
+**Page / flow:** Portfolio Dashboard's Fund/Period/Currency/Geography filter bar; Deal Flow's
+Fund/Stage/Owner/Age filter bar (Wave 3 — the plan's "currency/geography filters" item, which turned out
+to be one instance of a much broader problem)
+**Steps to reproduce:** Dashboard → set Geography to "Southern Africa", note the numbers, switch to "West
+Africa" (a region with zero real fixture data — every real portfolio company is Zimbabwe-based). Separately,
+Deal Flow → set Stage to "Due Diligence" (currently 2 of 5 real deals qualify).
+**Expected:** Numbers/rows change to reflect the filter; "West Africa" in particular should show
+materially different (near-zero) figures than "Southern Africa."
+**Actual:** Both are pure decoration. Dashboard: "Total Invested $8.6M · 4 portfolio companies" is
+byte-for-byte identical whether Geography is "Southern Africa" or "West Africa." Deal Flow: "Deal Register:
+5 opportunities" stays at 5 (all stages shown) after selecting "Due Diligence." Both selections do show a
+"Filter updated: <value>" toast, so it looks like something happened.
+**Root cause:** `matanho-portfolio-runtime.js`'s central `data-change-action` dispatcher (~line 4065) has
+one large catch-all `case` that groups a long list of filter ids — including **`dashboard-fund-filter`,
+`dashboard-period-filter`, `dashboard-currency-filter`, `dashboard-geography-filter`, `deal-fund-filter`,
+`deal-stage-filter`, `deal-owner-filter`, `deal-age-filter`**, plus several on Term Sheet
+(`term-version-filter`/`term-status-filter`/`term-owner-filter`), Reconciliation
+(`reconciliation-status-filter`/`reconciliation-amount-filter`/`expanded-recon-*`), Report Vault
+(`report-vault-type`/`report-vault-period`), and Mailer Lists (`mailer-type-filter`/`mailer-status-filter`/
+`mailer-channel-filter`) — whose entire handler body is `toast('Filter updated', target.value);
+softFocus(...)`. None of these ever write to `state` or re-filter anything; they only show a toast and
+visually focus the control. By contrast, the structurally identical filters on the **Funds** page
+(`fund-vintage-filter`, `fund-strategy-filter`, `fund-status-filter`, `fund-currency-filter`, lines
+4061-4064, confirmed live-working earlier this pass — selecting currency ZWG correctly zeroed the fund
+list) each have their own `case` that sets a real `state.fundXxxFilter` field and calls `render()`. The gap
+is specific to which filters got wired to real state versus left in the shared no-op bucket — not a
+systemic dispatcher problem.
+**Severity:** HIGH — Deal Flow's Stage/Owner/Age filters and Dashboard's own Fund/Period/Currency/Geography
+filters are all core, expected-to-work navigation on two of the module's most-used pages; a PM filtering by
+"Due Diligence" to see only deals needing attention silently gets the unfiltered full list with no
+indication anything is wrong.
+**Suspected area / fix shape:** give each listed filter id its own `case` following the exact
+`fund-*-filter` pattern (`state.<field> = target.value; render()`), plus whatever each page's render
+function needs to actually apply that state field when building its metrics/table (the Funds page already
+demonstrates the full working pattern to copy). Same bug class, one shared root cause (the catch-all
+case) — worth fixing every listed id in one pass rather than one page at a time as each is separately
+discovered, mirroring how FINDING-PV11-007's backend `authorize()` gap was closed repo-wide in one look
+rather than file by file.
 
 ## Format per finding
 ```
