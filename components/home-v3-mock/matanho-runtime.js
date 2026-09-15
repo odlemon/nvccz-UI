@@ -492,16 +492,7 @@ export function startMatanhoRuntime(rootEl, options = {}) {
       </section>
       ${assistant}
       <section class="card card-pad home-insight-card">
-        <div class="card-title"><div><h3>Workday Snapshot</h3><p>Focus quality and portfolio momentum in one calm view</p></div><select class="select-control small-btn" data-action="snapshot-range"><option>Today</option><option>This week</option><option>This month</option></select></div>
         <div class="snapshot-chart-pair">
-          <div class="snapshot-donut-pane">
-            <div class="focus-ring" style="--score:86%"><div><strong>86</strong><span>Excellent</span></div></div>
-            <div class="snapshot-signals">
-              <div><span>Deep work</span><strong>4h 48m</strong><i class="signal-bar"><b style="width:78%"></b></i></div>
-              <div><span>Momentum</span><strong>+12%</strong><i class="signal-bar emerald"><b style="width:88%"></b></i></div>
-              <div><span>Balance</span><strong>82%</strong><i class="signal-bar amber"><b style="width:82%"></b></i></div>
-            </div>
-          </div>
           ${aumSnapshotMarkup()}
         </div>
       </section>
