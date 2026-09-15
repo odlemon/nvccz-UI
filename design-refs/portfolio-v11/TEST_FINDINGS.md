@@ -9,16 +9,19 @@ as a hypothesis to verify, not a fact.
 | Severity | Open | Fixed locally, not deployed | Deployed and verified |
 |---|---|---|---|
 | CRITICAL | 0 | 0 | 0 |
-| HIGH | 1 | 0 | 7 |
-| MEDIUM | 2 | 0 | 1 |
+| HIGH | 0 | 0 | 8 |
+| MEDIUM | 1 | 0 | 2 |
 | LOW | 0 | 0 | 0 |
 
-Phase 4 pass (15 September 2026): fixed and verified live — PV11-002 (upgraded MEDIUM→HIGH once live
-testing showed the wizard was silently ignoring the fund/amount entirely, not just mis-rounding it),
-PV11-004 (real root cause was a live-bridge override shadowing the first fix attempt, see its finding for
-the correction), PV11-006, PV11-007, PV11-008, PV11-010 (Deal Flow half), PV11-011. Still open: PV11-005
-(net-new distribution-creation UI, decided but not yet
-built), PV11-002, PV11-006, PV11-009 (the last has no code fix planned — flagged for a product decision).
+**Phase 4 complete, 15 September 2026** — every finding but one fixed, deployed to dev and verified live:
+PV11-001 (earlier this session), PV11-002 (upgraded MEDIUM→HIGH once live testing showed the wizard was
+silently ignoring the fund/amount entirely, not just mis-rounding it), PV11-004 (real root cause was a
+live-bridge override shadowing the first fix attempt — see its finding for the correction), PV11-005 (built
+from scratch — the module's one net-new feature this pass), PV11-006, PV11-007, PV11-008, PV11-010 (Deal
+Flow half — Dashboard's four filters now write real state but `renderDashboard` doesn't yet read them, a
+smaller follow-up), PV11-011. **Only PV11-009 remains open** — no code fix planned, flagged for a product
+decision (make the demo role-switcher visibly non-binding, or wire it to the real user) rather than picked
+unilaterally.
 
 ## FINDING-PV11-001
 
@@ -273,6 +276,19 @@ unilaterally.
 
 **Decision (15 September 2026):** build it in this same sweep, in Phase 4 alongside the other fixes —
 Portfolio → LP Portal capital flows should work end to end before LP Portal's re-sweep depends on them.
+
+**BUILT and verified live, 15 September 2026** (nvccz-new `c0cab02` + `85ae223`, deployed to dev): added a
+"New distribution" button next to "Create fund" on the Funds page, opening a 2-step wizard (Details:
+fund/distribution date/source/gross amount/notes; Review) that mirrors the Create Fund wizard's shape,
+built correctly from scratch (proper wizard-draft merge from the start — no live-bridge override needed
+since nothing existing is being shadowed here). Wired through a new `api-create-distribution` handler in
+`lib/portfolio-v11/actions.ts` calling `lpFeesApi.declareDistribution()`. One deploy cycle caught a real
+webpack build break (the Funds header's `extra:` value is a plain expression, not a template literal like
+Deal Flow's — string-concatenating the two buttons instead of `${...}`-interpolating them fixed it; `node
+--check` did not catch this, only the actual `next build`/SWC parse did). Verified live end to end: declared
+a $2,000,000 Dividend distribution against "Arcus Growth Fund V", got a "Distribution declared" toast, and
+confirmed via `GET /funds/:id/distributions` that a real `DECLARED` record now exists
+(`id: cmu32oax7000opc01cf4ort8x`) alongside the fund's pre-existing seeded distribution.
 
 ## FINDING-PV11-006
 
