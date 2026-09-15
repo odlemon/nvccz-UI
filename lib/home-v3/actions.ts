@@ -421,3 +421,33 @@ export async function updateMyProfile(detail: {
     return { handled: true, error: message }
   }
 }
+
+export type Hv3AssistantResult = { handled: boolean; error: string | null; reply?: string }
+
+/**
+ * `assistant.message.sent` -> POST /api/assistant/chat. Unlike every other action in this file,
+ * the runtime can't apply this optimistically (there's no "obvious" reply to show ahead of the
+ * real one) and a full-page reload would blow away the conversation — so this is the one action
+ * whose result needs to flow back INTO the mounted runtime rather than just a toast. See
+ * RuntimeApi.receiveAssistantReply in home-v3-app.tsx / matanho-runtime.d.ts.
+ */
+export async function sendAssistantMessage(detail: {
+  prompt?: string
+  history?: { role: "user" | "assistant"; content: string }[]
+}): Promise<Hv3AssistantResult> {
+  const prompt = detail?.prompt?.trim()
+  if (!prompt) return { handled: false, error: null }
+  try {
+    const res: any = await apiClient.post("/assistant/chat", {
+      prompt,
+      history: detail.history ?? [],
+    })
+    const reply = typeof res?.data?.reply === "string" ? res.data.reply : ""
+    if (!reply) return { handled: true, error: "The assistant didn't return a response" }
+    return { handled: true, error: null, reply }
+  } catch (err: any) {
+    const message = err?.message ? String(err.message) : "Failed to reach the assistant"
+    console.error("[home-v3] assistant.message.sent failed:", message)
+    return { handled: true, error: message }
+  }
+}

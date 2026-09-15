@@ -29,12 +29,21 @@ declare module "@/components/home-v3-mock/matanho-runtime" {
       id: string
       name: string
       firstName: string
+      lastName: string
       role: string
       location: string
       email: string
       initials: string
       image?: string
     }) => void
+    /**
+     * Feeds a real assistant reply (or an error message) back into the mounted runtime's own AI
+     * conversation state, replacing the pending "Thinking…" placeholder aiRespond() pushes when
+     * the user sends a message. No hydrate() API exists on this runtime, so this is the one place
+     * a host->runtime data path was added deliberately, rather than falling back to a full reload
+     * (which would lose the conversation entirely).
+     */
+    receiveAssistantReply: (text: string, isError?: boolean) => void
     destroy: () => void
   }
 }

@@ -837,10 +837,9 @@ function servicesView() {
     return [
       {id:'work',label:'My Work',icon:'check',count:state.workTasks.length,detail:`${state.workTasks.filter(t=>!t.done).length} open tasks`},
       {id:'calendar',label:'Calendar',icon:'calendar',count:D.schedule.length,detail:'Meetings and focus blocks'},
-      {id:'documents',label:'Documents',icon:'folder',count:8,detail:'Files you can access'},
-      {id:'forums',label:'Forums',icon:'forum',count:D.forums.length,detail:'Discussions and accepted answers'},
-      {id:'news',label:'News',icon:'news',count:D.news.length,detail:'Internal and trusted sources'},
-      {id:'people',label:'People',icon:'people',count:D.people.length,detail:'Profiles, skills and availability'}
+      {id:'forums',label:'Forums',icon:'forum',count:(D.forumPosts||[]).length,detail:'Discussions across the company'},
+      {id:'news',label:'News',icon:'news',count:(D.newsPosts||[]).length,detail:'Company announcements'},
+      {id:'people',label:'People',icon:'people',count:(D.directory||[]).length,detail:'Colleague directory'}
     ];
   }
   function activeAiSources(){ return aiSources().filter(x=>state.aiContextSources[x.id]!==false); }
@@ -1060,12 +1059,12 @@ function servicesView() {
   function aiRespond(prompt){
     const p=String(prompt||'').trim(); if(!p)return;
     state.aiMode='ask';
+    const historyForApi=state.aiMessages.filter(m=>!m.pending).map(m=>({role:m.role,content:m.text||m.summary||''}));
     state.aiMessages.push({role:'user',text:p,createdAt:Date.now()});
-    const answer=aiAnswerFor(p);
-    state.aiMessages.push({role:'assistant',prompt:p,createdAt:Date.now(),...answer});
-    state.aiRecent=[{id:`ai-${Date.now()}`,title:answer.title,prompt:p,meta:'Just now'},...state.aiRecent.filter(x=>x.prompt!==p)].slice(0,8);
+    state.aiMessages.push({role:'assistant',text:'Thinking…',pending:true,createdAt:Date.now()});
     saveState(); render();
     setTimeout(()=>{const thread=document.getElementById('aiConversation');if(thread)thread.scrollTo({top:thread.scrollHeight,behavior:'smooth'})},60);
+    emitIntegrationEvent('assistant.message.sent',{prompt:p,history:historyForApi});
   }
 
   document.addEventListener('click' , e => {
@@ -1257,6 +1256,17 @@ function servicesView() {
     },
     setSessionUser(user) {
       applySessionUser(user);
+    },
+    receiveAssistantReply(text, isError) {
+      const idx = state.aiMessages.findIndex(m => m.pending);
+      const promptText = idx > 0 ? (state.aiMessages[idx - 1].text || '') : '';
+      const msg = { role: 'assistant', text: String(text || ''), createdAt: Date.now(), error: !!isError };
+      if (idx !== -1) state.aiMessages[idx] = msg; else state.aiMessages.push(msg);
+      if (!isError) {
+        state.aiRecent = [{ id: `ai-${Date.now()}`, title: String(text || '').slice(0, 60), prompt: promptText, meta: 'Just now' }, ...state.aiRecent].slice(0, 8);
+      }
+      saveState(); render();
+      setTimeout(() => { const thread = document.getElementById('aiConversation'); if (thread) thread.scrollTo({ top: thread.scrollHeight, behavior: 'smooth' }) }, 60);
     },
     destroy() {
       try {

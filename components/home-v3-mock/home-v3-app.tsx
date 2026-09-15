@@ -32,6 +32,7 @@ import {
   togglePostSolved,
   createNewsletter,
   updateMyProfile,
+  sendAssistantMessage,
 } from "@/lib/home-v3/actions"
 import { useAppDispatch, useAppSelector } from "@/lib/store"
 import { refreshUserDetails, logoutUser } from "@/lib/store/slices/authSlice"
@@ -132,6 +133,7 @@ type RuntimeApi = {
     }
   ) => void
   setSessionUser: (user: Hv3SessionUser) => void
+  receiveAssistantReply: (text: string, isError?: boolean) => void
   destroy: () => void
 }
 
@@ -379,6 +381,13 @@ export function HomeV3App() {
         }
       })
     }
+    const onAssistantMessageSent = (event: Event) => {
+      const detail = (event as CustomEvent).detail || {}
+      void sendAssistantMessage(detail).then((result) => {
+        if (result.error) apiRef.current?.receiveAssistantReply(result.error, true)
+        else if (result.reply) apiRef.current?.receiveAssistantReply(result.reply, false)
+      })
+    }
     window.addEventListener("matanho:priorities.task.toggled", onPriorityToggled)
     window.addEventListener("matanho:preferences.theme.updated", onCoverPreferenceUpdated)
     window.addEventListener("matanho:preferences.wallpaper.updated", onCoverPreferenceUpdated)
@@ -397,6 +406,7 @@ export function HomeV3App() {
     window.addEventListener("matanho:post.solved.toggled", onPostSolvedToggled)
     window.addEventListener("matanho:newsletter.created", onNewsletterCreated)
     window.addEventListener("matanho:profile.updated", onProfileUpdated)
+    window.addEventListener("matanho:assistant.message.sent", onAssistantMessageSent)
 
     apiRef.current = startMatanhoRuntime(el, {
       data,
@@ -444,6 +454,7 @@ export function HomeV3App() {
       window.removeEventListener("matanho:post.solved.toggled", onPostSolvedToggled)
       window.removeEventListener("matanho:newsletter.created", onNewsletterCreated)
       window.removeEventListener("matanho:profile.updated", onProfileUpdated)
+      window.removeEventListener("matanho:assistant.message.sent", onAssistantMessageSent)
       delete window.__HOME_V3_PATH__
       apiRef.current?.destroy()
       apiRef.current = null
