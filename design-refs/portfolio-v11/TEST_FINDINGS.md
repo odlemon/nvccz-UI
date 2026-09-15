@@ -355,6 +355,18 @@ fix lands, since the stage change is idempotent) or reports the partial state cl
 also exists in `lib/api/procurement-api.ts`'s `processInvoicePayment` (Procurement V23, already swept and
 merged) — flagged separately as its own task rather than fixed here, since Procurement is a different,
 already-closed sweep.
+**Positive confirmation, same pass:** `start-implementation` (the last of Wave 2's five named actions)
+correctly validates its precondition — tried live on "E2E Live Deal 1788589897" (board review in progress,
+term sheet still Draft) and got a clear, persistent (not fast-fading) error banner: "Failed to initiate
+investment implementation: Application must have a signed term sheet to initiate investment
+implementation." Not a bug — this is the backend correctly refusing an out-of-order request, and the error
+UI for this specific action is notably more durable/readable than the toast pattern used elsewhere.
+**Coverage gap, documented rather than skipped:** `start-due-diligence` (structurally identical to the
+already-verified-working `complete-due-diligence` — same `dueDiligenceApi` module, same simple
+single-call handler shape in `actions.ts:551-558`) was not live-exercised this pass: all 5 existing deals
+are already past the pre-DD stage (2 at Board Review, 3 at Due Diligence), so there is no current fixture
+to start DD *from*. Confirmed wired correctly by reading the code; live verification needs either a fresh
+deal walked through screening/shortlisting first, or a new fixture seeded directly at `SHORTLISTED`.
 
 ## Format per finding
 ```
