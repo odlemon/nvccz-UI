@@ -22,6 +22,7 @@ import { AlertCircle, CheckCircle2, FileText, Loader2, Package, Plus, Trash2, Up
 import { toast } from 'sonner'
 import { DatePicker } from '@/components/ui/date-picker'
 import { procurementApiV2, type VendorPortalPurchaseOrder } from '@/lib/api/procurement-api-v2'
+import { ORG_NAME, ORG_LOGO_PATH } from '@/lib/branding'
 
 interface InvoiceLine {
   itemName: string
@@ -75,10 +76,6 @@ function errorMessage(err: unknown, fallback: string): string {
   return fallback
 }
 
-function orgName(): string {
-  return process.env.NEXT_PUBLIC_ORGANIZATION_NAME || 'Arcus'
-}
-
 function Shell({ children }: { children: React.ReactNode }) {
   const [logoError, setLogoError] = useState(false)
   return (
@@ -88,8 +85,8 @@ function Shell({ children }: { children: React.ReactNode }) {
           <div className="relative w-48 h-12">
             {!logoError ? (
               <Image
-                src={process.env.NEXT_PUBLIC_ORGANIZATION_LOGO || '/logo.png'}
-                alt={orgName()}
+                src={ORG_LOGO_PATH}
+                alt={ORG_NAME}
                 fill
                 className="object-contain"
                 priority
@@ -98,9 +95,9 @@ function Shell({ children }: { children: React.ReactNode }) {
             ) : (
               <div className="flex items-center justify-center gap-2 h-full">
                 <div className="w-10 h-10 rounded bg-blue-600 flex items-center justify-center text-white font-bold">
-                  {orgName().substring(0, 1)}
+                  {ORG_NAME.substring(0, 1)}
                 </div>
-                <span className="text-xl font-bold text-gray-900">{orgName()}</span>
+                <span className="text-xl font-bold text-gray-900">{ORG_NAME}</span>
               </div>
             )}
           </div>
@@ -312,7 +309,7 @@ export default function VendorInvoiceSubmissionPage() {
             </div>
             <CardTitle className="text-2xl font-semibold">Invoice submitted</CardTitle>
             <CardDescription className="text-green-50">
-              Thank you. {orgName()} has received your invoice against {po.poNumber}.
+              Thank you. {ORG_NAME} has received your invoice against {po.poNumber}.
             </CardDescription>
           </CardHeader>
           <CardContent className="p-8 space-y-6">
