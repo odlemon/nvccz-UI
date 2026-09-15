@@ -9,13 +9,15 @@ as a hypothesis to verify, not a fact.
 | Severity | Open | Fixed locally, not deployed | Deployed and verified |
 |---|---|---|---|
 | CRITICAL | 0 | 0 | 0 |
-| HIGH | 1 | 0 | 6 |
-| MEDIUM | 3 | 0 | 1 |
+| HIGH | 1 | 0 | 7 |
+| MEDIUM | 2 | 0 | 1 |
 | LOW | 0 | 0 | 0 |
 
-Phase 4 pass (15 September 2026): fixed and verified live — PV11-004 (real root cause was a live-bridge
-override shadowing the first fix attempt, see its finding for the correction), PV11-007, PV11-008, PV11-010
-(Deal Flow half), PV11-011. Still open: PV11-005 (net-new distribution-creation UI, decided but not yet
+Phase 4 pass (15 September 2026): fixed and verified live — PV11-002 (upgraded MEDIUM→HIGH once live
+testing showed the wizard was silently ignoring the fund/amount entirely, not just mis-rounding it),
+PV11-004 (real root cause was a live-bridge override shadowing the first fix attempt, see its finding for
+the correction), PV11-006, PV11-007, PV11-008, PV11-010 (Deal Flow half), PV11-011. Still open: PV11-005
+(net-new distribution-creation UI, decided but not yet
 built), PV11-002, PV11-006, PV11-009 (the last has no code fix planned — flagged for a product decision).
 
 ## FINDING-PV11-001
@@ -112,10 +114,14 @@ either surface the computed percent (and the resulting real total) on the Review
 instead of echoing the raw typed dollar figure as if it were final, or recompute and show the actual
 resulting total immediately after creation rather than only the originally-typed target.
 
-**FIXED, deployment and live re-verification pending:** merged `state.modalWizard.draft` into the bridge's
-`submitCapitalCall` override (fixes the fund/amount being lost); `lib/portfolio-v11/actions.ts`'s handler
-now sums the created call's real `allocations[].currentCallAmount` and reports the actual total raised
-instead of a generic success message. Not yet re-deployed/re-tested — do that before marking this closed.
+**FIXED and verified live, 15 September 2026** (nvccz-new `b29b4f4`, deployed to dev): merged
+`state.modalWizard.draft` into the bridge's `submitCapitalCall` override; `lib/portfolio-v11/actions.ts`'s
+handler now sums the created call's real `allocations[].currentCallAmount` and reports the actual total
+raised. Verified live via a captured `api-create-capital-call` event and toast: selecting "Arcus Growth
+Fund V" with amount $1,000,000 and real dates now correctly emits that fund's own id (not `funds[0]`), a
+`callPercent` derived from the typed amount (not the hardcoded `10` default), and both dates as typed
+(previously always empty) — and the resulting toast reads "Capital call created — actual total $635,000
+across 2 LPs" instead of a generic message implying the $1M target was met exactly.
 
 ## FINDING-PV11-003
 
