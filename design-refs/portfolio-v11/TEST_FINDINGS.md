@@ -10,7 +10,7 @@ as a hypothesis to verify, not a fact.
 |---|---|---|---|
 | CRITICAL | 0 | 0 | 0 |
 | HIGH | 0 | 0 | 1 |
-| MEDIUM | 1 | 0 | 0 |
+| MEDIUM | 2 | 0 | 0 |
 | LOW | 0 | 0 | 0 |
 
 ## FINDING-PV11-001
@@ -43,6 +43,14 @@ and `inv.analyst@nts.local` both now get `GET /funds` → 200 with all 7 real fu
 now reach `POST /funds` (a follow-up 400 was an unrelated Prisma validation issue in the test payload,
 not a permission refusal); a role with no Portfolio grant at all (`proc.mgr@nts.local`) is still
 correctly refused with 403 — the fix is properly scoped, not a blanket opening.
+
+**Same root cause found in a sibling file, fixed in the same pass:** LP Management showed "0 LPs" /
+"$0 Total Commitments" for `portfolio.mgr` even though real LP records exist (visible via capital-call
+allocations) — traced to `nvccz/src/routes/clientRoutes.ts`'s `GET /clients` (and statistics/detail/
+investor-lookup/link-user/update) carrying the identical legacy `authorize(["admin","fund_manager"])`/
+`authorize(["admin"])` gate. Fixed the same way: `portfolio_mgr`+`inv_analyst` added to the read routes,
+`portfolio_mgr` added to create/update (delete left admin-only, matching how fund deletion isn't exposed
+to portfolio_mgr either).
 
 **Update — broader than first written:** `GET /funds` carries the same `authorize(["admin","fund_manager"])`
 gate, confirmed live: as `admin@nts.com` the Funds page correctly lists 7 real funds ($608M called,
@@ -87,6 +95,26 @@ For a financial instrument this is a real, if quiet, correctness gap.
 either surface the computed percent (and the resulting real total) on the Review step before submission
 instead of echoing the raw typed dollar figure as if it were final, or recompute and show the actual
 resulting total immediately after creation rather than only the originally-typed target.
+
+## FINDING-PV11-003
+
+**Page / flow:** LP Management → Add LP → Fund selector
+**Steps to reproduce:** As `portfolio.mgr@nts.local` (after PV11-001 is fixed, so `GET /funds` genuinely
+works for this role), navigate directly to `/portfolio/lps` → Add LP → open the Fund dropdown.
+**Expected:** Lists the 7 real funds, same as the Capital Calls page's fund selector.
+**Actual:** "No funds available", every time, even on a hard reload with a fresh login. Root-caused in
+`lib/portfolio-v11/bootstrap.ts`'s `scopesForPage()`: the `'lps'`/`'lp-detail'` case returns
+`{ primary: ['lps'], secondary: [] }` — it never requests the `funds` scope at all, unlike
+`'cash-accounts'`/`'cash-overview'` (`{ primary: ['cashAccounts'], secondary: ['funds'] }`), which
+correctly does. Landing on LP Management directly (rather than arriving from a page that happened to
+already load funds) leaves `funds` permanently empty for the whole page, including this modal. This
+also silently disables the LP-commitment enrichment step at bootstrap.ts:522 (`if (needsEnrich &&
+funds.length)`), which is gated on funds being loaded — a second, related symptom of the same missing
+scope.
+**Severity:** MEDIUM — blocks LP onboarding through its only entry point on this page.
+**Suspected area:** `lib/portfolio-v11/bootstrap.ts`'s `scopesForPage()`, `'lps'`/`'lp-detail'` case.
+**Fix applied (same pass):** added `'funds'` as a secondary scope, matching the `cash-accounts` pattern.
+Not yet re-verified live post-deploy — pending.
 
 ## Format per finding
 ```
