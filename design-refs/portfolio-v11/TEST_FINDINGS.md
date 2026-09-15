@@ -9,8 +9,8 @@ as a hypothesis to verify, not a fact.
 | Severity | Open | Fixed locally, not deployed | Deployed and verified |
 |---|---|---|---|
 | CRITICAL | 0 | 0 | 0 |
-| HIGH | 0 | 0 | 1 |
-| MEDIUM | 2 | 0 | 0 |
+| HIGH | 2 | 0 | 1 |
+| MEDIUM | 3 | 0 | 0 |
 | LOW | 0 | 0 | 0 |
 
 ## FINDING-PV11-001
@@ -115,6 +115,111 @@ scope.
 **Suspected area:** `lib/portfolio-v11/bootstrap.ts`'s `scopesForPage()`, `'lps'`/`'lp-detail'` case.
 **Fix applied (same pass):** added `'funds'` as a secondary scope, matching the `cash-accounts` pattern.
 Not yet re-verified live post-deploy — pending.
+
+## FINDING-PV11-004
+
+**Page / flow:** LP Management → Add LP wizard (all three steps: Details, Ownership, Review)
+**Steps to reproduce:** As `portfolio.mgr@nts.local`, `/portfolio/lps` → Add LP → Details: enter LP name +
+email only, leave the Fund dropdown on "Select fund (optional)" → Next → Ownership: leave Commitment
+blank → Next → Review → Start onboarding.
+**Expected:** A bare LP/client record is created with no fund and no commitment (exactly what the Review
+screen confirms: "Fund: -", "Commitment: -").
+**Actual:** Every single submission through this wizard fails — with or without a commitment amount typed
+in — with a red "Request failed — Amount and effective date are required when creating investment
+commitment" toast. No LP record is created (confirmed via a direct authenticated `GET /clients` before and
+after: count unchanged). The toast is real and correctly wired, but fades in well under 2 seconds, which
+made this look like a silent no-op during quick manual testing — it is not; a MutationObserver on the toast
+stack plus a full `window.fetch` trace proved the POST fires, gets HTTP 500, and the failure toast does
+render, it is just very easy to miss.
+**Root cause, traced end-to-end:**
+1. `matanho-portfolio-runtime.js`'s `submitLP()` (~line 3376) builds the live-action dataset as
+   `fundId: String(data.fundId || funds[0]?.id || '')`. When the user deliberately leaves "Select fund
+   (optional)" blank, `data.fundId` is `''` (falsy), so this silently substitutes **the first fund in the
+   whole funds list** — in this dev environment a leftover test fixture, "Wizard Smoke Fund
+   1788642979953" — as if the user had explicitly chosen it. The Review step's own summary card reads
+   `d.fundId` directly (not through this fallback) and correctly shows "Fund: -", so the screen the user
+   confirms and the payload actually sent disagree. Confirmed live: the real `POST /clients` body carried
+   `"fund_id":"cmtovuw00004gunmke3r8rp55"` (that fixture fund's id) even though nothing was ever selected.
+2. Backend `nvccz/src/services/ClientService.ts:97-100` (`createClient`): `if (request.fundId) { if
+   (!request.amount || !request.effectiveDate) { throw new Error("Amount and effective date are required
+   when creating investment commitment") } ... }` — any truthy `fundId` unconditionally requires both
+   `amount` and `effectiveDate`, regardless of caller intent. Because of bug #1, `fundId` is **always**
+   truthy from this wizard (as long as at least one fund exists in the system), so this validation always
+   fires for every "Add LP" submission, with or without a commitment.
+3. Compounding gap: even if a user *does* want to attach a commitment, the wizard's Ownership step
+   (`renderLPWizard()`, step 1) has only Commitment (USD), KYC status, and Onboarding notes — **no
+   effective-date field at all** — and `lib/portfolio-v11/actions.ts`'s `submit-add-lp` handler doesn't
+   forward an `effectiveDate` even if one existed. So today there is no combination of inputs in this
+   wizard that can ever satisfy the backend's requirement — LP-with-commitment creation is unreachable
+   from the UI, not just LP-without-commitment.
+**Severity:** HIGH — LP onboarding, called out in the sweep plan as a priority (LP Portal's re-test
+depends on it), fails 100% of the time through its only UI entry point, for every combination of inputs.
+**Suspected area / fix shape:**
+- Root fix (unblocks the common "no fund yet" case immediately): `matanho-portfolio-runtime.js`'s
+  `submitLP()` — drop the `|| funds[0]?.id` fallback so a deliberately-blank fund selection is sent as
+  blank, matching what the Review screen already promises. One-line change, mirrored into
+  `scripts/patch-portfolio-runtime.mjs` so it survives a future re-extraction.
+- Separate, smaller fix (unblocks the "add LP with a fund + commitment in one step" case): add an
+  "Effective date" input to the Ownership step and forward `effectiveDate` through
+  `lib/portfolio-v11/actions.ts`'s `submit-add-lp` handler into `clientsApi.create()`.
+- Not proposing a backend change: `ClientService.ts`'s requirement that a commitment need an amount and
+  effective date is reasonable on its own; the bug is the frontend forcing that code path to run when the
+  user never asked for a commitment.
+**Secondary defects found in the same pass (same page, worth fixing alongside):**
+- Review step field-mapping bug: the "Geography" row renders the LP name and email concatenated with no
+  separator (e.g. "Toast Visual Check LPtoast-visual-check@example.com") instead of the actual (blank)
+  geography value — a row-building bug in the Review step's summary-card renderer, independent of the
+  fund-default issue above.
+- After any live "Add LP" submission (success or failure), the modal never closes or re-renders itself:
+  `submitLP()`'s `if (state.liveData)` branch sets `state.modalWizard = null` and returns without calling
+  `render()`/`closeOverlays()`, relying entirely on the React host's post-`await` callback to tear the
+  modal down — which only happens today on a *successful* result. On failure the modal is left open with
+  stale internal state (already-nulled `modalWizard` while the DOM still shows the old wizard), and
+  reopening "Add LP" while that stale DOM is still present does not reliably start a fresh step-0 wizard.
+  Worth a small robustness fix (always close/reset on either outcome) rather than depending on the host.
+
+## FINDING-PV11-005
+
+**Page / flow:** Fund detail / Fund Performance / LP Management — capital distribution creation (Wave 1's
+third item: "distribution creation")
+**Steps to reproduce:** As `portfolio.mgr@nts.local` and as `admin@nts.com`, searched every Portfolio V11
+page and every runtime action id for any way to declare/create a capital distribution to LPs.
+**Expected:** Some screen (Fund detail, LP Management, or a dedicated Distributions page) has a "New
+distribution" / "Declare distribution" action, mirroring Capital Calls' "New Capital Call" wizard.
+**Actual:** No such UI exists anywhere in Portfolio V11. "Distribution"/"Distributions" appears only as a
+read-only line item inside charts (Activity Mix donut, Net Cash Flow bars, NAV bridge, analytics), never as
+an actionable button, tab, or wizard. Confirmed by exhaustive search of
+`components/portfolio-v11-mock/matanho-portfolio-runtime.js` (no `declare`/`payout`/distribution-wizard
+strings outside chart labels) and of every `if (action === ...)` branch in `lib/portfolio-v11/actions.ts`
+(none call any distribution API). This is not a broken flow — Wave 1's "distribution creation" checkpoint
+found there is currently nothing to click.
+**Root cause:** the backend capability is fully built —
+`nvccz/src/routes/lpFeesAndDistributionsRoutes.ts` exposes `GET/POST /:fundId/distributions`,
+`.../notices`, `.../payout` etc., and the frontend even has a matching typed API client,
+`lib/api/lp-fees-distributions-api.ts`'s `lpFeesApi` (`declareDistribution`, `sendNotices`,
+`recordPayout`, `listDistributions`...) — but a repo-wide search confirms `lpFeesApi` is imported and
+called from **nowhere**: no page, component, or action handler in this frontend ever uses it. It is dead,
+unreferenced code sitting next to a live, working backend. This is the same shape as the LP Portal's
+already-known accounting-treatment gaps this sweep's plan calls out for Phase 10 ("every distribution
+debits 4100 Dividend Income regardless of source", "RETURN_OF_CAPITAL/INCOME rejected by backend
+ALLOWED_SOURCES") — those checks concern distributions that already exist in the system (presumably
+seeded directly), not ones created through this UI, because staff currently have no way to create one at
+all.
+**Bonus finding, same file:** every route in `lpFeesAndDistributionsRoutes.ts` (fee policy, management
+fees, distributions, notices, payouts) is gated with `authenticate` only — no `authorize([...])` role
+check at all, unlike Funds/Clients' legacy over-restriction (FINDING-PV11-001). Today this is low-risk
+since nothing in the UI links here, but it means **any authenticated user of any role** could call these
+financial write endpoints directly (e.g. `POST /:fundId/distributions`) if they knew the URL. Worth closing
+whenever this area is built out, not urgent while it stays unreachable from the UI.
+**Severity:** HIGH (capability gap, not a defect) — a core PE-fund operation (returning capital to LPs) has
+no staff-facing path to execute it at all, and the LP Portal's own distribution display/validation logic
+already assumes this exists upstream.
+**Suspected area / fix shape:** this is a net-new UI build (a "New distribution" wizard, likely on the Fund
+detail page or a promoted LP Management action, following the Capital Calls wizard's shape), wired through
+a new `submit-create-distribution`/`api-create-distribution` action in `lib/portfolio-v11/actions.ts`
+calling the already-existing `lpFeesApi.declareDistribution()` — materially larger than the other findings
+in this report, which are all fixes to existing flows. Flagging for a scoping decision rather than building
+unilaterally.
 
 ## Format per finding
 ```
