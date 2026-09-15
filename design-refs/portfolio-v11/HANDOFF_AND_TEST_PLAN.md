@@ -53,7 +53,7 @@ in `middleware.ts`); the module id/folder naming stayed `portfolio-v11` througho
 | Phase | Status |
 |---|---|
 | 0 — Setup & preflight | **Done** — branch cut from `dev` @ `c3422c1`, docs scaffolded, FINDING-003's backend fix confirmed present and wired (`isExternalPortalUser`/`requireInternalStaffUser` gate `GET/POST /users`), `financial_reports`/`reporting_notification_logs` tables confirmed present on `arcus_dev`, all 5 personas confirmed logging in |
-| 1 — Security gate (FINDING-003) | Not started |
+| 1 — Security gate (FINDING-003) | **Done** — re-verified live, both layers hold, no regression across investee/LP/applicant role types. Detail in `design-refs/uat-three-module/TEST_FINDINGS.md`'s FINDING-003 |
 | 2 — Foundation (module fix, permission alias, personas) | Not started |
 | 3 — Live testing | Not started |
 | 4 — Fixes by severity | Not started |
