@@ -1,0 +1,2 @@
+    receiveAssistantReply(text, isError, sourcesUsed) {
+      const idx = state.aiMessages.findIndex(m => m.pending);

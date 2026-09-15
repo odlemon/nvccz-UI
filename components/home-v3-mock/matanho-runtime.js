@@ -108,6 +108,7 @@ export function startMatanhoRuntime(rootEl, options = {}) {
       {id:'client-update',title:'Client update draft',prompt:'Draft a concise client update for the Zambia mandate',meta:'29 Jul'}
     ],
     aiDraft: saved.aiDraft || {type:'Executive update',audience:'Investment team',subject:'Q3 progress update',body:''},
+    aiDraftPending: false,
     newsBookmarks: saved.newsBookmarks || [],
     profile: options.liveSession
       ? {
@@ -921,10 +922,13 @@ function servicesView() {
     </section>`;
   }
   function aiBriefsPanel(){
+    const portfolioMeeting=(D.schedule||[]).find(e=>(e.title||'').toLowerCase().includes('portfolio'));
+    const activeTaskCount=(state.workTasks||[]).filter(t=>!t.done).length;
+    const projectCount=(state.workProjects||[]).length;
     const briefs=[
       {title:'Today’s leadership brief',meta:'Calendar + My Work + Performance',detail:'Three decisions, two risks and your most important next action.',prompt:'Prepare a leadership brief for today'},
-      {title:'Portfolio review',meta:'14:00 · Harare Boardroom',detail:'Changes, unresolved risks and the decision pack in one place.',prompt:'Prepare me for today’s portfolio review'},
-      {title:'Weekly execution summary',meta:'7 active tasks · 3 projects',detail:'Progress, delivery confidence and ownership gaps.',prompt:'Summarise my priorities and risks for this week'}
+      {title:'Portfolio review',meta:portfolioMeeting?`${esc(portfolioMeeting.time||'')}${portfolioMeeting.location?' · '+esc(portfolioMeeting.location):''}`:'No portfolio review scheduled',detail:'Changes, unresolved risks and the decision pack in one place.',prompt:'Prepare me for today’s portfolio review'},
+      {title:'Weekly execution summary',meta:`${activeTaskCount} active task${activeTaskCount===1?'':'s'} · ${projectCount} project${projectCount===1?'':'s'}`,detail:'Progress, delivery confidence and ownership gaps.',prompt:'Summarise my priorities and risks for this week'}
     ];
     return `<section class="card ai-library-panel-v16"><div class="ai-section-head-v16"><div><span class="eyebrow">Work briefs</span><h2>Decision-ready context</h2><p>Generate repeatable briefs without rebuilding the same search every time.</p></div><button class="primary-btn" data-ai-prompt="Prepare a leadership brief for today">${icon('sparkles')} Generate brief</button></div><div class="ai-brief-list-v16">${briefs.map((b,i)=>`<article><div class="ai-brief-icon-v16">${icon(['sunrise','calendar','performance'][i])}</div><div><strong>${b.title}</strong><span>${b.meta}</span><p>${b.detail}</p></div><button class="secondary-btn" data-ai-prompt="${esc(b.prompt)}">Generate ${icon('arrow')}</button></article>`).join('')}</div></section>`;
   }
@@ -946,7 +950,7 @@ function servicesView() {
     return `<section class="card ai-library-panel-v16"><div class="ai-section-head-v16"><div><span class="eyebrow">Universal search</span><h2>Find one answer across connected work</h2><p>Search only the sources currently enabled in your context panel.</p></div></div><form class="ai-knowledge-search-v16" id="aiSearchForm">${icon('search')}<input id="aiKnowledgeSearch" name="query" value="${esc(q)}" placeholder="Search people, tasks, discussions and news…"/><button class="primary-btn">Search</button></form><div class="ai-result-list-v16">${empty?`<div class="work-empty-state">${icon(empty.icon)}<strong>${esc(empty.title)}</strong><span>${esc(empty.detail)}</span></div>`:results.map(r=>`<article class="ai-search-result-v16"><div class="ai-result-icon-v16">${icon(r.icon)}</div><div><span>${r.type}</span><strong>${esc(r.title)}</strong><p>${esc(r.detail)}</p></div><button class="secondary-btn" data-ai-open-route="${r.route}">Open ${icon('arrow')}</button></article>`).join('')}</div></section>`;
   }
   function aiDraftPanel(){
-    return `<section class="card ai-library-panel-v16"><div class="ai-section-head-v16"><div><span class="eyebrow">Draft workspace</span><h2>Turn context into a useful first draft</h2><p>Use connected work as source material, then review every sentence before sharing.</p></div><span class="ai-safety-chip-v16">${icon('lock')} Not shared until you approve</span></div><form id="aiDraftForm" class="ai-draft-form-v16"><div class="form-grid"><div class="form-field"><label>Draft type</label><select class="select-control" name="type"><option ${state.aiDraft.type==='Executive update'?'selected':''}>Executive update</option><option ${state.aiDraft.type==='Client email'?'selected':''}>Client email</option><option ${state.aiDraft.type==='Decision memo'?'selected':''}>Decision memo</option><option ${state.aiDraft.type==='Meeting follow-up'?'selected':''}>Meeting follow-up</option></select></div><div class="form-field"><label>Audience</label><select class="select-control" name="audience"><option ${state.aiDraft.audience==='Investment team'?'selected':''}>Investment team</option><option ${state.aiDraft.audience==='Executive committee'?'selected':''}>Executive committee</option><option ${state.aiDraft.audience==='Client'?'selected':''}>Client</option><option ${state.aiDraft.audience==='All employees'?'selected':''}>All employees</option></select></div><div class="form-field full"><label>Subject</label><input class="input-control" name="subject" value="${esc(state.aiDraft.subject)}"/></div><div class="form-field full"><label>Draft</label><textarea class="input-control ai-draft-editor-v16" name="body" placeholder="Generate or write your draft here…">${esc(state.aiDraft.body||'')}</textarea></div></div><div class="ai-draft-footer-v16"><span>${icon('sparkles')} Drafted from permission-visible work context.</span><div><button type="button" class="secondary-btn" data-ai-prompt="Draft a concise executive update for my current projects">Regenerate</button><button class="primary-btn">${icon('bookmark')} Save draft</button></div></div></form></section>`;
+    return `<section class="card ai-library-panel-v16"><div class="ai-section-head-v16"><div><span class="eyebrow">Draft workspace</span><h2>Turn context into a useful first draft</h2><p>Use connected work as source material, then review every sentence before sharing.</p></div><span class="ai-safety-chip-v16">${icon('lock')} Not shared until you approve</span></div><form id="aiDraftForm" class="ai-draft-form-v16"><div class="form-grid"><div class="form-field"><label>Draft type</label><select class="select-control" name="type"><option ${state.aiDraft.type==='Executive update'?'selected':''}>Executive update</option><option ${state.aiDraft.type==='Client email'?'selected':''}>Client email</option><option ${state.aiDraft.type==='Decision memo'?'selected':''}>Decision memo</option><option ${state.aiDraft.type==='Meeting follow-up'?'selected':''}>Meeting follow-up</option></select></div><div class="form-field"><label>Audience</label><select class="select-control" name="audience"><option ${state.aiDraft.audience==='Investment team'?'selected':''}>Investment team</option><option ${state.aiDraft.audience==='Executive committee'?'selected':''}>Executive committee</option><option ${state.aiDraft.audience==='Client'?'selected':''}>Client</option><option ${state.aiDraft.audience==='All employees'?'selected':''}>All employees</option></select></div><div class="form-field full"><label>Subject</label><input class="input-control" name="subject" value="${esc(state.aiDraft.subject)}"/></div><div class="form-field full"><label>Draft</label><textarea class="input-control ai-draft-editor-v16" name="body" placeholder="${state.aiDraftPending?'Generating your draft…':'Generate or write your draft here…'}" ${state.aiDraftPending?'disabled':''}>${esc(state.aiDraft.body||'')}</textarea></div></div><div class="ai-draft-footer-v16"><span>${icon('sparkles')} Drafted from permission-visible work context.</span><div><button type="button" class="secondary-btn" data-action="regenerate-draft" ${state.aiDraftPending?'disabled':''}>${state.aiDraftPending?'Generating…':'Regenerate'}</button><button class="primary-btn">${icon('bookmark')} Save draft</button></div></div></form></section>`;
   }
   function aiSavedPanel(){
     return `<section class="card ai-library-panel-v16"><div class="ai-section-head-v16"><div><span class="eyebrow">Saved answers</span><h2>Your reusable work intelligence</h2><p>Return to useful answers without running the same search again.</p></div></div>${state.aiSaved.length?`<div class="ai-saved-list-v16">${state.aiSaved.map((x,i)=>`<article><div class="ai-result-icon-v16">${icon('bookmark')}</div><div><strong>${esc(x.title||x.savedPrompt||'Saved answer')}</strong><p>${esc(x.summary||x.text||x.prompt||'Saved Matanho AI result')}</p><span>${esc(x.savedAt||'Saved recently')}</span></div><button class="secondary-btn" data-ai-saved-open="${i}">Open ${icon('arrow')}</button></article>`).join('')}</div>`:`<div class="ai-empty-v16"><div class="ai-orb-v16">${icon('bookmark')}</div><h3>No saved answers yet</h3><p>Save a useful brief or answer and it will appear here.</p><button class="primary-btn" data-ai-mode="ask">Ask Matanho AI</button></div>`}</section>`;
@@ -1117,6 +1121,20 @@ function servicesView() {
       if(action==='messages'){toast('Messages are ready — no unread conversations.');return}
       if(action==='ai-new-thread'){state.aiMessages=[];state.aiMode='ask';saveState();render();return}
       if(action==='ai-toggle-context'){state.aiContextOpen=!state.aiContextOpen;saveState();render();return}
+      if(action==='regenerate-draft'){
+        if(state.aiDraftPending)return;
+        const form=document.getElementById('aiDraftForm');
+        const f=form?new FormData(form):null;
+        const type=String(f?.get('type')||state.aiDraft.type||'Executive update');
+        const audience=String(f?.get('audience')||state.aiDraft.audience||'Investment team');
+        const subject=String(f?.get('subject')||state.aiDraft.subject||'').trim();
+        state.aiDraft={...state.aiDraft,type,audience,subject};
+        state.aiDraftPending=true;
+        saveState();render();
+        const prompt=`Draft a ${type.toLowerCase()} for the ${audience.toLowerCase()}${subject?` about "${subject}"`:''}. Use only what is visible in my connected work, and write only the draft body — no preamble.`;
+        emitIntegrationEvent('assistant.message.sent',{prompt,history:[],scope:state.aiScope,sources:state.aiContextSources});
+        return;
+      }
       if(action==='ai-save-latest'){
         const idxAttr=e.target.closest('[data-index]')?.dataset.index;
         const msgIdx=idxAttr!=null?Number(idxAttr):(()=>{for(let i=state.aiMessages.length-1;i>=0;i--){if(state.aiMessages[i].role==='assistant')return i}return -1})();
@@ -1311,6 +1329,13 @@ function servicesView() {
       applySessionUser(user);
     },
     receiveAssistantReply(text, isError, sourcesUsed) {
+      if (state.aiDraftPending) {
+        state.aiDraftPending = false;
+        if (!isError) state.aiDraft = { ...state.aiDraft, body: String(text || '') };
+        saveState(); render();
+        toast(isError ? 'Could not regenerate the draft.' : 'Draft regenerated.', isError ? '' : 'success');
+        return;
+      }
       const idx = state.aiMessages.findIndex(m => m.pending);
       const promptText = idx > 0 ? (state.aiMessages[idx - 1].text || '') : '';
       const msg = { role: 'assistant', text: String(text || ''), createdAt: Date.now(), error: !!isError, sources: (!isError && Array.isArray(sourcesUsed) && sourcesUsed.length) ? sourcesUsed : undefined };
