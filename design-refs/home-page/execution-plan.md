@@ -86,7 +86,29 @@ reads the same preference to render its scene.
 **Verify**: change theme, reload — persisted; log in as a second test user — independent preference, no
 bleed-through; confirm the copy claim ("stored against the employee profile") is now actually true.
 
-## Phase 3 — Employee Services (`/home/services`)
+## Phase 3 — Employee Services (`/home/services`) — done, verified live
+
+Shipped: `service_requests` table + `GET/POST /api/service-requests` (API repo `9b4e53f`),
+Services page wired to it plus the existing Payroll self-service endpoints (frontend `a909b15`).
+Leave balance and latest payslip show real data or an honest "Not set up" (every test persona
+tried has no linked Employee record — not a bug). Pending expenses is a real sum over the user's
+own requests; Learning hours has no backing data anywhere in the schema, so it says "Not tracked
+yet" rather than a number. Request leave and the generic service-request modal both submit for
+real now; download-payslip fetches the actual PDF.
+
+Two real bugs caught by live testing (not by typecheck): `state.requests` turned out to follow
+the same hardcoded-literal-fallback pattern as `state.cover` from Phase 2, not `D.requests` —
+fixed by seeding localStorage instead of evicting it. And the service catalog's `"expenses"` id
+didn't match the backend's `"expense"` enum entry — fixed by relaxing that validation instead of
+chasing an enum that has to stay in sync with frontend data. Deleted all test service-request
+rows from the shared dev DB after verification.
+
+Known gap, not fixed this phase: the "Request leave" modal's in-form balance preview
+(`state.leaveBalance`) still shows the mock's placeholder "18.5 days" for accounts with no
+Employee record, since there's no real number to substitute. The request itself is still
+genuinely created — only that one cosmetic preview number is unaddressed.
+
+## Phase 3 (original plan, for reference)
 
 **Backend**: stat tiles aggregate from Payroll (`LeaveBalance`, `Payslip`) and Accounting (`Expense`) via
 their existing APIs — no new tables for these. "My requests": approach depends on Phase 0's finding; default
