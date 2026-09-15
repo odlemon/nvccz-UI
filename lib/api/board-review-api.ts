@@ -103,11 +103,7 @@ class BoardReviewApiService {
     const formData = new FormData()
     formData.append('document', document)
     
-    return apiClient.post<BoardReviewResponse>(`/board-reviews/${applicationId}`, formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      }
-    })
+    return apiClient.postFormData<BoardReviewResponse>(`/board-reviews/${applicationId}`, formData)
   }
 
   // Get board review by application ID

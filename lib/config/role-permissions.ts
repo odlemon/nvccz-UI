@@ -2628,6 +2628,14 @@ export function getRolePermissions(roleCode: RoleCode): RolePermissions | null {
  */
 const MODULE_ID_ALIASES: Record<string, string> = {
   "performance-v22": "performance-management",
+  // middleware.ts's routePermissions map keys every /portfolio/* route to the literal
+  // moduleId "portfolio" (a third id, distinct from both "portfolio-v11" and
+  // "portfolio-management"). Every role's actual grant is still under "portfolio-management"
+  // (e.g. PORTFOLIO_MGR, INV_ANALYST) — without this alias hasModuleAccess("portfolio")
+  // finds no grant for any role, which is exactly why /portfolio currently has to stay in
+  // STAFF_PUBLIC_PASS_THROUGH (removing it without this alias first would 403 every role,
+  // same failure mode already hit once for performance-v22).
+  "portfolio": "portfolio-management",
 };
 
 /**

@@ -143,7 +143,7 @@ export function scopesForPage(page: string): PageScopePlan {
 
     case 'lps':
     case 'lp-detail':
-      return { primary: ['lps'], secondary: [] }
+      return { primary: ['lps'], secondary: ['funds'] }
 
     case 'cash-accounts':
     case 'cash-overview':
