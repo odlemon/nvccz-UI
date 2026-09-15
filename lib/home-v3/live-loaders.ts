@@ -344,8 +344,79 @@ export function summarizePendingExpenses(requests: Hv3ServiceRequestRow[]): { la
   }
 }
 
+export type Hv3CalendarEntry = {
+  id: string
+  title: string
+  description: string | null
+  startDate: string
+  endDate: string
+  location: string | null
+  entryType: string
+}
+
+/**
+ * `/api/calendar-entries` — the signed-in user's own entries for the current calendar week
+ * (Monday through the following Monday, matching how the runtime's own calendarWeekStart()
+ * computes "this week" — see scripts/_patch-fragments/calendar-view.js.fragment).
+ */
+export async function loadMyCalendarEntries(): Promise<ScopeResult<Hv3CalendarEntry[]>> {
+  return safe<Hv3CalendarEntry[]>(
+    "myCalendarEntries",
+    async () => {
+      const now = new Date()
+      const day = now.getDay()
+      const diff = day === 0 ? -6 : 1 - day
+      const monday = new Date(now.getFullYear(), now.getMonth(), now.getDate() + diff)
+      const nextMonday = new Date(monday)
+      nextMonday.setDate(monday.getDate() + 7)
+      const res: any = await apiClient.get(
+        `/calendar-entries?start=${monday.toISOString()}&end=${nextMonday.toISOString()}`,
+      )
+      return Array.isArray(res?.data) ? res.data : []
+    },
+    [],
+  )
+}
+
+export type Hv3CompanyEvent = {
+  id: string
+  title: string
+  description: string | null
+  startDate: string
+  endDate: string
+  location: string | null
+  googleCalendarLink?: string | null
+  author?: { firstName?: string; lastName?: string } | null
+}
+
+/**
+ * `/api/events` — the real, company-wide Event model, read-only. No date-range filtering exists
+ * server-side (see execution-plan.md Phase 4), so this fetches everything active and the
+ * runtime's own combinedWeekEvents() narrows it to the visible week.
+ */
+export async function loadCompanyEvents(): Promise<ScopeResult<Hv3CompanyEvent[]>> {
+  return safe<Hv3CompanyEvent[]>(
+    "companyEvents",
+    async () => {
+      const res: any = await apiClient.get("/events")
+      return Array.isArray(res?.data) ? res.data : []
+    },
+    [],
+  )
+}
+
 export async function loadHomeLiveData() {
-  const [priorities, schedule, aum, cover, servicesSummary, serviceRequests, customWallpapers] = await Promise.all([
+  const [
+    priorities,
+    schedule,
+    aum,
+    cover,
+    servicesSummary,
+    serviceRequests,
+    customWallpapers,
+    myCalendarEntries,
+    companyEvents,
+  ] = await Promise.all([
     loadMyPriorities(),
     loadUpcomingSchedule(),
     loadAumSnapshot(),
@@ -353,6 +424,8 @@ export async function loadHomeLiveData() {
     loadServicesSummary(),
     loadServiceRequests(),
     loadCustomWallpapers(),
+    loadMyCalendarEntries(),
+    loadCompanyEvents(),
   ])
   return {
     priorities,
@@ -362,6 +435,8 @@ export async function loadHomeLiveData() {
     servicesSummary,
     serviceRequests,
     customWallpapers,
+    myCalendarEntries,
+    companyEvents,
     pendingExpenses: summarizePendingExpenses(serviceRequests.data),
   }
 }

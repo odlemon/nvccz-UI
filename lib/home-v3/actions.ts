@@ -154,3 +154,44 @@ export async function syncRotationInterval(detail: { intervalMinutes?: number })
     return { handled: true, error: message }
   }
 }
+
+/**
+ * `calendar.entry.created` -> POST /api/calendar-entries
+ * Same reload reasoning as wallpaper upload/delete: the mounted runtime has no hydrate() API,
+ * so a new entry would silently not appear in the week grid until an unrelated navigation.
+ */
+export async function createCalendarEntry(detail: {
+  title?: string
+  startDate?: string
+  endDate?: string
+  description?: string | null
+}): Promise<Hv3ReloadingActionResult> {
+  if (!detail?.title || !detail?.startDate || !detail?.endDate) return { handled: false, error: null }
+  try {
+    await apiClient.post("/calendar-entries", {
+      title: detail.title,
+      startDate: detail.startDate,
+      endDate: detail.endDate,
+      description: detail.description ?? undefined,
+    })
+    return { handled: true, error: null, reload: true }
+  } catch (err: any) {
+    const message = err?.message ? String(err.message) : "Failed to create calendar entry"
+    console.error("[home-v3] calendar.entry.created failed:", message)
+    return { handled: true, error: message }
+  }
+}
+
+/** `calendar.entry.deleted` -> DELETE /api/calendar-entries/:id. Same reload reasoning as above. */
+export async function deleteCalendarEntry(detail: { id?: string }): Promise<Hv3ReloadingActionResult> {
+  const id = detail?.id
+  if (!id) return { handled: false, error: null }
+  try {
+    await apiClient.delete(`/calendar-entries/${id}`)
+    return { handled: true, error: null, reload: true }
+  } catch (err: any) {
+    const message = err?.message ? String(err.message) : "Failed to remove calendar entry"
+    console.error("[home-v3] calendar.entry.deleted failed:", message)
+    return { handled: true, error: message }
+  }
+}

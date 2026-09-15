@@ -22,6 +22,8 @@ import {
   uploadWallpapers,
   deleteWallpaper,
   syncRotationInterval,
+  createCalendarEntry,
+  deleteCalendarEntry,
 } from "@/lib/home-v3/actions"
 import { useAppDispatch, useAppSelector } from "@/lib/store"
 import { refreshUserDetails, logoutUser } from "@/lib/store/slices/authSlice"
@@ -192,6 +194,8 @@ export function HomeV3App() {
       // is seeded into localStorage above instead, before the runtime ever reads its cache.
       customWallpapers: live?.customWallpapers.data ?? [],
       rotationIntervalMinutes: live?.cover.data?.rotationIntervalMinutes ?? 1440,
+      myCalendarEntries: live?.myCalendarEntries.data ?? [],
+      companyEvents: live?.companyEvents.data ?? [],
     }
     const initial = parseHv3Location(pathnameRef.current)
 
@@ -205,6 +209,10 @@ export function HomeV3App() {
       toast.error("Couldn't load your requests", { description: live.serviceRequests.error })
     if (live?.customWallpapers.error)
       toast.error("Couldn't load your wallpapers", { description: live.customWallpapers.error })
+    if (live?.myCalendarEntries.error)
+      toast.error("Couldn't load your calendar", { description: live.myCalendarEntries.error })
+    if (live?.companyEvents.error)
+      toast.error("Couldn't load company events", { description: live.companyEvents.error })
 
     const onPriorityToggled = (event: Event) => {
       const detail = (event as CustomEvent).detail || {}
@@ -256,6 +264,26 @@ export function HomeV3App() {
         if (result.error) toast.error(result.error)
       })
     }
+    const onCalendarEntryCreated = (event: Event) => {
+      const detail = (event as CustomEvent).detail || {}
+      void createCalendarEntry(detail).then((result) => {
+        if (result.error) toast.error(result.error)
+        else if (result.reload) {
+          toast.success("Event created")
+          setTimeout(() => window.location.reload(), 800)
+        }
+      })
+    }
+    const onCalendarEntryDeleted = (event: Event) => {
+      const detail = (event as CustomEvent).detail || {}
+      void deleteCalendarEntry(detail).then((result) => {
+        if (result.error) toast.error(result.error)
+        else if (result.reload) {
+          toast.success("Event removed")
+          setTimeout(() => window.location.reload(), 800)
+        }
+      })
+    }
     window.addEventListener("matanho:priorities.task.toggled", onPriorityToggled)
     window.addEventListener("matanho:preferences.theme.updated", onCoverPreferenceUpdated)
     window.addEventListener("matanho:preferences.wallpaper.updated", onCoverPreferenceUpdated)
@@ -264,6 +292,8 @@ export function HomeV3App() {
     window.addEventListener("matanho:wallpaper.upload.requested", onWallpaperUploadRequested)
     window.addEventListener("matanho:wallpaper.delete.requested", onWallpaperDeleteRequested)
     window.addEventListener("matanho:preferences.rotation.updated", onRotationIntervalUpdated)
+    window.addEventListener("matanho:calendar.entry.created", onCalendarEntryCreated)
+    window.addEventListener("matanho:calendar.entry.deleted", onCalendarEntryDeleted)
 
     apiRef.current = startMatanhoRuntime(el, {
       data,
@@ -301,6 +331,8 @@ export function HomeV3App() {
       window.removeEventListener("matanho:wallpaper.upload.requested", onWallpaperUploadRequested)
       window.removeEventListener("matanho:wallpaper.delete.requested", onWallpaperDeleteRequested)
       window.removeEventListener("matanho:preferences.rotation.updated", onRotationIntervalUpdated)
+      window.removeEventListener("matanho:calendar.entry.created", onCalendarEntryCreated)
+      window.removeEventListener("matanho:calendar.entry.deleted", onCalendarEntryDeleted)
       delete window.__HOME_V3_PATH__
       apiRef.current?.destroy()
       apiRef.current = null
