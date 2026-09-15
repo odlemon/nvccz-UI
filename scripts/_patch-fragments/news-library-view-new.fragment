@@ -1,0 +1,7 @@
+  function newsLibraryView() {
+    const posts=D.newsPosts||[];
+    const featured=posts[0];
+    const rest=posts.slice(1);
+    return `${pageHead('News','Company announcements and updates.',`<button class="primary-btn" data-action="new-post">${icon('plus')} New post</button>`)}
+      ${posts.length?`<div class="news-layout news-layout-premium"><main>${featured?`<article class="story-card featured" data-news-open="${esc(featured.id)}"><div class="story-body"><div class="story-kicker"><span>${esc(featured.authorName)}</span><span>${timeAgo(featured.createdAt)}</span></div><h3>${esc(featured.title)}</h3><p>${esc(excerpt(featured.content,220))}</p><div class="story-meta"><span>${featured.replies.length} repl${featured.replies.length===1?'y':'ies'}</span></div></div></article>`:''}<div class="latest-list latest-list-premium">${rest.map(n=>`<article class="latest-item" data-news-open="${esc(n.id)}"><div><div class="story-source">${esc(n.authorName)} · ${timeAgo(n.createdAt)}</div><h4>${esc(n.title)}</h4><p>${esc(excerpt(n.content,140))}</p><div class="story-meta"><span>${n.replies.length} repl${n.replies.length===1?'y':'ies'}</span></div></div></article>`).join('')}</div></main></div>`:`<div class="empty-state">${icon('newsletter')}<h3>No posts yet.</h3><p>Company announcements will appear here once someone posts.</p></div>`}`;
+  }

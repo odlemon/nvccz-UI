@@ -290,3 +290,103 @@ export async function updateWorkTaskProgress(detail: {
     return { handled: true, error: message }
   }
 }
+
+/**
+ * `post.created` -> POST /api/posts. Shared by News and Forums: `category` unset means a News
+ * post, a real category means a Forum discussion (see the doc comment on Post in schema.prisma).
+ * `isNotified` is opt-in — only the News create form exposes a "notify everyone" checkbox
+ * (defaulted off); Forums never sends it, so a casual discussion never pages the whole company.
+ * Reloads on success: the mounted runtime has no hydrate() API, same reasoning as every other
+ * create action in this build.
+ */
+export async function createPost(detail: {
+  title?: string
+  content?: string
+  category?: string | null
+  isNotified?: boolean
+}): Promise<Hv3ReloadingActionResult> {
+  if (!detail?.title || !detail?.content) return { handled: false, error: null }
+  try {
+    await apiClient.post("/posts", {
+      title: detail.title,
+      content: detail.content,
+      category: detail.category || undefined,
+      isNotified: Boolean(detail.isNotified),
+    })
+    return { handled: true, error: null, reload: true }
+  } catch (err: any) {
+    const message = err?.message ? String(err.message) : "Failed to publish"
+    console.error("[home-v3] post.created failed:", message)
+    return { handled: true, error: message }
+  }
+}
+
+/** `post.reply.created` -> POST /api/posts/:postId/replies. Reloads (same reasoning as above). */
+export async function createPostReply(detail: {
+  postId?: string
+  content?: string
+}): Promise<Hv3ReloadingActionResult> {
+  if (!detail?.postId || !detail?.content) return { handled: false, error: null }
+  try {
+    await apiClient.post(`/posts/${detail.postId}/replies`, { content: detail.content })
+    return { handled: true, error: null, reload: true }
+  } catch (err: any) {
+    const message = err?.message ? String(err.message) : "Failed to post reply"
+    console.error("[home-v3] post.reply.created failed:", message)
+    return { handled: true, error: message }
+  }
+}
+
+/**
+ * `post.solved.toggled` -> PUT /api/posts/:id. That endpoint requires `title`/`content` on every
+ * update (a pre-existing, unrelated-to-this-build contract — see PostController.updatePost), so
+ * the runtime resends the post's own current title/content alongside the flag. Optimistic: the
+ * runtime already applied the change locally.
+ */
+export async function togglePostSolved(detail: {
+  id?: string
+  title?: string
+  content?: string
+  isSolved?: boolean
+}): Promise<Hv3ActionResult> {
+  const id = detail?.id
+  if (!id || !detail.title || !detail.content) return { handled: false, error: null }
+  try {
+    await apiClient.put(`/posts/${id}`, {
+      title: detail.title,
+      content: detail.content,
+      isSolved: Boolean(detail.isSolved),
+    })
+    return { handled: true, error: null }
+  } catch (err: any) {
+    const message = err?.message ? String(err.message) : "Failed to update"
+    console.error("[home-v3] post.solved.toggled failed:", message)
+    return { handled: true, error: message }
+  }
+}
+
+/**
+ * `newsletter.created` -> POST /api/newsletters (multipart; cover image optional). Always
+ * notifies internal staff and queues distribution email server-side (no opt-out on this
+ * endpoint) — expected for a company newsletter, unlike Post's opt-in isNotified. Reloads on
+ * success, same reasoning as every other create action in this build.
+ */
+export async function createNewsletter(detail: {
+  title?: string
+  content?: string
+  imageFile?: File | null
+}): Promise<Hv3ReloadingActionResult> {
+  if (!detail?.title || !detail?.content) return { handled: false, error: null }
+  try {
+    const formData = new FormData()
+    formData.append("title", detail.title)
+    formData.append("content", detail.content)
+    if (detail.imageFile) formData.append("image", detail.imageFile)
+    await apiClient.postFormData("/newsletters", formData)
+    return { handled: true, error: null, reload: true }
+  } catch (err: any) {
+    const message = err?.message ? String(err.message) : "Failed to publish newsletter"
+    console.error("[home-v3] newsletter.created failed:", message)
+    return { handled: true, error: message }
+  }
+}

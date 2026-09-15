@@ -623,6 +623,105 @@ export async function loadMyPerformanceOverview(): Promise<ScopeResult<Hv3Perfor
   }
 }
 
+export type Hv3PostReply = {
+  id: string
+  content: string
+  authorName: string
+  authorId: string
+  createdAt: string
+  parentReplyId: string | null
+}
+
+/**
+ * `/api/posts` shape, shared by News and Forums (see the doc comment on Post in schema.prisma):
+ * `category` null = a News/company post, a real category = a Forum discussion. Split into the
+ * two feeds client-side from one fetch rather than two overlapping list calls.
+ */
+export type Hv3Post = {
+  id: string
+  title: string
+  content: string
+  category: string | null
+  isSolved: boolean
+  authorName: string
+  authorId: string
+  createdAt: string
+  replies: Hv3PostReply[]
+}
+
+export type Hv3Newsletter = {
+  id: string
+  title: string
+  content: string
+  imageUrl: string | null
+  authorName: string
+  createdAt: string
+}
+
+function personDisplayName(p: any): string {
+  if (!p) return "Unknown"
+  const name = `${p.firstName || ""} ${p.lastName || ""}`.trim()
+  return name || p.email || "Unknown"
+}
+
+function mapPostReply(r: any): Hv3PostReply {
+  return {
+    id: String(r.id),
+    content: String(r.content || ""),
+    authorName: personDisplayName(r.author),
+    authorId: String(r.authorId || r.author?.id || ""),
+    createdAt: String(r.createdAt || ""),
+    parentReplyId: r.parentReplyId ? String(r.parentReplyId) : null,
+  }
+}
+
+function mapPost(p: any): Hv3Post {
+  return {
+    id: String(p.id),
+    title: String(p.title || "Untitled"),
+    content: String(p.content || ""),
+    category: p.category ?? null,
+    isSolved: Boolean(p.isSolved),
+    authorName: personDisplayName(p.author),
+    authorId: String(p.authorId || p.author?.id || ""),
+    createdAt: String(p.createdAt || ""),
+    replies: Array.isArray(p.replies) ? p.replies.map(mapPostReply) : [],
+  }
+}
+
+/** `/api/posts` — feeds both News (`category == null`) and Forums (`category` set). */
+export async function loadPosts(): Promise<ScopeResult<Hv3Post[]>> {
+  return safe<Hv3Post[]>(
+    "posts",
+    async () => {
+      const res: any = await apiClient.get("/posts")
+      const rows: any[] = Array.isArray(res?.data) ? res.data : []
+      return rows.map(mapPost)
+    },
+    [],
+  )
+}
+
+/** `/api/newsletters` — active newsletters, newest first. */
+export async function loadNewsletters(): Promise<ScopeResult<Hv3Newsletter[]>> {
+  return safe<Hv3Newsletter[]>(
+    "newsletters",
+    async () => {
+      const res: any = await apiClient.get("/newsletters")
+      const rows: any[] = Array.isArray(res?.data) ? res.data : []
+      return rows.map((n: any) => ({
+        id: String(n.id),
+        title: String(n.title || "Untitled"),
+        content: String(n.content || ""),
+        imageUrl: n.imageUrl ?? null,
+        authorName: personDisplayName(n.author),
+        createdAt: String(n.createdAt || ""),
+      }))
+    },
+    [],
+  )
+}
+
 export async function loadHomeLiveData(selfId?: string | null) {
   const [
     priorities,
@@ -637,6 +736,8 @@ export async function loadHomeLiveData(selfId?: string | null) {
     myTasks,
     teamRows,
     performanceOverview,
+    posts,
+    newsletters,
   ] = await Promise.all([
     loadMyPriorities(),
     loadUpcomingSchedule(),
@@ -650,6 +751,8 @@ export async function loadHomeLiveData(selfId?: string | null) {
     loadMyTasks(selfId),
     loadTeamRows(),
     loadMyPerformanceOverview(),
+    loadPosts(),
+    loadNewsletters(),
   ])
   return {
     priorities,
@@ -664,6 +767,8 @@ export async function loadHomeLiveData(selfId?: string | null) {
     myTasks,
     teamRows,
     performanceOverview,
+    posts,
+    newsletters,
     pendingExpenses: summarizePendingExpenses(serviceRequests.data),
   }
 }

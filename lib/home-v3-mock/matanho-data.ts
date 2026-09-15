@@ -2,6 +2,7 @@
 // Extracted from Matanho Employee Hub Premium V17.1
 export const MATANHO_DATA = {
   user: {
+    id: '',
     name: 'Fadzai Moyo',
     firstName: 'Fadzai',
     role: 'Managing Partner',

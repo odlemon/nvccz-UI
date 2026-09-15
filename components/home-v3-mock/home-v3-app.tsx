@@ -27,6 +27,10 @@ import {
   createWorkTask,
   updateWorkTask,
   updateWorkTaskProgress,
+  createPost,
+  createPostReply,
+  togglePostSolved,
+  createNewsletter,
 } from "@/lib/home-v3/actions"
 import { useAppDispatch, useAppSelector } from "@/lib/store"
 import { refreshUserDetails, logoutUser } from "@/lib/store/slices/authSlice"
@@ -120,9 +124,9 @@ type RuntimeApi = {
   setRoute: (
     route: string,
     detail?: {
-      selectedNews?: number | null
-      forumThread?: number | null
-      selectedNewsletter?: number | null
+      selectedNews?: string | null
+      forumThread?: string | null
+      selectedNewsletter?: string | null
       newsletterMode?: string
     }
   ) => void
@@ -209,6 +213,9 @@ export function HomeV3App() {
       })),
       teamRows: live?.teamRows.data ?? [],
       performanceOverview: live?.performanceOverview.data ?? null,
+      newsPosts: (live?.posts.data ?? []).filter((p) => !p.category),
+      forumPosts: (live?.posts.data ?? []).filter((p) => !!p.category),
+      newsletters: live?.newsletters.data ?? [],
     }
     const initial = parseHv3Location(pathnameRef.current)
 
@@ -228,6 +235,8 @@ export function HomeV3App() {
       toast.error("Couldn't load company events", { description: live.companyEvents.error })
     if (live?.myTasks.error) toast.error("Couldn't load your tasks", { description: live.myTasks.error })
     if (live?.teamRows.error) toast.error("Couldn't load team workload", { description: live.teamRows.error })
+    if (live?.posts.error) toast.error("Couldn't load posts", { description: live.posts.error })
+    if (live?.newsletters.error) toast.error("Couldn't load newsletters", { description: live.newsletters.error })
 
     const onPriorityToggled = (event: Event) => {
       const detail = (event as CustomEvent).detail || {}
@@ -321,6 +330,42 @@ export function HomeV3App() {
         if (result.error) toast.error(result.error)
       })
     }
+    const onPostCreated = (event: Event) => {
+      const detail = (event as CustomEvent).detail || {}
+      void createPost(detail).then((result) => {
+        if (result.error) toast.error(result.error)
+        else if (result.reload) {
+          toast.success(detail.category ? "Discussion published" : "Post published")
+          setTimeout(() => window.location.reload(), 800)
+        }
+      })
+    }
+    const onPostReplyCreated = (event: Event) => {
+      const detail = (event as CustomEvent).detail || {}
+      void createPostReply(detail).then((result) => {
+        if (result.error) toast.error(result.error)
+        else if (result.reload) {
+          toast.success("Reply posted")
+          setTimeout(() => window.location.reload(), 800)
+        }
+      })
+    }
+    const onPostSolvedToggled = (event: Event) => {
+      const detail = (event as CustomEvent).detail || {}
+      void togglePostSolved(detail).then((result) => {
+        if (result.error) toast.error(result.error)
+      })
+    }
+    const onNewsletterCreated = (event: Event) => {
+      const detail = (event as CustomEvent).detail || {}
+      void createNewsletter(detail).then((result) => {
+        if (result.error) toast.error(result.error)
+        else if (result.reload) {
+          toast.success("Newsletter published")
+          setTimeout(() => window.location.reload(), 800)
+        }
+      })
+    }
     window.addEventListener("matanho:priorities.task.toggled", onPriorityToggled)
     window.addEventListener("matanho:preferences.theme.updated", onCoverPreferenceUpdated)
     window.addEventListener("matanho:preferences.wallpaper.updated", onCoverPreferenceUpdated)
@@ -334,6 +379,10 @@ export function HomeV3App() {
     window.addEventListener("matanho:work.task.created", onWorkTaskCreated)
     window.addEventListener("matanho:work.task.updated", onWorkTaskUpdated)
     window.addEventListener("matanho:work.task.progress.updated", onWorkTaskProgressUpdated)
+    window.addEventListener("matanho:post.created", onPostCreated)
+    window.addEventListener("matanho:post.reply.created", onPostReplyCreated)
+    window.addEventListener("matanho:post.solved.toggled", onPostSolvedToggled)
+    window.addEventListener("matanho:newsletter.created", onNewsletterCreated)
 
     apiRef.current = startMatanhoRuntime(el, {
       data,
@@ -376,6 +425,10 @@ export function HomeV3App() {
       window.removeEventListener("matanho:work.task.created", onWorkTaskCreated)
       window.removeEventListener("matanho:work.task.updated", onWorkTaskUpdated)
       window.removeEventListener("matanho:work.task.progress.updated", onWorkTaskProgressUpdated)
+      window.removeEventListener("matanho:post.created", onPostCreated)
+      window.removeEventListener("matanho:post.reply.created", onPostReplyCreated)
+      window.removeEventListener("matanho:post.solved.toggled", onPostSolvedToggled)
+      window.removeEventListener("matanho:newsletter.created", onNewsletterCreated)
       delete window.__HOME_V3_PATH__
       apiRef.current?.destroy()
       apiRef.current = null
@@ -422,9 +475,9 @@ declare global {
     __HOME_V3_SIGN_OUT__?: (() => void | Promise<void>) | null
     __HOME_V3_PATH__?: (detail: {
       route: string
-      selectedNews?: number | null
-      forumThread?: number | null
-      selectedNewsletter?: number | null
+      selectedNews?: string | null
+      forumThread?: string | null
+      selectedNewsletter?: string | null
       newsletterMode?: string
     }) => void
   }

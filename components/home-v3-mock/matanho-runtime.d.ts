@@ -5,9 +5,9 @@ declare module "@/components/home-v3-mock/matanho-runtime" {
       data?: unknown
       initialRoute?: string
       initialDetail?: {
-        selectedNews?: number | null
-        forumThread?: number | null
-        selectedNewsletter?: number | null
+        selectedNews?: string | null
+        forumThread?: string | null
+        selectedNewsletter?: string | null
         newsletterMode?: string
       }
       config?: { useMockData?: boolean; apiBaseUrl?: string }
@@ -19,13 +19,14 @@ declare module "@/components/home-v3-mock/matanho-runtime" {
     setRoute: (
       route: string,
       detail?: {
-        selectedNews?: number | null
-        forumThread?: number | null
-        selectedNewsletter?: number | null
+        selectedNews?: string | null
+        forumThread?: string | null
+        selectedNewsletter?: string | null
         newsletterMode?: string
       }
     ) => void
     setSessionUser: (user: {
+      id: string
       name: string
       firstName: string
       role: string
