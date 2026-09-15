@@ -48,6 +48,25 @@ export async function syncCoverPreference(detail: { theme?: string; wallpaper?: 
 }
 
 /**
+ * `preferences.settings.updated` -> PUT /api/homepage/preferences
+ * Fired by the Settings modal's submit handler with the whole `state.settings` blob (language,
+ * timezone, density, notification toggles, etc). Stored opaquely server-side as JSON — same
+ * optimistic-already-applied-locally pattern as syncCoverPreference above.
+ */
+export async function syncHomeSettings(detail: { settings?: Record<string, unknown> }): Promise<Hv3ActionResult> {
+  const settings = detail?.settings
+  if (!settings || typeof settings !== "object") return { handled: false, error: null }
+  try {
+    await apiClient.put("/homepage/preferences", { settings })
+    return { handled: true, error: null }
+  } catch (err: any) {
+    const message = err?.message ? String(err.message) : "Failed to save your preferences"
+    console.error("[home-v3] preferences.settings.updated failed:", message)
+    return { handled: true, error: message }
+  }
+}
+
+/**
  * `service.request.created` -> POST /api/service-requests
  * Fired by both the dedicated leave-request form and the generic service-request form (any
  * Browse-services card or Quick action other than payroll). Deliberately does not re-render the

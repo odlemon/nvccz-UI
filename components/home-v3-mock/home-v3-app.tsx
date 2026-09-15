@@ -17,6 +17,7 @@ import { loadHomeLiveData, type Hv3CoverPreference } from "@/lib/home-v3/live-lo
 import {
   syncPriorityTaskStage,
   syncCoverPreference,
+  syncHomeSettings,
   createServiceRequest,
   downloadPayslip,
   uploadWallpapers,
@@ -36,6 +37,8 @@ import {
 } from "@/lib/home-v3/actions"
 import { useAppDispatch, useAppSelector } from "@/lib/store"
 import { refreshUserDetails, logoutUser } from "@/lib/store/slices/authSlice"
+import { getSwitcherModules } from "@/lib/config/modules"
+import { useRolePermissions } from "@/lib/hooks/useRolePermissions"
 import { toast } from "sonner"
 import "@/components/home-v3-mock/home-v3.css"
 import "@/components/home-v3-mock/home-v3-overrides.css"
@@ -81,6 +84,24 @@ function seedCoverPreferenceCache(pref: Hv3CoverPreference | null) {
     localStorage.setItem("matanho-hub-state", JSON.stringify(parsed))
   } catch {
     // Same reasoning as evictStaleCacheKeys — worst case the hardcoded default renders.
+  }
+}
+
+/**
+ * `state.settings` follows the exact same pattern as `cover` above (`{...hardcodedDefaults,
+ * ...(saved.settings||{})}`, never reads injected `data`) — seed the real saved blob in so a
+ * user's actual Settings choices (notably the four notification toggles) are what the Settings
+ * modal shows on first mount, not the runtime's own hardcoded defaults.
+ */
+function seedSettingsCache(settings: Record<string, unknown> | null | undefined) {
+  if (!settings) return
+  try {
+    const raw = localStorage.getItem("matanho-hub-state")
+    const parsed = raw ? JSON.parse(raw) : {}
+    parsed.settings = { ...(parsed.settings || {}), ...settings }
+    localStorage.setItem("matanho-hub-state", JSON.stringify(parsed))
+  } catch {
+    // Same reasoning as seedCoverPreferenceCache — worst case the hardcoded defaults render.
   }
 }
 
@@ -151,6 +172,7 @@ export function HomeV3App() {
   const { user, userDetails, isLoading, isFetchingDetails } = useAppSelector(
     (state) => state.auth
   )
+  const { hasModuleAccess, isLoading: isPermissionsLoading } = useRolePermissions()
   const pathnameRef = useRef(pathname)
   pathnameRef.current = pathname
   const [liveDataReady, setLiveDataReady] = useState(false)
@@ -170,14 +192,15 @@ export function HomeV3App() {
   }, [isLoading, user?.id])
 
   useEffect(() => {
-    if (isLoading || !liveDataReady || mountedRef.current) return
+    if (isLoading || !liveDataReady || isPermissionsLoading || mountedRef.current) return
 
     const el = rootRef.current
     if (!el) return
 
     mountedRef.current = true
-    evictStaleCacheKeys(["priorities", "workTasks", "workProjects"])
+    evictStaleCacheKeys(["priorities", "workTasks", "workProjects", "apps"])
     seedCoverPreferenceCache(liveDataRef.current?.cover.data ?? null)
+    seedSettingsCache(liveDataRef.current?.cover.data?.settings ?? null)
     seedLeaveBalanceCache(liveDataRef.current?.servicesSummary.data.leaveBalanceDays ?? null)
     seedRequestsCache(liveDataRef.current?.serviceRequests.data ?? null)
 
@@ -220,6 +243,21 @@ export function HomeV3App() {
       forumPosts: (live?.posts.data ?? []).filter((p) => !!p.category),
       newsletters: live?.newsletters.data ?? [],
       directory: live?.directory.data ?? [],
+      // Real, permission-filtered module list (same source as the header's own "Modules"
+      // switcher) rather than the runtime's fabricated 9-app fixture with fake pin/recent/
+      // access-request state — see patch-home-v3-phase8.mjs's appsView() doc comment.
+      apps: getSwitcherModules()
+        .filter((m) => hasModuleAccess(m.id))
+        .map((m) => ({
+          id: m.id,
+          name: m.name,
+          description: m.description,
+          // Matches arcus-app-switcher-dropdown.tsx's own onClick exactly: an external portal
+          // (LP/Investee) is a genuinely separate app and opens in a new tab; an internal module
+          // is just another route in this same Next.js app, so it navigates in place.
+          path: m.path,
+          externalUrl: m.externalPortalUrl ?? null,
+        })),
     }
     const initial = parseHv3Location(pathnameRef.current)
 
@@ -252,6 +290,12 @@ export function HomeV3App() {
     const onCoverPreferenceUpdated = (event: Event) => {
       const detail = (event as CustomEvent).detail || {}
       void syncCoverPreference(detail).then((result) => {
+        if (result.error) toast.error(result.error)
+      })
+    }
+    const onSettingsUpdated = (event: Event) => {
+      const detail = (event as CustomEvent).detail || {}
+      void syncHomeSettings(detail).then((result) => {
         if (result.error) toast.error(result.error)
       })
     }
@@ -391,6 +435,7 @@ export function HomeV3App() {
     window.addEventListener("matanho:priorities.task.toggled", onPriorityToggled)
     window.addEventListener("matanho:preferences.theme.updated", onCoverPreferenceUpdated)
     window.addEventListener("matanho:preferences.wallpaper.updated", onCoverPreferenceUpdated)
+    window.addEventListener("matanho:preferences.settings.updated", onSettingsUpdated)
     window.addEventListener("matanho:service.request.created", onServiceRequestCreated)
     window.addEventListener("matanho:payslip.download.requested", onPayslipDownloadRequested)
     window.addEventListener("matanho:wallpaper.upload.requested", onWallpaperUploadRequested)
@@ -439,6 +484,7 @@ export function HomeV3App() {
       window.removeEventListener("matanho:priorities.task.toggled", onPriorityToggled)
       window.removeEventListener("matanho:preferences.theme.updated", onCoverPreferenceUpdated)
       window.removeEventListener("matanho:preferences.wallpaper.updated", onCoverPreferenceUpdated)
+      window.removeEventListener("matanho:preferences.settings.updated", onSettingsUpdated)
       window.removeEventListener("matanho:service.request.created", onServiceRequestCreated)
       window.removeEventListener("matanho:payslip.download.requested", onPayslipDownloadRequested)
       window.removeEventListener("matanho:wallpaper.upload.requested", onWallpaperUploadRequested)
@@ -461,7 +507,7 @@ export function HomeV3App() {
       document.querySelectorAll(".home-v3-toast-host").forEach((n) => n.remove())
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isLoading, liveDataReady])
+  }, [isLoading, liveDataReady, isPermissionsLoading])
 
   useEffect(() => {
     const sessionUser = buildHv3SessionUser(user, userDetails)

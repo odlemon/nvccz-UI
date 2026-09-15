@@ -191,6 +191,7 @@ export type Hv3CoverPreference = {
   coverTheme: string
   coverWallpaper: string
   rotationIntervalMinutes: number
+  settings?: Record<string, unknown> | null
 }
 
 /** `/api/homepage/preferences` — the signed-in user's Daily Cover choice (Phase 2/2b). */
