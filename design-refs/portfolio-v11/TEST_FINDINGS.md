@@ -9,8 +9,8 @@ as a hypothesis to verify, not a fact.
 | Severity | Open | Fixed locally, not deployed | Deployed and verified |
 |---|---|---|---|
 | CRITICAL | 0 | 0 | 0 |
-| HIGH | 2 | 0 | 1 |
-| MEDIUM | 3 | 0 | 0 |
+| HIGH | 3 | 0 | 1 |
+| MEDIUM | 4 | 0 | 0 |
 | LOW | 0 | 0 | 0 |
 
 ## FINDING-PV11-001
@@ -223,6 +223,94 @@ unilaterally.
 
 **Decision (15 September 2026):** build it in this same sweep, in Phase 4 alongside the other fixes —
 Portfolio → LP Portal capital flows should work end to end before LP Portal's re-sweep depends on them.
+
+## FINDING-PV11-006
+
+**Page / flow:** Deal Flow list vs. Deal Detail page (Wave 2 — deal-lifecycle testing; found while picking
+a clean fixture to test `start-due-diligence`/`complete-due-diligence` on)
+**Steps to reproduce:** Open Deal Flow (`/portfolio/deals`) as `admin@nts.com`, note "Mukuru Logistics" and
+"GreenOrbit Energy" both list as stage **Due Diligence**. Open either deal's detail page.
+**Expected:** The detail page's hero status agrees with the list's stage (or with the deal's own
+`currentStage`, `ACTIVE_DD`).
+**Actual:** The detail page's hero badge reads **"Disbursed"** for both, with every lifecycle step tracker
+underneath (Due Diligence, Term Sheet, Board & IC) still showing "Not started" / "Pending" — internally
+self-contradictory as well as disagreeing with the list.
+**Root cause:** confirmed live via direct API reads — both applications carry `currentStage: "ACTIVE_DD"`
+**and** a real, fully-populated `disbursements` record (Mukuru: $3.1M, "PV11 full demo disbursement", ref
+`PV11-DISB-REG-MUKURU-2026-0004`, disbursed 15 Mar 2026; GreenOrbit: $1.8M) with no due-diligence, term
+sheet, or board-review records at all — evidently demo/seed fixtures built to give Portfolio Companies /
+Fund Performance something realistic to show, created by inserting a disbursement directly rather than
+walking the deal through its real lifecycle. The frontend bug this exposes: `matanho-portfolio-runtime.js`
+(~line 1793) computes the deal-detail hero status independently —
+`disbursedAny ? 'Disbursed' : hasImpl ? 'Approved - Closing' : hasBoard ? ... : hasDD ? ... : 'Screening
+Pending'`, purely from which sub-records exist — while the Deal Flow **list** derives its stage badge from
+`currentStage` via `adapters.ts`'s `STAGE_MAP`. These two are never reconciled, so any application whose
+`currentStage` and sub-records disagree (seed data today; potentially a real deal too, if any lifecycle
+action ever advances one without the other — not yet confirmed either way) renders two contradictory
+stories about the same deal on two screens one click apart, and the detail page's own step tracker
+contradicts its own hero badge in the same view.
+**Severity:** MEDIUM — confined to a handful of demo fixtures today (no clean Due Diligence-stage deal
+currently exists to rule out this also happening to a real deal), but a materially confusing display bug
+on a page a PM relies on to judge deal progress.
+**Suspected area / fix shape:** derive the deal-detail hero status primarily from `currentStage` (reusing
+`STAGE_MAP` or an equivalent detail-specific mapping) and use sub-record presence only to refine within a
+stage (e.g. "Term Sheet — draft" vs "Term Sheet — sent"), not to override it outright; alternatively, once
+Wave 2's lifecycle-action tests below confirm whether a normal action path can produce this same
+divergence, the fix may need to also ensure the action that creates a disbursement/implementation record
+also advances `currentStage` in the same transaction.
+**Testing impact:** none of the three current Due Diligence-stage deals (Mukuru Logistics, GreenOrbit
+Energy, NTS) is a "clean" mid-lifecycle fixture — the first two are contaminated as above; NTS has a real,
+uncontaminated `dueDiligenceReview` (status `IN_PROGRESS`, no term sheet/board record yet) despite also
+carrying a stray $1.25M disbursement, so it is the one used below to test `complete-due-diligence` live.
+`start-due-diligence` has no pre-DD fixture available at all (the only two other deals are already at
+Investment Committee); tested by advancing a fresh deal instead (see below).
+
+## FINDING-PV11-007
+
+**Page / flow:** Deal Detail → Term Sheet tab → Create term sheet; also Investment Implementation
+`/initiate` (Wave 2 — deal-lifecycle actions)
+**Steps to reproduce:** As `portfolio.mgr@nts.local`, open a deal at stage `TERM_SHEET` (e.g. "NTS", after
+legitimately completing its due diligence live — see below) → Term Sheet tab → Create term sheet → fill
+the form (amount, equity %, valuation, a PDF) → Create term sheet.
+**Expected:** Succeeds — this role has "full" access to the whole Portfolio module, same grant class as
+FINDING-PV11-001.
+**Actual:** `POST /api/term-sheets/:applicationId` → 403 `{"success":false,"message":"Forbidden:
+insufficient permissions"}`, surfaced correctly as a "Request failed" toast (not silent — the toast/error
+pipeline itself is fine here). Same root cause as FINDING-PV11-001, confirmed by reading the route
+directly: `nvccz/src/routes/termSheetRoutes.ts` gates `POST/PUT /:applicationId`, `POST
+/:applicationId/finalize`, and `GET /` with the legacy `authorize(['admin', 'fund_manager'])` — the same
+hardcoded, never-updated role-name list, in a **third** file beyond the two already fixed
+(`fundRoutes.ts`, `clientRoutes.ts`). `nvccz/src/routes/investmentImplementationRoutes.ts`'s `POST
+/initiate` (the `start-implementation` action) carries the identical gate — confirmed by reading the route,
+not yet live-reproduced since no deal has reached board-approved in this pass. By contrast,
+`applicationRoutes.ts` (due diligence) and `boardReviewRoutes.ts` (board review/voting) use `authenticate`
+only, no role gate, so `complete-due-diligence`/board-review actions are unaffected — this is specific to
+term sheets and implementation-initiation.
+**Severity:** HIGH — same class and impact as FINDING-PV11-001: blocks the intended day-to-day role from
+two more core deal-lifecycle steps, not an edge case. Also blocks live-testing the rest of Wave 2
+(board review, implementation) as this persona — continuing that testing as `admin@nts.com` instead.
+**Suspected area / fix shape:** identical to FINDING-PV11-001's already-applied, already-verified fix —
+add `portfolio_mgr` (and `inv_analyst` where the action is read-oriented) to the affected `authorize([...])`
+lists. Ran the repo-wide check this finding called for across every Portfolio-relevant route file
+(`dealSourcingRoutes`, `portfolioValuationRoutes`, `investmentImplementationRoutes`,
+`investmentMonitoringRoutes`, `portfolioCompanyRoutes`, `termSheetRoutes`, `applicationRoutes`,
+`fundraisingRoutes`, `boardReviewRoutes`, plus the two already-fixed files) so Phase 4 can fix this bug
+class once, not file by file. Confirmed still missing `portfolio_mgr`/`inv_analyst`:
+- `termSheetRoutes.ts` — `POST/PUT /:applicationId`, `POST /:applicationId/finalize`, `GET /` (all
+  `authorize(['admin','fund_manager'])`).
+- `investmentImplementationRoutes.ts` — `POST /initiate`, `PUT /:portfolioCompanyId/checklist`, `POST
+  /:portfolioCompanyId/milestones`, `POST /milestones/:milestoneId/complete`, and one of
+  `/disbursements/:disbursementId/approve`|`/disburse` (all `authorize(['admin','fund_manager'])`); by
+  contrast `POST /disbursements` and `/disbursements/:disbursementId/decision` have **no** role gate at
+  all (`authenticate` only) — too permissive, mirrors FINDING-PV11-005's bonus finding, lower priority
+  while this whole area is being touched anyway.
+- `portfolioCompanyRoutes.ts` — `GET /with-investments` (`authorize(['admin','fund_manager'])`); its other
+  `authorize` entries (`applicant`, `admin`) are Investee-Portal-facing, out of scope here.
+Confirmed correctly out of this bug's scope (not part of Portfolio V11's own UI, no fix needed here):
+`dealSourcingRoutes.ts`, `portfolioValuationRoutes.ts`, `investmentMonitoringRoutes.ts` — gated by
+`ceo`/`cfo`/`fund_manager`, backing CEO/CFO dashboards this module's sidebar doesn't expose.
+`applicationRoutes.ts`, `boardReviewRoutes.ts`, `fundraisingRoutes.ts`'s relevant routes already use
+`authenticate` only (no gate to fix).
 
 ## Format per finding
 ```
