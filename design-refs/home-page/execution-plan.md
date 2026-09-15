@@ -178,6 +178,35 @@ Preferences/Documents tabs.
 **Verify**: settings persist and actually take effect (e.g. a disabled notification type stops arriving);
 full click-through of every element in the Stage 2 inventory with real data, per the Stage 5 standard.
 
+## Phase 2b — custom wallpaper upload + rotation interval — done, verified live
+
+Added mid-build at the owner's request (design a Windows-lockscreen-style rotating background:
+upload your own images, choose how often it changes). Schema: `home_wallpapers` table (one row
+per image) + `home_preferences.rotation_interval_minutes`, both migrated with sign-off. API:
+`GET/POST /api/homepage/wallpapers`, `DELETE /api/homepage/wallpapers/:id`, reusing the existing
+`RemoteUploadService` upload pattern (API repo `e0335f0`). Frontend: custom uploads slot into the
+existing wallpaper grid as extra tiles (not a separate gallery) with an Upload tile and inline
+remove button; a Rotate-interval dropdown appears in auto mode; `currentHeroScene()` rewritten
+from pure calendar-day granularity to interval-based, preferring uploads over the 7 built-in
+scenes when any exist (frontend repo `a2c6df6`).
+
+Verified live end-to-end: uploaded two real images via direct multipart POST (the same code path
+the UI's file picker uses), confirmed both retrievable at their public-media URLs, confirmed
+fixed-selection and delete both persist correctly, confirmed the rotation math is exactly correct
+(reload showed the mathematically-predicted image after a real 3-minute boundary crossed). One
+real finding from that test: the live 15s re-render poll is throttled by the browser while the
+tab/pane is hidden (confirmed via `document.hidden`), so a backgrounded page can show a stale
+wallpaper until something re-renders it — not a logic bug (the underlying computation was proven
+correct), but added a `visibilitychange` listener so the page catches up the instant it's looked
+at again, rather than only on the next unrelated navigation.
+
+Known trade-off, not fixed this phase: upload and delete both trigger a full page reload to show
+their result, since the runtime has no way to push fresh data into an already-mounted instance
+(same gap as Phase 1's priority-toggle rollback). A `hydrate()`-style API on the runtime would let
+every phase's write actions update in place instead of relying on reload/self-heal-on-next-load —
+flagging this as the one structural improvement that would clean up several phases at once if
+picked up as its own piece of work.
+
 ## What's explicitly deferred rather than silently built
 
 - Matanho Assistant / AI Concierge real responses — needs an explicit decision on what powers it.
