@@ -10,6 +10,12 @@
 | MEDIUM | 0 | 0 | 2 |
 | LOW | 0 | 0 | 1 |
 
+The table counts the numbered findings below. **Cycle seven** (12 September 2026, see its section) found and
+fixed, on dev only: HIGH — buttons dead after any sidebar navigation (D1); HIGH — journal posting blocked by
+CORS, dev and production; MEDIUM — grants missing for 4–5 s after each navigation; MEDIUM — audit trail missing
+plans, contracts, documents, invoice readings and vendor submissions; LOW — Contract value overstated. Two LOW
+vendor-portal defects were handed off. **None of it is on production yet.**
+
 ## Deployment — 11 September 2026
 
 Every finding below is deployed to **production** (NVCCZ) and **dev** (Arcus).
@@ -444,6 +450,755 @@ chat round-trip returned `ok`. Extraction therefore works on prod as shipped.
 
 The key being in the repository rather than the environment is a known, accepted trade-off, recorded
 here so the next person does not "fix" it by moving it and breaking both modules at once.
+
+---
+
+## Cycles nine to fourteen — SRD completion, the "nothing half built" sweep and the move to /procurement, 13 September 2026 (dev only)
+
+Dev only; nothing was deployed to production. Mail guard on for every write run (outbound mail blocked). Each run ends
+with `dev_cleanup_procurement.mjs --apply` and `demo_integrity.mjs`.
+
+### Deployed to dev
+
+| Cycle | API | UI | Migrations |
+|---|---|---|---|
+| nine | `a086977` invoice viewer and highlights, flag for review, requisition project, line suggestions | `0796fbc` | `procurement_invoices.review_note`, `purchase_requisitions.project_id` (+ index) |
+| ten | `fbe5a01` vendor create/update permissions, authz probe | `892857f` | none |
+| eleven | unchanged | `4b15cec` Budget check column out, immediate pay confirmation, KPI cards, compliance filter | none |
+| twelve | `dc224d5` vendor self-registration decline, review queue guard and audit, `/procurement` notification links | `f4ff8be` module moved to `/procurement` (legacy to `/procurement-legacy`, redirects), self-registration review, Accounting messages | none |
+| thirteen | unchanged | `c0bac67` vendor portal requires SWIFT/BIC; portal buttons | none |
+| fourteen | unchanged | `9e8acbd` vendor self-registrations as decision cards | none |
+
+### Found and fixed
+
+1. **Dates read two ways on one page.** en-GB's short month is "Sept" on newer ICU and "Sep" on older, so a vendor
+   profile showed an order "30 Aug 2026" beside an invoice "08 Sept 2026". Loaders, bridge and the Accounting audit now
+   spell the month out ("13 Sep 2026"). The PO filters check caught it.
+2. **Accounting V52 drew its dialogs, drawers and profile menu unstyled.** Every Accounting style is scoped to
+   `.accounting-v52-root`, but the runtime appends its focus, drawer, modal and deep layers, its toolbar and its profile
+   menu (with the prototype user "Tariro Moyo") to `<body>`, and Payables' Pay dialog did the same. They rendered below
+   the page; the sidebar covered the dialog's Pay button. The profile menu is not installed in a live session; the host
+   moves every other layer into the root as it is added; the Pay dialog is inserted there. Found by the Payables UAT
+   (the Pay click was intercepted by the sidebar toggle).
+3. **Any staff account could create or change a vendor, and the plain update could blacklist one.** `POST` and `PUT
+   /accounting/vendors` only required a staff sign-in, and `PUT` accepted `isBlacklisted` and `registrationStatus`
+   without `procurement.vendors.approve`. Both now need `procurement.vendors.manage`; the blacklist and registration
+   fields also need approval rights; each change is audited with old and new values. The authz probe asserts it.
+4. **Vendor master could not be edited.** Edit profile opened the prototype's form (country, currency, status, WHT rate —
+   none stored) whose Save was refused. It now offers only the stored fields (name, contact, email, phone, address,
+   payment terms, tax clearance) and saves them; the Company profile card shows phone, address and payment terms.
+5. **Controls that opened a form nobody could save.** An audit of every control the census met that `actions.ts` did
+   not name found openers whose only save was refused (CSV line import, internal notes, evaluation criteria, report
+   builder and schedules, quotation import, record upload and generic edit, document and template editors, vendor
+   invites, bid-form preview, record history, "Send compliance reminder") and two terminal steps that announced success
+   without saving ("Validate import: 12 line items passed", the report builder's sample preview). None is offered in a
+   live session; Vendor Registry's reminder automation card, the profile's messaging card and its sample compliance
+   register are not shown; New record's Annual plan opens the live plan form.
+6. **KPI cards with no source.** Cards for features procurement does not record (withholding tax, eSignature,
+   committees, board packs, report schedules...) and fixture figures no loader answers showed "—" with "No live source".
+   They are left out; the census lists them per page.
+7. **A filter bar with nothing to filter.** On a page with no register row its Apply answered "This page has no register
+   to filter". It is not shown there.
+8. **Test clean-up that did not clean up.** The invoice-processing UAT passed its invoice ids to the delete script joined
+   by commas, which the script read as no ids; the auto-approval UAT's approved invoices were refused by the same script.
+   Ids are now separate arguments and `--approved-unpaid` removes a test's own approved, unpaid, unposted invoices
+   (still never a paid or posted one). Found by the demo integrity check (four supplier invoices where the demo has two).
+9. **A check that could not fail.** The AI capture UAT passed "the reading was filed" on either "Filed as VIN-…" or "Not
+   filed". A reading without a purchase order is deliberately not kept (the vendor is unknown), so the check now requires
+   exactly that message.
+10. **A Budget check column with nothing behind it.** Requisitions are not budget-checked (the loaders set the budget to a
+    dash), yet both requisition registers carried a Budget check column and the requisition view a Budget line, reading
+    "—" on every requisition. Not shown in a live session (`971d420`). Found reading the requisition assist screenshot.
+11. **A payment made from Accounting said nothing for over two minutes.** The Accounting host reloaded the six registers a
+    payment touches before showing "paid", so the payment went through (invoice PAID, journal and bank reference recorded)
+    while the person saw no confirmation. The confirmation now comes first (`c3cf673`). Found by the Payables UAT, which
+    now times it.
+12. **KPI cards that could only read zero, and cards that popped in.** Six cards were computed by the design from records
+    procurement does not keep (vendor inbound messages, pending compliance requests, missing documents; contracts awaiting
+    signature; asset purchases; editable report templates) and read 0 as if the feature existed; they are left out
+    (`668ce17`). Separately, before the first live load every fixture figure counted as sourceless, so cards were left out
+    and then appeared; they now show "Loading live figures…" until the loaders answer (`c1d6877`). Found by the census.
+13. **A compliance chip whose filter showed none of the vendors it counted.** Vendor Registry's chips counted a vendor
+    with no tax clearance on file as "Expired / missing" (31%), but the filter read each row's chip, which said "Missing",
+    so choosing the chip showed no vendor while "Under review 0%" showed four. Both now use one classification
+    (`4b15cec`); the vendor history UAT clicks the chip and compares the rows with the API. Found in the census toasts of
+    the Procurement Manager and Officer.
+14. **A vendor that registered itself could not be reviewed.** Vendors register on the vendor portal (its own domain,
+    no invitation) and wait in PENDING_REVIEW, but the Vendor Registry never showed that queue: they appeared as
+    ordinary vendors, with no way to approve or decline, and "Vendor portal" was hidden as not built. The registry now
+    marks them "Awaiting review" and lists them under "Self-registrations awaiting review" with their bank accounts and
+    documents; a role that approves vendors approves or declines with a reason, and the vendor is emailed either way
+    (new decline route, audited; approval audited). The review queue needed only a staff sign-in and returned each
+    vendor's portal upload token: it now needs vendor view rights and omits the token. "Vendor portal" opens the
+    registration page in a new tab. Backend `5d7f106`, UI `a9ca03c`; UAT `procurement-v23-vendor-self-registration.mjs`
+    22/22 in cycle fourteen (after items 17 and 19).
+15. **Every Accounting V52 write was silent.** The runtime's `commitSuccess` and `commitError` call handlers defined in
+    another of its closures, so neither showed anything: a supplier payment, a chart-of-accounts change or a journal
+    submission never said whether it worked. Confirmed on dev by calling `commitSuccess` directly (no error, no message).
+    The host now shows each result as a toast (`6086abf`). Found by the Payables UAT.
+16. **Procurement moved to `/procurement`.** At the owner's request the module left `/procurement-v23`: the frozen legacy
+    pages moved unchanged to `/procurement-legacy`, and `/procurement-v23/...` redirects (308) to `/procurement/...`, so
+    links in notifications and emails already sent still open. Notification links from the API use the new paths.
+    UI `f4ff8be`, API `dc224d5`; verified in cycle twelve (sidebar navigation 17/17 pages at `/procurement`, census clean
+    there) and the redirect by the self-registration UAT in cycle fourteen.
+
+17. **The vendor portal called a required field optional.** The self-registration form marked SWIFT code optional and
+    sent nothing when it was blank, but the API refuses a vendor bank account without one ("requires Branch Code,
+    SWIFT/BIC code, and Currency to ensure payment success"): a vendor who trusted the form was refused at the last step.
+    The form now requires it and says why (`361dfa5`). Found by the vendor self-registration UAT on dev (6/12 in cycle
+    twelve: nothing after the refused submission could exist), confirmed by posting the form's payload to the API.
+18. **A probe row that could not run.** The authz probe's new "list vendor self-registrations" row passed a `null` body on
+    a GET, so fetch threw before any request and every cell read `-1`. Fixed (`3bc06ac`); re-run on dev: every asserted
+    cell matched the policy.
+
+19. **A decision hidden behind a menu.** The review queue for vendor self-registrations was a table, and the module folds a
+    table row's buttons into its ⋯ menu, so Approve and Decline were a click away and the self-registration UAT waited for
+    a button that was not on the page (the officer's "offers no Approve" check passed only because nothing was shown).
+    Each registration is now a decision card, as in the Approval Centre, with Open profile and — for a role that approves
+    vendors — Approve and Decline in view (`9e8acbd`). A row click could not have approved a vendor: the row's click
+    action is chosen from non-mutating labels, and "Open profile" always ranked first.
+
+### Cycle thirteen results (UI `c0bac67`: SWIFT/BIC required on the vendor portal)
+
+| Suite | Result |
+|---|---|
+| vendor self-registration | 12/13 — the portal refuses a registration without SWIFT/BIC and accepts it with one; the vendor waits in PENDING_REVIEW with its bank account counted and no token exposed, is not invitable; the requester cannot list the queue; the officer sees it and cannot decide (API 403); the manager's Approve was folded into a row menu (item 19) |
+| vendor master | 18/18 |
+| cleanup | nothing left behind |
+| demo integrity | 18/18 |
+
+### Cycle twelve results (API `dc224d5`, UI `f4ff8be`)
+
+| Suite | Result |
+|---|---|
+| vendor self-registration | 6/12 — SWIFT required by the API but optional in the form (item 17); fixed and re-run in cycles thirteen and fourteen |
+| vendor master | 17/18 — the UAT still expected the profile's "Open vendor portal" gone; it now opens the portal (UAT updated) |
+| vendor history (incl. compliance filter) | 11/11 |
+| requisition assist (project, suggestions, no Budget check column) | 14/14 |
+| procure-to-pay flow | completed |
+| Accounting Payables (pay from Accounting, confirmation straight away) | 23/23 |
+| authz probe | every asserted cell matched the policy (after the probe fix, item 18) |
+| sidebar navigation at `/procurement` | 17/17 pages, openers 10/10 |
+| census, Procurement Manager, at `/procurement` | 0 dead ends, 0 "not connected", 0 page errors, 0 failed calls. Four controls with no visible effect: the three benign ones seen before, and "Vendor portal", whose new tab opens with `noopener` and so is not seen by the census (the self-registration UAT checks that tab) |
+| demo integrity after cleanup | 18/18 (the two records restored at the owner's request read as the demo expects) |
+
+### Cycle fourteen results (UI `9e8acbd`: self-registrations as decision cards)
+
+| Suite | Result |
+|---|---|
+| vendor self-registration | 21/22, then 22/22 — the first run looked the approved vendor up with `?isActive=all`, which the API reads as inactive only (UAT fixed, `7ad30dc`); on re-run every check passed |
+| cleanup | nothing left behind |
+| demo integrity | 18/18 |
+
+### A manual decision on the demo dataset (not a defect)
+
+After cycle eleven, `demo_integrity.mjs` reported 16/18: the FY 2027 plan read APPROVED (expected SUBMITTED) and the
+projector requisition REQ_20260911_0008 read REJECTED (expected PENDING_APPROVAL). The audit trail shows both decisions
+made by the **Admin NTS** account at 19:21 CAT, nine seconds apart, while no suite was running (cycle eleven was still
+deploying its UI) and while dev was open for manual use; no suite signs in as Admin NTS. No code changed either record.
+`scripts/procurement-ops/dev-data/dev_restore_demo_decisions.mjs` (`09ce17f`) puts both back if the owner wants the demo
+storyline restored — its dry run: the requisition and its one approval request reopened (two approval rows back to
+PENDING), the plan back to SUBMITTED, one decision notification removed; audit rows kept. The owner chose to restore:
+applied on dev at 20:10 and read back through the API (requisition PENDING_APPROVAL, plan SUBMITTED).
+
+### Census, cycle ten (UI `892857f`)
+
+Procurement Manager, every control operated on 19 pages: **0 dead ends, 0 controls answering "not connected", 0 page
+errors, 0 controls that could not be operated, 0 failed load calls.** The six success messages seen were live filters
+reporting what they matched. Three controls had no visible effect and are benign (Command Centre while on it, Preview
+tender pack on an empty form, Clear with no filter set). 23 KPI cards were left out without a live figure; each is either
+a feature procurement does not have (eSignature, delegations, board votes, SLAs, contract variations and obligations,
+regulatory exports, bank-change tracking) or an older layer's card whose live equivalent is on the same page ("Waiting
+on me", "Contract value", on-time delivery, the analytics tables). Procurement Officer, Accounts Payable and the requester
+(19 pages each): the same, all zero.
+
+### Results
+
+| Suite | Cycle nine | Cycle ten |
+|---|---|---|
+| dashboard | 9/9 | — |
+| analytics (cash, insights) | 14/14 | — |
+| PO filters | 11/11 | 11/11 |
+| invoice auto-approval | 20/20 | — |
+| AI capture, scanned PDF | 18/18 | 18/18 (stricter filing check) |
+| AI capture, photo | 18/18 | 18/18 |
+| invoice processing (viewer, flag) | 11/11 | — |
+| requisition assist | 12/13 (project display check) | 12/13 (the check clicked a row that opens nothing; fixed in the UAT) |
+| vendor history | 10/10 | 10/10 |
+| vendor master | — | 18/18 |
+| Accounting Payables | 14/16 (Pay dialog) | 21/22 (paid, journal and reference recorded; the confirmation waited for a reload) |
+| authz probe | — | every asserted cell matched the policy |
+| census, four roles (19 pages each) | — | 0 dead ends, 0 "not connected", 0 page errors, 0 failed calls |
+| demo integrity after cleanup | 18/18 | 18/18 |
+
+## Cycle eight — full browser test, 13 September 2026 (dev)
+
+The owner asked for the whole module to be tested from the browser, phase by phase, fixing and re-testing without
+waiting. Every phase drives real Chromium sessions as the demo personas against dev (staff `e393b63`, API `877d469`);
+production is not touched and the dev mail guard stays on.
+
+| Phase | What | Result |
+|---|---|---|
+| 0 | Preflight: build, mail guard, test data, demo integrity | Clean: working tree at `c2ec9e6`, mail guard on, no leftover test records or processes, demo integrity 17/17 |
+| 1 | Visual review of every page for the 8 roles that sign in (desktop screenshots read by a person), and tablet and phone widths | 152 desktop pages and 36 tablet/phone views read; 16 findings, all fixed in `55016b0` and `0a3ecc2` (below); dev audit trail tidied |
+| 2 | Every control on every page for all 8 roles (census): dead controls, errors, unrefused writes, sample text | On `0a3ecc2`: Procurement Manager, Accounts Payable and Operations head complete (19 pages each). No render failure, failed call or unrefused write. Flags triaged below; one wording fix (`9e9a458`), and the approval support documents found beside it. Remaining roles re-run on the next build |
+| 3 | End-to-end business flows through the UI: storyline, actions, workflows, AI capture | pending |
+| 4 | Permissions and refusals per role | pending |
+| 5 | Cross-module: accounting (journals, ledger, payables, cash), vendor portal, exports and letterheads | Exports and accounting 32/32 on `0a3ecc2`: every export downloads a real file with no sample or test text; Payables agrees with procurement ($2,518 outstanding = the stationery invoice awaiting Finance; $19,277 open commitments = the two uninvoiced POs; $7,421 sourcing pipeline). Vendor portal 2/4: the invited vendor's quotation form was blank (fix below, deploying) |
+| 6 | Fix, deploy, re-test until clean | pending |
+
+### Phase 1 — what a person reading the pages found
+
+Read as each role would see them, full-length at 1440px, plus 768px and 390px for two roles. Nothing showed sample
+text or a crash; what follows is what made pages wrong or unprofessional.
+
+| # | Where | Found | Fix |
+|---|---|---|---|
+| 1 | Tablet and phone, every page | The menu opened expanded as a 278px drawer with no backdrop, over the heading, head buttons and first KPIs | `55016b0` step 44: narrow screens start on the icon rail |
+| 2 | Every table | Words broke mid-word as columns squeezed: "Operation s", "$10,40 0" (`overflow-wrap:anywhere` on cells) | `procurement-v23-live.css`: `break-word`, imported after the vendored sheet (which an extract would overwrite) |
+| 3 | Vendor Registry | First column printed database ids (`cmtzc7u8s02j…`); contact line "— \| email"; Currency all dashes; "— / 5" | Step 46: Vendor · Contact (person, email, phone) columns; no currency column; "Not rated" |
+| 4 | Vendor Registry | A clearance 35 days from expiry read "Valid" in the table but "Expiring" in the doughnut | Step 45: `daysUntilV6` counted from the design's frozen 1 Aug 2026; now from today |
+| 5 | Contracts & Awards | Awards awaiting a contract showed their PO number in the Contract column | Step 47: "Not yet contracted", award and order under the description |
+| 6 | Tenders, Invoices, Analytics | Every RFQ read "Restricted tender"; Category and Estimate always "—" | Loader: "Request for quotation" unless publicly listed; category and estimate from the source requisition |
+| 7 | Approval Centre | A goods receipt awaiting inspection showed Value "—" (Receiving showed $6,290) | Loader: the receipt's value |
+| 8 | Sidebar | Purchase Requisitions badge "2" over the Procurement Manager's empty queue (counted every pending requisition) | Loader: requisitions awaiting my decision, else my own in approval |
+| 9 | Command Centre | "Spend by category" listed one bar, "Operations 100%" — grouped by department | Bridge: grouped by the requisition's sourcing category |
+| 10 | Analytics | "Entity plan execution — committed as a percentage of approved plan" read 100%; the header said 18% | Bridge: committed against each department's approved plan budget |
+| 11 | Command Centre, Analytics | Trend lines fell to zero across October–December, months that have not happened | Bridge: lines stop at the current month |
+| 12 | Reports Vault | "Report consumption" drew the spend trend (report runs are not logged) | Bridge: says report runs and downloads are not logged yet |
+| 13 | Invoices & 3-Way Match, Accounts Payable | Empty "Select a tender" card and no invoice: sources came from RFQs, which the role cannot read | Step 50 + `__pr23MatchSources`: sources from its purchase orders; workspaces resolve them |
+| 14 | Requester opening the module | Landed on "Your role does not include Command Centre" | Bridge + host: replaced by the first page the role's menu offers |
+| 15 | Audit & Compliance | 200 rows on one 8,000px page, most "Create RFQ RFQ_20260913_000x" left by test runs (RFQ rows are keyed by number, so cleanup never matched them) | Step 49: latest 50 with a line saying so; RFQ rows named; cleanup removes RFQ rows; `dev_audit_tidy.mjs` removed 57 orphaned rows and re-pointed 7 renumbered demo RFQs; integrity checks the trail |
+| 16 | Document Vault | The "Request for Quotation" template captioned "Vendor-submitted original · read-only" | Step 48: templates are never vendor submissions |
+
+Re-checked on dev after deploying `0a3ecc2` (`_tmp-v23-cycle8-fixes-check.mjs`): 26/27. The goods receipt still read
+"Value —" in the Approval Centre: the card is built from the approval prompt, a second place the value was left null —
+fixed with the Accounts Payable source cards naming the supplier where the role cannot see the department. Tablet and
+phone re-check: the menu no longer covers pages; the requester's "799px sideways scroll" was the closed side drawer
+parked off-screen (the document does not scroll), a false positive of the check, which now measures the viewport.
+
+### Phase 2 — census flags, triaged
+
+| Flag | Verdict |
+|---|---|
+| "Command Centre" in the menu while on the Command Centre: no visible effect | Expected — already on the page |
+| Document Vault "Clear" with no filter set: no visible effect | Expected — nothing to clear |
+| Report template status select "Draft": no visible effect | Expected — takes effect on save |
+| Create tender → "Preview tender pack" on the empty form: no visible effect | Expected — the browser's required-field prompt shows, nothing else changes |
+| Vendor Registry "Vendor portal": could not operate | Known — a not-built opener; its refusal toast covers the button |
+| Document Vault "Download PDF": console CORS error on socket.io | Transient — the dev API container was being recreated; CORS headers for `dev.matanho.com` are correct |
+| Accounts Payable: "No procurement plan has been approved yet", "No approved plan covers FY 2026", "No requisition has been approved yet" | **Wrong** — that role cannot read plans or others' requisitions; now "not visible to your role" (`9e9a458`) |
+
+KPI cards that show "—" all say why (no withholding calculation, no eSignature, report runs not stored…), and every
+success toast without an API call is a refusal, a filter count or a client-side export — none claims work that did
+not happen.
+
+### Approval support documents were fixtures presented as evidence
+
+Found reading what the census reported the department head opening in a requisition approval. The three supporting
+documents offered beside the decision paper were the design's samples with the record number filled in:
+
+- "Budget availability and funding confirmation" named the sample CFO "Tinashe Chaka" and said the commitment "has been
+  checked against the approved annual plan, department budget and current commitments" — no budget check exists;
+- "Evaluation or technical recommendation" scored three sample bidders (TechNova, NetShield, CloudAxis);
+- "Conflict and independence declaration" read "No conflict declared · SSO + MFA" though nobody declared anything;
+- every paper, the decision paper included, was "Generated 02 Aug 2026".
+
+The census's sample-text check did not see them: they open in a modal from inside a modal. Step 51 builds them from the
+records in a live session (`__pr23SupportDocument`): **Budget position** — the department's approved plan budget,
+commitments this year and where this request would take them, and a plain statement that no finance confirmation is
+recorded; **Quotation comparison** — the RFQ's submitted quotations, lowest first, with evaluation scores, for an award
+(and "not applicable" otherwise); **Conflict of interest declaration** — says none is recorded. The decision paper is
+dated today.
+
+Round-two check on dev after deploying `9e9a458` (`_tmp-v23-cycle8-round2-check.mjs`): **11/17**. Passing: the goods
+receipt's value, the support documents' labels, Accounts Payable's source cards, and the vendor form (title,
+organisation, the vendor's details, the lines, the closing date). Still wrong, and fixed next:
+
+- **The award decision paper** was still the vendored memorandum — step 51 replaced the supporting documents, not the
+  paper itself: "TechNova Solutions" as the selected bidder, three sample bidders' scores, bids "opened under committee
+  control", and an approval table showing the sample CFO "Tinashe Chaka — Signed — 01 Aug 2026". Now built from the
+  records (`__pr23AwardMemo`): the RFQ, its submitted quotations ranked by total with their evaluation scores, the basis
+  of the recommendation, and what approving does. Requisition, receipt, invoice and plan approvals use the generic
+  decision paper, which carries no sample content.
+- **Every paper's footer** read "Generated 02 Aug 2026" — a literal in two renderers; now today's date.
+- **The vendor form's page error** "Unexpected token '<'" was not the form: the root layout renders Vercel Analytics,
+  whose `/_vercel/insights/script.js` answers with an HTML page on a self-hosted server — so every page in every portal
+  logged it. `<Analytics />` now renders only on Vercel builds.
+
+### The requester's phone opened with the menu over the page
+
+The tablet and phone re-check on `9e9a458` was 31/36: four phone pages whose head buttons run into a sideways-scrolling
+row (the design's phone layout, accepted in cycle seven), and the requester on a phone, where "Export register" was
+covered. A browser trace showed why. The requester opening `/procurement-v23` is sent on to the Approval Centre
+(`9e9a458`), and that page opened with the full 278px menu over it. Nothing clicked it open: the second runtime read
+`window.innerWidth` as **784** on a 390px phone, because content overflows during the route transition and the mobile
+layout viewport widens. So step 44's `innerWidth > 780` thought it was a tablet. Step 52 decides with
+`matchMedia('(max-width: 780px)')`, the stylesheet's own breakpoint, which measures the device width.
+
+### Phase 5 — the invited vendor's quotation form was blank
+
+Found by the cross-module check, as Jacaranda Office Supplies opening its invitation link for `RFQ_20260912_0006`: the
+form showed the RFQ number and nothing else — no title, no lines, no closing date or delivery terms, the vendor's own
+details unfilled — and was headed "Submit Quotation to Arcus". The page decoded the token's signature as if it were the
+payload (so even the RFQ id was lost), and no endpoint let a vendor read the RFQ with their link.
+
+- API `dc8290e`: `GET /procurement/vendor-portal/rfq?token=` — public and token-scoped like the PO invoice link; only an
+  invited vendor (or anyone on a publicly listed RFQ) can read it. Returns the RFQ, its lines as issued (never
+  prices), closing date and delivery terms, the vendor's master details, the organisation's legal name, and the
+  quotation this vendor already sent.
+- UI: the form shows what is being bought, prefills the lines and the vendor's details, names the organisation,
+  says when the RFQ has closed or the vendor has already quoted (and disables Submit), and reads the token correctly.
+
+The first deploy of the endpoint answered 500 to every invited vendor: it ordered the vendor's earlier quotation by
+`createdAt`, which `VendorQuotation` does not have (it records `submittedAt`); the local Prisma client was stale and
+the typecheck did not see it. Fixed in API `7d7826f`. On dev (`check_vendor_rfq_endpoint.mjs`) **9/9**: an invited vendor
+reads its RFQ, lines without prices, its own details and the organisation's name; no token, an altered token and an
+uninvited vendor are refused (400, 400, 404).
+
+Census harness: the finance manager's run crashed when a call failed during the API container recreate — the
+`requestfailed` handler called `.request()` on what is already the request. Fixed; the internal auditor's run failed
+to sign in during the same recreate. Both are re-run on the next build.
+
+Seen and left: the journal reference `EXP-1789275136052-INV_20260822_0001` is the accounting API's own reference and
+reads the same in Accounting; the Configuration page lists raw permission keys, which is what Admin → Roles uses.
+
+## Cycle seven — demo readiness, 12 September 2026 (dev)
+
+Worked from `HANDOFF_AND_TEST_PLAN.md`, phases 0 → 6.
+
+### Phase 0 — preflight
+
+| Check | Result |
+|---|---|
+| Branch, both repos | `feature/procurement-v23-live`; UI `61e756f`, API `09a19ad`; unrelated dirty files left alone |
+| Dev health | API `/health` 200, staff `/procurement-v23` 200 |
+| Dev runs the §2 SHAs | staff: latest deploy stamp `20260912-082647` (the `61e756f` build); API: the `09a19ad` change is in the compiled controller on dev **and** prod |
+| Mail guard | ON (`MAIL_REDIRECT_ENFORCE=true`, no redirect address) |
+| Dataset | rebuilt: `REQ_20260912_0013` approved → `RFQ_20260912_0005` → `PO_20260912_0008` → `GRN_20260912_0004` → `INV_20260912_0003` approved; 58 messages blocked during the run |
+
+**One persona cannot sign in on dev.** `perf.sysadmin@nts.local` answers 401 "Invalid credentials" to
+the shared test password, which every seed script sets; the other personas sign in. Its password has been
+changed on dev outside the seeds. It was **not reset**, because other modules' UAT signs in as the same
+account; Phase 3 runs with the nine personas that sign in until someone confirms it can be reset.
+
+### D1 — "Capture this invoice" did nothing after opening the page from the sidebar
+
+**Reproduced on dev** (`61e756f`), as the Accountant, starting on Invoices: sidebar → AI Invoice
+Capture → upload `test-invoice.pdf` → choose a PO → Read (98% confidence, three lines) → **Capture this
+invoice**. No form, no toast, no route change. At the click the page threw:
+
+```
+TypeError: Cannot read properties of null (reading 'classList')
+  closeOverlay  ← openModal ← __pr23InvoiceCaptureModal ← invoiceIntakeModalV5   ($('#drawerLayer') is null)
+```
+
+(minified frames resolved against the served chunk). The suspects in the handoff — a re-render wiping the
+form, the no-open-orders modal, the prefill — were each ruled out by the same trace: nothing re-rendered
+and no modal opened.
+
+**Root cause.**
+- `RouteTransition` in the root layout renders the page inside `<motion.div key={pathname}>`, so **every
+  client-side navigation unmounts the procurement host and starts a new runtime**. The trace shows it: after
+  the sidebar click the runtime hydrated twice more, first with the empty payload and then with live data,
+  which is the host's mount sequence.
+- `destroy()` aborts `__pr23Abort`, but only **7 of the runtime's 22** document and window listeners had
+  been given its signal. The other 15 — including the vendored layers' capture-phase click dispatchers —
+  stayed attached, bound to the emptied root of the runtime they came from.
+- The first stale dispatcher to match a click called `stopImmediatePropagation`, so the live runtime never
+  saw it, and then threw against its own empty root.
+
+So after **one** sidebar navigation, every button the host does not claim was dead — not only this one.
+
+**Why no suite saw it.** `actions`, `workflows`, `explore` and `screens` all open every page with
+`page.goto`, a fresh load. The AI capture test passed on `1ae2c63` only because `intake` had no route
+then, so opening it pushed no navigation. `61e756f` gave it a route, which is what exposed the leak.
+
+**Fix — nvccz-new `b89e968`.** Patch step 24 routes every document and window listener through
+`__pr23On`, which adds the abort signal, so `destroy()` removes all of them; the bridge's own change
+listener uses it too. Patch `0 missed`, idempotent, `--check` clean; no bare `document`/`window`
+`addEventListener` is left in the runtime; typecheck clean for `procurement-v23`.
+
+**New suite: `scripts/_uat/procurement-v23-sidebar-nav.mjs`.** Opens every page in the role's sidebar
+*from the sidebar*, checks it stays and the address bar follows, then clicks the page's first opener
+(create / new / record / …) and requires something visible — a form, a drawer, a refusal or a page change —
+with no page errors. It never confirms a form, so it writes nothing (nvccz-new `c9a7fee`).
+
+**Before the fix** — dev `61e756f`, Procurement Manager, starting on Vendors: navigation was sound on all
+17 pages (each stayed, and the address bar followed), but **9/17 pages passed and only 3/11 openers
+worked**. D1 was the most visible case of a module-wide fault:
+
+| Page | Opener | After a sidebar navigation |
+|---|---|---|
+| Annual Procurement Plan | Create plan | **dead** — `Cannot read properties of null (reading 'classList')` |
+| Tenders & RFx | Create tender | **dead** — same |
+| Quotation Comparison | Create RFQ | **dead** — same |
+| Contracts & Awards | Create contract | **dead** — same |
+| Purchase Orders | Create PO | **dead** — same |
+| Invoices & 3-Way Match | Upload invoice | **dead** — `Cannot set properties of null (setting 'innerHTML')` |
+| Document Vault | Upload document | **dead** — `classList` |
+| Vendor Registry | Register vendor | **dead** — `classList` |
+| Command Centre | New record | works |
+| Receiving & Inspection | Record GRN | works |
+| Reports Vault | New template | works (honest "not connected" refusal) |
+
+The three that worked are handled by listeners that do not stop the click, so the live runtime still
+received it alongside the stale one.
+
+### Phase 1 — result on dev
+
+Staff portal `b89e968` deployed to dev (stamp `20260912-202541`, container healthy, 0 restarts; the served
+procurement layout chunk changed from `layout-11f13d9d…` to `layout-bb126c38…`).
+
+| Suite | Before (`61e756f`) | After (`b89e968`) |
+|---|---|---|
+| `procurement-v23-ai-capture.mjs`, starting on Invoices | 12/13 — Capture this invoice opened nothing | **13/13** |
+| `procurement-v23-sidebar-nav.mjs`, Procurement Manager from Vendors | 9/17 pages, 3/11 openers | **17/17 pages, 11/11 openers, no page errors** |
+
+On the after run the capture form opened on the order chosen on AI Invoice Capture
+(`PO_20260912_0008 · UAT P2P Office Supplies Ltd`) with that order's two lines, the invoice date
+2026-09-08 carried from the PDF, and the unit prices left alone with the reason stated — the PDF's three
+lines do not line up with the order's two. The reading was filed as `VIN-2026-0005`.
+
+**Exit criterion met.**
+
+### Phase 2 — regression suites on dev (`b89e968`)
+
+Dataset rebuilt first (`PO_20260912_0009` → `INV_20260912_0004`); mail guard on throughout.
+
+| Suite | Result |
+|---|---|
+| `procurement-v23-actions.mjs` | **17/17** verified through the API |
+| `procurement-v23-workflows.mjs` (W1–W9, N1–N4) | **15/15** verified through the API |
+| `procurement-v23-ai-capture.mjs` | **13/13** |
+
+**Exit criterion met: 45/45.** W5 approved `INV_20260912_0006` while its match was still
+`AWAITING_RECEIPT` — the current behaviour for the open product decision (§7.1 of the handoff: block,
+require a reason, or allow). Nothing was changed; it is recorded so the decision is made knowingly.
+
+### Phase 3 — navigation as every role (sidebar-nav, `b89e968`)
+
+| Persona | Pages | Openers |
+|---|---|---|
+| Procurement Manager | 17/17 | 11/11 |
+| Procurement Officer | 16/16 | 12/12 |
+| Buyer | 16/16 | 12/12 |
+| Operations member (requester) | 3/3 | 1/1 |
+| Operations head | 3/3 | — (no create-style button on its pages) |
+| Accountant | 13/13 | 10/10 |
+| Finance Manager | 17/17 | 11/11 |
+| Internal Auditor | 17/17 | 11/11 |
+| System Administrator | **cannot sign in on dev** | |
+| Chief Financial Officer | **cannot sign in on dev** | |
+
+Every page, for every persona that signs in, opened from the sidebar, stayed, and kept the address bar in
+step, with no page errors. `perf.sysadmin` and `payroll.cfo` both answer 401 "Invalid credentials" to the
+shared test password that every seed script sets, so both passwords were changed on dev outside the seeds.
+Neither was reset: other modules' UAT signs in as the same accounts.
+
+**A second defect behind the green numbers — grants missing for 4–5 s after every navigation.** "Does
+something" counted a form as a pass, but several forms opened for roles that cannot use them, and the
+same role got different answers from the same button:
+
+- Finance Manager: **Create tender** opened a form on Tenders & RFx, and then, from Quotation Comparison,
+  the same action was refused ("Your role does not have permission for creating tenders and RFQs").
+- Internal Auditor: Create tender, Create RFQ, Register vendor, Create contract and Upload document all
+  opened forms.
+- Buyer (no `intake.manage`): Upload invoice moved them onto AI Invoice Capture instead of refusing.
+
+Measured on dev as the Procurement Manager (no `intake.manage`): after a sidebar navigation the host had no
+grants for **4.5 s**. "Upload invoice" clicked in that window opened AI Invoice Capture; clicked after it,
+it was refused. The cause is the same remount as D1: every navigation starts a new host with no live
+payload, so the host's opener refusals (`refusedOpener`) and the runtime's page grants had nothing to check
+against, and every page briefly rendered with no records.
+
+**Fix — nvccz-new `74aa990`.** The host keeps the last live payload at module scope with the auth token it
+was loaded under, shows it at once on a new mount when the token matches (grants included), and refreshes
+straight away. The sidebar-nav suite now also reads each role's grants from the API — not from the page —
+and fails a gated opener that opens for a role without the grant, or is refused to a role that holds it.
+
+**Found in passing, no change:** "New requisition" opens its form for every role, including the Buyer, which
+holds no requisition-create grant. It is not one of the host's gated openers; whether any employee may
+raise a requisition is a product rule, so it is noted rather than changed.
+
+### Phase 4 — storyline step 6, the vendor portal, end to end
+
+Not verified before this cycle; the P2P flow submits quotations through the public API route, never the page.
+Driven in a real browser on dev (the RFQ link is minted inside `arcus-dev-api-1`, so the signing secret
+never left the container; mail guard on):
+
+| Check | Result |
+|---|---|
+| Procurement Officer sends an RFQ for `REQ_20260912_0017` to UAT P2P Office Supplies Ltd | `RFQ_20260912_0012` (201) |
+| The vendor's link opens on `dev.vendor.matanho.com/vendor-quotations/rfq-respond` | 200, "Submit Quotation to Arcus", names the RFQ |
+| Vendor fills company, contact, email, phone, the line, delivery time and a validity date; submits | the portal confirms; subtotal 227.50 |
+| The quotation exists through the API | **`QUO_20260912_0025` SUBMITTED, 262.76** (227.50 + VAT) |
+
+**Two low-severity defects on the vendor page, neither blocking a submission:**
+- **A page error on every vendor page:** `Unexpected token '<'`. `<Analytics />` in the root layout injects
+  `/_vercel/insights/script.js`; off Vercel that path does not exist, the vendor portal's middleware
+  redirects every unknown path to `/vendor-portal` (307), and the browser runs that HTML page as a script.
+  Traced with the redirect chain: `307 /_vercel/insights/script.js → 200 /vendor-portal`. The other
+  portals whose middleware redirects unknown paths (lp, investee, apply, events) will do the same. The fix
+  is in shared code (`middleware.ts` or the root layout), so it was handed off rather than changed here.
+- **The page decodes the wrong half of the token.** It reads `token.split('.')[1]` — the HMAC signature —
+  as the payload, logs "Error decoding token", and never sets `requisitionId`. The server verifies the token
+  itself and ignores the field, so submissions still land.
+
+### Phase 4 — storyline step 12, AI capture saved and compared with the PDF
+
+The AI capture suite never saves. To check the saved invoice against the PDF, a purchase order whose three
+lines match `test-invoice.pdf` was raised first through the API (`REQ_20260912_0030` → `PO_20260912_0016`,
+UAT P2P Stationery World, SENT, 607.53). Then, in the browser as the Accountant, starting on Invoices:
+
+| Check | Result |
+|---|---|
+| Upload the PDF, choose `PO_20260912_0016`, read | 98% confidence, filed as `VIN-2026-0006` |
+| Capture this invoice opens on that order | yes |
+| Invoice date, unit prices and quantities prefilled from the PDF | 2026-09-08 · 6.50, 14.25, 3.80 · 40, 12, 25 |
+| Save | no page errors |
+| Saved invoice (API) | **`INV_20260908_0001` DRAFT, 40×6.50, 12×14.25, 25×3.80, subtotal 526.00, total 607.53** |
+
+The script's "success message" check read the first toast on screen, which was still the earlier "Read 3
+lines…" message; the saved record is the evidence. **Note for the product owner:** the invoice was numbered
+from its invoice date (`INV_20260908_…`), not the day it was captured (`INV_20260912_…`), so a late invoice
+lands in an old date's series.
+
+### Phase 5 — demo polish: what was fixed, and what is a decision
+
+| Item | Outcome |
+|---|---|
+| **Contract value `$3,409,800`** | Stale figure from the earlier screen capture; the card read **$22,684** on dev. It is a live figure, but it summed every register row — two terminated contracts, and each terminated contract's award again as an award awaiting a contract. **Fixed, nvccz-new `9ac9e73`:** active contracts plus awards awaiting a contract, and the card says so. |
+| **Tax alerts `18`** | Real. All 19 POs on dev belong to the three UAT P2P vendors, none of which has a tax clearance date on file, so each attracts withholding. For a demo, give the vendors clearance dates — a data fix, not code. |
+| **Approval Centre "Approval queue" twice** | Decision owed (handoff §7.2). On My approvals the same prompts render as the card grid and again as the queue table; Group queue is every prompt, decided ones included. Not changed. |
+| **Invoices & 3-Way Match asks for a tender first** | Kept. The page-head buttons (Upload invoice, Capture invoice, Record payment, AI invoice capture) work without choosing one; the demo path reaches AI Invoice Capture from the sidebar. |
+| **Reports Vault and Audit & Compliance mostly "—"** | Each dash states its reason ("No live source for this figure yet"). Acceptable if said out loud in the demo; hiding them is a design decision. |
+| **Not built** — eSignature, vendor messaging, withholding tax, asset transfers, evaluation committees, report schedules, budget enforcement, reminder automation | All refuse honestly. Keep them out of the demo script. |
+| **Demo data** | Records on dev are named "UAT P2P …" / "UAT WF …". Replacing them with a clean realistic set means deleting test records on dev — **needs the owner's go-ahead**, so not done. |
+
+### Grants after the fix (`74aa990`)
+
+The sidebar-nav suite now reads each role's grants from the API and fails a gated opener that opens for a
+role without the grant, or is refused to a role holding it (nvccz-new `8aee3cc`). On dev `74aa990`, starting
+on Vendors:
+
+| Persona | Pages | Openers | Grant checks |
+|---|---|---|---|
+| Finance Manager | 17/17 | 11/11 | 9/9 — Create tender now refused on both pages that offer it |
+| Buyer | 16/16 | 12/12 | 9/9 — Upload invoice now refused |
+| Procurement Manager | 17/17 | 11/11 | all pass |
+| Internal Auditor | 17/17 | 12/12 | all pass — plan, tender, contract, PO, GRN, invoice, document and vendor openers all refused |
+
+(The Auditor's first run timed out on a slow load and passed on the rerun.)
+
+### Found while walking the storyline — two defects behind steps 15 and 18
+
+**Step 18 — the Internal Auditor's trail had no plans, contracts, documents or vendor submissions.**
+`GET /procurement/audit-events` reads `audit_logs` filtered to a list of entity types. The registers and AI
+capture had been writing rows since they shipped — on dev in 36 hours, 38 `ProcurementPlan`, 11
+`ProcurementContract`, 7 `ProcurementDocument`, 6 `VendorInvoiceIntake` — but none of those types was in the
+list. And a quotation submitted through the vendor's link wrote no row at all (only approve, reject and score
+existed for quotations). **Fix — nvccz `0567a73`:** the four types are listed and labelled by business
+number; the portal submission writes `SUBMIT` naming the vendor as actor (a failed audit write is logged and
+never fails the submission); the trail falls back to that name when there is no user. nvccz-new `4995f5e`
+names the new types on Audit & Compliance.
+
+**Step 15 — posting a journal from Accounts did nothing, on dev and on production.** The Post item (in the
+journal row's actions menu) sends `PATCH /accounting/journal-entries/:id/post`, and the browser never sent it:
+the preflight answered `Access-Control-Allow-Methods: GET,OPTIONS,PUT,POST,DELETE`. The API's own `cors()`
+allows PATCH; the header comes from the Traefik CORS middleware in our compose files, which omitted it.
+Read-only preflights confirmed the same header on `dev-api.matanho.com` and `api.nvccz.online`. In procurement,
+journal posting is the only live PATCH (the document-status client call has no UI caller). **Fix — nvccz-new
+`bb21fd2`:** PATCH added to both `deploy/arcus/docker-compose.dev.yml` and `deploy/nvccz/docker-compose.prod.yml`.
+The staff deploys copy those files onto the server; the live files were diffed first and differ from the repo
+copies only by this line. Traefik reads labels when the API container is created, so each API is recreated
+after its staff deploy.
+
+**Audit trail — verified on dev (API `0567a73`, `db:migrate:all` 142 ok / 0 failed, IMAGE_MATCH, DEV_API_OK).**
+Read as the Internal Auditor:
+
+| Record | In the trail now |
+|---|---|
+| Plan `APP-2026-007` | CREATE, UPDATE, SUBMIT by Proc Manager; **APPROVE by Payroll FinanceManager** |
+| Contract `CTR-2026-0004` | CREATE, APPROVE (activation), UPDATE (termination) by Proc Manager |
+| Vault document "UAT P2P tender pack" | CREATE and UPDATE (new version) by Proc Officer |
+| AI capture reading `VIN-2026-0006` | UPDATE by Proc Payables |
+| Quotation `QUO_20260912_0026`, submitted through the vendor portal after the fix (`RFQ_20260912_0013`) | **SUBMIT by "UAT P2P Office Supplies Ltd (vendor portal)"** |
+
+`QUO_20260912_0025`, submitted before the fix, has no row — nothing was written at the time, and nothing is
+back-filled.
+
+**Deploying on a flaky link.** Two staff deploys and one vendor-portal walk died mid-run with the VPS healthy
+and idle (load 0.17, 25 GB free): `EOFError` inside the 45 MB `sftp.put`, `ConnectionResetError` on HTTPS.
+The walk had in fact submitted `QUO_20260912_0026` before its last API check was reset, so it was not re-run.
+The staff deploy was re-run through `deploy_dev_staff_resilient.py` (scratchpad): the same packing and remote
+build script, with a resumable, sha256-checked upload and the build detached on the server so a dropped session
+cannot kill it.
+
+### Test → fix → deploy loop, 13 September 2026 (dev only)
+
+Each round: run the suites and the storyline on dev, read the report, fix, commit, deploy from a clean worktree
+at the SHA, run again. Production was not touched (API `09a19ad`, staff `2a36e93`); the mail guard stayed on.
+
+| Round | What the run found | Fix |
+|---|---|---|
+| 1 — storyline step 3 | A requisition carried one line; the form had no way to add another. | nvccz-new `dc10b9b`: Add line / Remove last line, total recalculated, every line saved. |
+| 1 — storyline step 7 | Every requisition raised from the UI was sourced as TECHNOLOGY without anyone choosing it (the Category select defaulted to it), and the API then refused the RFQ to any Office Supplies vendor: "category does not match this requisition sourcing category". | nvccz-new `166e38f`: the requester chooses the category; the RFQ builder takes it from the requisition and lists the vendors registered in it. |
+| 2 — actions suite, as the requester | The category list was built from vendors, which a requester cannot read, so it was empty. New requisition also showed the fixture "Matanho Holdings" and "IT & Digital / CC-1001", neither of which is saved. | nvccz-new `3f368d2`: one shared category list for every role and form (requisition, vendor, RFQ); entity and department are the organisation and the requester's own department, read-only. |
+| 3 — storyline step 18 | A contract raised from an award had a value of 0: the award read the quotation's price, which is sealed on a public RFQ, even after the award. | nvccz `877d469`: prices are no longer sealed once the RFQ is awarded, closed, cancelled or completed. nvccz-new `14f0793`: the award's value falls back to the purchase order total. |
+| 3 — storyline step 9 | Technical scores being typed were wiped a few seconds after the page opened: the fresh load redrew the page even when nothing had changed. The RFQ builder opened with no vendor selected. | nvccz-new `6d0baf3`: an identical payload no longer redraws; the builder opens on the vendors that can be invited. |
+| 4 — census (every page and form, as proc.mgr) | Fixture data still in a live session: Preview vendor form named "TechNova Solutions", a 1,280,000 bid, 12 weeks and 36 months against TN-2026-014; the Create tender / RFx, Edit record, Build procurement report, access request and letterhead selects offered Matanho Holdings, Matanho Capital Management, Kariba Agro Limited, Lumina Health Group, Kudu Logistics and Nyanga Hospitality; a record with no owner showed "Group Procurement". | nvccz-new `29346b6`: the runtime's entity list is replaced in place on hydrate with "All entities" and the organisation, so all twenty selects that read it are covered; letterhead choices name the organisation; the bid preview shows what the vendor fills in, with nothing invented. |
+| 5 — census text, second pass | More sample content reachable in a live session: Create eSignature Envelope prefilled signer "Tendai Moyo · CEO"; Delegate approval offered "Rudo Ndlovu", "Tinashe Chaka · CFO" and "Tendai Moyo · CEO"; Send document prefilled `approver@matanho.co.zw`; the staff preview of the vendor form offered "Submit to Matanho"; the Document Vault gained two sample vendor submissions (DOC-00201 "GreenGrid Energy · ITF263 Tax Clearance FY2026") whenever the organisation had no Vendor Submissions folder. The browser tab read "Matanho Procurement & Tender Management - V23". Register vendor prefilled the internal owner "Nyasha Moyo \| Group Procurement". Both Send document forms prefilled `procurement.approver@matanho.africa` and announced "Document sent" with no mail backend. Preview on a contract, a purchase order or an award report showed a blank document headed "[object Object] \| v1.0 \| Draft": five handlers passed the document itself to a lookup by id. | nvccz-new `460932b`: the tab reads "Procurement & Tender Management". `b0d330a`: eSignature, delegation, send-by-email and the vendor form preview are refused before their forms open (none has a backend; their final steps were already refused); the vault no longer receives sample submissions. `4c4663c`: a passed document is shown as it is, so those previews carry the contract, order or award; no sample internal owner; both Send document openers refused. |
+| 6 — census, Reports | "Manage all templates" showed the Report Templates folder for a moment and then the Document Vault root. Every route change remounts the module, and the new runtime started without the folder the old one had set; the same held for a vendor, an evaluation tender, an invoice match tender, a quotation tender, an approvals tab and an analytics drill-down opened from another page. | nvccz-new `121413d`: the navigation hook keeps the destination page's own sub-view and the next runtime opens on it. Verified on dev: the folder stays open at 0.3 s, 2 s and 5 s; the sidebar still opens Document Vault at its root. |
+| 7 — census, Procurement Officer | Send vendor communication offered the sample records TN-2026-014, PO-2026-0584 and CTR-2026-081 as the related record; Request vendor documents proposed a due date already past (5 Aug 2026). Both final steps were already refused. | nvccz-new `07ddece`: Message and Request docs are refused before their forms open, saying vendor messaging is not connected. Verified on dev: each raises its message and opens no form. |
+| 4 — census problem list | 17 lines. Probed one by one in a real browser (read-only): 13 were the census itself. A control inside a modal was located page-wide, so Delegate and Preview aimed at the covered button behind the modal and timed out; a refusal toast identical to one still showing was not counted (Run now); the click's own scroll closed the row actions menu it had just opened; tabs that were already selected (Journal queue, Approver queue, My approvals) were reported as dead. The other 4 are expected: Command Centre clicked while on it, Clear with no filter set, a status select inside a form, and Preview tender pack on an empty form (the browser's own required-field bubble). | nvccz-new `8714851`: the census scopes a control to its modal or drawer, counts toasts, scrolls before clicking, and reports "already selected". |
+
+**Verified on dev `6d0baf3` / API `877d469`:** actions 17/17, workflows 15/15, AI capture 13/13, sidebar
+navigation 8/8 roles (every page and every gated opener), storyline 20/20 (plan to audit trail, as the people who
+do each step, including the vendor's own portal submission).
+
+**Verified on dev `4c4663c` / API `877d469` (after rounds 4 and 5):** dataset rebuilt through the API (58 mails
+held by the guard), actions 17/17, workflows 15/15, AI capture 13/13, sidebar navigation 8/8 roles, storyline 20/20.
+Checked by hand in a browser: Create tender offers only the organisation; Preview vendor form invents nothing and
+offers only Close; a contract preview carries its own agreement (`CTR-2026-0010`); the tab reads "Procurement &
+Tender Management"; Edit default letterhead opens in 81 ms; no page errors.
+
+**Verified on dev `121413d` (after round 6):** dataset rebuilt (58 mails held), actions 17/17, workflows 15/15,
+AI capture 13/13, sidebar navigation 8/8 roles on the first pass, storyline 20/20.
+
+**Verified on dev `8a81936` and `5072202` (rounds 7–8, the Approval Centre fix, accounting Payables and the polish):**
+- In a browser, 15/15 on each build: the Approval Centre renders for the Procurement Manager and Finance Manager
+  with decision cards that carry Approve, and all open approvals with who they wait on; accounting Payables shows
+  procurement's orders, open RFQs and supplier bills and no sample record; no page errors.
+- Regression on `8a81936`: actions 17/17, workflows 14/15 (W8's race, then 1/1 once fixed in `f7cd03c`), AI
+  capture 13/13, sidebar navigation 8/8 roles on the first pass. The storyline's step 14 timed out waiting for the
+  page while `5072202` was being swapped in; it is re-run on its own below.
+- After each run the cleanup removed what the suites had created (on that run: 4 vendors, 13 requisitions, 5 RFQs,
+  10 quotations, 8 purchase orders, 4 GRNs, 3 invoices, 1 reading, 3 plans, 2 contracts, 2 documents, 1 cashbook
+  entry and 2 journals, with 125 audit rows), and the demo integrity check read 17/17.
+- On `5072202`, with the test dataset rebuilt first: **storyline 20/20** (step 14, AI capture, passes: its earlier
+  timeout was the container swap). Cleanup, then demo integrity 17/17.
+
+**Census on `5072202` — Accounts Payable, Finance Manager, Internal Auditor** (the last three roles; it never clicks a
+live write, and the demo integrity check read 17/17 before and after it):
+- **Document Vault, Accounts Payable — real.** Preview, Download PDF, Edit document and Upload new version on the RFQ
+  pack threw `Cannot read properties of undefined (reading 'id')`. A document of a recognised type (tender pack,
+  annual plan…) was rebuilt by `generatedDocumentV11` from its related record, which looks the tender up, and a role
+  that cannot see RFQs has none; where it did not throw, an uploaded document was shown generated text instead of its
+  stored file. **Fix — nvccz-new `e393b63`:** in a live session a document with a stored file previews as it was filed.
+  Verified on dev `e393b63` as Accounts Payable and the Procurement Manager: the RFQ pack's preview shows its folder,
+  version and related record (`RFQ_20260808_0001`), an "Open the stored file" link to the uploaded PDF, and the
+  organisation's letterhead from the company profile; Download PDF, Edit document and Upload new version raise no
+  error. (The check first reported the link missing: it read only the first 300 characters of the preview, and the
+  link sits at 378.) On the same build the Approval Centre and Payables checks read 15/15 and demo integrity 17/17.
+- **Vendor Registry "Vendor portal" could not be clicked (all three) — not a defect.** The button is visible and
+  clickable (a trial click passes; it raises the not-connected refusal); the census's previous refusal toast, shown
+  top-right, covered the page-head button for a few seconds.
+- Expected, as before: Command Centre clicked while on it, Clear with no filter set, a status select inside a form.
+
+The Procurement Manager's first sidebar-navigation run timed out on AI Invoice Capture and passed 17/17 on the
+rerun. The suite read the sidebar before the role's grants had loaded: until they land (a few seconds on a cold
+first load) every page is listed, and AI Invoice Capture then disappears for a role without the grant. The suite
+now waits for the grants (nvccz-new, next commit). A person sees the same brief flash on a cold first load only;
+later navigations reuse the loaded grants.
+
+**Seen, not changed:**
+- ~~No company profile on dev~~ — set up; see the next section.
+- ~~Group queue repeats My approvals~~ — redesigned; see the next section.
+- **perf.sysadmin and payroll.cfo cannot sign in on dev.** Their passwords were not reset for this cycle; the
+  eight other roles cover the storyline.
+- The only other failed request on every page is `/_vercel/insights/script.js` (dev is not hosted on Vercel).
+
+### Dev data, company profile, Approval Centre and accounting — 13 September 2026 (owner's instruction, dev only)
+
+The owner asked for the Group queue to be fixed, a company profile, the dev data cleaned and replaced with realistic
+data, and procurement tested together with accounting. Production was not touched.
+
+**Backup first.** `arcus_dev` was dumped before anything was deleted:
+`/var/www/projects/arcus/backups/arcus_dev-20260913-063341-pre-procurement-cleanup.sql.gz` (gzip integrity checked).
+
+**Test data removed.** Every procurement record on dev was test data. Removed in one transaction, children first, with
+the accounting postings they had created: 11 vendors, 116 requisitions, 45 RFQs, 92 quotations, 67 purchase orders,
+32 GRNs (52 lines), 33 invoices, 16 AI capture readings, 25 plans, 14 contracts, 16 vault documents, 14 cashbook
+entries, 28 journal entries, and the 1,045 audit rows about them. Nothing outside procurement pointed at those rows
+(expenses, sales invoices, statements, reconciliations, contra entries and fund disbursements were all checked first).
+
+**Company profile and people.** The profile names Matanho Investment Management (Private) Limited, procurement@matanho.com,
+matanho.com and the Harare head office, so letterheads carry it. Registration and tax numbers are left empty on purpose:
+they must come from the organisation, not be invented. The eight demo personas keep their logins and now show realistic
+names (Procurement Manager Tafadzwa Moyo, Procurement Officer Rumbidzai Chikwanha, Buyer Tinotenda Marufu, Requester
+Kudakwashe Ncube, Accounts Payable Chipo Mlambo, Operations head Farai Mutasa, Finance Manager Blessing Sibanda,
+Internal Auditor Rutendo Dube) instead of "Proc Manager" and "Payroll FinanceManager".
+
+**Demo dataset, built through the API** as the person who does each step, with the mail guard on:
+- 9 fictional vendors in five categories (example.com mailboxes), with realistic tax clearance dates — one expiring in 12 days.
+  The API refused a vendor with an expired clearance, a real rule, so none is seeded that way.
+- FY 2026 Operations plan approved by Finance; FY 2027 plan submitted and waiting on Finance.
+- Laptops: requisition → RFQ (2 bids, scored) → award → PO → GRN accepted → invoice approved → paid; the expense journal
+  posted to the ledger.
+- Stationery: received; the invoice waits on Finance. Generator and HVAC maintenance: PO open, 12-month contract active.
+- Boardroom furniture: the receipt waits on inspection. Network upgrade: two scored bids, award waiting on the Procurement
+  Manager. Welcome packs: RFQ open, no bids yet.
+- Requisitions in every other state: approved awaiting sourcing, two pending approval, a draft, one rejected with a reason.
+- Three vault documents (plan and maintenance agreement approved, RFQ pack under review).
+
+It was then spread over the past four months in business order — 51 records and their 86 audit rows — and dated
+documents renumbered to their day (`REQ_20260913_0001` → `REQ_20260806_0001`), with the 71 copies of those numbers
+(quotations, contract, journals, cashbook entry, vault document, audit values) following. The API's next number for a
+day is one past the highest suffix for that day, so numbering is unaffected.
+
+The tooling is in `scripts/procurement-ops/dev-data/` (nvccz-new `bba6bda`, `aa76463`) with a README: inventory,
+cleanup (test-named records by default, `--all` to rebuild from nothing), profile and personas, dataset, backdating.
+
+**Approval Centre** (nvccz-new `3c80409`, `4f9c686`). "Awaiting me" is a grid of decision cards, oldest first, with
+Review, Approve and Reject on each card; "All open approvals" is a table of every requisition, award, receipt, invoice
+and plan still open in the registers the role can read, with who it waits on and for how long. The KPIs count the same
+records. The eSignature and Delegations tabs (sample envelopes and people, no backend) are gone from a live session.
+
+**The redesign took the Approval Centre down on dev, and why no check caught it.** On `bba6bda` the page showed
+Next's "Application error": `ReferenceError: smallAction is not defined`. The bridge runs at the runtime's top level,
+and `smallAction` and `actionV6` are declared inside its V5/V6 layers, so the new renderer could not reach them. The
+runtime passed `node --check` and the patch script, because both only look at syntax; the regression had just started
+and was stopped (its test records were cleaned). **Fix — nvccz-new `8a81936`:** the bridge renders its own buttons
+with the same markup, and the patch script now refuses to write a runtime whose bridge calls a helper declared only
+inside a layer. Run against the crashed build's runtime, the guard names exactly `smallAction` and `actionV6`; against
+the fixed one, nothing.
+
+Two more things surfaced while stopping that run. Stopping its background task did not stop its child processes: the
+shell scripts and `node` suites kept running for another quarter of an hour, created test records, and workflows W7
+terminated the demo's maintenance contract (it took the first active contract). The processes were found by command
+line and killed, the test records cleaned, and the contract restored to active with the termination's audit row
+removed; the demo integrity check (`scripts/procurement-ops/dev-data/demo_integrity.mjs`) caught it and reads 17/17
+again. And the UAT-only patterns added to the suites in `aa76463` held a literal backspace byte where a word boundary
+was meant (the backslash was lost on the way into the files), so they could never match. **Fix — nvccz-new
+`5334700`:** real word boundaries, checked against UAT and demo names; W7 terminates only a contract the suites
+created.
+
+On the regression run against `8a81936` workflows W8 failed once: it read its plan straight after clicking Submit,
+while the "Line added" toast was still on screen, and saw REJECTED; the plan was SUBMITTED a second later (the API
+shows it updated at that moment, and no other plan changed). A race in the suite, not the module. **Fix — nvccz-new
+`f7cd03c`:** the step polls the plan's status for up to 20 seconds.
+
+**Suites kept off the demo** (nvccz-new `aa76463`). Several steps took the first record in a state — the first draft
+invoice, the first receipt waiting on inspection, the first vault document, any submitted plan, the second order in AI
+capture's list — which on dev are now demo records. Each takes a UAT record, arranging one where it did before. After a
+regression run, the cleanup removes what the suites created and leaves the demo.
+
+**Procurement and accounting, checked as the Finance Manager:**
+
+| Accounting page | What it shows of procurement |
+|---|---|
+| Journal Entries, General Ledger | The laptop invoice's posted expense journal (`EXP-…-INV_20260822_0001`) and its bank payment (`CB-2BGSVFW9`), USD 11,577.72 — correct. |
+| Payables & Payments | **Was wrong.** Open commitments USD 118,600 and a sourcing pipeline of USD 1,988,000 across "3 active RFQs", with the Purchase orders and Quotations & sourcing tabs listing TechNova Solutions, AfriCloud Infrastructure and other sample records: the page read the runtime's own arrays, which nothing replaced. Procurement's supplier invoices did not appear at all (the page read only accounting's purchase-invoice bills). **Fixed — nvccz-new `a44bed9`, verified in a browser on dev `8a81936` (15/15 checks: no sample commitments, pipeline or vendors; the Purchase orders, Quotations & sourcing and Supplier bills tabs show procurement's records; no page errors), polished in `63b7ca7` (a bill is referenced by its invoice number; the date filter covers the last 90 days):** the loader reads procurement's orders, RFQs, quotations and invoices; the Purchase orders tab, open commitments and the pipeline come from them; procurement invoices sit beside accounting's bills (awaiting approval reads Review, approved reads Approved, paid reads Paid); the Sourcing intelligence figures are counted from the RFQs beside them. A role without procurement access sees none (a 403 is not an error). |
+| Cash & Liquidity | Cash at bank is computed from posted journal lines (dev's bank shows a net credit). The register lists cashbook batches only, so a procurement payment — a single cashbook entry — is not listed there. Not changed. |
+
+**Decision owed (accounting policy).** A procurement invoice reaches the ledger only when it is paid:
+`ProcurementService.approveProcurementInvoice` posts nothing ("accounting entries will be created when invoice is
+PAID"), and payment posts the expense (Dr expense and VAT, Cr AP) and the bank payment (Dr AP, Cr bank) together. So an
+approved, unpaid supplier invoice is not a liability in the general ledger, trial balance or balance sheet. The platform
+already has an accrual path — accounting bills (`PurchaseInvoice`, `POST /procurement/purchase-orders/:id/convert-to-bill`,
+and AI capture's intake-to-bill). Recommendation: recognise the bill when Finance approves the invoice and settle it at
+payment. That changes what is posted and when, so it needs the accountant's sign-off before it is built.
 
 ---
 

@@ -29,10 +29,31 @@ const WAIT = Number(process.env.UAT_EXTRACT_TIMEOUT_MS || 180000)
 const LOAD = Number(process.env.UAT_LOAD_TIMEOUT_MS || 90000)
 
 if (!PDF || !fs.existsSync(PDF)) {
-  console.error("Pass the path to a PDF invoice as the first argument.")
+  console.error("Pass the path to an invoice (a PDF, a scan or a photo) as the first argument.")
   process.exit(1)
 }
 fs.mkdirSync(OUT, { recursive: true })
+
+// What a correct reading of this file shows. The fixtures under fixtures/invoices carry their truth in truth.json; the
+// original fixture's values are the default. Checks hard-coded to the original failed every other invoice.
+const money2 = (n) => `$${Number(n).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+const escapeRe = (s) => String(s).replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+const TRUTH = (() => {
+  try {
+    return JSON.parse(fs.readFileSync(path.join(path.dirname(PDF), "truth.json"), "utf8"))[path.basename(PDF)] ?? null
+  } catch {
+    return null
+  }
+})()
+const EXPECT = TRUTH
+  ? {
+      invoiceNumber: TRUTH.invoiceNumber,
+      lineText: TRUTH.lines[0].description,
+      cents: [money2(TRUTH.lines[0].unitPrice), money2(TRUTH.lines[0].lineTotal)],
+      date: TRUTH.invoiceDate,
+      ocr: !/text PDF/i.test(TRUTH.kind),
+    }
+  : { invoiceNumber: "INV-SW-4471", lineText: "A4 Bond Paper", cents: ["$6.50", "$260.00"], date: "2026-09-08", ocr: false }
 
 const results = []
 const record = (name, ok, detail) => {
@@ -48,7 +69,10 @@ try {
   const errors = []
   page.on("pageerror", (e) => errors.push(String(e.message || e)))
 
-  await page.goto(`${BASE}/procurement-v23`, { waitUntil: "domcontentloaded", timeout: LOAD })
+  // Deliberately NOT the dashboard. Opening the page from /procurement is the one route where a
+  // missing path mapping cannot bite, because the host skips the router push when the path already
+  // matches. Cycle six shipped without a path for `intake`, and this test passed anyway.
+  await page.goto(`${BASE}/procurement/invoices`, { waitUntil: "domcontentloaded", timeout: LOAD })
   await page.waitForSelector("#nav .nav-item", { timeout: LOAD })
   await page.waitForTimeout(2500)
 
@@ -60,14 +84,34 @@ try {
   const heading = (await page.locator(".page-head h1").first().textContent())?.trim()
   record("the page opens", heading === "AI Invoice Capture", `heading "${heading}"`)
 
+  // It must still be there a moment later: the router push happens after the runtime renders, so a
+  // wrong path shows the page and then replaces it with the Command Centre.
+  await page.waitForTimeout(4000)
+  const settledHeading = (await page.locator(".page-head h1").first().textContent())?.trim()
+  const url = page.url()
+  record(
+    "it stays open, and the address bar follows it",
+    settledHeading === "AI Invoice Capture" && /\/procurement\/intake$/.test(url),
+    `heading "${settledHeading}" at ${url.replace(/^https?:\/\/[^/]+/, "")}`,
+  )
+
   const emptyState = (await page.locator("#aiInvoiceResultV23").textContent())?.trim() || ""
   record("honest empty state before any upload", /Nothing read yet/i.test(emptyState), emptyState.slice(0, 80))
 
+  // Live data arrives after the page first paints, and the runtime re-renders when it does, which
+  // clears anything already typed or chosen. Wait for the orders to land before touching the form,
+  // the way a person waits for a page to finish loading.
+  await page
+    .waitForFunction(() => document.querySelectorAll("#aiInvoicePoV23 option").length > 1, null, { timeout: 60000 })
+    .catch(() => {})
   const poOptions = await page.locator("#aiInvoicePoV23 option").count()
   record("purchase orders are offered", poOptions > 0, `${poOptions} option(s) incl. the no-PO choice`)
 
   await page.setInputFiles('#aiInvoiceCaptureV23 input[name="document"]', PDF)
-  if (poOptions > 1) await page.locator("#aiInvoicePoV23").selectOption({ index: 1 })
+  // A UAT vendor's order only. Dev also carries the demo dataset, and a reading filed against a demo order would stay in it;
+  // with no UAT order offered the invoice is read without one.
+  const testPo = await page.$$eval("#aiInvoicePoV23 option", (os) => os.find((o) => o.value && /\bUAT\b/.test(o.textContent || ""))?.value ?? "")
+  if (testPo) await page.locator("#aiInvoicePoV23").selectOption(testPo)
 
   await page.locator('[data-action="confirm-extract-invoice-v23"]').click()
   await page.waitForFunction(
@@ -78,29 +122,51 @@ try {
   await page.waitForTimeout(1200)
 
   const read = (await page.locator("#aiInvoiceResultV23").textContent())?.trim() || ""
-  record("the invoice number was read", /INV-SW-4471/.test(read), read.match(/INV-[A-Z0-9-]+/)?.[0] || "not found")
+  record("the invoice number was read", new RegExp(escapeRe(EXPECT.invoiceNumber)).test(read), `expected ${EXPECT.invoiceNumber} · ${new RegExp(escapeRe(EXPECT.invoiceNumber)).test(read) ? "found" : "not found"}`)
   record("a confidence figure is shown", /\d+% confidence/.test(read), read.match(/\d+% confidence/)?.[0] || "none")
-  record("invoice lines were read", /A4 Bond Paper/i.test(read), /A4 Bond Paper/i.test(read) ? "line descriptions present" : "no lines")
-  record("the reading was filed", /Filed as VIN-/.test(read) || /Not filed/.test(read), read.match(/Filed as (VIN-[0-9-]+)/)?.[1] || "not filed")
+  record("invoice lines were read", new RegExp(escapeRe(EXPECT.lineText), "i").test(read), `expected "${EXPECT.lineText}"`)
+  // No purchase order is chosen before this reading, so the vendor is unknown and the reading must say it is not kept;
+  // a reading filed without an order, or no word either way, is a failure. (Filing against an order is covered by
+  // procurement-v23-invoice-processing.mjs and procurement-v23-invoice-documents.mjs.)
+  record(
+    "a reading without an order says it is not kept",
+    /Not filed: without a purchase order the vendor is unknown/.test(read) && !/Filed as VIN-/.test(read),
+    read.match(/Filed as (VIN-[0-9-]+)/)?.[1] ? `filed as ${read.match(/Filed as (VIN-[0-9-]+)/)[1]}` : /Not filed/.test(read) ? "not filed, with its reason" : "no filing message",
+  )
   // The runtime's money() rounds to whole dollars, which showed a $6.50 unit price as "$7" on the
   // one screen meant for comparing figures with the PDF.
-  record("amounts are shown to the cent", /\$6\.50/.test(read) && /\$260\.00/.test(read), read.match(/\$[\d,]+\.\d{2}/g)?.slice(0, 4).join(" ") || "no cent amounts found")
+  record("amounts are shown to the cent", EXPECT.cents.every((c) => read.includes(c)), `expected ${EXPECT.cents.join(" and ")} · read ${read.match(/\$[\d,]+\.\d{2}/g)?.slice(0, 4).join(" ") || "no cent amounts"}`)
+  if (EXPECT.ocr) record("a scan or photo is said to be read with OCR", /Read from a scan or photo/i.test(read), /Read from a scan or photo/i.test(read) ? "OCR note shown" : "no OCR note")
 
   await page.screenshot({ path: path.join(OUT, "ai-capture-read.png"), fullPage: true })
 
-  const capture = page.locator('#aiInvoiceResultV23 [data-action="capture-invoice-v5"]')
-  if (await capture.count()) {
-    await capture.first().click()
-    await page.waitForSelector("#invoiceCaptureV23", { timeout: LOAD })
-    await page.waitForTimeout(800)
-    const modal = (await page.locator("#invoiceCaptureV23").textContent())?.trim() || ""
-    const date = await page.locator('#invoiceCaptureV23 [name="invoiceDate"]').inputValue()
-    record("capture form says it was prefilled", /Prefilled from the read invoice/i.test(modal), modal.slice(0, 90))
-    record("the invoice date came from the PDF", date === "2026-09-08", `date "${date}"`)
-    await page.screenshot({ path: path.join(OUT, "ai-capture-prefilled-form.png"), fullPage: true })
+  // SRD §7 Invoice Processing Screen: the document beside the fields, with what was read highlighted on it.
+  const images = await page.locator("#aiInvoiceResultV23 [data-doc-scroll] img").count()
+  record("the document is shown beside the fields", images > 0, `${images} page image(s)`)
+  const boxes = await page.locator("#aiInvoiceResultV23 .pr23-hl").count()
+  record("values read are highlighted on the document", boxes >= 3, `${boxes} highlight(s)`)
+  record("the invoice number is found on the page", (await page.locator('#aiInvoiceResultV23 .pr23-hl[data-hl-field="invoiceNumber"]').count()) > 0)
+  await page.locator('#aiInvoiceResultV23 [data-read-field="invoiceNumber"]').first().hover().catch(() => {})
+  record("hovering a read field lights its box", (await page.locator(".pr23-hl[data-active]").count()) > 0)
+  await page.locator('#aiInvoiceResultV23 [data-doc-zoom="in"]').first().click().catch(() => {})
+  record("the viewer zooms", /125%/.test((await page.locator("#aiInvoiceResultV23 [data-doc-zoom-label]").first().textContent().catch(() => "")) || ""))
+
+  if (testPo) {
+    const form = page.locator("#aiInvoiceResultV23 #invoiceCaptureV23")
+    record("the capture form sits beside the document", (await form.count()) > 0)
+    const text = (await form.first().textContent().catch(() => "")) || ""
+    const date = await page.locator('#aiInvoiceResultV23 #invoiceCaptureV23 [name="invoiceDate"]').inputValue().catch(() => "")
+    record("capture form says it was prefilled", /Prefilled from the read invoice/i.test(text), text.slice(0, 90))
+    record("the invoice date came from the document", date === EXPECT.date, `expected ${EXPECT.date} · date "${date}"`)
+    record(
+      "it offers Save invoice and Flag for review",
+      (await page.locator('#aiInvoiceResultV23 [data-action="confirm-capture-invoice-v5"]').count()) > 0 &&
+        (await page.locator('#aiInvoiceResultV23 [data-action="confirm-capture-flag-invoice-v23"]').count()) > 0,
+    )
   } else {
-    record("capture form opens from the reading", false, "no Capture this invoice button")
+    record("without an order chosen, capture by hand is offered", (await page.locator('#aiInvoiceResultV23 [data-action="capture-invoice-v5"]').count()) > 0)
   }
+  await page.screenshot({ path: path.join(OUT, "ai-capture-processing.png"), fullPage: true })
 
   record("no page errors", errors.length === 0, errors.slice(0, 2).join(" | ") || "none")
 } finally {

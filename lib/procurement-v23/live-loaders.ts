@@ -17,6 +17,7 @@
  *     backend stands behind it — so a live session never shows a demo record as if it were ours.
  */
 import {
+  getApprovalMatrix,
   getCompanyProfile,
   getMyProcurementAccess,
   getProcurementDashboard,
@@ -29,12 +30,17 @@ import {
   listQuotations,
   listRequisitions,
   listRequisitionsAwaitingMyApproval,
+  listRequisitionProjects,
+  listPendingVendorRegistrations,
+  listProcurementCurrencies,
+  listDepartments,
   listRfqs,
   listBanks,
   listProcurementContracts,
   listProcurementDocuments,
   listProcurementPlans,
   listVendors,
+  type ApprovalRoute,
   type ProcurementAccess,
   type ProcurementRecord,
 } from "@/lib/api/procurement-v23-api"
@@ -42,7 +48,8 @@ import { IS_CUSTOM_BRAND, ORG_NAME } from "@/lib/branding"
 
 export type LoaderError = { source: string; message: string; status?: number }
 
-export type LiveKpi = { value: string | number; sub: string }
+/** hidden: the figure belongs to a feature the organisation does not have, so the card is not shown at all. */
+export type LiveKpi = { value: string | number; sub: string; hidden?: boolean }
 
 export type LiveBank = { id: string; name: string; accountNumber: string | null; currencyId: string | null }
 
@@ -60,6 +67,8 @@ export type ProcurementV23LivePayload = {
   navCounts: Record<string, number | null>
   /** Bank and cash accounts a payment can be made from; empty without procurement.invoices.pay. */
   banks?: LiveBank[]
+  currencies?: { code: string; name: string }[]
+  departments?: string[]
   errors: LoaderError[]
 }
 
@@ -91,11 +100,23 @@ const num = (v: unknown): number | null => {
 const sum = (rows: ProcurementRecord[], pick: (r: ProcurementRecord) => unknown): number =>
   rows.reduce((total, r) => total + (num(pick(r)) ?? 0), 0)
 
+// Spelt out: en-GB's short month is "Sept" on newer ICU and "Sep" on older, so one page read two ways side by side.
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+const pad2 = (n: number) => String(n).padStart(2, "0")
+
 function fmtDate(v: unknown): string {
   if (!v) return DASH
   const d = new Date(String(v))
   if (Number.isNaN(d.getTime())) return DASH
-  return d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })
+  return `${pad2(d.getDate())} ${MONTHS[d.getMonth()]} ${d.getFullYear()}`
+}
+
+/** "13 Sep 2026, 14:05" */
+function fmtDateTime(v: unknown): string {
+  const day = fmtDate(v)
+  if (day === DASH) return DASH
+  const d = new Date(String(v))
+  return `${day}, ${pad2(d.getHours())}:${pad2(d.getMinutes())}`
 }
 
 function personName(u: any): string {
@@ -156,7 +177,8 @@ function invoiceStatus(inv: ProcurementRecord): string {
   const s = String(inv.status ?? "").toUpperCase()
   const pay = String(inv.paymentStatus ?? "").toUpperCase()
   if (pay === "PAID" || s === "PAID") return "Paid"
-  if (s === "APPROVED") return "Approved"
+  // An exact match approved without a person says so (SRD §6.6), so nobody believes Finance looked at it.
+  if (s === "APPROVED") return String(inv.approvalSource ?? "").toUpperCase() === "AUTOMATIC" ? "Approved automatically" : "Approved"
   if (s === "REJECTED") return "Blocked"
   if (s === "DRAFT" || s === "PENDING" || s === "PENDING_APPROVAL") return "Pending approval"
   return titleCase(s)
@@ -174,6 +196,7 @@ function matchLabel(v: unknown): string {
 }
 
 function vendorStatus(v: ProcurementRecord): string {
+  if (String(v.registrationStatus ?? "").toUpperCase() === "PENDING_REVIEW") return "Awaiting review"
   if (v.isBlacklisted) return "Blacklisted"
   const tax = String(v.taxComplianceStatus ?? "").toUpperCase()
   // ACTIVE is what the backend sets when a valid ITF263 expiry is on file.
@@ -204,14 +227,49 @@ const NO_BACKEND_YET = [
   "complianceReminderLogV7",
 ] as const
 
+/** "Step 2 of 2 · Finance Manager": the step a requisition waits on, or just who decides a one-step route. */
+function routeStepLabel(route: ApprovalRoute | null | undefined): string | null {
+  if (!route?.waitingOn || route.currentPosition == null) return null
+  return route.totalSteps > 1 ? `Step ${route.currentPosition} of ${route.totalSteps} · ${route.waitingOn.who}` : route.waitingOn.who
+}
+
+/** Where a requisition stands on its route, for the approver deciding it: what is approved, and what follows. */
+function routeSentence(route: ApprovalRoute | null | undefined): string | null {
+  if (!route?.steps?.length) return null
+  const done = route.steps
+    .filter((s) => s.status === "APPROVED")
+    .map((s) => `${s.who} approved it${s.decidedBy ? ` (${s.decidedBy})` : ""}.`)
+  const next = route.steps
+    .filter((s) => s.status === "UPCOMING")
+    .map((s) => (s.aboveAmount != null ? `${s.who}, as it is above ${money(s.aboveAmount)}` : s.who))
+  const after = next.length ? `After this step: ${next.join(", then ")}.` : route.totalSteps > 1 ? "This is the last step." : ""
+  return [...done, after].filter(Boolean).join(" ") || null
+}
+
 export async function loadProcurementV23LiveData(): Promise<ProcurementV23LivePayload> {
   errors.length = 0
 
+  // Who decides a requisition, step by step (Configuration, Approval matrix). Started now, awaited with the rest.
+  const approvalMatrixLoad = safe("approval-matrix", getApprovalMatrix, null)
+  // The projects a requisition can be charged to, for the requisition form.
+  const projectsLoad = safe("requisition-projects", listRequisitionProjects, [] as ProcurementRecord[])
+  // Vendors who registered themselves on the vendor portal and wait for staff review (procurement.vendors.view).
+  const registrationsLoad = safe("vendor-registrations", listPendingVendorRegistrations, [] as ProcurementRecord[])
+  // The currencies set up in Accounting, for the RFQ builder's Currency (it offered ZAR where none exists).
+  const currenciesLoad = safe("currencies", listProcurementCurrencies, [] as ProcurementRecord[])
+  // The org's departments, for the annual plan's Department picker (it was free text) and for an admin
+  // with no department of their own, who still needs to choose one when raising a requisition.
+  const departmentsLoad = safe("departments", listDepartments, [] as ProcurementRecord[])
   const access = await safe<ProcurementAccess | null>("me/access", getMyProcurementAccess, null)
   const accessUnavailable = access === null && errors.some((e) => e.source === "me/access")
   const perms = new Set(access?.permissions ?? [])
   const has = (p: string) => perms.has(`procurement.${p}`)
+  // Whether an empty register means "none exist" or "not yours to see": a KPI that says "No procurement plan has been
+  // approved yet" to Accounts Payable, who cannot read plans, states something false.
+  const plansVisible = has("plans.view") || has("plans.manage") || has("plans.approve")
   const isDeptApprover = access?.departmentRole === "HEAD" || access?.departmentRole === "DEPUTY"
+  // The organisation's requisitions load only for these; anyone else sees just their own.
+  const allRequisitionsVisible = has("requisitions.view") || isDeptApprover
 
   const [
     allRequisitions,
@@ -237,7 +295,9 @@ export async function loadProcurementV23LiveData(): Promise<ProcurementV23LivePa
       : Promise.resolve([] as ProcurementRecord[]),
     // Everyone raises requisitions, so everyone sees their own, drafts included.
     safe("requisitions/my", listMyRequisitions, [] as ProcurementRecord[]),
-    isDeptApprover
+    // Anyone can be an approver on a step of a requisition's route (a department head, a role, a named person), so
+    // everyone asks what waits on them. A privileged role decides every pending requisition, taken from the register.
+    access && !access.isPrivileged
       ? safe("requisitions/pending-approval", listRequisitionsAwaitingMyApproval, [] as ProcurementRecord[])
       : Promise.resolve([] as ProcurementRecord[]),
     has("rfq.view") ? safe("rfq", listRfqs, [] as ProcurementRecord[]) : Promise.resolve([] as ProcurementRecord[]),
@@ -287,14 +347,11 @@ export async function loadProcurementV23LiveData(): Promise<ProcurementV23LivePa
   // ----------------------------------------------------------------- requisitions
   // Requisitions the caller can decide: a department head's own queue, or every pending one for a
   // privileged role. The approver view lists only these, never another department's requests.
-  const decidableIds = new Set(
-    (isDeptApprover
-      ? awaitingMe
-      : access?.isPrivileged
-        ? requisitionRows.filter((r) => String(r.status).toUpperCase() === "PENDING_APPROVAL")
-        : []
-    ).map((r) => r.id),
-  )
+  // Since the approval route is enforced, "mine" means this person approves the step the requisition is at.
+  const pendingForDecision = access?.isPrivileged
+    ? requisitionRows.filter((r) => String(r.status).toUpperCase() === "PENDING_APPROVAL")
+    : awaitingMe
+  const decidableIds = new Set(pendingForDecision.map((r) => r.id))
   const requisitionsView = requisitionRows.map((r) => ({
     id: r.requisitionNumber ?? r.id,
     recordId: r.id,
@@ -309,7 +366,11 @@ export async function loadProcurementV23LiveData(): Promise<ProcurementV23LivePa
     amount: num(r.totalAmount) || null,
     // No budget check exists on the backend; nothing is asserted either way.
     budget: DASH,
-    status: REQUISITION_STATUS[String(r.status).toUpperCase()] ?? titleCase(r.status),
+    // A pending requisition names the step it waits on ("Pending Finance Manager"), not always the department head.
+    status:
+      String(r.status).toUpperCase() === "PENDING_APPROVAL" && (r.approvalRoute as ApprovalRoute | null)?.waitingOn
+        ? `Pending ${(r.approvalRoute as ApprovalRoute).waitingOn!.who}`
+        : REQUISITION_STATUS[String(r.status).toUpperCase()] ?? titleCase(r.status),
     rawStatus: r.status,
     owner: personName(r.requestedBy),
     department: r.department ?? null,
@@ -317,6 +378,12 @@ export async function loadProcurementV23LiveData(): Promise<ProcurementV23LivePa
     requestedById: r.requestedById ?? null,
     // Prefills the requester's edit form with what they wrote, not the runtime's sample motivation.
     justification: r.justification ?? null,
+    // Each step, who decides it, when it applies and who decided it: the requester tracks it, the approver sees it.
+    approvalRoute: (r.approvalRoute as ApprovalRoute | null | undefined) ?? null,
+    createdAt: r.createdAt ?? null,
+    // SRD §7 "Project/Cost Center": the project the requisition is charged to, by id and by name.
+    projectId: r.projectId ?? null,
+    project: r.project?.name ?? null,
     items: (r.items ?? []).map((i: any) => ({ itemName: i.itemName, quantity: num(i.quantity), unit: i.unit ?? null, unitPrice: num(i.unitPrice) || null })),
   }))
 
@@ -326,19 +393,21 @@ export async function loadProcurementV23LiveData(): Promise<ProcurementV23LivePa
     const bids = (quotesByRfq.get(t.procurementRfqId ?? t.id) ?? []).filter((q) => String(q.status).toUpperCase() !== "DRAFT")
     const awarded = bids.some((q) => String(q.status).toUpperCase() === "ACCEPTED")
     const closed = t.closingAt ? new Date(t.closingAt).getTime() < now : false
+    // An RFQ carries no category or estimate of its own; the requisition it was raised from carries both.
+    const source = t.requisitionId ? reqById.get(String(t.requisitionId)) : undefined
     return {
       id: t.rfqNumber ?? t.id,
       recordId: t.procurementRfqId ?? t.id,
       title: t.title ?? DASH,
       entity: departmentOfRequisition(t.requisitionId),
-      category: DASH,
-      // An RFQ carries no estimated value; the quotations carry prices, shown in evaluation.
-      value: null,
+      category: source?.sourcingCategory ? titleCase(source.sourcingCategory) : DASH,
+      // The requester's estimate; the quotations carry the prices, shown in evaluation.
+      value: num(source?.totalAmount) || null,
       stage: awarded ? "Awarded" : bids.length ? "Evaluation" : closed ? "Closed" : "Published",
       close: fmtDate(t.closingAt),
       bids: bids.length,
-      // An RFQ invites named vendors, which is a restricted process unless publicly listed.
-      method: t.visibility === "PUBLIC_LISTING" ? "Open tender" : "Restricted tender",
+      // An RFQ invites named vendors; it is an open tender only when publicly listed.
+      method: t.visibility === "PUBLIC_LISTING" ? "Open tender" : "Request for quotation",
       owner: personName(t.createdBy),
       requisition: t.requisition?.requisitionNumber ?? null,
       rawStatus: t.status,
@@ -347,6 +416,53 @@ export async function loadProcurementV23LiveData(): Promise<ProcurementV23LivePa
   })
 
   // ----------------------------------------------------------------- vendors
+  // SRD §3: each vendor's history — purchase orders, invoices received and those flagged, receipts against the order's
+  // delivery date, and what each item has cost across its orders.
+  const vendorHistory = (vendorId: string) => {
+    const vOrders = orders
+      .filter((o) => o.vendorId === vendorId && String(o.status).toUpperCase() !== "CANCELLED")
+      .sort((a, b) => String(b.orderDate ?? b.createdAt).localeCompare(String(a.orderDate ?? a.createdAt)))
+    const poIds = new Set(vOrders.map((o) => o.id))
+    const vGrns = grns.filter((g) => poIds.has(g.purchaseOrderId ?? g.purchaseOrder?.id))
+    const timed = vGrns.filter((g) => g.receivedDate && g.purchaseOrder?.expectedDeliveryDate)
+    const receiptsOnTime = timed.filter((g) => new Date(g.receivedDate).getTime() <= new Date(g.purchaseOrder.expectedDeliveryDate).getTime()).length
+    const vInvoices = invoices
+      .filter((i) => i.vendorId === vendorId)
+      .sort((a, b) => String(b.invoiceDate ?? b.createdAt).localeCompare(String(a.invoiceDate ?? a.createdAt)))
+    const flagged = (i: any) => (Array.isArray(i.aiDiscrepancies?.flags) && i.aiDiscrepancies.flags.length > 0) || i.ocrData?.comparison?.agrees === false
+    const byItem = new Map<string, { item: string; prices: number[] }>()
+    for (const o of [...vOrders].reverse()) {
+      for (const it of o.items ?? []) {
+        const key = String(it.itemName ?? "").trim().toLowerCase()
+        const price = num(it.unitPrice)
+        if (!key || !price || price <= 0) continue
+        const entry = byItem.get(key) ?? { item: String(it.itemName), prices: [] as number[] }
+        entry.prices.push(price)
+        byItem.set(key, entry)
+      }
+    }
+    return {
+      orders: vOrders.map((o) => ({
+        id: o.poNumber ?? o.id,
+        date: fmtDate(o.orderDate ?? o.createdAt),
+        amount: num(o.totalAmount),
+        status: PO_STATUS[String(o.status).toUpperCase()] ?? titleCase(o.status),
+      })),
+      invoices: vInvoices.map((i) => ({
+        id: i.invoiceNumber ?? i.id,
+        date: fmtDate(i.invoiceDate),
+        amount: num(i.totalAmount),
+        status: invoiceStatus(i),
+        match: matchLabel(i.matchingStatus),
+        flagged: flagged(i),
+        supplierRef: i.ocrData?.supplierInvoiceNumber ?? null,
+      })),
+      receipts: vGrns.length,
+      receiptsTimed: timed.length,
+      receiptsOnTime,
+      items: [...byItem.values()].map((e) => ({ item: e.item, orders: e.prices.length, first: e.prices[0], last: e.prices[e.prices.length - 1] })),
+    }
+  }
   const vendorsView = vendors.map((v) => ({
     id: v.id,
     recordId: v.id,
@@ -365,12 +481,14 @@ export async function loadProcurementV23LiveData(): Promise<ProcurementV23LivePa
     email: v.email ?? DASH,
     contact: v.contactPerson ?? DASH,
     phone: v.phone ?? DASH,
+    address: v.address ?? DASH,
     paymentTerms: v.paymentTerms ?? DASH,
     taxExpiry: v.taxClearanceExpiryDate ? String(v.taxClearanceExpiryDate).slice(0, 10) : null,
     companyProfileDate: null,
     complianceDocs: [],
     whtRate: null,
     isBlacklisted: Boolean(v.isBlacklisted),
+    history: vendorHistory(v.id),
   }))
 
   // ----------------------------------------------------------------- purchase orders
@@ -388,6 +506,12 @@ export async function loadProcurementV23LiveData(): Promise<ProcurementV23LivePa
     asset: false,
     currency: o.currency?.code ?? null,
     requisition: o.requisition?.requisitionNumber ?? null,
+    // What was bought and its category, from the requisition: the invoice match names its sources with it for
+    // roles that cannot open RFQs, and spend by category groups on it.
+    sourceTitle: o.requisition?.title ?? null,
+    spendCategory: o.requisitionId && reqById.get(String(o.requisitionId))?.sourcingCategory
+      ? titleCase(reqById.get(String(o.requisitionId))?.sourcingCategory)
+      : null,
     quotation: o.quotation?.quotationNumber ?? null,
     // The RFQ this order was awarded from, which links it into the invoice match chain.
     rfq: o.quotation?.rfqNumber ?? null,
@@ -429,6 +553,50 @@ export async function loadProcurementV23LiveData(): Promise<ProcurementV23LivePa
   })
 
   // ----------------------------------------------------------------- invoices
+  // What the LLM read from the supplier's document, compared with the invoice as captured (ProcurementInvoiceReadingService).
+  const readingOf = (inv: any) => {
+    const o = inv.ocrData
+    if (!o || typeof o !== "object" || !o.status) {
+      return inv.documentPath ? { status: "PENDING", agrees: null, differences: [] as string[], supplierInvoiceNumber: null, fromOcr: false, message: null } : null
+    }
+    return {
+      status: String(o.status),
+      agrees: typeof o.comparison?.agrees === "boolean" ? o.comparison.agrees : null,
+      differences: Array.isArray(o.comparison?.differences) ? o.comparison.differences.map((d: any) => String(d?.message ?? "")) : ([] as string[]),
+      supplierInvoiceNumber: o.supplierInvoiceNumber ?? null,
+      fromOcr: Boolean(o.fromOcr),
+      message: o.message ?? null,
+    }
+  }
+  const readingSentence = (inv: any) => {
+    const r = readingOf(inv)
+    if (!r) return "No supplier document is attached."
+    if (r.status === "PENDING") return "The supplier's document is being read."
+    if (r.status !== "READ") return `The supplier's document could not be read${r.message ? `: ${r.message}` : ""}.`
+    const ref = r.supplierInvoiceNumber ? ` (supplier's invoice ${r.supplierInvoiceNumber})` : ""
+    return r.agrees
+      ? `The supplier's document${ref} agrees with the captured invoice.`
+      : `The supplier's document${ref} differs from the capture: ${r.differences.slice(0, 3).join("; ")}${r.differences.length > 3 ? ` and ${r.differences.length - 3} more` : ""}.`
+  }
+  // Why an invoice needs review, in the words its alert uses (API ProcurementInvoiceAlertService.reasonsFor): the
+  // three-way match's flags, a possible duplicate, and where the supplier's document disagrees with the capture.
+  const reviewReasons = (inv: any): string[] => {
+    const money2 = (v: any) => Number(v).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    const out: string[] = []
+    // SRD §7: "PO Not Found" is a reason to review; an invoice with no order has nothing to be matched against.
+    if (inv.reviewNote) out.push(`Flagged for review: ${inv.reviewNote}`)
+    if (String(inv.matchingStatus ?? "").toUpperCase() === "NO_PO") out.push("No purchase order: the invoice is not linked to an order, so nothing was matched")
+    for (const f of Array.isArray(inv.aiDiscrepancies?.flags) ? inv.aiDiscrepancies.flags : []) {
+      if (f?.type === "LINE_NOT_ON_PO") out.push(`"${f.itemName}" is not on the purchase order`)
+      else if (f?.type === "PRICE_OVER_PO") out.push(`"${f.itemName}" is invoiced at ${money2(f.invoiceUnitPrice)}; the order says ${money2(f.poUnitPrice)}`)
+      else if (f?.type === "QTY_OVER_ORDERED") out.push(`"${f.itemName}" invoices ${f.invoicedQty}; the order has ${f.orderedQty}`)
+      else if (f?.type === "QTY_OVER_RECEIVED") out.push(`"${f.itemName}" invoices ${f.invoicedQty}; receipts accepted ${f.acceptedQty}`)
+      else if (f?.type === "POSSIBLE_DUPLICATE") out.push(`Possible duplicate of ${f.otherInvoiceNumber}: ${f.reason}`)
+    }
+    const r = readingOf(inv)
+    if (r?.status === "READ" && r.agrees === false) out.push(...r.differences.map((d: string) => `Supplier's document: ${d}`))
+    return out
+  }
   const invoicesView = invoices.map((inv) => ({
     id: inv.invoiceNumber ?? inv.id,
     recordId: inv.id,
@@ -450,6 +618,10 @@ export async function loadProcurementV23LiveData(): Promise<ProcurementV23LivePa
       !["PAID", "PARTIALLY_PAID"].includes(String(inv.paymentStatus ?? "").toUpperCase()),
     outstanding: num(inv.totalAmount),
     matchFlags: Array.isArray(inv.aiDiscrepancies?.flags) ? inv.aiDiscrepancies.flags : [],
+    reading: readingOf(inv),
+    readingSentence: readingSentence(inv),
+    reviewReasons: reviewReasons(inv),
+    reviewNote: inv.reviewNote ?? null,
     journal: inv.journalEntry?.referenceNumber ?? null,
     journalStatus: inv.journalEntry?.status ?? null,
     // For the monthly charts: when it was invoiced, and when it was paid.
@@ -587,7 +759,9 @@ export async function loadProcurementV23LiveData(): Promise<ProcurementV23LivePa
           vendor: q.companyName || q.vendorName || DASH,
           vendorId: q.vendorId ?? null,
           entity: tender?.entity ?? DASH,
-          value: num(q.totalAmount) ?? 0,
+          // The quotations list withholds prices on a sealed RFQ, so an award there has no total of its own;
+          // its purchase order carries the awarded value. Without this a contract raised from it saved 0.
+          value: num(q.totalAmount) ?? num(po?.totalAmount) ?? 0,
           currency: q.currencyCode ?? null,
           start: q.reviewedAt ? String(q.reviewedAt).slice(0, 10) : DASH,
           end: DASH,
@@ -688,12 +862,7 @@ export async function loadProcurementV23LiveData(): Promise<ProcurementV23LivePa
   })
   const prompts: Record<string, unknown>[] = []
 
-  const pendingReqs = isDeptApprover
-    ? awaitingMe
-    : access?.isPrivileged
-      ? requisitionRows.filter((r) => String(r.status).toUpperCase() === "PENDING_APPROVAL")
-      : []
-  for (const r of pendingReqs) {
+  for (const r of pendingForDecision) {
     prompts.push(
       prompt({
         id: `PR-${r.requisitionNumber ?? r.id}`,
@@ -704,8 +873,8 @@ export async function loadProcurementV23LiveData(): Promise<ProcurementV23LivePa
         title: r.title ?? DASH,
         entity: r.department ?? DASH,
         amount: num(r.totalAmount) || null,
-        role: "Department head",
-        reason: r.justification || "Requisition submitted for department approval.",
+        role: routeStepLabel(r.approvalRoute) ?? "Department head",
+        reason: [routeSentence(r.approvalRoute), r.justification || "Requisition submitted for approval."].filter(Boolean).join(" "),
       }),
     )
   }
@@ -745,7 +914,8 @@ export async function loadProcurementV23LiveData(): Promise<ProcurementV23LivePa
           record: g.grnNumber ?? g.id,
           title: `Inspect and accept receipt against ${g.purchaseOrder?.poNumber ?? "PO"}`,
           entity: departmentOfRequisition(g.purchaseOrder?.requisitionId),
-          amount: null,
+          // The receipt's value as the Receiving register shows it; the Approval Centre card read "Value —".
+          amount: grnsView.find((x) => x.id === (g.grnNumber ?? g.id))?.value || null,
           role: "Procurement Manager",
           reason: `Received ${fmtDate(g.receivedDate)} by ${personName(g.receivedBy)}.`,
         }),
@@ -763,10 +933,12 @@ export async function loadProcurementV23LiveData(): Promise<ProcurementV23LivePa
           type: "Invoice",
           record: inv.invoiceNumber ?? inv.id,
           title: `Approve ${inv.vendor?.name ?? "vendor"} invoice for payment`,
-          entity: DASH,
+          // The department whose requisition the order was raised from.
+          entity: departmentOfRequisition(orders.find((o) => o.id === inv.purchaseOrderId)?.requisitionId),
           amount: num(inv.totalAmount),
           role: "Finance Manager",
-          reason: `Against ${inv.purchaseOrder?.poNumber ?? "no purchase order"}; three-way match ${matchLabel(inv.matchingStatus).toLowerCase()}.`,
+          // The approver sees what the LLM read from the supplier's own document beside the capture.
+          reason: `Against ${inv.purchaseOrder?.poNumber ?? "no purchase order"}; three-way match ${matchLabel(inv.matchingStatus).toLowerCase()}. ${readingSentence(inv)}`,
         }),
       )
     }
@@ -792,6 +964,98 @@ export async function loadProcurementV23LiveData(): Promise<ProcurementV23LivePa
     }
   }
 
+  // ----------------------------------------------------------------- every open approval
+  // The Approval Centre's "All open approvals": each approval still open in the registers this role can read,
+  // whoever it waits on, oldest first. "Awaiting me" (the prompts above) is the subset this person can decide.
+  const mineIds = new Set(prompts.map((p) => String(p.id)))
+  const firstDate = (...ds: unknown[]) => {
+    for (const d of ds) if (d && !Number.isNaN(new Date(String(d)).getTime())) return new Date(String(d)).toISOString()
+    return null
+  }
+  const approvalGroup: Record<string, unknown>[] = []
+  const open = (p: Record<string, unknown>) => approvalGroup.push({ ...p, mine: mineIds.has(String(p.id)) })
+  for (const r of requisitionRows.filter((x) => String(x.status).toUpperCase() === "PENDING_APPROVAL")) {
+    open({
+      id: `PR-${r.requisitionNumber ?? r.id}`,
+      type: "Purchase requisition",
+      record: r.requisitionNumber ?? r.id,
+      title: r.title ?? DASH,
+      entity: r.department ?? DASH,
+      amount: num(r.totalAmount) || null,
+      waitingOn: r.approvalRoute?.waitingOn
+        ? `${routeStepLabel(r.approvalRoute)} (${r.approvalRoute.waitingOn.approvers.map((p: { name: string }) => p.name).join(", ")})`
+        : r.department
+          ? `Head of ${r.department}`
+          : "Department head",
+      // Not updatedAt: any later edit would restart the clock.
+      since: firstDate(r.submittedAt, r.createdAt),
+      page: "requisitions",
+    })
+  }
+  for (const t of rfqs) {
+    const all = quotesByRfq.get(t.procurementRfqId ?? t.id) ?? []
+    const bids = all.filter((q) => ["SUBMITTED", "UNDER_REVIEW"].includes(String(q.status).toUpperCase()))
+    if (!bids.length || all.some((q) => String(q.status).toUpperCase() === "ACCEPTED")) continue
+    const lowest = [...bids].sort((a, b) => (num(a.totalAmount) ?? Infinity) - (num(b.totalAmount) ?? Infinity))[0]
+    open({
+      id: `AWARD-${t.rfqNumber ?? t.id}`,
+      type: "Tender award",
+      record: t.rfqNumber ?? t.id,
+      title: `Award to ${lowest.companyName || lowest.vendorName || "vendor"}`,
+      entity: departmentOfRequisition(t.requisitionId),
+      amount: num(lowest.totalAmount),
+      waitingOn: "Procurement Manager",
+      since: firstDate(...bids.map((q) => q.submittedAt).sort()),
+      page: "evaluation",
+    })
+  }
+  for (const g of grns.filter((x) => String(x.status).toUpperCase() === "RECEIVED")) {
+    open({
+      id: `RECEIPT-${g.grnNumber ?? g.id}`,
+      type: "Goods receipt",
+      record: g.grnNumber ?? g.id,
+      title: `Inspect and accept receipt against ${g.purchaseOrder?.poNumber ?? "PO"}`,
+      entity: departmentOfRequisition(g.purchaseOrder?.requisitionId),
+      // The receipt's value as the Receiving register shows it.
+      amount: grnsView.find((x) => x.id === (g.grnNumber ?? g.id))?.value || null,
+      waitingOn: "Procurement Manager",
+      since: firstDate(g.receivedDate, g.createdAt),
+      page: "receiving",
+    })
+  }
+  for (const inv of invoices.filter((x) => ["DRAFT", "PENDING", "PENDING_APPROVAL"].includes(String(x.status).toUpperCase()))) {
+    open({
+      id: `INVOICE-${inv.invoiceNumber ?? inv.id}`,
+      type: "Invoice",
+      record: inv.invoiceNumber ?? inv.id,
+      title: `Approve ${inv.vendor?.name ?? "vendor"} invoice for payment`,
+      entity: departmentOfRequisition(orders.find((o) => o.id === inv.purchaseOrderId)?.requisitionId),
+      amount: num(inv.totalAmount),
+      waitingOn: "Finance Manager",
+      since: firstDate(inv.createdAt, inv.invoiceDate),
+      page: "invoices",
+    })
+  }
+  for (const p of plansView.filter((x) => x.rawStatus === "SUBMITTED")) {
+    const raw = planRows.find((x) => x.id === p.recordId)
+    open({
+      id: `PLAN-${p.id}`,
+      type: "Procurement plan",
+      record: p.id,
+      title: `Approve ${p.name}`,
+      entity: p.entity,
+      amount: p.budget,
+      waitingOn: "Finance Manager",
+      since: firstDate(raw?.submittedAt, raw?.updatedAt, raw?.createdAt),
+      page: "plan",
+    })
+  }
+  // A decision offered to this person that no register above lists (a department head's own queue).
+  for (const p of prompts) {
+    if (!approvalGroup.some((g) => g.id === p.id)) approvalGroup.push({ ...p, mine: true, waitingOn: "You", since: null, page: "approvals" })
+  }
+  approvalGroup.sort((a, b) => String(a.since ?? "9").localeCompare(String(b.since ?? "9")))
+
   // ----------------------------------------------------------------- audit trail
   // The audit page renders tuples: [id, event, record, actor, time, class].
   const AUDIT_ENTITY: Record<string, string> = {
@@ -803,6 +1067,15 @@ export async function loadProcurementV23LiveData(): Promise<ProcurementV23LivePa
     GoodsReceivedNote: "goods receipt",
     ProcurementInvoice: "invoice",
     Vendor: "vendor",
+    ProcurementPlan: "plan",
+    ProcurementContract: "contract",
+    ProcurementDocument: "document",
+    VendorInvoiceIntake: "invoice reading",
+  }
+  // RFQ rows are written against the RFQ number rather than its id; name the RFQ the way other rows name theirs.
+  const rfqAuditLabel = (number: unknown) => {
+    const t = tendersView.find((x) => x.id === number)
+    return t ? `${t.id} · ${t.title}` : null
   }
   const auditEventsLive = auditRows.map((a) => {
     const act = String(a.action ?? "")
@@ -813,13 +1086,11 @@ export async function loadProcurementV23LiveData(): Promise<ProcurementV23LivePa
         : /CREATE|UPDATE|SUBMIT/.test(act)
           ? "Workflow"
           : "System"
-    const when = a.occurredAt
-      ? new Date(a.occurredAt).toLocaleString("en-GB", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: false })
-      : DASH
+    const when = fmtDateTime(a.occurredAt)
     return [
       `AUD-${String(a.id).slice(-8).toUpperCase()}`,
       `${titleCase(act)} ${AUDIT_ENTITY[a.entityType] ?? titleCase(a.entityType)}`,
-      a.entityLabel ?? a.entityId ?? DASH,
+      a.entityLabel ?? (a.entityType === "RFQ" ? rfqAuditLabel(a.entityId) : null) ?? a.entityId ?? DASH,
       a.actorName ?? "System",
       when,
       cls,
@@ -830,6 +1101,8 @@ export async function loadProcurementV23LiveData(): Promise<ProcurementV23LivePa
   // Keyed by card label. Where the backend can answer, the figure is computed here and the
   // derivation is in the sub-text; where it cannot, the card says so.
   const unknown = (sub: string): LiveKpi => ({ value: DASH, sub })
+  // A card for something procurement does not record at all (and the SRD does not ask for) is left out, not shown as a dash.
+  const hidden = (sub: string): LiveKpi => ({ value: DASH, sub, hidden: true })
   const countBy = <T,>(rows: T[], test: (r: T) => boolean) => rows.filter(test).length
   const reqStatus = (s: string) => countBy(requisitionRows, (r) => String(r.status).toUpperCase() === s)
   const openRfqs = tendersView.filter((t) => t.stage === "Published" || t.stage === "Evaluation")
@@ -880,16 +1153,16 @@ export async function loadProcurementV23LiveData(): Promise<ProcurementV23LivePa
           value: money(approvedBudget),
           sub: `${approvedPlans.length} approved plan${approvedPlans.length === 1 ? "" : "s"} (${[...new Set(approvedPlans.map((p) => p.fiscalYear).filter(Boolean))].join(", ") || "no fiscal year"})`,
         }
-      : unknown("No procurement plan has been approved yet"),
+      : unknown(plansVisible ? "No procurement plan has been approved yet" : "Procurement plans are not visible to your role"),
     "Committed spend": { value: money(committed), sub: `${liveOrders.length} purchase order${liveOrders.length === 1 ? "" : "s"}, not cancelled` },
     "Open tenders": { value: openRfqs.length, sub: `${tendersView.filter((t) => t.stage === "Evaluation").length} with quotations in` },
     Vendors: { value: vendorsView.length, sub: `${vendorsView.filter((v) => v.isBlacklisted).length} blacklisted` },
     // Requisitions
-    "Budget warnings": unknown("Requisitions are not budget-checked yet"),
+    "Budget warnings": hidden("Requisitions are not budget-checked yet"),
     "Approved for sourcing": { value: reqStatus("APPROVED"), sub: "Approved and not yet sent to RFQ" },
     "Returned drafts": { value: reqStatus("DRAFT") + reqStatus("REJECTED"), sub: "Drafts and rejected requests" },
     "Median approval time": medianDays === null
-      ? unknown("No requisition has been approved yet")
+      ? unknown(allRequisitionsVisible ? "No requisition has been approved yet" : "Your role sees only its own requisitions")
       : {
           value:
             medianDays < 1 / 24
@@ -902,13 +1175,13 @@ export async function loadProcurementV23LiveData(): Promise<ProcurementV23LivePa
     "Department isolation": { value: "Enforced", sub: "Department heads see their own department" },
     // Tenders
     "Active tenders": { value: openRfqs.length, sub: "Published or in evaluation" },
-    "Vendor invitations": unknown("Invitation counts are not returned by the RFQ register"),
+    "Vendor invitations": hidden("Invitation counts are not returned by the RFQ register"),
     "Secure submissions": { value: quotations.length, sub: "Quotations received through vendor links" },
     "Closing this week": {
       value: tendersView.filter((t) => t.closingAt && new Date(t.closingAt).getTime() >= now && new Date(t.closingAt).getTime() <= weekAhead).length,
       sub: "RFQs closing in the next 7 days",
     },
-    Clarifications: unknown("Clarifications are not loaded yet"),
+    Clarifications: hidden("Clarifications are not loaded yet"),
     // Evaluation
     "Awaiting evaluation": { value: tendersView.filter((t) => t.stage === "Evaluation").length, sub: "RFQs with quotations and no award" },
     // Receiving
@@ -926,6 +1199,14 @@ export async function loadProcurementV23LiveData(): Promise<ProcurementV23LivePa
     Prequalified: { value: vendorsView.filter((v) => v.status === "Prequalified").length, sub: "Valid tax clearance on file" },
     "Compliance review": { value: vendorsView.filter((v) => v.status === "Compliance review").length, sub: "Tax clearance not yet verified" },
     Blacklisted: { value: vendorsView.filter((v) => v.isBlacklisted).length, sub: "Excluded from invitations" },
+    // The design computes these from records procurement does not keep, so in a live session they could only read 0 and
+    // imply the feature exists (found by the cycle ten census). Left out.
+    "Inbound messages": hidden("Vendor messaging is not connected"),
+    "Pending compliance requests": hidden("Document requests to vendors are not recorded"),
+    "Missing documents": hidden("Vendor compliance documents are not recorded in procurement"),
+    "Awaiting signature": hidden("eSignature is not connected"),
+    "Asset purchases": hidden("Purchase order lines are not classified as fixed assets"),
+    "Report templates": hidden("Report templates are fixed exports and are not edited here"),
     // Audit
     "Events today": has("audit.view")
       ? {
@@ -953,7 +1234,7 @@ export async function loadProcurementV23LiveData(): Promise<ProcurementV23LivePa
         ? { value: `${Math.round((planned / budget) * 1000) / 10}%`, sub: "Planned lines against plan budgets" }
         : unknown("No plan has a budget yet")
     })(),
-    "Strategic tenders": unknown("Tenders are not linked to plan lines"),
+    "Strategic tenders": hidden("Tenders are not linked to plan lines"),
     "Plan amendments": {
       value: plansView.reduce((t, p) => t + Math.max(0, Number(String(p.version).replace(/[^0-9.]/g, "")) - 1), 0),
       sub: "Resubmissions after rejection",
@@ -963,13 +1244,23 @@ export async function loadProcurementV23LiveData(): Promise<ProcurementV23LivePa
       sub: "Planned beyond each plan budget",
     },
     // Contracts
+    // The runtime summed every row in the register, terminated contracts included — and a terminated
+    // contract's award comes back as an award awaiting a contract, so its value was counted twice.
+    "Contract value": (() => {
+      const active = contractsView.filter((c) => c.kind === "contract" && c.status === "Active")
+      const awards = contractsView.filter((c) => c.kind === "award")
+      return {
+        value: money([...active, ...awards].reduce((t, c) => t + (c.value || 0), 0)),
+        sub: `${active.length} active contract${active.length === 1 ? "" : "s"} and ${awards.length} award${awards.length === 1 ? "" : "s"} awaiting a contract`,
+      }
+    })(),
     "Renewals in 90 days": {
       value: contractsView.filter(
         (c) => c.kind === "contract" && c.rawStatus === "ACTIVE" && c.end !== DASH && new Date(c.end).getTime() - Date.now() < 90 * 864e5,
       ).length,
       sub: "Active contracts ending within 90 days",
     },
-    "Vendor obligations": unknown("Obligations are not tracked on contracts yet"),
+    "Vendor obligations": hidden("Obligations are not tracked on contracts yet"),
     // Cards the full UI census found blank although the records answer them.
     "Pending approvals": { value: prompts.length, sub: "Decisions waiting for you: requisitions, awards, receipts, invoices and plans" },
     "AP exposure": {
@@ -1002,13 +1293,13 @@ export async function loadProcurementV23LiveData(): Promise<ProcurementV23LivePa
       ),
       sub: "Captured or approved and not yet paid",
     },
-    "WHT required": unknown("Withholding tax is not calculated on procurement invoices"),
-    "WHT payable": unknown("Withholding tax is not calculated on procurement invoices"),
+    "WHT required": hidden("Withholding tax is not calculated on procurement invoices"),
+    "WHT payable": hidden("Withholding tax is not calculated on procurement invoices"),
     "Journal queue": { value: journalsView.filter((j) => j.status === "Pending").length, sub: "Payment journals awaiting posting to the ledger" },
-    "Asset transfer queue": unknown("Fixed-asset transfers are not recorded in procurement"),
+    "Asset transfer queue": hidden("Fixed-asset transfers are not recorded in procurement"),
     "Accounting API": { value: "Ledger", sub: "Invoice payments create journals in the accounting ledger" },
     "SoD checks": { value: "Enforced", sub: "Authors cannot approve their own plans; decisions are role-bound" },
-    "eSign coverage": unknown("eSignature is not connected"),
+    "eSign coverage": hidden("eSignature is not connected"),
     "Value in market": {
       value: money(
         sum(
@@ -1025,17 +1316,17 @@ export async function loadProcurementV23LiveData(): Promise<ProcurementV23LivePa
     "Actual spend": { value: money(paidTotal), sub: `${paidInvoices.length} paid invoice${paidInvoices.length === 1 ? "" : "s"}` },
     Remaining: yearBudget > 0
       ? { value: money(yearBudget - yearCommitted), sub: `FY ${thisYear} approved plan budgets less FY ${thisYear} commitments` }
-      : unknown(`No approved plan covers FY ${thisYear}`),
+      : unknown(plansVisible ? `No approved plan covers FY ${thisYear}` : "Procurement plans are not visible to your role"),
     Variance: yearBudget > 0
       ? { value: `${Math.round((yearCommitted / yearBudget) * 1000) / 10}%`, sub: `FY ${thisYear} commitments as a share of its approved plan budgets` }
-      : unknown(`No approved plan covers FY ${thisYear}`),
-    Forecast: unknown("Spend forecasting is not available"),
-    "Technical threshold": unknown("No scoring threshold is configured for RFQs"),
+      : unknown(plansVisible ? `No approved plan covers FY ${thisYear}` : "Procurement plans are not visible to your role"),
+    Forecast: hidden("Spend forecasting is not available"),
+    "Technical threshold": hidden("No scoring threshold is configured for RFQs"),
     "Potential savings": { value: money(savings), sub: "Accepted quotation against the highest bid, across awarded RFQs" },
     "Recommendations due": { value: tendersView.filter((t) => t.stage === "Evaluation").length, sub: "RFQs with quotations and no award" },
     "Recommendations pending": { value: tendersView.filter((t) => t.stage === "Evaluation").length, sub: "RFQs with quotations and no award" },
-    "Committee sessions": unknown("Evaluation committees are not recorded"),
-    "Declarations complete": unknown("Conflict-of-interest declarations are not recorded"),
+    "Committee sessions": hidden("Evaluation committees are not recorded"),
+    "Declarations complete": hidden("Conflict-of-interest declarations are not recorded"),
     "Evaluated value": {
       value: money(sum(quotations.filter((q) => ["SUBMITTED", "UNDER_REVIEW"].includes(String(q.status).toUpperCase())), (q) => q.totalAmount)),
       sub: "Open quotations on RFQs awaiting award",
@@ -1044,16 +1335,232 @@ export async function loadProcurementV23LiveData(): Promise<ProcurementV23LivePa
       value: tendersView.filter((t) => t.bids > 0).length,
       sub: `${tendersView.filter((t) => t.stage === "Evaluation").length} awaiting award`,
     },
-    "Published reports": unknown("Report runs are exported, not stored"),
-    "Scheduled deliveries": unknown("Report schedules are not stored"),
-    "Board packs": unknown("Board packs are not stored"),
-    "Downloads this month": unknown("Report downloads are not logged"),
+    "Published reports": hidden("Report runs are exported, not stored"),
+    "Scheduled deliveries": hidden("Report schedules are not stored"),
+    "Board packs": hidden("Board packs are not stored"),
+    "Downloads this month": hidden("Report downloads are not logged"),
     "Data freshness": { value: "Live", sub: "Registers load from the API when the page opens" },
     // Audit & Compliance: nothing measures these yet, and "no live source" said too little.
-    "Accounting accuracy": unknown("Journal accuracy is not measured in procurement"),
-    "Document retrieval": unknown("Vault retrieval is not measured"),
-    "Immutable records": unknown("Record immutability is not attested yet"),
+    "Accounting accuracy": hidden("Journal accuracy is not measured in procurement"),
+    "Document retrieval": hidden("Vault retrieval is not measured"),
+    "Immutable records": hidden("Record immutability is not attested yet"),
   }
+
+  // ----------------------------------------------------------------- analytics: cash requirements and insights
+  // SRD §4 Finance Manager: outstanding orders and invoices, committed spend for the month, and the cash they will need.
+  // SRD §2 insights: unusual spending, vendor on-time delivery and cost per item over time, top-spending departments, the
+  // most reliable vendors, and items bought above their estimate. Every figure comes from the registers loaded above;
+  // an amount whose due date, delivery date or vendor payment terms is missing is reported as "timing unknown", not
+  // placed by a guess.
+  const DAY = 86400000
+  const today0 = new Date()
+  today0.setHours(0, 0, 0, 0)
+  const up = (v: unknown) => String(v ?? "").toUpperCase()
+  const monthKey = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`
+  const validDate = (v: unknown) => {
+    if (!v) return null
+    const d = new Date(String(v))
+    return Number.isNaN(d.getTime()) ? null : d
+  }
+  const termsDays = (vendorId: unknown): number | null => {
+    const v = vendors.find((x) => x.id === vendorId)
+    const m = String(v?.paymentTerms ?? "").match(/\d+/)
+    return m ? Number(m[0]) : null
+  }
+  const deptOf = (o: any) => {
+    const d = departmentOfRequisition(o.requisitionId)
+    return d === DASH ? "No department" : d
+  }
+  const invoicedByPo = new Map<string, number>()
+  const paidByPo = new Map<string, number>()
+  for (const i of invoices) {
+    if (!i.purchaseOrderId || up(i.status) === "REJECTED") continue
+    invoicedByPo.set(i.purchaseOrderId, (invoicedByPo.get(i.purchaseOrderId) ?? 0) + (num(i.totalAmount) ?? 0))
+    if (up(i.paymentStatus) === "PAID") paidByPo.set(i.purchaseOrderId, (paidByPo.get(i.purchaseOrderId) ?? 0) + (num(i.totalAmount) ?? 0))
+  }
+
+  const cashMonths = [0, 1, 2].map((k) => {
+    const d = new Date(today0.getFullYear(), today0.getMonth() + k, 1)
+    return { key: monthKey(d), label: d.toLocaleDateString("en-GB", { month: "long", year: "numeric" }), invoices: 0, orders: 0 }
+  })
+  const cash = { overdue: { invoices: 0, orders: 0 }, later: { invoices: 0, orders: 0 }, unknown: { invoices: 0, orders: 0 } }
+  const place = (when: Date | null, amount: number, kind: "invoices" | "orders") => {
+    if (!amount) return
+    if (!when) cash.unknown[kind] += amount
+    else if (when.getTime() < today0.getTime()) cash.overdue[kind] += amount
+    else {
+      const m = cashMonths.find((b) => b.key === monthKey(when))
+      if (m) m[kind] += amount
+      else cash.later[kind] += amount
+    }
+  }
+  const unpaidInvoices = invoices.filter(
+    (i) => ["APPROVED", "DRAFT", "PENDING", "PENDING_APPROVAL"].includes(up(i.status)) && !["PAID", "PARTIALLY_PAID"].includes(up(i.paymentStatus)),
+  )
+  for (const i of unpaidInvoices) {
+    const terms = termsDays(i.vendorId)
+    const invoiced = validDate(i.invoiceDate)
+    // Due date as printed; otherwise the invoice date plus the vendor's payment terms.
+    const when = validDate(i.dueDate) ?? (invoiced && terms != null ? new Date(invoiced.getTime() + terms * DAY) : null)
+    place(when, num(i.totalAmount) ?? 0, "invoices")
+  }
+  let openCommitments = 0
+  for (const o of liveOrders.filter((x) => ["APPROVED", "SENT", "ACKNOWLEDGED", "PARTIALLY_DELIVERED", "DELIVERED"].includes(up(x.status)))) {
+    const remaining = Math.max(0, (num(o.totalAmount) ?? 0) - (invoicedByPo.get(o.id) ?? 0))
+    if (remaining < 0.005) continue
+    openCommitments += remaining
+    const delivery = validDate(o.expectedDeliveryDate)
+    const terms = termsDays(o.vendorId)
+    // Not yet invoiced: invoiced on delivery (today, if the delivery date has passed) and paid on the vendor's terms.
+    const when = delivery && terms != null ? new Date(Math.max(delivery.getTime(), today0.getTime()) + terms * DAY) : null
+    place(when, remaining, "orders")
+  }
+  const monthStart = new Date(today0.getFullYear(), today0.getMonth(), 1)
+  const committedThisMonth = liveOrders
+    .filter((o) => (validDate(o.orderDate ?? o.createdAt) ?? new Date(0)) >= monthStart)
+    .reduce((t, o) => t + (num(o.totalAmount) ?? 0), 0)
+
+  const quarterStart = new Date(today0.getFullYear(), Math.floor(today0.getMonth() / 3) * 3, 1)
+  const deptQuarter = new Map<string, { amount: number; orders: number }>()
+  const deptMonthly = new Map<string, Map<string, number>>()
+  for (const o of liveOrders) {
+    const d = validDate(o.orderDate ?? o.createdAt)
+    if (!d) continue
+    const dept = deptOf(o)
+    const amount = num(o.totalAmount) ?? 0
+    if (d >= quarterStart) {
+      const e = deptQuarter.get(dept) ?? { amount: 0, orders: 0 }
+      e.amount += amount
+      e.orders += 1
+      deptQuarter.set(dept, e)
+    }
+    const m = deptMonthly.get(dept) ?? new Map<string, number>()
+    m.set(monthKey(d), (m.get(monthKey(d)) ?? 0) + amount)
+    deptMonthly.set(dept, m)
+  }
+  const previousMonths = [1, 2, 3].map((k) => monthKey(new Date(today0.getFullYear(), today0.getMonth() - k, 1)))
+  const unusualSpending: { department: string; thisMonth: number; average: number; ratio: number }[] = []
+  for (const [department, m] of deptMonthly) {
+    const thisMonth = m.get(monthKey(today0)) ?? 0
+    const average = previousMonths.reduce((t, k) => t + (m.get(k) ?? 0), 0) / previousMonths.length
+    if (thisMonth > 0 && average > 0 && thisMonth > average * 2) {
+      unusualSpending.push({ department, thisMonth, average, ratio: Math.round((thisMonth / average) * 10) / 10 })
+    }
+  }
+
+  const vendorPerformance = vendors
+    .map((v) => {
+      const h = vendorHistory(v.id)
+      return {
+        vendor: v.name ?? DASH,
+        orders: h.orders.length,
+        receiptsTimed: h.receiptsTimed,
+        onTime: h.receiptsOnTime,
+        onTimePct: h.receiptsTimed ? Math.round((h.receiptsOnTime / h.receiptsTimed) * 100) : null,
+        invoices: h.invoices.length,
+        flagged: h.invoices.filter((i) => i.flagged).length,
+        items: h.items,
+      }
+    })
+    .filter((v) => v.orders > 0)
+  const costPerItem = vendorPerformance.flatMap((v) =>
+    v.items
+      .filter((it) => it.orders > 1 && it.first && it.last && it.first !== it.last)
+      .map((it) => ({ vendor: v.vendor, item: it.item, first: it.first, last: it.last, orders: it.orders, changePct: Math.round(((it.last - it.first) / it.first) * 1000) / 10 })),
+  )
+
+  const overEstimate = new Map<string, { item: string; times: number; worstPct: number; estimate: number; ordered: number }>()
+  for (const o of liveOrders) {
+    const req = o.requisitionId ? reqById.get(String(o.requisitionId)) : undefined
+    if (!req) continue
+    for (const it of o.items ?? []) {
+      const key = String(it.itemName ?? "").trim().toLowerCase()
+      const est = (req.items ?? []).find((ri: any) => String(ri.itemName ?? "").trim().toLowerCase() === key)
+      const estimate = num(est?.unitPrice)
+      const ordered = num(it.unitPrice)
+      if (!key || !estimate || !ordered || ordered <= estimate) continue
+      const pct = Math.round(((ordered - estimate) / estimate) * 1000) / 10
+      const cur = overEstimate.get(key) ?? { item: String(it.itemName), times: 0, worstPct: 0, estimate, ordered }
+      cur.times += 1
+      if (pct >= cur.worstPct) Object.assign(cur, { worstPct: pct, estimate, ordered })
+      overEstimate.set(key, cur)
+    }
+  }
+
+  const ageDays = (v: unknown) => {
+    const d = validDate(v)
+    return d ? Math.max(0, Math.floor((Date.now() - d.getTime()) / DAY)) : null
+  }
+  const stage = (label: string, owner: string, rows: any[], dateOf: (r: any) => unknown) => {
+    const ages = rows.map((r) => ageDays(dateOf(r))).filter((a): a is number => a != null).sort((a, b) => a - b)
+    return { label, owner, count: rows.length, median: ages.length ? ages[Math.floor(ages.length / 2)] : null, oldest: ages.length ? ages[ages.length - 1] : null }
+  }
+  const rfqBids = (t: any) => (quotesByRfq.get(t.procurementRfqId ?? t.id) ?? []).filter((q) => ["SUBMITTED", "UNDER_REVIEW"].includes(up(q.status)))
+  const rfqAwarded = (t: any) => (quotesByRfq.get(t.procurementRfqId ?? t.id) ?? []).some((q) => up(q.status) === "ACCEPTED")
+  const pipeline = [
+    stage("Requisitions awaiting approval", "The approvers on each requisition's route", requisitionRows.filter((r) => up(r.status) === "PENDING_APPROVAL"), (r) => r.submittedAt ?? r.updatedAt ?? r.createdAt),
+    stage("Approved requisitions not yet sourced", "Procurement desk", requisitionRows.filter((r) => up(r.status) === "APPROVED"), (r) => r.approvedAt ?? r.updatedAt),
+    stage("RFQs waiting for quotations", "Invited vendors", rfqs.filter((t) => !rfqAwarded(t) && !rfqBids(t).length && up(t.status) !== "CANCELLED"), (t) => t.createdAt),
+    stage("Quotations to evaluate and award", "Procurement Manager", rfqs.filter((t) => !rfqAwarded(t) && rfqBids(t).length > 0), (t) => t.closingAt ?? t.createdAt),
+    stage("Orders not yet delivered", "Vendors", liveOrders.filter((o) => ["APPROVED", "SENT", "ACKNOWLEDGED", "PARTIALLY_DELIVERED"].includes(up(o.status))), (o) => o.orderDate ?? o.createdAt),
+    stage("Receipts awaiting inspection", "Procurement Manager", grns.filter((g) => up(g.status) === "RECEIVED"), (g) => g.receivedDate ?? g.createdAt),
+    stage("Invoices awaiting approval", "Finance Manager", invoices.filter((i) => ["DRAFT", "PENDING", "PENDING_APPROVAL"].includes(up(i.status))), (i) => i.createdAt),
+    stage("Approved invoices not yet paid", "Accounts Payable", invoices.filter((i) => up(i.status) === "APPROVED" && up(i.paymentStatus) !== "PAID"), (i) => i.approvedAt ?? i.updatedAt),
+  ]
+
+  const categories = new Map<string, { category: string; orders: number; committed: number; invoiced: number; paid: number }>()
+  for (const o of liveOrders) {
+    const src = o.requisitionId ? reqById.get(String(o.requisitionId))?.sourcingCategory : null
+    const category = src ? titleCase(src) : "Uncategorised"
+    const e = categories.get(category) ?? { category, orders: 0, committed: 0, invoiced: 0, paid: 0 }
+    e.orders += 1
+    e.committed += num(o.totalAmount) ?? 0
+    e.invoiced += invoicedByPo.get(o.id) ?? 0
+    e.paid += paidByPo.get(o.id) ?? 0
+    categories.set(category, e)
+  }
+
+  const analyticsV23 = {
+    ordersVisible: has("orders.view"),
+    invoicesVisible: has("invoices.view"),
+    cash: {
+      overdue: cash.overdue,
+      months: cashMonths,
+      later: cash.later,
+      unknown: cash.unknown,
+      approvedUnpaid: unpaidInvoices.filter((i) => up(i.status) === "APPROVED").reduce((t, i) => t + (num(i.totalAmount) ?? 0), 0),
+      awaitingApproval: unpaidInvoices.filter((i) => up(i.status) !== "APPROVED").reduce((t, i) => t + (num(i.totalAmount) ?? 0), 0),
+      partPaid: invoices.filter((i) => up(i.paymentStatus) === "PARTIALLY_PAID").length,
+      openCommitments,
+      committedThisMonth,
+    },
+    topDepartments: [...deptQuarter.entries()].map(([department, e]) => ({ department, ...e })).sort((a, b) => b.amount - a.amount).slice(0, 6),
+    unusualSpending: unusualSpending.sort((a, b) => b.ratio - a.ratio),
+    reliableVendors: vendorPerformance
+      .map(({ items, ...v }) => v)
+      .sort((a, b) => (b.onTimePct ?? -1) - (a.onTimePct ?? -1) || a.flagged / Math.max(1, a.invoices) - b.flagged / Math.max(1, b.invoices) || b.orders - a.orders)
+      .slice(0, 8),
+    costPerItem: costPerItem.sort((a, b) => Math.abs(b.changePct) - Math.abs(a.changePct)).slice(0, 10),
+    overEstimate: [...overEstimate.values()].sort((a, b) => b.times - a.times || b.worstPct - a.worstPct).slice(0, 10),
+    duplicates: invoices.filter((i) => ["DRAFT", "PENDING", "PENDING_APPROVAL"].includes(up(i.status)) && (i.aiDiscrepancies?.flags ?? []).some((f: any) => f?.type === "POSSIBLE_DUPLICATE")).length,
+    pipeline,
+    categories: [...categories.values()].sort((a, b) => b.committed - a.committed),
+  }
+
+  const approvalMatrix = await approvalMatrixLoad
+  const vendorRegistrations = (await registrationsLoad).map((v) => ({
+    id: String(v.id),
+    name: String(v.name ?? DASH),
+    email: v.email ?? DASH,
+    contact: v.contactPerson ?? DASH,
+    phone: v.phone ?? DASH,
+    category: v.category ? titleCase(v.category) : DASH,
+    taxExpiry: v.taxClearanceExpiryDate ? fmtDate(v.taxClearanceExpiryDate) : null,
+    registeredAt: fmtDate(v.createdAt),
+    banks: num(v._count?.banks) ?? 0,
+    documents: num(v._count?.kycDocuments) ?? 0,
+  }))
+  const requisitionProjects = (await projectsLoad).map((p) => ({ id: String(p.id), name: String(p.name ?? DASH), clientName: p.clientName ?? null }))
 
   const hydrate: Record<string, unknown> = {
     requisitions: requisitionsView,
@@ -1063,6 +1570,11 @@ export async function loadProcurementV23LiveData(): Promise<ProcurementV23LivePa
     grns: grnsView,
     invoices: invoicesView,
     approvalPromptsV6: prompts,
+    approvalGroupV23: approvalGroup,
+    approvalMatrixV23: approvalMatrix,
+    analyticsV23,
+    requisitionProjectsV23: requisitionProjects,
+    vendorRegistrationsV23: vendorRegistrations,
     currentUserV6: { name: access?.name ?? DASH, role: access?.roleName ?? DASH },
     auditEventsLive,
     complianceReminderSettingsV7: NO_REMINDER_AUTOMATION,
@@ -1100,7 +1612,14 @@ export async function loadProcurementV23LiveData(): Promise<ProcurementV23LivePa
   const orNull = (n: number) => n || null
   const navCounts: Record<string, number | null> = {
     approvals: orNull(prompts.length),
-    requisitions: orNull(reqStatus("PENDING_APPROVAL")),
+    // What the page opens on for this user: requisitions awaiting their decision or, with none to decide, their
+    // own requests still in approval. Counting every pending requisition put a badge over a manager's empty queue.
+    requisitions: orNull(
+      requisitionsView.filter((r) => String(r.rawStatus).toUpperCase() === "PENDING_APPROVAL" && r.awaitingMe).length ||
+        requisitionsView.filter(
+          (r) => String(r.rawStatus).toUpperCase() === "PENDING_APPROVAL" && Boolean(access?.userId) && r.requestedById === access?.userId,
+        ).length,
+    ),
     tenders: orNull(openRfqs.length),
     evaluation: orNull(tendersView.filter((t) => t.stage === "Evaluation").length),
     orders: orNull(countBy(orders, (o) => String(o.status).toUpperCase() === "SENT" && !o.vendorAcknowledgedAt)),
@@ -1119,6 +1638,8 @@ export async function loadProcurementV23LiveData(): Promise<ProcurementV23LivePa
     banks: bankRows
       .filter((b) => b.isActive !== false)
       .map((b) => ({ id: String(b.id), name: String(b.name ?? b.id), accountNumber: b.accountNumber ?? null, currencyId: b.currencyId ?? null })),
+    currencies: (await currenciesLoad).filter((c) => c?.code).map((c) => ({ code: String(c.code), name: String(c.name ?? c.code) })),
+    departments: (await departmentsLoad).filter((d) => d?.name).map((d) => String(d.name)),
     errors: [...errors],
   }
 }
@@ -1140,8 +1661,12 @@ const NO_REMINDER_AUTOMATION = {
 /** What the runtime is hydrated with before the first live load lands: no demo records at all. */
 export const EMPTY_PROCUREMENT_HYDRATE: Record<string, unknown> = {
   ...Object.fromEntries(
-    ["requisitions", "tenders", "vendors", "orders", "grns", "invoices", "approvalPromptsV6", "auditEventsLive", "quotationsLive", "plans", "planItems", "documents", "journals", ...NO_BACKEND_YET].map((k) => [k, []]),
+    ["requisitions", "tenders", "vendors", "orders", "grns", "invoices", "approvalPromptsV6", "approvalGroupV23", "auditEventsLive", "quotationsLive", "plans", "planItems", "documents", "journals", ...NO_BACKEND_YET].map((k) => [k, []]),
   ),
   complianceReminderSettingsV7: NO_REMINDER_AUTOMATION,
   evaluationLive: {},
+  approvalMatrixV23: null,
+  analyticsV23: null,
+  requisitionProjectsV23: [],
+  vendorRegistrationsV23: [],
 }

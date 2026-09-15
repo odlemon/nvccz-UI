@@ -65,7 +65,7 @@ services:
       - traefik.http.routers.arcus-dev-api.entrypoints=websecure
       - traefik.http.routers.arcus-dev-api.tls.certresolver=le
       - traefik.http.routers.arcus-dev-api.middlewares=arcus-dev-api-cors@docker
-      - traefik.http.middlewares.arcus-dev-api-cors.headers.accesscontrolallowmethods=GET,OPTIONS,PUT,POST,DELETE
+      - traefik.http.middlewares.arcus-dev-api-cors.headers.accesscontrolallowmethods=GET,OPTIONS,PUT,POST,PATCH,DELETE
       - traefik.http.middlewares.arcus-dev-api-cors.headers.accesscontrolalloworiginlist=https://dev.matanho.com,https://dev.lp.matanho.com,https://dev.investee.matanho.com,https://dev.vendor.matanho.com,https://dev.events.matanho.com,https://dev.apply.matanho.com,https://dev-api.matanho.com
       - traefik.http.middlewares.arcus-dev-api-cors.headers.accesscontrolmaxage=100
       - traefik.http.middlewares.arcus-dev-api-cors.headers.addvaryheader=true

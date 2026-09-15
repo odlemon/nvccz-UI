@@ -669,6 +669,17 @@ html.dark [data-arcus-shared-topbar] button,
   color: #eef2f8 !important;
 }
 
+/* The Document Vault's "Procurement document control" banner keeps its own dark
+   purple gradient regardless of module theme (see .vault-summary in
+   procurement-v23.css); the shared black-heading reset above made its heading
+   black-on-purple, effectively invisible. Restore the panel's own white. */
+.procurement-v23-root .vault-summary h1,
+.procurement-v23-root .vault-summary h2,
+.procurement-v23-root .vault-summary h3,
+.procurement-v23-root .vault-summary h4 {
+  color: #fff !important;
+}
+
 /* Strong / bold text true black */
 .performance-v22-root strong,
 .performance-v22-root b,
@@ -827,6 +838,41 @@ html.dark [data-arcus-shared-topbar] button,
 .payroll-v6-root .sidebar .sidebar-foot,
 .procurement-v23-root .sidebar .sidebar-foot {
   border-color: #e2e8f0 !important;
+}
+/* Collapse control: the module CSS drew it as a full-width, near-invisible translucent-white
+   bar (background: rgba(255,255,255,.06), color: #cbd4e4) for the dark sidebar this used to be.
+   On the light surface above that reads as a faint, low-contrast rectangle. Values below are
+   Performance's own collapse control (.sidebar-foot / .collapse-btn), copied exactly (measured
+   with getComputedStyle) so this one matches instead of inventing a new style for it. */
+.payroll-v6-root .sidebar .collapse-wrap,
+.procurement-v23-root .sidebar .collapse-wrap {
+  padding: 8px !important;
+  border-top-color: #dfe4ed !important;
+  background: #ffffff !important;
+}
+.payroll-v6-root .sidebar .collapse-btn,
+.procurement-v23-root .sidebar .collapse-btn {
+  width: 100% !important;
+  height: 38px !important;
+  padding: 0 9px !important;
+  background: #f8f9fc !important;
+  border: 1px solid #dfe4ed !important;
+  border-radius: 7px !important;
+  color: #667085 !important;
+  font-weight: 400 !important;
+  font-size: 11px !important;
+  justify-content: flex-start !important;
+}
+.payroll-v6-root .sidebar .collapse-btn:hover,
+.procurement-v23-root .sidebar .collapse-btn:hover {
+  background: #f0ebff !important;
+  color: #5b21ff !important;
+}
+.payroll-v6-root .sidebar .collapse-btn svg,
+.procurement-v23-root .sidebar .collapse-btn svg {
+  width: 18px !important;
+  height: 18px !important;
+  stroke: currentColor !important;
 }
 .payroll-v6-root .sidebar .tenant,
 .procurement-v23-root .sidebar .tenant,
@@ -1464,5 +1510,35 @@ html.dark [data-arcus-shared-topbar] button,
   }
   [data-module="fundraising-kyc"]:has(.kyc-sidebar-collapsed) [data-arcus-shared-topbar] > div {
     padding-left: 92px !important;
+  }
+}
+
+/* ── Loading state on submit controls (project convention: loading state on write actions) ──
+   procurement-v23-app.tsx's single click dispatcher (handleProcurementV23Action) adds this class
+   to whatever [data-action] control was clicked for as long as its API call is in flight, so a
+   slow save/approve/send reads as "working" instead of looking like the click did nothing. Dims
+   the whole control rather than hiding its text/icon -- button markup varies (icon + bare text
+   node, no wrapping span), and opacity works for any of it without special-casing. */
+.procurement-v23-root [data-action].pr23-busy {
+  position: relative !important;
+  pointer-events: none !important;
+  opacity: 0.55 !important;
+}
+.procurement-v23-root [data-action].pr23-busy::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 14px;
+  height: 14px;
+  margin: -7px 0 0 -7px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: pr23-busy-spin 0.6s linear infinite;
+}
+@keyframes pr23-busy-spin {
+  to {
+    transform: rotate(360deg);
   }
 }

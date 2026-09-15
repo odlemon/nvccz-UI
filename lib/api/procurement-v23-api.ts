@@ -153,6 +153,8 @@ export async function createRequisition(body: {
   priority?: string
   justification?: string
   sourcingCategory?: string
+  /** SRD §7 "Project/Cost Center"; omitted or null for none. */
+  projectId?: string | null
   /** unitPrice is the requester's estimate; the backend keeps it internal and never copies it onto an RFQ. */
   items: { itemName: string; description?: string; quantity: number; unit?: string; unitPrice?: number }[]
 }): Promise<ProcurementRecord> {
@@ -169,7 +171,7 @@ export async function submitRequisition(id: string): Promise<ProcurementRecord> 
  */
 export async function updateRequisition(
   id: string,
-  body: { title?: string; justification?: string | null; sourcingCategory?: string | null },
+  body: { title?: string; justification?: string | null; sourcingCategory?: string | null; projectId?: string | null },
 ): Promise<ProcurementRecord> {
   return unwrapData(await apiClient.put<ApiResponse<ProcurementRecord>>(`/procurement/requisitions/${encodeURIComponent(id)}`, body))
 }
@@ -202,12 +204,29 @@ export async function createRfq(body: {
   deliveryAddress?: string
   specialRequirements?: string
   visibility?: "INVITED_ONLY" | "PUBLIC_LISTING"
+  /** USD, ZiG or ZAR: the currency vendors quote in. The API resolves it to the currency's id. */
+  reportingCurrencyCode?: string
   /** 0-1 each; the evaluation weighting of price against everything else. */
   priceWeight?: number
   technicalWeight?: number
   items?: { itemName: string; description?: string; quantity: number; unit?: string }[]
 }): Promise<ProcurementRecord> {
   return unwrapData(await apiClient.post<ApiResponse<ProcurementRecord>>("/procurement/rfq", body))
+}
+
+/** PATCH /rfqs/:id/closing {newClosingAt}: the only field an already-published RFQ can still change. */
+export async function extendRfqClosing(id: string, newClosingAt: string): Promise<ProcurementRecord> {
+  return unwrapData(await apiClient.patch<ApiResponse<ProcurementRecord>>(`/procurement/rfqs/${encodeURIComponent(id)}/closing`, { newClosingAt }))
+}
+
+/** GET /procurement/currencies: the active currencies an RFQ can be quoted in ({code, name}). */
+export async function listProcurementCurrencies(): Promise<ProcurementRecord[]> {
+  return unwrapData(await apiClient.get<ApiResponse<ProcurementRecord[]>>("/procurement/currencies"))
+}
+
+/** GET /departments: the org's departments ({id, name, ...}), for the plan and plan-item Department pickers. */
+export async function listDepartments(): Promise<ProcurementRecord[]> {
+  return unwrapData(await apiClient.get<ApiResponse<ProcurementRecord[]>>("/departments"))
 }
 
 /** The award. Accepting a quotation raises its purchase order. */
@@ -302,6 +321,13 @@ export async function captureProcurementInvoice(body: {
   invoiceDate: string
   dueDate?: string
   currencyId?: string
+  /** The supplier's document (from AI Invoice Capture); the API reads it with the LLM and compares it with the capture. */
+  documentPath?: string
+  documentType?: string
+  /** The intake holding the reading already made of that document, so it is not read twice. */
+  readingIntakeId?: string
+  /** Captured and flagged for review in one step, with why (SRD §7 Invoice Processing). */
+  reviewNote?: string
   items: { itemName: string; description?: string; quantity: number; unitPrice: number; unit?: string }[]
 }): Promise<ProcurementRecord> {
   return unwrapData(await apiClient.post<ApiResponse<ProcurementRecord>>("/procurement/invoices", body))
@@ -314,6 +340,18 @@ export type ExtractedInvoice = {
   invoiceNumber: string | null
   invoiceDate: string | null
   currencyCode: string | null
+  dueDate?: string | null
+  supplierName?: string | null
+  supplierTaxNumber?: string | null
+  purchaseOrderReference?: string | null
+  subtotal?: number | null
+  taxRate?: number | null
+  taxAmount?: number | null
+  totalAmount?: number | null
+  /** Figures that do not add up, or a total that could not be read. */
+  checks?: { code: string; message: string }[]
+  /** The text came from OCR of a scan or photo. */
+  readFromOcr?: boolean
   lines: ExtractedInvoiceLine[]
   taxTreatment?: "VAT_15" | "ZERO_RATED" | "EXEMPT" | "UNKNOWN"
   fieldConfidence?: Record<string, number>
@@ -329,6 +367,15 @@ export type InvoiceExtraction = {
   /** Below the confidence threshold: the operator is told to check every field. */
   lowConfidence: boolean
   threshold: number
+  /**
+   * The document as page images with the read values' positions (SRD §7 Invoice Processing). Null when it could not be
+   * rendered; `note` says why a file type cannot be shown.
+   */
+  preview?: {
+    pages: { image: string; width: number; height: number }[]
+    highlights: { field: string; label: string; page: number; left: number; top: number; width: number; height: number }[]
+    note: string | null
+  } | null
 }
 
 /**
@@ -341,6 +388,31 @@ export async function extractInvoiceForCapture(form: FormData): Promise<InvoiceE
   return unwrapData(
     await apiClient.postFormData<ApiResponse<InvoiceExtraction>>("/procurement/suite06/extract-for-capture", form),
   )
+}
+
+/** POST /procurement/invoices/:id/flag {note}: SRD §7 "Flag for Review" on an open invoice. */
+export async function flagProcurementInvoice(id: string, note: string): Promise<ProcurementRecord> {
+  return unwrapData(await apiClient.post<ApiResponse<ProcurementRecord>>(`/procurement/invoices/${encodeURIComponent(id)}/flag`, { note }))
+}
+
+export type RequisitionProject = { id: string; name: string; clientName: string | null; projectType: string | null; status: string }
+
+/** GET /procurement/requisition-projects: what a requisition can be charged to (SRD §7 "Project/Cost Center"). */
+export const listRequisitionProjects = () => list("/procurement/requisition-projects") as Promise<RequisitionProject[]>
+
+export type RequisitionLineSuggestion = {
+  itemName: string
+  unit: string | null
+  lastPrice: number | null
+  lastOrdered: string | null
+  lastPo: string | null
+  standardCost: number | null
+  vendors: { id: string; name: string; orders: number; lastPrice: number | null; source: "orders" | "inventory" }[]
+}
+
+/** GET /procurement/requisitions/line-suggestions?q=: items bought before, their last price and vendors (SRD §3). */
+export async function requisitionLineSuggestions(q: string): Promise<RequisitionLineSuggestion[]> {
+  return list(`/procurement/requisitions/line-suggestions?q=${encodeURIComponent(q)}`) as Promise<RequisitionLineSuggestion[]>
 }
 
 export async function approveProcurementInvoice(id: string, isTaxable = true): Promise<ProcurementRecord> {
@@ -448,6 +520,10 @@ export async function addProcurementPlanItem(id: string, body: PlanItemInput): P
   return unwrapData(await apiClient.post<ApiResponse<ProcurementRecord>>(`/procurement/plans/${encodeURIComponent(id)}/items`, body))
 }
 
+export async function updateProcurementPlanItem(id: string, itemId: string, body: Partial<PlanItemInput>): Promise<ProcurementRecord> {
+  return unwrapData(await apiClient.put<ApiResponse<ProcurementRecord>>(`/procurement/plans/${encodeURIComponent(id)}/items/${encodeURIComponent(itemId)}`, body))
+}
+
 export async function submitProcurementPlan(id: string): Promise<ProcurementRecord> {
   return unwrapData(await apiClient.post<ApiResponse<ProcurementRecord>>(`/procurement/plans/${encodeURIComponent(id)}/submit`))
 }
@@ -477,6 +553,22 @@ export async function updateVendor(id: string, body: Record<string, unknown>): P
   return unwrapData(await apiClient.put<ApiResponse<ProcurementRecord>>(`/accounting/vendors/${encodeURIComponent(id)}`, body))
 }
 
+/**
+ * Vendors who registered themselves on the vendor portal and wait for staff review
+ * (GET /accounting/vendors/pending-review, procurement.vendors.view).
+ */
+export const listPendingVendorRegistrations = () => list("/accounting/vendors/pending-review")
+
+/** Approve a self-registration: the vendor becomes active and is emailed (procurement.vendors.approve). */
+export async function approveVendorRegistration(id: string): Promise<ProcurementRecord> {
+  return unwrapData(await apiClient.put<ApiResponse<ProcurementRecord>>(`/accounting/vendors/${encodeURIComponent(id)}/approve-registration`, {}))
+}
+
+/** Decline a self-registration with a reason: the vendor is deactivated and emailed (procurement.vendors.approve). */
+export async function declineVendorRegistration(id: string, reason: string): Promise<ProcurementRecord> {
+  return unwrapData(await apiClient.put<ApiResponse<ProcurementRecord>>(`/accounting/vendors/${encodeURIComponent(id)}/decline-registration`, { reason }))
+}
+
 export async function blacklistVendor(id: string, blacklistReason: string): Promise<ProcurementRecord> {
   return unwrapData(
     await apiClient.post<ApiResponse<ProcurementRecord>>(`/accounting/vendors/${encodeURIComponent(id)}/blacklist`, { blacklistReason }),
@@ -487,11 +579,104 @@ export async function unblacklistVendor(id: string): Promise<ProcurementRecord> 
   return unwrapData(await apiClient.post<ApiResponse<ProcurementRecord>>(`/accounting/vendors/${encodeURIComponent(id)}/unblacklist`))
 }
 
+/** Soft-delete (deactivate) a vendor; the backend refuses when it has recorded expenses. */
+export async function deleteVendor(id: string): Promise<void> {
+  await apiClient.delete(`/accounting/vendors/${encodeURIComponent(id)}`)
+}
+
 // ---------------------------------------------------------------------------
 // Approval configuration
 // ---------------------------------------------------------------------------
 
 export const listApprovalConfigs = () => list("/procurement-approval-configs")
+
+/** One step of a requisition's approval route, as the requisition endpoints attach it (`approvalRoute`). */
+export type ApprovalRouteStep = {
+  position: number
+  stepNumber: number
+  name: string
+  kind: "DEPARTMENT_HEAD" | "ROLE" | "USER"
+  who: string
+  /** The step applies only above this total; null for every requisition. */
+  aboveAmount: number | null
+  approvers: { id: string; name: string }[]
+  status: "APPROVED" | "REJECTED" | "WAITING" | "UPCOMING" | "NOT_REACHED"
+  decidedBy: string | null
+  decidedById: string | null
+  /** Set when an administrator decided a step assigned to someone else. */
+  onBehalfOf: string | null
+  decidedAt: string | null
+  comments: string | null
+}
+
+export type ApprovalRoute = {
+  requestId: string
+  status: string
+  submittedAt: string
+  totalSteps: number
+  currentPosition: number | null
+  waitingOn: { who: string; approvers: { id: string; name: string }[] } | null
+  steps: ApprovalRouteStep[]
+}
+
+export type ApprovalMatrixStep = {
+  stepNumber: number
+  name: string
+  kind: "DEPARTMENT_HEAD" | "ROLE" | "USER"
+  who: string
+  aboveAmount: number | null
+  /** A fixed department; null means the requester's own department. */
+  department: string | null
+  deputy: boolean
+  roleCode: string | null
+  userId: string | null
+  /** Who holds the step today. */
+  people: string[]
+}
+
+export type InvoiceAutoApproval = { enabled: boolean; limit: number | null; updatedAt: string | null }
+
+export type ApprovalMatrix = {
+  canEdit: boolean
+  /** SRD §6.6: whether an exactly matching invoice, its document agreeing, is approved without a person. */
+  invoiceAutoApproval: InvoiceAutoApproval
+  configId: string | null
+  updatedAt: string | null
+  steps: ApprovalMatrixStep[]
+  departmentRoutes: { department: string; name: string; steps: ApprovalMatrixStep[] }[]
+  departments: string[]
+  roles: { code: string; name: string; people: number }[]
+  /** Staff who can be named on a step; only returned to someone who can edit. */
+  people: { id: string; name: string; role: string | null; department: string | null }[]
+  permissionDecisions: { label: string; permission: string; roles: { name: string; people: number }[] }[]
+}
+
+export type ApprovalMatrixStepInput = {
+  kind: "DEPARTMENT_HEAD" | "ROLE" | "USER"
+  department?: string | null
+  deputy?: boolean
+  roleCode?: string | null
+  userId?: string | null
+  aboveAmount?: number | null
+}
+
+/** GET /procurement/approval-matrix: the requisition route in force. Every member of staff may read it. */
+export async function getApprovalMatrix(): Promise<ApprovalMatrix> {
+  return unwrapData(await apiClient.get<ApiResponse<ApprovalMatrix>>("/procurement/approval-matrix"))
+}
+
+/**
+ * PUT /procurement/approval-matrix {steps}: replaces the route. Administrator or CFO only; it applies to requisitions
+ * submitted from then on, and ones already waiting keep the route they were given.
+ */
+export async function saveApprovalMatrix(steps: ApprovalMatrixStepInput[]): Promise<ApprovalMatrix> {
+  return unwrapData(await apiClient.put<ApiResponse<ApprovalMatrix>>("/procurement/approval-matrix", { steps }))
+}
+
+/** PUT /procurement/invoice-auto-approval {enabled, limit}: administrator or CFO. A null limit means no limit. */
+export async function saveInvoiceAutoApproval(body: { enabled: boolean; limit: number | null }): Promise<InvoiceAutoApproval> {
+  return unwrapData(await apiClient.put<ApiResponse<InvoiceAutoApproval>>("/procurement/invoice-auto-approval", body))
+}
 
 // ---------------------------------------------------------------------------
 // Audit

@@ -14,6 +14,7 @@ import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { DatePicker } from '@/components/ui/date-picker'
 import { procurementApiV2 } from '@/lib/api/procurement-api-v2'
+import { ORG_NAME, ORG_LOGO_PATH } from '@/lib/branding'
 
 interface QuotationItem {
   itemName: string
@@ -39,13 +40,6 @@ export default function VendorQuotationSubmissionPage() {
   const [submittedData, setSubmittedData] = useState<any>(null)
   const [logoError, setLogoError] = useState(false)
 
-  const getOrgLogo = () => {
-    return process.env.NEXT_PUBLIC_ORGANIZATION_LOGO || '/logo.png'
-  }
-
-  const getOrgName = () => {
-    return process.env.NEXT_PUBLIC_ORGANIZATION_NAME || 'Arcus'
-  }
 
   // Form state
   const [vendorName, setVendorName] = useState('')
@@ -199,8 +193,8 @@ export default function VendorQuotationSubmissionPage() {
                 <div className="w-20 h-20 bg-white rounded-full shadow-lg overflow-hidden relative">
                   {!logoError ? (
                     <Image
-                      src={getOrgLogo()}
-                      alt={getOrgName()}
+                      src={ORG_LOGO_PATH}
+                      alt={ORG_NAME}
                       width={80}
                       height={80}
                       className="rounded-full"
@@ -209,7 +203,7 @@ export default function VendorQuotationSubmissionPage() {
                     />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-100 to-blue-200">
-                      <span className="text-sm font-bold text-blue-700">{getOrgName().substring(0, 2).toUpperCase()}</span>
+                      <span className="text-sm font-bold text-blue-700">{ORG_NAME.substring(0, 2).toUpperCase()}</span>
                     </div>
                   )}
                   <div className="absolute bottom-0 right-0 bg-green-500 rounded-full p-1.5">
@@ -219,7 +213,7 @@ export default function VendorQuotationSubmissionPage() {
               </div>
               <CardTitle className="text-3xl font-bold">Quotation Submitted Successfully!</CardTitle>
               <CardDescription className="text-green-50 text-lg">
-                Thank you for submitting your quotation to {getOrgName()}
+                Thank you for submitting your quotation to {ORG_NAME}
               </CardDescription>
             </CardHeader>
             <CardContent className="p-8 space-y-6">
@@ -396,8 +390,8 @@ export default function VendorQuotationSubmissionPage() {
             <div className="w-20 h-20 bg-white rounded-full shadow-lg border-4 border-blue-100 flex items-center justify-center overflow-hidden">
               {!logoError ? (
                 <Image
-                  src={getOrgLogo()}
-                  alt={getOrgName()}
+                  src={ORG_LOGO_PATH}
+                  alt={ORG_NAME}
                   width={80}
                   height={80}
                   className="rounded-full"
@@ -406,12 +400,12 @@ export default function VendorQuotationSubmissionPage() {
                 />
               ) : (
                 <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-100 to-blue-200">
-                  <span className="text-sm font-bold text-blue-700">{getOrgName().substring(0, 2).toUpperCase()}</span>
+                  <span className="text-sm font-bold text-blue-700">{ORG_NAME.substring(0, 2).toUpperCase()}</span>
                 </div>
               )}
             </div>
           </div>
-          <h1 className="text-4xl font-bold text-gray-900 mb-2">Submit Quotation to {getOrgName()}</h1>
+          <h1 className="text-4xl font-bold text-gray-900 mb-2">Submit Quotation to {ORG_NAME}</h1>
           <p className="text-lg text-gray-600">Request for Quotation: <Badge variant="outline" className="text-base font-mono">{rfqNumber}</Badge></p>
         </div>
 

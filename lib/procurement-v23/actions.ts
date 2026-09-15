@@ -25,6 +25,7 @@ import {
   submitProcurementPlan,
   updateProcurementContract,
   updateProcurementPlan,
+  updateProcurementPlanItem,
   uploadProcurementDocumentVersion,
   uploadProcurementDocuments,
   approveGoodsReceivedNote,
@@ -36,6 +37,8 @@ import {
   createRequisition,
   createRfq,
   createVendor,
+  deleteVendor,
+  extendRfqClosing,
   extractInvoiceForCapture,
   payProcurementInvoice,
   postJournalEntry,
@@ -45,11 +48,33 @@ import {
   rejectQuotation,
   rejectRequisition,
   scoreQuotation,
+  saveApprovalMatrix,
+  saveInvoiceAutoApproval,
   sendPurchaseOrder,
   submitRequisition,
   updateRequisition,
+  updateVendor,
+  approveVendorRegistration,
+  declineVendorRegistration,
 } from "@/lib/api/procurement-v23-api"
 import type { ProcurementV23LivePayload } from "@/lib/procurement-v23/live-loaders"
+
+/** Who a requisition now waits on, from the route the API returns with it: "step 2 of 2, Finance Manager (Blessing Sibanda)". */
+function routeNext(rec: Record<string, any> | null | undefined): string | null {
+  const route = rec?.approvalRoute
+  if (!route?.waitingOn) return null
+  const names = (route.waitingOn.approvers ?? []).map((p: { name: string }) => p.name).join(", ")
+  const step = route.totalSteps > 1 ? `step ${route.currentPosition} of ${route.totalSteps}, ` : ""
+  return `${step}${route.waitingOn.who}${names ? ` (${names})` : ""}`
+}
+
+/** An approval that completes a step but not the route says where the requisition went next. */
+function approvedMessage(id: string, rec: Record<string, any> | null | undefined): string {
+  const next = routeNext(rec)
+  return String(rec?.status ?? "").toUpperCase() === "PENDING_APPROVAL" && next
+    ? `${id} approved at your step. It now waits for ${next}.`
+    : `${id} approved.`
+}
 
 export type ProcurementActionDetail = {
   action: string
@@ -67,6 +92,10 @@ export type ProcurementActionResult = {
 export const LIVE_ACTIONS = [
   "submit-pr",
   "save-pr",
+  "save-approval-matrix-v23",
+  "save-invoice-auto-approval-v23",
+  "confirm-capture-approve-invoice-v23",
+  "confirm-capture-flag-invoice-v23",
   "save-pr-v11",
   "submit-pr-v11",
   "approve-pr-v11",
@@ -75,6 +104,11 @@ export const LIVE_ACTIONS = [
   "confirm-reject-approval-v6",
   "register-vendor-confirm",
   "register-vendor-confirm-v6",
+  "save-vendor-profile-v23",
+  "delete-vendor-v23",
+  "extend-rfq-closing-v23",
+  "approve-vendor-registration-v23",
+  "confirm-decline-vendor-registration-v23",
   "send-po-v6",
   "create-send-tender-v13",
   "create-send-tender-from-preview-v13",
@@ -91,6 +125,7 @@ export const LIVE_ACTIONS = [
   "save-plan-v5",
   "create-plan-confirm-v5",
   "save-plan-item",
+  "save-plan-item-edit-v23",
   "submit-plan",
   "save-contract-v6",
   "activate-contract-v23",
@@ -202,6 +237,10 @@ const UNCONNECTED_TERMINAL_STEPS = new Set<string>([
   // Document Vault "Request replacement" announced a controlled request to the document's source;
   // nothing is sent anywhere.
   "request-source-document-v19",
+  // Cycle nine audit: "Validate import" announced "12 line items passed" for a CSV nobody read, and the report
+  // builder previewed the sample RPT-0104.
+  "validate-pr-import",
+  "preview-built-report-v5",
 ])
 
 /**
@@ -230,13 +269,68 @@ const OPENER_GRANTS: Record<string, { grants: string[]; what: string }> = {
   "upload-document-v5": { grants: ["documents.manage"], what: "filing documents in the vault" },
   "upload-document-v6": { grants: ["documents.manage"], what: "filing documents in the vault" },
   "register-vendor-v6": { grants: ["vendors.manage"], what: "registering vendors" },
+  "edit-vendor-v6": { grants: ["vendors.manage"], what: "changing vendor details" },
   // Reading an invoice costs an LLM call and stores an intake, so the grant is checked before the upload.
   "run-ocr-v5": { grants: ["intake.manage"], what: "capturing supplier invoices" },
   "upload-invoice-v5": { grants: ["intake.manage"], what: "capturing supplier invoices" },
 }
 
+/**
+ * Openers of features with no backend, refused to every role before the form opens. Their final steps
+ * were already refused, but the forms themselves showed the vendored sample people and addresses
+ * (signer "Tendai Moyo · CEO", delegates "Tinashe Chaka · CFO", recipient approver@matanho.co.zw), and
+ * the vendor form preview offered "Submit to Matanho" to staff. Found by the cycle seven census.
+ */
+const NOT_BUILT_OPENERS: Record<string, string> = {
+  "esign-new-v6": "eSignature is not connected yet, so no envelope can be sent from here.",
+  "create-delegation-v6": "Approval delegation is not connected yet.",
+  "delegate-approval-v6": "Approval delegation is not connected yet. The assigned approver decides this approval.",
+  "send-approval-doc-v13": "Sending documents by email is not connected yet. Download the PDF and send it from your mail.",
+  // Vault and preview "Send": prefilled procurement.approver@matanho.africa and toasted "Document sent".
+  "send-doc-v11": "Sending documents by email is not connected yet. Download the PDF and send it from your mail.",
+  "send-document": "Sending documents by email is not connected yet. Download the PDF and send it from your mail.",
+  // Related record offered the sample TN-2026-014, PO-2026-0584 and CTR-2026-081.
+  "message-vendor-v6": "Vendor messaging is not connected yet. Contact the vendor from your mail for now.",
+  // Its Send request was refused, and the form proposed a due date already past (5 Aug 2026).
+  "request-vendor-docs-v6": "Requesting documents from vendors is not connected yet. Ask the vendor by mail, then file what they send in the Document Vault.",
+  // The profile's "Send compliance reminder" opens the same document request.
+  "send-vendor-reminder-v6": "Requesting documents from vendors is not connected yet. Ask the vendor by mail, then file what they send in the Document Vault.",
+  // Found by the cycle nine audit of every control the census met that actions.ts did not name: each opens a form
+  // whose only save is refused (so the sweep left a form with nothing to press), or shows sample content.
+  "import-pr": "Importing requisition lines from CSV is not available. Add the lines on the requisition form.",
+  "add-note": "Internal notes are not recorded. Use the requisition's justification or the approval comment.",
+  "evaluation-settings": "Evaluation criteria are set on the RFQ when it is created, not here.",
+  "build-report-v5": "Custom report building is not available. Run a report template to export the live records.",
+  "build-report": "Custom report building is not available. Run a report template to export the live records.",
+  "schedule-report-v5": "Report schedules are not stored. Run a report template when you need it.",
+  "import-quotations-v5": "Quotations arrive from the vendor portal, from the link in the RFQ; they are not imported here.",
+  "upload-record-file-v5": "Attach documents to a record from the Document Vault.",
+  "invite-vendors": "Vendors are invited when the RFQ is created and sent, from the tender builder.",
+  "vendor-bid-preview": "Vendors fill in their quotation on the vendor portal, from the link in their RFQ.",
+  "view-history": "A record's history is in Audit & Compliance.",
+  "create-template-v5": "Document templates are not editable here; purchase orders use the organisation's letterhead.",
+  "edit-document": "Document templates are not editable here; purchase orders use the organisation's letterhead.",
+  "edit-report-template": "Report templates are not editable here. Run a template to export the live records.",
+  "edit-doc-v11": "Controlled documents are not edited here. Upload a new version from the Document Vault.",
+  "edit-approval-doc-v13": "Approval documents are generated from the record and are not edited here.",
+  "upload-version": "Upload a new version from the Document Vault.",
+  // Previewed a sample tender pack (pass mark, committee, email subject, "edit and send it from the Document Vault")
+  // built from fields the RFQ does not store.
+  "preview-tender-v13": "The RFQ is sent from the form. Vendors see its lines and closing date in their quotation form.",
+}
+
+/**
+ * True for a control a live session does not offer at all: an opener for something not built, or a step that would save
+ * nothing. The bridge removes these from pages, modals and drawers as they render (window.__pr23IsUnconnected), so no
+ * control answers "not connected" after the click. A role's missing permission is not this: those still explain.
+ */
+export function hasNoBackend(action: string): boolean {
+  return Boolean(NOT_BUILT_OPENERS[action]) || isUnconnectedWrite(action)
+}
+
 /** The refusal to show for an opener the signed-in role cannot complete, or null to let it open. */
 export function refusedOpener(action: string, live: ProcurementV23LivePayload | null): string | null {
+  if (NOT_BUILT_OPENERS[action]) return NOT_BUILT_OPENERS[action]
   const rule = OPENER_GRANTS[action]
   const access = live?.access
   if (!rule || !access || access.isPrivileged) return null
@@ -296,7 +390,9 @@ export async function handleProcurementV23Action(
       case "submit-pr": {
         const form = document.querySelector<HTMLFormElement>("#prForm")
         if (form && !form.reportValidity()) return { handled: true }
-        const department = live.access?.department
+        // An admin has no department of their own but can still raise a requisition, against
+        // whichever department they choose on the form (__pr23RequisitionDepartmentField).
+        const department = live.access?.department || (live.access?.isPrivileged ? val('#prForm [name="cost"]') : "")
         if (!department) {
           return {
             handled: true,
@@ -304,12 +400,26 @@ export async function handleProcurementV23Action(
           }
         }
         const title = val('#prForm [name="title"]')
-        const itemName = val('#prForm [name="item"]')
-        const quantity = Number(val('#prForm [name="qty"]'))
+        // Every line on the form. The vendored form had exactly one; without the live lines, the form itself is
+        // the single "line".
+        const lineRows = [...document.querySelectorAll<HTMLElement>("#prForm [data-pr-line]")]
+        const formEl = document.querySelector<HTMLElement>("#prForm")
+        const lines = (lineRows.length ? lineRows : formEl ? [formEl] : []).map((row) => {
+          const field = (n: string) =>
+            ((row.querySelector(`[name="${n}"]`) as HTMLInputElement | HTMLSelectElement | null)?.value ?? "").trim()
+          const estimate = Number(field("price"))
+          return {
+            itemName: field("item"),
+            quantity: Number(field("qty")),
+            unit: field("uom") || undefined,
+            // The requester's unit estimate; it stays internal and is never copied onto an RFQ.
+            unitPrice: estimate > 0 ? estimate : undefined,
+          }
+        })
         const missing: string[] = []
         if (!title) missing.push("requirement title")
-        if (!itemName) missing.push("line item")
-        if (!(quantity > 0)) missing.push("a quantity above zero")
+        if (!lines.length || lines.some((l) => !l.itemName)) missing.push(lines.length > 1 ? "an item on every line" : "line item")
+        if (lines.some((l) => !(l.quantity > 0))) missing.push("a quantity above zero on every line")
         if (missing.length) return { handled: true, error: `Cannot raise the requisition — missing ${missing.join(", ")}.` }
 
         const created = await createRequisition({
@@ -318,27 +428,28 @@ export async function handleProcurementV23Action(
           priority: "MEDIUM",
           justification: val('#prForm [name="motivation"]') || undefined,
           sourcingCategory: val('#prForm [name="category"]') || undefined,
-          items: [
-            {
-              itemName,
-              quantity,
-              unit: val('#prForm [name="uom"]') || undefined,
-              // The requester's unit estimate; it stays internal and is never copied onto an RFQ.
-              unitPrice: Number(val('#prForm [name="price"]')) > 0 ? Number(val('#prForm [name="price"]')) : undefined,
-            },
-          ],
+          projectId: val('#prForm [name="project"]') || undefined,
+          items: lines,
         })
         const number = created?.requisitionNumber ?? "The requisition"
         if (action === "save-pr") {
           closeRuntimeOverlay()
           return { handled: true, reload: true, message: `${number} saved as a draft.` }
         }
-        await submitRequisition(created.id)
+        let submitted: Record<string, any>
+        try {
+          submitted = await submitRequisition(created.id)
+        } catch (err) {
+          // The requisition exists as a draft by now; say so, or the requester raises it a second time.
+          closeRuntimeOverlay()
+          return { handled: true, reload: true, error: `${number} was saved as a draft but not submitted: ${errorText(err, "the submission failed")}` }
+        }
         closeRuntimeOverlay()
+        const next = routeNext(submitted)
         return {
           handled: true,
           reload: true,
-          message: `${number} submitted to the ${department} department head for approval.`,
+          message: next ? `${number} submitted for approval: ${next}.` : `${number} submitted for approval.`,
         }
       }
 
@@ -355,27 +466,32 @@ export async function handleProcurementV23Action(
         if (form && !form.reportValidity()) return { handled: true }
         const title = val('#editPrFormV11 [name="title"]')
         if (!title) return { handled: true, error: "A requirement title is required." }
-        await updateRequisition(r.recordId, { title, justification: val('#editPrFormV11 [name="justification"]') || null })
+        await updateRequisition(r.recordId, {
+          title,
+          justification: val('#editPrFormV11 [name="justification"]') || null,
+          ...(document.querySelector('#editPrFormV11 [name="project"]') ? { projectId: val('#editPrFormV11 [name="project"]') || null } : {}),
+        })
         if (action === "save-pr-v11") {
           closeRuntimeOverlay()
           return { handled: true, reload: true, message: `${r.id} saved.` }
         }
-        await submitRequisition(r.recordId)
+        const submitted = await submitRequisition(r.recordId)
         closeRuntimeOverlay()
-        const head = r.department ? `the ${r.department} department head` : "the department head"
+        const next = routeNext(submitted)
+        const verb = raw === "REJECTED" ? "corrected and resubmitted" : "submitted"
         return {
           handled: true,
           reload: true,
-          message: raw === "REJECTED" ? `${r.id} corrected and resubmitted to ${head}.` : `${r.id} submitted to ${head} for approval.`,
+          message: next ? `${r.id} ${verb} for approval: ${next}.` : `${r.id} ${verb} for approval.`,
         }
       }
 
       case "approve-pr-v11": {
         const r = byDisplayId("requisitions", detail.dataset.id)
         if (!r) return { handled: true, error: "That requisition is no longer in your register. Refresh and try again." }
-        await approveRequisition(r.recordId)
+        const decided = await approveRequisition(r.recordId)
         closeRuntimeOverlay()
-        return { handled: true, reload: true, message: `${r.id} approved.` }
+        return { handled: true, reload: true, message: approvedMessage(r.id, decided) }
       }
 
       case "confirm-reject-pr-v11": {
@@ -384,13 +500,62 @@ export async function handleProcurementV23Action(
         const form = document.querySelector<HTMLFormElement>("#rejectPrFormV11")
         if (form && !form.reportValidity()) return { handled: true }
         const decision = val('#rejectPrFormV11 [name="decision"]')
+        const category = val('#rejectPrFormV11 [name="category"]')
         const reason = val('#rejectPrFormV11 [name="reason"]')
         if (!reason) return { handled: true, error: "A reason is required to reject a requisition." }
         // The backend has one outcome, REJECTED, which the requester can correct and resubmit.
-        // "Return" and "request information" are recorded in the reason rather than invented as states.
-        await rejectRequisition(r.recordId, decision && decision !== "Reject requisition" ? `${decision}: ${reason}` : reason)
+        // "Return" and "request information", and the reason category, are recorded in the reason rather than invented as states.
+        const explained = category && category !== "Other" ? `${category}. ${reason}` : reason
+        await rejectRequisition(r.recordId, decision && decision !== "Reject requisition" ? `${decision}: ${explained}` : explained)
         closeRuntimeOverlay()
         return { handled: true, reload: true, message: `${r.id} returned to the requester with your reason.` }
+      }
+
+      // ----------------------------------------------------------- approval matrix
+      case "save-approval-matrix-v23": {
+        if (!live.access?.isPrivileged) {
+          return { handled: true, error: "Only an administrator or the Chief Financial Officer can change the approval matrix." }
+        }
+        const stepRows = [...document.querySelectorAll<HTMLElement>("#approvalMatrixFormV23 [data-matrix-step]")]
+        if (!stepRows.length) return { handled: true, error: "The route needs at least one step." }
+        const steps = stepRows.map((row) => {
+          const field = (n: string) =>
+            ((row.querySelector(`[name="${n}"]`) as HTMLInputElement | HTMLSelectElement | null)?.value ?? "").trim()
+          const kind = field("kind") as "DEPARTMENT_HEAD" | "ROLE" | "USER"
+          const above = field("aboveAmount")
+          return {
+            kind,
+            department: kind === "DEPARTMENT_HEAD" ? field("department") || null : null,
+            deputy: kind === "DEPARTMENT_HEAD" && field("deputy") === "DEPUTY",
+            roleCode: kind === "ROLE" ? field("roleCode") || null : null,
+            userId: kind === "USER" ? field("userId") || null : null,
+            aboveAmount: above === "" ? null : Number(above),
+          }
+        })
+        await saveApprovalMatrix(steps)
+        closeRuntimeOverlay()
+        return {
+          handled: true,
+          reload: true,
+          message: `Approval route saved with ${steps.length} step${steps.length === 1 ? "" : "s"}. It applies to requisitions submitted from now on.`,
+        }
+      }
+
+      case "save-invoice-auto-approval-v23": {
+        if (!live.access?.isPrivileged) {
+          return { handled: true, error: "Only an administrator or the Chief Financial Officer can change automatic invoice approval." }
+        }
+        const enabled = Boolean(document.querySelector<HTMLInputElement>('#invoiceAutoApprovalFormV23 [name="enabled"]')?.checked)
+        const limitText = val('#invoiceAutoApprovalFormV23 [name="limit"]')
+        const saved = await saveInvoiceAutoApproval({ enabled, limit: limitText === "" ? null : Number(limitText) })
+        const limit = saved.limit != null ? ` up to $${saved.limit.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : ""
+        return {
+          handled: true,
+          reload: true,
+          message: saved.enabled
+            ? `Invoices that match exactly are now approved automatically${limit}.`
+            : "Automatic approval is off: every invoice waits for a person to approve it.",
+        }
       }
 
       // ----------------------------------------------------------- approval centre
@@ -398,9 +563,11 @@ export async function handleProcurementV23Action(
         const p = rows("approvalPromptsV6").find((x) => x.id === detail.dataset.id)
         if (!p) return { handled: true, error: "That approval is no longer pending. Refresh and try again." }
         switch (p.kind) {
-          case "requisition":
-            await approveRequisition(p.targetId)
-            break
+          case "requisition": {
+            const decided = await approveRequisition(p.targetId)
+            closeRuntimeOverlay()
+            return { handled: true, reload: true, message: approvedMessage(String(p.record ?? p.id), decided) }
+          }
           case "award":
             if (!has("rfq.award")) return refuse("awarding quotations")
             await acceptQuotation(p.targetId, val("#approvalCommentV6") || undefined)
@@ -491,6 +658,7 @@ export async function handleProcurementV23Action(
           email: val(`${formId} [name="email"]`) || undefined,
           phone: val(`${formId} [name="phone"]`) || undefined,
           address: val(`${formId} [name="address"]`) || undefined,
+          paymentTerms: val(`${formId} [name="paymentTerms"]`) || undefined,
           taxClearanceExpiryDate: val(`${formId} [name="taxExpiry"]`) || val(`${formId} [name="itf"]`) || undefined,
         })
         closeRuntimeOverlay()
@@ -503,6 +671,65 @@ export async function handleProcurementV23Action(
           reload: true,
           message: `${created?.name ?? name} registered${cleared ? " with a valid tax clearance" : " and placed in compliance review"}.${bankTyped ? " Bank details were not saved here; Finance records them." : ""}`,
         }
+      }
+
+      case "approve-vendor-registration-v23": {
+        // A vendor that registered itself on the vendor portal (Vendor Registry, self-registrations awaiting review).
+        if (!has("vendors.approve")) return refuse("approving vendor registrations")
+        const reg = rows("vendorRegistrationsV23").find((x) => x.id === detail.dataset.id)
+        if (!reg) return { handled: true, error: "That registration is no longer awaiting review. Refresh and try again." }
+        await approveVendorRegistration(String(reg.id))
+        return { handled: true, reload: true, message: `${reg.name} is approved: an active vendor that can be invited to RFQs, and emailed to say so.` }
+      }
+
+      case "confirm-decline-vendor-registration-v23": {
+        if (!has("vendors.approve")) return refuse("declining vendor registrations")
+        const F = "#declineVendorRegistrationFormV23"
+        const form = document.querySelector<HTMLFormElement>(F)
+        if (form && !form.reportValidity()) return { handled: true }
+        const reg = rows("vendorRegistrationsV23").find((x) => x.id === val(`${F} [name="vendorId"]`))
+        if (!reg) return { handled: true, error: "That registration is no longer awaiting review. Refresh and try again." }
+        const reason = val(`${F} [name="reason"]`)
+        if (!reason) return { handled: true, error: "Say why the registration is declined; the vendor is told." }
+        await declineVendorRegistration(String(reg.id), reason)
+        closeRuntimeOverlay()
+        return { handled: true, reload: true, message: `${reg.name}: registration declined, and the vendor emailed the reason.` }
+      }
+
+      case "save-vendor-profile-v23": {
+        // The live Edit profile form (bridge __pr23VendorEditModal): only the fields the vendor record keeps.
+        if (!has("vendors.manage")) return refuse("changing vendor details")
+        const F = "#vendorEditFormV23"
+        const form = document.querySelector<HTMLFormElement>(F)
+        if (form && !form.reportValidity()) return { handled: true }
+        const v = byDisplayId("vendors", val(`${F} [name="vendorId"]`))
+        if (!v) return { handled: true, error: "That vendor is no longer in the registry. Refresh and try again." }
+        const name = val(`${F} [name="name"]`)
+        if (!name) return { handled: true, error: "The vendor's legal name is required." }
+        const taxExpiry = val(`${F} [name="taxExpiry"]`)
+        const updated = await updateVendor(String(v.recordId), {
+          name,
+          // The API normalises it (Office Supplies -> OFFICE_SUPPLIES), the form RFQs match invitations on.
+          category: val(`${F} [name="category"]`) || undefined,
+          contactPerson: val(`${F} [name="contact"]`),
+          email: val(`${F} [name="email"]`),
+          phone: val(`${F} [name="phone"]`),
+          address: val(`${F} [name="address"]`),
+          paymentTerms: val(`${F} [name="paymentTerms"]`),
+          // A cleared date is left as it was: the tax clearance is replaced, not removed, from here.
+          ...(taxExpiry ? { taxClearanceExpiryDate: taxExpiry } : {}),
+        })
+        closeRuntimeOverlay()
+        return { handled: true, reload: true, message: `${updated?.name ?? name} updated.` }
+      }
+
+      case "delete-vendor-v23": {
+        if (!has("vendors.manage")) return refuse("removing vendors")
+        const v = byDisplayId("vendors", detail.dataset.id)
+        if (!v) return { handled: true, error: "That vendor is no longer in the registry. Refresh and try again." }
+        if (!window.confirm(`Remove ${v.name} from the vendor registry? This can't be undone from here.`)) return { handled: true }
+        await deleteVendor(String(v.recordId))
+        return { handled: true, reload: true, message: `${v.name} removed from the vendor registry.` }
       }
 
       // ---------------------------------------------------------- purchase orders
@@ -636,6 +863,7 @@ export async function handleProcurementV23Action(
         const lines = [...form.querySelectorAll<HTMLTableRowElement>("#rfxLinesV13 tr")]
           .map((row) => ({
             itemName: (row.querySelector<HTMLInputElement>('[name="lineDescription"]')?.value ?? "").trim(),
+            description: (row.querySelector<HTMLInputElement>('[name="lineSpec"]')?.value ?? "").trim() || undefined,
             unit: row.querySelector<HTMLSelectElement>('[name="lineUom"]')?.value || undefined,
             quantity: Number(row.querySelector<HTMLInputElement>('[name="lineQty"]')?.value || 0),
           }))
@@ -661,6 +889,7 @@ export async function handleProcurementV23Action(
           rfqDeadline: close ? new Date(close).toISOString() : undefined,
           items: lines.length ? lines : undefined,
           visibility: String(fd.get("method")) === "Open tender" ? "PUBLIC_LISTING" : "INVITED_ONLY",
+          reportingCurrencyCode: String(fd.get("currency") ?? "").trim().toUpperCase() || undefined,
           // The backend weighs price against everything else: commercial is price, and
           // technical, delivery and risk together are the non-price share.
           priceWeight: commercial / 100,
@@ -673,6 +902,24 @@ export async function handleProcurementV23Action(
           reload: true,
           message: `${created?.rfqNumber ?? "The RFQ"} sent to ${count} vendor${count === 1 ? "" : "s"}${!lines.length && source ? `, with the lines of ${source.id}` : ""}.`,
         }
+      }
+
+      case "extend-rfq-closing-v23": {
+        // The vendored Edit button on a tender row opened a generic fixture form with no way to
+        // save at all -- the only field a published tender can actually change is when it closes.
+        if (!has("rfq.manage")) return refuse("changing tenders and RFQs")
+        const form = document.querySelector<HTMLFormElement>("#editTenderFormV23")
+        if (!form) return { handled: true, error: "Open Edit again; the form is not on screen." }
+        if (!form.reportValidity()) return { handled: true }
+        const t = byDisplayId("tenders", val('#editTenderFormV23 [name="tenderId"]'))
+        if (!t) return { handled: true, error: "That tender is no longer in the register. Refresh and try again." }
+        const newClosingAt = val('#editTenderFormV23 [name="closing"]')
+        if (new Date(newClosingAt).getTime() <= Date.now()) {
+          return { handled: true, error: "Choose a future closing date and time." }
+        }
+        await extendRfqClosing(t.recordId, new Date(newClosingAt).toISOString())
+        closeRuntimeOverlay()
+        return { handled: true, reload: true, message: `${t.id} closing date updated.` }
       }
 
       // ------------------------------------------------------- evaluation and award
@@ -743,8 +990,16 @@ export async function handleProcurementV23Action(
       }
 
       // ----------------------------------------------------------- invoice capture
-      case "confirm-capture-invoice-v5": {
+      case "confirm-capture-invoice-v5":
+      case "confirm-capture-approve-invoice-v23":
+      case "confirm-capture-flag-invoice-v23": {
         if (!has("intake.manage")) return refuse("capturing supplier invoices")
+        // The invoice processing screen (SRD §7) saves, saves and approves, or saves and flags for review.
+        const flagging = action === "confirm-capture-flag-invoice-v23"
+        const approving = action === "confirm-capture-approve-invoice-v23"
+        const reviewNote = flagging ? val("#invoiceReviewNoteV23") : ""
+        if (flagging && !reviewNote) return { handled: true, error: "Say why the invoice needs review before flagging it." }
+        if (approving && !has("invoices.approve")) return refuse("approving invoices")
         const form = document.querySelector<HTMLFormElement>("#invoiceCaptureV23")
         if (!form) return { handled: true, error: "Open Capture invoice again; the capture form is not on screen." }
         if (!form.reportValidity()) return { handled: true }
@@ -765,19 +1020,38 @@ export async function handleProcurementV23Action(
         if (items.some((l) => !(l.unitPrice > 0))) return { handled: true, error: "Every invoiced line needs a unit price above zero." }
         const invoiceDate = val('#invoiceCaptureV23 [name="invoiceDate"]')
         const dueDate = val('#invoiceCaptureV23 [name="dueDate"]')
+        // The supplier's document read on AI Invoice Capture goes with the invoice, and its reading is reused, when it
+        // was read for this order (or before any order was chosen). Captures made from a reading used to drop the PDF.
+        const reading =
+          (window as unknown as {
+            __pr23ReadingFor?: (po: string) => { documentUrl: string; documentType: string; intakeId: string | null } | null
+          }).__pr23ReadingFor?.(poId) ?? null
         const invoice = await captureProcurementInvoice({
           purchaseOrderId: poId,
           vendorId: String(po.vendorId),
           invoiceDate: new Date(invoiceDate).toISOString(),
           dueDate: dueDate ? new Date(dueDate).toISOString() : undefined,
           currencyId: po.currencyId ?? undefined,
+          documentPath: reading?.documentUrl,
+          documentType: reading?.documentType,
+          readingIntakeId: reading?.intakeId ?? undefined,
+          reviewNote: reviewNote || undefined,
           items,
         })
+        ;(window as unknown as { __pr23ClearReading?: () => void }).__pr23ClearReading?.()
+        const captured = invoice?.invoiceNumber ?? "The invoice"
+        if (approving && invoice?.id) {
+          await approveProcurementInvoice(invoice.id, true)
+          closeRuntimeOverlay()
+          return { handled: true, reload: true, message: `${captured} captured against ${po.id} and approved for payment.` }
+        }
         closeRuntimeOverlay()
         return {
           handled: true,
           reload: true,
-          message: `${invoice?.invoiceNumber ?? "The invoice"} captured against ${po.id} and sent to Finance for approval.`,
+          message: flagging
+            ? `${captured} captured against ${po.id} and flagged for review: ${reviewNote}`
+            : `${captured} captured against ${po.id} and sent to Finance for approval.`,
         }
       }
 
@@ -791,10 +1065,10 @@ export async function handleProcurementV23Action(
         if (!form.reportValidity()) return { handled: true }
         const file = form.querySelector<HTMLInputElement>('[name="document"]')?.files?.[0]
         if (!file) return { handled: true, error: "Attach the supplier's invoice PDF first." }
-        if (!/\.pdf$/i.test(file.name)) {
+        if (!/\.(pdf|png|jpe?g|webp|tiff?)$/i.test(file.name)) {
           return {
             handled: true,
-            error: "The invoice has to be a PDF. A photograph or a scan has to be saved as a PDF carrying selectable text before it can be read.",
+            error: "Upload the invoice as a PDF, or as a scan or photo (PNG, JPEG, WEBP or TIFF).",
           }
         }
         const fd = new FormData()
@@ -807,7 +1081,7 @@ export async function handleProcurementV23Action(
         if (!lineCount && !result.payload?.invoiceNumber) {
           return {
             handled: true,
-            error: "Nothing could be read from that PDF — most likely a scan with no text layer. Capture this invoice by hand.",
+            error: "Nothing could be read from that document. Check it is the supplier's invoice, or capture it by hand.",
           }
         }
         // The runtime owns the page's DOM, so the bridge does the filling in.
@@ -834,7 +1108,10 @@ export async function handleProcurementV23Action(
         const recordId = val('#planFormV23 [name="recordId"]')
         const body = {
           name: val('#planFormV23 [name="name"]'),
-          department: val('#planFormV23 [name="department"]') || undefined,
+          department: (() => {
+            const d = val('#planFormV23 [name="department"]')
+            return d && d !== "All departments" ? d : undefined
+          })(),
           fiscalYear: val('#planFormV23 [name="fiscalYear"]') || undefined,
           budget: Number(val('#planFormV23 [name="budget"]') || 0),
           currencyCode: val('#planFormV23 [name="currency"]') || undefined,
@@ -872,11 +1149,36 @@ export async function handleProcurementV23Action(
           quarter: val('#planItemFormV23 [name="quarter"]') || undefined,
           method: val('#planItemFormV23 [name="method"]') || undefined,
           estimatedValue: Number(val('#planItemFormV23 [name="estimatedValue"]') || 0),
-          department: val('#planItemFormV23 [name="department"]') || undefined,
+          department: (() => {
+            const d = val('#planItemFormV23 [name="department"]')
+            return d && d !== "Same as the plan's" ? d : undefined
+          })(),
         })
         closeRuntimeOverlay()
         const fmt = (n: unknown) => Number(n ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
         return { handled: true, reload: true, message: `Line added to ${plan.planNumber}: ${fmt(plan.plannedValue)} planned against a budget of ${fmt(plan.budget)}.` }
+      }
+
+      case "save-plan-item-edit-v23": {
+        if (!has("plans.manage")) return refuse("changing procurement plans")
+        const form = document.querySelector<HTMLFormElement>("#planItemEditFormV23")
+        if (!form) return { handled: true, error: "Open Edit again; the form is not on screen." }
+        if (!form.reportValidity()) return { handled: true }
+        const itemId = val('#planItemEditFormV23 [name="itemId"]')
+        const planId = val('#planItemEditFormV23 [name="planId"]')
+        const plan = await updateProcurementPlanItem(planId, itemId, {
+          description: val('#planItemEditFormV23 [name="description"]'),
+          category: val('#planItemEditFormV23 [name="category"]') || undefined,
+          quarter: val('#planItemEditFormV23 [name="quarter"]') || undefined,
+          method: val('#planItemEditFormV23 [name="method"]') || undefined,
+          estimatedValue: Number(val('#planItemEditFormV23 [name="estimatedValue"]') || 0),
+          department: (() => {
+            const d = val('#planItemEditFormV23 [name="department"]')
+            return d && d !== "Same as the plan's" ? d : undefined
+          })(),
+        })
+        closeRuntimeOverlay()
+        return { handled: true, reload: true, message: `${plan.planNumber}: line updated.` }
       }
 
       case "submit-plan": {
@@ -987,17 +1289,30 @@ export async function handleProcurementV23Action(
         const form = document.querySelector<HTMLFormElement>("#uploadVersionFormV11")
         if (!form) return { handled: true, error: "Open Upload version again; the form is not on screen." }
         if (!form.reportValidity()) return { handled: true }
-        const doc = byDisplayId("documents", detail.dataset.id)
-        if (!doc) {
-          return { handled: true, error: "Only a stored vault document takes a new version; templates and generated records have no stored file." }
-        }
         const file = form.querySelector<HTMLInputElement>('[name="file"]')?.files?.[0]
         if (!file) return { handled: true, error: "Attach the new version's file." }
+        const doc = byDisplayId("documents", detail.dataset.id)
+        if (doc) {
+          const fd = new FormData()
+          fd.append("file", file)
+          const out = await uploadProcurementDocumentVersion(doc.recordId, fd)
+          closeRuntimeOverlay()
+          return { handled: true, reload: true, message: `${doc.name} is now ${out.version}, awaiting review.` }
+        }
+        // This preview is a tender pack, plan, evaluation or other record rendered live from its
+        // own data -- there is no stored file behind it yet to version. Store the upload as the
+        // vault's first document for that record instead of refusing.
+        const name = document.querySelector("#modalTitle")?.textContent?.trim() || detail.dataset.id || "Uploaded document"
         const fd = new FormData()
-        fd.append("file", file)
-        const out = await uploadProcurementDocumentVersion(doc.recordId, fd)
+        fd.append("files", file)
+        fd.append("folder", "General")
+        fd.append("name", name)
+        fd.append("relatedRecord", detail.dataset.id ?? "")
+        const note = val('#uploadVersionFormV11 [name="note"]')
+        if (note) fd.append("description", note)
+        await uploadProcurementDocuments(fd)
         closeRuntimeOverlay()
-        return { handled: true, reload: true, message: `${doc.name} is now ${out.version}, awaiting review.` }
+        return { handled: true, reload: true, message: `${name} filed in the Document Vault, linked to ${detail.dataset.id}.` }
       }
 
       // ------------------------------------------------------------ invoice payment

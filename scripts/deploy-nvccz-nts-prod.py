@@ -31,6 +31,7 @@ STAFF_URL = f"https://{PUBLIC_STAFF_HOST}"
 APPLY_URL = os.environ.get("NVCCZ_APPLY_URL", "https://nvccz.online")
 LP_URL = os.environ.get("NVCCZ_LP_URL", "https://lp.nvccz.online")
 INVESTEE_URL = os.environ.get("NVCCZ_INVESTEE_URL", "https://investee.nvccz.online")
+VENDOR_URL = os.environ.get("NVCCZ_VENDOR_URL", "https://vendor.nvccz.online")
 API_URL = os.environ.get("NVCCZ_API_URL", "https://api.nvccz.online")
 ADMIN_EMAIL = "admin@nvccz.co.zw"
 
@@ -156,6 +157,8 @@ def env_blob(mysql_root: str, mysql_pass: str, jwt: str, admin_pw: str) -> str:
         "PUBLIC_LP_PORTAL_URL": lp_ui,
         "PUBLIC_INVESTEE_PORTAL_URL": investee_ui,
         "PUBLIC_APPLY_PORTAL_URL": apply_ui,
+        "PUBLIC_VENDOR_PORTAL_URL": VENDOR_URL,
+        "VENDOR_PORTAL_BASE_URL": VENDOR_URL,
         "PUBLIC_STAFF_HOST": PUBLIC_STAFF_HOST,
         # Mirror host (NVCCZ frontend on Matanho infrastructure). The staff
         # Traefik router matches this in addition to PUBLIC_STAFF_HOST, so a

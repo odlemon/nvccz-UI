@@ -78,7 +78,7 @@ export const STAFF_PUBLIC_PASS_THROUGH = [
   '/payroll',
   // The V52 accounting port now serves /accounting (renamed from /accounting-v52).
   '/accounting',
-  '/procurement-v23',
+  '/procurement',
   // '/performance' deliberately REMOVED (8 Sep 2026). This list is checked at
   // middleware.ts:350 and returns NextResponse.next() *before* the token check and
   // before the routePermissions loop, so while it was here every /performance* URL was

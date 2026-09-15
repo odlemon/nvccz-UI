@@ -1,4 +1,9 @@
-import html2canvas from 'html2canvas'
+// html2canvas itself cannot parse oklch/lab/lch -- it throws "Attempting to parse an unsupported
+// color function" on any element whose computed color resolves to one, which Tailwind v4's
+// Preflight (border-color: oklch(...) on every element by default) makes unavoidable in this app.
+// html2canvas-pro is the actively maintained fork that added support for these color functions,
+// with the same API; convertOklchToRgb below still runs as a belt-and-braces fallback.
+import html2canvas from 'html2canvas-pro'
 import jsPDF from 'jspdf'
 
 export interface PDFGenerationOptions {
@@ -29,12 +34,14 @@ export const generatePDF = async (
     tempContainer.style.height = element.offsetHeight + 'px'
     tempContainer.style.backgroundColor = '#ffffff'
     
-    // Clone the element and convert oklch colors to standard colors
+    // Clone the element and convert oklch colors to standard colors. The clone must be attached
+    // to the document before sanitizing: getComputedStyle on a detached node (not yet appended
+    // anywhere) resolves to initial/empty values, not the classes' actual cascaded oklch colors,
+    // so calling this before attaching silently sanitized nothing.
     const clonedElement = element.cloneNode(true) as HTMLElement
-    convertOklchToRgb(clonedElement)
-    
     tempContainer.appendChild(clonedElement)
     document.body.appendChild(tempContainer)
+    convertOklchToRgb(clonedElement)
 
     // Generate canvas from the temporary container
     const canvas = await html2canvas(tempContainer, {
@@ -46,9 +53,11 @@ export const generatePDF = async (
       width: tempContainer.offsetWidth,
       height: tempContainer.offsetHeight,
       ignoreElements: (element) => {
-        // Skip elements that might cause issues
-        return element.classList.contains('no-print') || 
-               element.style.display === 'none'
+        // Skip elements that might cause issues. html2canvas-pro types this callback's
+        // param as the base DOM `Element`, which has no `.style` -- narrow it since in
+        // practice html2canvas only ever passes rendered HTML elements here.
+        return element.classList.contains('no-print') ||
+               (element as HTMLElement).style?.display === 'none'
       }
     })
 
@@ -92,22 +101,33 @@ const convertOklchToRgb = (element: HTMLElement) => {
     null
   )
 
+  // TreeWalker.nextNode() only ever advances to a *descendant* of the walker's root -- the root
+  // itself (the element callers actually pass in, e.g. the whole preview panel) is never visited
+  // by the while loop below. Sanitize it explicitly first, then walk everything under it.
+  const sanitizeNode = (htmlElement: HTMLElement) => {
+    const computedStyle = window.getComputedStyle(htmlElement)
+
+    // html2canvas cannot parse oklch() (Tailwind v4's default color space). Reading the computed
+    // value (not the element's own inline style, which is empty for anything colored via a CSS
+    // class -- i.e. almost everything) and writing it back as an inline override is what actually
+    // neutralizes a class-applied oklch color before html2canvas walks the clone.
+    if (computedStyle.backgroundColor.includes('oklch')) {
+      htmlElement.style.backgroundColor = '#ffffff' // Default to white
+    }
+    if (computedStyle.color.includes('oklch')) {
+      htmlElement.style.color = '#000000' // Default to black
+    }
+    if (computedStyle.borderColor.includes('oklch')) {
+      htmlElement.style.borderColor = '#e5e7eb' // Default to gray
+    }
+  }
+
+  sanitizeNode(element)
+
   let node = walker.nextNode()
   while (node) {
     const htmlElement = node as HTMLElement
-    const computedStyle = window.getComputedStyle(htmlElement)
-    
-    // Convert common oklch colors to RGB equivalents
-    const style = htmlElement.style
-    if (style.backgroundColor && style.backgroundColor.includes('oklch')) {
-      style.backgroundColor = '#ffffff' // Default to white
-    }
-    if (style.color && style.color.includes('oklch')) {
-      style.color = '#000000' // Default to black
-    }
-    if (style.borderColor && style.borderColor.includes('oklch')) {
-      style.borderColor = '#e5e7eb' // Default to gray
-    }
+    sanitizeNode(htmlElement)
 
     node = walker.nextNode()
   }

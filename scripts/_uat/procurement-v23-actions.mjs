@@ -170,7 +170,7 @@ await step("1 Operations head approves PR-B (Approval Centre)", async (open) => 
   const pending = (await api(email, "/procurement/requisitions/pending-approval")) ?? []
   const target = pending.find((r) => String(r.title).startsWith("UAT P2P printer toner"))
   if (!target) return record(false, label, "no pending UAT requisition — run the p2p flow with --reset")
-  const { page, errors } = await open(email, "/procurement-v23/approvals")
+  const { page, errors } = await open(email, "/procurement/approvals")
   const control = `[data-action="approve-prompt-v6"][data-id="PR-${target.requisitionNumber}"]`
   if (!(await promptOnScreen(page, control))) return record(false, label, await explainMissingPrompt(page, control, errors))
   await page.click(control)
@@ -185,7 +185,7 @@ await step("2 Procurement Manager awards RFQ-B (Approval Centre)", async (open) 
   const email = "proc.mgr@nts.local"
   const rfq = ((await api(email, "/procurement/rfq")) ?? []).find((r) => String(r.title).startsWith("UAT P2P RFQ meeting room screen"))
   if (!rfq) return record(false, label, "no UAT RFQ-B — run the p2p flow with --reset")
-  const { page, errors } = await open(email, "/procurement-v23/approvals")
+  const { page, errors } = await open(email, "/procurement/approvals")
   const control = `[data-action="approve-prompt-v6"][data-id="AWARD-${rfq.rfqNumber}"]`
   if (!(await promptOnScreen(page, control))) return record(false, label, await explainMissingPrompt(page, control, errors))
   await page.click(control)
@@ -205,9 +205,11 @@ await step("3 Operations member raises a requisition (form)", async (open) => {
   const label = "3 Operations member raises a requisition (form)"
   const email = "proc.requester@nts.local"
   const title = `UAT P2P V23 form requisition ${RUN}`
-  const { page, errors } = await open(email, "/procurement-v23/requisitions")
+  const { page, errors } = await open(email, "/procurement/requisitions")
   await page.click('[data-action="create-requisition"]')
   await page.waitForSelector("#prForm")
+  // Category is required (cycle seven): choose the first real one; option 0 is "Choose a category".
+  await page.selectOption('#prForm select[name="category"]', { index: 1 })
   await page.fill('#prForm [name="title"]', title)
   await page.fill('#prForm [name="item"]', "Whiteboard markers")
   await page.fill('#prForm [name="qty"]', "24")
@@ -223,21 +225,22 @@ await step("3 Operations member raises a requisition (form)", async (open) => {
 })
 
 // ------------------------------------------------------------------ 4. officer registers a vendor
-await step("4 Procurement Officer registers a vendor (V6 form)", async (open) => {
-  const label = "4 Procurement Officer registers a vendor (V6 form)"
+await step("4 Procurement Officer registers a vendor (live form)", async (open) => {
+  const label = "4 Procurement Officer registers a vendor (live form)"
   const email = "proc.officer@nts.local"
   const name = `UAT P2P V23 Form Vendor ${RUN}`
-  const { page, errors } = await open(email, "/procurement-v23/vendors")
+  const { page, errors } = await open(email, "/procurement/vendors")
   // The live vendor page's header button is register-vendor-v6 (the base page's register-vendor is not rendered).
   await page.click('[data-action="register-vendor-v6"]')
-  const form = "#vendorFormV6, #vendorRegisterFormV6"
+  // Live, it opens the vendor form that saves only what the record keeps (#vendorForm); the prototype's V6 form remains the fallback.
+  const form = "#vendorForm, #vendorFormV6, #vendorRegisterFormV6"
   await page.waitForSelector(form)
-  const formId = (await page.$("#vendorFormV6")) ? "#vendorFormV6" : "#vendorRegisterFormV6"
+  const formId = (await page.$("#vendorForm")) ? "#vendorForm" : (await page.$("#vendorFormV6")) ? "#vendorFormV6" : "#vendorRegisterFormV6"
   const inYear = new Date(Date.now() + 365 * 86400000).toISOString().slice(0, 10)
   const values = {
     name, trading: name, country: "Zimbabwe", bp: `UAT-BP-${RUN}`, vat: `UAT-VAT-${RUN}`,
     contact: "Form Tester", email: `uat.form.${RUN}@vendors.example.test`, phone: "+263771000099",
-    address: "1 Uat Road, Harare", bank: "UAT Bank", branch: "001", accountName: name, accountNumber: "000111222", taxExpiry: inYear,
+    address: "1 Uat Road, Harare", paymentTerms: "30 days from invoice", bank: "UAT Bank", branch: "001", accountName: name, accountNumber: "000111222", taxExpiry: inYear,
   }
   for (const [field, value] of Object.entries(values)) {
     const el = await page.$(`${formId} [name="${field}"]`)
@@ -252,7 +255,10 @@ await step("4 Procurement Officer registers a vendor (V6 form)", async (open) =>
     else if (kind === "date") await el.fill(inYear)
     else if (kind !== "checkbox" && kind !== "select") await el.fill("UAT")
   }
-  await page.click('[data-action="register-vendor-confirm-v6"]')
+  // Category is required and starts empty (cycle seven): choose the first real one.
+  const category = await page.$(`${formId} select[name="category"]`)
+  if (category && !(await category.inputValue())) await page.selectOption(`${formId} select[name="category"]`, { index: 1 })
+  await page.click('#modalLayer [data-action="register-vendor-confirm"], [data-action="register-vendor-confirm-v6"]')
   const toast = await toasts(page)
   const vendor = ((await api(email, "/accounting/vendors")) ?? []).find((v) => v.name === name)
   record(
@@ -271,7 +277,7 @@ await step("5 Upload invoice opens AI Invoice Capture, nothing saved", async (op
   const label = "5 Upload invoice opens AI Invoice Capture, nothing saved"
   const email = "proc.ap@nts.local"
   const before = ((await api(email, "/procurement/invoices")) ?? []).length
-  const { page, errors } = await open(email, "/procurement-v23/invoices")
+  const { page, errors } = await open(email, "/procurement/invoices")
   await page.click('[data-action="upload-invoice-v5"]')
   await page.waitForSelector("#aiInvoiceCaptureV23", { timeout: 60000 })
   const heading = (await page.locator(".page-head h1").first().textContent())?.trim()
@@ -290,7 +296,7 @@ await step("6 Procurement Officer sends an RFQ from PR-E (tender builder)", asyn
   const email = "proc.officer@nts.local"
   const pr = ((await api(email, "/procurement/requisitions")) ?? []).find((r) => String(r.title).startsWith("UAT P2P projector lamps") && r.status === "APPROVED")
   if (!pr) return record(false, label, "no approved PR-E — run the p2p flow with --reset")
-  const { page, errors } = await open(email, "/procurement-v23/tenders")
+  const { page, errors } = await open(email, "/procurement/tenders")
   await page.click('[data-action="create-tender"]')
   await page.waitForSelector("#tenderFormV13")
   await page.selectOption('#tenderFormV13 [name="source"]', pr.id)
@@ -327,7 +333,7 @@ await step("7 Procurement Officer scores RFQ-C bids (Bid Evaluation)", async (op
   const email = "proc.officer@nts.local"
   const rfq = await rfqCOf(email)
   if (!rfq) return record(false, label, "no RFQ-C — run the p2p flow with --reset")
-  const { page, errors } = await open(email, "/procurement-v23/evaluation")
+  const { page, errors } = await open(email, "/procurement/evaluation")
   await page.click(`[data-action="open-evaluation"][data-id="${rfq.rfqNumber}"]`)
   await page.waitForSelector("[data-score-quote]", { timeout: 20000 })
   const inputs = await page.$$("[data-score-quote]")
@@ -350,7 +356,7 @@ await step("8 Procurement Manager awards RFQ-C (award panel)", async (open) => {
   const email = "proc.mgr@nts.local"
   const rfq = await rfqCOf(email)
   if (!rfq) return record(false, label, "no RFQ-C — run the p2p flow with --reset")
-  const { page, errors } = await open(email, "/procurement-v23/evaluation")
+  const { page, errors } = await open(email, "/procurement/evaluation")
   await page.click(`[data-action="open-evaluation"][data-id="${rfq.rfqNumber}"]`)
   await page.waitForSelector('.award-panel-v6 [name="awardWinnerV6"]', { timeout: 20000 })
   const recommended = page.locator('label.award-option-v6:has-text("System recommendation") input[name="awardWinnerV6"]')
@@ -385,7 +391,7 @@ await step("9 Procurement Officer records a GRN against PO-B (live form)", async
   const po = await poBOf(email)
   if (!po) return record(false, label, "no PO for RFQ-B — step 2 must award it first")
   const before = ((await api(email, "/procurement/goods-received-notes")) ?? []).filter((g) => g.purchaseOrderId === po.id).length
-  const { page, errors } = await open(email, "/procurement-v23/goods-received")
+  const { page, errors } = await open(email, "/procurement/goods-received")
   await page.click('[data-action="record-grn"]')
   await page.waitForSelector("#grnFormV23")
   await page.selectOption("#grnPoV23", po.id)
@@ -408,7 +414,7 @@ await step("10 Accountant captures the invoice for PO-B (live form)", async (ope
   const po = await poBOf("proc.officer@nts.local")
   if (!po) return record(false, label, "no PO for RFQ-B — step 2 must award it first")
   const before = ((await api(email, "/procurement/invoices")) ?? []).filter((i) => i.purchaseOrderId === po.id).length
-  const { page, errors } = await open(email, "/procurement-v23/invoices")
+  const { page, errors } = await open(email, "/procurement/invoices")
   await page.click('[data-action="capture-invoice-v5"]')
   await page.waitForSelector("#invoiceCaptureV23")
   await page.selectOption("#invoicePoV23", po.id)
@@ -428,9 +434,10 @@ await step("10 Accountant captures the invoice for PO-B (live form)", async (ope
 await step("11 Finance Manager rejects an invoice (Approval Centre)", async (open) => {
   const label = "11 Finance Manager rejects an invoice (Approval Centre)"
   const email = "payroll.finmgr@nts.local"
-  const target = ((await api(email, "/procurement/invoices")) ?? []).find((i) => String(i.status).toUpperCase() === "DRAFT")
-  if (!target) return record(false, label, "no DRAFT invoice to reject — step 10 captures one")
-  const { page, errors } = await open(email, "/procurement-v23/approvals")
+  // A UAT vendor's invoice only: dev also carries the demo dataset, whose invoice waiting on Finance is not ours to reject.
+  const target = ((await api(email, "/procurement/invoices")) ?? []).find((i) => String(i.status).toUpperCase() === "DRAFT" && /^UAT\b/.test(String(i.vendor?.name ?? "")))
+  if (!target) return record(false, label, "no DRAFT UAT invoice to reject — step 10 captures one")
+  const { page, errors } = await open(email, "/procurement/approvals")
   const id = `INVOICE-${target.invoiceNumber}`
   const review = `[data-action="open-approval-v6"][data-id="${id}"]`
   if (!(await promptOnScreen(page, review))) return record(false, label, await explainMissingPrompt(page, review, errors))
@@ -480,7 +487,7 @@ await step("12 Procurement Officer raises and sends a PO from an approved requis
   const approved = await apiCall("perf.deptmgr@nts.local", "PUT", `/procurement/requisitions/${made.data.id}/approve`, {})
   if (approved.data?.status !== "APPROVED") return record(false, label, `could not approve ${made.data.requisitionNumber}: ${approved.status} ${approved.message}`)
 
-  const { page, errors } = await open(officer, "/procurement-v23/purchase-orders")
+  const { page, errors } = await open(officer, "/procurement/purchase-orders")
   await page.click('[data-action="create-po-v6"]')
   await page.waitForSelector("#poFormV23")
   await page.selectOption("#poSourceV23", made.data.id)
@@ -508,15 +515,16 @@ await step("13 Accountant records payment of an approved invoice (Record payment
   const ap = "proc.ap@nts.local"
   const finance = "payroll.finmgr@nts.local"
   let invoices = (await api(ap, "/procurement/invoices")) ?? []
-  let target = invoices.find((i) => i.status === "APPROVED" && !["PAID", "PARTIALLY_PAID"].includes(i.paymentStatus))
+  const isTestVendor = (name) => /^UAT\b/.test(String(name ?? ""))
+  let target = invoices.find((i) => i.status === "APPROVED" && !["PAID", "PARTIALLY_PAID"].includes(i.paymentStatus) && isTestVendor(i.vendor?.name))
   if (!target) {
     // Arrange: accounts payable captures an invoice against a dispatched PO if none is waiting,
     // then Finance approves it, so there is one to pay.
-    let draft = invoices.find((i) => i.status === "DRAFT")
+    let draft = invoices.find((i) => i.status === "DRAFT" && isTestVendor(i.vendor?.name))
     if (!draft) {
       const orders = (await api(ap, "/procurement/purchase-orders")) ?? []
-      const po = orders.find((o) => ["SENT", "ACKNOWLEDGED", "PARTIALLY_DELIVERED", "DELIVERED"].includes(o.status) && (o.items ?? []).length)
-      if (!po) return record(false, label, "no dispatched PO to invoice — run the p2p flow first")
+      const po = orders.find((o) => ["SENT", "ACKNOWLEDGED", "PARTIALLY_DELIVERED", "DELIVERED"].includes(o.status) && (o.items ?? []).length && isTestVendor(o.vendor?.name))
+      if (!po) return record(false, label, "no dispatched UAT purchase order to invoice — run the p2p flow first")
       const captured = await apiCall(ap, "POST", "/procurement/invoices", {
         purchaseOrderId: po.id,
         vendorId: po.vendorId,
@@ -532,7 +540,7 @@ await step("13 Accountant records payment of an approved invoice (Record payment
     if (ok.status !== 200) return record(false, label, `could not approve ${draft.invoiceNumber}: ${ok.status} ${ok.message}`)
     target = { ...draft, status: "APPROVED" }
   }
-  const { page, errors } = await open(ap, "/procurement-v23/invoices")
+  const { page, errors } = await open(ap, "/procurement/invoices")
   await page.click('[data-action="record-payment-v23"]')
   await page.waitForSelector("#paymentFormV23")
   await page.selectOption("#paymentInvoiceV23", target.id)
@@ -554,7 +562,7 @@ await step("14 Procurement Manager creates an annual plan with a line (plan form
   const label = "14 Procurement Manager creates an annual plan with a line (plan form)"
   const email = "proc.mgr@nts.local"
   const name = `UAT P2P plan ${RUN}`
-  const { page, errors } = await open(email, "/procurement-v23/plan")
+  const { page, errors } = await open(email, "/procurement/plan")
   await page.click('[data-action="create-plan-v5"]')
   await page.waitForSelector("#planFormV23")
   await page.fill('#planFormV23 [name="name"]', name)
@@ -580,7 +588,7 @@ await step("15 Plan submitted by its author, approved by the Finance Manager (Ap
   const plan = ((await api(author, "/procurement/plans")) ?? []).find((p) => p.name === `UAT P2P plan ${RUN}`)
   if (!plan) return record(false, label, "no plan from step 14")
   {
-    const { page, errors } = await open(author, "/procurement-v23/plan")
+    const { page, errors } = await open(author, "/procurement/plan")
     await page.click(`[data-action="open-plan-detail-v5"][data-id="${plan.planNumber}"] >> nth=0`)
     await page.waitForSelector('[data-action="submit-plan"]')
     await page.click('[data-action="submit-plan"] >> nth=0')
@@ -588,7 +596,7 @@ await step("15 Plan submitted by its author, approved by the Finance Manager (Ap
     const submitted = ((await api(author, "/procurement/plans")) ?? []).find((p) => p.id === plan.id)
     if (submitted?.status !== "SUBMITTED") return record(false, label, `submit -> ${submitted?.status} · "${toast}"${suffix(errors)}`)
   }
-  const { page, errors } = await open(finance, "/procurement-v23/approvals")
+  const { page, errors } = await open(finance, "/procurement/approvals")
   const control = `[data-action="approve-prompt-v6"][data-id="PLAN-${plan.planNumber}"]`
   if (!(await promptOnScreen(page, control))) return record(false, label, await explainMissingPrompt(page, control, errors))
   await page.click(control)
@@ -602,7 +610,7 @@ await step("16 Procurement Manager creates a contract from an award and activate
   const label = "16 Procurement Manager creates a contract from an award and activates it"
   const email = "proc.mgr@nts.local"
   const title = `UAT P2P supply agreement ${RUN}`
-  const { page, errors } = await open(email, "/procurement-v23/contracts")
+  const { page, errors } = await open(email, "/procurement/contracts")
   await page.click('[data-action="create-contract-v6"]')
   await page.waitForSelector("#contractFormV23")
   const awards = await page.$$eval("#contractSourceV23 option", (os) => os.map((o) => o.value).filter(Boolean))
@@ -642,7 +650,7 @@ await step("17 Procurement Officer files a document in the vault (Upload documen
   const label = "17 Procurement Officer files a document in the vault (Upload document form)"
   const email = "proc.officer@nts.local"
   const name = `UAT P2P tender pack ${RUN}`
-  const { page, errors } = await open(email, "/procurement-v23/documents")
+  const { page, errors } = await open(email, "/procurement/documents")
   await page.click('[data-action="upload-document-v5"] >> nth=0')
   await page.waitForSelector("#uploadDocumentFormV5")
   await page.setInputFiles('#uploadDocumentFormV5 [name="files"]', { name: "uat-tender-pack.pdf", mimeType: "application/pdf", buffer: Buffer.from("%PDF-1.4\n%%EOF\n") })

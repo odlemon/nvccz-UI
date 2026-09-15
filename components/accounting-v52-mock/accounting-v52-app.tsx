@@ -10,6 +10,7 @@ import { startAccountingV52Runtime } from "@/components/accounting-v52-mock/mata
 import { ACCOUNTING_V52_SHELL_HTML } from "@/components/accounting-v52-mock/shell"
 import { loadAc52Scopes, scopesForAc52Page, type Ac52DataScope } from "@/lib/accounting-v52/live-loaders"
 import { handleAccountingV52Action } from "@/lib/accounting-v52/actions"
+import { toast } from "sonner"
 import type { Ac52Account } from "@/lib/accounting-v52/types"
 import "@/components/accounting-v52-mock/accounting-v52.css"
 
@@ -52,6 +53,8 @@ export function AccountingV52App() {
     // to the root route before the runtime ever shows the real page. Ignore nav
     // calls that don't match initialPage until we've seen one that does.
     let hasSettledOnInitialPage = initialPage === "overview"
+    // Pages patched for live data (scripts/patch-accounting-v52-runtime.mjs) render the records instead of samples.
+    ;(window as any).__AC52_LIVE__ = true
     const runtime = startAccountingV52Runtime(el, {
       shellHtml: ACCOUNTING_V52_SHELL_HTML,
       initialPage,
@@ -70,6 +73,20 @@ export function AccountingV52App() {
       },
     })
     apiRef.current = runtime
+
+    // Every Accounting style is scoped to .accounting-v52-root, but the runtime appends its drawers, focus and deep
+    // views, toolbar and menus to <body>, where they rendered unstyled below the page (and the sidebar covered
+    // Payables' Pay button). Keep each of them inside the module root, as it is added.
+    const belongsInRoot = (node: Element) =>
+      /^v\d+[A-Z]/.test(node.id) || Array.from(node.classList).some((c) => /^v\d+-/.test(c))
+    const adoptRuntimeLayers = () => {
+      for (const child of Array.from(document.body.children)) {
+        if (child.tagName !== "SCRIPT" && belongsInRoot(child)) el.appendChild(child)
+      }
+    }
+    adoptRuntimeLayers()
+    const bodyObserver = new MutationObserver(adoptRuntimeLayers)
+    bodyObserver.observe(document.body, { childList: true })
 
     ensurePageDataRef.current = async (page: string) => {
       const plan = scopesForAc52Page(page)
@@ -128,7 +145,7 @@ export function AccountingV52App() {
       const ce = event as CustomEvent
       const detail = ce.detail || {}
       const action = String(detail.action || "")
-      const LIVE_ACTIONS = new Set(["coa-save", "upload-document", "close-task-complete", "timesheet-approve", "timesheet-return", "create-tax-pack", "approval-decision", "journal-submit"])
+      const LIVE_ACTIONS = new Set(["coa-save", "upload-document", "close-task-complete", "timesheet-approve", "timesheet-return", "create-tax-pack", "approval-decision", "journal-submit", "ap-pay-bill"])
       if (!LIVE_ACTIONS.has(action)) return
       event.preventDefault()
       if (busyRef.current) return
@@ -143,6 +160,9 @@ export function AccountingV52App() {
       void handleAccountingV52Action({ action, payload }).then(async (result) => {
         busyRef.current = false
         if (result.error) {
+          // The runtime’s commitError/commitSuccess look for handlers that live in another of its closures, so on their own they
+          // showed nothing: every Accounting write was silent, success or failure. Say it here as well.
+          toast.error(result.error)
           runtime.commitError?.(new Error(result.error))
           return
         }
@@ -167,6 +187,8 @@ export function AccountingV52App() {
           // book an investment, or apply a CoA change — invalidate broadly rather than guess which.
           "approval-decision": { scopes: [...JOURNAL_DEPENDENT_SCOPES, "coa", "payables", "investments"], title: "Approval processed" },
           "journal-submit": { scopes: JOURNAL_DEPENDENT_SCOPES, title: "Journal submitted" },
+          // A supplier payment posts a journal and a cashbook entry, and reduces the bill (and the procurement invoice).
+          "ap-pay-bill": { scopes: ["payables", ...JOURNAL_DEPENDENT_SCOPES], title: "Supplier payment" },
         }
         const meta = ACTION_SCOPE[action] || { scopes: ["coa"] as Ac52DataScope[], title: "Updated" }
         // Drop the in-flight entry too, not just the loaded flag: a fetch issued before this
@@ -176,7 +198,17 @@ export function AccountingV52App() {
           loadedScopesRef.current.delete(scope)
           pendingScopesRef.current.delete(scope)
         }
+        if (action === "ap-pay-bill") {
+          // Say the bill is paid (and close the Pay dialog) as soon as the payment is recorded, then reload the six
+          // registers it touches behind the message. Waiting for them first left the dialog open with no word for over
+          // two minutes on dev, after the payment had already been made.
+          toast.success(meta.title, { description: result.message })
+          runtime.commitSuccess?.(meta.title, result.message, meta.scopes[0])
+          await ensurePageDataRef.current?.(pathToAc52Page(pathnameRef.current))
+          return
+        }
         await ensurePageDataRef.current?.(pathToAc52Page(pathnameRef.current))
+        toast.success(meta.title, { description: result.message })
         runtime.commitSuccess?.(meta.title, result.message, meta.scopes[0])
       })
     }

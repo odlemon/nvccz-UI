@@ -5,6 +5,7 @@ import { approveTimesheet, returnTimesheet } from '@/lib/api/timesheets-api'
 import { createTaxReturnPack, compileTaxReturnPack, getForecastEntities } from '@/lib/api/tax-return-pack-api'
 import { accountingApi } from '@/lib/api/accounting-api'
 import { approveApprovalRequest, rejectApprovalRequest } from '@/lib/api/approvals-api'
+import { payProcurementInvoice } from '@/lib/api/procurement-v23-api'
 import { ac52AccountTypeToBackend, ac52FinancialStatementForType } from './adapters'
 
 export type Ac52ActionResult = {
@@ -177,6 +178,60 @@ async function handleApprovalDecision(payload: ApprovalDecisionPayload): Promise
   return { handled: true, message: payload.decision === 'approve' ? 'Approved and applied.' : 'Returned to the maker.' }
 }
 
+type ApPayBillPayload = {
+  source?: 'procurement' | 'accounting'
+  recordId?: string
+  billId: string
+  vendor?: string
+  bankId: string
+  bankName?: string
+  date: string
+  reference?: string
+  amount: number
+  file?: File | null
+}
+
+const cents = (n: number) => `$${Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+
+/**
+ * Pay a supplier bill from Payables (SRD Procurement §3: approved invoices are paid from Accounts Payable, and the
+ * payment updates procurement). A procurement invoice is paid through procurement's payment endpoint, which posts the
+ * journal and cashbook entry, keeps the proof of payment and marks the invoice paid; a bill captured in Accounting is
+ * paid through its own endpoint, which may send a large payment to the CFO first.
+ */
+async function handleApPayBill(p: ApPayBillPayload): Promise<Ac52ActionResult> {
+  if (!p.recordId || !p.source) return { handled: true, error: `${p.billId} is no longer in the register. Refresh and try again.` }
+  if (!p.bankId) return { handled: true, error: 'Choose the account the payment is made from.' }
+  if (!p.date) return { handled: true, error: 'Enter the payment date.' }
+  if (p.source === 'procurement') {
+    if (!(p.file instanceof File)) {
+      return { handled: true, error: 'Attach the proof of payment: a procurement invoice is paid with its bank evidence.' }
+    }
+    const form = new FormData()
+    form.append('paymentAmount', String(p.amount))
+    form.append('paymentDate', p.date)
+    form.append('paymentMethod', 'BANK')
+    form.append('bankAccountId', p.bankId)
+    if (p.reference) form.append('paymentReference', p.reference)
+    form.append('proofOfPayment', p.file)
+    await payProcurementInvoice(p.recordId, form)
+    return {
+      handled: true,
+      message: `${p.billId} paid ${cents(p.amount)} to ${p.vendor ?? 'the vendor'}. The journal and cashbook entry are posted, and procurement shows the invoice paid.`,
+    }
+  }
+  const res: any = await accountingApi.payPurchaseInvoice(p.recordId, {
+    paymentMethod: 'BANK',
+    bankId: p.bankId,
+    paymentDate: p.date,
+    paymentReference: p.reference || undefined,
+  } as any)
+  if (res?.data?.status === 'pending_approval') {
+    return { handled: true, message: `${p.billId}: the payment is above the approval threshold and was sent to the CFO. It is posted once approved.` }
+  }
+  return { handled: true, message: `${p.billId} paid ${cents(p.amount)} to ${p.vendor ?? 'the vendor'}. The journal and cashbook entry are posted.` }
+}
+
 export async function handleAccountingV52Action(detail: {
   action: string
   payload: Record<string, unknown>
@@ -199,6 +254,8 @@ export async function handleAccountingV52Action(detail: {
         return await handleApprovalDecision(detail.payload as unknown as ApprovalDecisionPayload)
       case 'journal-submit':
         return await handleJournalSubmit(detail.payload as unknown as JournalSubmitPayload)
+      case 'ap-pay-bill':
+        return await handleApPayBill(detail.payload as unknown as ApPayBillPayload)
       default:
         return { handled: false }
     }

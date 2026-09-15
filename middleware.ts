@@ -49,35 +49,35 @@ function hasSubModuleAccess(roleCode: RoleCode | null, moduleId: string, subModu
 // Map routes to modules and sub-modules
 const routePermissions: Record<string, { module: string; subModule?: string }> = {
   // Procurement routes
-  '/procurement': { module: 'procurement', subModule: 'procurement-dashboard' },
-  '/procurement/requisitions': { module: 'procurement', subModule: 'purchase-requisitions' },
-  '/procurement/rfq': { module: 'procurement', subModule: 'rfq' },
-  '/procurement/quotations': { module: 'procurement', subModule: 'quotations' },
-  '/procurement/purchase-orders': { module: 'procurement', subModule: 'purchase-orders' },
-  '/procurement/invoices': { module: 'procurement', subModule: 'procurement-invoices' },
-  '/procurement/grn': { module: 'procurement', subModule: 'goods-received-notes' },
-  '/procurement/goods-received': { module: 'procurement', subModule: 'goods-received-notes' },
-  '/procurement/payments': { module: 'procurement', subModule: 'payments' },
-  '/procurement/approvals': { module: 'procurement', subModule: 'my-approvals' },
-  '/procurement/approval-configs': { module: 'procurement', subModule: 'approval-configurations' },
+  '/procurement-legacy': { module: 'procurement', subModule: 'procurement-dashboard' },
+  '/procurement-legacy/requisitions': { module: 'procurement', subModule: 'purchase-requisitions' },
+  '/procurement-legacy/rfq': { module: 'procurement', subModule: 'rfq' },
+  '/procurement-legacy/quotations': { module: 'procurement', subModule: 'quotations' },
+  '/procurement-legacy/purchase-orders': { module: 'procurement', subModule: 'purchase-orders' },
+  '/procurement-legacy/invoices': { module: 'procurement', subModule: 'procurement-invoices' },
+  '/procurement-legacy/grn': { module: 'procurement', subModule: 'goods-received-notes' },
+  '/procurement-legacy/goods-received': { module: 'procurement', subModule: 'goods-received-notes' },
+  '/procurement-legacy/payments': { module: 'procurement', subModule: 'payments' },
+  '/procurement-legacy/approvals': { module: 'procurement', subModule: 'my-approvals' },
+  '/procurement-legacy/approval-configs': { module: 'procurement', subModule: 'approval-configurations' },
 
   // Procurement V23 client design port
-  '/procurement-v23': { module: 'procurement-v23', subModule: 'pr23-dashboard' },
-  '/procurement-v23/plan': { module: 'procurement-v23', subModule: 'pr23-plan' },
-  '/procurement-v23/approvals': { module: 'procurement-v23', subModule: 'pr23-approvals' },
-  '/procurement-v23/requisitions': { module: 'procurement-v23', subModule: 'pr23-requisitions' },
-  '/procurement-v23/tenders': { module: 'procurement-v23', subModule: 'pr23-tenders' },
-  '/procurement-v23/evaluation': { module: 'procurement-v23', subModule: 'pr23-evaluation' },
-  '/procurement-v23/vendors': { module: 'procurement-v23', subModule: 'pr23-vendors' },
-  '/procurement-v23/contracts': { module: 'procurement-v23', subModule: 'pr23-contracts' },
-  '/procurement-v23/purchase-orders': { module: 'procurement-v23', subModule: 'pr23-orders' },
-  '/procurement-v23/goods-received': { module: 'procurement-v23', subModule: 'pr23-receiving' },
-  '/procurement-v23/invoices': { module: 'procurement-v23', subModule: 'pr23-invoices' },
-  '/procurement-v23/accounts': { module: 'procurement-v23', subModule: 'pr23-accounts' },
-  '/procurement-v23/documents': { module: 'procurement-v23', subModule: 'pr23-documents' },
-  '/procurement-v23/reports': { module: 'procurement-v23', subModule: 'pr23-reports' },
-  '/procurement-v23/audit': { module: 'procurement-v23', subModule: 'pr23-audit' },
-  '/procurement-v23/settings': { module: 'procurement-v23', subModule: 'pr23-settings' },
+  '/procurement': { module: 'procurement-v23', subModule: 'pr23-dashboard' },
+  '/procurement/plan': { module: 'procurement-v23', subModule: 'pr23-plan' },
+  '/procurement/approvals': { module: 'procurement-v23', subModule: 'pr23-approvals' },
+  '/procurement/requisitions': { module: 'procurement-v23', subModule: 'pr23-requisitions' },
+  '/procurement/tenders': { module: 'procurement-v23', subModule: 'pr23-tenders' },
+  '/procurement/evaluation': { module: 'procurement-v23', subModule: 'pr23-evaluation' },
+  '/procurement/vendors': { module: 'procurement-v23', subModule: 'pr23-vendors' },
+  '/procurement/contracts': { module: 'procurement-v23', subModule: 'pr23-contracts' },
+  '/procurement/purchase-orders': { module: 'procurement-v23', subModule: 'pr23-orders' },
+  '/procurement/goods-received': { module: 'procurement-v23', subModule: 'pr23-receiving' },
+  '/procurement/invoices': { module: 'procurement-v23', subModule: 'pr23-invoices' },
+  '/procurement/accounts': { module: 'procurement-v23', subModule: 'pr23-accounts' },
+  '/procurement/documents': { module: 'procurement-v23', subModule: 'pr23-documents' },
+  '/procurement/reports': { module: 'procurement-v23', subModule: 'pr23-reports' },
+  '/procurement/audit': { module: 'procurement-v23', subModule: 'pr23-audit' },
+  '/procurement/settings': { module: 'procurement-v23', subModule: 'pr23-settings' },
 
   // Accounting (client V52 design port, served at /accounting)
   '/accounting': { module: 'accounting-v52', subModule: 'ac52-overview' },
@@ -268,6 +268,16 @@ export function middleware(request: NextRequest) {
   // moved to /payroll-legacy to free the name, as accounting and performance did.
   if (pathname === '/payroll-v6' || pathname.startsWith('/payroll-v6/')) {
     const dest = pathname.replace(/^\/payroll-v6/, '/payroll') || '/payroll'
+    const url = request.nextUrl.clone()
+    url.pathname = dest
+    return NextResponse.redirect(url, 308)
+  }
+
+  // Permanent rename: /procurement-v23 → /procurement. The frozen legacy procurement module moved to
+  // /procurement-legacy to free the name, as payroll and accounting did. Links already sent in notifications and emails
+  // still open.
+  if (pathname === '/procurement-v23' || pathname.startsWith('/procurement-v23/')) {
+    const dest = pathname.replace(/^\/procurement-v23/, '/procurement') || '/procurement'
     const url = request.nextUrl.clone()
     url.pathname = dest
     return NextResponse.redirect(url, 308)

@@ -47,7 +47,8 @@ function must(cond, msg) {
 
 /** Replace `find` with `repl` once. Treats an already-patched file as success. */
 function replaceOnce(src, find, repl, label, alreadyMarker) {
-  if (alreadyMarker && src.includes(alreadyMarker)) {
+  // A later step may rewrite an earlier step's output; any of its markers means the step is in place.
+  if (alreadyMarker && [].concat(alreadyMarker).some((m) => src.includes(m))) {
     console.log(`  skip (already)  ${label}`)
     skipped += 1
     return src
@@ -169,6 +170,16 @@ s = replaceOnce(
   }
 }
 
+// 4b. A card __pr23Kpi leaves out (a feature procurement does not record, or a fixture figure with no live source)
+// renders nothing, instead of a dash that says there is no source.
+s = replaceUnique(
+  s,
+  "{[value,sub]=__pr23Kpi(label,value,sub);return ",
+  "{[value,sub]=__pr23Kpi(label,value,sub);if(value===__PR23_HIDDEN_KPI)return '';return ",
+  "kpi() -> leave out cards with no source",
+  "if(value===__PR23_HIDDEN_KPI)return ''",
+)
+
 // ---------------------------------------------------------------------------
 // 5. Sidebar badge counts
 // ---------------------------------------------------------------------------
@@ -182,7 +193,8 @@ s = replaceOnce(
 
 /** Replace a string that must occur exactly once — a second occurrence means the wrong target. */
 function replaceUnique(src, find, repl, label, alreadyMarker) {
-  if (alreadyMarker && src.includes(alreadyMarker)) {
+  // A later step may rewrite an earlier step's output; any of its markers means the step is in place.
+  if (alreadyMarker && [].concat(alreadyMarker).some((m) => src.includes(m))) {
     console.log(`  skip (already)  ${label}`)
     skipped += 1
     return src
@@ -261,7 +273,8 @@ s = replaceUnique(
   "<span>OCR confidence</span><strong>93.7%</strong>",
   "<span>OCR confidence</span><strong>${__pr23Live()?'—':'93.7%'}</strong>",
   "invoice match workspace: OCR confidence -> not recorded",
-  "<strong>${__pr23Live()?'—':'93.7%'}</strong>",
+  // Step 53 turns this into the document-reading line.
+  ["<strong>${__pr23Live()?'—':'93.7%'}</strong>", "__pr23Esc(__pr23ReadingLabel(inv))"],
 )
 
 // ---------------------------------------------------------------------------
@@ -774,7 +787,8 @@ s = replaceUnique(
 
 /** Replace every occurrence of `find`; the runtime is known to hold exactly `expected` of them. */
 function replaceEvery(src, find, repl, label, alreadyMarker, expected) {
-  if (alreadyMarker && src.includes(alreadyMarker)) {
+  // A later step may rewrite an earlier step's output; any of its markers means the step is in place.
+  if (alreadyMarker && [].concat(alreadyMarker).some((m) => src.includes(m))) {
     console.log(`  skip (already)  ${label}`)
     skipped += 1
     return src
@@ -1155,6 +1169,1189 @@ s = replaceUnique(
   "match workspace: 'Run OCR' -> 'AI invoice capture'",
   "actionButton('AI invoice capture','run-ocr-v5',t.id)",
 )
+
+// ---------------------------------------------------------------------------
+// 24. Every document and window listener is removed with the runtime
+// ---------------------------------------------------------------------------
+// RouteTransition in the root layout keys the page on its pathname, so each sidebar navigation
+// unmounts the host and starts a new runtime. destroy() aborts __pr23Abort, but only the listeners
+// given __pr23Sig went with it. The vendored layers' capture-phase click dispatchers stayed on
+// document and window, bound to the emptied root of the runtime they came from: the first to match a
+// click stopped it reaching the live runtime, then threw on $('#drawerLayer') being null. After one
+// sidebar navigation, every button the host does not claim did nothing ("Capture this invoice", D1).
+{
+  const label = "document and window listeners are removed by destroy()"
+  const anchor = "const __pr23Sig = { signal: __pr23Abort.signal };"
+  const helperMarker = "const __pr23On = "
+  const helper =
+    " const __pr23On = (target, type, fn, opts) => target.addEventListener(type, fn, Object.assign(typeof opts === 'object' && opts !== null ? { ...opts } : { capture: opts === true }, { signal: __pr23Abort.signal }));"
+  const calls = /(?<![.\w])(document|window)\.addEventListener\(/g
+  const pending = (s.match(calls) || []).length
+  if (s.includes(helperMarker) && pending === 0) {
+    console.log(`  skip (already)  ${label}`)
+    skipped += 1
+  } else if (!s.includes(helperMarker) && s.split(anchor).length !== 2) {
+    console.warn(`  MISS            ${label} (abort signal anchor not found exactly once)`)
+    missed += 1
+  } else {
+    if (!s.includes(helperMarker)) s = s.replace(anchor, anchor + helper)
+    s = s.replace(calls, "__pr23On($1, ")
+    console.log(`  patch           ${label} (${pending} listener${pending === 1 ? "" : "s"})`)
+    applied += 1
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 25. New requisition takes as many lines as the request needs
+// ---------------------------------------------------------------------------
+// The vendored form had one fixed line with a $1,000 unit estimate already filled in: a request for
+// three different things could not be raised from the UI, and every request carried an estimate
+// nobody had given. The bridge's __pr23PrLinesTbody() supplies the live lines.
+s = replaceUnique(
+  s,
+  '<tbody><tr><td><input name="item" required></td><td><select name="uom"><option>Each</option><option>Box</option><option>Lot</option><option>Month</option></select></td><td><input name="qty" type="number" value="1"></td><td><input name="price" type="number" value="1000"></td><td>$1,000</td></tr></tbody>',
+  '${__pr23Live()?__pr23PrLinesTbody():`<tbody><tr><td><input name="item" required></td><td><select name="uom"><option>Each</option><option>Box</option><option>Lot</option><option>Month</option></select></td><td><input name="qty" type="number" value="1"></td><td><input name="price" type="number" value="1000"></td><td>$1,000</td></tr></tbody>`}',
+  "new requisition -> as many lines as the request needs, no invented estimate",
+  "__pr23Live()?__pr23PrLinesTbody():",
+)
+
+// ---------------------------------------------------------------------------
+// 26. The requester chooses the requisition's category, from the categories vendors are registered in
+// ---------------------------------------------------------------------------
+// The vendored Category list (Technology, Medical, Agriculture, Facilities, Fleet) defaulted to
+// Technology, and none of it but Technology matched a registered vendor. Every requisition raised from
+// the UI was sourced as TECHNOLOGY without anyone choosing it, and the API then refused an RFQ to any
+// other vendor ("category does not match this requisition sourcing category").
+s = replaceUnique(
+  s,
+  "formField('Category','<select name=\"category\"><option>Technology</option><option>Medical</option><option>Agriculture</option><option>Facilities</option><option>Fleet</option></select>')",
+  "(__pr23Live()?formField('Category','<select name=\"category\" required>'+__pr23RequisitionCategoryOptions()+'</select>'):formField('Category','<select name=\"category\"><option>Technology</option><option>Medical</option><option>Agriculture</option><option>Facilities</option><option>Fleet</option></select>'))",
+  "new requisition -> category chosen from live vendor categories",
+  "'<select name=\"category\" required>'+__pr23RequisitionCategoryOptions()",
+)
+
+// ---------------------------------------------------------------------------
+// 27. Register vendor uses the same category list as requisitions and RFQs
+// ---------------------------------------------------------------------------
+// The vendored list (Technology, Medical, Agriculture, Fleet, Facilities, Professional services) could not
+// register an Office Supplies or Furniture vendor, while the API matches RFQ invitations on category.
+s = replaceUnique(
+  s,
+  "formField('Category','<select name=\"category\"><option>Technology</option><option>Medical</option><option>Agriculture</option><option>Fleet</option><option>Facilities</option><option>Professional services</option></select>')",
+  "(__pr23Live()?formField('Category','<select name=\"category\" required>'+__pr23RequisitionCategoryOptions()+'</select>'):formField('Category','<select name=\"category\"><option>Technology</option><option>Medical</option><option>Agriculture</option><option>Fleet</option><option>Facilities</option><option>Professional services</option></select>'))",
+  "register vendor -> category from the shared procurement list",
+  "__pr23RequisitionCategoryOptions()+'</select>'):formField('Category','<select name=\"category\"><option>Technology</option><option>Medical</option><option>Agriculture</option><option>Fleet</option><option>Facilities</option><option>Professional services</option></select>'))",
+)
+
+// ---------------------------------------------------------------------------
+// 28. New requisition shows the entity and department it is really raised against
+// ---------------------------------------------------------------------------
+// The vendored selects showed "Matanho Holdings" and "IT & Digital / CC-1001" to every requester. Neither is
+// saved - the host raises the requisition against the requester's own department - so a live session shows
+// the organisation and that department, read-only.
+s = replaceUnique(
+  s,
+  "${formField('Entity',`<select name=\"entity\">${entities.slice(1).map(x=>`<option>${x[1]}</option>`).join('')}</select>`)}${formField('Department / cost centre','<select name=\"cost\"><option>IT & Digital / CC-1001</option><option>Finance / CC-1002</option><option>Operations / CC-2001</option></select>')}",
+  "${__pr23Live()?__pr23RequisitionEntityField()+__pr23RequisitionDepartmentField():formField('Entity',`<select name=\"entity\">${entities.slice(1).map(x=>`<option>${x[1]}</option>`).join('')}</select>`)+formField('Department / cost centre','<select name=\"cost\"><option>IT & Digital / CC-1001</option><option>Finance / CC-1002</option><option>Operations / CC-2001</option></select>')}",
+  "new requisition -> real entity and department, read-only",
+  "__pr23RequisitionEntityField()+__pr23RequisitionDepartmentField()",
+)
+
+// ---------------------------------------------------------------------------
+// 29. Preview vendor form shows no fixture vendor or bid
+// ---------------------------------------------------------------------------
+// Found by the UI census: the preview named "TechNova Solutions" with a 1,280,000 bid against TN-2026-014,
+// and offered Save draft / Seal & submit buttons that save nothing. arguments[0] is the id actually passed;
+// the default parameter would turn a missing id into the fixture tender.
+s = replaceUnique(
+  s,
+  "function vendorBidPreview(id='TN-2026-014'){",
+  "function vendorBidPreview(id='TN-2026-014'){if(__pr23Live())return __pr23VendorBidPreview(arguments[0]);",
+  "vendor bid preview -> no fixture vendor, tender or bid",
+  "if(__pr23Live())return __pr23VendorBidPreview(arguments[0]);",
+)
+
+// ---------------------------------------------------------------------------
+// 30-34. No fixture company in entity, owner and letterhead choices
+// ---------------------------------------------------------------------------
+// Found by the UI census: Create tender / RFx, Edit record, Build procurement report and the letterhead
+// selects offered Matanho Holdings, Matanho Capital Management, Kariba Agro Limited, Lumina Health Group,
+// Kudu Logistics and Nyanga Hospitality, and a record with no owner showed "Group Procurement".
+s = replaceUnique(
+  s,
+  "if(payload.entity) state.entity=payload.entity;",
+  "if(typeof __pr23SyncEntities==='function')__pr23SyncEntities();if(payload.entity) state.entity=payload.entity;",
+  "hydrate -> entity list is the organisation's",
+  "__pr23SyncEntities();if(payload.entity)",
+)
+s = replaceUnique(
+  s,
+  "esc(r.owner||'Group Procurement')",
+  "esc(r.owner||(__pr23Live()?'':'Group Procurement'))",
+  "edit record -> no invented owner",
+  "esc(r.owner||(__pr23Live()?'':'Group Procurement'))",
+)
+s = replaceEvery(
+  s,
+  "<option>Matanho Group Procurement</option>",
+  "<option>'+__pr23LetterheadOption()+'</option>",
+  "letterhead selects -> the organisation's letterhead",
+  "<option>'+__pr23LetterheadOption()+'</option>",
+  3,
+)
+for (const fixture of [
+  "<option>Group Consolidated</option><option>Matanho Holdings</option><option>All investees</option>",
+  "<option>Group Consolidated</option><option>All investees</option><option>Matanho Holdings</option>",
+]) {
+  s = replaceUnique(
+    s,
+    `formField('Entity','<select>${fixture}</select>')`,
+    `formField('Entity','<select>'+__pr23ReportEntityOptions('${fixture}')+'</select>')`,
+    "report builder entity -> the organisation",
+    `__pr23ReportEntityOptions('${fixture}')`,
+  )
+}
+s = replaceUnique(
+  s,
+  "<select name=\"scope\"><option>Group Consolidated</option>${entities.slice(1)",
+  "<select name=\"scope\">${__pr23Live()?'':'<option>Group Consolidated</option>'}${entities.slice(1)",
+  "access request scope -> no Group Consolidated in a live session",
+  "<select name=\"scope\">${__pr23Live()?'':'<option>Group Consolidated</option>'}",
+)
+
+// ---------------------------------------------------------------------------
+// 36. No fixture vendor submissions in the live Document Vault
+// ---------------------------------------------------------------------------
+// Found by the UI census: with no "Vendor Submissions" folder in the organisation's vault, the runtime pushed
+// its sample documents into the live register (DOC-00201 "GreenGrid Energy · ITF263 Tax Clearance FY2026").
+s = replaceUnique(
+  s,
+  "function ensureVendorSubmissionsFolderV6(){",
+  "function ensureVendorSubmissionsFolderV6(){if(__pr23Live())return;",
+  "vendor submissions folder -> no sample documents in a live vault",
+  "function ensureVendorSubmissionsFolderV6(){if(__pr23Live())return;",
+)
+
+// ---------------------------------------------------------------------------
+// 37. Register vendor names no sample internal owner
+// ---------------------------------------------------------------------------
+// Found by the UI census: "Internal owner" was prefilled "Nyasha Moyo | Group Procurement" for everyone. The input
+// has no name, so nothing reads it; a live session leaves it for the person registering the vendor.
+s = replaceUnique(
+  s,
+  "formField('Internal owner','<input value=\"Nyasha Moyo | Group Procurement\">')",
+  "formField('Internal owner',__pr23Live()?'<input placeholder=\"Staff member responsible for this vendor\">':'<input value=\"Nyasha Moyo | Group Procurement\">')",
+  "register vendor -> no sample internal owner",
+  "__pr23Live()?'<input placeholder=\"Staff member responsible for this vendor\">'",
+)
+
+// ---------------------------------------------------------------------------
+// 38. Contract, purchase order and award previews show their own content
+// ---------------------------------------------------------------------------
+// Found by the UI census: Preview on a contract, a purchase order, an award report, an approval record and a tax
+// clause passed the document itself to previewDocV6, which looks documents up by id. The lookup fell through to
+// its blank "Controlled Procurement Document" and the header read "[object Object] | v1.0 | Draft".
+s = replaceUnique(
+  s,
+  "function docByIdV6(id){",
+  "function docByIdV6(id){if(id&&typeof id==='object')return {type:'Controlled document',version:'v1.0',status:'Draft',...id};",
+  "document preview -> a passed document is shown, not looked up",
+  "function docByIdV6(id){if(id&&typeof id==='object')",
+)
+
+// ---------------------------------------------------------------------------
+// 39-40. A page opened from another page keeps the sub-view it was opened on
+// ---------------------------------------------------------------------------
+// Found by the UI census: Reports "Manage all templates" set the Report Templates folder and moved to Documents; the
+// route change remounted the module and the new runtime opened the vault root. The navigation hook now stashes the
+// destination page's sub-view (__pr23StashCarry), and the next runtime takes it before its first render can
+// overwrite it and applies it before opening its initial page.
+s = replaceUnique(
+  s,
+  "window.__PROCUREMENT_V23_NAV__ = runtimeOptions.onNavigate || (() => {});",
+  "const __pr23Incoming = window.__pr23Carry || null; window.__pr23Carry = null; window.__PROCUREMENT_V23_NAV__ = (page) => { try { __pr23StashCarry(page); } catch (_) { window.__pr23Carry = null; } (runtimeOptions.onNavigate || (() => {}))(page); };",
+  "navigation hook -> stash the destination page's sub-view",
+  "const __pr23Incoming = window.__pr23Carry || null;",
+)
+s = replaceUnique(
+  s,
+  "if(initialPage&&supportedPages.has(initialPage))requestAnimationFrame(()=>navigateV14(initialPage));",
+  "if(initialPage&&supportedPages.has(initialPage)){try{__pr23ApplyCarry(initialPage,__pr23Incoming)}catch(_){}requestAnimationFrame(()=>navigateV14(initialPage));}",
+  "initial page -> opens on the carried sub-view",
+  "__pr23ApplyCarry(initialPage,__pr23Incoming)",
+)
+
+// ---------------------------------------------------------------------------
+// 41-42. Approval Centre: what waits on me, and every open approval
+// ---------------------------------------------------------------------------
+// The vendored page rendered the same prompts as cards and again as a table, its Group queue was the same list
+// again, and eSignature and Delegations showed sample envelopes and people. A live session renders
+// __pr23ApprovalsPageHtml from approvalPromptsV6 and the loaders' approvalGroupV23.
+s = replaceUnique(
+  s,
+  "'evaluationLive','letterhead'];",
+  "'evaluationLive','letterhead','approvalGroupV23'];",
+  "hydrate() -> every open approval",
+  // The approval-matrix step below extends this list's tail, so the marker stops before its end.
+  "'letterhead','approvalGroupV23'",
+)
+s = replaceUnique(
+  s,
+  "function approvalsPageV6(){",
+  "function approvalsPageV6(){if(__pr23Live())return __pr23ApprovalsPageHtml();",
+  "approval centre -> live page",
+  "function approvalsPageV6(){if(__pr23Live())return __pr23ApprovalsPageHtml();",
+)
+// Configuration's Approval matrix tab reads the requisition route the loaders fetch (GET /procurement/approval-matrix).
+s = replaceUnique(
+  s,
+  "'letterhead','approvalGroupV23'];",
+  "'letterhead','approvalGroupV23','approvalMatrixV23'];",
+  "hydrate() -> the approval matrix",
+  // The analytics step below extends this tail, so the marker stops before its end.
+  "'approvalGroupV23','approvalMatrixV23'",
+)
+// Analytics reads the cash requirements and insights the loaders compute (state.analyticsV23).
+s = replaceUnique(
+  s,
+  "'approvalGroupV23','approvalMatrixV23'];",
+  "'approvalGroupV23','approvalMatrixV23','analyticsV23'];",
+  "hydrate() -> analytics",
+  // The requisition projects step below extends this tail, so the marker stops before its end.
+  "'approvalMatrixV23','analyticsV23'",
+)
+// The requisition form's Project / cost centre list (state.requisitionProjectsV23).
+s = replaceUnique(
+  s,
+  "'approvalMatrixV23','analyticsV23'];",
+  "'approvalMatrixV23','analyticsV23','requisitionProjectsV23'];",
+  "hydrate() -> requisition projects",
+  // The vendor registrations step below extends this tail, so the marker stops before its end.
+  "'analyticsV23','requisitionProjectsV23'",
+)
+// Vendor Registry: self-registrations awaiting review (state.vendorRegistrationsV23).
+s = replaceUnique(
+  s,
+  "'approvalMatrixV23','analyticsV23','requisitionProjectsV23'];",
+  "'approvalMatrixV23','analyticsV23','requisitionProjectsV23','vendorRegistrationsV23'];",
+  "hydrate() -> vendor self-registrations",
+  "'requisitionProjectsV23','vendorRegistrationsV23'];",
+)
+
+// ---------------------------------------------------------------------------
+// 44. Tablets and phones open on the icon rail, not the full menu over the page
+// ---------------------------------------------------------------------------
+// Found by the cycle-eight responsive check: the runtime started with the menu expanded, and at 780px and below
+// the expanded menu is a fixed 278px drawer with no backdrop, so every page opened with its heading, head buttons
+// and first KPI cards under it. Narrow screens now start collapsed (the 58px icon rail the design has for them);
+// every navigation remounts the runtime, so the menu also closes once a page is chosen.
+s = replaceUnique(
+  s,
+  "year:'FY 2026',expanded:true,",
+  "year:'FY 2026',expanded:(typeof window==='undefined'||window.innerWidth>780),",
+  "narrow screens -> menu starts collapsed",
+  // Step 52 rewrites this check with a media query, so either form counts as already in place.
+  "year:'FY 2026',expanded:(typeof window==='undefined'||",
+)
+
+// ---------------------------------------------------------------------------
+// 53. The invoice match panel shows what the LLM read from the supplier's document
+// ---------------------------------------------------------------------------
+// Invoices that arrive with a document are now read by the LLM and compared with the capture (API
+// ProcurementInvoiceReadingService). The Supplier Invoice panel's "OCR confidence" line, a dash in a live session since
+// step 17, says what that reading found.
+s = replaceUnique(
+  s,
+  "<span>OCR confidence</span><strong>${__pr23Live()?'—':'93.7%'}</strong>",
+  "<span>${__pr23Live()?'Document reading':'OCR confidence'}</span><strong>${__pr23Live()?__pr23Esc(__pr23ReadingLabel(inv)):'93.7%'}</strong>",
+  "invoice match panel -> document reading",
+  "__pr23Esc(__pr23ReadingLabel(inv))",
+)
+
+// ---------------------------------------------------------------------------
+// 52. Narrow screens are decided by the stylesheet's media query, not innerWidth
+// ---------------------------------------------------------------------------
+// Found in cycle eight: a requester opening the module on a phone is sent on from the Command Centre to the Approval
+// Centre, and that page opened with the full menu over it. Traced on dev: the second runtime read window.innerWidth
+// as 784 on a 390px phone — while the route transition runs, content overflows and the mobile layout viewport widens,
+// so step 44's check thought it was a tablet. The media query the stylesheet uses measures the device width and does
+// not move with overflowing content.
+s = replaceUnique(
+  s,
+  "expanded:(typeof window==='undefined'||window.innerWidth>780),",
+  "expanded:(typeof window==='undefined'||!window.matchMedia||!window.matchMedia('(max-width: 780px)').matches),",
+  "narrow screens -> decided by the 780px media query",
+  "expanded:(typeof window==='undefined'||!window.matchMedia||!window.matchMedia('(max-width: 780px)').matches),",
+)
+
+// ---------------------------------------------------------------------------
+// 45. Tax-clearance days count from today, not the design's fixed date
+// ---------------------------------------------------------------------------
+// Found by the cycle-eight screen review: the Vendor Registry called a clearance 35 days from expiry "Valid" while
+// its doughnut counted it as expiring. taxRuleV6 counted days from the design's frozen 1 August 2026, so expiry
+// status, reminders and the withholding rule ran six weeks stale. A live session counts from now.
+s = replaceUnique(
+  s,
+  "const daysUntilV6 = value => Math.ceil((new Date(value).getTime() - todayV6.getTime()) / 86400000);",
+  "const daysUntilV6 = value => Math.ceil((new Date(value).getTime() - (__pr23Live() ? Date.now() : todayV6.getTime())) / 86400000);",
+  "tax clearance -> days counted from today",
+  "(__pr23Live() ? Date.now() : todayV6.getTime())",
+)
+
+// ---------------------------------------------------------------------------
+// 46. Vendor Registry: name and contact, not the database id
+// ---------------------------------------------------------------------------
+// Found by the cycle-eight screen review: the first column printed each vendor's database id (cmtzc7u8s02j…), the
+// contact line read "— | email" (vendors carry no country), every Currency cell was a dash (vendors carry none) and
+// an unrated vendor read "— / 5".
+s = replaceUnique(
+  s,
+  "table(['Vendor ID','Vendor','Category','BP number','Currency','Tax clearance','Document gaps','Rating','Status','Actions'],rows)",
+  "table(__pr23Live()?['Vendor','Contact','Category','BP number','Tax clearance','Document gaps','Rating','Status','Actions']:['Vendor ID','Vendor','Category','BP number','Currency','Tax clearance','Document gaps','Rating','Status','Actions'],rows)",
+  "vendor registry -> live columns",
+  "table(__pr23Live()?['Vendor','Contact',",
+)
+s = replaceUnique(
+  s,
+  "<td><strong class=\"link\">${esc(v.id)}</strong></td><td><strong>${esc(v.name)}</strong><br><span class=\"muted\">${esc(v.country)} | ${esc(v.email)}</span></td>",
+  "${__pr23Live()?`<td><strong class=\"link\">${esc(v.name)}</strong></td><td>${esc(v.contact)}<br><span class=\"muted\">${esc([v.email,v.phone].filter(x=>x&&x!=='—').join(' · ')||'—')}</span></td>`:`<td><strong class=\"link\">${esc(v.id)}</strong></td><td><strong>${esc(v.name)}</strong><br><span class=\"muted\">${esc(v.country)} | ${esc(v.email)}</span></td>`}",
+  "vendor registry -> name and contact cells",
+  "<td>${esc(v.contact)}<br><span class=\"muted\">${esc([v.email,v.phone]",
+)
+s = replaceUnique(
+  s,
+  "<td>${esc(v.bp)}</td><td>${esc(v.currency)}</td>",
+  "<td>${esc(v.bp)}</td>${__pr23Live()?'':`<td>${esc(v.currency)}</td>`}",
+  "vendor registry -> no currency column",
+  "<td>${esc(v.bp)}</td>${__pr23Live()?'':",
+)
+s = replaceUnique(
+  s,
+  "<td>${v.rating} / 5</td><td>${status(v.status)}</td><td><div class=\"actions\">${smallAction('Open','open-vendor-v6',v.id)}",
+  "<td>${__pr23Live()&&(v.rating==null||v.rating==='—')?'<span class=\"muted\">Not rated</span>':`${v.rating} / 5`}</td><td>${status(v.status)}</td><td><div class=\"actions\">${smallAction('Open','open-vendor-v6',v.id)}",
+  "vendor registry -> an unrated vendor says so",
+  "(v.rating==null||v.rating==='—')?'<span class=\"muted\">Not rated</span>'",
+)
+
+// ---------------------------------------------------------------------------
+// 47. Contracts & Awards: an award has no contract number
+// ---------------------------------------------------------------------------
+// Found by the cycle-eight screen review: an award awaiting its contract showed its purchase order number in the
+// Contract column, so the register read as four contracts, three of them numbered like orders.
+s = replaceUnique(
+  s,
+  "<td><strong class=\"link\">${esc(c.id)}</strong></td><td><strong>${esc(c.title)}</strong><br><span class=\"muted\">${esc(c.tender)}</span></td>",
+  "${__pr23Live()&&c.kind==='award'?`<td><span class=\"muted\">Not yet contracted</span></td><td><strong>${esc(c.title)}</strong><br><span class=\"muted\">Award on ${esc(c.tender)} · ${esc(c.id)}</span></td>`:`<td><strong class=\"link\">${esc(c.id)}</strong></td><td><strong>${esc(c.title)}</strong><br><span class=\"muted\">${esc(c.tender)}</span></td>`}",
+  "contracts -> an award shows no contract number",
+  "Not yet contracted</span></td><td><strong>${esc(c.title)}",
+)
+
+// ---------------------------------------------------------------------------
+// 48. Document Vault: a template is not a vendor submission
+// ---------------------------------------------------------------------------
+// Found by the cycle-eight screen review: the "Request for Quotation" sourcing template was captioned "Vendor-submitted
+// original · read-only" — its name matched the vendor-document pattern ("quotation").
+s = replaceUnique(
+  s,
+  "const text = [doc.name,doc.type,doc.folder,doc.owner,doc.source,doc.provenance].filter(Boolean).join(' ');",
+  "if (__pr23Live() && /template/i.test(String(doc.type || '') + ' ' + String(doc.folder || ''))) return false; const text = [doc.name,doc.type,doc.folder,doc.owner,doc.source,doc.provenance].filter(Boolean).join(' ');",
+  "document vault -> templates are not vendor submissions",
+  "/template/i.test(String(doc.type || '') + ' ' + String(doc.folder || ''))",
+)
+
+// ---------------------------------------------------------------------------
+// 49. Audit & Compliance shows the latest 50 events
+// ---------------------------------------------------------------------------
+// Found by the cycle-eight screen review: every loaded event (up to 200) was one table, an 8,000-pixel page. The page
+// shows the latest 50 and says so; the export carries the rest.
+s = replaceUnique(
+  s,
+  "const rows=(__pr23Live()?(state.auditEventsLive||[]):[",
+  "const rows=(__pr23Live()?(state.auditEventsLive||[]).slice(0,50):[",
+  "audit -> latest 50 events on the page",
+  // Step 44 (below) further rewrites this slice into a paginated one; either form means this
+  // step's own job (showing a bounded slice, not the raw 200) is already done.
+  ["(state.auditEventsLive||[]).slice(0,50)", "(state.__pr23AuditPage||0)*50"],
+)
+s = replaceUnique(
+  s,
+  "card('Immutable audit event stream','Every status change records user ID, timestamp, previous value, new value and reason',",
+  "card('Immutable audit event stream',__pr23Live()?__pr23AuditStreamNote():'Every status change records user ID, timestamp, previous value, new value and reason',",
+  "audit -> the card says how much it shows",
+  "__pr23Live()?__pr23AuditStreamNote():",
+)
+
+// ---------------------------------------------------------------------------
+// 50. Invoices & 3-Way Match works for a role that cannot see RFQs
+// ---------------------------------------------------------------------------
+// Found by the cycle-eight screen review as Accounts Payable: the page lists match sources from the RFQs, which that
+// role cannot read, so it showed an empty "Select a tender" card and no invoice. Such a role picks from its
+// purchase orders' sources instead (__pr23MatchSources), and the match workspace resolves them.
+s = replaceUnique(
+  s,
+  "const candidates=state.tenders.filter(t=>t.bids>0 || /Award|Evaluation|opening/i.test(t.stage));",
+  "const candidates=(__pr23Live()&&!state.tenders.length)?__pr23MatchSources():state.tenders.filter(t=>t.bids>0 || /Award|Evaluation|opening/i.test(t.stage));",
+  "invoice match -> order sources for roles without RFQs",
+  // Step 54 widens this to every role.
+  ["(__pr23Live()&&!state.tenders.length)?__pr23MatchSources():", "...__pr23MatchSources().filter(x=>!state.tenders.some(t=>t.id===x.id))]"],
+)
+s = replaceEvery(
+  s,
+  "const t=state.tenders.find(x=>x.id===id)||state.tenders[0];",
+  "const t=state.tenders.find(x=>x.id===id)||(__pr23Live()&&!state.tenders.length?__pr23MatchSources().find(x=>x.id===id):null)||state.tenders[0];",
+  "tender workspaces -> resolve an order source",
+  "__pr23MatchSources().find(x=>x.id===id)",
+  3,
+)
+
+// ---------------------------------------------------------------------------
+// 51. An approval's supporting documents come from the records
+// ---------------------------------------------------------------------------
+// Found in cycle eight, reading what a department head sees when reviewing a requisition: "Budget availability and
+// funding confirmation" named the sample CFO "Tinashe Chaka" and said the commitment "has been checked against the
+// approved annual plan, department budget and current commitments" — no such check exists; the evaluation report
+// scored three sample bidders (TechNova, NetShield, CloudAxis); the conflict declaration read "No conflict declared ·
+// SSO + MFA" though nobody declared anything; every paper was dated 02 Aug 2026. In a live session the documents are
+// built from the records by __pr23SupportDocument, and say plainly what is not recorded.
+s = replaceUnique(
+  s,
+  "function supportDocumentV13(approvalId,kind){",
+  "function supportDocumentV13(approvalId,kind){if(__pr23Live()){const __a=approvalBaseV13(approvalId),__d=__pr23SupportDocument(__a,kind),__k=`${approvalId}:${kind}`,__o=state.approvalDocumentOverridesV13[__k];if(__a&&__d)return {id:`${__a.record}-${String(kind).toUpperCase()}`,name:__d.name,type:'Supporting approval document',version:__o?.version||'v1.0',status:__a.status,owner:__a.approver,approvalId:__a.id,storageKey:__k,content:__o?.content||__d.content};}",
+  "approval support documents -> built from the records",
+  "__d=__pr23SupportDocument(__a,kind)",
+)
+s = replaceUnique(
+  s,
+  "date:'02 Aug 2026',approvalId:a.id,",
+  "date:__pr23Live()?__pr23Today():'02 Aug 2026',approvalId:a.id,",
+  "approval decision paper -> dated today",
+  "date:__pr23Live()?__pr23Today():'02 Aug 2026',approvalId:a.id,",
+)
+// Found by the round-two check on dev: the award decision paper was still the vendored memorandum ("TechNova Solutions",
+// three sample bidders, the sample CFO "Signed 01 Aug 2026"), and every paper's footer read "Generated 02 Aug 2026".
+s = replaceUnique(
+  s,
+  "if(type.includes('tender award')){",
+  "if(type.includes('tender award')){if(__pr23Live())return __pr23AwardMemo(a,tenderByRecordV13(a.record));",
+  "award decision paper -> built from the RFQ and its quotations",
+  "if(__pr23Live())return __pr23AwardMemo(a,tenderByRecordV13(a.record));",
+)
+s = replaceEvery(
+  s,
+  "<span>Generated 02 Aug 2026</span>",
+  "<span>Generated ${__pr23Live()?__pr23Today():'02 Aug 2026'}</span>",
+  "document footers -> generated today",
+  "<span>Generated ${__pr23Live()?__pr23Today():'02 Aug 2026'}</span>",
+  2,
+)
+for (const [label, key] of [
+  ["Budget availability and funding confirmation", "budget"],
+  ["Evaluation or technical recommendation", "evaluation"],
+  ["Conflict and independence declaration", "conflict"],
+]) {
+  s = replaceUnique(
+    s,
+    label,
+    `\${__pr23Live()?__PR23_SUPPORT_LABELS.${key}:'${label}'}`,
+    `approval support list -> "${label}" labelled for what it holds`,
+    `__PR23_SUPPORT_LABELS.${key}:'${label}'`,
+  )
+}
+
+// ---------------------------------------------------------------------------
+// 54. Invoices to review, and every invoice reachable from its match source
+// ---------------------------------------------------------------------------
+// SRD §7 asks for a list of the invoices flagged for review with the reason for each. The API now flags possible
+// duplicates and a supplier document that disagrees with the capture, and alerts reviewers; the Invoices page lists
+// those invoices above the match sources (__pr23InvoicesToReviewCard). Step 50 offered order-based sources only to a
+// role that sees no RFQs, so an invoice against a purchase order raised directly (no RFQ) had no source card for anyone
+// else: those sources are now listed for every role, and the workspace resolves them.
+s = replaceUnique(
+  s,
+  "${card('Select a tender or procurement source',",
+  "${__pr23Live()?__pr23InvoicesToReviewCard():''}${card('Select a tender or procurement source',",
+  "invoices page -> invoices to review",
+  "${__pr23Live()?__pr23InvoicesToReviewCard():''}",
+)
+s = replaceUnique(
+  s,
+  "const candidates=(__pr23Live()&&!state.tenders.length)?__pr23MatchSources():state.tenders.filter(t=>t.bids>0 || /Award|Evaluation|opening/i.test(t.stage));",
+  "const candidates=__pr23Live()?[...state.tenders.filter(t=>t.bids>0 || /Award|Evaluation|opening/i.test(t.stage)),...__pr23MatchSources().filter(x=>!state.tenders.some(t=>t.id===x.id))]:state.tenders.filter(t=>t.bids>0 || /Award|Evaluation|opening/i.test(t.stage));",
+  "invoice match -> order sources for every role",
+  "...__pr23MatchSources().filter(x=>!state.tenders.some(t=>t.id===x.id))]",
+)
+s = replaceEvery(
+  s,
+  "const t=state.tenders.find(x=>x.id===id)||(__pr23Live()&&!state.tenders.length?__pr23MatchSources().find(x=>x.id===id):null)||state.tenders[0];",
+  "const t=state.tenders.find(x=>x.id===id)||(__pr23Live()?__pr23MatchSources().find(x=>x.id===id):null)||state.tenders[0];",
+  "tender workspaces -> resolve an order source for every role",
+  "(__pr23Live()?__pr23MatchSources().find(x=>x.id===id):null)||state.tenders[0];",
+  3,
+)
+
+// ---------------------------------------------------------------------------
+// 55. The vendor profile carries the vendor's history
+// ---------------------------------------------------------------------------
+// SRD §3: a vendor profile tracks past POs, the invoices received and any flagged discrepancies, a complete performance
+// history. The profile showed company details, the tax rule, compliance documents and messages only. It now leads its
+// registers with orders, invoices (flagged or not), on-time delivery and item prices over time (__pr23VendorHistoryCard).
+// The header printed the database id and a blank country, and an unrated vendor read "— / 5", as the registry did.
+s = replaceUnique(
+  s,
+  "pageHead('Vendor profile',v.name,`${v.id} | ${v.category} | ${v.country}`,",
+  "pageHead('Vendor profile',v.name,__pr23Live()?[v.bp,v.category,v.email].filter(x=>x&&x!=='—').join(' | '):`${v.id} | ${v.category} | ${v.country}`,",
+  "vendor profile -> header without the database id",
+  "__pr23Live()?[v.bp,v.category,v.email].filter(x=>x&&x!=='—').join(' | '):",
+)
+s = replaceUnique(
+  s,
+  "kpi('Vendor rating',`${v.rating} / 5`,'Historical delivery and quality','vendor')",
+  "kpi('Vendor rating',__pr23Live()&&(v.rating==null||v.rating==='—')?'Not rated':`${v.rating} / 5`,'Historical delivery and quality','vendor')",
+  "vendor profile -> an unrated vendor says so",
+  "kpi('Vendor rating',__pr23Live()&&(v.rating==null||v.rating==='—')?'Not rated':",
+)
+s = replaceUnique(
+  s,
+  "${card('Vendor communications and received documents',",
+  "${__pr23Live()?__pr23VendorHistoryCard(v):''}${card('Vendor communications and received documents',",
+  "vendor profile -> orders, invoices, delivery and prices",
+  "${__pr23Live()?__pr23VendorHistoryCard(v):''}",
+)
+
+// 55b. Vendor Registry's "Automated compliance reminders" card: no reminder automation exists on the backend, so its
+// Save schedule and Run now were refused and the sweep removed them, leaving a schedule form with sample Last run and
+// Next run times and nothing to press. A live session does not show the card.
+s = replaceUnique(
+  s,
+  "return `<section class=\"card compliance-automation-v7\">",
+  "if(__pr23Live())return '';return `<section class=\"card compliance-automation-v7\">",
+  "vendor registry -> no reminder automation card when live",
+  "if(__pr23Live())return '';return `<section class=\"card compliance-automation-v7\">",
+)
+// 55d. Vendor profile "Edit profile" opens the live form, which offers only what the vendor record keeps and saves it.
+s = replaceUnique(
+  s,
+  "handlers['edit-vendor-v6']=a=>{",
+  "handlers['edit-vendor-v6']=a=>{if(__pr23Live())return __pr23VendorEditModal(a.dataset.id);",
+  "vendor profile -> edit opens the live vendor form",
+  "if(__pr23Live())return __pr23VendorEditModal(a.dataset.id);",
+)
+// 55h. Vendor Registry: vendors who registered on the vendor portal wait for review here (approve or decline).
+s = replaceUnique(
+  s,
+  "actionV6('Run reminders','run-compliance-reminders-v6','','','mail'))}${filterBar()}",
+  "actionV6('Run reminders','run-compliance-reminders-v6','','','mail'))}${filterBar()}${__pr23Live()?__pr23VendorRegistrationsCard():''}",
+  "vendor registry -> self-registrations awaiting review",
+  "${__pr23Live()?__pr23VendorRegistrationsCard():''}",
+)
+// 55i. Register vendor opens the live vendor form: the prototype's had no contact, email or phone, and only four sample
+// categories, none of them a requisition's, so a staff-registered vendor could not be emailed or invited to an RFQ.
+s = replaceUnique(
+  s,
+  "function vendorModal(){openModal('Register vendor',",
+  "function vendorModal(){if(__pr23Live())return __pr23VendorRegisterModal();openModal('Register vendor',",
+  "register vendor -> the live vendor form",
+  "function vendorModal(){if(__pr23Live())return __pr23VendorRegisterModal();",
+)
+// 55j. The header button actually shown is register-vendor-v6, whose form required bank, branch, account and document
+// fields that nothing saved (bank details are Finance's), and whose payment terms had no name. Live, it opens the same form.
+s = replaceUnique(
+  s,
+  "function vendorRegisterModalV6(){",
+  "function vendorRegisterModalV6(){if(__pr23Live())return __pr23VendorRegisterModal();",
+  "register vendor (V6 button) -> the live vendor form",
+  "function vendorRegisterModalV6(){if(__pr23Live())return __pr23VendorRegisterModal();",
+)
+// 55c. New record's "Annual plan" opened the base plan modal, whose Create is refused; the plan page's own create is live.
+s = replaceUnique(
+  s,
+  '<button class="folder" data-action="create-plan"><span class="folder-icon">',
+  "<button class=\"folder\" data-action=\"${__pr23Live()?'create-plan-v5':'create-plan'}\"><span class=\"folder-icon\">",
+  "new record -> annual plan opens the live plan form",
+  "data-action=\"${__pr23Live()?'create-plan-v5':'create-plan'}\"",
+)
+// 55e. SRD §3 vendor master: the Company profile card showed BP, VAT, contact and email, but not the phone, address and
+// payment terms the vendor record keeps.
+s = replaceUnique(
+  s,
+  "<div class=\"field\"><label>Email</label><input value=\"${esc(v.email)}\" readonly></div></div></div>`)}",
+  "<div class=\"field\"><label>Email</label><input value=\"${esc(v.email)}\" readonly></div>${__pr23Live()?`<div class=\"field\"><label>Phone</label><input value=\"${esc(v.phone)}\" readonly></div><div class=\"field\"><label>Payment terms</label><input value=\"${esc(v.paymentTerms)}\" readonly></div><div class=\"field full\"><label>Address</label><input value=\"${esc(v.address)}\" readonly></div>`:''}</div></div>`)}",
+  "vendor profile -> phone, payment terms and address",
+  "<label>Payment terms</label><input value=\"${esc(v.paymentTerms)}\" readonly>",
+)
+// 55f. The profile's "Vendor communications and received documents" card is vendor messaging, which is not connected:
+// in a live session it only ever read "No communication records". Not shown.
+s = replaceUnique(
+  s,
+  "${card('Vendor communications and received documents',",
+  "${__pr23Live()?'':card('Vendor communications and received documents',",
+  "vendor profile -> no messaging card when live",
+  "${__pr23Live()?'':card('Vendor communications and received documents',",
+)
+// 55g. The profile's "Compliance document register" listed the design's sample documents; the live vendor carries none
+// (vendor KYC uploads are not part of this module), so it only ever read "No records to show yet". Not shown.
+s = replaceUnique(
+  s,
+  "${card('Compliance document register',",
+  "${__pr23Live()?'':card('Compliance document register',",
+  "vendor profile -> no sample compliance register when live",
+  "${__pr23Live()?'':card('Compliance document register',",
+)
+
+// ---------------------------------------------------------------------------
+// 56. A requisition shows its approval route
+// ---------------------------------------------------------------------------
+// SRD §3 and §7: approval follows rules (a larger requisition needs a further level) and the requester tracks where a
+// request is. The review and view modals showed the estimate and the status only; they now show each step of the
+// route, who decides it, when it applies and who decided it when (__pr23ApprovalRouteHtml).
+s = replaceUnique(
+  s,
+  "${smallV11('Preview motivation','preview-doc-v11',`MOT-${r.id}`,'eye')}</div>`;",
+  "${smallV11('Preview motivation','preview-doc-v11',`MOT-${r.id}`,'eye')}</div>${__pr23Live()?__pr23ApprovalRouteHtml(r.approvalRoute):''}`;",
+  "requisition modal -> approval route",
+  "${__pr23Live()?__pr23ApprovalRouteHtml(r.approvalRoute):''}",
+)
+
+// ---------------------------------------------------------------------------
+// 57. A requisition's motivation document is the requester's own
+// ---------------------------------------------------------------------------
+// "Preview motivation" rendered a template as a controlled document: dated 01 Aug 2026 whatever the requisition, a
+// "budget check" no backend performs, and a stock business justification in place of what the requester wrote. A live
+// session builds it from the record: lines, the requester's justification, and the approval route
+// (__pr23RequisitionDocument). The notice no longer promises supporting evidence that is not stored.
+s = replaceUnique(
+  s,
+  "const isMotivation = ref.startsWith('MOT-');",
+  "const isMotivation = ref.startsWith('MOT-'); if (__pr23Live()) return __pr23RequisitionDocument(pr, isMotivation);",
+  "requisition document -> built from the record",
+  "if (__pr23Live()) return __pr23RequisitionDocument(pr, isMotivation);",
+)
+s = replaceUnique(
+  s,
+  "<strong>Internal motivation and supporting evidence</strong><p>Open the actual controlled motivation document before making a decision.</p>",
+  "<strong>${__pr23Live()?'Internal motivation':'Internal motivation and supporting evidence'}</strong><p>${__pr23Live()?'The lines, justification and approval route of this requisition, as one document.':'Open the actual controlled motivation document before making a decision.'}</p>",
+  "requisition modal -> motivation notice says what the document is",
+  "${__pr23Live()?'Internal motivation':'Internal motivation and supporting evidence'}",
+)
+
+// ---------------------------------------------------------------------------
+// 58. The requisition forms offer only what is saved
+// ---------------------------------------------------------------------------
+// The New requisition form offered an Attachment and a Request source (Internal, Investee, Subsidiary), and the edit
+// form offered Supporting documents. None reached the backend: files were dropped (the document vault takes uploads
+// from procurement.documents.manage only, which a requester does not hold) and the source was never sent, so an
+// "Investee" request was filed as an internal one. The SRD's requisition form (§7) is requester, department, lines and
+// justification; a live session shows those, and the subtitle no longer promises a budget check no backend performs.
+s = replaceUnique(
+  s,
+  "${formField('Request source','<select name=\"type\"><option>Internal</option><option>Investee</option><option>Subsidiary</option></select>')}",
+  "${__pr23Live()?'':formField('Request source','<select name=\"type\"><option>Internal</option><option>Investee</option><option>Subsidiary</option></select>')}",
+  "new requisition -> no request source that is not saved",
+  "${__pr23Live()?'':formField('Request source',",
+)
+s = replaceUnique(
+  s,
+  "${formField('Attachment','<input type=\"file\" accept=\".pdf,.doc,.docx,.xlsx,.csv\">','full')}",
+  "${__pr23Live()?'':formField('Attachment','<input type=\"file\" accept=\".pdf,.doc,.docx,.xlsx,.csv\">','full')}",
+  "new requisition -> no attachment that is not saved",
+  "${__pr23Live()?'':formField('Attachment',",
+)
+s = replaceUnique(
+  s,
+  "<div class=\"field span2\"><label>Supporting documents</label><input type=\"file\" multiple accept=\".pdf,.doc,.docx,.xlsx,.csv\"></div>",
+  "${__pr23Live()?'':'<div class=\"field span2\"><label>Supporting documents</label><input type=\"file\" multiple accept=\".pdf,.doc,.docx,.xlsx,.csv\"></div>'}",
+  "edit requisition -> no supporting documents that are not saved",
+  "${__pr23Live()?'':'<div class=\"field span2\"><label>Supporting documents</label>",
+)
+s = replaceUnique(
+  s,
+  "openModal('New purchase requisition','Create an internal, investee or subsidiary request with line items, budget check and approval routing.',",
+  "openModal('New purchase requisition',__pr23Live()?'Raise a request with its lines and justification. It is routed for approval when you submit it.':'Create an internal, investee or subsidiary request with line items, budget check and approval routing.',",
+  "new requisition -> subtitle promises only what happens",
+  "__pr23Live()?'Raise a request with its lines and justification.",
+)
+
+// ---------------------------------------------------------------------------
+// 59. The purchase order register filters by vendor, date and status
+// ---------------------------------------------------------------------------
+// SRD §5 Phase 2: "Implement filtering by vendor, date, and status". The register had the module-wide filter bar
+// (year, department, status) which hides rows by matching their text, no vendor or date filter, and no order date on
+// the rows. A live session filters the orders themselves (__pr23FilteredOrders) with a vendor, an order-date range and
+// a status, shows the order date in place of a classification that always read "Goods / services", and drops the
+// eSignature row action, queue and coverage card: eSignature is not part of the SRD and has no backend.
+s = replaceUnique(
+  s,
+  "const rows=state.orders.map(o=>{const v=state.vendors.find(x=>x.name===o.vendor);const rule=taxRuleV6(v);",
+  "const rows=(__pr23Live()?__pr23FilteredOrders():state.orders).map(o=>{const v=state.vendors.find(x=>x.name===o.vendor);const rule=taxRuleV6(v);",
+  "purchase orders -> rows follow the register filters",
+  "(__pr23Live()?__pr23FilteredOrders():state.orders).map(o=>",
+)
+s = replaceUnique(
+  s,
+  "<td>${o.asset?'Fixed asset':'Goods / services'}</td><td>${vendorStatusChipV6(v||{})}</td>",
+  "<td>${__pr23Live()?__pr23DayLabel(o.orderDate):(o.asset?'Fixed asset':'Goods / services')}</td><td>${vendorStatusChipV6(v||{})}</td>",
+  "purchase orders -> order date on each row",
+  "${__pr23Live()?__pr23DayLabel(o.orderDate):",
+)
+s = replaceUnique(
+  s,
+  "${smallAction('Send','send-po-v6',o.id,'mail')}${smallAction('eSign','esign-new-v6',o.id,'signature')}",
+  "${smallAction('Send','send-po-v6',o.id,'mail')}${__pr23Live()?'':smallAction('eSign','esign-new-v6',o.id,'signature')}",
+  "purchase orders -> no eSignature row action",
+  "${__pr23Live()?'':smallAction('eSign','esign-new-v6',o.id,'signature')}",
+)
+s = replaceUnique(
+  s,
+  "+actionV6('Send selected','email-po','','','mail')+actionV6('Signature queue','signature-queue','','','signature'))}${filterBar()}",
+  "+actionV6('Send selected','email-po','','','mail')+(__pr23Live()?'':actionV6('Signature queue','signature-queue','','','signature')))}${__pr23Live()?'':filterBar()}",
+  "purchase orders -> register filters replace the text-matching bar; no signature queue",
+  "(__pr23Live()?'':actionV6('Signature queue','signature-queue','','','signature')))}${__pr23Live()?'':filterBar()}",
+)
+s = replaceUnique(
+  s,
+  "${kpi('Awaiting acknowledgement','1','Vendor reminder active','mail')}${kpi('eSign coverage','100%','Controlled approval documents','signature')}",
+  "${kpi('Awaiting acknowledgement','1','Vendor reminder active','mail')}${__pr23Live()?'':kpi('eSign coverage','100%','Controlled approval documents','signature')}",
+  "purchase orders -> no eSignature coverage card",
+  "${__pr23Live()?'':kpi('eSign coverage','100%','Controlled approval documents','signature')}",
+)
+s = replaceUnique(
+  s,
+  "${card('Purchase order register','Preview, edit, send, sign and monitor every controlled purchase order.',table(['PO','Vendor','Entity','Amount','Classification','Tax clearance','Tax rule','Delivery','Status','Actions'],rows))}",
+  "${__pr23Live()?__pr23OrderFiltersHtml():''}${card('Purchase order register',__pr23Live()?'Every purchase order your role can see. The filters narrow this register; the cards above cover every order.':'Preview, edit, send, sign and monitor every controlled purchase order.',table(['PO','Vendor','Entity','Amount',__pr23Live()?'Ordered':'Classification','Tax clearance','Tax rule','Delivery','Status','Actions'],__pr23Live()&&!rows.length?__pr23OrderEmptyRows():rows))}",
+  "purchase orders -> vendor, date and status filters over the register",
+  "${__pr23Live()?__pr23OrderFiltersHtml():''}",
+)
+
+// ---------------------------------------------------------------------------
+// 60. The Command Centre carries the SRD dashboard's four cards
+// ---------------------------------------------------------------------------
+// SRD §7 Procurement Dashboard: Awaiting My Approval (a large count, linked to the list), Recent POs (status and a
+// quick view), Spend by Department over a selectable date range (exact amount on hover), and Invoices to Review (a brief
+// reason each). They lead the live Command Centre, from the records (__pr23DashboardSrdHtml).
+s = replaceUnique(
+  s,
+  "<div class=\"grid two\" style=\"margin-bottom:14px\">${card('Plan, commitment and actual spend'",
+  "${__pr23Live()?__pr23DashboardSrdHtml():''}<div class=\"grid two\" style=\"margin-bottom:14px\">${card('Plan, commitment and actual spend'",
+  "command centre -> SRD dashboard cards",
+  "${__pr23Live()?__pr23DashboardSrdHtml():''}",
+)
+
+// ---------------------------------------------------------------------------
+// 61. Analytics is drawn from the records
+// ---------------------------------------------------------------------------
+// The vendored Analytics page kept a live hero over sample panels: a 287-record funnel, sample cycle drivers, owners and
+// queues, a sample category register, an owner workload, an invoice exception register and a report delivery log. A live
+// session renders __pr23AnalyticsHtml, which adds what SRD §4 and §2 ask of it: the cash supplier obligations will need,
+// top-spending departments, unusual spending, the most reliable vendors, cost per item over time, items bought above
+// their estimate and possible duplicate invoices.
+s = replaceUnique(
+  s,
+  "function analyticsPageV5(){",
+  "function analyticsPageV5(){if(__pr23Live())return __pr23AnalyticsHtml();",
+  "analytics -> live page",
+  "function analyticsPageV5(){if(__pr23Live())return __pr23AnalyticsHtml();",
+)
+
+// ---------------------------------------------------------------------------
+// 62. A requisition names its project or cost centre
+// ---------------------------------------------------------------------------
+// SRD §7 Purchase Requisition Form: "Project/Cost Center (a searchable dropdown menu)". The New requisition form, the
+// requester's edit form and the requisition view carry it (__pr23RequisitionProjectField); the lines on the New
+// requisition form suggest items bought before as they are typed (bridge, SRD §3).
+s = replaceUnique(
+  s,
+  "__pr23RequisitionEntityField()+__pr23RequisitionDepartmentField()",
+  "__pr23RequisitionEntityField()+__pr23RequisitionDepartmentField()+__pr23RequisitionProjectField()",
+  "new requisition -> project / cost centre",
+  "__pr23RequisitionDepartmentField()+__pr23RequisitionProjectField()",
+)
+s = replaceUnique(
+  s,
+  "<div class=\"field span2\"><label>Requirement title</label><input name=\"title\" value=\"${escV11(r.title)}\" required></div>",
+  "<div class=\"field span2\"><label>Requirement title</label><input name=\"title\" value=\"${escV11(r.title)}\" required></div>${__pr23Live()?__pr23RequisitionProjectField(r.projectId,'span2'):''}",
+  "edit requisition -> project / cost centre",
+  "${__pr23Live()?__pr23RequisitionProjectField(r.projectId,'span2'):''}",
+)
+s = replaceUnique(
+  s,
+  "<div><span>Category</span><strong>${escV11(r.category)}</strong></div>",
+  "<div><span>Category</span><strong>${escV11(r.category)}</strong></div>${__pr23Live()?`<div><span>Project</span><strong>${escV11(r.project||'None')}</strong></div>`:''}",
+  "requisition view -> project / cost centre",
+  "<div><span>Project</span><strong>${escV11(r.project||'None')}</strong></div>",
+)
+
+// 62b. Requisitions are not budget-checked (live-loaders sets budget to a dash: the backend has no budget check), so the
+// registers' Budget check column and the view's Budget line read "—" on every requisition. Not shown in a live session.
+s = replaceUnique(
+  s,
+  "'Estimate','Budget check','Status','Owner'",
+  "'Estimate',...(__pr23Live()?[]:['Budget check']),'Status','Owner'",
+  "requisition register -> no Budget check column when live",
+  "'Estimate',...(__pr23Live()?[]:['Budget check']),'Status','Owner'",
+)
+s = replaceUnique(
+  s,
+  "'Estimate','Budget check','Status','Action'",
+  "'Estimate',...(__pr23Live()?[]:['Budget check']),'Status','Action'",
+  "my requisitions -> no Budget check column when live",
+  "'Estimate',...(__pr23Live()?[]:['Budget check']),'Status','Action'",
+)
+s = replaceUnique(
+  s,
+  "<td>${/Warning/.test(r.budget)?status(r.budget):`<span style=\"color:var(--green)\">${r.budget}</span>`}</td>",
+  "${__pr23Live()?'':`<td>${/Warning/.test(r.budget)?status(r.budget):`<span style=\"color:var(--green)\">${r.budget}</span>`}</td>`}",
+  "requisition register -> no budget cell when live",
+  "${__pr23Live()?'':`<td>${/Warning/.test(r.budget)?status(r.budget):`<span style=\"color:var(--green)\">${r.budget}</span>`}</td>`}",
+)
+s = replaceUnique(
+  s,
+  "<td>${/Warning/.test(r.budget)?status(r.budget):`<span style=\"color:var(--green)\">${escV11(r.budget)}</span>`}</td>",
+  "${__pr23Live()?'':`<td>${/Warning/.test(r.budget)?status(r.budget):`<span style=\"color:var(--green)\">${escV11(r.budget)}</span>`}</td>`}",
+  "my requisitions -> no budget cell when live",
+  "${__pr23Live()?'':`<td>${/Warning/.test(r.budget)?status(r.budget):`<span style=\"color:var(--green)\">${escV11(r.budget)}</span>`}</td>`}",
+)
+s = replaceUnique(
+  s,
+  "<div><span>Budget</span><strong>${esc(r.budget)}</strong></div>",
+  "${__pr23Live()?'':`<div><span>Budget</span><strong>${esc(r.budget)}</strong></div>`}",
+  "requisition view -> no Budget line when live",
+  "${__pr23Live()?'':`<div><span>Budget</span><strong>${esc(r.budget)}</strong></div>`}",
+)
+
+// ---------------------------------------------------------------------------
+// 43. A filed document previews as itself
+// ---------------------------------------------------------------------------
+// Found by the UI census as Accounts Payable: previewing, downloading, editing or versioning the RFQ pack threw
+// "Cannot read properties of undefined (reading 'id')". A document of a recognised type (tender pack, annual plan…)
+// was rebuilt by generatedDocumentV11 from its related record, which looks the tender up — and a role that cannot
+// see RFQs has none. Even where it did not throw, a document someone uploaded was shown generated text in place of
+// the stored file. In a live session a document with a stored file is shown as it was filed.
+s = replaceUnique(
+  s,
+  "    if (!found) return generatedDocumentV11(id);",
+  "    if (!found) return generatedDocumentV11(id); if (__pr23Live() && found.fileUrl) return found;",
+  "document vault -> a filed document previews as itself",
+  "if (__pr23Live() && found.fileUrl) return found;",
+)
+
+// ---------------------------------------------------------------------------
+// 35. The browser tab carries no build label
+// ---------------------------------------------------------------------------
+// Found on dev: the tab read "Matanho Procurement & Tender Management - V23" (each layer set its own version).
+for (const [version, count] of [["13", 1], ["18", 2], ["20", 1], ["23", 1]]) {
+  const title = `Matanho Procurement & Tender Management - V${version}`
+  s = replaceEvery(
+    s,
+    `document.title='${title}';`,
+    `document.title=__pr23Title('${title}');`,
+    `tab title V${version} -> no build label`,
+    `__pr23Title('${title}')`,
+    count,
+  )
+}
+
+// ---------------------------------------------------------------------------
+// 36. Sidebar and document logo -> the clean wordmark, not the blurred export
+// ---------------------------------------------------------------------------
+// The vendored LOGO_DATA (sidebar brand mark, and every letterhead/document-preview that reuses it)
+// is a blurred export: a soft grey glow around the letters, visible once the sidebar is expanded.
+// performance-v22's own vendored export of the same logo has no such artifact (it is also the exact
+// asset already committed at public/investee-portal-v8/assets/matanho-logo-transparent.png) — reuse it.
+{
+  const CLEAN_LOGO_PATH = path.join(ROOT, "public/investee-portal-v8/assets/matanho-logo-transparent.png")
+  must(fs.existsSync(CLEAN_LOGO_PATH), `clean logo asset not found at ${CLEAN_LOGO_PATH}`)
+  const cleanLogoDataUri = `data:image/png;base64,${fs.readFileSync(CLEAN_LOGO_PATH).toString("base64")}`
+  const marker = `LOGO_DATA='${cleanLogoDataUri.slice(0, 80)}`
+  const m = s.match(/const LOGO_DATA='data:image\/png;base64,[^']+';/)
+  if (m) {
+    s = replaceUnique(
+      s,
+      m[0],
+      `const LOGO_DATA='${cleanLogoDataUri}';`,
+      "sidebar + document logo -> the clean wordmark (matches performance-v22)",
+      marker,
+    )
+  } else if (!s.includes(marker)) {
+    console.warn("  MISS            sidebar + document logo -> clean wordmark (LOGO_DATA assignment not found)")
+    missed += 1
+  } else {
+    console.log("  skip (already)  sidebar + document logo -> clean wordmark")
+    skipped += 1
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 38. Download PDF/Excel/CSV on a V6 preview -> the same content just previewed
+// ---------------------------------------------------------------------------
+// previewDocV6({id, name, content, ...}) is how POs, contracts, approval decisions, award
+// reports and vendor tax clauses build their preview: a synthetic object with real content,
+// passed straight through (docByIdV6 special-cases typeof id === 'object'). But the footer's
+// Download PDF/Excel/CSV buttons carry only doc.id (a string) as data-id, and clicking one calls
+// docByIdV6(thatId) again -- which, given a string, searches the Document Vault/templates/reports
+// (a PO or contract id is in none of them) and falls through to a generic placeholder with none
+// of the content just shown. Cache the object the first time (the preview call) so the string
+// lookup can find it again.
+{
+  const marker38 = "window.__pr23DocCacheV6[built.id]=built;"
+  if (s.includes(marker38)) {
+    console.log("  skip (already)  docByIdV6 caches a previewed object so its own download buttons find it again")
+    skipped += 1
+  } else {
+    const findV6 = s.match(/function docByIdV6\(id\)\{if\(id&&typeof id==='object'\)return \{type:'Controlled document',version:'v1\.0',status:'Draft',\.\.\.id\};[\s\S]*?\n  \}/)?.[0]
+    must(findV6, "docByIdV6 (step 38's own output) not found to extend for caching")
+    const replV6 = findV6.replace(
+      "if(id&&typeof id==='object')return {type:'Controlled document',version:'v1.0',status:'Draft',...id};",
+      "if(id&&typeof id==='object'){const built={type:'Controlled document',version:'v1.0',status:'Draft',...id};if(built.id){window.__pr23DocCacheV6=window.__pr23DocCacheV6||{};window.__pr23DocCacheV6[built.id]=built;}return built;}\n    if(window.__pr23DocCacheV6&&window.__pr23DocCacheV6[id])return window.__pr23DocCacheV6[id];",
+    )
+    must(replV6 !== findV6, "docByIdV6 replacement text did not change")
+    s = replaceUnique(s, findV6, replV6, "docByIdV6 caches a previewed object so its own download buttons find it again", marker38)
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 39. Download PDF on a V6 preview also -> the same content just previewed
+// ---------------------------------------------------------------------------
+// Step 38 fixed Excel and CSV (both reassigned to use docByIdV6, which now finds the previewed
+// object). PDF was never reassigned alongside them: 'download-document-v5' still calls the older
+// getDoc(id), which does not know about the preview cache and falls through to its own unrelated
+// placeholder ("Procurement Document"), so the PDF ignored the content the preview and the other
+// two downloads now agree on.
+{
+  // Extracted from the live file rather than typed here: this region is CRLF (see
+  // project_runtime_patch_crlf_trap), and a hand-typed \n find silently never matches.
+  const marker39 = "'download-document-v5':a=>exportFile('pdf',docByIdV6(a.dataset.id).name)"
+  if (s.includes(marker39)) {
+    console.log("  skip (already)  PDF download (V6 preview) -> docByIdV6, matching Excel and CSV")
+    skipped += 1
+  } else {
+    const find39 = s.match(/'download-document-xls':a=>exportFile\('xls',docByIdV6\(a\.dataset\.id\)\.name\),\r?\n\s*'download-document-csv':a=>exportFile\('csv',docByIdV6\(a\.dataset\.id\)\.name\)\r?\n\s*\}\);/)?.[0]
+    must(find39, "download-document-xls/csv handler block (step 38's own output) not found to extend for PDF")
+    const repl39 = `${marker39},\n    ` + find39
+    s = replaceUnique(s, find39, repl39, "PDF download (V6 preview) -> docByIdV6, matching Excel and CSV", marker39)
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 40. A plan line's Edit opens a real form with a save button
+// ---------------------------------------------------------------------------
+// Both places a plan line is listed (the combined Plan requirement register on /procurement/plan,
+// and a single plan's own workspace) wired Edit to editRecordV5, a generic fixture form whose only
+// buttons are Preview and Close -- there was no way to save a change at all. Point both at the new
+// __pr23EditPlanItemModal, and register its opener alongside the other V6 modal openers.
+s = replaceUnique(
+  s,
+  `data-record="plan-item" data-id="\${i.id}"><td><strong class="link">\${i.id}</strong><span class="row-tools-inline">\${smallAction('Edit','edit-record-v5',i.id)}`,
+  `data-record="plan-item" data-id="\${i.id}"><td><strong class="link">\${i.id}</strong><span class="row-tools-inline">\${smallAction('Edit','edit-plan-item-v23',i.id)}`,
+  "plan requirement register: Edit -> the real plan-item form",
+  `<span class="row-tools-inline">\${smallAction('Edit','edit-plan-item-v23',i.id)}`,
+)
+s = replaceUnique(
+  s,
+  "<td>${money(i.budget)}</td><td>${status(i.status)}</td><td>${smallAction('Edit','edit-record-v5',i.id)}</td></tr>",
+  "<td>${money(i.budget)}</td><td>${status(i.status)}</td><td>${smallAction('Edit','edit-plan-item-v23',i.id)}</td></tr>",
+  "plan workspace line table: Edit -> the real plan-item form",
+  "${smallAction('Edit','edit-plan-item-v23',i.id)}</td></tr>",
+)
+s = replaceUnique(
+  s,
+  "'edit-po-v6':a=>poModalV6(a.dataset.id),",
+  "'edit-po-v6':a=>poModalV6(a.dataset.id),\n    'edit-plan-item-v23':a=>__pr23EditPlanItemModal(a.dataset.id),",
+  "edit-plan-item-v23 opener registered",
+  "'edit-plan-item-v23':a=>__pr23EditPlanItemModal(a.dataset.id),",
+)
+
+// ---------------------------------------------------------------------------
+// 41. Drop the Document Vault's "use the three-dot menu" instructional captions
+// ---------------------------------------------------------------------------
+// Card subtitles telling the user how to operate the table they're looking at -- not content,
+// just narration -- read as clutter once the feature is familiar. The UI should be usable without
+// a caption explaining its own affordances.
+s = replaceUnique(
+  s,
+  "card(`${folder} records`,'Use the three-dot menu for document actions. Clicking a UID opens the actual document preview.',",
+  "card(`${folder} records`,'',",
+  "controlled folder records card: drop the three-dot-menu caption",
+  "card(`${folder} records`,'',",
+)
+s = replaceUnique(
+  s,
+  "card('Recent controlled documents','Use the three-dot menu for actions. Document names and UIDs open the actual preview.',",
+  "card('Recent controlled documents','',",
+  "recent controlled documents card: drop the three-dot-menu caption",
+  "card('Recent controlled documents','',",
+)
+
+// ---------------------------------------------------------------------------
+// 42. Vendor Registry: a vendor can be removed, not just edited
+// ---------------------------------------------------------------------------
+// The vendor profile page could be opened and edited but never deleted -- there was no control
+// for it anywhere in the module, though the backend already has a (soft) delete endpoint. Add the
+// button; actions.ts confirms and calls it, gated on vendors.manage like the edit action beside it.
+s = replaceUnique(
+  s,
+  "actionV6('Send message','message-vendor-v6',v.id,'','mail'))}",
+  "actionV6('Send message','message-vendor-v6',v.id,'','mail')+(__pr23Live()?actionV6('Delete vendor','delete-vendor-v23',v.id,'danger'):''))}",
+  "vendor profile: a Delete vendor button beside Edit profile",
+  "actionV6('Delete vendor','delete-vendor-v23',v.id,'danger')",
+)
+
+// ---------------------------------------------------------------------------
+// 43. Import the xlsx library so exports can write a real workbook, not an HTML-as-.xls trick
+// ---------------------------------------------------------------------------
+// __pr23ExportFile (the bridge) needs the XLSX binding, but the bridge is injected inside
+// startProcurementV23Runtime's body, and an import statement is only legal at module top level --
+// so the import goes in the vendored preamble, ahead of the function it's used inside.
+{
+  const marker43 = 'import * as XLSX from "xlsx";'
+  if (s.includes(marker43)) {
+    console.log("  skip (already)  top-level xlsx import for real spreadsheet export")
+    skipped += 1
+  } else {
+    const find43 = s.match(/import \{[\s\S]*?\} from "@\/components\/client-design-mock\/runtime-auth";\r?\n/)?.[0]
+    must(find43, "top-of-file client-design-mock import block not found")
+    s = replaceUnique(s, find43, `${find43}${marker43}\n`, "top-level xlsx import for real spreadsheet export", marker43)
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 45. Import the shared element-to-PDF renderer for downloads that must match the preview
+// ---------------------------------------------------------------------------
+{
+  const marker45 = 'import { generatePDF } from "@/lib/utils/pdf-generator";'
+  if (s.includes(marker45)) {
+    console.log("  skip (already)  top-level generatePDF import for preview-accurate PDF downloads")
+    skipped += 1
+  } else {
+    const find45 = s.match(/import \* as XLSX from "xlsx";\r?\n/)?.[0]
+    must(find45, "top-level xlsx import (step 43, added just above) not found")
+    s = replaceUnique(s, find45, `${find45}${marker45}\n`, "top-level generatePDF import for preview-accurate PDF downloads", marker45)
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 44. Audit & Compliance: paginate the 200 loaded events instead of hard-capping at 50
+// ---------------------------------------------------------------------------
+// The event stream sliced the loaded 200 events down to the newest 50 with no way to see the
+// other 150 -- "loaded" but genuinely unreachable. Page over what's already loaded, 50 at a time.
+{
+  const marker44 = '__pr23AuditPager((state.auditEventsLive'
+  if (s.includes(marker44)) {
+    console.log("  skip (already)  audit page: paginate the event stream 50 at a time")
+    skipped += 1
+  } else {
+    const find44 = s.match(/function auditPage\(\)\{[\s\S]*?\r?\n\}/)?.[0]
+    must(find44, "auditPage() function not found")
+    let repl44 = find44
+      .replace(".slice(0,50)", ".slice((state.__pr23AuditPage||0)*50,(state.__pr23AuditPage||0)*50+50)")
+      .replace(
+        "table(['Event','Activity','Record','Actor','Timestamp','Classification'],rows))}</div>`",
+        "table(['Event','Activity','Record','Actor','Timestamp','Classification'],rows)+(__pr23Live()?__pr23AuditPager((state.auditEventsLive||[]).length):''))}</div>`",
+      )
+    must(repl44 !== find44 && repl44.includes(marker44), "auditPage patch text did not change as expected")
+    s = replaceUnique(s, find44, repl44, "audit page: paginate the event stream 50 at a time", marker44)
+  }
+}
+s = replaceUnique(
+  s,
+  "'edit-plan-item-v23':a=>__pr23EditPlanItemModal(a.dataset.id),",
+  "'edit-plan-item-v23':a=>__pr23EditPlanItemModal(a.dataset.id),\n    'audit-page-prev':()=>{state.__pr23AuditPage=Math.max(0,(state.__pr23AuditPage||0)-1);render()},\n    'audit-page-next':()=>{const total=(state.auditEventsLive||[]).length;const last=Math.max(0,Math.ceil(total/50)-1);state.__pr23AuditPage=Math.min(last,(state.__pr23AuditPage||0)+1);render()},",
+  "audit-page-prev/next openers registered",
+  "'audit-page-prev':()=>{",
+)
+
+// ---------------------------------------------------------------------------
+// 46. Approval support documents (Budget position, evaluation, conflict) download as themselves
+// ---------------------------------------------------------------------------
+// download-approval-doc-v13 threw the actual computed content away and called the generic
+// register export with just the document's title -- "Budget position" matched /budget/i and
+// produced the whole plan-items register, nothing about the specific approval it was opened from.
+s = replaceUnique(
+  s,
+  "if(action==='download-approval-doc-v13'){const [approvalId,kind]=id.split('|');const doc=(kind||'main')==='main'?approvalDocumentV13(approvalId):supportDocumentV13(approvalId,kind);return exportFile('pdf',doc.name)}",
+  "if(action==='download-approval-doc-v13'){const [approvalId,kind]=id.split('|');const doc=(kind||'main')==='main'?approvalDocumentV13(approvalId):supportDocumentV13(approvalId,kind);return __pr23Live()?__pr23DownloadPreviewPdf('.approval-document-stage-v13',doc.name):exportFile('pdf',doc.name)}",
+  "approval document download: render the actual preview, not the register export",
+  "__pr23DownloadPreviewPdf('.approval-document-stage-v13',doc.name)",
+)
+
+// ---------------------------------------------------------------------------
+// 47. Document Vault previews (tender packs, plans, vendor compliance, ...) download as themselves
+// ---------------------------------------------------------------------------
+// Same bug, same fix, for the Document Vault's own preview -- download-doc-v11 also discarded
+// doc.content and asked the generic register export for a title match instead.
+s = replaceUnique(
+  s,
+  "if (action === 'download-doc-v11') { const doc=resolveDocumentV11(id); exportFile(actionEl.dataset.format==='csv'?'csv':actionEl.dataset.format==='xlsx'?'xlsx':'pdf',doc.name); }",
+  "if (action === 'download-doc-v11') { const doc=resolveDocumentV11(id); const fmt=actionEl.dataset.format==='csv'?'csv':actionEl.dataset.format==='xlsx'?'xlsx':'pdf'; if(fmt==='pdf'&&__pr23Live()){__pr23DownloadPreviewPdf('.document-preview-canvas-v11',doc.name);}else{exportFile(fmt,doc.name);} }",
+  "document vault download: render the actual preview, not the register export",
+  "__pr23DownloadPreviewPdf('.document-preview-canvas-v11',doc.name)",
+)
+
+// ---------------------------------------------------------------------------
+// 48. A tender row's Edit opens a real form (closing date) instead of the dead-end fixture
+// ---------------------------------------------------------------------------
+// enhanceCurrentPageV5 stamps every "data-record" row's Edit button with edit-record-v5 --
+// genericEditRecordV5's only real button is Preview, so this was a dead end for every record
+// type it touches. Tenders are the one named in the bug report; branch just that type to the
+// new real edit form rather than touching the shared injector's behaviour for every other type.
+s = replaceUnique(
+  s,
+  `const tools=document.createElement('span');tools.className='row-tools-inline';tools.innerHTML=\`<button class="text-action" data-action="edit-record-v5" data-id="\${esc(id)}">Edit</button><button class="text-action" data-action="preview-document" data-id="\${esc(id)}">Preview</button>\`;first.append(tools);`,
+  `const editAction=type==='tender'&&__pr23Live()?'edit-tender-v23':'edit-record-v5';const tools=document.createElement('span');tools.className='row-tools-inline';tools.innerHTML=\`<button class="text-action" data-action="\${editAction}" data-id="\${esc(id)}">Edit</button><button class="text-action" data-action="preview-document" data-id="\${esc(id)}">Preview</button>\`;first.append(tools);`,
+  "row Edit button: tenders get the real edit-tender-v23 form",
+  "editAction=type==='tender'",
+)
+s = replaceUnique(
+  s,
+  "'edit-plan-item-v23':a=>__pr23EditPlanItemModal(a.dataset.id),",
+  "'edit-plan-item-v23':a=>__pr23EditPlanItemModal(a.dataset.id),\n    'edit-tender-v23':a=>__pr23EditTenderModal(a.dataset.id),",
+  "edit-tender-v23 opener registered",
+  "'edit-tender-v23':a=>__pr23EditTenderModal(a.dataset.id),",
+)
+
+// ---------------------------------------------------------------------------
+// P2P chain toolbar: don't offer Capture invoice / Record payment to roles the
+// backend will refuse anyway (INV-2) -- same __pr23Can(...) gate the invoice
+// register's own per-row Record payment button already uses.
+// ---------------------------------------------------------------------------
+s = replaceUnique(
+  s,
+  "actionButton('Capture invoice','capture-invoice-v5',t.id,'','invoice')+actionButton('Record payment','record-payment-v23',t.id,'','account')",
+  "(__pr23Can('intake.manage')?actionButton('Capture invoice','capture-invoice-v5',t.id,'','invoice'):'')+(__pr23Can('invoices.pay')?actionButton('Record payment','record-payment-v23',t.id,'','account'):'')",
+  "P2P chain toolbar: hide Capture invoice / Record payment without the grant",
+  "__pr23Can('intake.manage')?actionButton('Capture invoice'",
+)
+
+// ---------------------------------------------------------------------------
+// Scope guard: the bridge may only call what is in its scope
+// ---------------------------------------------------------------------------
+// The bridge is injected at the runtime's top level. Helpers the vendored layers declare inside their own blocks
+// (smallAction, actionV6, actionButton, ...) do not exist there: a bridge page that called smallAction threw
+// "smallAction is not defined" and took the Approval Centre down on dev (cycle seven). Syntax checks cannot see it,
+// so refuse to write a runtime whose bridge calls a helper declared only inside a layer.
+{
+  const b0 = s.indexOf("/* BEGIN_PROCUREMENT_LIVE_BRIDGE */")
+  const b1 = s.indexOf("/* END_PROCUREMENT_LIVE_BRIDGE */")
+  const outside = s.slice(0, b0) + s.slice(b1)
+  const declared = (re) => new Set([...outside.matchAll(re)].map((m) => m[1]))
+  const topLevel = declared(/^(?:function\s+|(?:const|let|var)\s+)([A-Za-z_$][\w$]*)/gm)
+  const nested = declared(/^[ \t]+(?:function\s+|(?:const|let|var)\s+)([A-Za-z_$][\w$]*)\s*(?:=|\()/gm)
+  const bridgeCode = s
+    .slice(b0, b1)
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .replace(/^\s*\/\/.*$/gm, "")
+    .replace(/'[^'\n]*'/g, "''")
+    .replace(/"[^"\n]*"/g, '""')
+  const bridgeOwn = new Set([...bridgeCode.matchAll(/(?:function\s+|(?:const|let|var)\s+)([A-Za-z_$][\w$]*)/g)].map((m) => m[1]))
+  const outOfScope = [...new Set([...bridgeCode.matchAll(/(?<![.\w$])([A-Za-z_$][\w$]*)\s*\(/g)].map((m) => m[1]))].filter(
+    (name) => nested.has(name) && !topLevel.has(name) && !bridgeOwn.has(name),
+  )
+  if (outOfScope.length) {
+    console.error(`FATAL: the bridge calls helpers declared only inside a runtime layer (out of its scope): ${outOfScope.join(", ")}`)
+    missed += 1
+  } else {
+    console.log("  scope           bridge calls only what is in its scope")
+  }
+}
 
 console.log(`\n${applied} applied, ${skipped} already in place, ${missed} missed`)
 if (missed) {

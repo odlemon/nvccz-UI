@@ -231,6 +231,10 @@ export function VendorRegistrationForm() {
         contactPerson: data.contactPerson,
         phoneNumber: data.phoneNumber,
         industry: data.industry,
+        // The API stores `category` and `phone`: without them a self-registered vendor had no category, so it could never
+        // be invited to an RFQ (invitations match the requisition's category), and no phone.
+        category: data.industry,
+        phone: data.phoneNumber,
         banks: data.banks.map((bank) => ({
           bankName: bank.bankName,
           accountName: bank.accountName,
@@ -457,15 +461,26 @@ export function VendorRegistrationForm() {
           <div className="space-y-2">
             <Label htmlFor="industry" className="flex items-center gap-2">
               <Globe size={18} />
-              Industry *
+              Category *
             </Label>
+            {/* The same categories a requisition is raised under: an RFQ only invites vendors whose category matches the
+                requisition's, so free text ("Services") left a registered vendor that no RFQ could ever invite. */}
             <Controller
               name="industry"
               control={control}
-              rules={{ required: 'Industry is required' }}
+              rules={{ required: 'Choose the category you supply' }}
               render={({ field }) => (
                 <div>
-                  <Input {...field} id="industry" placeholder="Services" className={errors.industry ? 'border-red-500' : ''} />
+                  <select
+                    {...field}
+                    id="industry"
+                    className={`flex h-10 w-full rounded-md border bg-white px-3 py-2 text-sm ${errors.industry ? 'border-red-500' : ''}`}
+                  >
+                    <option value="">Choose a category</option>
+                    {['Office Supplies', 'Furniture', 'Technology', 'Facilities', 'Fleet', 'Medical', 'Agriculture', 'Professional Services'].map((c) => (
+                      <option key={c} value={c}>{c}</option>
+                    ))}
+                  </select>
                   {errors.industry && <p className="text-sm text-red-500 mt-1">{errors.industry.message}</p>}
                 </div>
               )}
@@ -478,21 +493,21 @@ export function VendorRegistrationForm() {
     if (step === 2) {
       return (
         <div className="space-y-5">
-          <div className="rounded-lg border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+          <div className="rounded-[10px] border border-[#d5e0f0] bg-[#eef0fd] px-4 py-3 text-sm text-[#3c47b0]">
             Bank details are required to complete vendor profile setup.
           </div>
 
           {bankFields.map((bank, index) => (
-            <div key={bank.id} className="rounded-xl border border-gray-200 p-4 space-y-4">
+            <div key={bank.id} className="rounded-[13px] border border-[#d5e0f0] p-4 space-y-4">
               <div className="flex items-center justify-between">
-                <h4 className="font-semibold text-gray-900">Bank #{index + 1}</h4>
+                <h4 className="font-semibold text-[#0f172a]">Bank #{index + 1}</h4>
                 <Button
                   type="button"
                   variant="outline"
                   size="sm"
                   onClick={() => remove(index)}
                   disabled={bankFields.length === 1}
-                  className="gap-2 rounded-full h-9 px-4"
+                  className="gap-2 rounded-[9px] h-9 px-4 border-[#d5e0f0]"
                 >
                   <Trash2 className="w-4 h-4" />
                   Remove
@@ -591,12 +606,18 @@ export function VendorRegistrationForm() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor={`swiftCode-${index}`}>SWIFT Code</Label>
+                  <Label htmlFor={`swiftCode-${index}`}>SWIFT / BIC Code *</Label>
+                  {/* Required: the API refuses a vendor bank account without a SWIFT/BIC code (payments need it), so a
+                      form that called it optional let vendors reach the last step only to be refused. */}
                   <Controller
                     name={`banks.${index}.swiftCode` as const}
                     control={control}
+                    rules={{ required: 'SWIFT/BIC code is required so payments reach the account' }}
                     render={({ field }) => (
-                      <Input {...field} id={`swiftCode-${index}`} placeholder="2121" />
+                      <div>
+                        <Input {...field} id={`swiftCode-${index}`} placeholder="CBZKZWHA" className={errors.banks?.[index]?.swiftCode ? 'border-red-500' : ''} />
+                        {errors.banks?.[index]?.swiftCode && <p className="text-sm text-red-500 mt-1">{errors.banks[index]?.swiftCode?.message}</p>}
+                      </div>
                     )}
                   />
                 </div>
@@ -607,7 +628,7 @@ export function VendorRegistrationForm() {
           <Button
             type="button"
             variant="outline"
-            className="gap-2 rounded-full h-10 px-6"
+            className="gap-2 rounded-[9px] h-10 px-6 border-[#d5e0f0]"
             onClick={() => append({
               bankName: '',
               accountName: '',
@@ -633,17 +654,17 @@ export function VendorRegistrationForm() {
       const isUploadingThisDoc = uploadingDocCode === slot.code
 
       return (
-        <div key={slot.code} className="group relative border rounded-2xl p-4 bg-white shadow-sm hover:shadow-md transition-all duration-200">
-          <div className="aspect-[4/3] bg-gradient-to-br from-blue-50 to-blue-100 rounded-xl mb-3 flex items-center justify-center overflow-hidden">
+        <div key={slot.code} className="group relative border border-[#d5e0f0] rounded-[13px] p-4 bg-white shadow-[0_1px_3px_0_rgba(0,0,0,0.04)] hover:shadow-[0_4px_14px_0_rgba(16,24,40,0.06)] transition-all duration-200">
+          <div className="aspect-[4/3] bg-[#eef0fd] rounded-[10px] mb-3 flex items-center justify-center overflow-hidden">
             {uploaded ? (
               <div className="text-center px-3">
-                <FileText className="w-10 h-10 text-blue-600 mx-auto mb-2" />
-                <p className="text-xs text-blue-700 font-medium truncate max-w-[170px]">{uploaded.fileName}</p>
+                <FileText className="w-10 h-10 text-[#5865E8] mx-auto mb-2" />
+                <p className="text-xs text-[#3c47b0] font-medium truncate max-w-[170px]">{uploaded.fileName}</p>
               </div>
             ) : (
               <div className="text-center px-3">
-                <Upload className="w-10 h-10 text-blue-500 mx-auto mb-2" />
-                <p className="text-xs text-blue-700 font-medium">{isUploadingThisDoc ? 'Uploading...' : 'Add Document'}</p>
+                <Upload className="w-10 h-10 text-[#5865E8] mx-auto mb-2" />
+                <p className="text-xs text-[#3c47b0] font-medium">{isUploadingThisDoc ? 'Uploading...' : 'Add Document'}</p>
               </div>
             )}
           </div>
@@ -651,16 +672,16 @@ export function VendorRegistrationForm() {
           <div className="space-y-2">
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
-                <p className="text-sm font-semibold text-gray-900">{slot.label}</p>
-                <p className="text-xs text-gray-500">{slot.description || 'Upload a clear scan or PDF.'}</p>
+                <p className="text-sm font-semibold text-[#0f172a]">{slot.label}</p>
+                <p className="text-xs text-[#64748b]">{slot.description || 'Upload a clear scan or PDF.'}</p>
               </div>
-              <span className={`text-[10px] px-2 py-0.5 rounded-full ${isRequired ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-700'}`}>
+              <span className={`text-[10px] px-2 py-0.5 rounded-full ${isRequired ? 'bg-red-100 text-red-700' : 'bg-[#e2e8f0] text-[#475569]'}`}>
                 {isRequired ? 'Required' : 'Optional'}
               </span>
             </div>
 
             <label htmlFor={elementId} className="block cursor-pointer">
-              <div className="border border-dashed border-gray-300 rounded-lg py-2 px-3 text-center text-xs text-gray-700 hover:border-blue-500 hover:bg-blue-50 transition-colors">
+              <div className="border border-dashed border-[#d5e0f0] rounded-[9px] py-2 px-3 text-center text-xs text-[#334155] hover:border-[#5865E8] hover:bg-[#eef0fd] transition-colors">
                 {uploaded ? 'Replace File' : 'Upload File'}
               </div>
             </label>
@@ -693,19 +714,19 @@ export function VendorRegistrationForm() {
     return (
       <div className="space-y-6">
         <div className="text-center mb-2">
-          <h3 className="text-2xl font-bold text-gray-900 mb-1">Upload KYC Documents</h3>
-          <p className="text-sm text-gray-600">Upload required compliance documents to complete registration.</p>
+          <h3 className="text-[23px] font-bold text-[#0f172a] mb-1">Upload KYC Documents</h3>
+          <p className="text-sm text-[#64748b]">Upload required compliance documents to complete registration.</p>
         </div>
 
         {loadingKycMeta ? (
-          <div className="py-10 flex items-center justify-center text-gray-600 text-sm gap-2">
+          <div className="py-10 flex items-center justify-center text-[#64748b] text-sm gap-2">
             <Loader2 className="w-4 h-4 animate-spin" />
             Loading KYC requirements...
           </div>
         ) : (
           <>
             <div>
-              <h4 className="text-sm font-medium text-gray-700 mb-3">Required Documents</h4>
+              <h4 className="text-sm font-medium text-[#334155] mb-3">Required Documents</h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {requiredSlots.map((slot) => renderKycCard(slot, true))}
               </div>
@@ -713,7 +734,7 @@ export function VendorRegistrationForm() {
 
             {optionalSlots.length > 0 && (
               <div>
-                <h4 className="text-sm font-medium text-gray-700 mb-3">Optional Documents</h4>
+                <h4 className="text-sm font-medium text-[#334155] mb-3">Optional Documents</h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                   {optionalSlots.map((slot) => renderKycCard(slot, false))}
                 </div>
@@ -723,8 +744,7 @@ export function VendorRegistrationForm() {
             <div className="pt-2 flex justify-end">
               <Button
                 type="button"
-                className="rounded-full h-11 px-8 gap-2 shadow-sm"
-                variant="gradient-create"
+                className="rounded-[9px] h-11 px-8 gap-2 bg-[#5865E8] hover:bg-[#4650c9] text-white shadow-[0_5px_14px_0_rgba(88,101,232,0.24)]"
                 onClick={submitKyc}
                 disabled={uploadingKyc || !kycToken}
               >
@@ -748,14 +768,17 @@ export function VendorRegistrationForm() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-green-50 py-12 px-4">
+    <div
+      className="min-h-screen bg-[#f4f6fa] py-12 px-4"
+      style={{ fontFamily: '-apple-system,BlinkMacSystemFont,"SF Pro Display","SF Pro Text",Inter,"Segoe UI",Roboto,Helvetica,Arial,sans-serif' }}
+    >
       <div className="max-w-5xl mx-auto">
         <div className="text-center mb-8">
           <div className="flex justify-center mb-4">
-            <Image src="/logo.png" alt="Logo" width={160} height={56} className="object-contain" priority />
+            <Image src="/investee-portal-v8/assets/matanho-logo-transparent.png" alt="Matanho" width={170} height={52} className="object-contain" priority />
           </div>
-          <h1 className="text-4xl font-bold text-gray-900 mb-2">Vendor Self-Registration</h1>
-          <p className="text-lg text-gray-600">Complete your profile, upload KYC, then await staff approval</p>
+          <h1 className="text-[23px] font-bold text-[#0f172a] mb-1">Vendor Self-Registration</h1>
+          <p className="text-sm text-[#64748b]">Complete your profile, upload KYC, then await staff approval</p>
         </div>
 
         <div className="flex items-center justify-between mb-8 px-4">
@@ -766,30 +789,30 @@ export function VendorRegistrationForm() {
               <div key={current} className="flex items-center flex-1">
                 <div className="flex flex-col items-center min-w-[100px]">
                   <div
-                    className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm ${
-                      done ? 'bg-emerald-500 text-white' : active ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-600'
+                    className={`w-10 h-10 rounded-[10px] flex items-center justify-center font-bold text-sm ${
+                      done ? 'bg-[#5865E8] text-white' : active ? 'bg-[#5865E8] text-white shadow-[0_5px_14px_0_rgba(88,101,232,0.24)]' : 'bg-white text-[#64748b] border border-[#d5e0f0]'
                     }`}
                   >
                     {current}
                   </div>
-                  <span className={`text-xs mt-2 font-medium ${active ? 'text-blue-700' : 'text-gray-600'}`}>
+                  <span className={`text-xs mt-2 font-medium ${active ? 'text-[#5865E8]' : 'text-[#64748b]'}`}>
                     {current === 1 ? 'Company Info' : current === 2 ? 'Bank Details' : 'KYC Upload'}
                   </span>
                 </div>
-                {current < 3 && <div className="flex-1 h-1 bg-gray-200 mx-3" />}
+                {current < 3 && <div className="flex-1 h-1 bg-[#e2e8f0] mx-3 rounded-full" />}
               </div>
             )
           })}
         </div>
 
-        <Card className="shadow-lg border border-gray-200 rounded-2xl">
-          <CardHeader className="bg-white rounded-t-2xl border-b border-gray-100 px-8 py-6 text-center">
-            <CardTitle className="text-gray-900">
+        <Card className="shadow-[0_1px_3px_0_rgba(0,0,0,0.04)] border border-[#d5e0f0] rounded-[13px]">
+          <CardHeader className="bg-white rounded-t-[13px] border-b border-[#e3e7ee] px-8 py-6 text-center">
+            <CardTitle className="text-[#0f172a]">
               {step === 1 && 'Step 1: Company Information'}
               {step === 2 && 'Step 2: Bank Information'}
               {step === 3 && 'Step 3: Compliance & KYC Upload'}
             </CardTitle>
-            <CardDescription className="text-gray-600">
+            <CardDescription className="text-[#64748b]">
               {step === 1 && 'Tell us who you are and how to contact you'}
               {step === 2 && 'Provide primary banking details for vendor master setup'}
               {step === 3 && 'Use your token to upload all required compliance documents'}
@@ -811,7 +834,7 @@ export function VendorRegistrationForm() {
                     onClick={moveBack}
                     disabled={step === 1 || loading}
                     variant="outline"
-                    className="gap-2 rounded-full h-11 px-8 disabled:opacity-50"
+                    className="gap-2 rounded-[9px] h-11 px-8 border-[#d5e0f0] disabled:opacity-50"
                   >
                     <ChevronLeft size={18} />
                     Previous
@@ -821,8 +844,7 @@ export function VendorRegistrationForm() {
                     type="button"
                     disabled={loading}
                     onClick={moveNext}
-                    variant="gradient-create"
-                    className="rounded-full h-11 px-8 gap-2 shadow-sm"
+                    className="rounded-[9px] h-11 px-8 gap-2 bg-[#5865E8] hover:bg-[#4650c9] text-white shadow-[0_5px_14px_0_rgba(88,101,232,0.24)]"
                   >
                     {loading ? (
                       <>
@@ -842,7 +864,7 @@ export function VendorRegistrationForm() {
           </CardContent>
         </Card>
 
-        <div className="mt-8 text-center text-sm text-gray-600">
+        <div className="mt-8 text-center text-sm text-[#64748b]">
           <p>Flow: Register, upload KYC with token, then staff reviews and approves activation.</p>
         </div>
       </div>
@@ -856,7 +878,7 @@ export function VendorRegistrationForm() {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="rounded-md border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">
+          <div className="rounded-[9px] border border-[#d5e0f0] bg-[#eef0fd] p-3 text-sm text-[#3c47b0]">
             {pendingUpload ? `File: ${pendingUpload.file.name}` : 'No file selected'}
           </div>
 
@@ -864,10 +886,10 @@ export function VendorRegistrationForm() {
             <Button type="button" variant="outline" onClick={() => {
               setIsUploadConfirmOpen(false)
               setPendingUpload(null)
-            }} disabled={Boolean(uploadingDocCode)} className="rounded-full h-10 px-6">
+            }} disabled={Boolean(uploadingDocCode)} className="rounded-[9px] h-10 px-6 border-[#d5e0f0]">
               Cancel
             </Button>
-            <Button type="button" onClick={confirmAndUploadDocument} disabled={Boolean(uploadingDocCode)} variant="gradient-create" className="rounded-full h-10 px-6 shadow-sm">
+            <Button type="button" onClick={confirmAndUploadDocument} disabled={Boolean(uploadingDocCode)} className="rounded-[9px] h-10 px-6 bg-[#5865E8] hover:bg-[#4650c9] text-white shadow-[0_5px_14px_0_rgba(88,101,232,0.24)]">
               {uploadingDocCode ? (
                 <span className="inline-flex items-center gap-2">
                   <Loader2 className="w-4 h-4 animate-spin" />

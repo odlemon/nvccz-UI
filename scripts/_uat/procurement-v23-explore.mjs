@@ -42,24 +42,25 @@ const PERSONAS = [
 ]
 
 const PAGES = [
-  ["dashboard", "/procurement-v23"],
-  ["plan", "/procurement-v23/plan"],
-  ["approvals", "/procurement-v23/approvals"],
-  ["requisitions", "/procurement-v23/requisitions"],
-  ["tenders", "/procurement-v23/tenders"],
-  ["quotations", "/procurement-v23/quotations"],
-  ["evaluation", "/procurement-v23/evaluation"],
-  ["vendors", "/procurement-v23/vendors"],
-  ["contracts", "/procurement-v23/contracts"],
-  ["orders", "/procurement-v23/purchase-orders"],
-  ["receiving", "/procurement-v23/goods-received"],
-  ["invoices", "/procurement-v23/invoices"],
-  ["accounts", "/procurement-v23/accounts"],
-  ["documents", "/procurement-v23/documents"],
-  ["reports", "/procurement-v23/reports"],
-  ["audit", "/procurement-v23/audit"],
-  ["settings", "/procurement-v23/settings"],
-  ["analytics", "/procurement-v23/analytics"],
+  ["dashboard", "/procurement"],
+  ["plan", "/procurement/plan"],
+  ["approvals", "/procurement/approvals"],
+  ["requisitions", "/procurement/requisitions"],
+  ["tenders", "/procurement/tenders"],
+  ["quotations", "/procurement/quotations"],
+  ["evaluation", "/procurement/evaluation"],
+  ["vendors", "/procurement/vendors"],
+  ["contracts", "/procurement/contracts"],
+  ["orders", "/procurement/purchase-orders"],
+  ["receiving", "/procurement/goods-received"],
+  ["invoices", "/procurement/invoices"],
+  ["intake", "/procurement/intake"],
+  ["accounts", "/procurement/accounts"],
+  ["documents", "/procurement/documents"],
+  ["reports", "/procurement/reports"],
+  ["audit", "/procurement/audit"],
+  ["settings", "/procurement/settings"],
+  ["analytics", "/procurement/analytics"],
 ]
 
 // First record of each fixture array in the runtime's state store, plus the demo owner.
@@ -202,7 +203,10 @@ function OVERLAY() {
 
 async function locate(page, c) {
   if (c.kind === "action") {
-    const all = page.locator(`[data-action=${q(c.action)}]${c.id ? `[data-id=${q(c.id)}]` : ""} >> visible=true`)
+    // A control in a form is looked for in that form. The page behind it can carry the same action (a card's
+    // Delegate under the approval modal), and that one is covered, so clicking it timed out.
+    const scope = c.where === "modal" ? "#modalLayer.open " : c.where === "drawer" ? "#drawerLayer.open " : ""
+    const all = page.locator(`${scope}[data-action=${q(c.action)}]${c.id ? `[data-id=${q(c.id)}]` : ""} >> visible=true`)
     // Several controls can share an action (a backdrop, an ×, a Cancel); aim at the labelled one.
     if (c.label) {
       const labelled = all.filter({ hasText: c.label })
@@ -227,6 +231,9 @@ async function operate(page, c) {
     await el.fill("zz-no-such-record", { timeout: 5000 })
     return el.press("Enter")
   }
+  // Scrolled into view first: a row actions menu closes on scroll, and the click's own scroll closed it as it opened.
+  await el.scrollIntoViewIfNeeded({ timeout: 5000 }).catch(() => {})
+  await page.waitForTimeout(120)
   return el.click({ timeout: 5000 })
 }
 
@@ -262,14 +269,21 @@ for (const [email, role] of USERS) {
     if (/\/api\//.test(u) && !/_next/.test(u)) w.api.push({ method: r.request().method(), path: u.replace(/^https?:\/\/[^/]+/, "").replace(/\?.*$/, ""), status: r.status() })
   })
   page.on("requestfailed", (r) => {
-    if (/\/api\//.test(r.url())) w.api.push({ method: r.request().method(), path: r.url().replace(/^https?:\/\/[^/]+/, "").replace(/\?.*$/, ""), status: `failed ${r.failure()?.errorText || ""}` })
+    // "requestfailed" hands over the Request itself (no .request()); calling it crashed the census whenever a call
+    // failed, as it did while the dev API container was being recreated.
+    if (/\/api\//.test(r.url())) w.api.push({ method: r.method(), path: r.url().replace(/^https?:\/\/[^/]+/, "").replace(/\?.*$/, ""), status: `failed ${r.failure()?.errorText || ""}` })
   })
   page.on("download", (d) => w.downloads.push(d.suggestedFilename()))
   page.on("dialog", (d) => { w.dialogs.push(`${d.type()}: ${d.message().slice(0, 160)}`); d.dismiss().catch(() => {}) })
   context.on("page", async (p) => {
     if (p === page) return
+    // Recorded the moment the tab opens. Waiting for it to load first recorded a slow external page (the vendor
+    // portal) after the probe had read its effects, so a working "Vendor portal" read as having no visible effect.
+    // The list is held by reference: a load that finishes after reset() updates this probe's entry, not the next's.
+    const list = w.popups
+    const i = list.push(p.url() || "about:blank") - 1
     await p.waitForLoadState("domcontentloaded").catch(() => {})
-    w.popups.push(p.url())
+    list[i] = p.url() || list[i]
     await p.close().catch(() => {})
   })
 
@@ -303,6 +317,12 @@ for (const [email, role] of USERS) {
         await page.waitForTimeout(450)
       }
       const before = await page.evaluate(SNAP)
+      // A tab or view that is already the selected one has nothing to change.
+      const wasSelected =
+        target.kind === "action" &&
+        (await (await locate(page, target))
+          .evaluate((el) => el.classList.contains("active") || el.getAttribute("aria-selected") === "true" || el.getAttribute("aria-pressed") === "true")
+          .catch(() => false))
       reset()
       await operate(page, target)
       if (target.kind === "nav") await page.waitForFunction((p) => location.pathname !== p, before.url.split("?")[0], { timeout: 4000 }).catch(() => {})
@@ -318,7 +338,13 @@ for (const [email, role] of USERS) {
       if (after.drawer && after.drawer !== before.drawer) out.effect.push(`opens drawer "${after.drawer}"`)
       if (!after.modal && before.modal) out.effect.push("closes the modal")
       if (!after.drawer && before.drawer) out.effect.push("closes the drawer")
-      for (const t of after.toasts.filter((t) => !before.toasts.includes(t))) out.effect.push(`toast "${t}"`)
+      // Counted, not matched by text: a second identical refusal while the first is still showing is a refusal too.
+      const shown = new Map()
+      for (const t of before.toasts) shown.set(t, (shown.get(t) || 0) + 1)
+      for (const t of after.toasts) {
+        if (shown.get(t)) shown.set(t, shown.get(t) - 1)
+        else out.effect.push(`toast "${t}"`)
+      }
       for (const d of w.downloads) out.effect.push(`download ${d}`)
       for (const p of w.popups) out.effect.push(`new tab ${p}`)
       for (const d of w.dialogs) out.effect.push(`dialog ${d}`)
@@ -338,6 +364,7 @@ for (const [email, role] of USERS) {
         }
       }
       if (!out.effect.length && after.hash !== before.hash) out.effect.push("changes the page in place")
+      if (!out.effect.length && wasSelected) out.effect.push("already selected")
       if (!out.effect.length) out.effect.push("NO VISIBLE EFFECT")
       for (const e of w.errors) out.effect.push(`ERROR ${e}`)
     } catch (e) {
@@ -415,9 +442,14 @@ for (const [email, role] of USERS) {
         pr.probes.push(await probe(route, [c, item], pid))
       }
     }
+    // A modal left with a form and nothing to save once the controls with no backend were removed (bridge __pr23DeadEnds).
+    pr.deadEnds = await page.evaluate(() => { const d = window.__pr23DeadEnds || []; window.__pr23DeadEnds = []; return d }).catch(() => [])
+    // KPI cards left out because nothing live answers them (bridge __pr23Kpi), to review page by page.
+    pr.hiddenKpis = await page.evaluate(() => { const h = window.__pr23HiddenKpis || {}; window.__pr23HiddenKpis = {}; return h }).catch(() => ({}))
+    const notConnected = pr.probes.filter((p) => p.effect.some((e) => /not connected/i.test(e))).length
     const flagged = pr.probes.filter((p) => p.effect.some((e) => /^(NO VISIBLE|COULD NOT|ERROR|API WRITE)/.test(e))).length
     const blankKpis = (pr.kpis || []).filter((k) => /No live source/i.test(k)).length
-    console.log(`[${TAG}] ${email} ${pid}: ${pr.tables?.length ?? 0} table(s), ${pr.kpis?.length ?? 0} KPI(s) (${blankKpis} without a source), ${pr.probes.length} probe(s), ${flagged} flagged, load errors ${pr.loadErrors.length}, failed calls ${pr.loadApi.length}`)
+    console.log(`[${TAG}] ${email} ${pid}: ${pr.tables?.length ?? 0} table(s), ${pr.kpis?.length ?? 0} KPI(s) (${blankKpis} without a source), ${pr.probes.length} probe(s), ${flagged} flagged, ${notConnected} not connected, ${pr.deadEnds.length} dead end(s), load errors ${pr.loadErrors.length}, failed calls ${pr.loadApi.length}`)
     save()
   }
   await context.close()

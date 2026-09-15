@@ -21,14 +21,14 @@ const USERS = list(arg("users")).length ? list(arg("users")) : [
   "payroll.cfo@nts.local", "payroll.intaudit@nts.local",
 ]
 const PAGES = [
-  ["dashboard", "/procurement-v23"], ["plan", "/procurement-v23/plan"], ["approvals", "/procurement-v23/approvals"],
-  ["requisitions", "/procurement-v23/requisitions"], ["tenders", "/procurement-v23/tenders"],
-  ["quotations", "/procurement-v23/quotations"], ["evaluation", "/procurement-v23/evaluation"],
-  ["vendors", "/procurement-v23/vendors"], ["contracts", "/procurement-v23/contracts"],
-  ["orders", "/procurement-v23/purchase-orders"], ["receiving", "/procurement-v23/goods-received"],
-  ["invoices", "/procurement-v23/invoices"], ["accounts", "/procurement-v23/accounts"],
-  ["documents", "/procurement-v23/documents"], ["reports", "/procurement-v23/reports"],
-  ["audit", "/procurement-v23/audit"], ["settings", "/procurement-v23/settings"], ["analytics", "/procurement-v23/analytics"],
+  ["dashboard", "/procurement"], ["plan", "/procurement/plan"], ["approvals", "/procurement/approvals"],
+  ["requisitions", "/procurement/requisitions"], ["tenders", "/procurement/tenders"],
+  ["quotations", "/procurement/quotations"], ["evaluation", "/procurement/evaluation"],
+  ["vendors", "/procurement/vendors"], ["contracts", "/procurement/contracts"],
+  ["orders", "/procurement/purchase-orders"], ["receiving", "/procurement/goods-received"],
+  ["invoices", "/procurement/invoices"], ["intake", "/procurement/intake"], ["accounts", "/procurement/accounts"],
+  ["documents", "/procurement/documents"], ["reports", "/procurement/reports"],
+  ["audit", "/procurement/audit"], ["settings", "/procurement/settings"], ["analytics", "/procurement/analytics"],
 ].filter(([id]) => !list(arg("pages")).length || list(arg("pages")).includes(id))
 const OUT = path.resolve(arg("out") || ".procurement-screens")
 // A remote run (dev over a slow link) needs longer than a local page load.
