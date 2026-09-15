@@ -9,7 +9,7 @@ as a hypothesis to verify, not a fact.
 | Severity | Open | Fixed locally, not deployed | Deployed and verified |
 |---|---|---|---|
 | CRITICAL | 0 | 0 | 0 |
-| HIGH | 5 | 0 | 1 |
+| HIGH | 6 | 0 | 1 |
 | MEDIUM | 5 | 0 | 0 |
 | LOW | 0 | 0 | 0 |
 
@@ -446,6 +446,39 @@ demonstrates the full working pattern to copy). Same bug class, one shared root 
 case) — worth fixing every listed id in one pass rather than one page at a time as each is separately
 discovered, mirroring how FINDING-PV11-007's backend `authorize()` gap was closed repo-wide in one look
 rather than file by file.
+
+## FINDING-PV11-011
+
+**Page / flow:** Period Close & GL — "Run close pre-check" and "Request approval" (Wave 3 — "Period Close
+checklist" spot-check; the checklist display itself looks solid, both of its primary actions do not work)
+**Steps to reproduce:** As `admin@nts.com`, Period Close & GL → Run close pre-check.
+**Expected:** Runs a pre-check against the current close period (July 2026, shown in the page's own context
+bar) and updates the checklist/readiness state.
+**Actual:** Nothing observable happens — no toast, no error, no network request at all (confirmed via a
+`window.fetch` trace: the click produced zero API calls, not even a failed one). "Request approval" was
+inspected and carries the identical defect (not separately click-tested, to avoid triggering a real
+approval-route side effect on a page with named real approvers).
+**Root cause:** both buttons are plain, static `button(...)` calls in the runtime
+(`matanho-portfolio-runtime.js:1241-1242`: `button('Run close pre-check','run-close-precheck',...)` and
+`button('Request approval','request-close-approval',...)`) with no extra `data-*` fields — so the
+`dataset` the click dispatcher forwards is just `{action: '...'}`, nothing else. Both action ids correctly
+remap in `portfolio-v11-app.tsx`'s `onBeforeAction` (`run-close-precheck` → `run-pre-check`,
+`request-close-approval` → `period-close`) and correctly reach `lib/portfolio-v11/actions.ts`'s matching
+handlers — but both handlers guard on `(ds.period || ds.id)` (lines 152 and 161) before doing anything.
+Since neither field is ever present, both `if` blocks are skipped entirely and the dispatcher falls through
+to `return { handled: false }` — which, per `portfolio-v11-app.tsx`'s result handling, produces **no toast
+and no error**, only `setLoadStatus("ready")`: a click that visibly does nothing at all, not even the
+"Filter updated" toast FINDING-PV11-010's buttons at least show.
+**Severity:** HIGH — both of Period Close's primary actions (the whole point of the page: verify readiness,
+then request approval to actually close a period) are unreachable from the UI. The rich 10-item checklist
+underneath renders real, well-detailed data — this is specifically the two buttons above it.
+**Suspected area / fix shape:** the current close period is already known and displayed on this exact page
+(the "Close period: July 2026" hero, and `state.closePeriod` is referenced elsewhere per
+`lib/portfolio-v11/actions.ts`'s `rehydrate(['periodClose'], { closePeriod: period })` calls). Both buttons
+need a `data-period` (or `data-id`) attribute sourced from that same state value — either via `attrs` on
+the `button(...)` calls (the helper's 5th parameter already exists for exactly this) or by having the
+runtime's dispatcher inject the current close period into these two specific action ids' dataset before
+emitting, matching how form-backed actions elsewhere already assemble their dataset from live state.
 
 ## Format per finding
 ```
