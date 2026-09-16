@@ -111,7 +111,7 @@ export function mapInvestorOrg(raw: Record<string, any>, idx = 0): InvestorOrg {
   }
 }
 
-export function mapContactRow(raw: Record<string, any>, orgName?: string, idx = 0) {
+export function mapContactRow(raw: Record<string, any>, orgName?: string, idx = 0, orgOwnerName?: string) {
   const influence = String(raw.decisionInfluence || '')
     .replace(/_/g, ' ')
     .replace(/\b\w/g, (c) => c.toUpperCase())
@@ -129,7 +129,7 @@ export function mapContactRow(raw: Record<string, any>, orgName?: string, idx = 
     phone: raw.phone || '—',
     influence: influence || '—',
     consent: Boolean(raw.communicationConsent),
-    owner: readableName(raw.ownerName || nestedPersonName(raw.owner)),
+    owner: readableName(raw.ownerName || nestedPersonName(raw.owner) || orgOwnerName),
     nextAction: raw.nextAction || '—',
     lastInteraction: raw.lastInteractionAt
       ? new Date(raw.lastInteractionAt).toLocaleDateString()
