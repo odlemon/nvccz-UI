@@ -267,7 +267,7 @@ Docs: [`multi-portal-domain-separation.md`](./multi-portal-domain-separation.md)
 
 | Portal | Build flag | Who uses it | Auth | Home route after login |
 |--------|------------|-------------|------|------------------------|
-| **Staff** | `NEXT_PUBLIC_PORTAL=staff` | Employees — accounting, portfolio, investments, procurement, etc. | Required (`portal: staff`) | `/home-v3` |
+| **Staff** | `NEXT_PUBLIC_PORTAL=staff` | Employees — accounting, portfolio, investments, procurement, etc. | Required (`portal: staff`) | `/home` (legacy `/home-v3` still redirects) |
 | **LP** | `NEXT_PUBLIC_PORTAL=lp` | Limited partners — fund performance, documents, capital activity | Required (`portal: lp`) | `/lp-portal` |
 | **Investee** | `NEXT_PUBLIC_PORTAL=investee` | Applicants / portfolio companies post-acceptance | Required (`portal: investee`) | `/investee-portal-v8` |
 | **Apply** | `NEXT_PUBLIC_PORTAL=apply` | Public funding applicants (no account) | **None** | `/funding-application` |
@@ -559,7 +559,7 @@ npm run db:seed:portfolio-v11-local-demo
 
 | Module | Route | Handoff |
 |--------|-------|---------|
-| **Home V3** | `/home-v3` | [`home-v3-ui-handoff.md`](./home-v3-ui-handoff.md) |
+| **Home V3** | `/home` (legacy `/home-v3` redirects) — **graduated from mock to real-data-end-to-end**, see `design-refs/home-page/execution-plan.md` | [`home-v3-ui-handoff.md`](./home-v3-ui-handoff.md) (historical; execution-plan.md is current) |
 | **Accounting V52** | `/accounting-v52` | [`accounting-v52-ui-handoff.md`](./accounting-v52-ui-handoff.md) |
 | **Procurement V23** | `/procurement-v23` | [`procurement-v23-ui-handoff.md`](./procurement-v23-ui-handoff.md) |
 | **Performance V22** | `/performance-v22` | [`performance-v22-ui-handoff.md`](./performance-v22-ui-handoff.md) |

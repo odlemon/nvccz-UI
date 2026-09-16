@@ -609,3 +609,76 @@ endpoint" rather than "design new data models." The only genuinely new backend a
 the `HomePreference` table (Phase 1/2/8), `FocusSession` (Phase 1), the Services request-tracking model
 (Phase 3), Forums' two additive fields on `Post` (Phase 6), and Profile's skills/recognition models (Phase
 7, only if confirmed wanted).
+
+## Round 2 — full clean regression pass + merge to trunk (2026-09-15/16) — done, verified live
+
+After Phase 9, the user asked for a full clean regression test from a fresh login (not a scoped
+re-check), with issues recorded first and fixed after. Two rounds of this turned up real bugs beyond
+what Phases 0-9 covered, all fixed and verified live against the real backend, not just patched and
+assumed:
+
+**Round 2 fixes** (frontend `components/home-v3-mock/matanho-runtime.js` unless noted; each has a
+`scripts/patch-home-v3-*.mjs` + fragment pair documenting the exact diff):
+- Calendar's "Find a time" button was pure decoration (canned toast) — now computes real >=30-min
+  gaps from the signed-in user's own combined calendar.
+- AI panel's Saved tab was unreachable (its only save trigger lived in dead rich-card message
+  code nothing renders any more) and, if reached, its dedupe-by-`.title` logic would have silently
+  wiped every prior save the moment a second one was added. Fixed and rewired to the real
+  plain-bubble reply view; dedupe now keys on `.createdAt`.
+- Four "submit a request" flows (leave, expense, app-access, documents) hardcoded a fake person's
+  name as the owner and a stale literal date, regardless of who submitted or when. Now honest
+  ("Pending assignment" + today's real date). The leave modal's fake "Manager: Tawanda Kasere"
+  field now honestly reads "Not set" — no manager/reporting-line field exists on the User model.
+- Settings modal's "Live preview" caption went stale the moment you touched the OLED slider or
+  density select (baked into the modal's HTML once at open time). Now updates live.
+- **Shared topbar search bar** (`components/layout/shared-topbar.tsx` +
+  `components/layout/client-design-module-shell.tsx` — used by every `-mock` module, not just
+  home, see `home-v3-ui-handoff.md`'s "Known deviations"): below ~1033px window width the search
+  input's typed text rendered invisible under the fixed nav rail, because the rail (position:fixed,
+  sized by a module-scoped `--sidebar` CSS var) and the topbar (a DOM sibling, not a descendant of
+  the mounted module) had no way to coordinate widths. Fixed with a small width-observer in the
+  shared shell exposing the rail's real rendered width as a CSS var the topbar reserves space for;
+  verified at the repro width, 1440px, mobile, and with the rail collapsed, across Home,
+  Performance, Portfolio and Procurement — the four modules using this fixed-rail convention.
+- "Request app access" and "Add document" had no reachable UI trigger at all (dead handler code)
+  and no backend even if reached. Built real backend (`AppAccessRequest` + `ProfileDocument`
+  models, raw-SQL migrations following this project's standard idempotent-migration-script
+  convention, `ProfileDocument` uploads via the same `RemoteUploadService` every other upload in
+  this app uses — see backend repo commit `f056971`), then added the missing UI: a "Documents" tab
+  on My Profile and "Request access"/"My requests" buttons on the Apps page.
+- Performance's Feedback tab (dropped in an earlier fix rather than ship invented scores/quotes)
+  is back, wired to the real `PerformanceReview`/`PerformanceReviewFeedback` API — no backend
+  changes needed, it already existed. Scoped to a read-only summary of the signed-in user's own
+  most recent review, not the full multi-stage review-editing workflow (separate, larger,
+  admin/HR-facing scope). **Known gap:** the populated-data view was never exercised end-to-end —
+  creating a test review is correctly blocked when you'd be your own reviewee, and no second test
+  account was available. Empty state is confirmed live; the mapping matches the backend's
+  confirmed response shape but hasn't been eyeballed with real data.
+- AI panel's Briefs tab showed hardcoded fake metadata ("14:00 · Harare Boardroom", "7 active
+  tasks · 3 projects") even though the real data was already available in the same file — now
+  computed for real. Draft tab's "Regenerate" button silently abandoned whatever you were
+  drafting (navigated away to a new Ask conversation with a hardcoded generic prompt, ignoring
+  your actual type/audience/subject, never wrote anything back) — now builds a real prompt from
+  the current form and writes the reply into the draft in place.
+
+**Verification method throughout:** live browser testing against the real backend on every fix (not
+just code review) — real API calls confirmed via network-request inspection, real database records
+created and inspected where relevant, honest empty/error states distinguished from actual bugs.
+
+**Known gaps carried forward, not silently built:**
+1. Performance Feedback tab's populated-data rendering (see above).
+2. `lib/config/modules.ts`'s Home entry still points at the legacy `/home-v3` path rather than the
+   canonical `/home` — works correctly via `middleware.ts`'s "Legacy /home-v3 → /home" redirect, so
+   not a functional bug, just an indirection worth cleaning up.
+
+## Merge to trunk (2026-09-16)
+
+`feature/home-page` (frontend, 35 commits over Phases 0-9 + round 2) and `feature/home-page`
+(backend, 12 commits) merged into `dev`/`master` respectively via real merge commits (not squashed).
+Both trunks had moved on since branching (dev +40 commits, master +10) — merged trunk into the
+feature branch first in each repo (auto-merged cleanly, zero conflicts — the diverged work touched
+disjoint files: portfolio/procurement/vendor-portal on the frontend side, portfolio/procurement
+services on the backend side), then merged the feature branch into trunk. Verified locally
+afterward: full stack (MySQL :3306, backend, frontend) started from the merged trunk worktrees,
+home module and several other modules (Portfolio, App Switcher, login-redirect) exercised in a real
+browser — see the session record for the full verification log.
