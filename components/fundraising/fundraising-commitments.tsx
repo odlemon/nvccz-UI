@@ -659,6 +659,7 @@ export function FundraisingCommitments() {
   const [fundAmount, setFundAmount] = useState("")
   const [admitting, setAdmitting] = useState(false)
   const [funding, setFunding] = useState(false)
+  const [provisioning, setProvisioning] = useState(false)
   const [lifecycleStatus, setLifecycleStatus] = useState("")
   const [updatingLifecycle, setUpdatingLifecycle] = useState(false)
   const [requirements, setRequirements] = useState<FrRequirementsState>(emptyRequirementsState)
@@ -996,6 +997,24 @@ export function FundraisingCommitments() {
     }
   }
 
+  async function handleProvisionLp() {
+    if (!selected) return
+    setProvisioning(true)
+    try {
+      const result = await fundraisingApi.provisionLp(selected.id)
+      toast.success(
+        result?.alreadyProvisioned
+          ? `${selected.name} is already provisioned as an LP`
+          : `${selected.name} provisioned as an LP in Portfolio`
+      )
+      await loadData()
+    } catch (err) {
+      toastFrError(err, "Could not provision LP")
+    } finally {
+      setProvisioning(false)
+    }
+  }
+
   async function handleLifecycleUpdate() {
     if (!selected || !lifecycleStatus || lifecycleStatus === selected.status) return
     if (["ADMITTED_AT_CLOSE", "PARTIALLY_FUNDED", "FUNDED"].includes(lifecycleStatus)) {
@@ -1040,6 +1059,11 @@ export function FundraisingCommitments() {
     Boolean(selected) &&
     !selected?.complianceBlocked &&
     ["ADMITTED_AT_CLOSE", "PARTIALLY_FUNDED"].includes(selected?.status || "")
+  const isProvisioned = Boolean(selected?.raw?.clientId)
+  const canProvisionLp =
+    Boolean(selected) &&
+    !isProvisioned &&
+    ["ADMITTED_AT_CLOSE", "PARTIALLY_FUNDED", "FUNDED"].includes(selected?.status || "")
 
   return (
     <div className="h-full overflow-y-auto bg-[#f8fafc] p-4 md:p-6">
@@ -1298,6 +1322,17 @@ export function FundraisingCommitments() {
                       {funding ? "Recording…" : "Record Funding"}
                     </Button>
                   </div>
+                  {selected && ["ADMITTED_AT_CLOSE", "PARTIALLY_FUNDED", "FUNDED"].includes(selected.status || "") ? (
+                    <Button
+                      variant="outline"
+                      className="mt-2 h-8 w-full rounded-full text-[11px]"
+                      disabled={!canProvisionLp || provisioning}
+                      onClick={handleProvisionLp}
+                    >
+                      {provisioning ? <Loader2 className="h-3 w-3 animate-spin" /> : null}
+                      {provisioning ? "Provisioning…" : isProvisioned ? "Provisioned as LP ✓" : "Provision as LP"}
+                    </Button>
+                  ) : null}
                 </div>
               }
             />
