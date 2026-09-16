@@ -1,0 +1,15 @@
+      if(action==='ai-toggle-context'){state.aiContextOpen=!state.aiContextOpen;saveState();render();return}
+      if(action==='regenerate-draft'){
+        if(state.aiDraftPending)return;
+        const form=document.getElementById('aiDraftForm');
+        const f=form?new FormData(form):null;
+        const type=String(f?.get('type')||state.aiDraft.type||'Executive update');
+        const audience=String(f?.get('audience')||state.aiDraft.audience||'Investment team');
+        const subject=String(f?.get('subject')||state.aiDraft.subject||'').trim();
+        state.aiDraft={...state.aiDraft,type,audience,subject};
+        state.aiDraftPending=true;
+        saveState();render();
+        const prompt=`Draft a ${type.toLowerCase()} for the ${audience.toLowerCase()}${subject?` about "${subject}"`:''}. Use only what is visible in my connected work, and write only the draft body — no preamble.`;
+        emitIntegrationEvent('assistant.message.sent',{prompt,history:[],scope:state.aiScope,sources:state.aiContextSources});
+        return;
+      }

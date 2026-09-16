@@ -1,0 +1,9 @@
+    receiveAssistantReply(text, isError, sourcesUsed) {
+      if (state.aiDraftPending) {
+        state.aiDraftPending = false;
+        if (!isError) state.aiDraft = { ...state.aiDraft, body: String(text || '') };
+        saveState(); render();
+        toast(isError ? 'Could not regenerate the draft.' : 'Draft regenerated.', isError ? '' : 'success');
+        return;
+      }
+      const idx = state.aiMessages.findIndex(m => m.pending);

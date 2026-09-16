@@ -1,0 +1,19 @@
+  function forumsView() {
+    if (state.forumThread) {
+      const t=(D.forumPosts||[]).find(x=>x.id===state.forumThread);
+      if(t) return forumThreadView(t);
+    }
+    const posts=D.forumPosts||[];
+    const filter=state.forumFilter||'All discussions';
+    const counts={};
+    posts.forEach(p=>{const c=p.category||'Other';counts[c]=(counts[c]||0)+1});
+    const cats=forumCategories().map(c=>[c,counts[c]||0]);
+    let filtered=posts;
+    if(filter==='Unanswered') filtered=posts.filter(p=>p.replies.length===0);
+    if(filter==='My discussions') filtered=posts.filter(p=>p.authorId===D.user.id);
+    const contributorCounts={};
+    posts.forEach(p=>{contributorCounts[p.authorName]=(contributorCounts[p.authorName]||0)+1;p.replies.forEach(r=>{contributorCounts[r.authorName]=(contributorCounts[r.authorName]||0)+1})});
+    const topContributors=Object.entries(contributorCounts).sort((a,b)=>b[1]-a[1]).slice(0,3);
+    const solvedRecent=posts.filter(p=>p.isSolved).slice(0,3);
+    return `${pageHead('Forums','Ask, share and build knowledge together.',`<button class="primary-btn" data-action="new-discussion">${icon('edit')} Start a discussion</button>`)}<div class="category-row">${cats.map((c,i)=>`<div class="card category-card card-hover"><div class="task-icon">${icon(['performance','people','people','settings','sparkles'][i])}</div><div><strong>${esc(c[0])}</strong><span>${c[1]} discussion${c[1]===1?'':'s'}</span></div></div>`).join('')}</div><div class="forum-layout"><main class="card forum-table"><div class="toolbar" style="padding:12px 14px;margin:0"><div class="segmented">${['All discussions','Unanswered','My discussions'].map(x=>`<button class="${filter===x?'active':''}" data-forum-filter="${x}">${x}</button>`).join('')}</div></div><div class="forum-head"><span>Discussion</span><span>Topic</span><span>Author</span><span>Replies</span><span>Last activity</span></div>${filtered.length?filtered.map(f=>`<div class="forum-row" data-forum-open="${esc(f.id)}"><div class="forum-topic"><strong>${f.isSolved?'✓ ':''}${esc(f.title)}</strong><span>${f.isSolved?'Solved · ':''}${esc(excerpt(f.content,80))}</span></div><span class="status-pill blue">${esc(f.category||'')}</span><div class="author-cell">${avatar({name:f.authorName,initials:(f.authorName||'').split(' ').map(w=>w[0]||'').join('').slice(0,2).toUpperCase()})}<span>${esc(f.authorName)}</span></div><span>${f.replies.length}</span><span style="font-size:9.5px;color:var(--muted)">${timeAgo(f.createdAt)}</span></div>`).join(''):`<div class="work-empty-state">${icon('message')}<strong>No discussions match this view.</strong><span>Start a discussion to get the conversation going.</span></div>`}</main><aside>${solvedRecent.length?`<section class="card side-list"><div class="card-title"><div><h3>Knowledge that lasts</h3><p>Recently solved discussions.</p></div></div>${solvedRecent.map(x=>`<div class="detail-line" style="align-items:flex-start;color:var(--success)">${icon('check')}<div><strong style="font-size:10px;color:var(--ink)">${esc(x.title)}</strong><div style="font-size:9px;color:var(--muted);margin-top:3px">Solved · ${timeAgo(x.updatedAt||x.createdAt)}</div></div></div>`).join('')}</section>`:''}${topContributors.length?`<section class="card side-list" style="margin-top:14px"><div class="card-title"><h3>Top contributors</h3><span style="font-size:10px;color:var(--muted)">This forum</span></div>${topContributors.map(([name,count])=>`<div class="detail-line">${avatar({name,initials:(name||'').split(' ').map(w=>w[0]||'').join('').slice(0,2).toUpperCase()})}<div><strong style="font-size:10px">${esc(name)}</strong></div><span style="margin-left:auto;color:var(--blue);font-weight:700">${count}</span></div>`).join('')}</section>`:''}</aside></div>`;
+  }

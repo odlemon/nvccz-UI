@@ -21,9 +21,9 @@ export const HV3_PATH_TO_ROUTE: Record<string, string> = Object.fromEntries(
 
 export type Hv3LocationState = {
   route: string
-  selectedNews: number | null
-  forumThread: number | null
-  selectedNewsletter: number | null
+  selectedNews: string | null
+  forumThread: string | null
+  selectedNewsletter: string | null
   newsletterMode: "library" | "reader" | "editor"
 }
 
@@ -45,9 +45,9 @@ export function parseHv3Location(pathname: string): Hv3LocationState {
     return { ...base, route: "home" }
   }
 
-  const newsArticle = pathname.match(/^\/home\/news\/(\d+)\/?$/)
+  const newsArticle = pathname.match(/^\/home\/news\/([^/]+)\/?$/)
   if (newsArticle) {
-    return { ...base, route: "news", selectedNews: Number(newsArticle[1]) }
+    return { ...base, route: "news", selectedNews: newsArticle[1] }
   }
   if (pathname === "/home/news" || pathname.startsWith("/home/news/")) {
     return { ...base, route: "news" }
@@ -56,12 +56,12 @@ export function parseHv3Location(pathname: string): Hv3LocationState {
   if (pathname === "/home/newsletters/editor") {
     return { ...base, route: "newsletters", newsletterMode: "editor" }
   }
-  const newsletter = pathname.match(/^\/home\/newsletters\/(\d+)\/?$/)
+  const newsletter = pathname.match(/^\/home\/newsletters\/([^/]+)\/?$/)
   if (newsletter) {
     return {
       ...base,
       route: "newsletters",
-      selectedNewsletter: Number(newsletter[1]),
+      selectedNewsletter: newsletter[1],
       newsletterMode: "reader",
     }
   }
@@ -69,9 +69,9 @@ export function parseHv3Location(pathname: string): Hv3LocationState {
     return { ...base, route: "newsletters", newsletterMode: "library" }
   }
 
-  const forum = pathname.match(/^\/home\/forums\/(\d+)\/?$/)
+  const forum = pathname.match(/^\/home\/forums\/([^/]+)\/?$/)
   if (forum) {
-    return { ...base, route: "forums", forumThread: Number(forum[1]) }
+    return { ...base, route: "forums", forumThread: forum[1] }
   }
   if (pathname.startsWith("/home/forums")) {
     return { ...base, route: "forums" }
@@ -87,9 +87,9 @@ export function parseHv3Location(pathname: string): Hv3LocationState {
 /** Build Next path from Matanho route + optional detail */
 export function buildHv3Path(input: {
   route: string
-  selectedNews?: number | null
-  forumThread?: number | null
-  selectedNewsletter?: number | null
+  selectedNews?: string | null
+  forumThread?: string | null
+  selectedNewsletter?: string | null
   newsletterMode?: string
 }): string {
   const { route } = input

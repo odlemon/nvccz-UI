@@ -1,0 +1,12 @@
+  function todaysContextSignals(){
+    const out=[];
+    if(D.schedule&&D.schedule[0]) out.push({icon:'calendar',title:D.schedule[0].title,detail:`${D.schedule[0].time||''}${D.schedule[0].location?' · '+D.schedule[0].location:''}`,route:'calendar'});
+    const openPriority=state.priorities.find(t=>!t.done);
+    if(openPriority) out.push({icon:'check',title:openPriority.title,detail:`${openPriority.priority||''} priority${openPriority.meta?' · '+openPriority.meta:''}`,route:'my-work'});
+    if(D.performanceOverview&&D.performanceOverview.available){
+      const goals=(D.performanceOverview.goals||[]).slice().sort((a,b)=>(a.score??101)-(b.score??101));
+      const lowest=goals[0];
+      if(lowest&&lowest.score!=null&&lowest.score<70) out.push({icon:'target',title:lowest.title,detail:`${lowest.score}% · needs attention`,route:'performance'});
+    }
+    return out.slice(0,3);
+  }

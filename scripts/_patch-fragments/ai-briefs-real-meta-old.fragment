@@ -1,0 +1,6 @@
+  function aiBriefsPanel(){
+    const briefs=[
+      {title:'Today’s leadership brief',meta:'Calendar + My Work + Performance',detail:'Three decisions, two risks and your most important next action.',prompt:'Prepare a leadership brief for today'},
+      {title:'Portfolio review',meta:'14:00 · Harare Boardroom',detail:'Changes, unresolved risks and the decision pack in one place.',prompt:'Prepare me for today’s portfolio review'},
+      {title:'Weekly execution summary',meta:'7 active tasks · 3 projects',detail:'Progress, delivery confidence and ownership gaps.',prompt:'Summarise my priorities and risks for this week'}
+    ];

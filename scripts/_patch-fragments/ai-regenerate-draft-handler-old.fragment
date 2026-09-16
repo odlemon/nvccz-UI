@@ -1,0 +1,1 @@
+      if(action==='ai-toggle-context'){state.aiContextOpen=!state.aiContextOpen;saveState();render();return}

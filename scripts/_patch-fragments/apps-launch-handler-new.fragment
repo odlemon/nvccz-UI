@@ -1,0 +1,1 @@
+    const app=e.target.closest('[data-launch-app]'); if(app){const a=state.apps.find(x=>x.id===app.dataset.launchApp);if(a?.externalUrl)window.open(a.externalUrl,'_blank','noopener,noreferrer');else if(a?.path)window.location.href=a.path;return}

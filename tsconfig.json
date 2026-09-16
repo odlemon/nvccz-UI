@@ -40,7 +40,8 @@
     ".next-staff-review/types/**/*.ts",
     ".next-build-verify/types/**/*.ts",
     ".next-staff-uat/types/**/*.ts",
-    ".next-lp-uat/types/**/*.ts"
+    ".next-lp-uat/types/**/*.ts",
+    ".next-staff-home-page/types/**/*.ts"
   ],
   "exclude": [
     "node_modules"

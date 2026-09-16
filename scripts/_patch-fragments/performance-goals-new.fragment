@@ -1,0 +1,8 @@
+  function performanceGoals(mult){
+    const perf=D.performanceOverview;
+    const goals=(perf&&perf.available)?(perf.goals||[]):[];
+    if(!goals.length){
+      return `<div class="performance-detail-grid"><main><section class="card card-pad"><div class="card-title"><div><span class="eyebrow">Goal portfolio</span><h3>No goals for this period</h3></div></div><div class="work-empty-state">${icon('target')}<strong>${esc((perf&&perf.blockedReason)||'No goals to show for this period.')}</strong></div></section></main></div>`;
+    }
+    return `<div class="performance-detail-grid"><main><section class="card card-pad"><div class="card-title"><div><span class="eyebrow">Goal portfolio</span><h3>${goals.length} weighted goal${goals.length===1?'':'s'}</h3></div></div>${goals.map((g,i)=>`<article class="goal-detail-card"><div class="goal-detail-head"><div><span class="goal-number">0${i+1}</span><div><h3>${esc(g.title)}</h3></div></div>${g.status?`<span class="confidence">${esc(g.status)}</span>`:''}</div><div class="goal-detail-metrics"><div><span>Score</span><strong>${g.score!=null?g.score+'%':'—'}</strong></div><div><span>Weight</span><strong>${g.weight!=null?g.weight+'%':'—'}</strong></div></div><div class="goal-detail-progress"><div class="progress-mini"><i style="width:${Math.min(100,g.score||0)}%"></i></div></div></article>`).join('')}</section></main></div>`;
+  }
