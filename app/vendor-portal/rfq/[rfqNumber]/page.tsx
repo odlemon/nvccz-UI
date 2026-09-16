@@ -42,6 +42,7 @@ import {
 import { format } from 'date-fns'
 import Link from 'next/link'
 import { procurementApiV2, type RFQ, type SubmitQuotationRequest } from '@/lib/api/procurement-api-v2'
+import { ORG_NAME } from '@/lib/branding'
 
 interface QuotationItemForm {
   itemName: string
@@ -261,7 +262,7 @@ export default function VendorRFQDetailsPage() {
               <Building2 className="h-8 w-8 text-primary" />
               <div>
                 <h1 className="text-2xl font-bold">Vendor Portal</h1>
-                <p className="text-sm text-muted-foreground">Arcus</p>
+                <p className="text-sm text-muted-foreground">{ORG_NAME}</p>
               </div>
             </div>
           </div>
@@ -319,7 +320,7 @@ export default function VendorRFQDetailsPage() {
             <Building2 className="h-8 w-8 text-primary" />
             <div>
               <h1 className="text-2xl font-bold">Vendor Portal</h1>
-              <p className="text-sm text-muted-foreground">Arcus</p>
+              <p className="text-sm text-muted-foreground">{ORG_NAME}</p>
             </div>
           </div>
         </div>

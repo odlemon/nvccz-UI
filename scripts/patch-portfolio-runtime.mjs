@@ -126,22 +126,48 @@ s = replaceOnce(
 )
 
 // Companies averages
-s = replaceAllSafe(
+// NOTE: these three guard the divisor by wrapping the exact original
+// expression in a ternary, so the original find text stays intact inside the
+// replacement and would re-match (and re-nest) on every subsequent run —
+// discovered when three script runs in one session produced triple-nested
+// ternaries here. Guard each with an explicit marker instead of relying on
+// replaceAllSafe's plain "does find exist" check.
+// Only the already-guarded shape is matched (this session hand-fixed the
+// runtime's triple-nesting back to single-guarded once, marker included) —
+// a genuinely fresh extraction with no guard at all falls through to MISS
+// here, same as any other patch whose target text has moved; re-check this
+// step specifically the next time extract-portfolio-v25.mjs actually runs.
+function patchOnceMarked(src, marker, find, repl, label) {
+  if (src.includes(marker)) {
+    console.log("skip (already)", label)
+    return src
+  }
+  if (!src.includes(find)) {
+    console.warn("MISS", label)
+    return src
+  }
+  console.log("applied", label)
+  return src.replace(find, repl)
+}
+s = patchOnceMarked(
   s,
-  "sum(companies,c=>c.revenueGrowth)/companies.length",
-  "(companies.length?sum(companies,c=>c.revenueGrowth)/companies.length:0)",
+  "/* patched:companies-growth-nan */",
+  "const avgGrowth = companies.length ? sum(companies,c=>c.revenueGrowth)/companies.length : 0;",
+  "const avgGrowth = companies.length ? sum(companies,c=>c.revenueGrowth)/companies.length : 0; /* patched:companies-growth-nan */",
   "companies-growth-nan",
 )
-s = replaceAllSafe(
+s = patchOnceMarked(
   s,
-  "sum(companies,c=>c.margin)/companies.length",
-  "(companies.length?sum(companies,c=>c.margin)/companies.length:0)",
+  "/* patched:companies-margin-nan */",
+  "const avgMargin = companies.length ? sum(companies,c=>c.margin)/companies.length : 0;",
+  "const avgMargin = companies.length ? sum(companies,c=>c.margin)/companies.length : 0; /* patched:companies-margin-nan */",
   "companies-margin-nan",
 )
-s = replaceAllSafe(
+s = patchOnceMarked(
   s,
-  "sum(companies,c=>c.health)/companies.length",
-  "(companies.length?sum(companies,c=>c.health)/companies.length:0)",
+  "<!--patched:companies-health-nan-->",
+  "${companies.length?Math.round(sum(companies,c=>c.health)/companies.length):0}</strong>",
+  "${companies.length?Math.round(sum(companies,c=>c.health)/companies.length):0}</strong><!--patched:companies-health-nan-->",
   "companies-health-nan",
 )
 s = replaceAllSafe(
@@ -198,6 +224,327 @@ s = replaceAllSafe(
   "(Array.isArray(envelope?.recipients)?envelope.recipients:[]).map(",
   "envelope-opt-recipients-map",
 )
+
+// 10) FINDING-PV11-004 — LP wizard silently defaulted to the first fund in the
+// list whenever the user left "Select fund (optional)" blank, instead of
+// sending no fund at all; the backend then requires amount+effectiveDate for
+// ANY truthy fundId, so a fund-less/commitment-less LP could never be created.
+s = replaceOnce(
+  s,
+  "fundId: String(data.fundId || funds[0]?.id || ''),",
+  "fundId: String(data.fundId || ''),",
+  "lp-wizard-no-fund-fallback",
+)
+
+// 11) FINDING-PV11-010 — Deal Flow's Fund/Stage/Owner/Age filters and
+// Dashboard's Fund/Period/Currency/Geography filters all routed to a shared
+// catch-all dispatcher case that only showed a toast and never touched
+// `state` or re-filtered anything. Give each its own case (Funds page's
+// fund-*-filter cases show the working pattern), then have renderDealFlow
+// actually apply its four filters. Dashboard's fund filter is wired the same
+// way; period/currency/geography are wired to state (so the dispatcher no
+// longer silently drops them) but not yet threaded through renderDashboard's
+// aggregates — tracked as a smaller follow-up, not re-claimed as fixed here.
+s = replaceOnce(
+  s,
+  "case 'dashboard-fund-filter': case 'dashboard-period-filter': case 'dashboard-currency-filter': case 'dashboard-geography-filter': case 'deal-fund-filter': case 'deal-stage-filter': case 'deal-owner-filter': case 'deal-age-filter': toast('Filter updated'",
+  "toast('Filter updated'",
+  "filter-catchall-remove-dashboard-deal-ids",
+)
+// Plain replaceOnce isn't idempotent here: the anchor ('term-version-filter'
+// case) has to stay intact in the output for the switch to keep working, so
+// a naive prepend would still match its own find text on every re-run and
+// duplicate the block. Guard explicitly with a marker comment instead.
+if (s.includes("/* patched:filter-dedicated-cases */")) {
+  console.log("skip (already)", "filter-dedicated-cases")
+} else {
+  const anchor = "case 'term-version-filter': case 'term-status-filter': case 'term-owner-filter':"
+  if (s.includes(anchor)) {
+    s = s.replace(
+      anchor,
+      `/* patched:filter-dedicated-cases */\r\n      case 'dashboard-fund-filter': state.dashboardFundFilter=target.value; render(); break;\r\n      case 'dashboard-period-filter': state.dashboardPeriodFilter=target.value; render(); break;\r\n      case 'dashboard-currency-filter': state.dashboardCurrencyFilter=target.value; render(); break;\r\n      case 'dashboard-geography-filter': state.dashboardGeographyFilter=target.value; render(); break;\r\n      case 'deal-fund-filter': state.dealFundFilter=target.value; render(); break;\r\n      case 'deal-stage-filter': state.dealStageFilter=target.value; render(); break;\r\n      case 'deal-owner-filter': state.dealOwnerFilter=target.value; render(); break;\r\n      case 'deal-age-filter': state.dealAgeFilter=target.value; render(); break;\r\n      ${anchor}`,
+    )
+  } else {
+    console.warn("MISS", "filter-dedicated-cases")
+  }
+}
+// Runtime file uses CRLF line endings — a multi-line find string with plain
+// \n breaks silently MISSes (see project_runtime_patch_crlf_trap in memory),
+// so this is done as single-line replacements instead.
+// Same non-idempotency trap as filter-dedicated-cases: the anchor line has to
+// stay intact in the output, so guard with an explicit marker.
+if (s.includes("/* patched:deal-flow-filter-setup */")) {
+  console.log("skip (already)", "deal-flow-filter-setup")
+} else {
+  const stageColorsLine = "const stageColors = {'Sourcing':'#3b82f6','Screening':'#0ea5a8','Initial Review':'#60a5fa','Investment Committee':'#f59e0b','Due Diligence':'#2563eb','Term Sheet':'#0ea5a8','Portfolio':'#10b981','Rejected':'#ef4444'};"
+  if (s.includes(stageColorsLine)) {
+    s = s.replace(
+      stageColorsLine,
+      `${stageColorsLine} /* patched:deal-flow-filter-setup */\r\n    const dealFundFilter = state.dealFundFilter || 'All Funds';\r\n    const dealStageFilter = state.dealStageFilter || 'All stages';\r\n    const dealOwnerFilter = state.dealOwnerFilter || 'All owners';\r\n    const dealAgeFilter = state.dealAgeFilter || 'All ages';\r\n    const filteredDeals = deals.filter(d =>\r\n      (dealFundFilter==='All Funds' || d.fund===dealFundFilter) &&\r\n      (dealStageFilter==='All stages' || d.stage===dealStageFilter) &&\r\n      (dealOwnerFilter==='All owners' || d.owner===dealOwnerFilter) &&\r\n      (dealAgeFilter==='All ages' || (dealAgeFilter==='0–30 days' ? d.age<=30 : dealAgeFilter==='31–60 days' ? (d.age>=31&&d.age<=60) : d.age>=61))\r\n    );`,
+    )
+  } else {
+    console.warn("MISS", "deal-flow-filter-setup")
+  }
+}
+s = replaceOnce(
+  s,
+  "const pipelineValue=sum(deals,d=>d.amount);",
+  "const pipelineValue=sum(filteredDeals,d=>d.amount);",
+  "deal-flow-pipeline-value",
+)
+s = replaceOnce(
+  s,
+  "const wonDeals=deals.filter(d=>d.stage==='Portfolio');",
+  "const wonDeals=filteredDeals.filter(d=>d.stage==='Portfolio');",
+  "deal-flow-won-deals",
+)
+s = replaceOnce(
+  s,
+  "const lostDeals=deals.filter(d=>d.stage==='Rejected');",
+  "const lostDeals=filteredDeals.filter(d=>d.stage==='Rejected');",
+  "deal-flow-lost-deals",
+)
+s = replaceOnce(
+  s,
+  "deals.filter(d=>!['Portfolio','Rejected'].includes(d.stage)).length",
+  "filteredDeals.filter(d=>!['Portfolio','Rejected'].includes(d.stage)).length",
+  "deal-flow-active-deals",
+)
+s = replaceAllSafe(
+  s,
+  "deals.filter(d=>d.stage==='Due Diligence')",
+  "filteredDeals.filter(d=>d.stage==='Due Diligence')",
+  "deal-flow-dd-metric",
+)
+s = replaceAllSafe(
+  s,
+  "deals.filter(d=>d.stage==='Investment Committee')",
+  "filteredDeals.filter(d=>d.stage==='Investment Committee')",
+  "deal-flow-ic-metric",
+)
+s = replaceOnce(
+  s,
+  "const stageDeals=deals.filter(deal=>deal.stage===stage);",
+  "const stageDeals=filteredDeals.filter(deal=>deal.stage===stage);",
+  "deal-flow-kanban",
+)
+s = replaceOnce(
+  s,
+  '<span class="table-badge">${deals.length} opportunities</span>',
+  '<span class="table-badge">${filteredDeals.length} opportunities</span>',
+  "deal-flow-register-count",
+)
+s = replaceOnce(
+  s,
+  "${deals.map((deal,index)=>`<tr class=\"clickable\" data-action=\"open-deal\"",
+  "${filteredDeals.map((deal,index)=>`<tr class=\"clickable\" data-action=\"open-deal\"",
+  "deal-flow-register-rows",
+)
+s = replaceOnce(
+  s,
+  "const dayDeals=deals.filter((_,idx)=>",
+  "const dayDeals=filteredDeals.filter((_,idx)=>",
+  "deal-flow-calendar",
+)
+s = replaceOnce(
+  s,
+  "action:'deal-fund-filter',selected:'All Funds'",
+  "action:'deal-fund-filter',selected:dealFundFilter",
+  "deal-flow-filter-bar-fund",
+)
+s = replaceOnce(
+  s,
+  "action:'deal-stage-filter',selected:'All stages'",
+  "action:'deal-stage-filter',selected:dealStageFilter",
+  "deal-flow-filter-bar-stage",
+)
+s = replaceOnce(
+  s,
+  "action:'deal-owner-filter',selected:'All owners'",
+  "action:'deal-owner-filter',selected:dealOwnerFilter",
+  "deal-flow-filter-bar-owner",
+)
+s = replaceOnce(
+  s,
+  "action:'deal-age-filter',selected:'All ages'",
+  "action:'deal-age-filter',selected:dealAgeFilter",
+  "deal-flow-filter-bar-age",
+)
+
+// 12) FINDING-PV11-011 — Period Close's "Run close pre-check" and "Request
+// approval" are plain static buttons with no dataset at all, but their
+// actions.ts handlers require ds.period/ds.id and silently no-op (not even a
+// toast) without it. Derive a YYYY-MM period code from state.asOfDate (the
+// same "as of" reference date already used elsewhere) and attach it as
+// data-id, matching the backend's SpCashCloseService.precheck() expectation
+// (`${periodCode}-01` must parse as a date).
+// Same non-idempotency trap: the anchor has to survive in the output.
+if (s.includes("/* patched:period-close-code-var */")) {
+  console.log("skip (already)", "period-close-code-var")
+} else {
+  const anchor = "function renderPeriodClose() {"
+  if (s.includes(anchor)) {
+    s = s.replace(
+      anchor,
+      `${anchor} /* patched:period-close-code-var */\r\n    const closePeriodDate = new Date(state.asOfDate);\r\n    const closePeriodCode = Number.isNaN(closePeriodDate.getTime()) ? '' : \`\${closePeriodDate.getFullYear()}-\${String(closePeriodDate.getMonth()+1).padStart(2,'0')}\`;`,
+    )
+  } else {
+    console.warn("MISS", "period-close-code-var")
+  }
+}
+s = replaceOnce(
+  s,
+  "button('Run close pre-check','run-close-precheck','primary','refresh')",
+  "button('Run close pre-check','run-close-precheck','primary','refresh',`data-id=\"${closePeriodCode}\"`)",
+  "period-close-precheck-data-id",
+)
+s = replaceOnce(
+  s,
+  "button('Request approval','request-close-approval','','user-check')",
+  "button('Request approval','request-close-approval','','user-check',`data-id=\"${closePeriodCode}\"`)",
+  "period-close-approval-data-id",
+)
+
+// 13) FINDING-PV11-006 — Deal Detail's hero status trusted `disbursedAny` on
+// its own, so a deal whose only real lifecycle record is a stray/demo
+// disbursement (no due diligence, term sheet or board review ever run) shows
+// "Disbursed" while its own step tracker (built from the same hasDD/hasTS/
+// hasBoard signals) says everything is "Not started" — self-contradictory.
+// A legitimate disbursement is never reachable without board approval first,
+// so gate on hasBoard too rather than trusting disbursedAny alone.
+s = replaceOnce(
+  s,
+  "isTerminalRejected ? 'Rejected' : disbursedAny ? 'Disbursed' : hasImpl ? 'Approved - Closing' : hasBoard ? 'Board & IC Review' : hasTS ? 'Term Sheet' : hasDD ? 'Due Diligence' : realOutcome ? realOutcome.replace(/_/g,' ') : 'Screening Pending';",
+  "isTerminalRejected ? 'Rejected' : (disbursedAny && hasBoard) ? 'Disbursed' : hasImpl ? 'Approved - Closing' : hasBoard ? 'Board & IC Review' : hasTS ? 'Term Sheet' : hasDD ? 'Due Diligence' : realOutcome ? realOutcome.replace(/_/g,' ') : 'Screening Pending';",
+  "deal-hero-status-requires-board",
+)
+
+// 14) FINDING-PV11-005 — capital distribution creation had no UI at all,
+// despite a fully-built, unused backend/API client (lpFeesApi.declareDistribution).
+// New 2-step wizard on the Funds page, mirroring the Create Fund wizard's
+// shape exactly (including its correct draft-merge — no bridge override
+// needed since this is new code, not an existing function being shadowed).
+if (s.includes("/* patched:distribution-wizard */")) {
+  console.log("skip (already)", "distribution-wizard")
+} else {
+  const modalWizardFormIdAnchor = "  function modalWizardFormId(kind) {\r\n    if (kind === 'create-term-sheet') return 'createTermSheetForm';"
+  const showCreateFundModalAnchor = "  function showCreateFundModal() {\r\n    state.modalWizard = { kind: 'create-fund', step: 0, maxReached: 0, draft: {} };\r\n    renderCreateFundWizard();\r\n  }"
+  const renderModalWizardAnchor = "  function renderModalWizard() {\r\n    if (!state.modalWizard) return;\r\n    if (state.modalWizard.kind === 'create-term-sheet') return;"
+  const openCase = "      case 'create-fund': showCreateFundModal(); break;"
+  const submitCase = "      case 'submit-create-fund': submitCreateFund(); return;"
+  const fundsHeaderAnchor = "button('Create fund','create-fund','primary','plus')"
+
+  if (
+    s.includes(modalWizardFormIdAnchor) &&
+    s.includes(showCreateFundModalAnchor) &&
+    s.includes(renderModalWizardAnchor) &&
+    s.includes(openCase) &&
+    s.includes(submitCase) &&
+    s.includes(fundsHeaderAnchor)
+  ) {
+    s = s.replace(
+      modalWizardFormIdAnchor,
+      "  function modalWizardFormId(kind) {\r\n    if (kind === 'new-distribution') return 'distributionForm';\r\n    if (kind === 'create-term-sheet') return 'createTermSheetForm';",
+    )
+    s = s.replace(
+      renderModalWizardAnchor,
+      "  function renderModalWizard() {\r\n    if (!state.modalWizard) return;\r\n    if (state.modalWizard.kind === 'new-distribution') return renderDistributionWizard();\r\n    if (state.modalWizard.kind === 'create-term-sheet') return;",
+    )
+    s = s.replace(
+      showCreateFundModalAnchor,
+      `  function showDistributionModal() {
+    state.modalWizard = { kind: 'new-distribution', step: 0, maxReached: 0, draft: {} };
+    renderDistributionWizard();
+  }
+
+  function renderDistributionWizard() {
+    const wiz = state.modalWizard || { step: 0, draft: {}, maxReached: 0 };
+    const step = Number(wiz.step || 0);
+    wiz.maxReached = Math.max(Number(wiz.maxReached || 0), step);
+    const d = wiz.draft || {};
+    const steps = ['Details', 'Review'];
+    const sourceOptions = ['Dividend', 'Exit Proceeds', 'Interest', 'Other'];
+    const fundOptions = funds.length
+      ? funds.map((f) => '<option value="' + escapeHTML(f.id || f.name) + '">' + escapeHTML(f.name) + '</option>').join('')
+      : '<option value="">No funds available</option>';
+    let body = '';
+    if (step === 0) {
+      body = '<form id="distributionForm"><div class="form-grid">' +
+        '<div class="form-field full"><label class="required">Fund</label><select name="fundId" required><option value="">Select fund</option>' + fundOptions + '</select></div>' +
+        '<div class="form-field"><label class="required">Distribution date</label><input type="date" name="distributionDate" required value="' + escapeHTML(d.distributionDate || '') + '"></div>' +
+        '<div class="form-field"><label class="required">Source</label><select name="source" required>' + addDealSelectOptions(sourceOptions, d.source, 'Select source') + '</select></div>' +
+        '<div class="form-field"><label class="required">Gross amount (USD)</label><input name="grossAmount" type="number" min="0" required placeholder="e.g. 2000000" value="' + escapeHTML(d.grossAmount != null && d.grossAmount !== '' ? String(d.grossAmount) : '') + '"></div>' +
+        '<div class="form-field full"><label>Notes</label><textarea name="notes" placeholder="Context for LPs / fund accounting">' + escapeHTML(d.notes || '') + '</textarea></div>' +
+      '</div></form>';
+    } else {
+      const fundName = (funds.find((f) => String(f.id) === String(d.fundId) || String(f.name) === String(d.fundId)) || {}).name || d.fundId || '-';
+      const rows = [
+        ['Fund', fundName],
+        ['Distribution date', d.distributionDate || '-'],
+        ['Source', d.source || '-'],
+        ['Gross amount', d.grossAmount ? formatMoney(Number(d.grossAmount)) : '-'],
+        ['Notes', d.notes || '-'],
+      ].map((r) => '<div class="info-row"><span>' + escapeHTML(r[0]) + '</span><strong>' + escapeHTML(String(r[1])) + '</strong></div>').join('');
+      body = '<form id="distributionForm"><div class="form-field full">' + card('Review summary', '<div class="info-list">' + rows + '</div>') + '</div><p class="muted small">Declares a live distribution via the fund\\'s capital-activity API.</p></form>';
+    }
+    const footer = step === 0
+      ? button('Cancel', 'close-modal') + button('Next', 'wizard-next', 'primary', 'arrow-right')
+      : button('Back', 'wizard-back') + button('Declare distribution', 'submit-distribution', 'primary', 'trend-up');
+    showModal('New distribution', step === 1 ? 'Confirm and declare via API.' : 'Record a capital distribution to LPs.', body, footer, {
+      variant: 'wizard', size: 'lg', eyebrow: 'Distribution', rail: steps, railStep: step, railMax: wiz.maxReached,
+    });
+  }
+
+  function submitDistribution() {
+    const form = $('#distributionForm');
+    if (!form?.reportValidity()) return;
+    captureModalWizardDraft();
+    const data = { ...(state.modalWizard && state.modalWizard.draft ? state.modalWizard.draft : {}), ...Object.fromEntries(new FormData(form)) };
+    const sourceMap = { 'Dividend': 'DIVIDEND', 'Exit Proceeds': 'EXIT_PROCEEDS', 'Interest': 'INTEREST', 'Other': 'OTHER' };
+    if (state.liveData) {
+      emitIntegrationEvent('matanho:before-action', {
+        action: 'api-create-distribution',
+        dataset: {
+          fundId: String(data.fundId || ''),
+          distributionDate: String(data.distributionDate || ''),
+          source: String(sourceMap[data.source] || data.source || 'OTHER'),
+          grossAmount: String(data.grossAmount || ''),
+          notes: String(data.notes || ''),
+        },
+        state: typeof publicSnapshot === 'function' ? publicSnapshot().state : state,
+      }, true);
+      state.modalWizard = null;
+      return;
+    }
+    state.modalWizard = null;
+    closeOverlays(); toast('Distribution recorded', 'Live data required to declare a real distribution.'); render();
+  }
+
+  function showCreateFundModal() {
+    state.modalWizard = { kind: 'create-fund', step: 0, maxReached: 0, draft: {} };
+    renderCreateFundWizard();
+  }`,
+    )
+    s = s.replace(
+      openCase,
+      "      case 'new-distribution': showDistributionModal(); break;\r\n      case 'create-fund': showCreateFundModal(); break;",
+    )
+    s = s.replace(
+      submitCase,
+      "      case 'submit-distribution': submitDistribution(); return;\r\n      case 'submit-create-fund': submitCreateFund(); return;",
+    )
+    s = s.replace(
+      fundsHeaderAnchor,
+      "button('Create fund','create-fund','primary','plus')+button('New distribution','new-distribution','','trend-up')",
+    )
+    s = s.replace(
+      "  function renderFunds() {",
+      "  function renderFunds() { /* patched:distribution-wizard */",
+    )
+  } else {
+    console.warn("MISS", "distribution-wizard")
+  }
+}
 
 fs.writeFileSync(RUNTIME, s)
 console.log("patched", RUNTIME, "bytes", Buffer.byteLength(s))

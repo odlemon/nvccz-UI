@@ -2618,8 +2618,13 @@ function __pr23ApplyTableFilters() {
   const want = [];
   if (f.status && f.status !== 'All statuses') want.push(f.status);
   if (f.category && f.category !== 'All categories') want.push(f.category);
-  const year = String(f.period || '').match(/\d{4}/);
-  if (year) want.push(year[0]);
+  // Vendor Registry rows carry no date of their own -- the only 4-digit text is an unrelated tax-clearance
+  // expiry, which coincidentally matching (or not) the selected fiscal year hid every vendor regardless of
+  // category/status. Every other page's rows show a genuine record date that this heuristic is meant for.
+  if (state.page !== 'vendors') {
+    const year = String(f.period || '').match(/\d{4}/);
+    if (year) want.push(year[0]);
+  }
   const rows = [...document.querySelectorAll('#workspace table tbody tr')].filter(r => !r.querySelector('.pr23-empty-row'));
   let shown = 0;
   for (const row of rows) {
@@ -3523,7 +3528,7 @@ window.MatanhoProcurement=Object.freeze({version:'8.0.0',navigate,render,getStat
     const inv=__chain?(__chain.invoices[0]||{id:'—',amount:null,tax:'—',match:'No invoice'}):(state.invoices.find(i=>i.po===po.id)||state.invoices[0]);
     const rows=(__chain?__chain.invoices:state.invoices).map(i=>`<tr data-record="invoice" data-id="${i.id}"><td><strong class="link">${i.id}</strong><span class="row-tools-inline">${smallAction('Preview','preview-invoice-v5',i.id,'eye')}</span></td><td>${esc(i.vendor)}</td><td>${esc(i.po)}</td><td class="money">${money(i.amount)}</td><td>${status(i.match)}</td><td>${esc(i.tax)}</td><td>${status(i.status)}</td><td>${smallAction('Open match','open-match-detail-v5',i.id,'arrow')}</td></tr>`);
     return `<div class="page"><div class="breadcrumbs"><button data-action="back-match-list-v5">Invoices & 3-Way Match</button><i>›</i><span>${t.id}</span><i>›</i><strong>${esc(t.title)}</strong></div>
-      ${pageHead('Tender-specific P2P chain',t.title,`${t.id} · ${t.entity} · source-to-payment document chain`,actionButton('Upload invoice','upload-invoice-v5',t.id,'primary','plus')+actionButton('Capture invoice','capture-invoice-v5',t.id,'','invoice')+actionButton('Record payment','record-payment-v23',t.id,'','account')+actionButton('AI invoice capture','run-ocr-v5',t.id)+actionButton('Activity','activity-menu',t.id,'','more'))}
+      ${pageHead('Tender-specific P2P chain',t.title,`${t.id} · ${t.entity} · source-to-payment document chain`,actionButton('Upload invoice','upload-invoice-v5',t.id,'primary','plus')+(__pr23Can('intake.manage')?actionButton('Capture invoice','capture-invoice-v5',t.id,'','invoice'):'')+(__pr23Can('invoices.pay')?actionButton('Record payment','record-payment-v23',t.id,'','account'):'')+actionButton('AI invoice capture','run-ocr-v5',t.id)+actionButton('Activity','activity-menu',t.id,'','more'))}
       <div class="workflow-strip"><div class="workflow-step done"><strong>Tender</strong><span>${t.id}</span></div><div class="workflow-step done"><strong>Award</strong><span>Approved supplier</span></div><div class="workflow-step done"><strong>Purchase order</strong><span>${po.id}</span></div><div class="workflow-step done"><strong>Goods receipt</strong><span>${grn.id}</span></div><div class="workflow-step current"><strong>Invoice & match</strong><span>${inv.id}</span></div><div class="workflow-step"><strong>Accounts payable</strong><span>${/Matched/.test(inv.match)?'Ready':'Exception held'}</span></div></div>
       <div class="match-triptych" style="margin-bottom:14px">
         <section class="match-panel"><div class="match-head"><strong>Purchase Order</strong>${status('Controlled')}</div><div class="match-body"><div class="match-lines"><div class="match-line"><span>PO number</span><strong>${po.id}</strong></div><div class="match-line"><span>Vendor</span><strong>${esc(po.vendor)}</strong></div><div class="match-line"><span>Order value</span><strong>${money(po.amount)}</strong></div><div class="match-line"><span>Delivery date</span><strong>${esc(po.delivery)}</strong></div></div><div class="actions" style="margin-top:12px">${smallAction('Preview','preview-document',po.id,'eye')}${smallAction('Edit','edit-record-v5',po.id)}</div></div></section>

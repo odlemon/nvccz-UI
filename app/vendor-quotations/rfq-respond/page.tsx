@@ -14,6 +14,7 @@ import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { DatePicker } from '@/components/ui/date-picker'
 import { procurementApiV2 } from '@/lib/api/procurement-api-v2'
+import { ORG_NAME, ORG_LOGO_PATH } from '@/lib/branding'
 
 interface RfqInvitation {
   organisation: string | null
@@ -94,18 +95,6 @@ function RFQRespondContent() {
       setError('Missing RFQ details or security token.')
       setIsValidating(false)
       return
-    }
-
-    // The token is base64url JSON, which atob cannot read as it stands.
-    const payloadBase64 = token.split('.')[0]
-    try {
-      if (payloadBase64) {
-        const b64 = payloadBase64.replace(/-/g, '+').replace(/_/g, '/')
-        const decodedPayload = JSON.parse(atob(b64.padEnd(Math.ceil(b64.length / 4) * 4, '=')))
-        if (decodedPayload.r) setRequisitionId(decodedPayload.r)
-      }
-    } catch {
-      // The server verifies the token either way; the id is only a convenience for the submission.
     }
 
     let cancelled = false
@@ -283,8 +272,8 @@ function RFQRespondContent() {
           <div className="flex justify-center mb-8">
             <div className="relative w-48 h-16">
               <Image
-                src="/logo.png"
-                alt="Logo"
+                src={ORG_LOGO_PATH}
+                alt={ORG_NAME}
                 fill
                 className="object-contain"
                 priority
@@ -377,8 +366,8 @@ function RFQRespondContent() {
         <div className="flex justify-center mb-6">
           <div className="relative w-48 h-16">
             <Image
-              src="/logo.png"
-              alt="Logo"
+              src={ORG_LOGO_PATH}
+              alt={ORG_NAME}
               fill
               className="object-contain"
               priority
@@ -423,9 +412,9 @@ function RFQRespondContent() {
           <div className="mb-6 flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4 text-amber-900">
             <AlertCircle className="w-5 h-5 mt-0.5" />
             <p className="text-sm">
-              {alreadySubmitted
-                ? `Your quotation ${alreadySubmitted.quotationNumber} was received${alreadySubmitted.submittedAt ? ` on ${fmt(alreadySubmitted.submittedAt)}` : ''} and is with the procurement team.`
-                : `This request for quotation is no longer accepting quotations${closedFor?.closingAt ? ` (it closed on ${fmt(closedFor.closingAt)})` : ''}.`}
+              {closedFor
+                ? `This request for quotation is no longer accepting quotations${closedFor.closingAt ? ` (it closed on ${fmt(closedFor.closingAt)})` : ''}.`
+                : `Your quotation ${alreadySubmitted.quotationNumber} was received${alreadySubmitted.submittedAt ? ` on ${fmt(alreadySubmitted.submittedAt)}` : ''} and is with the procurement team. You can still submit a revised quote below before the RFQ closes.`}
             </p>
           </div>
         )}
@@ -550,9 +539,9 @@ function RFQRespondContent() {
             </CardContent>
           </Card>
 
-          <Button type="submit" disabled={submitting || Boolean(closedFor) || Boolean(alreadySubmitted)} className="w-full bg-blue-600 hover:bg-blue-700 text-white py-6 rounded-full text-lg font-normal shadow-sm">
+          <Button type="submit" disabled={submitting || Boolean(closedFor)} className="w-full bg-blue-600 hover:bg-blue-700 text-white py-6 rounded-full text-lg font-normal shadow-sm">
             {submitting ? <Loader2 className="animate-spin mr-2" /> : <CheckCircle2 className="mr-2" />}
-            Submit Quotation
+            {alreadySubmitted ? 'Submit Revised Quotation' : 'Submit Quotation'}
           </Button>
         </form>
       </div>

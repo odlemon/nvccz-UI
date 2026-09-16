@@ -10,6 +10,7 @@ import { useAppDispatch } from "@/lib/store"
 import { resetPassword } from "@/lib/store/slices/authSlice"
 import { toast } from "sonner"
 import { Button } from "@/components/ui/button"
+import { ORG_NAME, ORG_LOGO_PATH } from "@/lib/branding"
 
 export default function ResetPasswordPage() {
   const [newPassword, setNewPassword] = useState("")
@@ -105,8 +106,8 @@ export default function ResetPasswordPage() {
             <div className="text-left mb-8 px-12">
               <div className="inline-flex items-center justify-center mb-4">
                 <Image
-                  src="/logo.png"
-                  alt="Arcus Logo"
+                  src={ORG_LOGO_PATH}
+                  alt={ORG_NAME}
                   width={200}
                   height={200}
                   className="object-contain"

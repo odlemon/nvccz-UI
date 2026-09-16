@@ -308,7 +308,16 @@ NO LOCKOUT
 Layer 2 is proven with a *valid* token rather than a rejected login, so it holds
 independently of layer 1.
 
-**Status:** FIXED (pending verification) — re-asserted every cycle as roadmap item **X.5**.
+**Status:** FIXED and independently re-verified, 15 September 2026, as Phase 1 of the Portfolio +
+Investee + LP Portal full-sweep engagement — before any of that engagement's own testing began, per
+that engagement's own rule that no persona's activity on the shared dev environment is trustworthy
+until this is confirmed closed. Re-ran layer 1 against `company.nts@arcus.co.zw` (staff login → 403
+"not authorized for the staff portal") and spot-checked the LP and applicant role types the same way
+(`lp.test@arcus.co.zw`, `lp.signatory@example.com` → 403 "LP accounts must use the LP portal";
+`investee.test@arcus.co.zw` → 403 "Applicant accounts must use the investee portal"). Re-ran layer 2
+with a freshly-issued, valid investee token directly against `GET`/`POST /api/users` → 403 "not
+authorized for staff resources" both times. All results match the original verification above exactly
+— no regression. No longer "pending."
 
 ---
 
