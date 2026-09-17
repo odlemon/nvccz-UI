@@ -29,6 +29,12 @@ export function FundraisingKycApp() {
     if (!el) return
 
     const initialStep = pathToFrKycStep(pathnameRef.current)
+    // The runtime module reads window.MATANHO_CONFIG at import time (before this
+    // effect runs), so this must be set as early as possible — it only takes
+    // effect for calls made after this line, which is fine since nothing calls
+    // the api object before the user interacts with the wizard.
+    const w = window as unknown as { MATANHO_CONFIG?: Record<string, unknown> }
+    w.MATANHO_CONFIG = { ...(w.MATANHO_CONFIG || {}), useMockApi: false }
     apiRef.current = startFundraisingKycRuntime(el, {
       shellHtml: FUNDRAISING_KYC_SHELL_HTML,
       initialStep,
