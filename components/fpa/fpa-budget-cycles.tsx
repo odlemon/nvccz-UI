@@ -766,24 +766,47 @@ function CycleDetailPanel({
   const worksheetHref = `/forecasting/budget/${encodeURIComponent(cycle.id)}/workspace?${worksheetQs.toString()}`
 
   const planningAreas = (workspace?.planningAreas?.length
-    ? workspace.planningAreas.map((a) => {
-        const meta = BUDGET_INPUT_CATEGORIES.find((c) => c.id === a.area)
-        const stLabel =
-          a.status === "COMPLETE"
-            ? "Complete"
-            : a.status === "IN_PROGRESS"
-              ? "In Progress"
-              : "Not Started"
-        return {
-          id: `${a.departmentId || ""}-${a.area}`,
-          label: meta?.label || a.area,
-          status: stLabel as "Complete" | "In Progress" | "Not Started",
-          detail:
-            a.totalCells != null
-              ? `${a.filledCells ?? 0}/${a.totalCells}`
-              : undefined,
+    ? (() => {
+        // This card shows one row per category (Revenue/Workforce/Opex/...),
+        // not per department — the API returns one entry per department+area,
+        // so multiple departments sharing an area (e.g. two departments both
+        // having an OPEX area) rendered as visually-identical duplicate rows.
+        // Aggregate by area before rendering.
+        const byArea = new Map<
+          string,
+          { filledCells: number; totalCells: number; hasTotals: boolean; statuses: Set<string> }
+        >()
+        for (const a of workspace.planningAreas) {
+          const entry = byArea.get(a.area) || {
+            filledCells: 0,
+            totalCells: 0,
+            hasTotals: false,
+            statuses: new Set<string>(),
+          }
+          if (a.totalCells != null) {
+            entry.filledCells += a.filledCells ?? 0
+            entry.totalCells += a.totalCells
+            entry.hasTotals = true
+          }
+          entry.statuses.add(a.status)
+          byArea.set(a.area, entry)
         }
-      })
+        return Array.from(byArea.entries()).map(([area, entry]) => {
+          const meta = BUDGET_INPUT_CATEGORIES.find((c) => c.id === area)
+          const stLabel =
+            entry.statuses.size === 1 && entry.statuses.has("COMPLETE")
+              ? "Complete"
+              : entry.statuses.has("IN_PROGRESS") || (entry.statuses.has("COMPLETE") && entry.statuses.size > 1)
+                ? "In Progress"
+                : "Not Started"
+          return {
+            id: area,
+            label: meta?.label || area,
+            status: stLabel as "Complete" | "In Progress" | "Not Started",
+            detail: entry.hasTotals ? `${entry.filledCells}/${entry.totalCells}` : undefined,
+          }
+        })
+      })()
     : (cycle.inputCategories?.length
         ? cycle.inputCategories
         : BUDGET_INPUT_CATEGORIES.map((c) => c.id)
