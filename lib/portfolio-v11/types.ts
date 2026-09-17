@@ -114,6 +114,25 @@ export type Pv11Lp = {
   portalUserCount: number
   portalRoles: { viewer: number; manager: number }
   portalUsers: Array<{ name: string; email: string; role: string; isActive: boolean }>
+  /** Real capital call / distribution transaction ledger, newest first. */
+  transactions: Array<{
+    date: string
+    type: 'Capital Call' | 'Distribution'
+    fundName: string
+    amount: number
+    paid: number
+    status: string
+  }>
+  /** Real per-client documents from the LP portal document vault. */
+  documents: Array<{
+    id: string
+    category: string
+    title: string
+    fundName: string
+    mimeType: string | null
+    sizeBytes: number | null
+    publishedAt: string | null
+  }>
 }
 
 export type Pv11Report = {
