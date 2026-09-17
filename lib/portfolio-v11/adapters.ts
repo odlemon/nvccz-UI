@@ -320,6 +320,42 @@ export function adaptLps(raw: any[]): Pv11Lp[] {
       role: String(r.lpRole || 'VIEWER'),
       isActive: Boolean(r.isActive),
     }))
+    const commitments = Array.isArray(c.investmentCommitments) ? c.investmentCommitments : []
+    const transactions: Pv11Lp['transactions'] = []
+    for (const ic of commitments) {
+      for (const a of Array.isArray(ic.capitalCallAllocations) ? ic.capitalCallAllocations : []) {
+        transactions.push({
+          date: fmtDate(a.capitalCall?.transactionDate || a.capitalCall?.paymentDueDate),
+          type: 'Capital Call',
+          fundName: String(a.capitalCall?.fund?.name || ic.fund?.name || 'Fund'),
+          amount: num(a.currentCallAmount),
+          paid: num(a.amountPaid),
+          status: String(a.status || 'PENDING'),
+        })
+      }
+      for (const a of Array.isArray(ic.distributionAllocations) ? ic.distributionAllocations : []) {
+        transactions.push({
+          date: fmtDate(a.distribution?.distributionDate),
+          type: 'Distribution',
+          fundName: String(a.distribution?.fund?.name || ic.fund?.name || 'Fund'),
+          amount: num(a.shareAmount),
+          paid: num(a.amountPaid),
+          status: String(a.status || 'PENDING'),
+        })
+      }
+    }
+    transactions.sort((x, y) => new Date(y.date).getTime() - new Date(x.date).getTime())
+    const documents: Pv11Lp['documents'] = Array.isArray(c.lpPortalDocuments)
+      ? c.lpPortalDocuments.map((d: any) => ({
+          id: String(d.id),
+          category: String(d.category || 'Other'),
+          title: String(d.title || 'Document'),
+          fundName: String(d.fund?.name || 'All Funds'),
+          mimeType: d.mimeType || null,
+          sizeBytes: d.fileSizeBytes != null ? num(d.fileSizeBytes) : null,
+          publishedAt: d.publishedAt ? fmtDate(d.publishedAt) : null,
+        }))
+      : []
     return {
       id: String(c.id),
       name: String(c.legalName || c.name || 'LP'),
@@ -344,6 +380,8 @@ export function adaptLps(raw: any[]): Pv11Lp[] {
         manager: relations.filter((r: any) => String(r.lpRole).toUpperCase() === 'MANAGER').length,
       },
       portalUsers,
+      transactions,
+      documents,
     }
   })
 }
