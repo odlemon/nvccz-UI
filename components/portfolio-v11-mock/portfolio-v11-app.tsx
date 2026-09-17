@@ -119,8 +119,20 @@ export function PortfolioV11App() {
           }
           if (dealId) path = `/portfolio/deals/detail?id=${encodeURIComponent(String(dealId))}`
         }
+        if (page === "lp-detail") {
+          let lpId = ""
+          try {
+            lpId =
+              window.MatanhoPortfolioUI?.getSnapshot?.()?.state?.selectedLPId ||
+              new URLSearchParams(window.location.search).get("id") ||
+              ""
+          } catch {
+            lpId = ""
+          }
+          if (lpId) path = `/portfolio/lps/detail?id=${encodeURIComponent(String(lpId))}`
+        }
         const pathOnly = path.split("?")[0]
-        if (pathnameRef.current === pathOnly && page !== "deal-detail") return
+        if (pathnameRef.current === pathOnly && page !== "deal-detail" && page !== "lp-detail") return
         pathnameRef.current = pathOnly
         window.history.pushState({ portfolioV11: page }, "", path)
         void ensurePageDataRef.current?.(page, { soft: true })
@@ -156,7 +168,14 @@ export function PortfolioV11App() {
             sessionStorage.getItem("pv11.selectedDealId") ||
             undefined
           : undefined
-      apiRef.current?.setPage(page, dealId ? { selectedDealId: dealId } : undefined)
+      const lpId =
+        page === "lp-detail"
+          ? new URLSearchParams(window.location.search).get("id") || undefined
+          : undefined
+      apiRef.current?.setPage(page, {
+        ...(dealId ? { selectedDealId: dealId } : {}),
+        ...(lpId ? { selectedLPId: lpId } : {}),
+      })
       void ensurePageDataRef.current?.(page, { soft: true })
       if (page === "deal-detail" && dealId) {
         window.MatanhoPortfolioUI?.setDealDetailLoading?.(true)
@@ -659,7 +678,14 @@ export function PortfolioV11App() {
           (typeof sessionStorage !== "undefined" ? sessionStorage.getItem("pv11.selectedDealId") : null) ||
           undefined
         : undefined
-    apiRef.current?.setPage(page, dealId ? { selectedDealId: dealId } : undefined)
+    const lpId =
+      page === "lp-detail"
+        ? new URLSearchParams(typeof window !== "undefined" ? window.location.search : "").get("id") || undefined
+        : undefined
+    apiRef.current?.setPage(page, {
+      ...(dealId ? { selectedDealId: dealId } : {}),
+      ...(lpId ? { selectedLPId: lpId } : {}),
+    })
     // Soft ensure when URL changes (sidebar soft-nav already calls ensure; this covers
     // direct path / Next router changes without remounting the layout host).
     void ensurePageDataRef.current?.(page, { soft: true })

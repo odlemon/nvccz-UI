@@ -31,7 +31,7 @@ declare global {
       hydrate: (payload: unknown) => void
       beginLiveLoad?: () => void
       failLiveLoad?: (message?: string) => void
-      getSnapshot?: () => { state?: { selectedDealId?: string; page?: string } }
+      getSnapshot?: () => { state?: { selectedDealId?: string; selectedLPId?: string; page?: string } }
       setDealDetail?: (detail: unknown) => void
       setDealDetailLoading?: (loading: boolean) => void
       setPageLoading?: (loading: boolean) => void

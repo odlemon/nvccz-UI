@@ -367,9 +367,19 @@ function kpisPage(){
     const periods=Object.entries(fk.kpiValues);
     if(!periods.length)return [];
     const [period,values]=periods[periods.length-1];
-    return Object.entries(values||{}).filter(([k])=>k!=='manualEntries').map(([name,value])=>({
-     name,value,period,unit:'number',target:null,status:'Submitted',category:'Financial',frequency:'Period',owner:'Company'
-    }));
+    // `derived` is a metadata bundle (computedAt, formulasVersion, missingInputs, ...),
+    // not a displayable value. `AUTO_KPI_FLAT` is a nested map of the same derived
+    // metrics keyed by name — flatten those into their own rows instead of showing
+    // the map itself as one entry.
+    const flat=(values||{}).AUTO_KPI_FLAT;
+    const seen=new Set();
+    const submitted=Object.entries(values||{})
+     .filter(([k,v])=>k!=='manualEntries'&&k!=='derived'&&k!=='AUTO_KPI_FLAT'&&typeof v!=='object')
+     .map(([name,value])=>{seen.add(name);return {name,value,period,unit:'number',target:null,status:'Submitted',category:'Financial',frequency:'Period',owner:'Company'};});
+    const derivedRows=flat&&typeof flat==='object'?Object.entries(flat)
+     .filter(([name,value])=>!seen.has(name)&&typeof value!=='object')
+     .map(([name,value])=>({name,value,period,unit:'number',target:null,status:'Submitted',category:'Financial (derived)',frequency:'Period',owner:'Company'})):[];
+    return [...submitted,...derivedRows];
    }
    return [];
   })();
