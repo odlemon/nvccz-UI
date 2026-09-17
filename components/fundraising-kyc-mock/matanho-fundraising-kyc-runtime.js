@@ -1,4 +1,5 @@
 /* Auto-extracted Matanho Investor KYC — adapted for Next.js */
+import { fundraisingApi } from '@/lib/api/fundraising-api';
 export function startFundraisingKycRuntime(rootEl, options = {}) {
   window.__FR_KYC_NAV__ = options.onNavigate || (() => {});
   window.MATANHO_CONFIG = window.MATANHO_CONFIG || {
@@ -21,6 +22,7 @@ function createDefaultApplication() {
   return {
     applicationId: '',
     reference: '',
+    investorId: '',
     applicantType: '',
     relationshipType: '',
     product: '',
@@ -297,10 +299,15 @@ function clearLocalDraft() {
 }
 
 
-const apiModuleConfig = window.MATANHO_CONFIG || {};
-const apiBaseUrl = String(apiModuleConfig.apiBaseUrl || '').replace(/\/$/, '');
-const useMockApi = apiModuleConfig.useMockApi !== false;
+// Read fresh on every call rather than once at module-import time: this module is
+// imported statically (before startFundraisingKycRuntime ever runs), so a
+// module-level `const` here would freeze useMockApi at whatever
+// window.MATANHO_CONFIG happened to be before the host had a chance to set it.
+function isMockApi() { return (window.MATANHO_CONFIG || {}).useMockApi !== false; }
+const apiBaseUrl = String((window.MATANHO_CONFIG || {}).apiBaseUrl || '').replace(/\/$/, '');
 
+// Unused now that the api object below calls fundraisingApi directly, kept only
+// in case a future generic endpoint needs it.
 async function request(path, options = {}) {
   const response = await fetch(`${apiBaseUrl}${path}`, {
     ...options,
@@ -339,65 +346,87 @@ function mockApplication(status = 'draft', existingId = '') {
 }
 
 const api = {
+  // `applicationId` doubles as the backend FundraisingKycCase id once a case
+  // exists; `application.investorId` (added below) holds the linked
+  // InvestorOrganisation id — the case's own investorId is not editable after
+  // creation, so this is created once, up front, and never re-created.
   async createDraft(data) {
-    if (useMockApi) return mockApplication('draft');
-    return request('/api/v1/onboarding/applications', { method: 'POST', body: JSON.stringify(data) });
+    if (isMockApi()) return mockApplication('draft');
+    const legalName = data.identity?.legalName?.trim() || 'Untitled applicant';
+    const investorType = data.applicantType || 'individual';
+    const investor = await fundraisingApi.createInvestor({ legalName, investorType });
+    const kycCase = await fundraisingApi.createKycCase({
+      investorId: investor.id,
+      status: 'IN_PROGRESS',
+      detailsJson: { application: data },
+    });
+    return { applicationId: kycCase.id, reference: investor.id, investorId: investor.id, status: kycCase.status };
   },
 
   async saveDraft(applicationId, data) {
-    if (useMockApi) return { ...mockApplication('draft', applicationId), reference: data.reference || mockApplication().reference };
-    return request(`/api/v1/onboarding/applications/${applicationId}`, {
-      method: 'PATCH',
-      headers: { 'Idempotency-Key': crypto.randomUUID() },
-      body: JSON.stringify(data),
+    if (isMockApi()) return { ...mockApplication('draft', applicationId), reference: data.reference || mockApplication().reference };
+    const risk = calculateIndicativeRisk(data);
+    const compliance = data.compliance || {};
+    await fundraisingApi.patchKycCase(applicationId, {
+      detailsJson: { application: data },
+      riskRating: risk.band.toUpperCase(),
+      pepFlag: compliance.pep === 'yes',
+      adverseMediaFlag: compliance.adverseMedia === 'yes',
     });
+    return { applicationId, reference: data.reference, status: 'IN_PROGRESS', updatedAt: new Date().toISOString() };
   },
 
-  async createLivenessSession(applicationId) {
-    if (useMockApi) return { sessionId: `live_${crypto.randomUUID()}` };
-    return request(`/api/v1/onboarding/applications/${applicationId}/liveness/session`, { method: 'POST', body: '{}' });
+  // No biometric liveness provider is integrated (config marks this 'mock').
+  // Rather than fabricate a "passed" result, a session is recorded and the
+  // outcome is reported as needing assisted/human review — captureSelfie()
+  // already renders that path correctly for any status other than 'passed'.
+  async createLivenessSession() {
+    if (isMockApi()) return { sessionId: `live_${crypto.randomUUID()}` };
+    return { sessionId: `self_${crypto.randomUUID()}` };
   },
 
-  async completeLivenessSession(applicationId, payload) {
-    if (useMockApi) return { status: 'passed', score: 96 };
-    return request(`/api/v1/onboarding/applications/${applicationId}/liveness/complete`, {
-      method: 'POST',
-      body: JSON.stringify(payload),
-    });
+  async completeLivenessSession() {
+    if (isMockApi()) return { status: 'passed', score: 96 };
+    return { status: 'self_attested', score: null };
   },
 
+  // The real backend takes a direct multipart upload (fundraisingApi.createDocument),
+  // not the presign-then-PUT flow this mock's contract assumed. requestDocumentUpload
+  // and registerDocument become no-ops; uploadDocument does the real work and writes
+  // the real document id onto `upload` so the caller's registerDocument call (a no-op)
+  // still sees a valid id on `application.documents[].documentId`.
   async requestDocumentUpload(applicationId, metadata) {
-    if (useMockApi) return { documentId: `doc_${crypto.randomUUID()}`, uploadUrl: 'mock://upload' };
-    return request(`/api/v1/onboarding/applications/${applicationId}/documents/presign`, {
-      method: 'POST',
-      body: JSON.stringify(metadata),
-    });
+    if (isMockApi()) return { documentId: `doc_${crypto.randomUUID()}`, uploadUrl: 'mock://upload' };
+    return { documentId: '', uploadUrl: 'real://upload', metadata };
   },
 
   async uploadDocument(upload, file) {
-    if (useMockApi || String(upload.uploadUrl).startsWith('mock://')) {
+    if (isMockApi() || String(upload.uploadUrl).startsWith('mock://')) {
       await new Promise((resolve) => setTimeout(resolve, 450));
       return;
     }
-    const response = await fetch(upload.uploadUrl, { method: 'PUT', headers: upload.headers || {}, body: file });
-    if (!response.ok) throw new Error('Document upload failed.');
+    const applicationId = application.applicationId;
+    const doc = await fundraisingApi.createDocument(
+      {
+        name: upload.metadata?.fileName || file.name,
+        category: 'kyc',
+        sourceType: 'KYC_CASE',
+        sourceId: applicationId,
+        investorId: application.investorId || undefined,
+      },
+      file
+    );
+    upload.documentId = doc?.id || '';
   },
 
-  async registerDocument(applicationId, documentId) {
-    if (useMockApi) return;
-    await request(`/api/v1/onboarding/applications/${applicationId}/documents`, {
-      method: 'POST',
-      body: JSON.stringify({ documentId }),
-    });
+  async registerDocument() {
+    // Real uploads are already registered by uploadDocument() above.
   },
 
   async submit(applicationId) {
-    if (useMockApi) return mockApplication('submitted', applicationId);
-    return request(`/api/v1/onboarding/applications/${applicationId}/submit`, {
-      method: 'POST',
-      headers: { 'Idempotency-Key': crypto.randomUUID() },
-      body: '{}',
-    });
+    if (isMockApi()) return mockApplication('submitted', applicationId);
+    await fundraisingApi.patchKycCase(applicationId, { status: 'UNDER_REVIEW' });
+    return { applicationId, reference: application.reference, status: 'UNDER_REVIEW', updatedAt: new Date().toISOString() };
   },
 };
 
@@ -549,6 +578,7 @@ async function ensureApplication() {
   const response = await api.createDraft(application);
   application.applicationId = response.applicationId;
   application.reference = response.reference;
+  if (response.investorId) application.investorId = response.investorId;
   saveLocalDraft(application);
   const reference = document.querySelector('#application-reference');
   if (reference) reference.textContent = application.reference;
