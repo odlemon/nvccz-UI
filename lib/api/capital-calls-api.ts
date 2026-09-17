@@ -265,7 +265,14 @@ export interface ClientRecord {
     notes: string | null
     createdAt: string
     updatedAt: string
-    fund?: { id: string; name: string; description: string; status: string }
+    fund?: { id: string; name: string; description: string; status: string; vintageYear: number | null }
+    capitalCallAllocations?: Array<{ currentCallAmount: string; amountPaid: string }>
+    distributionAllocations?: Array<{ shareAmount: string; amountPaid: string }>
+  }>
+  lpUserRelations?: Array<{
+    lpRole: string
+    isActive: boolean
+    user?: { firstName: string; lastName: string; email: string }
   }>
 }
 
