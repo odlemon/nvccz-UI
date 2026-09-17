@@ -284,7 +284,10 @@ export function adaptCapitalCalls(
 
 export function adaptLps(raw: any[]): Pv11Lp[] {
   return (raw || []).map((c, i) => {
-    const commitment = num(c.totalCommitment ?? c.commitment ?? c.commitments?.[0]?.amount)
+    const commitmentFromApi = Array.isArray(c.investmentCommitments)
+      ? c.investmentCommitments.reduce((sum: number, ic: any) => sum + num(ic.amount), 0)
+      : 0
+    const commitment = num(c.totalCommitment ?? c.commitment ?? c.commitments?.[0]?.amount, commitmentFromApi)
     const called = num(c.cumulativeCalled ?? c.called)
     return {
       id: String(c.id),
