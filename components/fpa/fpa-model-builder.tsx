@@ -343,8 +343,18 @@ export function FpaModelBuilder({ modelId }: { modelId?: string }) {
     }
     setLoading(true)
     try {
-      if (routeModelId) await dispatch(bootstrapFpaSelection(routeModelId))
-      else await dispatch(bootstrapFpaSelection(id))
+      // Only (re)bootstrap the redux selection when this model isn't already
+      // the selected one. bootstrapFpaSelection's `.pending` reducer resets
+      // selectedScenarioId/selectedVersionId to null unconditionally, which —
+      // since those feed this callback's own dependency array — recreates
+      // `load` and re-fires the mount effect below, indefinitely, before any
+      // single invocation reaches its `finally` and clears `loading`.
+      // Skipping redundant re-bootstraps for an already-selected model breaks
+      // that loop.
+      if (!bootstrapped || selectedModelId !== id) {
+        if (routeModelId) await dispatch(bootstrapFpaSelection(routeModelId))
+        else await dispatch(bootstrapFpaSelection(id))
+      }
 
       const [mRes, liRes, dimRes, modRes, graphRes, modelDimRes] = await Promise.all([
         fpaApi.getModel(id),
@@ -504,7 +514,7 @@ export function FpaModelBuilder({ modelId }: { modelId?: string }) {
     } finally {
       if (requestId === loadRequestRef.current) setLoading(false)
     }
-  }, [id, routeModelId, dispatch, versionId, selectedScenarioId, clearLoadedState])
+  }, [id, routeModelId, dispatch, versionId, selectedScenarioId, bootstrapped, selectedModelId, clearLoadedState])
 
   useEffect(() => {
     void load()
