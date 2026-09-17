@@ -373,6 +373,21 @@ const api = {
       pepFlag: compliance.pep === 'yes',
       adverseMediaFlag: compliance.adverseMedia === 'yes',
     });
+    // createDraft() may have created the investor before legalName/applicantType
+    // were filled in (a user can hit "Save and exit" from step 0). Keep the
+    // investor record in sync on every later save rather than leaving it stuck
+    // with whatever placeholder it was first created with.
+    const legalName = data.identity?.legalName?.trim();
+    if (data.investorId && (legalName || data.applicantType)) {
+      try {
+        await fundraisingApi.patchInvestor(data.investorId, {
+          ...(legalName ? { legalName } : {}),
+          ...(data.applicantType ? { investorType: data.applicantType } : {}),
+        });
+      } catch {
+        // Non-fatal: the case itself already saved above.
+      }
+    }
     return { applicationId, reference: data.reference, status: 'IN_PROGRESS', updatedAt: new Date().toISOString() };
   },
 
