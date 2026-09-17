@@ -269,6 +269,8 @@ export const MODULE_CONFIG: ModuleConfig[] = [
       { id: "goals-management", name: "Goals", path: "/performance/goals", icon: CiCircleCheck, description: "Goals" },
       { id: "tasks-management", name: "Tasks", path: "/performance/tasks", icon: CiViewList, description: "Tasks" },
       { id: "performance-reviews", name: "Reviews", path: "/performance/reviews", icon: CiFileOn, description: "Unified hub for self-assessments, evaluations, cycles and reports" },
+      { id: "fpa-mapping", name: "FP&A Integration", path: "/performance-legacy/configuration/fpa-mapping", icon: CiViewTable, description: "Target and Driver mappings between FP&A and KPIs" },
+      { id: "fpa-forecast-reviews", name: "Forecast Review Triggers", path: "/performance-legacy/fpa-forecast-reviews", icon: CiBellOn, description: "KPI breaches awaiting FP&A review" },
     ],
     groups: [
       {
