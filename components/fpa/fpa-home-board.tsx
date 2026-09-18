@@ -41,6 +41,7 @@ import {
 } from "@/lib/store/slices/fpaSlice"
 import { asNumber, formatMoney, type FpaHomeDashboard } from "@/lib/api/fpa-api"
 import { useFpaBootstrap } from "@/lib/hooks/useFpaBootstrap"
+import { formatCashRunway } from "@/components/fpa/planning/planning-workspace-chrome"
 import {
   Dialog,
   DialogContent,
@@ -668,7 +669,14 @@ export function FpaHomeBoard() {
       return {
         id: item.id,
         label: item.label,
-        value: value == null ? EMPTY : item.money ? formatMoney(value, currency) : `${value.toFixed(1)}${item.suffix}`,
+        value:
+          item.id === "runway"
+            ? formatCashRunway(value)
+            : value == null
+              ? EMPTY
+              : item.money
+                ? formatMoney(value, currency)
+                : `${value.toFixed(1)}${item.suffix}`,
         pct: delta == null ? EMPTY : `${Math.abs(delta).toFixed(1)}%`,
         vs: delta == null ? "" : "vs prior period",
         up: delta != null && delta >= 0,
@@ -756,9 +764,11 @@ export function FpaHomeBoard() {
 
   const cash = useMemo(() => {
     const runway = liveDashboard?.cashRunway
+    const runwayMonths = optionalNumber(runway?.runwayMonths)
+    const isCashGenerative = runwayMonths == null || runwayMonths <= 0
     return {
-      value: runway?.runwayMonths == null ? EMPTY : asNumber(runway.runwayMonths).toFixed(1),
-      unit: runway?.runwayMonths == null ? "" : "months",
+      value: isCashGenerative ? "Cash Generative" : runwayMonths.toFixed(1),
+      unit: isCashGenerative ? "" : "months",
       delta: EMPTY,
       up: false,
       bars: (runway?.byMonth || [])

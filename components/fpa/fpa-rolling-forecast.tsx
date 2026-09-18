@@ -30,6 +30,7 @@ import { errorMessage } from "@/lib/fpa/fpa-api-gaps"
 import { useFpaBootstrap } from "@/lib/hooks/useFpaBootstrap"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
+import { formatCashRunway } from "@/components/fpa/planning/planning-workspace-chrome"
 
 const R = "rounded-lg"
 
@@ -224,7 +225,7 @@ export function FpaRollingForecast() {
       { label: "Revenue Forecast", value: money(values?.revenue), delta: "Rolling horizon" },
       { label: "EBITDA", value: money(values?.ebitda), delta: "Rolling horizon" },
       { label: "Closing Cash", value: money(values?.closingCash ?? values?.cash), delta: "Forecast close" },
-      { label: "Cash Runway", value: number(values?.runwayMonths, " mo"), delta: "Forecast runway" },
+      { label: "Cash Runway", value: formatCashRunway(values?.runwayMonths), delta: "Forecast runway" },
       { label: "Forecast Accuracy", value: number(values?.accuracyPct, "%"), delta: "Reported accuracy" },
     ]
   }, [summary?.kpis])
