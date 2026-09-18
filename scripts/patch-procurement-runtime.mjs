@@ -1863,7 +1863,7 @@ s = replaceUnique(
 )
 s = replaceUnique(
   s,
-  "<div class=\"field span2\"><label>Supporting documents</label><input type=\"file\" multiple accept=\".pdf,.doc,.docx,.xlsx,.csv\"></div>",
+  "${__pr23Live()?'':'<div class=\"field span2\"><label>Supporting documents</label><input type=\"file\" multiple accept=\".pdf,.doc,.docx,.xlsx,.csv\"></div>'}",
   "${__pr23Live()?__pr23RequisitionAttachmentsField()+__pr23RequisitionAttachmentsBox(r.recordId):'<div class=\"field span2\"><label>Supporting documents</label><input type=\"file\" multiple accept=\".pdf,.doc,.docx,.xlsx,.csv\"></div>'}",
   "edit requisition -> real attachments upload and list",
   "${__pr23Live()?__pr23RequisitionAttachmentsField()+__pr23RequisitionAttachmentsBox(r.recordId):",
@@ -1965,24 +1965,24 @@ s = replaceUnique(
 // requisition form suggest items bought before as they are typed (bridge, SRD §3).
 s = replaceUnique(
   s,
-  "__pr23RequisitionEntityField()+__pr23RequisitionDepartmentField()",
+  "__pr23RequisitionEntityField()+__pr23RequisitionDepartmentField()+__pr23RequisitionProjectField()",
   "__pr23RequisitionEntityField()+__pr23RequisitionDepartmentField()+__pr23RequisitionProjectField()+(__pr23Live()?__pr23RequisitionExtraFields():'')",
   "new requisition -> project / cost centre",
-  "__pr23RequisitionDepartmentField()+__pr23RequisitionProjectField()+(__pr23Live()?__pr23RequisitionExtraFields():'')",
+  "+(__pr23Live()?__pr23RequisitionExtraFields():'')",
 )
 s = replaceUnique(
   s,
-  "<div class=\"field span2\"><label>Requirement title</label><input name=\"title\" value=\"${escV11(r.title)}\" required></div>",
+  "<div class=\"field span2\"><label>Requirement title</label><input name=\"title\" value=\"${escV11(r.title)}\" required></div>${__pr23Live()?__pr23RequisitionProjectField(r.projectId,'span2'):''}",
   "<div class=\"field span2\"><label>Requirement title</label><input name=\"title\" value=\"${escV11(r.title)}\" required></div>${__pr23Live()?__pr23RequisitionProjectField(r.projectId,'span2')+__pr23RequisitionExtraFields(r):''}",
   "edit requisition -> project / cost centre",
   "${__pr23Live()?__pr23RequisitionProjectField(r.projectId,'span2')+__pr23RequisitionExtraFields(r):''}",
 )
 s = replaceUnique(
   s,
-  "<div><span>Category</span><strong>${escV11(r.category)}</strong></div>",
+  "<div><span>Category</span><strong>${escV11(r.category)}</strong></div>${__pr23Live()?`<div><span>Project</span><strong>${escV11(r.project||'None')}</strong></div>`:''}",
   "<div><span>Category</span><strong>${escV11(r.category)}</strong></div>${__pr23Live()?`<div><span>Project</span><strong>${escV11(r.project||'None')}</strong></div><div><span>Required date</span><strong>${escV11(r.requiredDateDisplay||'—')}</strong></div><div><span>Delivery location</span><strong>${escV11(r.deliveryLocation||'—')}</strong></div><div><span>Budget code</span><strong>${escV11(r.budgetCode||'—')}</strong></div>`:''}",
   "requisition view -> project / cost centre",
-  "<div><span>Project</span><strong>${escV11(r.project||'None')}</strong></div><div><span>Required date</span>",
+  "<div><span>Required date</span>",
 )
 
 // 62b. Requisitions are not budget-checked (live-loaders sets budget to a dash: the backend has no budget check), so the
