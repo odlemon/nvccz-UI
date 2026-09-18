@@ -1924,6 +1924,18 @@ the create-user route. A caller without it gets `{ id, firstName, lastName, user
 per user; a caller with it gets the unchanged full record. Controller-level change only, no schema
 change, no migration. Commit `d969135` on `fix/proc-finding-010-users-directory-trim` (nvccz).
 
+*Concurrent second implementation:* a sibling session fixed the same finding independently, in
+`UserService.getAllUsers` (nvccz `src/services/UserService.ts`) — a `directoryOnly` flag narrows the
+**Prisma select itself** for non-`manage_users` callers, instead of fetching the full row and
+stripping fields in the controller after the fact. Same output shape, verified identical over the
+wire (`{id, firstName, lastName, userDepartment, role:{name}}` vs. full record), the difference being
+that a non-privileged caller's PII never leaves the database in the first place. Commit `6ca36ba` on
+`fix/finding-010-users-directory-trim` (nvccz, note the branch name is *not* the same as `d969135`'s).
+**This is the version actually running on dev right now** — confirmed live inside `arcus-dev-api-1`
+(`grep directoryOnly src/services/UserService.ts` matches; container recreated after `d969135` would
+have landed). Either fix closes the finding; whoever merges to `dev`/`master` should pick one
+`UserController.getAllUsers` implementation and drop the other rather than carrying both.
+
 **Also fixed:** `components/performance/searchable-user-selector.tsx`'s search filter called
 `u.email.toLowerCase()` unguarded — a hard crash for a non-admin user typing into that picker once
 email stopped being present. Guarded to `(u.email || "").toLowerCase()`, matching the guard already
@@ -1966,9 +1978,37 @@ hygiene since it is technically still reachable, but it is not the active Perfor
     returned — the real field is `userDepartment` — so scope already read "—" for every row before
     and after this change; not a regression, not fixed here.)
 
+**Independent re-verification** (separate session, same day, after the `directoryOnly` implementation
+above became the live one — commands run from `nvccz-new`, `dev-api.matanho.com`):
+
+  - `proc.requester@nts.local` → `GET /users` **200**, every one of 22 rows exactly
+    `{id, firstName, lastName, userDepartment, role:{name}}` — checked the full array, not just
+    row 0. `admin@nts.com` → **200**, same 22 rows, full unchanged shape (`email`, `departmentRole`,
+    `roleCode`, `votingPower`, `role:{id,name,description}`, `createdAt`, `updatedAt` all present).
+  - Browser, logged in as `perf.deptmgr@nts.local` (Operations Manager, no `manage_users`): the
+    Home shell's **People** directory (`/people`, home-v3-mock's live colleague list — not the
+    Performance V22 Create Task Owner/Reviewer dropdown, which on inspection populates from a
+    fixed fixture list of names that do not match any seeded user and never issued a network
+    request to `/users` when opened — that dropdown is not wired to this endpoint and proves
+    nothing about the fix either way). People showed **22 Colleagues** (matches the trimmed
+    row count), real names/departments/roles for every row (e.g. Blessing Sibanda · Finance ·
+    Finance Manager), typing "Blessing" into its search filtered correctly with no crash, and the
+    detail panel's Contact section rendered with no email (expected — trimmed) rather than
+    throwing.
+  - Browser, logged in as `payroll.finmgr@nts.local` (Finance Manager, no `manage_users`): FP&A's
+    **Workflow** page (`/forecasting/workflow`) — the Workflow Tasks table's Assignee/Reviewer
+    columns rendered real names (Admin NTS, Sam Viewer, Jane Signatory) for every row, and opening
+    a task's "Reassign to" picker populated a full dropdown of real seeded names (Ben Jane,
+    Blessing Sibanda, Chiedza Nyathi, ... Tinotenda Marufu) with no blank/`undefined` entries and
+    no crash. This is the FPA workflow approver picker.
+  - No regressions found; both flows above are genuinely wired to `GET /users` (confirmed by name
+    correspondence with the live seeded-user list, not just an absence of errors).
+
 **Status:** FIXED — deployed to dev, verified for both a non-admin and an admin account, and checked
 against two real picker/directory UI flows (Performance V22 task assignment, Accounting V52 Access
-Control). Not deployed to production; the owner decides when to merge and promote.
+Control), then independently re-checked against two more live flows (Home People directory, FP&A
+Workflow reassign/approver picker). Not deployed to production; the owner decides when to merge and
+promote, and which of the two equivalent backend implementations (`d969135` vs `6ca36ba`) to keep.
 
 ---
 
