@@ -5085,7 +5085,6 @@ window.MatanhoProcurement=Object.freeze({version:'8.0.0',navigate,render,getStat
       content:`<h1>Invitation to Tender</h1><p class="doc-lead-v11">${escV11(tender.title)}</p><table><tbody><tr><th>Tender reference</th><td>${escV11(tender.id)}</td><th>Entity</th><td>${escV11(tender.entity)}</td></tr><tr><th>Procurement method</th><td>${escV11(tender.method)}</td><th>Estimated value</th><td>${money(tender.value)}</td></tr><tr><th>Closing date</th><td>${escV11(tender.close)}</td><th>Category</th><td>${escV11(tender.category)}</td></tr></tbody></table><h2>1. Invitation</h2><p>Eligible suppliers are invited to submit a complete, compliant and competitively priced bid through the secure Matanho vendor portal before the stated closing date.</p><h2>2. Scope of requirement</h2><p>The successful bidder shall provide the goods, implementation, documentation, training, warranty and support specified in the controlled technical schedules.</p><h2>3. Submission requirements</h2><ul><li>Completed technical response and compliance schedule.</li><li>Commercial response using the prescribed pricing schedule.</li><li>Current company, tax, banking and beneficial-ownership documents.</li><li>Signed declarations, conflict disclosure and authorised eSignature.</li></ul><h2>4. Evaluation</h2><p>Bids will be evaluated against mandatory compliance, technical merit, commercial value, delivery readiness, warranty and risk. The authorised user retains the final award decision, subject to approval authority.</p>`
       };
     }
-    };
 
     const order = state.orders.find(o => o.id === ref);
     if (order) {
@@ -5104,7 +5103,6 @@ window.MatanhoProcurement=Object.freeze({version:'8.0.0',navigate,render,getStat
         content: `<h1>Goods Received Note</h1><table><tbody><tr><th>GRN number</th><td>${escV11(grnDoc.id)}</td><th>Purchase order</th><td>${escV11(grnDoc.po)}</td></tr><tr><th>Item / service</th><td>${escV11(grnDoc.item)}</td><th>Accepted value</th><td>${money(grnDoc.value)}</td></tr></tbody></table><h2>Inspection and acceptance</h2><p>I confirm that the quantities and condition recorded above accurately reflect the goods or services received.</p>`
       };
     }
-    };
 
     const contract = (state.contractsV6 || []).find(c => c.id === ref);
     if (contract) return {
