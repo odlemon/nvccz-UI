@@ -359,6 +359,23 @@ export function FpaVarianceAnalysis() {
     }
   }
 
+  const draftWithAi = async (): Promise<string | null> => {
+    if (!selectedModelId || !varianceIdForComment) {
+      toast.error("Select a variance row before drafting.")
+      return null
+    }
+    try {
+      const res = await fpaApi.aiCommentaryDraft({ modelId: selectedModelId, varianceId: varianceIdForComment })
+      if (!res.success || !res.data) throw new Error(res.message || "Draft failed")
+      const commentary = (res.data as { payloadJson?: { commentary?: string } })?.payloadJson?.commentary
+      if (!commentary) throw new Error("No draft returned")
+      return commentary
+    } catch (err) {
+      toast.error(errorMessage(err))
+      return null
+    }
+  }
+
   const onSelectDept = (dept: string, period: string) => {
     const departmentRows = results.filter((item) => departmentName(item) === dept)
     const row =
@@ -440,6 +457,7 @@ export function FpaVarianceAnalysis() {
       onSelectCommentary={onSelectCommentary}
       onCloseDetail={() => setDetailOpen(false)}
       onSaveComment={(body) => void saveCommentary(body)}
+      onDraftWithAi={draftWithAi}
       onRefresh={() => void load()}
       onRecalculate={() => void recalculate()}
     />

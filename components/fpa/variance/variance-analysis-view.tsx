@@ -11,6 +11,7 @@ import {
   Loader2,
   MoreHorizontal,
   RefreshCw,
+  Sparkles,
   X,
 } from "lucide-react"
 import {
@@ -262,16 +263,19 @@ function VarianceDetailPanel({
   onClose,
   canAddCommentary,
   onSaveComment,
+  onDraftWithAi,
   busy,
 }: {
   detail: VarDetail | null
   onClose: () => void
   canAddCommentary?: boolean
   onSaveComment?: (body: string) => void
+  onDraftWithAi?: () => Promise<string | null>
   busy?: boolean
 }) {
   const [tab, setTab] = useState<"details" | "history">("details")
   const [comment, setComment] = useState("")
+  const [drafting, setDrafting] = useState(false)
 
   useEffect(() => {
     setTab("details")
@@ -377,17 +381,39 @@ function VarianceDetailPanel({
                   value={comment}
                   onChange={(e) => setComment(e.target.value)}
                 />
-                <button
-                  type="button"
-                  disabled={busy || !comment.trim()}
-                  onClick={() => {
-                    onSaveComment?.(comment.trim())
-                    setComment("")
-                  }}
-                  className="mt-2 h-9 rounded-full bg-[#1570ef] px-4 text-[12px] font-medium text-white disabled:opacity-50"
-                >
-                  Add Comment
-                </button>
+                <div className="mt-2 flex items-center gap-2">
+                  <button
+                    type="button"
+                    disabled={busy || !comment.trim()}
+                    onClick={() => {
+                      onSaveComment?.(comment.trim())
+                      setComment("")
+                    }}
+                    className="h-9 rounded-full bg-[#1570ef] px-4 text-[12px] font-medium text-white disabled:opacity-50"
+                  >
+                    Add Comment
+                  </button>
+                  {onDraftWithAi ? (
+                    <button
+                      type="button"
+                      disabled={busy || drafting}
+                      title="Fills the box with a draft starting point — always review and edit before adding it as your comment."
+                      onClick={async () => {
+                        setDrafting(true)
+                        try {
+                          const draft = await onDraftWithAi()
+                          if (draft) setComment(draft)
+                        } finally {
+                          setDrafting(false)
+                        }
+                      }}
+                      className="h-9 inline-flex items-center gap-1.5 rounded-full border border-[#d0d5dd] px-3 text-[12px] font-medium text-[#111111] hover:bg-[#f9fafb] disabled:opacity-50"
+                    >
+                      {drafting ? <Loader2 className="size-3.5 animate-spin" /> : <Sparkles className="size-3.5" />}
+                      Draft starting point
+                    </button>
+                  ) : null}
+                </div>
               </div>
             ) : (
               <button type="button" className="rounded-full px-2 py-1 text-[12px] font-medium text-[#1570ef] hover:bg-[#eff8ff]">
@@ -431,6 +457,7 @@ export type VarianceAnalysisViewProps = {
   onSelectCommentary?: (req: VarCommentaryReq, period: string) => void
   onCloseDetail?: () => void
   onSaveComment?: (body: string) => void
+  onDraftWithAi?: () => Promise<string | null>
   onRefresh?: () => void
   onRecalculate?: () => void
 }
@@ -463,6 +490,7 @@ export function VarianceAnalysisView({
   onSelectCommentary,
   onCloseDetail,
   onSaveComment,
+  onDraftWithAi,
   onRefresh,
   onRecalculate,
 }: VarianceAnalysisViewProps) {
@@ -1017,6 +1045,7 @@ export function VarianceAnalysisView({
             onClose={() => onCloseDetail?.()}
             canAddCommentary={canAddCommentary}
             onSaveComment={onSaveComment}
+            onDraftWithAi={onDraftWithAi}
             busy={busy}
           />
         ) : null}
