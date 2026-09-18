@@ -60,6 +60,7 @@ export const FPA_SUBMODULES_FULL = {
   'fpa-reports': 'full',
   'fpa-workflow': 'full',
   'fpa-settings': 'full',
+  'fpa-audit-logs': 'full',
 } as const
 
 export const FPA_SUBMODULES_MANAGER = {
@@ -79,6 +80,7 @@ export const FPA_SUBMODULES_MANAGER = {
   'fpa-reports': 'write',
   'fpa-workflow': 'full',
   'fpa-settings': 'write',
+  'fpa-audit-logs': 'read',
 } as const
 
 export const FPA_SUBMODULES_ANALYST = {
@@ -98,6 +100,7 @@ export const FPA_SUBMODULES_ANALYST = {
   'fpa-reports': 'write',
   'fpa-workflow': 'write',
   'fpa-settings': 'none',
+  'fpa-audit-logs': 'none',
 } as const
 
 export const FPA_SUBMODULES_DEPT_OWNER = {
@@ -117,6 +120,7 @@ export const FPA_SUBMODULES_DEPT_OWNER = {
   'fpa-reports': 'read',
   'fpa-workflow': 'write',
   'fpa-settings': 'none',
+  'fpa-audit-logs': 'none',
 } as const
 
 export const FPA_SUBMODULES_VIEWER = {
@@ -136,6 +140,7 @@ export const FPA_SUBMODULES_VIEWER = {
   'fpa-reports': 'read',
   'fpa-workflow': 'read',
   'fpa-settings': 'none',
+  'fpa-audit-logs': 'none',
 } as const
 
 const ALL = Object.values(FPA_ACTIONS)

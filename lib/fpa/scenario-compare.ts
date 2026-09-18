@@ -6,7 +6,7 @@ export const CANONICAL_COMPARE_METRICS = [
   { code: "GROSS_PROFIT", label: "Gross Profit", match: /gross\s*profit/i },
   { code: "GROSS_MARGIN", label: "Gross Margin", match: /gross\s*margin/i, pct: true },
   { code: "OPEX", label: "Opex", match: /opex|operating\s*exp/i },
-  { code: "EBITDA", label: "EBITDA", match: /ebitda/i },
+  { code: "EBITDA", label: "EBITDA", match: /ebitda(?!\s*margin)/i },
   { code: "EBITDA_MARGIN", label: "EBITDA Margin", match: /ebitda\s*margin/i, pct: true },
   { code: "CAPEX", label: "Capex", match: /capex|capital\s*exp/i },
   { code: "HEADCOUNT", label: "Headcount (FTE)", match: /headcount|fte/i, count: true },
