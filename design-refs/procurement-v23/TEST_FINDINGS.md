@@ -1838,7 +1838,7 @@ Also checked on the servers:
 
 ## PROC-FINDING-010
 
-**Title:** `GET /users` returns the full internal user directory to any staff account with no permission check — confirmed via a procurement persona; the obvious fix cannot ship as-is
+**Title:** `GET /users` returns the full internal user directory to any staff account with no permission check — confirmed via a procurement persona; fixed by trimming the response for non-admins
 **Module:** Platform (backend, not procurement-specific) · **Dimension:** QAT · **Category:** Access Control
 **Severity:** MEDIUM — internal-directory information disclosure, not full "administrator API access" (see Root cause)
 **Persona affected:** Every internal staff account's PII (name, email, department, role, internal id, timestamps)
@@ -1907,25 +1907,31 @@ FPA/Portfolio/Accounting user selector, platform-wide, for effectively every rea
 
 ### Fix
 
-**Not shipped.** The obvious fix was fully investigated (grep across `nvccz-new` for every caller,
-live DB query of every role's `manage_users` grant) before touching code, precisely to avoid the
-"shipping the guard alone would 403 legitimate holders" trap the create-route's own migration script
-(`nvccz/scripts/run-user-management-permission-migration.ts`) already warns about for this same
-permission. Once the blast radius above was confirmed against dev's actual live role/permission data,
-the change was not made — it would be a platform-wide regression larger than the disclosure it closes.
-No code was changed or deployed anywhere.
-
-This needs a product decision between two imperfect options, not a unilateral pick:
+The two options below were logged here initially with neither implemented. The owner chose **(b)**:
+keep `requireInternalStaffUser()` (staff-wide access preserved, every picker keeps working) but trim
+the response for a caller who lacks `manage_users`.
 
 - **(a)** A new, broadly-granted permission (e.g. `view_user_directory`), distinct from
-  `manage_users`, seeded `true` for every internal-staff role, gating this route instead — keeps
-  every picker above working and gives the org an explicit, revocable "who can see the directory"
-  toggle instead of an implicit "any staff" rule.
-- **(b)** Keep `requireInternalStaffUser()` (staff-wide) but trim the response for the general
-  listing to what pickers actually render — id, first/last name, department, role name — and drop
-  email, role code and internal timestamps unless the caller also holds `manage_users`. Satisfies
-  SRD §70's spirit (a normal user should not pull the full PII directory) without touching any of
-  the seven modules' existing calls.
+  `manage_users`, seeded `true` for every internal-staff role, gating this route instead.
+- **(b) — chosen.** Keep `requireInternalStaffUser()` (staff-wide) but trim the response for the
+  general listing to what pickers actually render — id, first/last name, department, role name —
+  and drop email, role code, the role's internal id/description and both timestamps unless the
+  caller also holds `manage_users`.
+
+**Shipped:** `UserController.getAllUsers` (nvccz `src/controllers/UserController.ts`) now branches on
+`userHasEffectivePermission(req.user, "manage_users")` — the same check `requirePermission` uses for
+the create-user route. A caller without it gets `{ id, firstName, lastName, userDepartment, role: { name } }`
+per user; a caller with it gets the unchanged full record. Controller-level change only, no schema
+change, no migration. Commit `d969135` on `fix/proc-finding-010-users-directory-trim` (nvccz).
+
+**Also fixed:** `components/performance/searchable-user-selector.tsx`'s search filter called
+`u.email.toLowerCase()` unguarded — a hard crash for a non-admin user typing into that picker once
+email stopped being present. Guarded to `(u.email || "").toLowerCase()`, matching the guard already
+used elsewhere (e.g. the Performance kanban task dialogs). Commit `6e86cc0` on
+`feature/proc-finding-010-users-directory-docs` (nvccz-new). This component is reached only through
+the superseded `performance-management` module (`hiddenFromSwitcher`, owned by `performance-v22` on
+the live `/performance` path per `lib/config/modules.ts`'s supersession order) — kept as defensive
+hygiene since it is technically still reachable, but it is not the active Performance surface.
 
 ### Verification
 
@@ -1938,8 +1944,31 @@ This needs a product decision between two imperfect options, not a unilateral pi
   `matanho-*-runtime.js` calls this route directly); no caller found outside the modules listed above.
 - Backend audit: no other controller imports `UserService.getAllUsers` or calls this route
   server-to-server, so no internal caller depends on the current behaviour either way.
+- **Post-fix, deployed to dev** (API `d969135`, staff portal `6e86cc0`, stamp `20260918-134920`):
+  - `proc.requester@nts.local` (Operations Member, no `manage_users`) → `GET /users` **200**, 22
+    records, each exactly `{id, firstName, lastName, userDepartment, role:{name}}` — no `email`,
+    `roleCode`, `role.id`, `role.description`, `votingPower`, `createdAt` or `updatedAt`.
+  - `admin@nts.com` (holds `manage_users`) → `GET /users` **200**, same 22 records, full unchanged
+    shape (`email`, `departmentRole`, `roleCode`, `votingPower`, `role:{id,name,description}`,
+    `createdAt`, `updatedAt` all present) — no regression for admins.
+  - Browser, logged in as a non-admin staff account: Performance V22's Create Task dialog
+    (`/performance/tasks`) — Owner and Reviewer pickers populate correctly with real names
+    (Tatenda Mlambo, Nyasha Moyo, Tendai Dube, Rumbidzai Chaza, Tariro Moyo, Chipo Ncube, Farai
+    Muchengezi), no crash, no `undefined` text. Confirmed via the page's own resource timing that
+    this call hit `dev-api.matanho.com/api/users` live, and a same-session fetch with the browser's
+    own token round-tripped the trimmed 5-key shape.
+  - Browser, same non-admin session: Accounting V52's Access Control page (`/accounting/access`)
+    loads without error; confirmed live (network + in-page fetch) that it also calls `GET /users`
+    and receives the trimmed shape with no crash. Its "Named-user access register" reads `u.email`
+    directly with no guard, but only assigns it to a display field (never calls a method on it), so
+    a missing email renders as a blank cell, not an error — no code change needed there. (Separately,
+    unrelated to this fix: that table's `scope` column reads a `department` field the API has never
+    returned — the real field is `userDepartment` — so scope already read "—" for every row before
+    and after this change; not a regression, not fixed here.)
 
-**Status:** OPEN — confirmed, not fixed, not deployed. Awaiting a decision between (a)/(b) above.
+**Status:** FIXED — deployed to dev, verified for both a non-admin and an admin account, and checked
+against two real picker/directory UI flows (Performance V22 task assignment, Accounting V52 Access
+Control). Not deployed to production; the owner decides when to merge and promote.
 
 ---
 
