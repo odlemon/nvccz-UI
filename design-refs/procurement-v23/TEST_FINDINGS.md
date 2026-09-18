@@ -1836,6 +1836,113 @@ Also checked on the servers:
 
 ---
 
+## PROC-FINDING-010
+
+**Title:** `GET /users` returns the full internal user directory to any staff account with no permission check — confirmed via a procurement persona; the obvious fix cannot ship as-is
+**Module:** Platform (backend, not procurement-specific) · **Dimension:** QAT · **Category:** Access Control
+**Severity:** MEDIUM — internal-directory information disclosure, not full "administrator API access" (see Root cause)
+**Persona affected:** Every internal staff account's PII (name, email, department, role, internal id, timestamps)
+**Surface:** API · `GET /api/users` (`src/routes/userRoutes.ts:76`)
+
+Found while UAT-testing SRD `NTS_SRD_DT_ProcMS_16_09_2026.pdf` §70 item 1, "normal users cannot access
+administrator APIs", with a procurement persona. The endpoint itself is platform-wide, not
+procurement-specific — recorded here because that is how it surfaced.
+
+*Numbering note: this branch was cut from `origin/dev` at `888f877`, which does not yet contain a
+PROC-FINDING-009 that exists (uncommitted, dated 18 September 2026) in the shared working checkout at
+the time this was written — a vendor-portal-rfq token investigation, closed, not a defect. This entry
+is numbered 010 on the assumption that 009 lands first; renumber on merge if it doesn't.*
+
+### Steps to reproduce
+
+1. Sign in on dev as `proc.requester@nts.local` / `admin123` — role **Operations Member**, department
+   Operations, `deptRole MEMBER`, no admin-adjacent grants (confirmed live: `manage_users: false`).
+2. `GET https://dev-api.matanho.com/api/users?limit=3` with that token.
+3. Compare with `GET /roles` on the same token.
+
+### Expected
+
+Per SRD §70 item 1, a route this sensitive should refuse a normal user the way `/roles` does.
+
+### Actual
+
+- `GET /users` → **200** — full directory: every user's first/last name, email, department, role
+  name, role code, internal id, `createdAt`/`updatedAt`.
+- `GET /roles` (same token) → **403**, correctly refused.
+
+### Root cause
+
+`src/routes/userRoutes.ts:76` — `router.get("/", requireInternalStaffUser(), UserController.getAllUsers)`
+— checks only that the caller is *some* internal staff account, unlike `/roles` or the create-user
+route on the same file (`POST /`, line 378: `requireInternalStaffUser(), requirePermission("manage_users")`).
+
+On the surface this looks like the same class of gap `requireInternalStaffUser()` exists to close
+elsewhere (an external-portal account reaching a staff-only route). It is not: the middleware's own
+header comment (`src/middleware/permissionAuth.ts:9-18`) names this exact route's use case as the
+reason the staff-only check exists at all, rather than a specific permission: *"Use this on any route
+whose data is internal but whose audience is 'all staff', where a specific permission would be too
+narrow -- assignment pickers and directory lookups being the usual case."* The route's own comment
+(line 73-75) repeats it.
+
+That rationale checks out against real traffic, not just the comment. `GET /users` — via
+`lib/api/users-api.ts`'s `usersApi.getAll()`, plus two more direct `apiClient.get('/users')` callers —
+is the shared "pick a colleague" call behind, at minimum: Performance (`task-form.tsx`,
+`searchable-user-selector.tsx`, `kanban-board.tsx` and its create/edit dialogs, `review-create-dialog.tsx`,
+`goals-management.tsx`, and `performance-v22-mock`'s own department-member-count and user-list
+live-loaders), FPA (`fpa-budget-cycles.tsx`, `fpa-workflow-approvals.tsx`, `fpa-worksheet.tsx`,
+`planning-collab-sidebar.tsx`, `workflow-task-drawer.tsx`, `fpa-model-planning-cycle-create-modal.tsx`),
+Payroll (`employee-form.tsx`), Fundraising (`fundraising-create-wizards.tsx`, `fundraising-meetings.tsx`),
+and Portfolio V11 and Accounting V52's own live-loaders/actions. Exactly one caller —
+`lib/api/admin-api.ts`'s `adminApiService.getUsers()`, behind the Admin → Users page — is actually
+admin-only.
+
+Queried live on dev (inside `arcus-dev-api-1`): `manage_users` is held by exactly **1 of 60** seeded
+roles — `admin`. Every Manager-level role lacks it (Finance Manager, CFO, Operations Manager,
+Procurement Manager, HR Manager, Portfolio Manager, Payroll Manager, IT Manager, even
+"System Administrator"). Mirroring the create-user route's `requirePermission("manage_users")` onto
+this GET route — the obvious fix, since that guard exists precisely to gate a narrow,
+privilege-granting action — would 403 the directory lookup for every account except `admin`, breaking
+task assignment, reviewer selection, meeting-invitee pickers, payroll employee selection, and every
+FPA/Portfolio/Accounting user selector, platform-wide, for effectively every real user.
+
+### Fix
+
+**Not shipped.** The obvious fix was fully investigated (grep across `nvccz-new` for every caller,
+live DB query of every role's `manage_users` grant) before touching code, precisely to avoid the
+"shipping the guard alone would 403 legitimate holders" trap the create-route's own migration script
+(`nvccz/scripts/run-user-management-permission-migration.ts`) already warns about for this same
+permission. Once the blast radius above was confirmed against dev's actual live role/permission data,
+the change was not made — it would be a platform-wide regression larger than the disclosure it closes.
+No code was changed or deployed anywhere.
+
+This needs a product decision between two imperfect options, not a unilateral pick:
+
+- **(a)** A new, broadly-granted permission (e.g. `view_user_directory`), distinct from
+  `manage_users`, seeded `true` for every internal-staff role, gating this route instead — keeps
+  every picker above working and gives the org an explicit, revocable "who can see the directory"
+  toggle instead of an implicit "any staff" rule.
+- **(b)** Keep `requireInternalStaffUser()` (staff-wide) but trim the response for the general
+  listing to what pickers actually render — id, first/last name, department, role name — and drop
+  email, role code and internal timestamps unless the caller also holds `manage_users`. Satisfies
+  SRD §70's spirit (a normal user should not pull the full PII directory) without touching any of
+  the seven modules' existing calls.
+
+### Verification
+
+- Live repro above, confirmed on dev 18 September 2026.
+- Role/permission audit run inside `arcus-dev-api-1` (Prisma query against the live dev DB): 1/60
+  roles (`admin`) holds `manage_users`; sampled 27 live users, 25 lack it, including every
+  Manager-level, CFO, Portfolio Manager and Payroll Manager account.
+- Frontend caller audit: every bare `GET /users` / `apiClient.get('/users')` / `usersApi.getAll()`
+  call site in `nvccz-new` (TypeScript and vendored non-TS runtime alike — no vendored
+  `matanho-*-runtime.js` calls this route directly); no caller found outside the modules listed above.
+- Backend audit: no other controller imports `UserService.getAllUsers` or calls this route
+  server-to-server, so no internal caller depends on the current behaviour either way.
+
+**Status:** OPEN — confirmed, not fixed, not deployed. Awaiting a decision between (a)/(b) above.
+
+---
+
 ## Not yet findings
 
 - **`POST /procurement/rfqs/:id/award` returns 410** to everyone. This is intended: award was
