@@ -106,6 +106,7 @@ export function FpaSettings() {
   const [archivingEntity, setArchivingEntity] = useState(false)
   const [archiveError, setArchiveError] = useState<string | null>(null)
   const [archiveReferences, setArchiveReferences] = useState<string[]>([])
+  const [resyncingCoa, setResyncingCoa] = useState(false)
 
   // Persisted settings state
   const [settings, setSettings] = useState<PersistedFpaSettings | null>(null)
@@ -119,7 +120,7 @@ export function FpaSettings() {
 
   const activeCoa = useMemo(() => {
     const rows = coaRows.map((row) => ({
-      code: row.code || row.account_code || "—",
+      code: row.code || row.account_code || row.account_no || "—",
       name: row.name || row.account_name || "Unnamed account",
     }))
     const q = coaSearch.trim().toLowerCase()
@@ -209,6 +210,26 @@ export function FpaSettings() {
   useEffect(() => {
     void loadCoa(selectedEntity)
   }, [loadCoa, selectedEntity])
+
+  const resyncCoa = async () => {
+    if (!selectedEntity || !canManageSettings) return
+    setResyncingCoa(true)
+    try {
+      const res = await fpaApi.resyncEntityCoa(selectedEntity)
+      if (!res.success) throw new Error(res.message || "Could not resync chart of accounts")
+      const { accounts_added = 0, accounts_updated = 0 } = res.data || {}
+      toast.success(
+        accounts_added || accounts_updated
+          ? `Synced from General Ledger: ${accounts_added} added, ${accounts_updated} updated`
+          : "Already up to date with the General Ledger",
+      )
+      await Promise.all([loadCoa(selectedEntity), loadEntities()])
+    } catch (err) {
+      toast.error("Could not resync chart of accounts", { description: errorMessage(err) })
+    } finally {
+      setResyncingCoa(false)
+    }
+  }
 
   useEffect(() => {
     setArchiveConfirming(false)
@@ -550,13 +571,26 @@ export function FpaSettings() {
                       <h3 className="text-[14px] font-semibold text-[#000000]">Chart of Accounts Mappings</h3>
                       <p className="text-[11px] text-[#111111] mt-0.5">Accounts linked from General Ledger source</p>
                     </div>
-                    <input
-                      type="search"
-                      value={coaSearch}
-                      onChange={(e) => setCoaSearch(e.target.value)}
-                      placeholder="Search accounts…"
-                      className="h-8 w-44 rounded-full border border-[#d0d5dd] px-3 text-xs focus:outline-none focus:ring-1 focus:ring-[#2563eb]"
-                    />
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="search"
+                        value={coaSearch}
+                        onChange={(e) => setCoaSearch(e.target.value)}
+                        placeholder="Search accounts…"
+                        className="h-8 w-44 rounded-full border border-[#d0d5dd] px-3 text-xs focus:outline-none focus:ring-1 focus:ring-[#2563eb]"
+                      />
+                      {canManageSettings && (
+                        <button
+                          type="button"
+                          disabled={resyncingCoa}
+                          onClick={() => void resyncCoa()}
+                          className="h-8 inline-flex items-center gap-1.5 rounded-full border border-[#d0d5dd] px-3 text-xs font-semibold text-[#111111] hover:bg-[#f9fafb] disabled:opacity-60"
+                        >
+                          {resyncingCoa && <Loader2 className="size-3.5 animate-spin" />}
+                          Sync from General Ledger
+                        </button>
+                      )}
+                    </div>
                   </div>
 
                   {coaLoading ? (
