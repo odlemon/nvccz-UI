@@ -242,6 +242,8 @@ export interface SubmitQuotationRequest {
   deliveryTime?: string
   notes?: string
   attachments?: any
+  /** Staged upload ids from uploadQuotationAttachment(); linked to the quotation server-side after creation. */
+  attachmentIds?: string[]
   items: Array<{
     itemName: string
     description: string
@@ -946,6 +948,20 @@ class ProcurementApiServiceV2 {
    */
   async getRfqInvitation(token: string): Promise<ProcurementResponse<any>> {
     return apiClient.get<ProcurementResponse<any>>(`/procurement/vendor-portal/rfq?token=${encodeURIComponent(token)}`)
+  }
+
+  /**
+   * PUBLIC: stage a quotation attachment (multipart field `document`, PDF only, up to 50MB) before/while
+   * filling in the RFQ response form. Pass `vendorPortalToken` (the same token as the RFQ link) and
+   * `entityType=VENDOR_QUOTATION` in the FormData; the returned `data.id` goes into
+   * SubmitQuotationRequest.attachmentIds so the backend links it to the quotation once created.
+   * POST /procurement/document-attachments/portal/upload — see vendorDocumentAttachmentRoutes.ts (nvccz repo).
+   */
+  async uploadQuotationAttachment(formData: FormData): Promise<ProcurementResponse<{ id: string; originalFileName?: string; fileSizeBytes?: number }>> {
+    return apiClient.postFormData<ProcurementResponse<{ id: string; originalFileName?: string; fileSizeBytes?: number }>>(
+      '/procurement/document-attachments/portal/upload',
+      formData,
+    )
   }
 
   /**

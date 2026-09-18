@@ -9,7 +9,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
-import { Building2, Mail, Phone, MapPin, User, FileText, DollarSign, Calendar, Package, CheckCircle2, Plus, Trash2, Loader2, AlertCircle } from 'lucide-react'
+import { Building2, Mail, Phone, MapPin, User, FileText, DollarSign, Calendar, Package, CheckCircle2, Plus, Trash2, Loader2, AlertCircle, Paperclip, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { DatePicker } from '@/components/ui/date-picker'
@@ -73,6 +73,7 @@ function RFQRespondContent() {
   const [deliveryTerms, setDeliveryTerms] = useState('')
   const [deliveryTime, setDeliveryTime] = useState('')
   const [notes, setNotes] = useState('')
+  const [attachmentFiles, setAttachmentFiles] = useState<File[]>([])
 
   const [items, setItems] = useState<QuotationItem[]>([
     {
@@ -169,6 +170,31 @@ function RFQRespondContent() {
     setItems(updatedItems)
   }
 
+  const MAX_ATTACHMENT_BYTES = 50 * 1024 * 1024
+
+  const handleAttachmentSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || [])
+    e.target.value = '' // allow re-selecting the same file name after a removal
+    const accepted: File[] = []
+    for (const file of files) {
+      const isPdf = file.type === 'application/pdf' || /\.pdf$/i.test(file.name)
+      if (!isPdf) {
+        toast.error(`${file.name} was not attached`, { description: 'Only PDF documents are accepted.' })
+        continue
+      }
+      if (file.size > MAX_ATTACHMENT_BYTES) {
+        toast.error(`${file.name} was not attached`, { description: 'Files must be 50MB or smaller.' })
+        continue
+      }
+      accepted.push(file)
+    }
+    if (accepted.length) setAttachmentFiles(prev => [...prev, ...accepted])
+  }
+
+  const removeAttachment = (index: number) => {
+    setAttachmentFiles(prev => prev.filter((_, i) => i !== index))
+  }
+
   const calculateItemTotal = (item: QuotationItem) => {
     const unitPrice = parseFloat(item.unitPrice) || 0
     return (unitPrice * item.quantity).toFixed(2)
@@ -194,9 +220,31 @@ function RFQRespondContent() {
       return
     }
 
+    if (!paymentTerms.trim()) {
+      toast.error('Please state your payment terms')
+      return
+    }
+
     setSubmitting(true)
 
     try {
+      let attachmentIds: string[] = []
+      if (attachmentFiles.length) {
+        attachmentIds = await Promise.all(
+          attachmentFiles.map(async (file) => {
+            const form = new FormData()
+            form.append('document', file)
+            form.append('vendorPortalToken', token!)
+            form.append('entityType', 'VENDOR_QUOTATION')
+            const uploadResult = await procurementApiV2.uploadQuotationAttachment(form)
+            if (!uploadResult?.success || !uploadResult.data?.id) {
+              throw new Error(uploadResult?.message || `Failed to upload ${file.name}`)
+            }
+            return uploadResult.data.id
+          })
+        )
+      }
+
       const payload = {
         rfqNumber: rfqNumber!,
         requisitionId: requisitionId!,
@@ -215,6 +263,7 @@ function RFQRespondContent() {
         deliveryTime,
         notes,
         attachments: {},
+        attachmentIds,
         items: items.map(item => ({
           ...item,
           unitPrice: parseFloat(item.unitPrice),
@@ -338,6 +387,14 @@ function RFQRespondContent() {
                   <div>
                     <p className="text-sm text-gray-500">Phone</p>
                     <p className="font-medium">{submittedData.phoneNumber}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">Payment Terms</p>
+                    <p className="font-medium">{submittedData.paymentTerms || 'Not specified'}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500">Attachments</p>
+                    <p className="font-medium">{submittedData.attachmentIds?.length ? `${submittedData.attachmentIds.length} document(s)` : 'None'}</p>
                   </div>
                 </div>
               </div>
@@ -535,6 +592,55 @@ function RFQRespondContent() {
                   <Label>Delivery Time</Label>
                   <Input value={deliveryTime} onChange={e => setDeliveryTime(e.target.value)} placeholder="e.g. 3 days" className="rounded-lg" />
                 </div>
+                <div className="space-y-2">
+                  <Label>Payment Terms <span className="text-red-500">*</span></Label>
+                  <Input value={paymentTerms} onChange={e => setPaymentTerms(e.target.value)} placeholder="e.g. Net 30, 50% advance" required className="rounded-lg" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Delivery Terms</Label>
+                  <Input value={deliveryTerms} onChange={e => setDeliveryTerms(e.target.value)} placeholder="e.g. FOB, CIF, EXW" className="rounded-lg" />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>Comments</Label>
+                <Textarea value={notes} onChange={e => setNotes(e.target.value)} placeholder="Any additional information about this quotation" className="rounded-lg" rows={3} />
+              </div>
+              <div className="space-y-2">
+                <Label>Attachments (PDF)</Label>
+                <div className="flex items-center gap-3">
+                  <label
+                    htmlFor="quotation-attachments"
+                    className="inline-flex items-center gap-2 px-4 py-2 border rounded-lg cursor-pointer text-sm font-medium text-gray-700 hover:bg-gray-50"
+                  >
+                    <Paperclip className="w-4 h-4" />
+                    Attach document
+                  </label>
+                  <input
+                    id="quotation-attachments"
+                    type="file"
+                    accept="application/pdf,.pdf"
+                    multiple
+                    onChange={handleAttachmentSelect}
+                    className="hidden"
+                  />
+                  <span className="text-xs text-gray-500">PDF only, up to 50MB each</span>
+                </div>
+                {attachmentFiles.length > 0 && (
+                  <ul className="space-y-2 mt-2">
+                    {attachmentFiles.map((file, index) => (
+                      <li key={`${file.name}-${index}`} className="flex items-center justify-between gap-2 px-3 py-2 bg-gray-50 border rounded-lg text-sm">
+                        <span className="flex items-center gap-2 truncate">
+                          <FileText className="w-4 h-4 text-gray-500 shrink-0" />
+                          <span className="truncate">{file.name}</span>
+                          <span className="text-gray-400 shrink-0">({(file.size / (1024 * 1024)).toFixed(2)} MB)</span>
+                        </span>
+                        <Button type="button" variant="ghost" size="sm" onClick={() => removeAttachment(index)} className="text-red-600 hover:bg-red-50 shrink-0">
+                          <X className="w-4 h-4" />
+                        </Button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
             </CardContent>
           </Card>
