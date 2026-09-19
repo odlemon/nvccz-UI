@@ -515,7 +515,7 @@ export function LpPerformanceScreen() {
           iconBg="bg-[#dcfce7]"
           iconColor="text-[#16a34a]"
           label="Net IRR"
-          value={formatPercent(metrics?.netIrr)}
+          value={metrics?.netIrr == null ? "—" : formatPercent(metrics.netIrr)}
           helper="Since Inception"
           trend
         />
@@ -524,7 +524,7 @@ export function LpPerformanceScreen() {
           iconBg="bg-[#ffedd5]"
           iconColor="text-[#ea580c]"
           label="TVPI"
-          value={formatMultiple(metrics?.tvpi)}
+          value={metrics?.tvpi == null ? "—" : formatMultiple(metrics.tvpi)}
           helper="Since Inception"
           trend
         />
@@ -533,7 +533,7 @@ export function LpPerformanceScreen() {
           iconBg="bg-[#dbeafe]"
           iconColor="text-[#2563eb]"
           label="DPI"
-          value={formatMultiple(metrics?.dpi)}
+          value={metrics?.dpi == null ? "—" : formatMultiple(metrics.dpi)}
           helper="Since Inception"
           trend
         />
@@ -542,7 +542,7 @@ export function LpPerformanceScreen() {
           iconBg="bg-[#ffedd5]"
           iconColor="text-[#ea580c]"
           label="RVPI"
-          value={formatMultiple(metrics?.rvpi)}
+          value={metrics?.rvpi == null ? "—" : formatMultiple(metrics.rvpi)}
           helper="Since Inception"
           trend
         />

@@ -47,6 +47,34 @@ the metrics fix already went out); no other chart in this codebase shares the ex
 `h-[Npx] min-h-0 flex-1` combination (checked via grep across `components/lp-portal/screens/*.tsx`), so
 this looks isolated to these two charts, not a systemic pattern elsewhere.
 
+### Q11 — OPEN_ENDED fund path, exercised for the first time — real G3 violation found and fixed
+
+`lp.signatory@example.com` now has a real OPEN_ENDED fund on their account ("Arcus Equity Opportunities").
+Selecting it from the Fund/Account dropdown on Performance reproduced exactly the failure mode this
+codebase's own comment (in `LpPortalPerformanceService.ts`'s `byFund` construction) already describes and
+had fixed for the all-funds table row: **Net IRR -2.0%, TVPI/DPI/RVPI 0.00x were shown as real KPI cards**
+for an open-ended fund, directly against SRD section 37 (G3: "never show DPI/RVPI/TVPI... regardless of
+operating model") — confirmed via a direct API call
+(`GET /lp-portal/performance?fundId=<equity-opps-id>`) returning `netIrr: "-2.0000"`, `tvpi/dpi/rvpi:
+"0.0000"` in the top-level `metrics` object.
+
+Root cause: the `byFund` array's per-row `privateCapitalMultiples` gate (added for exactly this SRD
+requirement) was never applied to the single-fund **summary** `metrics` object returned by the same
+`getPerformance()` call — so requesting the aggregate-by-fund table got it right, but selecting that one
+fund directly on the Performance screen (the normal way an LP would look at their own open-ended holding)
+did not.
+
+Fixed on `nvccz` branch `feature/lp-portal-resweep-live` (commit pending push): when `opts.fundId` scopes
+the request to a single fund and that fund's `operatingModel` is `OPEN_ENDED`, `metrics.netIrr/tvpi/dpi/
+rvpi` are now `null` rather than a computed (and meaningless) number, mirroring the existing per-row gate
+exactly. Frontend (`components/lp-portal/screens/lp-performance-screen.tsx`) updated to render "—" for
+these four KPI cards when null, matching the convention the "Performance by Fund" table already uses,
+rather than defaulting through `formatMultiple`/`formatPercent` to a fabricated "0.00x"/"0.0%". The
+existing "Open-Ended Account Metrics" card (Account Value/Units Held/NAV Per Unit/YTD Return) is
+unaffected and continues to be the correct place these investors see their own performance. Not yet
+deployed/live-verified — do that before merging (deploy the API fix together with the two chart-height
+fixes above, since both touch this same file/service).
+
 ## Carried over from the baseline, still to verify or exercise
 
 - **Pending re-run (baseline defects 8, 9):** third Performance chart axis (capital flow) fixed-50M-step
@@ -58,7 +86,7 @@ this looks isolated to these two charts, not a systemic pattern elsewhere.
   doesn't delete original), Q9 (audit records for downloads/bank changes), Q10 (org admin can't expand
   entitlements).
 - **Q11 caveat:** OPEN_ENDED fund path was never exercised (no such fund existed on the test account at
-  the time).
+  the time). Now exercised — see "Q11" below, real defect found and fixed.
 - **Accounting-treatment issues, referred not fixed (need chart-of-accounts sign-off, not a frontend/
   backend guess):** every distribution debits `4100 Dividend Income` regardless of actual source;
   `RETURN_OF_CAPITAL`/`INCOME` distribution types are rejected by the backend's `ALLOWED_SOURCES` despite
