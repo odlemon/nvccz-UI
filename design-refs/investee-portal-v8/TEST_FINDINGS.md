@@ -49,12 +49,12 @@ Commit `f2d9196`, branch `feature/investee-portal-v8-live`.
 
 ### Verification
 
-Deployed to dev (`ui-investee` only). *(Fill in exact re-check once the Phase 7 sweep resumes: reload
-Signatures as `investee.test@arcus.co.zw` and confirm "Investee Test Term Sheet" now shows
-**Completed**, not "Awaiting your signature", and that the Signatures summary's "Completed this
-quarter" count reflects it.)*
+Deployed to dev (`ui-investee`), 19 September 2026. Reloaded Signatures as `investee.test@arcus.co.zw`:
+"Investee Test Term Sheet" now shows **Completed · Signed 2026-09-05** (previously "Awaiting your
+signature"). Summary cards: **Awaiting your signature: 0** (was 1), **Completed this quarter: 1** (was
+0), **Audit certificates: 100%** (was —). Confirmed fixed.
 
-**Status:** FIXED — deployed to dev (`ui-investee`), pushed to `origin/feature/investee-portal-v8-live`. Live re-verification pending (see above). Not merged to `dev`/`master`/prod.
+**Status:** FIXED and verified live, deployed to dev (`ui-investee`), pushed to `origin/feature/investee-portal-v8-live`. Not merged to `dev`/`master`/prod.
 
 ---
 
@@ -97,28 +97,30 @@ Commit `f2d9196` (same commit as FINDING-IP8-001), branch `feature/investee-port
 
 ### Verification
 
-Deployed to dev (`ui-investee` only). *(Fill in exact re-check once the Phase 7 sweep resumes: reload
-KPI Centre and confirm all cards show numeric values — expect `NET_PROFIT`, `CASH_FLOW_NET`,
-`TOTAL_REVENUE`, `WORKING_CAPITAL`, `CASH_OPERATING_NET_APPROX`, no `derived` card, no `[object
-Object]` anywhere.)*
+Deployed to dev (`ui-investee`), 19 September 2026. Reloaded KPI Centre as `investee.test@arcus.co.zw`:
+all 5 cards now show numeric values — `NET_PROFIT` 250,000, `WORKING_CAPITAL` 0, `CASH_OPERATING_NET_APPROX`
+0, `CASH_FLOW_NET` 180,000, `TOTAL_REVENUE` 1,200,000. No `derived` card, no `[object Object]` anywhere.
+Confirmed fixed.
 
-**Status:** FIXED — deployed to dev (`ui-investee`), pushed to `origin/feature/investee-portal-v8-live`. Live re-verification pending (see above). Not merged to `dev`/`master`/prod.
+**Status:** FIXED and verified live, deployed to dev (`ui-investee`), pushed to `origin/feature/investee-portal-v8-live`. Not merged to `dev`/`master`/prod.
 
 ---
 
 ## FINDING-IP8-003
 
-**Title:** Two unexplained 400 responses on every load of the Reporting Centre screen
+**Title:** Two unexplained 400 responses on every fresh page load, not specific to any one screen
 **Module:** Investee Portal (frontend `nvccz-new` and/or backend `nvccz`) · **Dimension:** UAT · **Category:** Unresolved — needs further investigation
-**Severity:** LOW (provisional) — the page's own visible content (reporting schedule, 3 real records) renders correctly despite the errors; severity may change once the actual failing call is identified
+**Severity:** LOW (provisional) — every screen's own visible content renders correctly despite the errors; severity may change once the actual failing call is identified
 **Persona affected:** Unknown — reproduced only for `investee.test@arcus.co.zw` so far
 **Surface:** Unknown — reproduced console-side only
 
 ### Steps to reproduce (live on dev, 19 September 2026)
 
-Loaded `/investee-portal-v8/reports` as `investee.test@arcus.co.zw` (fresh navigation, not a client-
-side transition). Browser console shows exactly two `Failed to load resource: the server responded
-with a status of 400 ()` errors, consistently, on every fresh load of this specific route.
+Originally found on `/investee-portal-v8/reports` (fresh navigation, not a client-side transition):
+browser console shows exactly two `Failed to load resource: the server responded with a status of 400
+()` errors. **Re-confirmed 19 September 2026 (post-deploy) that this is not route-specific** — the same
+two errors reproduce on a fresh load of `/investee-portal-v8/kpis` as well. Likely a global, once-per-
+full-page-load call (not tied to any one screen's own data), not yet identified.
 
 ### Investigation (inconclusive)
 
