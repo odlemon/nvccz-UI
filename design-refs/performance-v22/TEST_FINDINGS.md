@@ -162,11 +162,11 @@ Commit `0efa691`, branch `feature/performance-v22-live`.
 
 ### Verification
 
-*(Fill in once deployed to dev `ui-staff`: reload any `/performance/*` page and confirm the Alerts &
-Audit sidebar badge is gone — 0 real critical/escalated alerts exist in this environment, so the badge
-should not render at all.)*
+Deployed to dev (`ui-staff`), 19 September 2026. Reloaded `/performance/alerts` as `admin@nts.com`: the
+Alerts & Audit sidebar item now shows no count badge at all (real data is 0 critical / 0 escalated / 0
+resolved). Confirmed fixed.
 
-**Status:** FIXED — pushed to `origin/feature/performance-v22-live`. Live re-verification pending. Not merged to `dev`/`master`/prod.
+**Status:** FIXED and verified live, deployed to dev (`ui-staff`), pushed to `origin/feature/performance-v22-live`. Not merged to `dev`/`master`/prod.
 
 ---
 
