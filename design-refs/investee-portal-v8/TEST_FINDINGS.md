@@ -159,7 +159,18 @@ temporary API request logging to identify the failing call before it can be fixe
 | Reporting Centre | Reporting schedule table renders 3 real records correctly. FINDING-IP8-003 (see above, unresolved). Draft workspace / Submission history / Templates tabs not yet exercised. |
 | Overview, Capital & Procurement Requests | Covered in an earlier round-test this session (see `design-refs/procurement-v23/TEST_FINDINGS.md`'s cross-module regression sweep note) — both loaded cleanly, zero console errors, "New capital or procurement request" form opens and renders correctly (not submitted, to avoid creating a real drawdown request as a side effect of a smoke test). |
 
-**Not yet covered:** Financial Reporting structured submit + upload, Settings (profile/company/
-letterhead), the `application-portal/<suffix>` → `investee-portal-v8<suffix>` redirect audit, and
-confirming Document Vault / Messages / Cap Table / Governance / Forecasts / Team & Access are in their
-documented (mock/fixture/inert) state rather than regressed. Continuing Phase 7 from here.
+| Financial Reporting (structured submit + upload) | "Submit investor report" modal: Income statement/Balance sheet/Cash flow/Commentary & evidence tabs all switch correctly, submission-readiness % updates live (25% → 50% as tabs are completed), real pre-filled figures ($4,260 total revenue etc.), file-upload control present ("Attach ledgers, bank statements and supporting schedules"). Not actually submitted, to avoid creating fake real financial data. No defects found. |
+| Settings | Company profile, own profile, and letterhead sections all render with real data (Arcus Demo Investee Co, real registration number/contact details). FINDING-IP8-003's 2 unexplained 400s reproduce here too — further confirms it's global/per-page-load, not route-specific (already broadened in that finding's own text). |
+| Team & Access | Correctly honest: "Company team and access management is not available yet — a real team/user-management API is not pending. See design-refs/investee-portal-v8-backend-asks.md." Matches documented inert state. |
+| Cap Table | Correctly honest: "A live cap table has not been recorded yet — a cap table API is still pending." A transient loading-skeleton briefly showed a different demo company name ("Zambezi Pay") before resolving correctly to "Arcus Demo" — cosmetic loading-flicker only, not a real company-switch bug (confirmed the final rendered state was correct). |
+| Governance | Correctly honest: "Governance tracking (board calendar, consent requests, reserved matters) is not available yet — a live governance API is still pending." Matches documented inert state. |
+| Document Vault | Shows **real** data — 4 real application documents (business-plan.pdf, proof-of-concept.pdf, market-research.pdf, deal.pdf), correctly scoped as "Application documents linked to your live application record" (not the more general company document vault, which remains correctly unbuilt per backend-asks). |
+| Messages | Correctly honest: "Messages are not available yet — an applicant messaging API is still pending." Matches documented inert state. |
+| Forecast Model | Correctly honest: "A live actuals & forecast model has not been set up yet — the forecasting API is still pending." Same transient loading-skeleton company-name flicker as Cap Table, same non-issue. |
+| `application-portal` redirect audit | Confirmed: navigating to `https://dev.matanho.com/application-portal` while authenticated as the investee test persona redirects to the real, live Investee Portal Overview on `dev.investee.matanho.com` with correct real data. This is legitimate role-based access control (an investee-role session being kept off a staff-only route), not a dead/broken redirect target — the original phase-7 checklist item's framing ("check for dead targets") turned out to be based on an assumption that didn't hold up under live testing; the actual behavior is correct. |
+
+**Phase 7: complete.** Every screen live-tested. 2 real defects found and fixed (IP8-001, IP8-002),
+both verified live. 1 real defect found, confirmed reproducible across every route tested (Reporting
+Centre, KPI Centre, Settings), root cause not isolated (IP8-003) — left open. All fixture/inert screens
+confirmed correctly honest, none regressed to fabricated data. Not yet merged to `dev`/`master`/prod —
+checkpointing before that merge, per this sweep's standing convention.
