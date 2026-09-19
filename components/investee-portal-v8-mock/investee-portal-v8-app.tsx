@@ -8,7 +8,7 @@ import {
 } from "@/lib/investee-portal-v8-mock/nav"
 import { startInvesteePortalV8Runtime } from "@/components/investee-portal-v8-mock/matanho-investee-portal-runtime"
 import { INVESTEE_PORTAL_V8_SHELL_HTML } from "@/components/investee-portal-v8-mock/shell"
-import { loadInvesteePortalLiveData } from "@/lib/investee-portal-v8/live-loaders"
+import { loadInvesteePortalLiveData, type InvesteePortalLivePayload } from "@/lib/investee-portal-v8/live-loaders"
 import { handleInvesteePortalV8Action } from "@/lib/investee-portal-v8/actions"
 import "@/components/investee-portal-v8-mock/investee-portal-v8.css"
 import "@/components/investee-portal-v8-mock/investee-portal-v8-overrides.css"
@@ -38,6 +38,44 @@ const API_ACTIONS = new Set([
   "submit-capital-request",
 ])
 
+/**
+ * GET /term-sheets/my nests each signature under `applicantSignature`/`investorSignature`
+ * ({ signatureUrl, signatureFileName, signedAt, signedBy }), but the vendored runtime's signed-
+ * status check (`ts.isSigned || ts.applicantSignedAt || ...`) reads flat `applicantSignedAt`/
+ * `applicantSignatureUrl` fields that this endpoint never sends. A term sheet the applicant had
+ * already signed kept showing "Awaiting your signature" forever, and re-signing failed with a
+ * confusing "signature already exists" error and no indication anything had actually happened.
+ * Flatten both shapes onto each term sheet before hydrating so the runtime's existing check works
+ * without touching the generated runtime.js itself.
+ */
+function normalizeTermSheetSignatures(payload: InvesteePortalLivePayload): InvesteePortalLivePayload {
+  const sheets = payload.termSheets?.data?.termSheets
+  if (!Array.isArray(sheets) || !sheets.length) return payload
+
+  return {
+    ...payload,
+    termSheets: {
+      ...payload.termSheets!,
+      data: {
+        ...payload.termSheets!.data,
+        termSheets: sheets.map((ts) => {
+          const applicant = (ts as typeof ts & { applicantSignature?: { signatureUrl?: string | null; signatureFileName?: string | null; signedAt?: string | null } }).applicantSignature
+          const investor = (ts as typeof ts & { investorSignature?: { signatureUrl?: string | null; signatureFileName?: string | null; signedAt?: string | null } }).investorSignature
+          return {
+            ...ts,
+            applicantSignatureUrl: ts.applicantSignatureUrl ?? applicant?.signatureUrl ?? null,
+            applicantSignatureFileName: ts.applicantSignatureFileName ?? applicant?.signatureFileName ?? null,
+            applicantSignedAt: ts.applicantSignedAt ?? applicant?.signedAt ?? null,
+            investorSignatureUrl: ts.investorSignatureUrl ?? investor?.signatureUrl ?? null,
+            investorSignatureFileName: ts.investorSignatureFileName ?? investor?.signatureFileName ?? null,
+            investorSignedAt: ts.investorSignedAt ?? investor?.signedAt ?? null,
+          }
+        }),
+      },
+    },
+  }
+}
+
 export function InvesteePortalV8App() {
   const rootRef = useRef<HTMLDivElement>(null)
   const apiRef = useRef<RuntimeApi | null>(null)
@@ -64,8 +102,9 @@ export function InvesteePortalV8App() {
 
     const loadLive = () => {
       void loadInvesteePortalLiveData().then((payload) => {
-        apiRef.current?.hydrate?.(payload)
-        window.MatanhoInvesteeUI?.hydrate?.(payload)
+        const hydrated = normalizeTermSheetSignatures(payload)
+        apiRef.current?.hydrate?.(hydrated)
+        window.MatanhoInvesteeUI?.hydrate?.(hydrated)
       })
     }
     loadLive()
