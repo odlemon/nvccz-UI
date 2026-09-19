@@ -162,11 +162,30 @@ from "Opened" (Ack. Required: 1) to "Acknowledged" (Acknowledged: 1) correctly v
 `POST /lp-portal/notices/:id/acknowledge` call. The Documents screen's "Download History" panel showed real,
 correct entries (user id, real IP, real timestamps) from my own earlier direct API test downloads this
 session — confirming the Q9 document-access audit fix (`lpDocumentAccessAudit`) is not just writing
-correctly but is also being read back and displayed correctly in the UI. One unrelated minor note, not
-investigated further: the "Secure Downloads YTD" KPI card showed 0 despite the visible download history
-having 2 real entries from today — possibly a similar "hardcoded/stale counter" pattern seen elsewhere in
-this codebase; flagging for whoever picks this module up next rather than chasing a third investigation in
-the same pass.
+correctly but is also being read back and displayed correctly in the UI.
+
+**Follow-up, resolved — not a separate bug:** the "Secure Downloads YTD" KPI showing 0 was traced to
+`LpPortalDocumentsService.summary()` correctly counting `lpDocumentAccessAudit` rows with
+`action: "DOWNLOAD"` — and there genuinely were none yet, because `download()` only writes that audit row
+*after* `LpPortalVaultService.download()` succeeds, and every download attempt before the persistent-volume
+fix above had been throwing (500) before reaching it. The 2 entries visible in "Download History" were VIEW
+actions from opening the document detail panel, not downloads. Re-checked `GET /lp-portal/documents/summary`
+after the volume fix and one successful download: `secureDownloadsYtd` now correctly reads `1`. No separate
+fix needed.
+
+### Dashboard: same stale-snapshot bug as Performance, found and fixed with a shared helper
+
+While closing out remaining items, opened the LP Portal Dashboard (not previously re-tested this pass) and
+saw the identical symptom already root-caused for Performance: Current NAV $0.00, Distributions $0.00,
+0.00x TVPI/RVPI, despite Total Commitment and Unfunded Commitment showing real blended numbers. Traced to
+`LpPortalDashboardService.getDashboard()` and `getDashboardSrd()` — both read
+`lpPortalMetricSnapshot.metrics` independently of `LpPortalPerformanceService` and had the exact same gap
+(reading `totalPaidIn`/`nav`/`totalDistributions` only, missing the pre-rename `paidIn`/`currentNav`/
+`distributions` shape). Rather than copy the same inline `?? legacy-key ?? 0` fallback a third time, extracted
+`normalizeSnapshotMetrics()` into `LpFundMetricsService` (the module that owns the canonical shape) and
+pointed all three read sites at it — Performance's own fix was refactored to use the shared helper too.
+Deployed to dev; live-verification of the Dashboard screen still pending (API deploy in progress as this is
+written).
 
 ### New observation while verifying the Q11 fix — TVPI computed two different ways for the same fund
 
