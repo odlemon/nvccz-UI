@@ -58,6 +58,15 @@ services:
       REMOTE_MEDIA_INTERNAL_BASE: http://upload:3050/uploads
     volumes:
       - arcus_dev_api_storage:/app/storage/local-upload-mock
+      # One-off seed/manual-content scripts (e.g. seed-lp-portal-srd-demo.ts) write files under
+      # /app/uploads and point a DB row's storagePath at them. Without a named volume here, that
+      # path lives only in the container's own writable layer and is silently wiped on the next
+      # `docker compose build && up --force-recreate api` — the DB row survives (MySQL has its own
+      # volume) but every download of that document then 500s with "Request failed with status
+      # code 404" from the remote-storage fallback, since fs.existsSync() on the now-missing local
+      # path fails first. Found live: LP Portal's seeded Q1 Investor Pack document 500'd on
+      # download for exactly this reason.
+      - arcus_dev_api_uploads:/app/uploads
     labels:
       - traefik.enable=true
       - traefik.docker.network=lms_lms-network
@@ -260,4 +269,5 @@ services:
 volumes:
   arcus_dev_mysql:
   arcus_dev_api_storage:
+  arcus_dev_api_uploads:
   arcus_dev_upload:
