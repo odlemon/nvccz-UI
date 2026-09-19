@@ -347,7 +347,12 @@ const navGroups=[
  {group:'Administration',items:[['access','Access & Settings','settings']]}
 ];
 function renderNav(){
- $('#nav').innerHTML=navGroups.map(g=>`<div class="nav-group">${g.group}</div>${g.items.map(([p,l,i])=>`<button class="nav-item ${state.page===p?'active':''} ${canPage(p)?'':'locked'}" data-page="${p}" title="${esc(l)}${canPage(p)?'':' - restricted'}"><span class="nav-icon">${icon(i)}</span><span class="nav-label">${esc(l)}</span>${p==='alerts'?`<span class="nav-count">${state.notifications}</span>`:''}</button>`).join('')}`).join('');
+ $('#nav').innerHTML=navGroups.map(g=>`<div class="nav-group">${g.group}</div>${g.items.map(([p,l,i])=>`<button class="nav-item ${state.page===p?'active':''} ${canPage(p)?'':'locked'}" data-page="${p}" title="${esc(l)}${canPage(p)?'':' - restricted'}"><span class="nav-icon">${icon(i)}</span><span class="nav-label">${esc(l)}</span>${p==='alerts'?/* patched:nav-alert-badge */(() => {
+  const s = __perfObject('alertSummary');
+  if (!s) return '';
+  const n = (Number(s.critical) || 0) + (Number(s.escalated) || 0);
+  return n > 0 ? `<span class="nav-count">${n}</span>` : '';
+})():''}</button>`).join('')}`).join('');
 }
 function pageHead(eyebrow,title,desc,actions=''){return `<div class="page-head"><div><div class="eyebrow">${esc(eyebrow)}</div><h1>${esc(title)}</h1><p>${esc(desc)}</p></div><div class="actions">${actions}</div></div>`}
 function roleScope(){return state.role==='Executive'?'Organization-wide strategy, approvals and high-level performance':state.role==='HR/M&E Manager'?'Organization-wide people performance, reviews, governance and reports':state.role==='Department Manager'?'Department scorecards, team goals, tasks and reviews':state.role==='Employee'?'Personal goals, tasks, reviews and performance documents':'Full system administration and performance data';}
