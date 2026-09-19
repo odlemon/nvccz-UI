@@ -384,6 +384,12 @@ export async function loadProcurementV23LiveData(): Promise<ProcurementV23LivePa
     // SRD §7 "Project/Cost Center": the project the requisition is charged to, by id and by name.
     projectId: r.projectId ?? null,
     project: r.project?.name ?? null,
+    // SRD §11: Required Date, Delivery Location and Budget Code. Raw ISO value kept alongside the
+    // display string so the edit form can prefill a native date input (YYYY-MM-DD).
+    requiredDate: r.requiredDate ?? null,
+    requiredDateDisplay: r.requiredDate ? fmtDate(r.requiredDate) : DASH,
+    deliveryLocation: r.deliveryLocation ?? null,
+    budgetCode: r.budgetCode ?? null,
     items: (r.items ?? []).map((i: any) => ({ itemName: i.itemName, quantity: num(i.quantity), unit: i.unit ?? null, unitPrice: num(i.unitPrice) || null })),
   }))
 
@@ -412,6 +418,9 @@ export async function loadProcurementV23LiveData(): Promise<ProcurementV23LivePa
       requisition: t.requisition?.requisitionNumber ?? null,
       rawStatus: t.status,
       closingAt: t.closingAt ?? null,
+      // An RFQ carries no items of its own on the backend; the requisition it was raised from does
+      // (SRD §13 Invitation to Tender must show the actual scope, not a generic paragraph).
+      items: (source?.items ?? []).map((i: any) => ({ itemName: i.itemName, quantity: num(i.quantity), unit: i.unit ?? null, unitPrice: num(i.unitPrice) || null })),
     }
   })
 
@@ -492,11 +501,15 @@ export async function loadProcurementV23LiveData(): Promise<ProcurementV23LivePa
   }))
 
   // ----------------------------------------------------------------- purchase orders
+  const vendorById = new Map<string, ProcurementRecord>(vendors.map((v) => [v.id, v]))
   const ordersView = orders.map((o) => ({
     id: o.poNumber ?? o.id,
     recordId: o.id,
     vendor: o.vendor?.name ?? DASH,
     vendorId: o.vendorId ?? null,
+    // The PO's own embedded vendor is a thin projection (name/email/phone); the BP number
+    // lives on the full vendor record loaded for the Vendor Registry.
+    vendorCode: (o.vendorId && vendorById.get(String(o.vendorId))?.bpNumber) ?? null,
     entity: departmentOfRequisition(o.requisitionId),
     amount: num(o.totalAmount),
     status: PO_STATUS[String(o.status).toUpperCase()] ?? titleCase(o.status),
@@ -520,11 +533,20 @@ export async function loadProcurementV23LiveData(): Promise<ProcurementV23LivePa
     sentAt: o.sentAt ?? null,
     // For the monthly commitment chart.
     orderDate: o.orderDate ?? o.createdAt ?? null,
+    // SRD §21 Purchase Orders: the generated PO document must show delivery, payment and tax
+    // detail, not just supplier/entity/total. All copied straight from the record.
+    deliveryAddress: o.shippingAddress ?? null,
+    paymentTerms: o.paymentTerms ?? null,
+    purchaseConditions: o.deliveryTerms ?? null,
+    subtotal: num(o.subtotal),
+    taxAmount: num(o.taxAmount),
     items: (o.items ?? []).map((i: any) => ({
       id: i.id,
       itemName: i.itemName,
       quantity: num(i.quantity),
+      unit: i.unit ?? null,
       unitPrice: num(i.unitPrice),
+      lineTotal: num(i.totalPrice),
       received: num(i.quantityReceived),
     })),
   }))
@@ -549,6 +571,20 @@ export async function loadProcurementV23LiveData(): Promise<ProcurementV23LivePa
       quality: titleCase(g.qualityStatus),
       receivedBy: personName(g.receivedBy),
       received: fmtDate(g.receivedDate),
+      // SRD §5 Goods Received Notes: the generated GRN document must show the vendor, PO and
+      // received/accepted/rejected quantities per line, not a template with no transaction data.
+      vendor: g.purchaseOrder?.vendor?.name ?? null,
+      currency: g.purchaseOrder?.currency?.code ?? null,
+      lines: lines.map((l: any) => ({
+        itemName: l.po?.itemName ?? DASH,
+        unit: l.po?.unit ?? null,
+        unitPrice: num(l.po?.unitPrice),
+        ordered: num(l.quantityOrdered),
+        received: num(l.quantityReceived),
+        accepted: num(l.quantityAccepted),
+        rejected: num(l.quantityRejected),
+        quality: l.qualityStatus ? titleCase(l.qualityStatus) : null,
+      })),
     }
   })
 

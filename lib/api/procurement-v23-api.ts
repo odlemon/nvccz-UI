@@ -11,7 +11,10 @@
  *   GET    /procurement/requisitions/my                   the caller's own, drafts included
  *   GET    /procurement/requisitions/pending-approval     department head's queue
  *   GET    /procurement/requisitions/:id
- *   POST   /procurement/requisitions                      {title, department, priority, justification, items[{itemName, quantity, unit}]}
+ *   POST   /procurement/requisitions                      {title, department, priority, justification, requiredDate,
+ *                                                         deliveryLocation, budgetCode, items[{itemName, quantity, unit}]}
+ *   POST   /procurement/requisitions/:id/attachments       multipart `files[]`; owner-gated, not procurement.documents.manage
+ *   GET    /procurement/requisitions/:id/attachments
  *   PUT    /procurement/requisitions/:id/submit
  *   PUT    /procurement/requisitions/:id/approve          the requisition's department HEAD or DEPUTY
  *   PUT    /procurement/requisitions/:id/reject           {rejectionReason}
@@ -155,10 +158,28 @@ export async function createRequisition(body: {
   sourcingCategory?: string
   /** SRD §7 "Project/Cost Center"; omitted or null for none. */
   projectId?: string | null
+  /** SRD §11 "Required Date": ISO date string, when the requester needs the goods/services by. */
+  requiredDate?: string
+  /** SRD §11 "Delivery Location". */
+  deliveryLocation?: string
+  /** SRD §11 "Budget Code" (free text; no budget-code register exists on the backend yet). */
+  budgetCode?: string
   /** unitPrice is the requester's estimate; the backend keeps it internal and never copies it onto an RFQ. */
   items: { itemName: string; description?: string; quantity: number; unit?: string; unitPrice?: number }[]
 }): Promise<ProcurementRecord> {
   return unwrapData(await apiClient.post<ApiResponse<ProcurementRecord>>("/procurement/requisitions", body))
+}
+
+/** SRD §11 "Attachments": multipart `files[]`. Owner-gated on the backend, not procurement.documents.manage. */
+export async function uploadRequisitionAttachments(id: string, form: FormData): Promise<ProcurementRecord[]> {
+  return unwrapData(
+    await apiClient.postFormData<ApiResponse<ProcurementRecord[]>>(`/procurement/requisitions/${encodeURIComponent(id)}/attachments`, form),
+  )
+}
+
+/** SRD §11 "Attachments": files already attached to a requisition (requester and approvers both). */
+export async function listRequisitionAttachments(id: string): Promise<ProcurementRecord[]> {
+  return unwrapData(await apiClient.get<ApiResponse<ProcurementRecord[]>>(`/procurement/requisitions/${encodeURIComponent(id)}/attachments`))
 }
 
 export async function submitRequisition(id: string): Promise<ProcurementRecord> {
@@ -171,7 +192,16 @@ export async function submitRequisition(id: string): Promise<ProcurementRecord> 
  */
 export async function updateRequisition(
   id: string,
-  body: { title?: string; justification?: string | null; sourcingCategory?: string | null; projectId?: string | null },
+  body: {
+    title?: string
+    justification?: string | null
+    sourcingCategory?: string | null
+    projectId?: string | null
+    /** SRD §11; null or "" clears the field, omit to leave unchanged. */
+    requiredDate?: string | null
+    deliveryLocation?: string | null
+    budgetCode?: string | null
+  },
 ): Promise<ProcurementRecord> {
   return unwrapData(await apiClient.put<ApiResponse<ProcurementRecord>>(`/procurement/requisitions/${encodeURIComponent(id)}`, body))
 }

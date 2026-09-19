@@ -744,7 +744,10 @@ s = replaceUnique(
   "function exportFile(format,title='Matanho Procurement Report'){",
   "function exportFile(format,title='Matanho Procurement Report'){if(__pr23Live())return __pr23ExportFile(format,title);",
   "exports -> live register by name",
-  "if(__pr23Live())return __pr23ExportFile(format,title);",
+  // Patch 41 below adds a `rows` parameter through this same signature (a specific record's own
+  // document preview exports its own rows, not the title-matched register dump), which removes
+  // this exact marker text -- so its own output is an equally valid "already done" signal.
+  ["if(__pr23Live())return __pr23ExportFile(format,title);", "if(__pr23Live())return __pr23ExportFile(format,title,rows);"],
 )
 s = replaceUnique(
   s,
@@ -1806,10 +1809,12 @@ s = replaceUnique(
 // route, who decides it, when it applies and who decided it when (__pr23ApprovalRouteHtml).
 s = replaceUnique(
   s,
-  "${smallV11('Preview motivation','preview-doc-v11',`MOT-${r.id}`,'eye')}</div>`;",
   "${smallV11('Preview motivation','preview-doc-v11',`MOT-${r.id}`,'eye')}</div>${__pr23Live()?__pr23ApprovalRouteHtml(r.approvalRoute):''}`;",
+  // SRD §11 "Attachments" (cycle eight): the read-only view lists what has already been uploaded,
+  // lazy-loaded so opening the register never fires one request per row (__pr23RequisitionAttachmentsBox).
+  "${smallV11('Preview motivation','preview-doc-v11',`MOT-${r.id}`,'eye')}</div>${__pr23Live()?__pr23ApprovalRouteHtml(r.approvalRoute)+__pr23RequisitionAttachmentsBox(r.recordId):''}`;",
   "requisition modal -> approval route",
-  "${__pr23Live()?__pr23ApprovalRouteHtml(r.approvalRoute):''}",
+  "${__pr23Live()?__pr23ApprovalRouteHtml(r.approvalRoute)+__pr23RequisitionAttachmentsBox(r.recordId):''}",
 )
 
 // ---------------------------------------------------------------------------
@@ -1849,19 +1854,22 @@ s = replaceUnique(
   "new requisition -> no request source that is not saved",
   "${__pr23Live()?'':formField('Request source',",
 )
+// SRD §11 "Attachments" (cycle eight): the vendored field above saved nothing, so it stayed hidden in a
+// live session; it is now replaced with a real upload (__pr23RequisitionAttachmentsField), sent to
+// POST /procurement/requisitions/:id/attachments once the requisition exists.
 s = replaceUnique(
   s,
-  "${formField('Attachment','<input type=\"file\" accept=\".pdf,.doc,.docx,.xlsx,.csv\">','full')}",
   "${__pr23Live()?'':formField('Attachment','<input type=\"file\" accept=\".pdf,.doc,.docx,.xlsx,.csv\">','full')}",
-  "new requisition -> no attachment that is not saved",
-  "${__pr23Live()?'':formField('Attachment',",
+  "${__pr23Live()?__pr23RequisitionAttachmentsField():formField('Attachment','<input type=\"file\" accept=\".pdf,.doc,.docx,.xlsx,.csv\">','full')}",
+  "new requisition -> real attachments upload",
+  "${__pr23Live()?__pr23RequisitionAttachmentsField():formField('Attachment',",
 )
 s = replaceUnique(
   s,
-  "<div class=\"field span2\"><label>Supporting documents</label><input type=\"file\" multiple accept=\".pdf,.doc,.docx,.xlsx,.csv\"></div>",
   "${__pr23Live()?'':'<div class=\"field span2\"><label>Supporting documents</label><input type=\"file\" multiple accept=\".pdf,.doc,.docx,.xlsx,.csv\"></div>'}",
-  "edit requisition -> no supporting documents that are not saved",
-  "${__pr23Live()?'':'<div class=\"field span2\"><label>Supporting documents</label>",
+  "${__pr23Live()?__pr23RequisitionAttachmentsField()+__pr23RequisitionAttachmentsBox(r.recordId):'<div class=\"field span2\"><label>Supporting documents</label><input type=\"file\" multiple accept=\".pdf,.doc,.docx,.xlsx,.csv\"></div>'}",
+  "edit requisition -> real attachments upload and list",
+  "${__pr23Live()?__pr23RequisitionAttachmentsField()+__pr23RequisitionAttachmentsBox(r.recordId):",
 )
 s = replaceUnique(
   s,
@@ -1960,24 +1968,24 @@ s = replaceUnique(
 // requisition form suggest items bought before as they are typed (bridge, SRD §3).
 s = replaceUnique(
   s,
-  "__pr23RequisitionEntityField()+__pr23RequisitionDepartmentField()",
   "__pr23RequisitionEntityField()+__pr23RequisitionDepartmentField()+__pr23RequisitionProjectField()",
+  "__pr23RequisitionEntityField()+__pr23RequisitionDepartmentField()+__pr23RequisitionProjectField()+(__pr23Live()?__pr23RequisitionExtraFields():'')",
   "new requisition -> project / cost centre",
-  "__pr23RequisitionDepartmentField()+__pr23RequisitionProjectField()",
+  "+(__pr23Live()?__pr23RequisitionExtraFields():'')",
 )
 s = replaceUnique(
   s,
-  "<div class=\"field span2\"><label>Requirement title</label><input name=\"title\" value=\"${escV11(r.title)}\" required></div>",
   "<div class=\"field span2\"><label>Requirement title</label><input name=\"title\" value=\"${escV11(r.title)}\" required></div>${__pr23Live()?__pr23RequisitionProjectField(r.projectId,'span2'):''}",
+  "<div class=\"field span2\"><label>Requirement title</label><input name=\"title\" value=\"${escV11(r.title)}\" required></div>${__pr23Live()?__pr23RequisitionProjectField(r.projectId,'span2')+__pr23RequisitionExtraFields(r):''}",
   "edit requisition -> project / cost centre",
-  "${__pr23Live()?__pr23RequisitionProjectField(r.projectId,'span2'):''}",
+  "${__pr23Live()?__pr23RequisitionProjectField(r.projectId,'span2')+__pr23RequisitionExtraFields(r):''}",
 )
 s = replaceUnique(
   s,
-  "<div><span>Category</span><strong>${escV11(r.category)}</strong></div>",
   "<div><span>Category</span><strong>${escV11(r.category)}</strong></div>${__pr23Live()?`<div><span>Project</span><strong>${escV11(r.project||'None')}</strong></div>`:''}",
+  "<div><span>Category</span><strong>${escV11(r.category)}</strong></div>${__pr23Live()?`<div><span>Project</span><strong>${escV11(r.project||'None')}</strong></div><div><span>Required date</span><strong>${escV11(r.requiredDateDisplay||'—')}</strong></div><div><span>Delivery location</span><strong>${escV11(r.deliveryLocation||'—')}</strong></div><div><span>Budget code</span><strong>${escV11(r.budgetCode||'—')}</strong></div>`:''}",
   "requisition view -> project / cost centre",
-  "<div><span>Project</span><strong>${escV11(r.project||'None')}</strong></div>",
+  "<div><span>Required date</span>",
 )
 
 // 62b. Requisitions are not budget-checked (live-loaders sets budget to a dash: the backend has no budget check), so the
@@ -2120,7 +2128,11 @@ for (const [version, count] of [["13", 1], ["18", 2], ["20", 1], ["23", 1]]) {
   // Extracted from the live file rather than typed here: this region is CRLF (see
   // project_runtime_patch_crlf_trap), and a hand-typed \n find silently never matches.
   const marker39 = "'download-document-v5':a=>exportFile('pdf',docByIdV6(a.dataset.id).name)"
-  if (s.includes(marker39)) {
+  // Patch 41 below wraps all three download-document-* handlers further (each doc's own exportRows,
+  // not just docByIdV6), which removes this exact marker text -- so its own output is an equally
+  // valid "already done" signal, or this step re-applies over patch 41's work and undoes it.
+  const marker39Superseded = "exportFile('pdf',doc.name,doc.exportRows)"
+  if (s.includes(marker39) || s.includes(marker39Superseded)) {
     console.log("  skip (already)  PDF download (V6 preview) -> docByIdV6, matching Excel and CSV")
     skipped += 1
   } else {
@@ -2352,6 +2364,48 @@ s = replaceUnique(
     console.log("  scope           bridge calls only what is in its scope")
   }
 }
+
+
+// ---------------------------------------------------------------------------
+// 6. SRD §21 Purchase Orders / §13 RFQ and Tender Management / §5 Goods Received Notes: the
+// generated PO, "Invitation to Tender" and GRN documents were boilerplate with no line items,
+// VAT breakdown, delivery detail or linked requisition/RFQ/award reference -- confirmed live on
+// dev against PO_20260918_0002 (18 Sep 2026). __pr23OrderDocument, __pr23TenderDocument and
+// __pr23GrnDocument (added to the live bridge) build the real document from the record; these
+// patches wire them in behind __pr23Live() and leave the mock/demo path untouched.
+// ---------------------------------------------------------------------------
+s = replaceOnce(
+  s,
+  "function exportFile(format,title='Matanho Procurement Report'){if(__pr23Live())return __pr23ExportFile(format,title);",
+  "function exportFile(format,title='Matanho Procurement Report',rows){if(__pr23Live())return __pr23ExportFile(format,title,rows);",
+  "exportFile() -> passes explicit rows through to __pr23ExportFile",
+  "function exportFile(format,title='Matanho Procurement Report',rows)",
+)
+
+s = replaceOnce(
+  s,
+  "'preview-po-v6':a=>{const o=state.orders.find(x=>x.id===a.dataset.id);const v=state.vendors.find(x=>x.name===o?.vendor);const r=taxRuleV6(v);previewDocV6({id:o.id,name:`Purchase Order ${o.id}`,version:'Issued copy',status:o.status,owner:'Group Procurement',content:`<h1>Purchase Order</h1><p><strong>Supplier:</strong> ${esc(o.vendor)}</p><p><strong>Purchasing entity:</strong> ${esc(o.entity)}</p><p><strong>Order value:</strong> ${money(o.amount)}</p><h2>Order and tax conditions</h2><p>${esc(r.poClause)}</p><h2>Supply requirements</h2><p>The Supplier shall deliver the approved goods or services in accordance with the specifications, delivery dates, warranties and acceptance criteria. No variation is effective unless approved in writing.</p><h2>Payment</h2><p>Payment is subject to receipt, inspection, a valid tax invoice, applicable matching controls and the configured approval workflow.</p>`})},",
+  "'preview-po-v6':a=>{const o=state.orders.find(x=>x.id===a.dataset.id);if(__pr23Live())return previewDocV6(__pr23OrderDocument(o));const v=state.vendors.find(x=>x.name===o?.vendor);const r=taxRuleV6(v);previewDocV6({id:o.id,name:`Purchase Order ${o.id}`,version:'Issued copy',status:o.status,owner:'Group Procurement',content:`<h1>Purchase Order</h1><p><strong>Supplier:</strong> ${esc(o.vendor)}</p><p><strong>Purchasing entity:</strong> ${esc(o.entity)}</p><p><strong>Order value:</strong> ${money(o.amount)}</p><h2>Order and tax conditions</h2><p>${esc(r.poClause)}</p><h2>Supply requirements</h2><p>The Supplier shall deliver the approved goods or services in accordance with the specifications, delivery dates, warranties and acceptance criteria. No variation is effective unless approved in writing.</p><h2>Payment</h2><p>Payment is subject to receipt, inspection, a valid tax invoice, applicable matching controls and the configured approval workflow.</p>`})},",
+  "Purchase Orders register Preview -> real PO document when live",
+  "if(__pr23Live())return previewDocV6(__pr23OrderDocument(o));",
+)
+
+s = replaceOnce(
+  s,
+  "'download-document-v5':a=>exportFile('pdf',docByIdV6(a.dataset.id).name),\n    'download-document-xls':a=>exportFile('xls',docByIdV6(a.dataset.id).name),\r\n    'download-document-csv':a=>exportFile('csv',docByIdV6(a.dataset.id).name)",
+  "'download-document-v5':a=>{const doc=docByIdV6(a.dataset.id);exportFile('pdf',doc.name,doc.exportRows)},\n    'download-document-xls':a=>{const doc=docByIdV6(a.dataset.id);exportFile('xls',doc.name,doc.exportRows)},\r\n    'download-document-csv':a=>{const doc=docByIdV6(a.dataset.id);exportFile('csv',doc.name,doc.exportRows)}",
+  "Document preview PDF/Excel/CSV -> use the document's own exportRows when present",
+  "exportFile('pdf',doc.name,doc.exportRows)",
+)
+
+s = replaceOnce(
+  s,
+  "const tender = state.tenders.find(t => t.id === ref || `${t.id} Tender Pack` === ref);\r\n    if (tender) return {\r\n      id: tender.id,\r\n      name: `${tender.id} - ${tender.title}`,\r\n      type: 'Tender pack', version:'v3.0', owner:tender.owner, status:tender.stage, date:tender.close,\r\n      content:`<h1>Invitation to Tender</h1><p class=\"doc-lead-v11\">${escV11(tender.title)}</p><table><tbody><tr><th>Tender reference</th><td>${escV11(tender.id)}</td><th>Entity</th><td>${escV11(tender.entity)}</td></tr><tr><th>Procurement method</th><td>${escV11(tender.method)}</td><th>Estimated value</th><td>${money(tender.value)}</td></tr><tr><th>Closing date</th><td>${escV11(tender.close)}</td><th>Category</th><td>${escV11(tender.category)}</td></tr></tbody></table><h2>1. Invitation</h2><p>Eligible suppliers are invited to submit a complete, compliant and competitively priced bid through the secure Matanho vendor portal before the stated closing date.</p><h2>2. Scope of requirement</h2><p>The successful bidder shall provide the goods, implementation, documentation, training, warranty and support specified in the controlled technical schedules.</p><h2>3. Submission requirements</h2><ul><li>Completed technical response and compliance schedule.</li><li>Commercial response using the prescribed pricing schedule.</li><li>Current company, tax, banking and beneficial-ownership documents.</li><li>Signed declarations, conflict disclosure and authorised eSignature.</li></ul><h2>4. Evaluation</h2><p>Bids will be evaluated against mandatory compliance, technical merit, commercial value, delivery readiness, warranty and risk. The authorised user retains the final award decision, subject to approval authority.</p>`\r\n    };\r\n\r\n    const order = state.orders.find(o => o.id === ref);\r\n    if (order) return {\r\n      id:order.id,name:`Purchase Order ${order.id}`,type:'Purchase order',version:'Current',owner:'Group Procurement',status:order.status,date:order.delivery,\r\n      content:`<h1>Purchase Order</h1><table><tbody><tr><th>Purchase order</th><td>${escV11(order.id)}</td><th>Supplier</th><td>${escV11(order.vendor)}</td></tr><tr><th>Entity</th><td>${escV11(order.entity)}</td><th>Order value</th><td>${money(order.amount)}</td></tr><tr><th>Delivery date</th><td>${escV11(order.delivery)}</td><th>Classification</th><td>${order.asset ? 'Fixed asset' : 'Goods / services'}</td></tr></tbody></table><h2>Order description</h2><p>The supplier is authorised to provide the approved goods and services in accordance with the sourcing record, accepted quotation, delivery schedule and controlled purchase terms.</p><h2>Tax and compliance</h2><p>Payment is subject to valid tax documentation, invoice validation, receipt or acceptance, applicable withholding tax and all statutory deductions.</p><h2>Commercial terms</h2><p>No variation is binding unless approved in writing by an authorised representative. The supplier must quote this purchase-order number on all delivery notes and invoices.</p>`\r\n    };\r\n\r\n    const contract = (state.contractsV6 || []).find(c => c.id === ref);",
+  "const tender = state.tenders.find(t => t.id === ref || `${t.id} Tender Pack` === ref);\r\n    if (tender) {\r\n      if (__pr23Live()) return __pr23TenderDocument(tender);\r\n      return {\r\n      id: tender.id,\r\n      name: `${tender.id} - ${tender.title}`,\r\n      type: 'Tender pack', version:'v3.0', owner:tender.owner, status:tender.stage, date:tender.close,\r\n      content:`<h1>Invitation to Tender</h1><p class=\"doc-lead-v11\">${escV11(tender.title)}</p><table><tbody><tr><th>Tender reference</th><td>${escV11(tender.id)}</td><th>Entity</th><td>${escV11(tender.entity)}</td></tr><tr><th>Procurement method</th><td>${escV11(tender.method)}</td><th>Estimated value</th><td>${money(tender.value)}</td></tr><tr><th>Closing date</th><td>${escV11(tender.close)}</td><th>Category</th><td>${escV11(tender.category)}</td></tr></tbody></table><h2>1. Invitation</h2><p>Eligible suppliers are invited to submit a complete, compliant and competitively priced bid through the secure Matanho vendor portal before the stated closing date.</p><h2>2. Scope of requirement</h2><p>The successful bidder shall provide the goods, implementation, documentation, training, warranty and support specified in the controlled technical schedules.</p><h2>3. Submission requirements</h2><ul><li>Completed technical response and compliance schedule.</li><li>Commercial response using the prescribed pricing schedule.</li><li>Current company, tax, banking and beneficial-ownership documents.</li><li>Signed declarations, conflict disclosure and authorised eSignature.</li></ul><h2>4. Evaluation</h2><p>Bids will be evaluated against mandatory compliance, technical merit, commercial value, delivery readiness, warranty and risk. The authorised user retains the final award decision, subject to approval authority.</p>`\r\n      };\r\n    }\r\n\r\n    const order = state.orders.find(o => o.id === ref);\r\n    if (order) {\r\n      if (__pr23Live()) return __pr23OrderDocument(order);\r\n      return {\r\n      id:order.id,name:`Purchase Order ${order.id}`,type:'Purchase order',version:'Current',owner:'Group Procurement',status:order.status,date:order.delivery,\r\n      content:`<h1>Purchase Order</h1><table><tbody><tr><th>Purchase order</th><td>${escV11(order.id)}</td><th>Supplier</th><td>${escV11(order.vendor)}</td></tr><tr><th>Entity</th><td>${escV11(order.entity)}</td><th>Order value</th><td>${money(order.amount)}</td></tr><tr><th>Delivery date</th><td>${escV11(order.delivery)}</td><th>Classification</th><td>${order.asset ? 'Fixed asset' : 'Goods / services'}</td></tr></tbody></table><h2>Order description</h2><p>The supplier is authorised to provide the approved goods and services in accordance with the sourcing record, accepted quotation, delivery schedule and controlled purchase terms.</p><h2>Tax and compliance</h2><p>Payment is subject to valid tax documentation, invoice validation, receipt or acceptance, applicable withholding tax and all statutory deductions.</p><h2>Commercial terms</h2><p>No variation is binding unless approved in writing by an authorised representative. The supplier must quote this purchase-order number on all delivery notes and invoices.</p>`\r\n      };\r\n    }\r\n\r\n    const grnDoc = (state.grns || []).find(g => g.id === ref);\r\n    if (grnDoc) {\r\n      if (__pr23Live()) return __pr23GrnDocument(grnDoc);\r\n      return {\r\n        id: grnDoc.id, name: `Goods Received Note ${grnDoc.id}`, type: 'Goods received note', version: 'v1.0', owner: 'Group Procurement', status: grnDoc.status, date: grnDoc.received || grnDoc.date,\r\n        content: `<h1>Goods Received Note</h1><table><tbody><tr><th>GRN number</th><td>${escV11(grnDoc.id)}</td><th>Purchase order</th><td>${escV11(grnDoc.po)}</td></tr><tr><th>Item / service</th><td>${escV11(grnDoc.item)}</td><th>Accepted value</th><td>${money(grnDoc.value)}</td></tr></tbody></table><h2>Inspection and acceptance</h2><p>I confirm that the quantities and condition recorded above accurately reflect the goods or services received.</p>`\r\n      };\r\n    }\r\n\r\n    const contract = (state.contractsV6 || []).find(c => c.id === ref);",
+  "generatedDocumentV11: tender/order/GRN -> real documents when live",
+  "if (__pr23Live()) return __pr23TenderDocument(tender);",
+)
+
 
 console.log(`\n${applied} applied, ${skipped} already in place, ${missed} missed`)
 if (missed) {

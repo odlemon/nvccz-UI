@@ -1836,6 +1836,65 @@ Also checked on the servers:
 
 ---
 
+## PROC-FINDING-016
+
+**Title:** Generated PO, RFQ ("Invitation to Tender") and GRN controlled documents showed no line items, VAT/quantity detail or linked records — boilerplate only
+**Module:** Procurement (frontend, `nvccz-new`) · **Dimension:** Reporting / document generation · **Category:** Missing required document content
+**Severity:** HIGH — SRD `NTS_SRD_DT_ProcMS_16_09_2026.pdf` §21 "Purchase Orders" requires the generated PO to contain (at minimum) PO Number, Vendor, Vendor Code, Date, Currency, Items, Quantity, Unit Price, VAT, Total, Delivery Address, Delivery Date, Cost Centre, GL Code, Budget Code, Payment Terms, Purchase Conditions, Linked Requisition, Linked RFQ/Tender, Linked Award, Approvals; §13 "RFQ and Tender Management" implies the tender document reflects its actual scope. None of this held for any of the three affected document types.
+**Persona affected:** Any staff role that previews or exports a Purchase Order, an RFQ's "Invitation to Tender", or a Goods Received Note (Procurement Manager/Officer/Buyer confirmed; the documents carry no role-specific content, so every role sees the same gap)
+**Surface:** Frontend only — `Purchase Orders` register row Preview + its PDF/Excel/CSV export, `Tenders & RFx` row's tender-number document preview, `Receiving & Inspection` row Preview; vendored runtime `components/procurement-v23-mock/matanho-procurement-runtime.js` and its hand-maintained source `scripts/procurement-runtime-live-bridge.inc.js` / `scripts/patch-procurement-runtime.mjs`
+
+### Steps to reproduce (as reported, live on dev, 18 September 2026)
+
+1. Logged in as `proc.mgr@nts.local` (Tafadzwa Moyo, Procurement Manager).
+2. `Purchase Orders` → row `PO_20260918_0002` (Baobab Networks & Computing, Finance dept, $610, linked to `REQ_20260918_0005` and `RFQ_20260918_0002`) → **Preview**: the document showed only Supplier name, Purchasing entity and a total order value, followed by three fixed paragraphs ("Order and tax conditions", "Supply requirements", "Payment"). No line item, quantity, unit price, VAT breakdown, delivery address, cost centre, GL/budget code or linked requisition/RFQ/award reference. **PDF / Excel / CSV** from the same preview fired no additional API call (confirmed via the browser's network panel) and rendered the identical boilerplate — this is the actual generated document, not a preview truncation.
+3. `Tenders & RFx` → `RFQ_20260918_0002` → the tender's own "Invitation to Tender" document: no line items shown, despite the RFQ genuinely having one (`USB-C laptop docking stations`, qty 6) — confirmed the data exists and is reachable elsewhere, since `/vendor-quotations/rfq-respond` correctly prefills the same item/quantity from the same underlying record.
+4. `Receiving & Inspection` → `GRN_20260918_0002` (for `PO_20260918_0002`, qty 6, $528) → **Preview**: worse than the PO/RFQ case — a "Controlled Procurement Document" with zero transaction specifics: no vendor, no item, no quantity, no value, no PO reference beyond the GRN's own number in the header, just two generic paragraphs ("This document records the approved procurement requirement..." / "The content is subject to version control...").
+
+### Investigation
+
+Three separate generic document-template code paths in the vendored runtime, none wired to `__pr23Live()` unlike their sibling documents:
+
+- **PO preview** (`Purchase Orders` register's own `'preview-po-v6'` click handler) built its content inline from only `o.vendor`, `o.entity`, `o.amount` plus a fixed tax-clause lookup, regardless of live/mock mode.
+- **RFQ/tender document and GRN fallback** both come from a single shared function, `generatedDocumentV11` (used by the "document trail" preview and the Document Vault's `download-doc-v11`/PDF/Excel/CSV path): its `tender` branch built "Invitation to Tender" from only `tender.title/entity/method/value/close/category` (no items); it had **no branch at all for GRNs**, so a GRN id fell through to the fully generic final-else fallback ("Controlled Procurement Document... This document records the approved procurement requirement...") — exactly the zero-detail text from the live report.
+- By contrast, `__pr23RequisitionDocument` and `__pr23AwardMemo` (same file) already follow the correct pattern: a `__pr23Live()` branch building the document from the real record. That pattern was never extended to PO, RFQ/tender or GRN documents.
+- The underlying data was already available at render time and did not need a backend change: `lib/procurement-v23/live-loaders.ts`'s `ordersView` already carried `o.items` (itemName/quantity/unitPrice/received), `o.requisition`, `o.rfq` and `o.quotation` (award reference); it was missing only `vendorCode`, `deliveryAddress`, `paymentTerms`, `purchaseConditions`, `subtotal` and `taxAmount`, all present on the raw PO record (`GET /procurement/purchase-orders` returns `subtotal`, `taxAmount`, `shippingAddress`, `paymentTerms`, `vendor.bpNumber`, `quotation.quotationNumber`, `quotation.rfqNumber`). `tendersView` had no `items` at all — confirmed via the raw API that an RFQ record itself carries no item lines; they live on the requisition it was raised from (`reqById.get(t.requisitionId)?.items`, already computed once for `category`/`value`). `grnsView` had enough to identify the GRN but not per-line ordered/received/accepted/rejected quantities or the vendor name. Cost centre, GL code and budget code are genuinely not tracked anywhere in this schema (confirmed against the full raw PO/requisition JSON) — the SRD fields for those are reported as "Not tracked" rather than fabricated.
+- A related, separate architectural problem found while fixing: the PDF/Excel/CSV buttons on a single-record document preview (`download-document-v5/xls/csv`) route through `exportFile`/`__pr23ExportFile`, which picks its rows by **matching words in the document's title against the whole register** (`__pr23ExportRows`) — so exporting "Purchase Order PO_20260918_0002" actually produced a CSV of **all 9 purchase orders**, not that one PO's detail. This is documented in the bridge file itself (`__pr23DownloadPreviewPdf`'s comment) as a known limitation of that fallback for PDF; it had no equivalent fix for Excel/CSV before this change.
+
+### Fix
+
+Frontend only, `nvccz-new`, branch `fix/proc-finding-po-document-fields` (cut from a clean worktree off `origin/dev`), commits `65bf706`, `04d2cbc`:
+
+- `lib/procurement-v23/live-loaders.ts`: `ordersView` gained `vendorCode` (via a `vendorById` map into the vendor list already loaded for the Vendor Registry), `deliveryAddress`, `paymentTerms`, `purchaseConditions`, `subtotal`, `taxAmount`, and its `items` gained `unit`/`lineTotal`; `tendersView` gained `items` sourced from the RFQ's requisition; `grnsView` gained `vendor`, `currency` and a `lines` array with per-line ordered/received/accepted/rejected quantities and quality.
+- `scripts/procurement-runtime-live-bridge.inc.js` (the hand-maintained source injected into the vendored runtime by the patch script — never hand-edited the runtime bundle directly, per this module's standing rule): added `__pr23TenderDocument`, `__pr23OrderDocument` and `__pr23GrnDocument`, each following the existing `__pr23RequisitionDocument` pattern — full line-item table, VAT/subtotal/total breakdown, delivery address and date, payment terms and purchase conditions, linked requisition/RFQ/award, "Not tracked" for cost centre/GL/budget code — plus an `exportRows` array on each so a record's own PDF/Excel/CSV reflects that record instead of the register-wide dump. `__pr23ExportFile` gained an `explicitRows` parameter (used only when supplied; every other existing caller is unaffected).
+- `scripts/patch-procurement-runtime.mjs`: new idempotent patch steps (verified `0 missed` and `--check` clean) wiring the above into `'preview-po-v6'`, `generatedDocumentV11`'s tender/order branches (a GRN branch added, there was none before), and the `download-document-v5/xls/csv` handlers; two pre-existing steps' "already applied" guards were extended with an alternate marker so they stay idempotent alongside the new ones instead of re-applying over each other.
+- Mock/demo (non-live) document content is untouched — every new branch is gated on `__pr23Live()`.
+- A first version of the `generatedDocumentV11` patch (commit `65bf706`) left a stray extra `};` between the tender/order and order/GRN branches: syntactically legal on its own (`node --check` passed) but rejected by the real `next build`'s SWC parser ("Expected ',', got ';'") — only caught by actually deploying and building, not by the syntax check. Fixed in `04d2cbc` and reconfirmed with a clean dev build.
+
+### Verification
+
+Live on dev (`https://dev.matanho.com`, `arcus-dev-ui-staff` rebuilt from this branch, deploy stamp `20260918-200506`), as `proc.mgr@nts.local`:
+
+| | Before | After |
+|---|---|---|
+| PO preview, `PO_20260918_0002` | Supplier/entity/total + 3 boilerplate paragraphs | PO number, status, vendor **BP-207731**, currency, order/delivery dates, order-lines table (`USB-C laptop docking stations`, qty **6**, unit **Each**, unit price **$88.00**, line total **$528.00**), subtotal **$528.00** / VAT **$81.84** / total **$609.84**, delivery address (`Unit 5, 88 Enterprise Road, Highlands, Harare`), cost-centre/GL/budget code **"Not tracked by this system"**, linked requisition **REQ_20260918_0005**, RFQ **RFQ_20260918_0002**, award/quotation **QUO_20260918_0002**, payment terms **Net 30** |
+| PO CSV export (intercepted the generated `Blob`, since the browser's download event isn't otherwise observable) | 9-row register dump, no PO-specific detail | single row for `PO_20260918_0002` carrying every field above plus the item line |
+| RFQ `RFQ_20260918_0002` "Invitation to Tender" | Entity/method/value/closing date only, no scope | line-item table (`USB-C laptop docking stations`, qty 6, unit Each, estimated unit price $95.00 — the requisition's own estimate, ahead of RFQ negotiation which reached $88 on the PO), linked requisition `REQ_20260918_0005` |
+| GRN `GRN_20260918_0002` preview | "Controlled Procurement Document" with no vendor/item/quantity/value/PO reference | PO `PO_20260918_0002`, vendor `Baobab Networks & Computing (Pvt) Ltd`, entity Finance, received date 18 Sep 2026, received by Tafadzwa Moyo, line (`USB-C laptop docking stations`, ordered 6, received 6, accepted 6, rejected 0, quality Pending), accepted value $528.00 |
+| Regression: multi-line PO, `PO_20260830_0002` (Jacaranda Office Supplies, Operations) | not applicable (same generic template) | 3 order lines rendered correctly (A4 copy paper qty 40, toner cartridge qty 12, lever-arch file qty 60), unit column shows **"—"** for items with no unit recorded rather than breaking; subtotal $2,180.00 / VAT $337.90 |
+| Regression: PO with no linked requisition, `PO_20260915_0001`/`PO_20260915_0002` | not applicable | `requisition: null` on the record renders as "Not linked" rather than a blank or an error (read from the live record, not separately re-tested by preview since the field-level fallback is identical code to the tested case) |
+
+Build verified end to end via the same clean-worktree deploy used for this change (`scripts/deploy-arcus-dev-selective.py --portals staff`, `next build` succeeding after the brace fix, container `arcus-dev-ui-staff-1` healthy post-deploy).
+
+**Status:** FIXED — deployed to dev (staff UI only) and verified live, 18 September 2026. Branch `fix/proc-finding-po-document-fields`, commits `65bf706` and `04d2cbc`, pushed to `origin`. **Not merged to `master`/`dev`/`prod`.**
+
+### Follow-up (out of this fix's scope)
+
+- `__pr23RequisitionDocument`'s and `__pr23AwardMemo`'s own single-record PDF/Excel/CSV exports were not checked for the same register-wide-dump problem this finding fixed for PO/RFQ/GRN — worth a pass if those are ever reported against.
+- Contract and Management-report documents in the same `generatedDocumentV11` function are still the original generic templates (untouched here, since neither was reported as a live UAT finding this cycle).
+
+---
+
 ## Not yet findings
 
 - **`POST /procurement/rfqs/:id/award` returns 410** to everyone. This is intended: award was

@@ -795,6 +795,95 @@ function __pr23RequisitionDocument(pr, isMotivation) {
   };
 }
 
+/**
+ * SRD §13 RFQ and Tender Management: the generated "Invitation to Tender" document must reflect the RFQ's
+ * actual scope (line items, quantities), not a generic paragraph. Items come from the requisition the RFQ
+ * was raised from, since an RFQ carries no item lines of its own on the backend (tendersView in live-loaders.ts).
+ */
+function __pr23TenderDocument(t) {
+  const lines = (t.items || []).map(i => {
+    const total = i.unitPrice != null && i.quantity != null ? Number(i.unitPrice) * Number(i.quantity) : null;
+    return `<tr><td>${__pr23Esc(i.itemName)}</td><td>${i.quantity == null ? '—' : __pr23Esc(i.quantity)}</td><td>${__pr23Esc(i.unit || '—')}</td><td>${i.unitPrice != null ? __pr23Cents(i.unitPrice) : 'Not estimated'}</td><td>${total != null ? __pr23Cents(total) : '—'}</td></tr>`;
+  }).join('');
+  return {
+    id: t.id,
+    name: `Invitation to Tender - ${t.title}`,
+    type: 'Tender pack',
+    version: 'From the record',
+    owner: t.owner,
+    status: t.stage,
+    date: t.close,
+    content: `<h1>Invitation to Tender</h1><p class="doc-lead-v11">${__pr23Esc(t.title)}</p><table><tbody><tr><th>RFQ reference</th><td>${__pr23Esc(t.id)}</td><th>Entity</th><td>${__pr23Esc(t.entity)}</td></tr><tr><th>Procurement method</th><td>${__pr23Esc(t.method)}</td><th>Category</th><td>${__pr23Esc(t.category)}</td></tr><tr><th>Closing date</th><td>${__pr23Esc(t.close)}</td><th>Stage</th><td>${__pr23Esc(t.stage)}</td></tr><tr><th>Linked requisition</th><td colspan="3">${t.requisition ? __pr23Esc(t.requisition) : 'Not linked'}</td></tr></tbody></table><h2>1. Invitation</h2><p>Eligible suppliers are invited to submit a complete, compliant and competitively priced bid through the secure Matanho vendor portal before the stated closing date.</p><h2>2. Scope of requirement</h2>${lines ? `<table><thead><tr><th>Item</th><th>Quantity</th><th>Unit</th><th>Estimated unit price</th><th>Estimated line total</th></tr></thead><tbody>${lines}</tbody></table>` : '<p>No line items are recorded against this RFQ.</p>'}<h2>3. Submission requirements</h2><ul><li>Completed technical response and compliance schedule.</li><li>Commercial response using the prescribed pricing schedule.</li><li>Current company, tax, banking and beneficial-ownership documents.</li><li>Signed declarations, conflict disclosure and authorised eSignature.</li></ul><h2>4. Evaluation</h2><p>Bids will be evaluated against mandatory compliance, technical merit, commercial value, delivery readiness, warranty and risk. The authorised user retains the final award decision, subject to approval authority. ${t.bids ? `${__pr23Esc(t.bids)} bid(s) received to date.` : 'No bids have been received yet.'}</p>`,
+    // The PDF/Excel/CSV export buttons on this preview must reflect this RFQ's own scope, not a
+    // register-wide dump of every tender (the generic export picks rows by matching words in the title).
+    exportRows: [
+      ['RFQ', 'Stage', 'Entity', 'Method', 'Category', 'Closing date', 'Linked requisition', 'Item', 'Quantity', 'Unit', 'Estimated unit price', 'Estimated line total'],
+      ...((t.items || []).length
+        ? t.items.map(i => [t.id, t.stage, t.entity, t.method, t.category, t.close, t.requisition || 'Not linked', i.itemName, i.quantity ?? '', i.unit || '', i.unitPrice ?? '', (i.unitPrice != null && i.quantity != null) ? Number(i.unitPrice) * Number(i.quantity) : ''])
+        : [[t.id, t.stage, t.entity, t.method, t.category, t.close, t.requisition || 'Not linked', 'No line items recorded', '', '', '', '']]),
+    ],
+  };
+}
+
+/**
+ * SRD §21 Purchase Orders: the generated PO document must show, at minimum, PO number, vendor, vendor
+ * code, date, currency, items, quantity, unit price, VAT, total, delivery address, delivery date,
+ * payment terms, purchase conditions and the linked requisition/RFQ/award — not just supplier, entity
+ * and a total. Every field is copied straight from the order record (ordersView in live-loaders.ts);
+ * anything this system does not capture (cost centre, GL code, budget code) says so instead of being invented.
+ */
+function __pr23OrderDocument(o) {
+  const lines = (o.items || []).map(i => {
+    const total = i.lineTotal != null ? i.lineTotal : (i.unitPrice != null && i.quantity != null ? Number(i.unitPrice) * Number(i.quantity) : null);
+    return `<tr><td>${__pr23Esc(i.itemName)}</td><td>${i.quantity == null ? '—' : __pr23Esc(i.quantity)}</td><td>${__pr23Esc(i.unit || '—')}</td><td>${i.unitPrice != null ? __pr23Cents(i.unitPrice) : '—'}</td><td>${total != null ? __pr23Cents(total) : '—'}</td></tr>`;
+  }).join('');
+  return {
+    id: o.id,
+    name: `Purchase Order ${o.id}`,
+    type: 'Purchase order',
+    version: 'Issued copy',
+    owner: 'Group Procurement',
+    status: o.status,
+    date: o.delivery,
+    content: `<h1>Purchase Order: ${__pr23Esc(o.id)}</h1><p class="doc-lead-v11">Issued to ${__pr23Esc(o.vendor)} by ${__pr23Esc(o.entity)}.</p><table><tbody><tr><th>PO number</th><td>${__pr23Esc(o.id)}</td><th>Status</th><td>${__pr23Esc(o.status)}</td></tr><tr><th>Vendor</th><td>${__pr23Esc(o.vendor)}</td><th>Vendor code</th><td>${o.vendorCode ? __pr23Esc(o.vendorCode) : 'Not tracked'}</td></tr><tr><th>Purchasing entity</th><td>${__pr23Esc(o.entity)}</td><th>Currency</th><td>${o.currency ? __pr23Esc(o.currency) : 'Not tracked'}</td></tr><tr><th>Order date</th><td>${o.orderDate ? __pr23Esc(__pr23DayLabel(o.orderDate)) : '—'}</td><th>Required delivery</th><td>${__pr23Esc(o.delivery || '—')}</td></tr></tbody></table><h2>1. Order lines</h2>${lines ? `<table><thead><tr><th>Item</th><th>Quantity</th><th>Unit</th><th>Unit price</th><th>Line total</th></tr></thead><tbody>${lines}</tbody></table>` : '<p>No lines are recorded against this order.</p>'}<h2>2. Commercial summary</h2><table><tbody><tr><th>Subtotal</th><td>${o.subtotal != null ? __pr23Cents(o.subtotal) : 'Not tracked'}</td></tr><tr><th>VAT / tax</th><td>${o.taxAmount != null ? __pr23Cents(o.taxAmount) : 'Not tracked'}</td></tr><tr><th>Total</th><td>${o.amount != null ? __pr23Cents(o.amount) : '—'}</td></tr></tbody></table><h2>3. Delivery</h2><p><strong>Delivery address:</strong> ${o.deliveryAddress ? __pr23Esc(o.deliveryAddress) : 'Not tracked'}<br><strong>Required delivery date:</strong> ${__pr23Esc(o.delivery || 'Not tracked')}</p><h2>4. Cost allocation</h2><p><strong>Cost centre / GL code / budget code:</strong> Not tracked by this system; the requisition's department (${__pr23Esc(o.entity)}) is the closest recorded cost owner.</p><h2>5. Linked records</h2><p><strong>Requisition:</strong> ${o.requisition ? __pr23Esc(o.requisition) : 'Not linked'}<br><strong>RFQ:</strong> ${o.rfq ? __pr23Esc(o.rfq) : 'Not linked'}<br><strong>Award / accepted quotation:</strong> ${o.quotation ? __pr23Esc(o.quotation) : 'Not linked'}</p><h2>6. Payment terms and purchase conditions</h2><p><strong>Payment terms:</strong> ${o.paymentTerms ? __pr23Esc(o.paymentTerms) : 'Not tracked'}<br><strong>Purchase conditions:</strong> ${o.purchaseConditions ? __pr23Esc(o.purchaseConditions) : 'Standard Matanho purchase terms: payment is subject to delivery, acceptance, a valid tax invoice and the applicable withholding treatment. No variation is binding unless approved in writing.'}</p><h2>7. Approvals</h2><p>Issued under the configured procurement approval workflow; approval evidence is recorded in the record's audit trail.</p>`,
+    // The PDF/Excel/CSV export buttons on this preview must reflect this PO's own detail, not a
+    // register-wide dump of every purchase order (the generic export picks rows by matching words in the title).
+    exportRows: [
+      ['PO', 'Status', 'Vendor', 'Vendor code', 'Entity', 'Currency', 'Order date', 'Required delivery', 'Delivery address', 'Payment terms', 'Requisition', 'RFQ', 'Award / quotation', 'Subtotal', 'VAT / tax', 'Total', 'Item', 'Quantity', 'Unit', 'Unit price', 'Line total'],
+      ...((o.items || []).length
+        ? o.items.map(i => [o.id, o.status, o.vendor, o.vendorCode || 'Not tracked', o.entity, o.currency || 'Not tracked', o.orderDate ? __pr23DayLabel(o.orderDate) : '', o.delivery || '', o.deliveryAddress || 'Not tracked', o.paymentTerms || 'Not tracked', o.requisition || 'Not linked', o.rfq || 'Not linked', o.quotation || 'Not linked', o.subtotal ?? '', o.taxAmount ?? '', o.amount ?? '', i.itemName, i.quantity ?? '', i.unit || '', i.unitPrice ?? '', i.lineTotal ?? ''])
+        : [[o.id, o.status, o.vendor, o.vendorCode || 'Not tracked', o.entity, o.currency || 'Not tracked', o.orderDate ? __pr23DayLabel(o.orderDate) : '', o.delivery || '', o.deliveryAddress || 'Not tracked', o.paymentTerms || 'Not tracked', o.requisition || 'Not linked', o.rfq || 'Not linked', o.quotation || 'Not linked', o.subtotal ?? '', o.taxAmount ?? '', o.amount ?? '', 'No lines recorded', '', '', '', '']]),
+    ],
+  };
+}
+
+/**
+ * SRD §5 Goods Received Notes: the generated GRN document must show the vendor, the linked PO and the
+ * received / accepted / rejected quantity per line, not a template with no transaction data at all
+ * (grnsView in live-loaders.ts).
+ */
+function __pr23GrnDocument(g) {
+  const lines = (g.lines || []).map(l => `<tr><td>${__pr23Esc(l.itemName)}</td><td>${__pr23Esc(l.unit || '—')}</td><td>${l.ordered == null ? '—' : __pr23Esc(l.ordered)}</td><td>${l.received == null ? '—' : __pr23Esc(l.received)}</td><td>${l.accepted == null ? '—' : __pr23Esc(l.accepted)}</td><td>${l.rejected == null ? '—' : __pr23Esc(l.rejected)}</td><td>${l.quality ? __pr23Esc(l.quality) : '—'}</td></tr>`).join('');
+  return {
+    id: g.id,
+    name: `Goods Received Note ${g.id}`,
+    type: 'Goods received note',
+    version: 'Issued copy',
+    owner: g.receivedBy,
+    status: g.status,
+    date: g.received,
+    content: `<h1>Goods Received Note: ${__pr23Esc(g.id)}</h1><p class="doc-lead-v11">Received against ${g.po && g.po !== '—' ? __pr23Esc(g.po) : 'no recorded purchase order'}.</p><table><tbody><tr><th>GRN number</th><td>${__pr23Esc(g.id)}</td><th>Purchase order</th><td>${g.po && g.po !== '—' ? __pr23Esc(g.po) : 'Not linked'}</td></tr><tr><th>Vendor</th><td>${g.vendor ? __pr23Esc(g.vendor) : 'Not tracked'}</td><th>Entity</th><td>${__pr23Esc(g.entity)}</td></tr><tr><th>Received date</th><td>${__pr23Esc(g.received || '—')}</td><th>Received by</th><td>${__pr23Esc(g.receivedBy || '—')}</td></tr><tr><th>Status</th><td>${__pr23Esc(g.status)}</td><th>Quality</th><td>${__pr23Esc(g.quality || '—')}</td></tr></tbody></table><h2>1. Lines received</h2>${lines ? `<table><thead><tr><th>Item</th><th>Unit</th><th>Ordered</th><th>Received</th><th>Accepted</th><th>Rejected</th><th>Quality</th></tr></thead><tbody>${lines}</tbody></table>` : '<p>No lines are recorded against this receipt.</p>'}<h2>2. Accepted value</h2><p>${g.value != null ? __pr23Cents(g.value) : 'Not tracked'}, at the purchase order's line unit prices${g.currency ? ` (${__pr23Esc(g.currency)})` : ''}.</p><h2>3. Inspection and acceptance</h2><p>I confirm that the quantities and condition recorded above accurately reflect the goods or services received.</p>`,
+    // The PDF/Excel/CSV export buttons on this preview must reflect this GRN's own receipt lines, not a
+    // register-wide dump of every GRN (the generic export picks rows by matching words in the title).
+    exportRows: [
+      ['GRN', 'Purchase order', 'Vendor', 'Entity', 'Status', 'Quality', 'Received date', 'Received by', 'Item', 'Unit', 'Ordered', 'Received', 'Accepted', 'Rejected', 'Line quality'],
+      ...((g.lines || []).length
+        ? g.lines.map(l => [g.id, g.po && g.po !== '—' ? g.po : 'Not linked', g.vendor || 'Not tracked', g.entity, g.status, g.quality || '', g.received || '', g.receivedBy || '', l.itemName, l.unit || '', l.ordered ?? '', l.received ?? '', l.accepted ?? '', l.rejected ?? '', l.quality || ''])
+        : [[g.id, g.po && g.po !== '—' ? g.po : 'Not linked', g.vendor || 'Not tracked', g.entity, g.status, g.quality || '', g.received || '', g.receivedBy || '', 'No lines recorded', '', '', '', '', '', '']]),
+    ],
+  };
+}
+
 function __pr23MatrixRowsHtml(steps) {
   return (steps || []).map(s => `<tr><td>${s.stepNumber}</td><td><strong>${__pr23Esc(s.who)}</strong></td><td>${s.aboveAmount != null ? `Only above ${__pr23Cents(s.aboveAmount)}` : 'Every requisition'}</td><td>${(s.people || []).length ? s.people.map(p => `<div>${__pr23Esc(p)}</div>`).join('') : '<span class="muted">Nobody holds this step, so requisitions reaching it are refused at submission</span>'}</td></tr>`);
 }
@@ -1693,10 +1782,14 @@ function __pr23PdfBlob(title, rows) {
   return new Blob([out], { type: 'application/pdf' });
 }
 
-function __pr23ExportFile(format, title) {
+function __pr23ExportFile(format, title, explicitRows) {
   const name = String(title || 'Matanho Procurement Export');
   const base = name.replace(/[^a-z0-9]+/gi, '_').replace(/^_|_$/g, '') || 'export';
-  const rows = __pr23ExportRows(name);
+  // A specific record's own document (a single PO, RFQ or GRN preview built by __pr23OrderDocument /
+  // __pr23TenderDocument / __pr23GrnDocument) supplies its own rows, so the export matches what is on
+  // screen; without them, fall back to the title-matched register dump (see __pr23DownloadPreviewPdf's
+  // note above on why that fallback has nothing to do with the specific record being previewed).
+  const rows = (Array.isArray(explicitRows) && explicitRows.length) ? explicitRows : __pr23ExportRows(name);
   if (format === 'pdf') return downloadBlob(__pr23PdfBlob(name, rows), base + '.pdf');
   if (format === 'json') {
     const [head, ...body] = rows;
@@ -1782,6 +1875,77 @@ function __pr23RequisitionProjectField(selected, cls) {
     .concat(projects.map(p => `<option value="${__pr23Esc(p.id)}"${p.id === selected ? ' selected' : ''}>${__pr23Esc(p.name)}${p.clientName ? ` · ${__pr23Esc(p.clientName)}` : ''}</option>`))
     .join('');
   return formField('Project / cost centre', `<input type="search" data-project-search placeholder="Search projects" aria-label="Search projects" style="margin-bottom:6px"><select name="project">${options}</select>`, cls || '');
+}
+
+/**
+ * SRD §11 "Purchase Requisitions": Required Date, Delivery Location and Budget Code. Budget Code is
+ * free text -- no budget-code register exists on this backend yet (procurement-v23-backend-asks.md).
+ */
+function __pr23RequisitionExtraFields(r) {
+  r = r || {};
+  const required = r.requiredDate ? String(r.requiredDate).slice(0, 10) : '';
+  return formField('Required date', `<input type="date" name="requiredDate" value="${required}">`)
+    + formField('Delivery location', `<input type="text" name="deliveryLocation" value="${__pr23Esc(r.deliveryLocation || '')}" placeholder="e.g. Head Office stores, Harare" maxlength="255">`)
+    + formField('Budget code', `<input type="text" name="budgetCode" value="${__pr23Esc(r.budgetCode || '')}" placeholder="e.g. OPEX-2026-IT-014" maxlength="100">`);
+}
+
+/**
+ * SRD §11 "Attachments": a real upload, unlike the vendored Attachment/Supporting documents fields
+ * removed in cycle seven (they reached no backend). Files are sent to
+ * POST /procurement/requisitions/:id/attachments once the requisition exists -- on New requisition,
+ * that means after the record is created; the host does this from the click dispatcher.
+ */
+function __pr23RequisitionAttachmentsField() {
+  return formField(
+    'Attachments',
+    '<input type="file" name="attachments" multiple accept=".pdf,.doc,.docx,.xlsx,.csv,.jpg,.jpeg,.png"><p class="muted" style="margin:4px 0 0">Uploaded when you save.</p>',
+    'span2'
+  );
+}
+
+/**
+ * Lazy attachments list for the read-only requisition view: a placeholder that the sweep observer
+ * (below) fills in once it is actually inserted into the DOM, so opening a requisition register
+ * never fires N extra requests -- only the one record actually opened does.
+ */
+function __pr23RequisitionAttachmentsBox(recordId) {
+  return `<div class="pr23-pr-attachments" data-pr-attachments-for="${__pr23Esc(recordId)}" style="margin-top:10px"><p class="muted" style="margin:0">Loading attachments…</p></div>`;
+}
+
+function __pr23RenderRequisitionAttachments(list) {
+  if (!Array.isArray(list) || !list.length) return '<p class="muted" style="margin:0">No attachment has been uploaded yet.</p>';
+  return '<ul style="margin:0;padding-left:18px">' + list.map(d => {
+    const name = __pr23Esc(d.name || 'Attachment');
+    const url = d.fileUrl ? String(d.fileUrl) : '';
+    const label = url ? `<a href="${__pr23Esc(url)}" target="_blank" rel="noopener">${name}</a>` : name;
+    return `<li>${label}</li>`;
+  }).join('') + '</ul>';
+}
+
+if (typeof window !== 'undefined' && !window.__pr23AttachmentsObserverWired) {
+  window.__pr23AttachmentsObserverWired = true;
+  const fillAttachmentBox = box => {
+    if (box.dataset.pr23Loaded) return;
+    box.dataset.pr23Loaded = '1';
+    const id = box.getAttribute('data-pr-attachments-for');
+    const fetcher = window.__pr23FetchRequisitionAttachments;
+    if (!id || typeof fetcher !== 'function') {
+      box.innerHTML = '<p class="muted" style="margin:0">Attachments are not available right now.</p>';
+      return;
+    }
+    fetcher(id).then(list => { box.innerHTML = __pr23RenderRequisitionAttachments(list); })
+      .catch(() => { box.innerHTML = '<p class="muted" style="margin:0">Could not load attachments.</p>'; });
+  };
+  const scan = node => {
+    if (!node || node.nodeType !== 1) return;
+    if (node.matches && node.matches('[data-pr-attachments-for]')) fillAttachmentBox(node);
+    node.querySelectorAll && node.querySelectorAll('[data-pr-attachments-for]').forEach(fillAttachmentBox);
+  };
+  if (typeof MutationObserver !== 'undefined') {
+    new MutationObserver(records => {
+      for (const record of records) for (const added of record.addedNodes) scan(added);
+    }).observe(document.documentElement, { childList: true, subtree: true });
+  }
 }
 
 __pr23On(document, 'input', event => {
@@ -3064,7 +3228,7 @@ function previewReport(id){const r=state.reports.find(x=>x.id===id)||state.repor
 function formField(label,input,full=''){return `<div class="field ${full}"><label>${label}</label>${input}</div>`}
 function createPlanModal(){openModal('Create annual procurement plan','Create the plan header, then add requirements and submit through the approval workflow.',`<form id="planForm" class="form-grid">${formField('Plan name','<input name="name" required value="FY 2027 Procurement Plan">')}${formField('Entity',`<select name="entity">${entities.map(x=>`<option>${x[1]}</option>`).join('')}</select>`)}${formField('Financial year','<select name="year"><option>FY 2027</option><option>FY 2026</option></select>')}${formField('Currency','<select name="currency"><option>USD</option><option>ZiG</option><option>ZAR</option></select>')}${formField('Budget ceiling','<input name="budget" type="number" required value="1000000">')}${formField('Plan owner','<input name="owner" value="Group Procurement">')}${formField('Planning assumptions','<textarea name="notes">Capture strategic priorities, demand assumptions and known funding constraints.</textarea>','full')}</form>`,btn('Save draft','save-plan')+btn('Create & add items','create-plan-confirm','primary'))}
 function addPlanItemModal(){if(__pr23Live())return __pr23PlanItemModal();openModal('Add procurement plan item','Budget validation and sourcing method are captured before submission.',`<form id="planItemForm" class="form-grid">${formField('Requirement','<input name="description" required>','full')}${formField('Entity',`<select name="entity">${entities.slice(1).map(x=>`<option>${x[1]}</option>`).join('')}</select>`)}${formField('Category','<select name="category"><option>Technology</option><option>Medical</option><option>Agriculture</option><option>Fleet</option><option>Facilities</option></select>')}${formField('Quarter','<select name="quarter"><option>Q1</option><option>Q2</option><option>Q3</option><option>Q4</option></select>')}${formField('Sourcing method','<select name="method"><option>Open tender</option><option>Restricted tender</option><option>Competitive quotations</option><option>Framework</option></select>')}${formField('Estimated budget','<input name="budget" type="number" required>')}${formField('Cost centre','<input name="cost" value="CC-1001">')}${formField('Business justification','<textarea name="notes"></textarea>','full')}</form>`,btn('Save item','save-plan-item','primary'))}
-function requisitionModal(){openModal('New purchase requisition',__pr23Live()?'Raise a request with its lines and justification. It is routed for approval when you submit it.':'Create an internal, investee or subsidiary request with line items, budget check and approval routing.',`<form id="prForm" class="form-grid">${__pr23Live()?'':formField('Request source','<select name="type"><option>Internal</option><option>Investee</option><option>Subsidiary</option></select>')}${__pr23Live()?__pr23RequisitionEntityField()+__pr23RequisitionDepartmentField()+__pr23RequisitionProjectField():formField('Entity',`<select name="entity">${entities.slice(1).map(x=>`<option>${x[1]}</option>`).join('')}</select>`)+formField('Department / cost centre','<select name="cost"><option>IT & Digital / CC-1001</option><option>Finance / CC-1002</option><option>Operations / CC-2001</option></select>')}${(__pr23Live()?formField('Category','<select name="category" required>'+__pr23RequisitionCategoryOptions()+'</select>'):formField('Category','<select name="category"><option>Technology</option><option>Medical</option><option>Agriculture</option><option>Facilities</option><option>Fleet</option></select>'))}${formField('Requirement title','<input name="title" required>','full')}<div class="field full"><label>Line items</label><div class="table-wrap"><table style="min-width:650px"><thead><tr><th>Item</th><th>UOM</th><th>Qty</th><th>Unit estimate</th><th>Total</th></tr></thead>${__pr23Live()?__pr23PrLinesTbody():`<tbody><tr><td><input name="item" required></td><td><select name="uom"><option>Each</option><option>Box</option><option>Lot</option><option>Month</option></select></td><td><input name="qty" type="number" value="1"></td><td><input name="price" type="number" value="1000"></td><td>$1,000</td></tr></tbody>`}</table></div></div>${formField('Internal motivation','<textarea name="motivation" required></textarea>','full')}${__pr23Live()?'':formField('Attachment','<input type="file" accept=".pdf,.doc,.docx,.xlsx,.csv">','full')}<div class="field full"><div class="notice"><div><strong>Live budget check</strong>${__pr23Live()?__pr23BudgetNotice():'<p>Remaining budget: $86,400. The request will warn or block according to the cost-centre control.</p>'}</div></div></div></form>`,btn('Save draft','save-pr')+btn('Submit for approval','submit-pr','primary'))}
+function requisitionModal(){openModal('New purchase requisition',__pr23Live()?'Raise a request with its lines and justification. It is routed for approval when you submit it.':'Create an internal, investee or subsidiary request with line items, budget check and approval routing.',`<form id="prForm" class="form-grid">${__pr23Live()?'':formField('Request source','<select name="type"><option>Internal</option><option>Investee</option><option>Subsidiary</option></select>')}${__pr23Live()?__pr23RequisitionEntityField()+__pr23RequisitionDepartmentField()+__pr23RequisitionProjectField()+(__pr23Live()?__pr23RequisitionExtraFields():''):formField('Entity',`<select name="entity">${entities.slice(1).map(x=>`<option>${x[1]}</option>`).join('')}</select>`)+formField('Department / cost centre','<select name="cost"><option>IT & Digital / CC-1001</option><option>Finance / CC-1002</option><option>Operations / CC-2001</option></select>')}${(__pr23Live()?formField('Category','<select name="category" required>'+__pr23RequisitionCategoryOptions()+'</select>'):formField('Category','<select name="category"><option>Technology</option><option>Medical</option><option>Agriculture</option><option>Facilities</option><option>Fleet</option></select>'))}${formField('Requirement title','<input name="title" required>','full')}<div class="field full"><label>Line items</label><div class="table-wrap"><table style="min-width:650px"><thead><tr><th>Item</th><th>UOM</th><th>Qty</th><th>Unit estimate</th><th>Total</th></tr></thead>${__pr23Live()?__pr23PrLinesTbody():`<tbody><tr><td><input name="item" required></td><td><select name="uom"><option>Each</option><option>Box</option><option>Lot</option><option>Month</option></select></td><td><input name="qty" type="number" value="1"></td><td><input name="price" type="number" value="1000"></td><td>$1,000</td></tr></tbody>`}</table></div></div>${formField('Internal motivation','<textarea name="motivation" required></textarea>','full')}${__pr23Live()?__pr23RequisitionAttachmentsField():formField('Attachment','<input type="file" accept=".pdf,.doc,.docx,.xlsx,.csv">','full')}<div class="field full"><div class="notice"><div><strong>Live budget check</strong>${__pr23Live()?__pr23BudgetNotice():'<p>Remaining budget: $86,400. The request will warn or block according to the cost-centre control.</p>'}</div></div></div></form>`,btn('Save draft','save-pr')+btn('Submit for approval','submit-pr','primary'))}
 function vendorModal(){if(__pr23Live())return __pr23VendorRegisterModal();openModal('Register vendor','Zimbabwe vendor controls include duplicate BP/VAT validation, mandatory bank details, currency and tax clearance.',`<form id="vendorForm" class="form-grid">${formField('Legal name','<input name="name" required>')}${formField('Category','<select name="category"><option>Technology</option><option>Medical</option><option>Facilities</option><option>Fleet</option></select>')}${formField('BP number','<input name="bp" required>')}${formField('VAT number','<input name="vat" required>')}${formField('Bank','<input name="bank" required>')}${formField('Branch code','<input name="branch" required>')}${formField('Default currency','<select name="currency"><option>USD</option><option>ZiG</option><option>ZAR</option></select>')}${formField('ITF263 expiry','<input name="itf" type="date">')}${formField('Certificate of incorporation','<input type="file">')}${formField('CR14 / current company extract','<input type="file">')}</form>`,btn('Cancel','close-overlay')+btn('Validate & register','register-vendor-confirm','primary'))}
 function inviteVendorsModal(){const eligible=state.vendors.filter(v=>v.status!=='Blacklisted');openModal('Invite vendors to bid','Only category-eligible, non-blacklisted suppliers are available. The system emails a unique secure bid-form link.',`<div class="notice" style="margin-bottom:14px"><span class="kpi-icon">${icon('mail')}</span><div><strong>Secure system-generated bid form</strong><p>Each vendor receives an individual expiring link. Submissions are timestamped, sealed and cannot be edited after closing.</p></div></div><div class="list">${eligible.map(v=>`<label class="list-row"><input type="checkbox" checked> <div class="list-main"><strong>${v.name}</strong><span>${v.category} · ${v.currency} · ${v.status}</span></div><span>${v.rating}/5</span></label>`).join('')}</div>`,btn('Preview vendor form','vendor-bid-preview')+btn(`Email ${eligible.length} invitations`,'send-invitations','primary','mail'))}
 function vendorBidPreview(id='TN-2026-014'){if(__pr23Live())return __pr23VendorBidPreview(arguments[0]);openModal('Vendor Bid Submission Form',`${id} · secure external form preview`,`<div class="notice" style="margin-bottom:14px"><div><strong>Unique vendor link · expires at tender close</strong><p>Vendor identity and tender reference are locked by the invitation token.</p></div></div><div class="form-grid">${formField('Vendor','<input value="TechNova Solutions" readonly>')}${formField('Tender','<input value="'+id+'" readonly>')}${formField('Technical response','<textarea placeholder="Structured response to mandatory and scored criteria"></textarea>','full')}${formField('Bid currency','<select><option>USD</option><option>ZiG</option><option>ZAR</option></select>')}${formField('Total bid price','<input type="number" value="1280000">')}${formField('Delivery period','<input value="12 weeks">')}${formField('Warranty / support','<input value="36 months">')}${formField('Commercial schedule','<input type="file" accept=".xlsx,.csv,.pdf">','full')}${formField('Declarations','<label><input type="checkbox"> I declare the bid is accurate and disclose all conflicts.</label>','full')}${formField('Authorised signature','<input placeholder="Type authorised signatory name">','full')}</div>`,btn('Save draft','vendor-save-draft')+btn('Seal & submit bid','vendor-submit-bid','primary','signature'))}
@@ -3075,7 +3239,7 @@ function pdfBlob(title){
  const objs=[`1 0 obj <</Type/Catalog/Pages 2 0 R>> endobj`,`2 0 obj <</Type/Pages/Kids[3 0 R]/Count 1>> endobj`,`3 0 obj <</Type/Page/Parent 2 0 R/MediaBox[0 0 612 792]/Resources<</Font<</F1 5 0 R>>>>/Contents 4 0 R>> endobj`,`4 0 obj <</Length ${text.length}>> stream\n${text}\nendstream endobj`,`5 0 obj <</Type/Font/Subtype/Type1/BaseFont/Helvetica>> endobj`];let out='%PDF-1.4\n',off=[0];objs.forEach(o=>{off.push(out.length);out+=o+'\n'});const x=out.length;out+=`xref\n0 6\n0000000000 65535 f \n${off.slice(1).map(n=>String(n).padStart(10,'0')+' 00000 n ').join('\n')}\ntrailer <</Size 6/Root 1 0 R>>\nstartxref\n${x}\n%%EOF`;return new Blob([out],{type:'application/pdf'})
 }
 function downloadBlob(blob,name){const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;document.body.append(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},400)}
-function exportFile(format,title='Matanho Procurement Report'){if(__pr23Live())return __pr23ExportFile(format,title);
+function exportFile(format,title='Matanho Procurement Report',rows){if(__pr23Live())return __pr23ExportFile(format,title,rows);
  const base=title.replace(/[^a-z0-9]+/gi,'_').replace(/^_|_$/g,'');
  if(format==='pdf')return downloadBlob(pdfBlob(title),base+'.pdf');
  const data=[['Record','Entity','Category','Value','Status'],...state.tenders.map(t=>[t.id,t.entity,t.category,t.value,t.stage])];
@@ -4530,7 +4694,7 @@ window.MatanhoProcurement=Object.freeze({version:'8.0.0',navigate,render,getStat
     'edit-tender-v23':a=>__pr23EditTenderModal(a.dataset.id),
     'audit-page-prev':()=>{state.__pr23AuditPage=Math.max(0,(state.__pr23AuditPage||0)-1);render()},
     'audit-page-next':()=>{const total=(state.auditEventsLive||[]).length;const last=Math.max(0,Math.ceil(total/50)-1);state.__pr23AuditPage=Math.min(last,(state.__pr23AuditPage||0)+1);render()},
-    'preview-po-v6':a=>{const o=state.orders.find(x=>x.id===a.dataset.id);const v=state.vendors.find(x=>x.name===o?.vendor);const r=taxRuleV6(v);previewDocV6({id:o.id,name:`Purchase Order ${o.id}`,version:'Issued copy',status:o.status,owner:'Group Procurement',content:`<h1>Purchase Order</h1><p><strong>Supplier:</strong> ${esc(o.vendor)}</p><p><strong>Purchasing entity:</strong> ${esc(o.entity)}</p><p><strong>Order value:</strong> ${money(o.amount)}</p><h2>Order and tax conditions</h2><p>${esc(r.poClause)}</p><h2>Supply requirements</h2><p>The Supplier shall deliver the approved goods or services in accordance with the specifications, delivery dates, warranties and acceptance criteria. No variation is effective unless approved in writing.</p><h2>Payment</h2><p>Payment is subject to receipt, inspection, a valid tax invoice, applicable matching controls and the configured approval workflow.</p>`})},
+    'preview-po-v6':a=>{const o=state.orders.find(x=>x.id===a.dataset.id);if(__pr23Live())return previewDocV6(__pr23OrderDocument(o));const v=state.vendors.find(x=>x.name===o?.vendor);const r=taxRuleV6(v);previewDocV6({id:o.id,name:`Purchase Order ${o.id}`,version:'Issued copy',status:o.status,owner:'Group Procurement',content:`<h1>Purchase Order</h1><p><strong>Supplier:</strong> ${esc(o.vendor)}</p><p><strong>Purchasing entity:</strong> ${esc(o.entity)}</p><p><strong>Order value:</strong> ${money(o.amount)}</p><h2>Order and tax conditions</h2><p>${esc(r.poClause)}</p><h2>Supply requirements</h2><p>The Supplier shall deliver the approved goods or services in accordance with the specifications, delivery dates, warranties and acceptance criteria. No variation is effective unless approved in writing.</p><h2>Payment</h2><p>Payment is subject to receipt, inspection, a valid tax invoice, applicable matching controls and the configured approval workflow.</p>`})},
     'preview-po-form-v6':()=>previewDocV6('TPL-PO-01'),
     'save-po-v6':()=>{const f=$('#poFormV6');if(!f?.reportValidity())return;const d=new FormData(f);let o=state.orders.find(x=>x.id===d.get('id'));if(!o){o={id:'PO-2026-'+String(590+state.orders.length),status:'Draft'};state.orders.unshift(o)}o.vendor=d.get('vendor');o.entity=d.get('entity');o.amount=Number(d.get('amount'));o.delivery=fmtDateV6(d.get('delivery'));o.asset=d.get('classification')==='Fixed asset';closeOverlay();render();toast('Purchase order saved',`${o.id} was saved with the vendor compliance and tax rule snapshot.`)},
     'submit-po-v6':()=>{const f=$('#poFormV6');if(!f?.reportValidity())return;const d=new FormData(f);const v=state.vendors.find(x=>x.name===d.get('vendor'));const rule=taxRuleV6(v);closeOverlay();state.approvalPromptsV6.unshift({id:'APR-'+Date.now(),type:'Purchase order',record:'PO-DRAFT',title:`Purchase order for ${v.name}`,entity:d.get('entity'),amount:Number(d.get('amount')),role:Number(d.get('amount'))>5000?'CFO':'Department Approver',approver:Number(d.get('amount'))>5000?'Tinashe Chaka':'Panashe Mlambo',due:'Today',priority:rule.state==='valid'?'Normal':'High',status:'Awaiting me',esign:true,reason:`PO approval with ${rule.withholding}% withholding rule`});render();toast('PO submitted','The responsible approver received an in-app and email prompt.')},
@@ -4630,9 +4794,9 @@ window.MatanhoProcurement=Object.freeze({version:'8.0.0',navigate,render,getStat
     'preview-editor-v6':a=>previewDocV6(a.dataset.id),
     'save-document-v6':a=>saveDocEditorV6(a.dataset.id),
     'upload-version':a=>documentUploadModalV6(docByIdV6(a.dataset.id).folder||'Procurement Documents'),
-    'download-document-v5':a=>exportFile('pdf',docByIdV6(a.dataset.id).name),
-    'download-document-xls':a=>exportFile('xls',docByIdV6(a.dataset.id).name),
-    'download-document-csv':a=>exportFile('csv',docByIdV6(a.dataset.id).name)
+    'download-document-v5':a=>{const doc=docByIdV6(a.dataset.id);exportFile('pdf',doc.name,doc.exportRows)},
+    'download-document-xls':a=>{const doc=docByIdV6(a.dataset.id);exportFile('xls',doc.name,doc.exportRows)},
+    'download-document-csv':a=>{const doc=docByIdV6(a.dataset.id);exportFile('csv',doc.name,doc.exportRows)}
   });
 
   /* Correct the vendor registration action for both legacy and V6 field names. */
@@ -4983,18 +5147,33 @@ window.MatanhoProcurement=Object.freeze({version:'8.0.0',navigate,render,getStat
     }
 
     const tender = state.tenders.find(t => t.id === ref || `${t.id} Tender Pack` === ref);
-    if (tender) return {
+    if (tender) {
+      if (__pr23Live()) return __pr23TenderDocument(tender);
+      return {
       id: tender.id,
       name: `${tender.id} - ${tender.title}`,
       type: 'Tender pack', version:'v3.0', owner:tender.owner, status:tender.stage, date:tender.close,
       content:`<h1>Invitation to Tender</h1><p class="doc-lead-v11">${escV11(tender.title)}</p><table><tbody><tr><th>Tender reference</th><td>${escV11(tender.id)}</td><th>Entity</th><td>${escV11(tender.entity)}</td></tr><tr><th>Procurement method</th><td>${escV11(tender.method)}</td><th>Estimated value</th><td>${money(tender.value)}</td></tr><tr><th>Closing date</th><td>${escV11(tender.close)}</td><th>Category</th><td>${escV11(tender.category)}</td></tr></tbody></table><h2>1. Invitation</h2><p>Eligible suppliers are invited to submit a complete, compliant and competitively priced bid through the secure Matanho vendor portal before the stated closing date.</p><h2>2. Scope of requirement</h2><p>The successful bidder shall provide the goods, implementation, documentation, training, warranty and support specified in the controlled technical schedules.</p><h2>3. Submission requirements</h2><ul><li>Completed technical response and compliance schedule.</li><li>Commercial response using the prescribed pricing schedule.</li><li>Current company, tax, banking and beneficial-ownership documents.</li><li>Signed declarations, conflict disclosure and authorised eSignature.</li></ul><h2>4. Evaluation</h2><p>Bids will be evaluated against mandatory compliance, technical merit, commercial value, delivery readiness, warranty and risk. The authorised user retains the final award decision, subject to approval authority.</p>`
-    };
+      };
+    }
 
     const order = state.orders.find(o => o.id === ref);
-    if (order) return {
+    if (order) {
+      if (__pr23Live()) return __pr23OrderDocument(order);
+      return {
       id:order.id,name:`Purchase Order ${order.id}`,type:'Purchase order',version:'Current',owner:'Group Procurement',status:order.status,date:order.delivery,
       content:`<h1>Purchase Order</h1><table><tbody><tr><th>Purchase order</th><td>${escV11(order.id)}</td><th>Supplier</th><td>${escV11(order.vendor)}</td></tr><tr><th>Entity</th><td>${escV11(order.entity)}</td><th>Order value</th><td>${money(order.amount)}</td></tr><tr><th>Delivery date</th><td>${escV11(order.delivery)}</td><th>Classification</th><td>${order.asset ? 'Fixed asset' : 'Goods / services'}</td></tr></tbody></table><h2>Order description</h2><p>The supplier is authorised to provide the approved goods and services in accordance with the sourcing record, accepted quotation, delivery schedule and controlled purchase terms.</p><h2>Tax and compliance</h2><p>Payment is subject to valid tax documentation, invoice validation, receipt or acceptance, applicable withholding tax and all statutory deductions.</p><h2>Commercial terms</h2><p>No variation is binding unless approved in writing by an authorised representative. The supplier must quote this purchase-order number on all delivery notes and invoices.</p>`
-    };
+      };
+    }
+
+    const grnDoc = (state.grns || []).find(g => g.id === ref);
+    if (grnDoc) {
+      if (__pr23Live()) return __pr23GrnDocument(grnDoc);
+      return {
+        id: grnDoc.id, name: `Goods Received Note ${grnDoc.id}`, type: 'Goods received note', version: 'v1.0', owner: 'Group Procurement', status: grnDoc.status, date: grnDoc.received || grnDoc.date,
+        content: `<h1>Goods Received Note</h1><table><tbody><tr><th>GRN number</th><td>${escV11(grnDoc.id)}</td><th>Purchase order</th><td>${escV11(grnDoc.po)}</td></tr><tr><th>Item / service</th><td>${escV11(grnDoc.item)}</td><th>Accepted value</th><td>${money(grnDoc.value)}</td></tr></tbody></table><h2>Inspection and acceptance</h2><p>I confirm that the quantities and condition recorded above accurately reflect the goods or services received.</p>`
+      };
+    }
 
     const contract = (state.contractsV6 || []).find(c => c.id === ref);
     if (contract) return {
@@ -5191,7 +5370,7 @@ window.MatanhoProcurement=Object.freeze({version:'8.0.0',navigate,render,getStat
   function viewPrV11(id, mode='view') {
     const r = state.requisitions.find(x => x.id === id); if (!r) return;
     const editable = mode === 'edit';
-    const fields = editable ? `<form id="editPrFormV11" class="dense-form-grid"><div class="field span2"><label>Requirement title</label><input name="title" value="${escV11(r.title)}" required></div>${__pr23Live()?__pr23RequisitionProjectField(r.projectId,'span2'):''}${__pr23Live()?'':`<div class="field"><label>Category</label><select name="category"><option>${escV11(r.category)}</option><option>Technology</option><option>Medical</option><option>Agriculture</option><option>Facilities</option><option>Fleet</option></select></div><div class="field"><label>Estimated value</label><input name="amount" type="number" value="${Number(r.amount)}" required></div>`}<div class="field span2"><label>Business justification</label><textarea name="justification">${__pr23Live()?escV11(r.justification||''):'The requirement supports approved departmental operations and service-delivery objectives. Procurement should validate the specification and sourcing route before commitment.'}</textarea></div>${__pr23Live()?'':'<div class="field span2"><label>Supporting documents</label><input type="file" multiple accept=".pdf,.doc,.docx,.xlsx,.csv"></div>'}</form>` : `<div class="source-meta"><div><span>Entity</span><strong>${escV11(r.entity)}</strong></div><div><span>Source</span><strong>${escV11(r.type)}</strong></div><div><span>Category</span><strong>${escV11(r.category)}</strong></div>${__pr23Live()?`<div><span>Project</span><strong>${escV11(r.project||'None')}</strong></div>`:''}<div><span>Estimate</span><strong>${money(r.amount)}</strong></div><div><span>Budget check</span><strong>${escV11(r.budget)}</strong></div><div><span>Status</span><strong>${escV11(r.status)}</strong></div></div><div class="notice" style="margin-top:14px"><span class="kpi-icon">${icon('document')}</span><div><strong>${__pr23Live()?'Internal motivation':'Internal motivation and supporting evidence'}</strong><p>${__pr23Live()?'The lines, justification and approval route of this requisition, as one document.':'Open the actual controlled motivation document before making a decision.'}</p></div>${smallV11('Preview motivation','preview-doc-v11',`MOT-${r.id}`,'eye')}</div>${__pr23Live()?__pr23ApprovalRouteHtml(r.approvalRoute):''}`;
+    const fields = editable ? `<form id="editPrFormV11" class="dense-form-grid"><div class="field span2"><label>Requirement title</label><input name="title" value="${escV11(r.title)}" required></div>${__pr23Live()?__pr23RequisitionProjectField(r.projectId,'span2')+__pr23RequisitionExtraFields(r):''}${__pr23Live()?'':`<div class="field"><label>Category</label><select name="category"><option>${escV11(r.category)}</option><option>Technology</option><option>Medical</option><option>Agriculture</option><option>Facilities</option><option>Fleet</option></select></div><div class="field"><label>Estimated value</label><input name="amount" type="number" value="${Number(r.amount)}" required></div>`}<div class="field span2"><label>Business justification</label><textarea name="justification">${__pr23Live()?escV11(r.justification||''):'The requirement supports approved departmental operations and service-delivery objectives. Procurement should validate the specification and sourcing route before commitment.'}</textarea></div>${__pr23Live()?__pr23RequisitionAttachmentsField()+__pr23RequisitionAttachmentsBox(r.recordId):'<div class="field span2"><label>Supporting documents</label><input type="file" multiple accept=".pdf,.doc,.docx,.xlsx,.csv"></div>'}</form>` : `<div class="source-meta"><div><span>Entity</span><strong>${escV11(r.entity)}</strong></div><div><span>Source</span><strong>${escV11(r.type)}</strong></div><div><span>Category</span><strong>${escV11(r.category)}</strong></div>${__pr23Live()?`<div><span>Project</span><strong>${escV11(r.project||'None')}</strong></div><div><span>Required date</span><strong>${escV11(r.requiredDateDisplay||'—')}</strong></div><div><span>Delivery location</span><strong>${escV11(r.deliveryLocation||'—')}</strong></div><div><span>Budget code</span><strong>${escV11(r.budgetCode||'—')}</strong></div>`:''}<div><span>Estimate</span><strong>${money(r.amount)}</strong></div><div><span>Budget check</span><strong>${escV11(r.budget)}</strong></div><div><span>Status</span><strong>${escV11(r.status)}</strong></div></div><div class="notice" style="margin-top:14px"><span class="kpi-icon">${icon('document')}</span><div><strong>${__pr23Live()?'Internal motivation':'Internal motivation and supporting evidence'}</strong><p>${__pr23Live()?'The lines, justification and approval route of this requisition, as one document.':'Open the actual controlled motivation document before making a decision.'}</p></div>${smallV11('Preview motivation','preview-doc-v11',`MOT-${r.id}`,'eye')}</div>${__pr23Live()?__pr23ApprovalRouteHtml(r.approvalRoute)+__pr23RequisitionAttachmentsBox(r.recordId):''}`;
     let foot = actionV11('Preview motivation','preview-doc-v11',`MOT-${r.id}`,'','eye');
     if (mode === 'edit') foot += actionV11(__pr23Live()?'Save draft':'Save changes','save-pr-v11',r.id,__pr23Live()?'':'primary','document') + (__pr23Live()?actionV11('Save and submit','submit-pr-v11',r.id,'primary','approve'):'');
     if (mode === 'approve') foot += actionV11('Reject or return','reject-pr-v11',r.id,'danger') + actionV11('Approve requisition','approve-pr-v11',r.id,'primary','approve');
