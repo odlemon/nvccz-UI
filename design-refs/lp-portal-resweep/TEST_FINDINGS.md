@@ -108,6 +108,15 @@ for a decision rather than guessing and building a heartbeat that might not be w
   entitlements).
 - **Q11 caveat:** OPEN_ENDED fund path was never exercised (no such fund existed on the test account at
   the time). Now exercised — see "Q11" below, real defect found and fixed.
+- **Q7/Q8 (provisional/restated statement labelling, restatement preserves the original) — not a bug, a
+  missing capability.** Grepped the whole backend for `restate`/`provisional`/`RESTATED`/`PROVISIONAL` —
+  no matches anywhere relevant to LP-facing statements. `QuarterlyStatementPublishService` only ever writes
+  `status: "PUBLISHED"`; there is no draft/provisional/restated status lifecycle, no versioning, and
+  nothing in the schema or LP portal UI to show a "restated" label or link back to a superseded version.
+  This is a real gap, but it's a from-scratch feature (data model for statement versions, a restatement
+  workflow, UI labelling, notification/audit implications) rather than a bug with an obvious root-cause
+  fix — logging it as a backend-ask for `FULL_SWEEP_2026-09_OVERVIEW.md` rather than building an unscoped
+  versioning system unilaterally.
 - **Accounting-treatment issues, referred not fixed (need chart-of-accounts sign-off, not a frontend/
   backend guess):** every distribution debits `4100 Dividend Income` regardless of actual source;
   `RETURN_OF_CAPITAL`/`INCOME` distribution types are rejected by the backend's `ALLOWED_SOURCES` despite
