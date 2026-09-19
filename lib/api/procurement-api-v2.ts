@@ -965,6 +965,18 @@ class ProcurementApiServiceV2 {
   }
 
   /**
+   * Roll back a staged attachment upload from uploadQuotationAttachment() that never got linked to a
+   * submitted quotation -- e.g. one file in a multi-file batch failed and the others must not be left
+   * orphaned. Only works while the attachment is still unlinked; the backend rejects it otherwise.
+   * DELETE /procurement/document-attachments/portal/:id — see vendorDocumentAttachmentRoutes.ts (nvccz repo).
+   */
+  async deleteQuotationAttachment(attachmentId: string, vendorPortalToken: string): Promise<ProcurementResponse<unknown>> {
+    return apiClient.delete<ProcurementResponse<unknown>>(
+      `/procurement/document-attachments/portal/${attachmentId}?vendorPortalToken=${encodeURIComponent(vendorPortalToken)}`,
+    )
+  }
+
+  /**
    * Accept a quotation
    * Required Role: PROC_MGR or PROC_OFF
    */

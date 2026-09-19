@@ -230,7 +230,7 @@ function RFQRespondContent() {
     try {
       let attachmentIds: string[] = []
       if (attachmentFiles.length) {
-        attachmentIds = await Promise.all(
+        const uploadResults = await Promise.allSettled(
           attachmentFiles.map(async (file) => {
             const form = new FormData()
             form.append('document', file)
@@ -243,6 +243,27 @@ function RFQRespondContent() {
             return uploadResult.data.id
           })
         )
+
+        const uploaded = uploadResults.filter(
+          (r): r is PromiseFulfilledResult<string> => r.status === 'fulfilled'
+        )
+        const failed = uploadResults.filter((r): r is PromiseRejectedResult => r.status === 'rejected')
+
+        if (failed.length) {
+          // One file in the batch failed -- don't leave the ones that DID upload sitting in
+          // storage unlinked to any quotation. Roll them back (best-effort) so a failed batch
+          // never orphans a partial set of attachments; the vendor sees exactly what failed and
+          // can fix it and resubmit cleanly.
+          await Promise.allSettled(
+            uploaded.map((r) => procurementApiV2.deleteQuotationAttachment(r.value, token!))
+          )
+          const reasons = failed
+            .map((r) => (r.reason instanceof Error ? r.reason.message : String(r.reason)))
+            .join('; ')
+          throw new Error(`Attachment upload failed, nothing was saved: ${reasons}`)
+        }
+
+        attachmentIds = uploaded.map((r) => r.value)
       }
 
       const payload = {
