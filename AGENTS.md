@@ -1,4 +1,21 @@
-﻿# NVCCZ / Arcus — Current Task
+﻿# NVCCZ / Arcus
+
+## Deployment policy — no direct file transfer, ever
+
+Deploying by copying files from this machine straight to a server (via scp, sftp, rsync, paramiko, tar-and-upload, `vercel --prod` from local, or any similar direct transfer) is forbidden. This has caused multi-gigabyte accidental uploads before (a single missed build-output folder turned into an 869 MB–1.8 GB tarball upload) and must not happen again in any form, intentional or accidental.
+
+The only allowed deployment flow is:
+1. Commit and push the change to GitHub.
+2. The server pulls from GitHub itself (`git fetch` + `git reset --hard origin/<branch>`), over SSH — triggered either by a GitHub Action or a script run on the server.
+3. The server builds/installs/compiles in place, using its own CPU and disk — never a build produced locally and shipped over.
+4. The server restarts the service (pm2 reload / systemctl restart / docker compose up) and the deploy script verifies the app actually answers before declaring success.
+
+Don't let large assets exist to be uploaded in the first place:
+- Never commit or ship `node_modules`, `.git`, `dist`, `coverage`, or any build output directory (`.next`, `.next-*`, `out`, etc.) — these are always rebuilt on the server, never transferred.
+- `.gitignore` must exclude all of these, matched by pattern (e.g. `.next*`) not by hardcoding each name, so a newly-named build variant can't slip through.
+- If a task genuinely requires moving a large binary asset to a server, stop and ask the user explicitly before transferring it — don't fold it into a routine deploy.
+
+# NVCCZ / Arcus — Current Task (prior session log, below)
 
 ## Context
 Working on SSL/rate limiting across:

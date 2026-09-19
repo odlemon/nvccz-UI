@@ -57,3 +57,29 @@ if not SSH_PASSWORD and not os.path.isfile(SSH_KEY):
         "      ARCUS_SSH_PASSWORD=<password>\n"
         f"  ...or place a key at {SSH_KEY}."
     )
+
+# The NVCCZ (102.217.49.126) and Singapore (207.180.234.151) deploy scripts used to have
+# their SSH passwords hard-coded in plaintext directly in the committed .py file
+# (deploy-nvccz-docker-vps.py, deploy-nvccz-api-singapore.py) — the exact class of leak
+# _ssh_creds.py was created to close for the arcus host. Same resolution order, same
+# git-ignored secrets file, different key names so all three hosts' credentials can live
+# in one place without colliding.
+
+
+def _named_password(env_var: str, file_key: str) -> str:
+    return os.environ.get(env_var) or _from_file(file_key)
+
+
+NVCCZ_DOCKER_VPS_PASSWORD = _named_password("NVCCZ_DOCKER_VPS_PASSWORD", "NVCCZ_DOCKER_VPS_PASSWORD")
+SINGAPORE_VPS_PASSWORD = _named_password("SINGAPORE_VPS_PASSWORD", "SINGAPORE_VPS_PASSWORD")
+
+
+def require(value: str, env_var: str, file_key: str) -> str:
+    """Fail loudly (not with a silent empty-password SSH attempt) if a secret is missing."""
+    if not value:
+        raise SystemExit(
+            f"No credential found for {file_key}.\n"
+            f"  Set {env_var}, or add a line to {_SECRETS_FILE}:\n"
+            f"      {file_key}=<password>"
+        )
+    return value

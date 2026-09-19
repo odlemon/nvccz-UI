@@ -1,14 +1,27 @@
 #!/usr/bin/env python3
-"""Pack Matanho site, upload to NTS VPS, docker compose up on :3130."""
+"""Deploy the Matanho marketing site to the NTS VPS (:3130) via server-side git pull.
+
+Per CLAUDE.md's "Deployment policy — no direct file transfer, ever": this script never
+uploads code from this machine. Push your branch to GitHub first (`git push` in
+~/Documents/Matanho), then run this — the VPS clones/pulls directly from
+https://github.com/odlemon/matanho over SSH and builds in place with docker compose.
+
+ONE-TIME SETUP REQUIRED before this script can run (not done by this script):
+  1. Generate a deploy keypair and add the PUBLIC key as a read-only Deploy Key on
+     https://github.com/odlemon/matanho.
+  2. Put the PRIVATE key on the VPS and add a `Host github.com-matanho` alias in
+     /root/.ssh/config using that key.
+  3. This script only writes REMOTE_ROOT/.env if it doesn't already exist (same as the
+     version it replaces) — an existing .env's secrets are never touched or re-generated.
+
+Usage:
+  python scripts/deploy-matanho-nts-vps.py --branch main
+"""
 from __future__ import annotations
 
-import hashlib
-import os
+import argparse
 import secrets
 import sys
-import tarfile
-import tempfile
-from pathlib import Path
 
 import paramiko
 from _ssh_creds import SSH_PASSWORD  # rotated 2026-09-07; value lives in .secrets/ssh.env
@@ -16,135 +29,85 @@ from _ssh_creds import SSH_PASSWORD  # rotated 2026-09-07; value lives in .secre
 HOST = "31.220.82.129"
 USER = "root"
 PASSWORD = SSH_PASSWORD
-LOCAL_ROOT = Path(r"C:\Users\lysp\Documents\Matanho")
+REPO_URL = "git@github.com-matanho:odlemon/matanho.git"
 REMOTE_ROOT = "/var/www/projects/matanho"
 HOST_PORT = "3130"
 SITE_URL = f"http://{HOST}:{HOST_PORT}"
 
-EXCLUDE_DIRS = {"node_modules", ".git", ".next", ".vercel", "out", "src/generated"}
-EXCLUDE_NAMES = {".env", ".env.local"}
 
-
-def skip(rel: str) -> bool:
-    parts = Path(rel).parts
-    if any(p in EXCLUDE_DIRS for p in parts):
-        return True
-    if Path(rel).name in EXCLUDE_NAMES:
-        return True
-    if Path(rel).name.startswith(".env.") and Path(rel).name.endswith(".local"):
-        return True
-    return False
-
-
-def make_tarball(root: Path, out_path: Path) -> str:
-    with tarfile.open(out_path, mode="w:gz") as tar:
-        for dirpath, dirs, files in os.walk(root):
-            dirs[:] = [d for d in dirs if d not in EXCLUDE_DIRS and not d.startswith(".")]
-            for name in files:
-                full = Path(dirpath) / name
-                rel = str(full.relative_to(root))
-                if skip(rel):
-                    continue
-                tar.add(full, arcname=rel.replace("\\", "/"))
-    h = hashlib.sha256()
-    with open(out_path, "rb") as f:
-        for chunk in iter(lambda: f.read(1024 * 1024), b""):
-            h.update(chunk)
-    return h.hexdigest()
+def run(client: paramiko.SSHClient, cmd: str, timeout: int = 3600) -> str:
+    print(f"\n$ {cmd}", flush=True)
+    stdin, stdout, stderr = client.exec_command(cmd, timeout=timeout)
+    out = stdout.read().decode("utf-8", errors="replace")
+    err = stderr.read().decode("utf-8", errors="replace")
+    code = stdout.channel.recv_exit_status()
+    if out.strip():
+        print(out)
+    if err.strip():
+        print(err, file=sys.stderr)
+    if code != 0:
+        raise SystemExit(f"remote command failed (exit {code}): {cmd}")
+    return out
 
 
 def main() -> int:
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
-    pg_pw = secrets.token_urlsafe(24)
-    session = secrets.token_urlsafe(48)
-    bootstrap = secrets.token_urlsafe(32)
-    analytics = secrets.token_urlsafe(32)
-    cron = secrets.token_urlsafe(32)
+    p = argparse.ArgumentParser()
+    p.add_argument("--branch", default="main")
+    args = p.parse_args()
 
-    env_body = f"""MATANHO_HOST_PORT={HOST_PORT}
+    client = paramiko.SSHClient()
+    client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    print(f"Connecting {HOST}...", flush=True)
+    client.connect(HOST, 22, USER, PASSWORD, timeout=30, look_for_keys=False, allow_agent=False)
+
+    print("Verifying GitHub deploy-key access from the VPS (see module docstring if this fails)...")
+    run(client, "ssh -T git@github.com-matanho -o StrictHostKeyChecking=no 2>&1 | grep -qi 'successfully authenticated' "
+                "&& echo GITHUB_AUTH_OK || (echo GITHUB_AUTH_FAILED; exit 1)")
+
+    check = client.exec_command(f"test -d {REMOTE_ROOT}/.git && echo YES || echo NO")[1].read().decode().strip()
+    if check == "YES":
+        run(client, f"cd {REMOTE_ROOT} && git fetch origin {args.branch} && git reset --hard origin/{args.branch} && git clean -fdx -e .env")
+    else:
+        run(client, f"mkdir -p $(dirname {REMOTE_ROOT}) && rm -rf {REMOTE_ROOT} && git clone --branch {args.branch} --single-branch {REPO_URL} {REMOTE_ROOT}")
+    sha = run(client, f"cd {REMOTE_ROOT} && git rev-parse --short HEAD").strip()
+    print(f"{REMOTE_ROOT} now at {sha} ({args.branch})")
+
+    has_env = client.exec_command(f"test -f {REMOTE_ROOT}/.env && echo YES || echo NO")[1].read().decode().strip()
+    if has_env != "YES":
+        print("No .env found — writing one with freshly generated secrets (first deploy only).")
+        env_body = f"""MATANHO_HOST_PORT={HOST_PORT}
 NEXT_PUBLIC_SITE_URL={SITE_URL}
-POSTGRES_PASSWORD={pg_pw}
-SESSION_SECRET={session}
-ADMIN_BOOTSTRAP_SECRET={bootstrap}
-ANALYTICS_SALT={analytics}
+POSTGRES_PASSWORD={secrets.token_urlsafe(24)}
+SESSION_SECRET={secrets.token_urlsafe(48)}
+ADMIN_BOOTSTRAP_SECRET={secrets.token_urlsafe(32)}
+ANALYTICS_SALT={secrets.token_urlsafe(32)}
 ANALYTICS_RETENTION_DAYS=180
-CRON_SECRET={cron}
+CRON_SECRET={secrets.token_urlsafe(32)}
 BLOB_READ_WRITE_TOKEN=
 """
-
-    remote_sh = f"""
-set -euo pipefail
-ROOT={REMOTE_ROOT}
-mkdir -p "$ROOT"
-cd "$ROOT"
-echo '=== verify checksum ==='
-echo "$APP_SHA  /tmp/matanho-app.tgz" | sha256sum -c -
-echo '=== extract ==='
-tar -xzf /tmp/matanho-app.tgz -C "$ROOT"
-test -f "$ROOT/package.json"
-test -f "$ROOT/Dockerfile"
-test -f "$ROOT/docker-compose.yml"
-# keep existing .env if present; otherwise write fresh
-if [ ! -f "$ROOT/.env" ]; then
-  cp /tmp/matanho.env "$ROOT/.env"
-  echo 'Wrote new .env'
-else
-  echo 'Keeping existing .env'
-fi
-# ensure compose can read env
-set -a
-. "$ROOT/.env"
-set +a
-echo '=== docker compose build/up ==='
-docker compose --env-file .env up -d --build
-docker compose --env-file .env ps
-echo '=== smoke ==='
-sleep 3
-curl -fsS -o /dev/null -w 'health:%{{http_code}}\\n' http://127.0.0.1:{HOST_PORT}/api/health || true
-curl -fsS -o /dev/null -w 'home:%{{http_code}}\\n' http://127.0.0.1:{HOST_PORT}/ || true
-echo MATANHO_DEPLOY_DONE
-echo "URL={SITE_URL}"
-echo "ADMIN_SETUP={SITE_URL}/admin/setup"
-grep -E '^(ADMIN_BOOTSTRAP_SECRET|NEXT_PUBLIC_SITE_URL)=' "$ROOT/.env" || true
-"""
-
-    with tempfile.TemporaryDirectory() as tmp:
-        tgz = Path(tmp) / "matanho-app.tgz"
-        print("Packing Matanho...", flush=True)
-        sha = make_tarball(LOCAL_ROOT, tgz)
-        print(f"  {tgz.stat().st_size/1024/1024:.1f} MB sha={sha[:12]}", flush=True)
-
-        client = paramiko.SSHClient()
-        client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        print(f"Connecting {HOST}...", flush=True)
-        client.connect(HOST, 22, USER, PASSWORD, timeout=30, look_for_keys=False, allow_agent=False)
         sftp = client.open_sftp()
-        for remote in ("/tmp/matanho-app.tgz", "/tmp/matanho.env", "/tmp/matanho-up.sh"):
-            try:
-                sftp.remove(remote)
-            except OSError:
-                pass
-        print("Uploading...", flush=True)
-        sftp.put(str(tgz), "/tmp/matanho-app.tgz")
-        with sftp.file("/tmp/matanho.env", "w") as f:
+        with sftp.file(f"{REMOTE_ROOT}/.env", "w") as f:
             f.write(env_body)
-        with sftp.file("/tmp/matanho-up.sh", "w") as f:
-            f.write(f"export APP_SHA={sha}\n" + remote_sh)
-        sftp.chmod("/tmp/matanho-up.sh", 0o755)
+        sftp.chmod(f"{REMOTE_ROOT}/.env", 0o600)
         sftp.close()
+    else:
+        print("Existing .env found — leaving it untouched.")
 
-        print("Building on VPS (this takes a while)...", flush=True)
-        stdin, stdout, stderr = client.exec_command("bash /tmp/matanho-up.sh", timeout=3600, get_pty=True)
-        for line in stdout:
-            print(line, end="", flush=True)
-        err = stderr.read().decode("utf-8", errors="replace")
-        if err.strip():
-            print(err, file=sys.stderr)
-        code = stdout.channel.recv_exit_status()
-        client.close()
-        return code
+    run(client, f"cd {REMOTE_ROOT} && DOCKER_BUILDKIT=1 BUILDKIT_PROGRESS=plain docker compose --env-file .env build", timeout=3600)
+    run(client, f"cd {REMOTE_ROOT} && docker compose --env-file .env up -d --force-recreate")
+    run(client, f"cd {REMOTE_ROOT} && docker compose --env-file .env ps")
+
+    print("\n=== verifying the app actually answers ===")
+    run(client, f"sleep 3; curl -fsS -o /dev/null -w 'health:%{{http_code}}\\n' http://127.0.0.1:{HOST_PORT}/api/health || true")
+    run(client, f"curl -fsS -o /dev/null -w 'home:%{{http_code}}\\n' http://127.0.0.1:{HOST_PORT}/ || true")
+
+    print("MATANHO_GIT_DEPLOY_DONE")
+    print(f"URL={SITE_URL}")
+    client.close()
+    return 0
 
 
 if __name__ == "__main__":
