@@ -384,6 +384,12 @@ export async function loadProcurementV23LiveData(): Promise<ProcurementV23LivePa
     // SRD §7 "Project/Cost Center": the project the requisition is charged to, by id and by name.
     projectId: r.projectId ?? null,
     project: r.project?.name ?? null,
+    // SRD §11: Required Date, Delivery Location and Budget Code. Raw ISO value kept alongside the
+    // display string so the edit form can prefill a native date input (YYYY-MM-DD).
+    requiredDate: r.requiredDate ?? null,
+    requiredDateDisplay: r.requiredDate ? fmtDate(r.requiredDate) : DASH,
+    deliveryLocation: r.deliveryLocation ?? null,
+    budgetCode: r.budgetCode ?? null,
     items: (r.items ?? []).map((i: any) => ({ itemName: i.itemName, quantity: num(i.quantity), unit: i.unit ?? null, unitPrice: num(i.unitPrice) || null })),
   }))
 

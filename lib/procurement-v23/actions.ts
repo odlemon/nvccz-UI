@@ -53,6 +53,7 @@ import {
   sendPurchaseOrder,
   submitRequisition,
   updateRequisition,
+  uploadRequisitionAttachments,
   updateVendor,
   approveVendorRegistration,
   declineVendorRegistration,
@@ -356,6 +357,25 @@ function errorText(err: unknown, fallback: string): string {
   return body.message || fallback
 }
 
+/**
+ * SRD §11 "Attachments": upload whatever is selected on a requisition form's file input, once the
+ * requisition exists (it needs an id to attach to). Never throws — a failed upload should not undo
+ * an otherwise-successful save; the caller folds the note into its own message.
+ */
+async function uploadPrAttachmentsIfAny(formSelector: string, requisitionId: string): Promise<string | null> {
+  const input = document.querySelector<HTMLInputElement>(`${formSelector} [name="attachments"]`)
+  const files = input?.files
+  if (!files || !files.length) return null
+  const form = new FormData()
+  for (const file of Array.from(files)) form.append("files", file)
+  try {
+    await uploadRequisitionAttachments(requisitionId, form)
+    return `${files.length} attachment${files.length === 1 ? "" : "s"} uploaded.`
+  } catch (err) {
+    return `attachment upload failed: ${errorText(err, "the upload failed")}`
+  }
+}
+
 const refuse = (what: string): ProcurementActionResult => ({
   handled: true,
   error: `Your role does not have permission for ${what}.`,
@@ -429,12 +449,20 @@ export async function handleProcurementV23Action(
           justification: val('#prForm [name="motivation"]') || undefined,
           sourcingCategory: val('#prForm [name="category"]') || undefined,
           projectId: val('#prForm [name="project"]') || undefined,
+          // SRD §11: Required Date, Delivery Location, Budget Code.
+          requiredDate: val('#prForm [name="requiredDate"]') || undefined,
+          deliveryLocation: val('#prForm [name="deliveryLocation"]') || undefined,
+          budgetCode: val('#prForm [name="budgetCode"]') || undefined,
           items: lines,
         })
         const number = created?.requisitionNumber ?? "The requisition"
+        // Attachments need the requisition's id, so they upload once it exists — same order the
+        // vendored form promised ("Uploaded when you save").
+        const attachmentNote = created?.id ? await uploadPrAttachmentsIfAny("#prForm", created.id) : null
+        const withAttachmentNote = (msg: string) => (attachmentNote ? `${msg} (${attachmentNote})` : msg)
         if (action === "save-pr") {
           closeRuntimeOverlay()
-          return { handled: true, reload: true, message: `${number} saved as a draft.` }
+          return { handled: true, reload: true, message: withAttachmentNote(`${number} saved as a draft.`) }
         }
         let submitted: Record<string, any>
         try {
@@ -449,7 +477,7 @@ export async function handleProcurementV23Action(
         return {
           handled: true,
           reload: true,
-          message: next ? `${number} submitted for approval: ${next}.` : `${number} submitted for approval.`,
+          message: withAttachmentNote(next ? `${number} submitted for approval: ${next}.` : `${number} submitted for approval.`),
         }
       }
 
@@ -470,10 +498,17 @@ export async function handleProcurementV23Action(
           title,
           justification: val('#editPrFormV11 [name="justification"]') || null,
           ...(document.querySelector('#editPrFormV11 [name="project"]') ? { projectId: val('#editPrFormV11 [name="project"]') || null } : {}),
+          // SRD §11: Required Date, Delivery Location, Budget Code — present whenever the live extra
+          // fields rendered (they always do in live mode; the guard mirrors the project field above).
+          ...(document.querySelector('#editPrFormV11 [name="requiredDate"]') ? { requiredDate: val('#editPrFormV11 [name="requiredDate"]') || null } : {}),
+          ...(document.querySelector('#editPrFormV11 [name="deliveryLocation"]') ? { deliveryLocation: val('#editPrFormV11 [name="deliveryLocation"]') || null } : {}),
+          ...(document.querySelector('#editPrFormV11 [name="budgetCode"]') ? { budgetCode: val('#editPrFormV11 [name="budgetCode"]') || null } : {}),
         })
+        const attachmentNote = await uploadPrAttachmentsIfAny("#editPrFormV11", r.recordId)
+        const withAttachmentNote = (msg: string) => (attachmentNote ? `${msg} (${attachmentNote})` : msg)
         if (action === "save-pr-v11") {
           closeRuntimeOverlay()
-          return { handled: true, reload: true, message: `${r.id} saved.` }
+          return { handled: true, reload: true, message: withAttachmentNote(`${r.id} saved.`) }
         }
         const submitted = await submitRequisition(r.recordId)
         closeRuntimeOverlay()
@@ -482,7 +517,7 @@ export async function handleProcurementV23Action(
         return {
           handled: true,
           reload: true,
-          message: next ? `${r.id} ${verb} for approval: ${next}.` : `${r.id} ${verb} for approval.`,
+          message: withAttachmentNote(next ? `${r.id} ${verb} for approval: ${next}.` : `${r.id} ${verb} for approval.`),
         }
       }
 

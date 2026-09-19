@@ -1806,10 +1806,12 @@ s = replaceUnique(
 // route, who decides it, when it applies and who decided it when (__pr23ApprovalRouteHtml).
 s = replaceUnique(
   s,
-  "${smallV11('Preview motivation','preview-doc-v11',`MOT-${r.id}`,'eye')}</div>`;",
   "${smallV11('Preview motivation','preview-doc-v11',`MOT-${r.id}`,'eye')}</div>${__pr23Live()?__pr23ApprovalRouteHtml(r.approvalRoute):''}`;",
+  // SRD §11 "Attachments" (cycle eight): the read-only view lists what has already been uploaded,
+  // lazy-loaded so opening the register never fires one request per row (__pr23RequisitionAttachmentsBox).
+  "${smallV11('Preview motivation','preview-doc-v11',`MOT-${r.id}`,'eye')}</div>${__pr23Live()?__pr23ApprovalRouteHtml(r.approvalRoute)+__pr23RequisitionAttachmentsBox(r.recordId):''}`;",
   "requisition modal -> approval route",
-  "${__pr23Live()?__pr23ApprovalRouteHtml(r.approvalRoute):''}",
+  "${__pr23Live()?__pr23ApprovalRouteHtml(r.approvalRoute)+__pr23RequisitionAttachmentsBox(r.recordId):''}",
 )
 
 // ---------------------------------------------------------------------------
@@ -1849,19 +1851,22 @@ s = replaceUnique(
   "new requisition -> no request source that is not saved",
   "${__pr23Live()?'':formField('Request source',",
 )
+// SRD §11 "Attachments" (cycle eight): the vendored field above saved nothing, so it stayed hidden in a
+// live session; it is now replaced with a real upload (__pr23RequisitionAttachmentsField), sent to
+// POST /procurement/requisitions/:id/attachments once the requisition exists.
 s = replaceUnique(
   s,
-  "${formField('Attachment','<input type=\"file\" accept=\".pdf,.doc,.docx,.xlsx,.csv\">','full')}",
   "${__pr23Live()?'':formField('Attachment','<input type=\"file\" accept=\".pdf,.doc,.docx,.xlsx,.csv\">','full')}",
-  "new requisition -> no attachment that is not saved",
-  "${__pr23Live()?'':formField('Attachment',",
+  "${__pr23Live()?__pr23RequisitionAttachmentsField():formField('Attachment','<input type=\"file\" accept=\".pdf,.doc,.docx,.xlsx,.csv\">','full')}",
+  "new requisition -> real attachments upload",
+  "${__pr23Live()?__pr23RequisitionAttachmentsField():formField('Attachment',",
 )
 s = replaceUnique(
   s,
-  "<div class=\"field span2\"><label>Supporting documents</label><input type=\"file\" multiple accept=\".pdf,.doc,.docx,.xlsx,.csv\"></div>",
   "${__pr23Live()?'':'<div class=\"field span2\"><label>Supporting documents</label><input type=\"file\" multiple accept=\".pdf,.doc,.docx,.xlsx,.csv\"></div>'}",
-  "edit requisition -> no supporting documents that are not saved",
-  "${__pr23Live()?'':'<div class=\"field span2\"><label>Supporting documents</label>",
+  "${__pr23Live()?__pr23RequisitionAttachmentsField()+__pr23RequisitionAttachmentsBox(r.recordId):'<div class=\"field span2\"><label>Supporting documents</label><input type=\"file\" multiple accept=\".pdf,.doc,.docx,.xlsx,.csv\"></div>'}",
+  "edit requisition -> real attachments upload and list",
+  "${__pr23Live()?__pr23RequisitionAttachmentsField()+__pr23RequisitionAttachmentsBox(r.recordId):",
 )
 s = replaceUnique(
   s,
@@ -1960,24 +1965,24 @@ s = replaceUnique(
 // requisition form suggest items bought before as they are typed (bridge, SRD §3).
 s = replaceUnique(
   s,
-  "__pr23RequisitionEntityField()+__pr23RequisitionDepartmentField()",
   "__pr23RequisitionEntityField()+__pr23RequisitionDepartmentField()+__pr23RequisitionProjectField()",
+  "__pr23RequisitionEntityField()+__pr23RequisitionDepartmentField()+__pr23RequisitionProjectField()+(__pr23Live()?__pr23RequisitionExtraFields():'')",
   "new requisition -> project / cost centre",
-  "__pr23RequisitionDepartmentField()+__pr23RequisitionProjectField()",
+  "+(__pr23Live()?__pr23RequisitionExtraFields():'')",
 )
 s = replaceUnique(
   s,
-  "<div class=\"field span2\"><label>Requirement title</label><input name=\"title\" value=\"${escV11(r.title)}\" required></div>",
   "<div class=\"field span2\"><label>Requirement title</label><input name=\"title\" value=\"${escV11(r.title)}\" required></div>${__pr23Live()?__pr23RequisitionProjectField(r.projectId,'span2'):''}",
+  "<div class=\"field span2\"><label>Requirement title</label><input name=\"title\" value=\"${escV11(r.title)}\" required></div>${__pr23Live()?__pr23RequisitionProjectField(r.projectId,'span2')+__pr23RequisitionExtraFields(r):''}",
   "edit requisition -> project / cost centre",
-  "${__pr23Live()?__pr23RequisitionProjectField(r.projectId,'span2'):''}",
+  "${__pr23Live()?__pr23RequisitionProjectField(r.projectId,'span2')+__pr23RequisitionExtraFields(r):''}",
 )
 s = replaceUnique(
   s,
-  "<div><span>Category</span><strong>${escV11(r.category)}</strong></div>",
   "<div><span>Category</span><strong>${escV11(r.category)}</strong></div>${__pr23Live()?`<div><span>Project</span><strong>${escV11(r.project||'None')}</strong></div>`:''}",
+  "<div><span>Category</span><strong>${escV11(r.category)}</strong></div>${__pr23Live()?`<div><span>Project</span><strong>${escV11(r.project||'None')}</strong></div><div><span>Required date</span><strong>${escV11(r.requiredDateDisplay||'—')}</strong></div><div><span>Delivery location</span><strong>${escV11(r.deliveryLocation||'—')}</strong></div><div><span>Budget code</span><strong>${escV11(r.budgetCode||'—')}</strong></div>`:''}",
   "requisition view -> project / cost centre",
-  "<div><span>Project</span><strong>${escV11(r.project||'None')}</strong></div>",
+  "<div><span>Required date</span>",
 )
 
 // 62b. Requisitions are not budget-checked (live-loaders sets budget to a dash: the backend has no budget check), so the
