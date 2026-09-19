@@ -131,16 +131,62 @@ reproduction run to find the exact triggering condition, or direct instrumentati
 
 ---
 
+## FINDING-PM22-003
+
+**Title:** Alerts & Audit sidebar nav badge always shows "4" regardless of real alert counts
+**Module:** Performance (frontend `nvccz-new`, vendored runtime) · **Dimension:** UAT · **Category:** Hardcoded value masquerading as live data — the exact pattern CLAUDE.md warns about ("sidebar badge counts... found hardcoded rather than computed from real records in more than one module")
+**Severity:** LOW — cosmetic, no functional or data-integrity impact, but actively misleading (implies 4 items need attention when there are none)
+**Persona affected:** Every staff user viewing any `/performance/*` page
+**Surface:** `matanho-performance-runtime.js`'s `renderNav()`
+
+### Steps to reproduce (live on dev, 19 September 2026)
+
+The "Alerts & Audit" sidebar item showed a "4" count badge on every Performance page, while
+`/performance/alerts` itself (already correctly live-wired per `perf-patches/alerts.mjs`) showed
+**Critical alerts: 0, Escalated items: 0, Resolved: 0** the entire time. Traced to `renderNav()`:
+`${p==='alerts'?`<span class="nav-count">${state.notifications}</span>`:''}`, where `state.notifications`
+is set once in the initial `state` object literal to the literal `4` and never updated anywhere in the
+file — a leftover client demo fixture from before this module had any live-data wiring at all.
+
+### Fix
+
+New `scripts/perf-patches/_nav-badge.mjs` (following this module's established per-page patch-file
+convention, `perf-patches/alerts.mjs` etc.): computes the badge from the same `alertSummary` scope the
+Alerts & Escalations page already reads (`critical + escalated`), hides the badge entirely when that
+total is zero or the scope hasn't loaded, rather than showing a stale number or a bare "0" pill.
+`matanho-performance-runtime.js` regenerated via the patch script (never hand-edited directly, per this
+module's Phase 0 safety net). Verified idempotent: `--check` reports `applied=0 skipped=305 missed=0`
+after applying for real.
+
+Commit `0efa691`, branch `feature/performance-v22-live`.
+
+### Verification
+
+*(Fill in once deployed to dev `ui-staff`: reload any `/performance/*` page and confirm the Alerts &
+Audit sidebar badge is gone — 0 real critical/escalated alerts exist in this environment, so the badge
+should not render at all.)*
+
+**Status:** FIXED — pushed to `origin/feature/performance-v22-live`. Live re-verification pending. Not merged to `dev`/`master`/prod.
+
+---
+
 ## Phase 0/1 coverage so far
 
-Module-identity/routing (FINDING-PM22-001, fixed) and one navigation race condition (FINDING-PM22-002,
-open) found. Screens checked so far, live, with real data and no other defects found: Command Centre
-(Executive Command Centre, honest empty states for enterprise performance/KPI attainment/review
-completion/strategic alignment), Company Strategy (honest "no strategy cycle configured" empty states
-across every section), Scorecards (Organization BSC view, honest "no goals recorded yet"), Objectives &
-Key Results (honest empty state), Tasks & Projects (real task data: active/overdue/completion-rate
-counts, To Do / In Progress board columns with real assignees and due dates), Performance Reviews
-(honest "no performance reviews have been created yet"). Not yet covered: Corrective Actions, Reports &
-Compliance, Document Vault, Alerts & Audit, Access & Settings, Departments, Integrations, KPI Analytics,
-KPI Management, Timesheets, Performance Contracts, Risk Register, Compliance Centre, BSC Pillars. That's
-the next step, following the same live-browser-testing standard as every other module in this sweep.
+Module-identity/routing (FINDING-PM22-001, fixed), one navigation race condition (FINDING-PM22-002,
+open), and one hardcoded nav badge (FINDING-PM22-003, fixed) found. Screens checked so far, live, with
+real data and no other defects found: Command Centre (Executive Command Centre, honest empty states for
+enterprise performance/KPI attainment/review completion/strategic alignment), Company Strategy (honest
+"no strategy cycle configured" empty states across every section), Scorecards (Organization BSC view,
+honest "no goals recorded yet"), Objectives & Key Results (honest empty state), Tasks & Projects (real
+task data: active/overdue/completion-rate counts, To Do / In Progress board columns with real assignees
+and due dates), Performance Reviews (honest "no performance reviews have been created yet"), Corrective
+Actions (honest empty states across every stat), Reports & Compliance (Report Library/Compliance
+Centre/Scheduled Reports tabs, honest empty states — noted a minor cosmetic nav-highlight ambiguity:
+"Reports" and "Compliance Centre" are two separate sidebar entries that both link to `/performance/reports`,
+so a fresh load's active-highlight picks whichever is later in the nav list rather than "Reports"; not
+worth a dedicated finding since the page content itself is correct either way), Document Vault (honest
+"No documents yet", correct nav highlight), Alerts & Audit (honest empty states, see FINDING-PM22-003 for
+the nav badge issue found here). Not yet covered: Access & Settings, Departments, Integrations, KPI
+Analytics, KPI Management, Timesheets, Performance Contracts, Risk Register, Compliance Centre (the
+dedicated sidebar entry, not the Reports tab), BSC Pillars. That's the next step, following the same
+live-browser-testing standard as every other module in this sweep.
