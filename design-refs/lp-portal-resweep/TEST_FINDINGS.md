@@ -126,6 +126,48 @@ case this branch needed to serve. Not yet deployed/live-verified — do that bef
 sending a message and confirming it now appears in the thread and updates `GET /lp-portal/messages`'s
 `lastMessagePreview` for this conversation.
 
+**Deployed and live-verified 2026-09-19 21:38 UTC**: sent "Post-fix verification message" on the same
+thread — it now appears immediately under the Arcus Team reply, attributed to "You", and the conversation
+list preview updated to show it as the latest message. Fixed and confirmed.
+
+### Documents: download 500'd — Critical, found and fixed (separate from the messaging bug, same session)
+
+Also prompted by the direct question about whether Documents actually work. Downloading the one seeded
+document ("LP SRD Seed — Q1 Investor Pack") returned `500 {"code":"LP_EXPORT_FAILED","message":"Failed to
+download file: Request failed with status code 404"}`.
+
+Root cause: the document's DB row (`storagePath: /app/uploads/lp-portal/seed/lp-srd-seed-q1.txt`) was
+created by a one-off manual fixture script (`scripts/seed-lp-portal-srd-demo.ts`, run once on 2026-08-18),
+not by the container's own automatic boot-time seed (`RUN_SEED=1` only runs `ensure-admin.js`). `/app/uploads`
+was never a mounted volume the way `/app/storage/local-upload-mock` is, so the file that script wrote lived
+only in that one container's writable layer — wiped on the next `docker compose build && up
+--force-recreate api`, which is a routine, frequent operation (I did it 4+ times earlier in this same
+session). The DB row survives (MySQL has its own volume); the file does not. **This isn't specific to this
+one document** — any locally-seeded or manually-placed file under `/app/uploads` is subject to the same
+silent loss on the next API rebuild.
+
+Fixed on `nvccz-new` branch `feature/lp-portal-resweep-live`: added a named Docker volume
+(`arcus_dev_api_uploads:/app/uploads`) to the `api` service in `deploy/arcus/docker-compose.dev.yml`
+(version-controlled, syncs to the live VPS compose on the next full UI deploy). Applied immediately on the
+live dev VPS: synced the compose file, recreated the `api` container with the new volume, and restored the
+missing file's exact original bytes (`docker cp`, not shell `printf`, after a first attempt with `printf
+'\xe2\x80\x94'` inside the container's `sh` produced the wrong bytes — verified the checksum matched the
+DB's stored `sha256` before considering it fixed, not just that a file existed). Live-verified:
+`GET /lp-portal/documents/.../download` now returns 200 with the exact original content.
+
+### Notices and document-access audit — confirmed working correctly (no fix needed)
+
+Also tested directly since these were named in the same question: acknowledging the seeded notice moved it
+from "Opened" (Ack. Required: 1) to "Acknowledged" (Acknowledged: 1) correctly via a real
+`POST /lp-portal/notices/:id/acknowledge` call. The Documents screen's "Download History" panel showed real,
+correct entries (user id, real IP, real timestamps) from my own earlier direct API test downloads this
+session — confirming the Q9 document-access audit fix (`lpDocumentAccessAudit`) is not just writing
+correctly but is also being read back and displayed correctly in the UI. One unrelated minor note, not
+investigated further: the "Secure Downloads YTD" KPI card showed 0 despite the visible download history
+having 2 real entries from today — possibly a similar "hardcoded/stale counter" pattern seen elsewhere in
+this codebase; flagging for whoever picks this module up next rather than chasing a third investigation in
+the same pass.
+
 ### New observation while verifying the Q11 fix — TVPI computed two different ways for the same fund
 
 Not fixed, flagging for a follow-up: comparing `GET /lp-portal/performance?fundId=<growth-fund-v>` against
