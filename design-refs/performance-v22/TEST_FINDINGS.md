@@ -186,7 +186,87 @@ Centre/Scheduled Reports tabs, honest empty states — noted a minor cosmetic na
 so a fresh load's active-highlight picks whichever is later in the nav list rather than "Reports"; not
 worth a dedicated finding since the page content itself is correct either way), Document Vault (honest
 "No documents yet", correct nav highlight), Alerts & Audit (honest empty states, see FINDING-PM22-003 for
-the nav badge issue found here). Not yet covered: Access & Settings, Departments, Integrations, KPI
-Analytics, KPI Management, Timesheets, Performance Contracts, Risk Register, Compliance Centre (the
-dedicated sidebar entry, not the Reports tab), BSC Pillars. That's the next step, following the same
-live-browser-testing standard as every other module in this sweep.
+the nav badge issue found here). Performance Contracts also checked: honest empty states throughout
+("No performance contracts yet").
+
+---
+
+## FINDING-PM22-004
+
+**Title:** A second, independent decoration layer intermittently shows a raw fabricated "governance" banner (99.2% data quality, 6 open approvals, 5 control exceptions, "Healthy" service health) instead of the honest, already-fixed collapsed summary every other page uses
+**Module:** Performance (frontend `nvccz-new`, vendored runtime) · **Dimension:** UAT · **Category:** Hardcoded values masquerading as live data, race condition between two competing legacy decoration layers
+**Severity:** MEDIUM — prominently visible fabricated numbers (not hidden in a collapsed section like the equivalent content on other pages), on multiple pages, intermittently
+**Persona affected:** Any staff user viewing Departments, KPI Analytics, or (per the code, not yet individually confirmed) any of Command Centre/Strategic Themes/Performance Contracts/Timesheets/Performance Reports/Ad-hoc Report Studio/Scheduled Reports/Report History/KPI Management/BSC Pillars/Integration Mapping/Settings, depending on a timing race
+**Surface:** `matanho-performance-runtime.js` — two independent functions, `enrich10()`/`wrapSystemMeta()` (the "V7" layer) and `decorateV8()` (the "V8" layer), both inject a governance-metadata banner using the same CSS class names
+
+### Steps to reproduce (live on dev, 19 September 2026)
+
+1. `/performance/departments` — a "Data quality 99.2% · 12 connected sources / Evidence coverage 96% /
+   Open approvals 6 / Control exceptions 5, 2 require attention / Service health Healthy" strip renders
+   directly and prominently below the page header, in the exact same visual position where every other
+   page tested this round (Company Strategy, Scorecards, Corrective Actions, Reports & Compliance,
+   Document Vault, Alerts & Audit) instead shows a collapsed, honest `<details>` disclosure reading
+   "Audit on · governed data · data quality not yet measured".
+2. `/performance/kpi-analytics` — same raw fabricated strip, same five numbers, verbatim.
+3. `/performance/contracts` (Performance Contracts) — by contrast, shows the honest collapsed version,
+   **despite being on the same page list** as Departments and KPI Analytics in the code (see below) —
+   proving this is not a fixed per-page split, but a timing-dependent race.
+
+### Root cause
+
+Two entirely separate functions independently inject a metadata banner using the identical class names
+(`enterprise-page-meta-v7`, `enterprise-decision-strip-v7`):
+
+- **The V7 layer** (`enrich10()`, driven by a `MutationObserver` on `#workspace`): builds the banner via
+  `pageMetaV7()`/`decisionStripV7()`, then immediately calls `wrapSystemMeta()`, which moves both
+  elements inside a collapsed `<details class="v10-system-meta">` whose visible `<summary>` is the
+  honest "Audit on · governed data · data quality not yet measured" line — this is what every correctly-
+  behaving page in this round's testing actually showed.
+- **The V8 layer** (`decorateV8()`, called from a different render hook, covering a named page list:
+  `dashboard, themes, contracts, timesheets, performanceReports, adHocReports, scheduledReports,
+  reportHistory, kpiAnalytics, kpiManagement, departments, bscPillars, integrations, settings`): builds
+  its **own** banner with the same class names but its **original, never-updated fabricated numbers**
+  (`99.2%`, `6`, `5`, `"Healthy"`, literal strings, no `__perfObject`/`__perfScope` call anywhere in this
+  function), guarded only by `if (!page.querySelector('.enterprise-page-meta-v7'))` — i.e. "inject my
+  version only if nobody already put one there." It never calls `wrapSystemMeta()` and is never itself
+  wrapped by it.
+
+Whichever layer's injection runs first for a given page load wins: if the V7 layer's `MutationObserver`
+callback fires first, its honest wrapped version occupies the DOM position and the V8 layer's own guard
+correctly no-ops; if the V8 layer's render hook fires first, its raw fabricated banner occupies the
+position instead, and by the time the V7 layer's observer callback runs, `wrapSystemMeta()`'s own guard
+(`if (!p || p.querySelector('.v10-system-meta')) return`) doesn't stop it, but the elements it collapses
+at that point are the **V8 layer's own fabricated ones** — so on a "V8 wins" load, wrapping might still
+apply afterward, or might not, depending on exact `MutationObserver` batching order. Whether the
+downstream wrap ever recovers the V8 output was not tested precisely; the reproduction above shows at
+least one persistent visible failure mode (Departments, KPI Analytics) where it plainly does not.
+
+### Assessment
+
+Not fixed in this pass. This is a deeper, page-list-wide architectural race between two legacy
+decoration layers that predate this module's live-data wiring, not a single-value fix like
+FINDING-PM22-003. A durable fix needs one of: (a) deleting the V8 layer's own banner injection entirely
+and letting the already-correct, already-honest V7 layer be the only one that ever runs (cleanest, if
+nothing else specifically depends on `decorateV8()`'s version existing), or (b) making `decorateV8()`
+call `wrapSystemMeta()` itself and, like `_nav-badge.mjs`, replacing its five hardcoded values with real
+computations (`__perfObject('alertSummary')` for open approvals/exceptions if that's genuinely what they
+represent — unconfirmed — otherwise honest dashes). Recommend (a) unless investigation turns up a reason
+the V8 layer's banner needs to exist independently.
+
+**Status:** OPEN — confirmed real and reproducible on 2 of ~14 potentially-affected pages (Departments,
+KPI Analytics), confirmed absent (correctly showing the honest version) on a 3rd page from the same list
+(Performance Contracts), proving the failure is a timing race rather than deterministic per page.
+Root cause identified with reasonable confidence; fix direction recommended above but not attempted.
+
+---
+
+## Phase 0/1 coverage so far (updated)
+
+Findings: PM22-001 (module-identity, fixed), PM22-002 (intermittent nav content-not-updating, open),
+PM22-003 (hardcoded alert nav badge, fixed), PM22-004 (intermittent fabricated governance banner, open).
+Screens checked this round with no *additional* new defects beyond what's captured above: Departments
+(real department/employee counts, honest per-department stats aside from the PM22-004 banner),
+KPI Analytics (fully honest content aside from the PM22-004 banner). Not yet covered: Access & Settings,
+Integrations, KPI Management, Timesheets, Risk Register, Compliance Centre (the dedicated sidebar entry,
+not the Reports tab), BSC Pillars. That's the next step, following the same live-browser-testing standard
+as every other module in this sweep.
