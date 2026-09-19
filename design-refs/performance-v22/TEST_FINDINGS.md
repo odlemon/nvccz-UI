@@ -89,10 +89,58 @@ highlighted at all on `/performance` (the resolved module, `performance-manageme
 
 ---
 
+## FINDING-PM22-002
+
+**Title:** Sidebar client-side navigation intermittently leaves the previous page's content on screen after the URL has already changed
+**Module:** Performance (frontend `nvccz-new`) · **Dimension:** UAT · **Category:** Client-side routing race condition — matches CLAUDE.md's documented "Tab-switching bug pattern"
+**Severity:** MEDIUM — when it happens, the user sees stale content with no visible error, and the sidebar can show the wrong item highlighted; a manual reload always recovers
+**Persona affected:** Any staff user navigating between Performance sub-pages via the sidebar
+**Surface:** `components/performance-v22-mock/performance-v22-app.tsx`'s `pathname`-keyed `setPage` effect; `matanho-performance-runtime.js`'s internal `render()`/page-switch logic
+
+### Steps to reproduce (live on dev, 19 September 2026) — intermittent, not always reproducible
+
+1. Fresh load of `/performance` (Command Centre) → click **Goals & KPIs** in the sidebar. URL correctly
+   becomes `/performance/objectives`; content correctly shows "Objectives & Key Results". (Works.)
+2. From there, click **Tasks & Projects**. URL correctly becomes `/performance/tasks`, and the sidebar
+   highlights **both** "Goals & KPIs" and "Tasks & Projects" simultaneously — but the main content area
+   is still showing "Objectives & Key Results" verbatim, not the Tasks & Projects page. A full page
+   reload at the same URL renders Tasks & Projects correctly, confirming the underlying data/route is
+   fine and this is a client-side render-sync issue, not a data or routing bug.
+3. **Re-attempted the identical sequence twice more** (fresh `/performance/objectives` load → click
+   Tasks & Projects) to gauge reliability: both retries updated the content correctly. A third distinct
+   pairing (Tasks & Projects → Performance Reviews) also updated correctly on the first attempt. **This
+   is intermittent**, not a deterministic per-page-pair failure — most likely a race between the
+   previous page's in-flight async data load and the new page's `render()` call, where a late-arriving
+   response for the old page re-renders it after the runtime already switched `state.page`.
+
+### Assessment
+
+Confirmed real and matches a known pattern already called out project-wide in `CLAUDE.md` ("Tab-
+switching bug pattern... Check this explicitly on any tabbed UI you touch"), but the intermittent,
+timing-dependent nature makes it expensive to pin down precisely without instrumenting the (large,
+partially-minified) vendored runtime's own render/page-switch internals — a materially bigger
+investigation than the module-identity fix above. Not attempted in this pass; logging it clearly so it
+isn't mistaken for "no navigation bugs found" and so whoever picks this up next has an exact repro
+attempt count (1 failure in ~4 attempts) to calibrate expectations rather than assuming it's either
+constant or a one-off fluke.
+
+**Status:** OPEN — confirmed real (screenshotted, with URL/content mismatch verified via
+`window.location.pathname`), intermittent, root cause not yet isolated. Needs either a longer
+reproduction run to find the exact triggering condition, or direct instrumentation of the runtime's
+`render()`/`setPage()` internals.
+
+---
+
 ## Phase 0/1 coverage so far
 
-Only the module-identity/routing question above has been investigated and fixed. No screen-by-screen
-live testing (Command Centre, Company Strategy, Scorecards, Objectives & KPIs, Tasks & Projects,
-Performance Reviews, Corrective Actions, Reports & Compliance, Document Vault, Alerts & Audit, Access &
-Settings, Departments, Integrations, KPI Analytics, Timesheets) has started yet — that's the next step,
-following the same live-browser-testing standard as every other module in this sweep.
+Module-identity/routing (FINDING-PM22-001, fixed) and one navigation race condition (FINDING-PM22-002,
+open) found. Screens checked so far, live, with real data and no other defects found: Command Centre
+(Executive Command Centre, honest empty states for enterprise performance/KPI attainment/review
+completion/strategic alignment), Company Strategy (honest "no strategy cycle configured" empty states
+across every section), Scorecards (Organization BSC view, honest "no goals recorded yet"), Objectives &
+Key Results (honest empty state), Tasks & Projects (real task data: active/overdue/completion-rate
+counts, To Do / In Progress board columns with real assignees and due dates), Performance Reviews
+(honest "no performance reviews have been created yet"). Not yet covered: Corrective Actions, Reports &
+Compliance, Document Vault, Alerts & Audit, Access & Settings, Departments, Integrations, KPI Analytics,
+KPI Management, Timesheets, Performance Contracts, Risk Register, Compliance Centre, BSC Pillars. That's
+the next step, following the same live-browser-testing standard as every other module in this sweep.
