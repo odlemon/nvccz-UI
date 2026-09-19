@@ -4,6 +4,7 @@
  */
 import fs from "fs"
 import path from "path"
+import { spawnSync } from "child_process"
 
 const CLIENT =
   process.env.PM22_CLIENT_PACKAGE ||
@@ -442,6 +443,23 @@ for (const [id, p, name] of pages) {
   fs.mkdirSync(dir, { recursive: true })
   fs.writeFileSync(path.join(dir, "page.tsx"), pageTpl(name))
 }
+}
+
+// Always re-apply hand patches so regenerations stay safe (mirrors
+// extract-portfolio-v25.mjs's T0.1 pattern and extract-investee-portal-v8.mjs's equivalent).
+// This runtime shipped with zero backend wiring at all until scripts/patch-performance-runtime.mjs's
+// live-data bridge (see that file's own header for the full incident context); an unconditional
+// extract like the rest of this script performs would otherwise silently wipe it on every regeneration,
+// the same incident class already hit once on Portfolio (ba32eef).
+const patch = spawnSync(process.execPath, ["scripts/patch-performance-runtime.mjs"], {
+  encoding: "utf8",
+  cwd: process.cwd(),
+})
+if (patch.stdout) process.stdout.write(patch.stdout)
+if (patch.stderr) process.stderr.write(patch.stderr)
+if (patch.status !== 0) {
+  console.error("patch-performance-runtime.mjs failed — runtime written but unpatched")
+  process.exit(patch.status || 1)
 }
 
 console.log("done")
