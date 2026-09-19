@@ -305,19 +305,28 @@ export const MODULE_CONFIG: ModuleConfig[] = [
     description: "Matanho Performance Management — command centre, scorecards, reviews and compliance",
     icon: CiViewTimeline,
     color: "oklch(0.55 0.16 280)",
-    path: "/performance-v22",
+    // Real canonical route is /performance (see middleware.ts's ROLE_PERMISSIONS_MAP comment,
+    // "Performance Management (Matanho V22 — canonical /performance)"); /performance-v22 itself just
+    // redirects there. Before this fix these paths still said /performance-v22/*, which meant
+    // getModuleByPath('/performance') matched only the old, superseded `performance-management` entry
+    // (this one never claimed the path at all, so there was no ambiguity for the supersededness
+    // tie-break below to resolve) -- ClientDesignModuleShell's defaultModuleId="performance-v22" got
+    // silently overwritten with "performance-management" on every mount, and every permission check
+    // keyed by module id evaluated the wrong id. Exact same incident class already fixed for Portfolio
+    // (portfolio-v11's config said /portfolio-v11 after the real rename to /portfolio).
+    path: "/performance",
     subModules: [
-      { id: "pm22-dashboard", name: "Command Centre", path: "/performance-v22", icon: CiGrid41, description: "Command Centre" },
-      { id: "pm22-strategy", name: "Company Strategy", path: "/performance-v22/strategy", icon: CiFileOn, description: "Company Strategy" },
-      { id: "pm22-scorecards", name: "Scorecards", path: "/performance-v22/scorecards", icon: CiViewTable, description: "Scorecards" },
-      { id: "pm22-objectives", name: "Objectives & KPIs", path: "/performance-v22/objectives", icon: CiCircleCheck, description: "Objectives & KPIs" },
-      { id: "pm22-tasks", name: "Tasks & Projects", path: "/performance-v22/tasks", icon: CiViewList, description: "Tasks & Projects" },
-      { id: "pm22-reviews", name: "Performance Reviews", path: "/performance-v22/reviews", icon: CiFileOn, description: "Performance Reviews" },
-      { id: "pm22-corrective", name: "Corrective Actions", path: "/performance-v22/corrective", icon: CiViewTimeline, description: "Corrective Actions" },
-      { id: "pm22-reports", name: "Reports & Compliance", path: "/performance-v22/reports", icon: CiViewTable, description: "Reports & Compliance" },
-      { id: "pm22-vault", name: "Document Vault", path: "/performance-v22/vault", icon: CiFileOn, description: "Document Vault" },
-      { id: "pm22-alerts", name: "Alerts & Audit", path: "/performance-v22/alerts", icon: CiBellOn, description: "Alerts & Audit" },
-      { id: "pm22-access", name: "Access & Settings", path: "/performance-v22/access", icon: CiSettings, description: "Access & Settings" },
+      { id: "pm22-dashboard", name: "Command Centre", path: "/performance", icon: CiGrid41, description: "Command Centre" },
+      { id: "pm22-strategy", name: "Company Strategy", path: "/performance/strategy", icon: CiFileOn, description: "Company Strategy" },
+      { id: "pm22-scorecards", name: "Scorecards", path: "/performance/scorecards", icon: CiViewTable, description: "Scorecards" },
+      { id: "pm22-objectives", name: "Objectives & KPIs", path: "/performance/objectives", icon: CiCircleCheck, description: "Objectives & KPIs" },
+      { id: "pm22-tasks", name: "Tasks & Projects", path: "/performance/tasks", icon: CiViewList, description: "Tasks & Projects" },
+      { id: "pm22-reviews", name: "Performance Reviews", path: "/performance/reviews", icon: CiFileOn, description: "Performance Reviews" },
+      { id: "pm22-corrective", name: "Corrective Actions", path: "/performance/corrective", icon: CiViewTimeline, description: "Corrective Actions" },
+      { id: "pm22-reports", name: "Reports & Compliance", path: "/performance/reports", icon: CiViewTable, description: "Reports & Compliance" },
+      { id: "pm22-vault", name: "Document Vault", path: "/performance/vault", icon: CiFileOn, description: "Document Vault" },
+      { id: "pm22-alerts", name: "Alerts & Audit", path: "/performance/alerts", icon: CiBellOn, description: "Alerts & Audit" },
+      { id: "pm22-access", name: "Access & Settings", path: "/performance/access", icon: CiSettings, description: "Access & Settings" },
     ]
   },
   {
