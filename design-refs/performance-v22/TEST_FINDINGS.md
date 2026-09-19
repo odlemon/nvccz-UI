@@ -260,13 +260,28 @@ Root cause identified with reasonable confidence; fix direction recommended abov
 
 ---
 
-## Phase 0/1 coverage so far (updated)
+## Coverage: complete — all 16 screens live-tested
 
-Findings: PM22-001 (module-identity, fixed), PM22-002 (intermittent nav content-not-updating, open),
-PM22-003 (hardcoded alert nav badge, fixed), PM22-004 (intermittent fabricated governance banner, open).
-Screens checked this round with no *additional* new defects beyond what's captured above: Departments
-(real department/employee counts, honest per-department stats aside from the PM22-004 banner),
-KPI Analytics (fully honest content aside from the PM22-004 banner). Not yet covered: Access & Settings,
-Integrations, KPI Management, Timesheets, Risk Register, Compliance Centre (the dedicated sidebar entry,
-not the Reports tab), BSC Pillars. That's the next step, following the same live-browser-testing standard
-as every other module in this sweep.
+Findings: PM22-001 (module-identity, **fixed & verified**), PM22-002 (intermittent nav content-not-
+updating, **open**), PM22-003 (hardcoded alert nav badge, **fixed & verified**), PM22-004 (intermittent
+fabricated governance banner, **open**, fix direction documented).
+
+Every sidebar screen checked live: Command Centre, Company Strategy, Scorecards, Objectives & KPIs
+(Goals & KPIs), Tasks & Projects, Performance Reviews, Corrective Actions, Reports & Compliance
+(including its Compliance Centre tab), Document Vault, Alerts & Audit, Performance Contracts,
+Departments, KPI Analytics, KPI Management, Timesheets, Risk Register (including its Risk Matrix tab —
+the exact tab-switching bug class CLAUDE.md flags by name for this screen was specifically re-tested and
+did **not** reproduce; tab content switched correctly), Access & Settings, BSC Pillars. All render either
+real live data or honest "not yet tracked" empty states; no fabricated numbers found beyond FINDING-
+PM22-004's already-documented banner. One minor cosmetic note (not a dedicated finding): the "Reports"
+and "Compliance Centre" sidebar entries both link to the same `/performance/reports` URL, and clicking
+"Compliance Centre" doesn't deep-link to that page's own Compliance Centre tab specifically — lands on
+whichever tab was last active (defaults to Report Library). Low value to fix given the destination page
+is correct either way.
+
+**Module status: live-testing phase done.** 2 real defects fixed and verified live (PM22-001, PM22-003).
+2 real defects found, root-caused, and documented with a recommended fix direction but not yet fixed
+(PM22-002 intermittent nav race, PM22-004 intermittent fabricated banner race) — both are variations of
+the same underlying "multiple decoration/render layers race on the same DOM" architecture issue and may
+be worth investigating together. Not yet merged to `dev`/`master`/prod — checkpointing before that
+merge, per this sweep's standing convention.
