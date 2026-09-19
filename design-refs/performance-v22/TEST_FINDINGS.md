@@ -75,13 +75,17 @@ Commit `6adfe61`, branch `feature/performance-v22-live`.
 
 ### Verification
 
-*(Fill in once the ui-staff deploy carrying this fix is confirmed: reload `/performance` as a staff
-user, and check `ClientDesignModuleShell`'s resolved module id — e.g. via the module switcher's
-highlighted tile, or by adding a temporary console log — now stays `performance-v22`, not
-`performance-management`. Also spot-check `/performance/strategy`, `/performance/scorecards` etc. now
-resolve to a defined module at all, where before they resolved to `undefined`.)*
+Deployed to dev (`ui-staff`), 19 September 2026. Reloaded `/performance` as `admin@nts.com` and opened
+the module switcher ("Switch module"): the **Performance Management** tile is now correctly highlighted
+(blue border + active dot) with description "Matanho Performance Management — command centre,
+scorecards, reviews and compliance" — the `performance-v22` entry's own description, not the old
+module's "Performance tracking and reporting". Before this fix the switcher would have shown no tile
+highlighted at all on `/performance` (the resolved module, `performance-management`, is
+`hiddenFromSwitcher: true` and never appears as a tile to compare against). Repeated on
+`/performance/strategy` — same correct highlight; previously this subroute resolved to `undefined`
+(neither module's pre-fix config claimed that exact path). Confirmed fixed.
 
-**Status:** FIXED — pushed to `origin/feature/performance-v22-live`. Live re-verification in progress (deploy running as of this writing). Not merged to `dev`/`master`/prod.
+**Status:** FIXED and verified live, deployed to dev (`ui-staff`), pushed to `origin/feature/performance-v22-live`. Not merged to `dev`/`master`/prod.
 
 ---
 
