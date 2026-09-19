@@ -89,4 +89,41 @@ other document-download surface in this codebase (reports, term sheets) returns 
 building this out as a proper formatted statement — a backend/frontend-doc-generation gap, not a security
 or correctness issue, so not fixed here without a decision on desired layout/branding.
 
+### Q10 — org (LP) manager can't expand entitlements beyond what the GP granted — PASS
+
+`nvccz/src/services/lpPortal/LpPortalColleagueService.ts`: `inviteColleague` (line 55) and `patchColleague`
+(line 131) both explicitly reject promoting a colleague to `MANAGER` unless the caller `ctx.isStaff`
+("Cannot invite/promote another MANAGER via portal", 403) — an LP-side MANAGER can create/edit VIEWER or
+SIGNATORY colleagues only, never another MANAGER. Separately, both methods intersect any `fundIds` passed
+in the request against `ctx.fundScope` (the inviting manager's own granted funds) before writing, so a
+colleague can never be given access to a fund the inviting manager doesn't themselves have. `revokeViewer`
+also refuses to revoke a MANAGER through the colleague API. No regression from baseline; this is a solid,
+narrowly-scoped guard against horizontal/vertical entitlement escalation.
+
+### Q9 — audit records exist for downloads and for bank-instruction changes — PARTIAL, gap fixed
+
+Split into two halves per the guardrail's own wording:
+
+- **Downloads (document vault):** already implemented and working. `LpPortalDocumentsService.get/download/
+  preview` (`nvccz/src/services/lpPortal/LpPortalDocumentsService.ts`) all call a private `audit()` helper
+  that writes VIEW/DOWNLOAD/PREVIEW rows to `lpDocumentAccessAudit` (backing the dedicated
+  `LpDocumentAccessAudit` Prisma model — documentId/clientId/userId/action/ip/userAgent), and `get()` even
+  returns the last 20 access-history rows back to the caller. No gap here; my first grep pass missed this
+  because it searched for the Prisma **model** name (`LpDocumentAccessAudit`, PascalCase) instead of the
+  **client accessor** name (`lpDocumentAccessAudit`, camelCase) actually used in the code — corrected.
+- **Bank-instruction changes: real gap, now fixed.** `LpPortalServiceDeskService.createBankInstructionChange`
+  had no audit call anywhere — confirmed via a repo-wide grep for `audit` (any case) across every
+  `lpPortal/*.ts` service file, which matched only `LpPortalDocumentsService.ts`. Fixed on
+  `nvccz` branch `feature/lp-portal-resweep-live` (commit `e4ef20a`): the method now calls the existing
+  generic `AuditService.log()` (already used by ~10 other domains in this codebase for exactly this
+  action/entityType/entityId/oldValues/newValues/ip/userAgent shape) with `action: "CREATE"`,
+  `entityType: "LpBankInstructionChange"`, recording the requesting user, IP, user agent, and the
+  submitted payload. Controller (`LpPortalController.createBankInstructionChange`) updated to pass
+  `req.ip`/`req.get("user-agent")` through. Deployed to dev (`arcus-dev-api-1`, rebuilt from the clean
+  `feature/lp-portal-resweep-live` worktree) and live-verified: submitted a real
+  `POST /lp-portal/bank-instructions/changes` as `lp.signatory@example.com`, then queried the dev DB
+  directly and confirmed the `audit_logs` row — correct `userId`, `action: "CREATE"`,
+  `entityType: "LpBankInstructionChange"`, `entityId` matching the created change, the submitted payload
+  in `newValues`, real `ipAddress`/`userAgent`. Fixed and confirmed.
+
 ---
