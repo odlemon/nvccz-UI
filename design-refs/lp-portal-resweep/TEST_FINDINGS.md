@@ -96,6 +96,36 @@ already does) or "an idle tab is provably kicked within 60s" (which would need a
 websocket-pushed forced-logout) isn't fully clear from the guardrail's one-line description — flagging
 for a decision rather than guessing and building a heartbeat that might not be wanted.
 
+### Messages tab: replies to a request-linked conversation silently vanish — Critical, found and fixed
+
+Prompted by a direct question about whether messaging, notifications, notices and documents actually work
+end to end — tested by sending real messages rather than just reading screens.
+
+Sent two real messages via the "Messages" tab's conversation composer, on the seeded "LP SRD Seed — Ops
+thread" (linked to service request SR-LPSEED001). Both showed a "Message sent" success toast, and both
+disappeared: the thread view still showed only the original seeded message after reload. This is a false
+positive an investor would have no way to detect from the UI alone — they'd reasonably believe the Arcus
+team had received their message.
+
+Root cause, confirmed by instrumenting `fetch` in the live page and cross-checking both backend endpoints
+directly: `lp-requests-messages-screen.tsx`'s `sendReply()` had a special case — when the open conversation
+thread's `relatedType` contained "REQUEST" (this thread's is `SERVICE_REQUEST`), it posted the reply via
+`replyToRequest()` → `POST /requests/:reference/messages`, which writes into a completely different table
+(`lpServiceRequestMessage`, tied to the service request's own record) than the one this exact screen reads
+from to render the thread and unread badges (`lpMessageThread`/`lpMessage`, via `GET /messages/:id`). The
+POST genuinely succeeded (201, confirmed both new messages sitting in the request's own `messages[]` via a
+direct API call) — it just wrote to the wrong place. `replyToMessageThread()` → `POST /messages/:id/replies`
+is the endpoint that actually appends to the thread being viewed: it updates `lastMessageAt`/`status` on
+the thread and fires a realtime push (`LpPortalRealtimeService.emitThreadMessage`) that staff monitoring is
+presumably wired to — meaning staff likely never saw either of my two test replies at all.
+
+Fixed by removing the `isRequestThread` branch entirely: the composer now always calls
+`replyToMessageThread(activeConversationId, ...)`, matching what `getMessageThread`/`getMessages` already
+read from. This is the only reply composer on the screen (single call site), so there was no legitimate
+case this branch needed to serve. Not yet deployed/live-verified — do that before merging, and re-test by
+sending a message and confirming it now appears in the thread and updates `GET /lp-portal/messages`'s
+`lastMessagePreview` for this conversation.
+
 ### New observation while verifying the Q11 fix — TVPI computed two different ways for the same fund
 
 Not fixed, flagging for a follow-up: comparing `GET /lp-portal/performance?fundId=<growth-fund-v>` against

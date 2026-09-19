@@ -497,24 +497,19 @@ export function LpRequestsMessagesScreen({
     setSendingReply(true)
     try {
       const attachmentIds = replyFiles.length ? await uploadAttachmentFiles(replyFiles) : undefined
-      const isRequestThread = threadDetail?.relatedType?.toUpperCase().includes("REQUEST")
-      if (isRequestThread) {
-        const req =
-          requests.find((r) => r.id === threadDetail?.relatedId) ??
-          requests.find((r) => r.reference === threadDetail?.relatedId)
-        if (req?.reference) {
-          await lpPortalApi.replyToRequest(req.reference, { body: reply.trim(), attachmentIds })
-        } else if (threadDetail?.relatedId) {
-          await lpPortalApi.replyToRequest(threadDetail.relatedId, { body: reply.trim(), attachmentIds })
-        } else {
-          throw new Error("Could not resolve request reference for reply")
-        }
-      } else {
-        await lpPortalApi.replyToMessageThread(activeConversationId, {
-          body: reply.trim(),
-          attachmentIds,
-        })
-      }
+      // This composer always posts to the currently open conversation thread
+      // (`activeConversationId`, from getMessageThread) — the thread view, unread counts and
+      // realtime push all read from that same lpMessageThread/lpMessage pair via
+      // replyToMessageThread. A thread being *linked* to a service request (relatedType
+      // "SERVICE_REQUEST") used to redirect the reply through replyToRequest instead, which
+      // writes to that request's own separate lpServiceRequestMessage log — a real table, just
+      // not the one this screen reads back from. The API call succeeded and showed "Message
+      // sent", but the reply never appeared in the thread the investor was looking at, and never
+      // updated lastMessageAt/unreadCount or triggered the realtime push staff rely on.
+      await lpPortalApi.replyToMessageThread(activeConversationId, {
+        body: reply.trim(),
+        attachmentIds,
+      })
       toast.success("Message sent.")
       setReply("")
       setReplyFiles([])
