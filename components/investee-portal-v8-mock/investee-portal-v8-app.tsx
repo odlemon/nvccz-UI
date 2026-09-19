@@ -76,6 +76,56 @@ function normalizeTermSheetSignatures(payload: InvesteePortalLivePayload): Inves
   }
 }
 
+/**
+ * KPI Centre finding: `company.financialKpis.kpiValues[period]` mixes flat numeric metrics
+ * (NET_PROFIT, CASH_FLOW_NET, ...) with nested meta buckets (`derived`, `manualEntries`, and a
+ * misleadingly-named `AUTO_KPI_FLAT` that is itself a small nested object, not flat at all). The
+ * runtime's own filter only excludes `manualEntries`; the other buckets flow straight into a KPI
+ * card's value and render as the literal string "[object Object]" (its own defensive
+ * `String(k.value ?? '—')` fallback for a non-number value). Rather than deny-listing bucket names
+ * one at a time as new ones appear, drop any key whose value is a plain object -- except spread its
+ * own entries up a level first, so a bucket like `AUTO_KPI_FLAT` still contributes its real metrics
+ * (WORKING_CAPITAL, CASH_OPERATING_NET_APPROX) instead of just disappearing. `derived`'s own values
+ * are a computed ratios bucket (mostly null pending more source statements) which belongs in a
+ * dedicated ratios view, not as bare KPI cards, so it is intentionally dropped rather than flattened.
+ */
+function normalizeFinancialKpis(payload: InvesteePortalLivePayload): InvesteePortalLivePayload {
+  const fk = (payload.company as { data?: { financialKpis?: any } } | null)?.data?.financialKpis
+  const kpiValues = fk?.kpiValues
+  if (!kpiValues || typeof kpiValues !== "object") return payload
+
+  const cleanedKpiValues: Record<string, unknown> = {}
+  for (const [period, values] of Object.entries(kpiValues)) {
+    if (!values || typeof values !== "object") {
+      cleanedKpiValues[period] = values
+      continue
+    }
+    const cleaned: Record<string, unknown> = {}
+    for (const [key, value] of Object.entries(values as Record<string, unknown>)) {
+      if (key === "manualEntries" || key === "derived") continue
+      if (value !== null && typeof value === "object" && !Array.isArray(value)) {
+        for (const [subKey, subValue] of Object.entries(value as Record<string, unknown>)) {
+          if (!(subKey in cleaned)) cleaned[subKey] = subValue
+        }
+        continue
+      }
+      cleaned[key] = value
+    }
+    cleanedKpiValues[period] = cleaned
+  }
+
+  return {
+    ...payload,
+    company: {
+      ...(payload.company as object),
+      data: {
+        ...(payload.company as { data: object }).data,
+        financialKpis: { ...fk, kpiValues: cleanedKpiValues },
+      },
+    },
+  } as InvesteePortalLivePayload
+}
+
 export function InvesteePortalV8App() {
   const rootRef = useRef<HTMLDivElement>(null)
   const apiRef = useRef<RuntimeApi | null>(null)
@@ -102,7 +152,7 @@ export function InvesteePortalV8App() {
 
     const loadLive = () => {
       void loadInvesteePortalLiveData().then((payload) => {
-        const hydrated = normalizeTermSheetSignatures(payload)
+        const hydrated = normalizeFinancialKpis(normalizeTermSheetSignatures(payload))
         apiRef.current?.hydrate?.(hydrated)
         window.MatanhoInvesteeUI?.hydrate?.(hydrated)
       })
