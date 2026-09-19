@@ -75,6 +75,27 @@ unaffected and continues to be the correct place these investors see their own p
 deployed/live-verified — do that before merging (deploy the API fix together with the two chart-height
 fixes above, since both touch this same file/service).
 
+### Q3 — session revocation takes effect within 60 seconds — PASS for active use, caveat for a fully idle tab
+
+Traced the actual mechanism rather than timing it by the clock. `LpPortalColleagueService.revokeViewer` /
+`LpPortalAccessService.revokeMembership` (`nvccz/src/services/lpPortal/LpPortalAccessService.ts:119-134`)
+does two things in one transaction: sets `lpUserRelation.isActive = false` and increments
+`user.tokenVersion`. Every authenticated request — LP portal or otherwise — goes through
+`nvccz/src/middleware/authenticate.ts:67-72`, which re-reads the user from the DB on every single call and
+rejects (401) the instant the JWT's embedded `tokenVersion` claim no longer matches the live DB value; the
+frontend's `api-client.ts` redirects to `/login` on any 401. So revocation is enforced on the very next
+request the revoked session makes — for anyone actively using the portal (clicking around, any page nav,
+any write action), that's within a few seconds, comfortably inside 60s.
+
+**Caveat, not a fix (needs a product decision, not a unilateral change):** there is no polling heartbeat and
+no realtime/websocket push tied to revocation (`LpPortalRealtimeService` emits notice/notification events
+but nothing for session state) — so a session sitting genuinely idle on an already-rendered page, making no
+further requests, would keep showing already-fetched data until the user's next interaction, with no
+enforced upper bound. Whether the original "≤60s" requirement meant "next request is rejected" (which this
+already does) or "an idle tab is provably kicked within 60s" (which would need a new heartbeat/poll or a
+websocket-pushed forced-logout) isn't fully clear from the guardrail's one-line description — flagging
+for a decision rather than guessing and building a heartbeat that might not be wanted.
+
 ## Carried over from the baseline, still to verify or exercise
 
 - **Pending re-run (baseline defects 8, 9):** third Performance chart axis (capital flow) fixed-50M-step
