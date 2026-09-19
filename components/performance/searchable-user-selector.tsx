@@ -59,7 +59,9 @@ export function SearchableUserSelector({
     const q = query.trim().toLowerCase()
     return users.filter((u) => {
       const fullName = `${u.firstName} ${u.lastName}`.toLowerCase()
-      return fullName.includes(q) || u.email.toLowerCase().includes(q)
+      // PROC-FINDING-010: a non-admin caller's GET /users no longer carries email, so this
+      // must not assume it is present.
+      return fullName.includes(q) || (u.email || "").toLowerCase().includes(q)
     })
   }, [users, query])
 

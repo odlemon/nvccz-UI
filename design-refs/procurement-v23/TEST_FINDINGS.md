@@ -1836,6 +1836,182 @@ Also checked on the servers:
 
 ---
 
+## PROC-FINDING-010
+
+**Title:** `GET /users` returns the full internal user directory to any staff account with no permission check — confirmed via a procurement persona; fixed by trimming the response for non-admins
+**Module:** Platform (backend, not procurement-specific) · **Dimension:** QAT · **Category:** Access Control
+**Severity:** MEDIUM — internal-directory information disclosure, not full "administrator API access" (see Root cause)
+**Persona affected:** Every internal staff account's PII (name, email, department, role, internal id, timestamps)
+**Surface:** API · `GET /api/users` (`src/routes/userRoutes.ts:76`)
+
+Found while UAT-testing SRD `NTS_SRD_DT_ProcMS_16_09_2026.pdf` §70 item 1, "normal users cannot access
+administrator APIs", with a procurement persona. The endpoint itself is platform-wide, not
+procurement-specific — recorded here because that is how it surfaced.
+
+*Numbering note: this branch was cut from `origin/dev` at `888f877`, which does not yet contain a
+PROC-FINDING-009 that exists (uncommitted, dated 18 September 2026) in the shared working checkout at
+the time this was written — a vendor-portal-rfq token investigation, closed, not a defect. This entry
+is numbered 010 on the assumption that 009 lands first; renumber on merge if it doesn't.*
+
+### Steps to reproduce
+
+1. Sign in on dev as `proc.requester@nts.local` / `admin123` — role **Operations Member**, department
+   Operations, `deptRole MEMBER`, no admin-adjacent grants (confirmed live: `manage_users: false`).
+2. `GET https://dev-api.matanho.com/api/users?limit=3` with that token.
+3. Compare with `GET /roles` on the same token.
+
+### Expected
+
+Per SRD §70 item 1, a route this sensitive should refuse a normal user the way `/roles` does.
+
+### Actual
+
+- `GET /users` → **200** — full directory: every user's first/last name, email, department, role
+  name, role code, internal id, `createdAt`/`updatedAt`.
+- `GET /roles` (same token) → **403**, correctly refused.
+
+### Root cause
+
+`src/routes/userRoutes.ts:76` — `router.get("/", requireInternalStaffUser(), UserController.getAllUsers)`
+— checks only that the caller is *some* internal staff account, unlike `/roles` or the create-user
+route on the same file (`POST /`, line 378: `requireInternalStaffUser(), requirePermission("manage_users")`).
+
+On the surface this looks like the same class of gap `requireInternalStaffUser()` exists to close
+elsewhere (an external-portal account reaching a staff-only route). It is not: the middleware's own
+header comment (`src/middleware/permissionAuth.ts:9-18`) names this exact route's use case as the
+reason the staff-only check exists at all, rather than a specific permission: *"Use this on any route
+whose data is internal but whose audience is 'all staff', where a specific permission would be too
+narrow -- assignment pickers and directory lookups being the usual case."* The route's own comment
+(line 73-75) repeats it.
+
+That rationale checks out against real traffic, not just the comment. `GET /users` — via
+`lib/api/users-api.ts`'s `usersApi.getAll()`, plus two more direct `apiClient.get('/users')` callers —
+is the shared "pick a colleague" call behind, at minimum: Performance (`task-form.tsx`,
+`searchable-user-selector.tsx`, `kanban-board.tsx` and its create/edit dialogs, `review-create-dialog.tsx`,
+`goals-management.tsx`, and `performance-v22-mock`'s own department-member-count and user-list
+live-loaders), FPA (`fpa-budget-cycles.tsx`, `fpa-workflow-approvals.tsx`, `fpa-worksheet.tsx`,
+`planning-collab-sidebar.tsx`, `workflow-task-drawer.tsx`, `fpa-model-planning-cycle-create-modal.tsx`),
+Payroll (`employee-form.tsx`), Fundraising (`fundraising-create-wizards.tsx`, `fundraising-meetings.tsx`),
+and Portfolio V11 and Accounting V52's own live-loaders/actions. Exactly one caller —
+`lib/api/admin-api.ts`'s `adminApiService.getUsers()`, behind the Admin → Users page — is actually
+admin-only.
+
+Queried live on dev (inside `arcus-dev-api-1`): `manage_users` is held by exactly **1 of 60** seeded
+roles — `admin`. Every Manager-level role lacks it (Finance Manager, CFO, Operations Manager,
+Procurement Manager, HR Manager, Portfolio Manager, Payroll Manager, IT Manager, even
+"System Administrator"). Mirroring the create-user route's `requirePermission("manage_users")` onto
+this GET route — the obvious fix, since that guard exists precisely to gate a narrow,
+privilege-granting action — would 403 the directory lookup for every account except `admin`, breaking
+task assignment, reviewer selection, meeting-invitee pickers, payroll employee selection, and every
+FPA/Portfolio/Accounting user selector, platform-wide, for effectively every real user.
+
+### Fix
+
+The two options below were logged here initially with neither implemented. The owner chose **(b)**:
+keep `requireInternalStaffUser()` (staff-wide access preserved, every picker keeps working) but trim
+the response for a caller who lacks `manage_users`.
+
+- **(a)** A new, broadly-granted permission (e.g. `view_user_directory`), distinct from
+  `manage_users`, seeded `true` for every internal-staff role, gating this route instead.
+- **(b) — chosen.** Keep `requireInternalStaffUser()` (staff-wide) but trim the response for the
+  general listing to what pickers actually render — id, first/last name, department, role name —
+  and drop email, role code, the role's internal id/description and both timestamps unless the
+  caller also holds `manage_users`.
+
+**Shipped:** `UserController.getAllUsers` (nvccz `src/controllers/UserController.ts`) now branches on
+`userHasEffectivePermission(req.user, "manage_users")` — the same check `requirePermission` uses for
+the create-user route. A caller without it gets `{ id, firstName, lastName, userDepartment, role: { name } }`
+per user; a caller with it gets the unchanged full record. Controller-level change only, no schema
+change, no migration. Commit `d969135` on `fix/proc-finding-010-users-directory-trim` (nvccz).
+
+*Concurrent second implementation:* a sibling session fixed the same finding independently, in
+`UserService.getAllUsers` (nvccz `src/services/UserService.ts`) — a `directoryOnly` flag narrows the
+**Prisma select itself** for non-`manage_users` callers, instead of fetching the full row and
+stripping fields in the controller after the fact. Same output shape, verified identical over the
+wire (`{id, firstName, lastName, userDepartment, role:{name}}` vs. full record), the difference being
+that a non-privileged caller's PII never leaves the database in the first place. Commit `6ca36ba` on
+`fix/finding-010-users-directory-trim` (nvccz, note the branch name is *not* the same as `d969135`'s).
+**This is the version actually running on dev right now** — confirmed live inside `arcus-dev-api-1`
+(`grep directoryOnly src/services/UserService.ts` matches; container recreated after `d969135` would
+have landed). Either fix closes the finding; whoever merges to `dev`/`master` should pick one
+`UserController.getAllUsers` implementation and drop the other rather than carrying both.
+
+**Also fixed:** `components/performance/searchable-user-selector.tsx`'s search filter called
+`u.email.toLowerCase()` unguarded — a hard crash for a non-admin user typing into that picker once
+email stopped being present. Guarded to `(u.email || "").toLowerCase()`, matching the guard already
+used elsewhere (e.g. the Performance kanban task dialogs). Commit `6e86cc0` on
+`feature/proc-finding-010-users-directory-docs` (nvccz-new). This component is reached only through
+the superseded `performance-management` module (`hiddenFromSwitcher`, owned by `performance-v22` on
+the live `/performance` path per `lib/config/modules.ts`'s supersession order) — kept as defensive
+hygiene since it is technically still reachable, but it is not the active Performance surface.
+
+### Verification
+
+- Live repro above, confirmed on dev 18 September 2026.
+- Role/permission audit run inside `arcus-dev-api-1` (Prisma query against the live dev DB): 1/60
+  roles (`admin`) holds `manage_users`; sampled 27 live users, 25 lack it, including every
+  Manager-level, CFO, Portfolio Manager and Payroll Manager account.
+- Frontend caller audit: every bare `GET /users` / `apiClient.get('/users')` / `usersApi.getAll()`
+  call site in `nvccz-new` (TypeScript and vendored non-TS runtime alike — no vendored
+  `matanho-*-runtime.js` calls this route directly); no caller found outside the modules listed above.
+- Backend audit: no other controller imports `UserService.getAllUsers` or calls this route
+  server-to-server, so no internal caller depends on the current behaviour either way.
+- **Post-fix, deployed to dev** (API `d969135`, staff portal `6e86cc0`, stamp `20260918-134920`):
+  - `proc.requester@nts.local` (Operations Member, no `manage_users`) → `GET /users` **200**, 22
+    records, each exactly `{id, firstName, lastName, userDepartment, role:{name}}` — no `email`,
+    `roleCode`, `role.id`, `role.description`, `votingPower`, `createdAt` or `updatedAt`.
+  - `admin@nts.com` (holds `manage_users`) → `GET /users` **200**, same 22 records, full unchanged
+    shape (`email`, `departmentRole`, `roleCode`, `votingPower`, `role:{id,name,description}`,
+    `createdAt`, `updatedAt` all present) — no regression for admins.
+  - Browser, logged in as a non-admin staff account: Performance V22's Create Task dialog
+    (`/performance/tasks`) — Owner and Reviewer pickers populate correctly with real names
+    (Tatenda Mlambo, Nyasha Moyo, Tendai Dube, Rumbidzai Chaza, Tariro Moyo, Chipo Ncube, Farai
+    Muchengezi), no crash, no `undefined` text. Confirmed via the page's own resource timing that
+    this call hit `dev-api.matanho.com/api/users` live, and a same-session fetch with the browser's
+    own token round-tripped the trimmed 5-key shape.
+  - Browser, same non-admin session: Accounting V52's Access Control page (`/accounting/access`)
+    loads without error; confirmed live (network + in-page fetch) that it also calls `GET /users`
+    and receives the trimmed shape with no crash. Its "Named-user access register" reads `u.email`
+    directly with no guard, but only assigns it to a display field (never calls a method on it), so
+    a missing email renders as a blank cell, not an error — no code change needed there. (Separately,
+    unrelated to this fix: that table's `scope` column reads a `department` field the API has never
+    returned — the real field is `userDepartment` — so scope already read "—" for every row before
+    and after this change; not a regression, not fixed here.)
+
+**Independent re-verification** (separate session, same day, after the `directoryOnly` implementation
+above became the live one — commands run from `nvccz-new`, `dev-api.matanho.com`):
+
+  - `proc.requester@nts.local` → `GET /users` **200**, every one of 22 rows exactly
+    `{id, firstName, lastName, userDepartment, role:{name}}` — checked the full array, not just
+    row 0. `admin@nts.com` → **200**, same 22 rows, full unchanged shape (`email`, `departmentRole`,
+    `roleCode`, `votingPower`, `role:{id,name,description}`, `createdAt`, `updatedAt` all present).
+  - Browser, logged in as `perf.deptmgr@nts.local` (Operations Manager, no `manage_users`): the
+    Home shell's **People** directory (`/people`, home-v3-mock's live colleague list — not the
+    Performance V22 Create Task Owner/Reviewer dropdown, which on inspection populates from a
+    fixed fixture list of names that do not match any seeded user and never issued a network
+    request to `/users` when opened — that dropdown is not wired to this endpoint and proves
+    nothing about the fix either way). People showed **22 Colleagues** (matches the trimmed
+    row count), real names/departments/roles for every row (e.g. Blessing Sibanda · Finance ·
+    Finance Manager), typing "Blessing" into its search filtered correctly with no crash, and the
+    detail panel's Contact section rendered with no email (expected — trimmed) rather than
+    throwing.
+  - Browser, logged in as `payroll.finmgr@nts.local` (Finance Manager, no `manage_users`): FP&A's
+    **Workflow** page (`/forecasting/workflow`) — the Workflow Tasks table's Assignee/Reviewer
+    columns rendered real names (Admin NTS, Sam Viewer, Jane Signatory) for every row, and opening
+    a task's "Reassign to" picker populated a full dropdown of real seeded names (Ben Jane,
+    Blessing Sibanda, Chiedza Nyathi, ... Tinotenda Marufu) with no blank/`undefined` entries and
+    no crash. This is the FPA workflow approver picker.
+  - No regressions found; both flows above are genuinely wired to `GET /users` (confirmed by name
+    correspondence with the live seeded-user list, not just an absence of errors).
+
+**Status:** FIXED — deployed to dev, verified for both a non-admin and an admin account, and checked
+against two real picker/directory UI flows (Performance V22 task assignment, Accounting V52 Access
+Control), then independently re-checked against two more live flows (Home People directory, FP&A
+Workflow reassign/approver picker). Not deployed to production; the owner decides when to merge and
+promote, and which of the two equivalent backend implementations (`d969135` vs `6ca36ba`) to keep.
+
+---
+
 ## PROC-FINDING-016
 
 **Title:** Generated PO, RFQ ("Invitation to Tender") and GRN controlled documents showed no line items, VAT/quantity detail or linked records — boilerplate only
