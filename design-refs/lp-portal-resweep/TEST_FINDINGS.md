@@ -9,6 +9,44 @@ combinations verified. This re-sweep re-verifies the 2 items marked "pending re-
 guardrails/QA scenarios that baseline explicitly left unexercised, exercises the OPEN_ENDED fund path for
 the first time, and re-checks the cross-module flow now that Portfolio's own live-testing sweep has landed.
 
+## Pending re-run defects: re-verified, both root-caused and fixed
+
+Re-tested against `lp.signatory@example.com` on the live Performance page, selecting a specific fund
+(Arcus Growth Fund V) rather than "All Funds" — that's where both baseline items live.
+
+**Defect 9 (RVPI missing) — superseded by a bigger, related bug, both now fixed.** RVPI is present as its
+own KPI card today (not missing), but selecting a specific fund showed Current NAV $0.00, Paid-In Capital
+$0.00 and TVPI/DPI 0.00x, while the *same* response's `netIrr`/`tvpi`/`dpi`/`rvpi` were correct non-zero
+values (18.7% / 1.27x / 0.50x / 0.77x) — and the "Performance by Fund" table (a separate query) showed the
+correct NAV. Root cause, confirmed by reading `lpPortalMetricSnapshot` directly in the dev DB: this fund's
+cached snapshot row (created 2026-08-18, updated 2026-09-04) stores dollar fields under the pre-rename keys
+`paidIn`/`currentNav`/`distributions`, but `LpPortalPerformanceService.metricsForFund()` reads the
+post-rename keys `totalPaidIn`/`nav`/`totalDistributions` — a silent `?? 0` on every mismatch. The ratio
+fields share the same key name in both shapes, so they alone stayed correct, which is exactly why this
+looked like "RVPI is fine, something else is off" rather than an obvious blank page. Fixed on `nvccz`
+branch `feature/lp-portal-resweep-live` (commit `e82113f`): read both the current and legacy key names.
+Deployed to dev, live-verified: Current NAV now reads $198.76M, Paid-In Capital $156.42M, matching the
+by-fund table.
+
+**Defect 8 (capital-flow chart axis) — the chart was not just mis-labelled, it was fully invisible; found
+and fixed while re-verifying.** After the metrics fix above, the KPI cards were correct but the "Capital
+Activity (Cash Flow)" chart — and the "Performance History" NAV chart above it — stayed completely blank:
+no bars, no axis, no gridlines, just the section header and legend. `getBoundingClientRect()` on both
+charts' `.recharts-responsive-container` elements showed real width but **`height: 0`**. Root cause: both
+containers are `<div className="h-[Npx] min-h-0 flex-1 ...">` inside a `flex flex-col` `<section>` that has
+no definite height of its own (`overflow-hidden`, height driven by content) — `flex-1` compiles to
+`flex: 1 1 0%`, and `flex-basis: 0%` wins over the element's own `h-[Npx]` for sizing purposes when the
+flex container's cross size isn't resolved yet, so Recharts' `ResponsiveContainer` (which sizes off its
+parent via `ResizeObserver`) measures 0 height and never recovers. Confirmed live by toggling the class in
+devtools (`flex-1` → `grow`) and watching both charts render immediately with real data. Fixed at the
+source in `components/lp-portal/screens/lp-performance-screen.tsx` (both chart-container divs, lines ~644
+and ~849): swapped `flex-1` (`flex: 1 1 0%`) for `grow` (`flex-grow: 1`, default `flex-basis: auto`), which
+lets the element's own height act as the basis while still allowing it to grow — same fix validated live
+before touching source. Not yet redeployed to dev (frontend UI deploy queued, since the backend deploy for
+the metrics fix already went out); no other chart in this codebase shares the exact
+`h-[Npx] min-h-0 flex-1` combination (checked via grep across `components/lp-portal/screens/*.tsx`), so
+this looks isolated to these two charts, not a systemic pattern elsewhere.
+
 ## Carried over from the baseline, still to verify or exercise
 
 - **Pending re-run (baseline defects 8, 9):** third Performance chart axis (capital flow) fixed-50M-step

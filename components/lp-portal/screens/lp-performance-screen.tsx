@@ -641,7 +641,7 @@ export function LpPerformanceScreen() {
             </div>
           </div>
 
-          <div className="mt-1 h-[300px] min-h-0 flex-1 px-2 pb-1 pt-2">
+          <div className="mt-1 h-[300px] min-h-0 grow px-2 pb-1 pt-2">
             <ResponsiveContainer width="100%" height="100%">
               <ComposedChart data={chartData} margin={{ top: 18, right: 78, left: 4, bottom: 4 }}>
                 <defs>
@@ -846,7 +846,7 @@ export function LpPerformanceScreen() {
             <span className="shrink-0 pt-0.5 text-[12px] text-[#9ca3af]">Since Inception</span>
           </div>
 
-          <div className="h-[280px] min-h-0 flex-1 px-1 pb-1 pt-1">
+          <div className="h-[280px] min-h-0 grow px-1 pb-1 pt-1">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart
                 data={capitalFlow}
