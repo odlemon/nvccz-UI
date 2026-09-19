@@ -96,6 +96,17 @@ already does) or "an idle tab is provably kicked within 60s" (which would need a
 websocket-pushed forced-logout) isn't fully clear from the guardrail's one-line description — flagging
 for a decision rather than guessing and building a heartbeat that might not be wanted.
 
+### New observation while verifying the Q11 fix — TVPI computed two different ways for the same fund
+
+Not fixed, flagging for a follow-up: comparing `GET /lp-portal/performance?fundId=<growth-fund-v>` against
+`GET /lp-portal/performance/by-fund` for the exact same fund and date, TVPI reads **1.77x** in the former
+(the single-fund summary, recomputed as `(distributions + nav) / paidIn` from the snapshot's raw dollar
+fields) vs **1.27x** in the latter (the `byFund` row, taken directly from the snapshot's own stored `tvpi`
+field) — same fund, same snapshot row, two different numbers depending which endpoint you ask. Both values
+trace to real stored fields (nothing fabricated), but a fund's TVPI shouldn't depend on which screen you're
+looking at it from. Pre-existing, not introduced by this sweep's fixes; not investigated further here since
+it needs a decision on which of the two computations is authoritative before touching either.
+
 ## Carried over from the baseline, still to verify or exercise
 
 - **Pending re-run (baseline defects 8, 9):** third Performance chart axis (capital flow) fixed-50M-step
