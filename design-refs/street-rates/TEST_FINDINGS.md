@@ -120,12 +120,16 @@ deploy's container logs show, unprompted:
 `fetchedAt: 2026-09-20T09:30:52.523Z`, `stale: false` — matching the scheduled run exactly. This confirms
 the schedule fires on its own and the widget picks up the fresh quote without staff intervention.
 
-**Residual risk worth flagging, not a defect in this fix:** because several concurrent QA sessions on this
-engagement redeploy the same shared `arcus-dev-api` container from their own worktrees/branches, a
-subsequent deploy built from a checkout that doesn't include `feature/street-rates-auto-refresh` (e.g. built
-from `master` before this branch merges) will transiently drop the scheduler again until it's redeployed.
-Merging this branch to `master` closes that gap for good — recommended as the next step once this doc is
-reviewed.
+The same collision happened a **second time** ~3 minutes later (container restarted again at
+`09:33:46Z` by another concurrent deploy, scheduler file gone from `dist/` again) — confirming this wasn't a
+one-off but a recurring hazard of several concurrent QA sessions on this engagement redeploying the same
+shared `arcus-dev-api` container from checkouts that don't yet include this fix. Redeployed a third time
+(`09:35:11Z`) to restore it, then closed the gap at the source: fast-forward merged
+`feature/street-rates-auto-refresh` straight into `nvccz`/master (`bc72624` → `e05193f`, clean fast-forward,
+pushed to origin) so any future deploy — from this engagement's other concurrent sessions or otherwise —
+that builds from a fresh `master` checkout now includes the scheduler by default, rather than depending on
+this feature branch surviving until someone remembers to merge it. Final state confirmed stable: container
+`arcus-dev-api-1` healthy, `RestartCount=0`, `StreetRateAutoRefreshScheduler.js` present in `dist/`.
 
 ## Coverage note
 
