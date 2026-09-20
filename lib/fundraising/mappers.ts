@@ -194,7 +194,19 @@ export function mapOpportunityRow(raw: Record<string, any>) {
     priority: raw.priority || 'MEDIUM',
     status: raw.status || 'OPEN',
     currency: raw.opportunityCurrency || 'USD',
-    ageDays: asNumber(raw.daysInStage ?? raw.ageDays),
+    // The backend never sends daysInStage/ageDays (no stage-transition timestamp exists to
+    // compute it from), so this silently fell back to asNumber(undefined) -> 0 for every
+    // opportunity — a 12-day-old deal showed "0d" next to real activity going back weeks.
+    // updatedAt is the closest real signal to "time in current stage" available today (any
+    // stage move updates the record), so use days-since-updatedAt as an honest approximation
+    // rather than a wrong zero. A precise "days in stage" needs a real backend field tracking
+    // stage-entry time — flagged as a backend-ask, not guessed at further here.
+    ageDays:
+      raw.daysInStage != null || raw.ageDays != null
+        ? asNumber(raw.daysInStage ?? raw.ageDays)
+        : raw.updatedAt
+          ? Math.max(0, Math.round((Date.now() - new Date(raw.updatedAt).getTime()) / 86400000))
+          : 0,
     raw,
   }
 }
