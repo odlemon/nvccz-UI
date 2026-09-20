@@ -132,6 +132,7 @@ function UsersDataTable({
                     <Button
                       variant="gradient-update"
                       size="icon"
+                      aria-label={`Edit ${row.firstName} ${row.lastName}`}
                       onClick={(e) => {
                         e.stopPropagation()
                         onEdit(row)
@@ -143,6 +144,7 @@ function UsersDataTable({
                     <Button
                       variant="gradient-danger"
                       size="icon"
+                      aria-label={`Delete ${row.firstName} ${row.lastName}`}
                       onClick={(e) => {
                         e.stopPropagation()
                         onDelete(row)
