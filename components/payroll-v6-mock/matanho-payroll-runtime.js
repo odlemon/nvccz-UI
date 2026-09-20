@@ -1580,6 +1580,7 @@ document.addEventListener('click', (event) => {
 
 
 
+
 const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>[...r.querySelectorAll(s)];
 const safeStorage={getItem(key){try{return window.safeStorage.getItem(key)}catch{return null}},setItem(key,value){try{window.safeStorage.setItem(key,value)}catch{}}};
 const iconPaths={
@@ -1736,7 +1737,7 @@ function overviewPage(){
   </div>
   <div class="stack">
    ${card('Unresolved exceptions','Highest priority payroll blockers',`<div class="card-body list">${exceptions.slice(0,4).map(e=>`<div class="list-row" data-exception="${e.id}"><div class="list-icon ${e.severity==='Critical'?'red':'amber'}">${icon('alert')}</div><div class="list-main"><strong>${e.type}</strong><span>${e.employee} - ${e.age} open</span></div><div class="list-end">${badge(e.severity)}<span>${e.amount}</span></div></div>`).join('')}<button class="btn soft" style="margin-top:12px" data-page="exceptions">View all exceptions</button></div>`)}
-   ${card('Upcoming statutory deadlines','Zimbabwe filing and payment calendar',`<div class="card-body list">${[['PAYE return and payment','10 Jul 2026'],['NSSA P4 schedule','10 Jul 2026'],['AIDS levy payment','10 Jul 2026'],['NEC contribution file','15 Jul 2026']].map((x,i)=>{const due=new Date(x[1]+' 00:00:00');const days=Math.ceil((due-new Date())/86400000);const overdue=days<0;const label=Math.abs(days)+' day'+(Math.abs(days)===1?'':'s');return `<div class="list-row" data-page="reports"><div class="list-icon ${overdue?'amber':(i<3?'amber':'violet')}">${icon('calendar')}</div><div class="list-main"><strong>${x[0]}</strong><span>${x[1]}</span></div><div class="list-end"><strong>${label}</strong><span>${overdue?'overdue':'remaining'}</span></div></div>`;}).join('')}</div>`)}
+   ${card('Upcoming statutory deadlines','Zimbabwe filing and payment calendar',`<div class="card-body list">${[['PAYE return and payment',10],['NSSA P4 schedule',10],['AIDS levy payment',10],['NEC contribution file',15]].map((x,i)=>{const months=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];const now=new Date();const today=new Date(now.getFullYear(),now.getMonth(),now.getDate());let due=new Date(today.getFullYear(),today.getMonth(),x[1]);if(due<today){due=new Date(today.getFullYear(),today.getMonth()+1,x[1]);}const dueLabel=due.getDate()+' '+months[due.getMonth()]+' '+due.getFullYear();const days=Math.ceil((due-now)/86400000);const overdue=days<0;const label=Math.abs(days)+' day'+(Math.abs(days)===1?'':'s');return `<div class="list-row" data-page="reports"><div class="list-icon ${overdue?'amber':(i<3?'amber':'violet')}">${icon('calendar')}</div><div class="list-main"><strong>${x[0]}</strong><span>${dueLabel}</span></div><div class="list-end"><strong>${label}</strong><span>${overdue?'overdue':'remaining'}</span></div></div>`;}).join('')}</div>`)}
    ${card('Activity timeline','Sensitive and approval events',`<div class="card-body timeline">${auditEvents.slice(0,4).map((a,i)=>`<div class="timeline-item ${i===0?'bad':i===3?'warn':''}"><div><strong>${a[2].replaceAll('_',' ')}</strong><p>${a[4]}</p></div><time>${a[0].split(' ').slice(0,2).join(' ')}</time></div>`).join('')}</div>`)}
   </div>
  </div></div>`;

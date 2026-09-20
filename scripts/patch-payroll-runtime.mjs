@@ -1921,7 +1921,34 @@ s = replaceOnce(
   "${[['PAYE return and payment','10 Jul 2026','12 days'],['NSSA P4 schedule','10 Jul 2026','12 days'],['AIDS levy payment','10 Jul 2026','12 days'],['NEC contribution file','15 Jul 2026','17 days']].map((x,i)=>`<div class=\"list-row\" data-page=\"reports\"><div class=\"list-icon ${i<3?'amber':'violet'}\">${icon('calendar')}</div><div class=\"list-main\"><strong>${x[0]}</strong><span>${x[1]}</span></div><div class=\"list-end\"><strong>${x[2]}</strong><span>remaining</span></div></div>`).join('')}",
   "${[['PAYE return and payment','10 Jul 2026'],['NSSA P4 schedule','10 Jul 2026'],['AIDS levy payment','10 Jul 2026'],['NEC contribution file','15 Jul 2026']].map((x,i)=>{const due=new Date(x[1]+' 00:00:00');const days=Math.ceil((due-new Date())/86400000);const overdue=days<0;const label=Math.abs(days)+' day'+(Math.abs(days)===1?'':'s');return `<div class=\"list-row\" data-page=\"reports\"><div class=\"list-icon ${overdue?'amber':(i<3?'amber':'violet')}\">${icon('calendar')}</div><div class=\"list-main\"><strong>${x[0]}</strong><span>${x[1]}</span></div><div class=\"list-end\"><strong>${label}</strong><span>${overdue?'overdue':'remaining'}</span></div></div>`;}).join('')}",
   "statutory deadlines countdown -> computed from real date",
-  "const due=new Date(x[1]+' 00:00:00');const days=Math.ceil((due-new Date())/86400000);",
+  // Not "const due=new Date(x[1]+..." - that exact substring gets superseded by the
+  // "computed next occurrence of day-of-month" patch below, which rewrites this whole
+  // block again. Use a marker that survives both that patch's before AND after text
+  // (the list-icon amber/violet-by-overdue expression is unchanged by it) so re-running
+  // this script against an already-fully-patched runtime reports a clean skip instead of
+  // a false "drifted" MISS once both patches have applied in sequence.
+  "list-icon ${overdue?'amber':(i<3?'amber':'violet')}",
+)
+
+// The countdown fix above still measures against frozen '10 Jul 2026'/'15 Jul 2026'
+// fixture dates - correct countdown math against a date that never advances just means
+// every deadline reads "N days overdue" forever once July passes (confirmed live on dev,
+// 2026-09-20: dates unchanged since the previous patch, only the countdown looked live).
+// PAYE, NSSA and AIDS levy filings are due by the 10th of the month following the pay
+// period; NEC contribution files are due by the 15th - the standard ZIMRA/NSSA/NEC
+// monthly filing convention. Checked for an authoritative rule already encoded in this
+// codebase (../nvccz/src/services/payroll/ZimraStatutoryEngine.ts and sibling payroll
+// services) - none exists; there is still no backend compliance-calendar source, per
+// FINDING-PR-002 in design-refs/payroll-v6/TEST_FINDINGS.md. Replace the frozen date
+// literals with the day-of-month only, and compute the next upcoming occurrence (this
+// month's Nth if it hasn't passed yet, otherwise next month's) at render time, so the
+// calendar keeps rolling forward instead of going stale again after July 2026.
+s = replaceOnce(
+  s,
+  "${[['PAYE return and payment','10 Jul 2026'],['NSSA P4 schedule','10 Jul 2026'],['AIDS levy payment','10 Jul 2026'],['NEC contribution file','15 Jul 2026']].map((x,i)=>{const due=new Date(x[1]+' 00:00:00');const days=Math.ceil((due-new Date())/86400000);const overdue=days<0;const label=Math.abs(days)+' day'+(Math.abs(days)===1?'':'s');return `<div class=\"list-row\" data-page=\"reports\"><div class=\"list-icon ${overdue?'amber':(i<3?'amber':'violet')}\">${icon('calendar')}</div><div class=\"list-main\"><strong>${x[0]}</strong><span>${x[1]}</span></div><div class=\"list-end\"><strong>${label}</strong><span>${overdue?'overdue':'remaining'}</span></div></div>`;}).join('')}",
+  "${[['PAYE return and payment',10],['NSSA P4 schedule',10],['AIDS levy payment',10],['NEC contribution file',15]].map((x,i)=>{const months=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];const now=new Date();const today=new Date(now.getFullYear(),now.getMonth(),now.getDate());let due=new Date(today.getFullYear(),today.getMonth(),x[1]);if(due<today){due=new Date(today.getFullYear(),today.getMonth()+1,x[1]);}const dueLabel=due.getDate()+' '+months[due.getMonth()]+' '+due.getFullYear();const days=Math.ceil((due-now)/86400000);const overdue=days<0;const label=Math.abs(days)+' day'+(Math.abs(days)===1?'':'s');return `<div class=\"list-row\" data-page=\"reports\"><div class=\"list-icon ${overdue?'amber':(i<3?'amber':'violet')}\">${icon('calendar')}</div><div class=\"list-main\"><strong>${x[0]}</strong><span>${dueLabel}</span></div><div class=\"list-end\"><strong>${label}</strong><span>${overdue?'overdue':'remaining'}</span></div></div>`;}).join('')}",
+  "statutory deadlines dates -> computed next occurrence of day-of-month",
+  "let due=new Date(today.getFullYear(),today.getMonth(),x[1]);if(due<today){due=new Date(today.getFullYear(),today.getMonth()+1,x[1]);}",
 )
 
 console.log("")
