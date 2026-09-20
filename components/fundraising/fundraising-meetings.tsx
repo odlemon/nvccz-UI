@@ -722,7 +722,21 @@ export function FundraisingMeetings() {
   }, [tasks, search])
 
   const overdueCount = tasks.filter((t) => t.status === "OVERDUE").length
-  const scheduledCount = meetings.filter((m) => m.status === "Scheduled").length
+  // "Upcoming meetings" must mean genuinely upcoming (today or later), not just status
+  // "Scheduled" — a meeting whose date has passed without anyone updating its status
+  // (e.g. the two 8 Sept meetings still marked Scheduled on 20 Sept) would otherwise keep
+  // inflating this KPI indefinitely, the same stale-status pattern as FINDING-FR-001's Age bug.
+  const startOfToday = useMemo(() => {
+    const d = new Date()
+    d.setHours(0, 0, 0, 0)
+    return d
+  }, [])
+  const scheduledCount = meetings.filter((m) => {
+    if (m.status !== "Scheduled") return false
+    if (!m.scheduledStart) return true
+    const start = new Date(m.scheduledStart)
+    return !Number.isNaN(start.getTime()) && start >= startOfToday
+  }).length
 
   async function moveTask(id: string, status: FrTaskStatusValue) {
     setMovingTaskId(id)
