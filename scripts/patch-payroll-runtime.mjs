@@ -1895,6 +1895,35 @@ s = replaceOnce(s, "calendar:'payroll.prepare',", "calendar:'calendar.view',", "
   }
 }
 
+// Trend chart's "N% movement" divides by the first row's USD value with no zero guard —
+// an employer with no payroll processed yet (first[1] === 0) produced literal "NaN%" on
+// the Command Centre. Found live on dev, 2026-09-20: Gross payroll USD 0.00 for every row,
+// dashboard showed "12M movement NaN%". Treat "no baseline to compare against" as 0%
+// movement rather than propagating the division's NaN into the rendered label.
+s = replaceOnce(
+  s,
+  "const change=((last[1]-first[1])/first[1])*100;",
+  "const change=first[1]?((last[1]-first[1])/first[1])*100:0;",
+  "trend summary change% -> guard divide-by-zero",
+  "first[1]?((last[1]-first[1])/first[1])*100:0",
+)
+
+// Upcoming statutory deadlines were a hardcoded [name, date, "N days"] fixture with the
+// countdown baked in as a literal string, never recomputed against the real date. Found
+// live on dev, 2026-09-20: every deadline read "10 Jul 2026" / "12 days remaining" while
+// today was 2026-09-20 - over two months past the printed due date, still claiming 12 days
+// left. The due dates themselves are still fixture data (no real compliance-calendar
+// backend exists yet - see design-refs/payroll-v6/TEST_FINDINGS.md), but the countdown
+// against *today* is now real, and a passed deadline reads "N days overdue" instead of a
+// stale, misleadingly-safe number.
+s = replaceOnce(
+  s,
+  "${[['PAYE return and payment','10 Jul 2026','12 days'],['NSSA P4 schedule','10 Jul 2026','12 days'],['AIDS levy payment','10 Jul 2026','12 days'],['NEC contribution file','15 Jul 2026','17 days']].map((x,i)=>`<div class=\"list-row\" data-page=\"reports\"><div class=\"list-icon ${i<3?'amber':'violet'}\">${icon('calendar')}</div><div class=\"list-main\"><strong>${x[0]}</strong><span>${x[1]}</span></div><div class=\"list-end\"><strong>${x[2]}</strong><span>remaining</span></div></div>`).join('')}",
+  "${[['PAYE return and payment','10 Jul 2026'],['NSSA P4 schedule','10 Jul 2026'],['AIDS levy payment','10 Jul 2026'],['NEC contribution file','15 Jul 2026']].map((x,i)=>{const due=new Date(x[1]+' 00:00:00');const days=Math.ceil((due-new Date())/86400000);const overdue=days<0;const label=Math.abs(days)+' day'+(Math.abs(days)===1?'':'s');return `<div class=\"list-row\" data-page=\"reports\"><div class=\"list-icon ${overdue?'amber':(i<3?'amber':'violet')}\">${icon('calendar')}</div><div class=\"list-main\"><strong>${x[0]}</strong><span>${x[1]}</span></div><div class=\"list-end\"><strong>${label}</strong><span>${overdue?'overdue':'remaining'}</span></div></div>`;}).join('')}",
+  "statutory deadlines countdown -> computed from real date",
+  "const due=new Date(x[1]+' 00:00:00');const days=Math.ceil((due-new Date())/86400000);",
+)
+
 console.log("")
 if (missed > 0) {
   console.error(
