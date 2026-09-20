@@ -184,8 +184,25 @@ saw the identical symptom already root-caused for Performance: Current NAV $0.00
 `distributions` shape). Rather than copy the same inline `?? legacy-key ?? 0` fallback a third time, extracted
 `normalizeSnapshotMetrics()` into `LpFundMetricsService` (the module that owns the canonical shape) and
 pointed all three read sites at it — Performance's own fix was refactored to use the shared helper too.
-Deployed to dev; live-verification of the Dashboard screen still pending (API deploy in progress as this is
-written).
+Deployed to dev and live-verified: `GET /lp-portal/dashboard` now returns Arcus Growth Fund V's real
+`nav: 198760000`, `totalPaidIn: 156420000`, `totalDistributions: 78340000` (previously all 0), while
+Arcus Equity Opportunities (OPEN_ENDED, genuinely has no capital calls) correctly still reads 0 — a real
+zero, not the same stale-snapshot bug. Fixed and confirmed.
+
+## Summary: LP Portal re-sweep status
+
+All guardrails (G5, G6, G9, G10) and Q-scenarios (Q3, Q6, Q7/Q8, Q9, Q10, Q11) exercised. Five real,
+confirmed defects found and fixed, deployed to dev, and live-verified: the Q9 bank-instruction-change audit
+gap, the stale-snapshot metrics bug (Performance + Dashboard, shared helper), the Performance chart
+zero-height CSS bug, the OPEN_ENDED-fund SRD/G3 violation, the Messages silent-failure bug, and the
+Documents download 500 (+ its underlying persistent-volume infrastructure gap). Two items intentionally
+left unfixed pending product/architecture decisions (Q3's idle-session heartbeat, Q7/Q8's missing
+provisional/restated-statement feature) and two pre-existing accounting-treatment issues remain referred,
+not fixed, per baseline. One new data-consistency observation (TVPI computed two ways) logged as a
+follow-up, not yet root-caused to a single fix.
+
+Both branches (`feature/lp-portal-resweep-live` on `nvccz` and `nvccz-UI`) are fully committed, pushed, and
+deployed to dev — not yet merged to `dev`/`master`, per the standing checkpoint convention.
 
 ### New observation while verifying the Q11 fix — TVPI computed two different ways for the same fund
 
