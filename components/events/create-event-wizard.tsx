@@ -266,10 +266,11 @@ export function CreateEventWizard({ isOpen, onClose, initialDate, editMode = fal
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="description">Description</Label>
+                  <Label htmlFor="description">Description *</Label>
                   <Controller
                     name="description"
                     control={control}
+                    rules={{ required: "Description is required" }}
                     render={({ field }) => (
                       <Textarea
                         {...field}
@@ -280,6 +281,7 @@ export function CreateEventWizard({ isOpen, onClose, initialDate, editMode = fal
                       />
                     )}
                   />
+                  {errors.description && <span className="text-xs text-red-500">{errors.description.message}</span>}
                 </div>
               </CardContent>
             </Card>
