@@ -341,7 +341,21 @@ export async function handlePortfolioV11Action(detail: {
       if (!ds.distributionDate) return { handled: true, error: 'Distribution date is required' }
       const grossAmount = Number(ds.grossAmount || 0)
       if (!grossAmount) return { handled: true, error: 'Gross amount is required' }
-      const allowedSources = ['DIVIDEND', 'EXIT_PROCEEDS', 'INTEREST', 'OTHER'] as const
+      // Backend ALLOWED_SOURCES (nvccz DistributionService) also accepts RETURN_OF_CAPITAL and
+      // INCOME as of commit 6dd18b7 — this list was left stale after that fix, so a staff user
+      // declaring either of those two types silently got 'OTHER' substituted instead. The LP
+      // portal already displays both as real categories (lib/lp-portal/mappers.ts
+      // mapDistributionType); this keeps the creation side in sync with what can actually be
+      // declared and correctly reported back to LPs.
+      const allowedSources = [
+        'DIVIDEND',
+        'EXIT_PROCEEDS',
+        'REALISATION_PROCEEDS',
+        'INTEREST',
+        'INCOME',
+        'RETURN_OF_CAPITAL',
+        'OTHER',
+      ] as const
       const source = (
         allowedSources.includes(ds.source as (typeof allowedSources)[number]) ? ds.source : 'OTHER'
       ) as (typeof allowedSources)[number]
