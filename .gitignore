@@ -59,3 +59,66 @@ scripts/_*.py
 .fr-dump/
 .fr-trace/
 .fr-e2e/
+
+# Agent / local tooling scratch
+.agents/
+.kilo/
+
+# Portal / module UAT dumps, traces, tokens, AI-capture artifacts
+.lp-uat/
+.lp-trace/
+.payroll-dumps/
+.payroll-trace/
+.procurement-ai-capture/
+.procurement-ai-capture-dev/
+.procurement-crossmodule/
+
+# Local logs and root scratch (screenshots, cost spreadsheets, one-off probes)
+*.log
+_build-*-log.txt
+/analytics-spend.png
+/dashboard-srd.png
+/invoice-processing.png
+/requisition-assist.png
+/arcus-*-costs*.xlsx
+/arcus-cost-analysis*.xlsx
+/test-content.js
+/test-dashboard.js
+/test-profile.js
+/test-role.js
+/test-title.js
+
+# Credential-bearing local files (never commit)
+deploy/nvccz/CREDENTIALS*.local.md
+design-refs/vps-access-and-ssl-reference.md
+
+# Large local SRD binaries / client packages not yet integrated
+design-refs/fpa-srds/*.pdf
+design-refs/portfolio-v25/
+
+# Python cache + tmp/diag/log scratch under scripts/
+scripts/__pycache__/
+scripts/_tmp*/
+scripts/_tmp-*
+scripts/*-log*.txt
+scripts/_*-out.txt
+scripts/_*-log*.txt
+scripts/_inspect-out.txt
+scripts/_verify-out.txt
+scripts/_perf-check-out.txt
+scripts/_uat/_tmp-*
+scripts/_uat/fixtures/test-invoice.pdf
+
+# One-off deploy/helper scripts with hardcoded host passwords (stay on disk, never commit)
+scripts/deploy-nvccz-api-singapore.py
+scripts/deploy-nvccz-docker-vps.py
+scripts/deploy-singapore-docx-cleanup.py
+scripts/fix-singapore-cors.py
+scripts/fix-singapore-reports-ws.py
+scripts/install-docker-nvccz-vps.py
+scripts/rebuild-nvccz-api.py
+scripts/rebuild-nvccz-ui.py
+scripts/relink-singapore-ui-api.py
+scripts/run-nvccz-deploy-when-ready.py
+scripts/run-vps-deploy.py
+scripts/vps-deploy-helper.py

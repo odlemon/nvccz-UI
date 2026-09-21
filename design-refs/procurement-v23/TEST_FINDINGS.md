@@ -1836,6 +1836,820 @@ Also checked on the servers:
 
 ---
 
+## PROC-FINDING-009
+
+**Title:** `GET /procurement/vendor-portal/rfq` 404'd on a hand-minted token — investigated as a possible regression of PROC-FINDING-008, confirmed not a defect
+**Module:** Procurement (backend) · **Dimension:** QAT · **Category:** Investigation (no code defect found)
+**Severity:** N/A (not a defect)
+**Persona affected:** None — real vendor invitation links are unaffected
+**Surface:** API `GET /api/procurement/vendor-portal/rfq`
+
+### Steps to reproduce (as reported)
+
+While UAT-testing SRD §9/§15 on dev on 18 September 2026: created RFQ `RFQ_20260918_0001`
+(`procurement_rfqs.id = cmu6tel5o002qnz01eebn8wfu`, status `OPEN`, `visibility = INVITED_ONLY`) from an
+approved requisition through the live staff UI, which genuinely invited two vendors (confirmed via
+`RfqVendorInvitation` rows). A token was then hand-minted for the invited vendor Baobab Networks &
+Computing (`vendorId cmtzc7u8s02jhnu01al4q2jeo`) using the API's own `signVendorPortalToken`
+(`src/utils/vendorPortalToken.ts`), run inside `arcus-dev-api-1` so it used the real signing secret,
+with payload `{ k: "RFQ_SUBMIT", v: vendorId, r: "RFQ_20260918_0001", exp: <valid> }`. Calling
+`GET /vendor-portal/rfq?token=<that token>` returned **404** `"No request for quotation matches this
+link"`, despite the RFQ genuinely existing, being open, and the vendor genuinely being invited.
+
+### Investigation
+
+`ProcurementController.getVendorPortalRfq` (`src/controllers/ProcurementController.ts:1391`) resolves
+the RFQ with `prisma.procurementRfq.findUnique({ where: { id: payload.r }, … })` — it looks up the
+signed token's `r` field as the RFQ's **database id** (a cuid), not its human-readable `rfqNumber`.
+The hand-minted token above put the *rfqNumber* (`"RFQ_20260918_0001"`) in `r`, so the id lookup found
+nothing and the generic "no match" 404 fired — the same 404 a genuinely-unrelated token would produce.
+
+Checked every place the backend actually mints an `RFQ_SUBMIT` token, to see whether any real flow
+could produce a token shaped like the hand-minted one:
+- `ProcurementService.createAndSendRFQ` (`src/services/ProcurementService.ts:2054-2057`) — `r: rfqRow.id`
+- `ProcurementRfqService.extendClosing` (`src/services/ProcurementRfqService.ts:301-304`) — `r: rfq.id`
+- `ProcurementRfqService.postRfqClarification`-triggered resend (`ProcurementRfqService.ts:406-409`) — `r: rfq.id`
+
+All three sign `r` as the RFQ's id. The emailed link itself
+(`src/utils/vendorRfqEmailLinks.ts:buildVendorRfqResponsePageUrl`) also carries a separate
+`rfqNumber=` query parameter for the page to *display*, but that parameter never enters the signed
+token — the frontend (`lib/api/procurement-api-v2.ts:getRfqInvitation`) forwards only the `token`
+value to this endpoint. There is no code path, frontend or backend, that ever signs `r` as the
+rfqNumber; the frontend cannot mint tokens at all (it doesn't hold `VENDOR_PORTAL_TOKEN_SECRET`).
+
+### Root cause
+
+Not a backend defect. The reproduction script minted its own token by hand and put the RFQ's
+display number in the `r` field instead of its database id — an easy mix-up, since the controller's
+own comment merely says "`r` = RFQ id" without spelling out *which* id. A real vendor's invitation
+link, built entirely server-side, always embeds the correct database id and was never at risk.
+
+### Fix
+
+None required — no code changed, nothing deployed.
+
+### Verification
+
+Live on dev, tokens minted inside `arcus-dev-api-1` with the real `signVendorPortalToken`:
+
+| Token | Result |
+|---|---|
+| `r` = rfqNumber (`"RFQ_20260918_0001"`, the original repro) | **404** `"No request for quotation matches this link"` |
+| `r` = the RFQ's actual id (`cmu6tel5o002qnz01eebn8wfu`), same vendor | **200** — `organisation: "Matanho Investment Management (Private) Limited"`, `rfqNumber: "RFQ_20260918_0001"`, `status: "OPEN"`, `open: true`, `closingAt: 2026-10-09T10:00:00.000Z`, one line item (`Ergonomic office chairs`, qty 4, no prices), and the vendor's own master details (Baobab Networks & Computing, contact, phone, tax number, address) |
+| No token | **400** `"This quotation link is missing its token"` |
+| Signature altered (last 2 chars of a valid token flipped) | **400** `"Invalid vendor portal token signature"` |
+| Correctly-shaped token (`r` = real id) for a vendor never invited to this RFQ | **404** `"No request for quotation matches this link"` |
+
+Matches PROC-FINDING-008's originally-verified shape for this endpoint. No regression; no fix shipped.
+
+**Status:** CLOSED — not a defect, confirmed on dev 18 September 2026. No branch, no deploy.
+
+---
+
+## PROC-FINDING-011
+
+**Title:** Cross-department authorization bypass — a department head could view and approve another department's purchase requisition
+**Module:** Procurement (backend) · **Dimension:** Security · **Category:** Broken access control (segregation of duties)
+**Severity:** CRITICAL — major security failure; the approval workflow's segregation-of-duties control (SRD §12 "Requisition Approval") did not hold, and an unauthorized user could complete an approval action that should have required a different department's authority (SRD §70 "Critical Security Test Cases", test 2: "one department cannot access restricted records of another department unless authorised")
+**Persona affected:** Any department HEAD/DEPUTY, against any other department's purchase requisitions
+**Surface:** API `GET /api/procurement/requisitions/:id`, `PUT /api/procurement/requisitions/:id/approve`, `PUT /api/procurement/requisitions/:id/reject`
+
+*Numbered 011, not 010: PROC-FINDING-010 (an unrelated `GET /users` directory-exposure bug) was claimed concurrently by a sibling agent on its own branch before this one merged.*
+
+### Steps to reproduce (as reported, live on dev, 18 September 2026)
+
+1. Logged in as `payroll.finmgr@nts.local` (Finance Manager, Finance department, `departmentRole: HEAD`). Created a purchase requisition via `POST /procurement/requisitions` with `department: "Finance"` (`cmu6uqz7j003vnz01f24nx5ij`, `REQ_20260918_0003`), then submitted it via `PUT /procurement/requisitions/:id/submit` — moved to `PENDING_APPROVAL` correctly.
+2. Logged in as `perf.deptmgr@nts.local` (Head of Operations — a different department). `GET /procurement/requisitions/pending-approval` correctly returned only Operations department requisitions (3 of them).
+3. `GET /procurement/requisitions/cmu6uqz7j003vnz01f24nx5ij` (the Finance requisition, by direct id) as the Operations department head returned **200** — full read access to another department's requisition.
+4. `PUT /procurement/requisitions/cmu6uqz7j003vnz01f24nx5ij/approve` as the same Operations department head returned **200 "Purchase requisition approved successfully"** — an Operations head actually approved a Finance department requisition.
+
+### Investigation
+
+Two independent gaps, both stemming from the same root misconfiguration:
+
+**Root cause (data):** the live requisition approval matrix (`GET /procurement/approval-matrix`, the general/company-wide route, `config.department = null`) had exactly one step, `DEPARTMENT_HEAD`, but with its department hard-pinned to `"Operations"` instead of left dynamic (`department: null`, meaning "the requester's own department"). `ApprovalService.createApprovalRequest`'s `DEPARTMENT`-step branch (`src/services/ApprovalService.ts:226-248`) honors a stage's fixed `requiredUserDepartment` before ever falling back to the submitting requisition's own department — so **every** submitted requisition, regardless of department, got its sole approval step assigned to the Operations department head. This is a live, active misconfiguration, not a hypothetical: the only 3 requisitions in `PENDING_APPROVAL` at investigation time were all (correctly, coincidentally) Operations', so it had gone unnoticed.
+
+**Root cause (code, the actual exploitable gap):** even granting that a stage's approver assignment could be wrong (by data-entry error today, or in principle a future misconfiguration, or a user's department changing after being assigned), nothing re-validated the assignment against the specific requisition being acted on:
+
+- `ProcurementController.getPurchaseRequisitionById` (`src/controllers/ProcurementController.ts:349`) called only `ProcurementService.assertUserCanViewInvesteePurchaseRequisition`, which is a no-op (`if (!r.portfolioCompanyId) return;`) for every ordinary department requisition — i.e. it enforces investee/fund isolation for Suite 02 records only, and enforces *nothing* department-wise for the common case. Any authenticated user could view any department's requisition by id.
+- `ProcurementRequisitionApprovalService.decide()` (`src/services/ProcurementRequisitionApprovalService.ts:197`, shared by both approve and reject) only checked "does a `PENDING` `Approval` row exist with `approverId === actorId` at the current step" (`own`). It never checked that a `DEPARTMENT`-type step's approver actually belongs to *this* requisition's department — so the Operations head's (misassigned) Approval row was honored at face value.
+
+Reject shares the identical `decide()` code path (confirmed by reading `ProcurementService.rejectPurchaseRequisition`, `src/services/ProcurementService.ts:1345-1453`), so it had the same gap. There is no separate "return for amendment" action in this codebase to check.
+
+### Fix
+
+Backend-only; branch `fix/procurement-department-authz-bypass` (2 files changed):
+
+- `ProcurementController.ts`: added `assertUserCanViewDepartmentPurchaseRequisition` — a requisition may be viewed by its own requester; an admin/CFO or `procurement.requisitions.view` holder; `PROC_MGR`; a member of the requisition's own department; or a genuine cross-department approver on *this* requisition's route whose step is ROLE/USER/AMOUNT_THRESHOLD (not DEPARTMENT). Wired into `getPurchaseRequisitionById` for the non-investee case.
+- `ProcurementRequisitionApprovalService.ts`: `decide()` now re-checks, for a `DEPARTMENT`-type step, that the actor's own `userDepartment` matches the requisition's actual `department` (looked up live, not trusted from the `Approval` row) before honoring an `own` match, unless the actor is module-privileged (admin/CFO). ROLE/USER/AMOUNT_THRESHOLD steps (CFO, PROC_MGR, a named person, a threshold-based finance approver) are explicitly unaffected — they are legitimately cross-department by design.
+- Data: also corrected the live misconfigured approval matrix via the existing (legitimate, admin-only) `PUT /procurement/approval-matrix` endpoint — the single general-route step's department was changed from the hard-pinned `"Operations"` back to `null` ("the requester's own department"), which is what `ApprovalService`'s dynamic-routing branch already expected. Without this, the code fix alone would have left every non-Operations department (including Finance) with no valid approver at all for their own requisitions — confirmed there were no other pending non-Operations requisitions at the time, so this was safe to correct immediately.
+
+### Verification
+
+Live on dev (`https://dev-api.matanho.com`), after deploying the API-only fix and correcting the matrix:
+
+1. Created and submitted a fresh Finance-department test requisition as `payroll.finmgr@nts.local` (`cmu6vos7u000io101zghaxyl5`, `REQ_20260918_0004`).
+2. `perf.deptmgr@nts.local` (Operations HEAD) `GET` by id → **403** `"You are not authorized to view Finance department requisitions."` (was 200 before the fix).
+3. `perf.deptmgr@nts.local` `PUT .../approve` → **400** `"This requisition waits for step 1 of 1, Head of Finance (Blessing Sibanda). You are not an approver on that step."` (same refusal style/status as the pre-existing, already-correct self-approval check; was 200 "approved successfully" before the fix).
+4. `perf.deptmgr@nts.local` `GET /requisitions/pending-approval` (regression check) → unchanged, still only the 3 Operations-department requisitions.
+5. `payroll.finmgr@nts.local` (the legitimate Finance HEAD) `PUT .../approve` on their own department's requisition → **200** `"Purchase requisition approved successfully"`, `approvedBy: payroll.finmgr@nts.local` — legitimate same-department approval still works.
+6. `perf.deptmgr@nts.local` `GET` by id after approval → still **403** (department isolation holds post-decision, not just pre-decision).
+
+### Cleanup
+
+The two test requisitions created during discovery and verification (`cmu6uqz7j003vnz01f24nx5ij`, now incorrectly `APPROVED` by the Operations head from before the fix — left as-is; and `cmu6vos7u000io101zghaxyl5`, correctly `APPROVED` by Finance's own head after the fix) were left in `arcus_dev`. Both are titled "safe to delete" / "Post-fix verification" and are non-draft, so there is no delete endpoint for them per the SRD's soft-delete/historical-integrity rule — this matches the expected, by-design limitation, not an omission.
+
+**Status:** FIXED — deployed to dev (API only, no UI/portal service touched), verified live 18 September 2026. Branch `fix/procurement-department-authz-bypass`, commit `15d0363`, pushed to `origin`. Not merged to `master`/prod.
+
+---
+
+## PROC-FINDING-012
+
+**Title:** `GET /procurement/vendor-portal/rfq` read its line-item snapshot as if it were stored as a bare array — always false, silently masked by a fallback
+**Module:** Procurement (backend) · **Dimension:** QAT · **Category:** Functional / data integrity
+**Severity:** MEDIUM (no live vendor was ever shown wrong data by this — see "Actual" below — but the fallback it depended on is not always safe)
+**Persona affected:** An invited vendor on an RFQ with no linked requisition (would see zero line items, forever); an invited vendor on an RFQ whose source requisition's items were edited after the RFQ was sent (would silently see the requisition's *current* items instead of what the RFQ actually asked for)
+**Surface:** API `GET /api/procurement/vendor-portal/rfq`
+
+### Steps to reproduce
+
+Continuing the same SRD §9/§15 UAT as PROC-FINDING-009, now with a correctly-shaped token (`r` =
+the RFQ's database id, per that finding): `RFQ_20260918_0001`
+(`procurement_rfqs.id = cmu6tel5o002qnz01eebn8wfu`), vendor Baobab Networks & Computing
+(`cmtzc7u8s02jhnu01al4q2jeo`). Before trusting the endpoint's item output, its `itemsSnapshot`
+column was read directly from the database: `{"items":[{"unit":"Each","itemName":"Ergonomic
+office chairs","quantity":4,"lineTotal":null,"unitPrice":null}]}` — an **object** with an `items`
+key, not a bare array.
+
+### Actual
+
+`ProcurementController.getVendorPortalRfq` (`src/controllers/ProcurementController.ts:1449`, before
+this fix) computed the lines with:
+
+```ts
+const snapshot = Array.isArray(rfq.itemsSnapshot) ? (rfq.itemsSnapshot as any[]) : [];
+const lines = (snapshot.length ? snapshot : ((rfq.requisition?.items as any[]) ?? [])).map(...)
+```
+
+`itemsSnapshot` is **always** persisted as `{ items: [...] }` — see
+`ProcurementService.ts:1991` (`itemsSnapshot: { items: resolvedItems } as object`) and the existing
+unwrap helper `enrichRfqItemsSnapshotForApi` (`src/utils/rfqItemInput.ts:118-137`), which every other
+reader of this column already accounts for. `Array.isArray(rfq.itemsSnapshot)` was therefore always
+`false`, `snapshot` was always `[]`, and every call silently fell through to
+`rfq.requisition?.items` — the requisition's row **right now**, not the RFQ's own snapshot as issued.
+
+This produced no visible symptom for `RFQ_20260918_0001`, because its linked requisition still
+exists and its items are unchanged since the RFQ was sent — the fallback happens to return the same
+data the snapshot would have. A direct call to the live (pre-fix) endpoint with a correctly-shaped
+token confirmed this: **200**, full vendor details, and the one item (`Ergonomic office chairs`,
+qty 4, unit `Each`) — already correct, for the wrong reason. The comment directly above the code
+("The lines as the RFQ was issued (its snapshot), else the requisition's") describes intent this
+code did not actually implement.
+
+Two cases where it would have mattered, neither present in this dataset: an RFQ raised without a
+linked requisition (`requisitionId` null) would show no items at all, forever, since both the
+snapshot read and the fallback would be empty; an RFQ whose requisition's line items were edited,
+added to, or removed after the RFQ was sent would silently show the requisition's edited state
+rather than what the vendor was actually asked to quote on.
+
+### Root cause
+
+`Array.isArray()` checked the wrapper object itself instead of unwrapping its `items` field first,
+unlike every other reader of this same JSON column.
+
+### Fix
+
+**nvccz `d93713a`** (branch `fix/procurement-vendor-quote-prefill`,
+`src/controllers/ProcurementController.ts`): unwrap `itemsSnapshot.items` the same way
+`enrichRfqItemsSnapshotForApi` and `ProcurementRfqService.extendClosing` (`ProcurementRfqService.ts:290`)
+already do, keeping the bare-array shape as a defensive fallback for any pre-existing row, and only
+then falling back to the requisition's current items when the snapshot truly has none.
+
+No frontend change was needed or made. `app/vendor-quotations/rfq-respond/page.tsx` and
+`lib/api/procurement-api-v2.ts:getRfqInvitation` already call this endpoint and prefill company
+name, contact person, email, phone, tax EIN, address, currency and every line from the response —
+this is the PROC-FINDING-008 / cycle-eight-phase-5 fix, already on `origin/dev` (verified identical,
+byte for byte after line-ending normalisation, to what is checked into `nvccz-new`'s working tree)
+and already in the deployed `arcus-dev-ui-vendor-1` bundle (built 15 September 2026; the marker
+string added by that fix, `"quotation link is not valid"`, is present in the served chunk
+`app/vendor-quotations/rfq-respond/page-293ab9a3291ba47d.js`). There is nothing to fix or deploy on
+the UI side for this finding.
+
+### Verification
+
+Tokens minted inside `arcus-dev-api-1` with the real `signVendorPortalToken`, `r` = the RFQ's actual id:
+
+| | Before `d93713a` | After `d93713a` (deployed) |
+|---|---|---|
+| `GET /procurement/vendor-portal/rfq` | **200** — vendor details correct; item correct *only* via the requisition fallback | **200** — identical output, now read from the RFQ's own `itemsSnapshot` |
+| Compiled fix present in the running container | — | `grep` on `/app/dist/controllers/ProcurementController.js` inside `arcus-dev-api-1` finds the new comment |
+
+Live browser render of `https://dev.vendor.matanho.com/vendor-quotations/rfq-respond` with a fresh
+token (post-deploy): organisation name ("Matanho Investment Management (Private) Limited"), RFQ
+title, closing date (09 Oct 2026), and all of Company Name, Tax EIN, Contact Person, Email, Phone
+and Business Address prefilled from the vendor's master record; Quoted Items pre-populated with
+"Ergonomic office chairs", qty 4, unit "Each" — all editable, matching the digest fix's original
+intent ("prefill the lines and the vendor's details, names the organisation").
+
+**End-to-end quotation submission**, through that same live form: Unit Price 185, Delivery Time
+"10 business days", Quote Valid Until 18 Oct 2026 (30 days out). Submitted successfully —
+confirmation screen showed quotation number `QUO_20260918_0001`, total USD 740.00. Confirmed
+independently, read-only, in the database inside `arcus-dev-api-1`:
+
+```
+VendorQuotation { quotationNumber: "QUO_20260918_0001", status: "SUBMITTED", totalAmount: "854.7",
+  currencyCode: "USD", vendorId: "cmtzc7u8s02jhnu01al4q2jeo", vendorEmail: "accounts@baobabnetworks.example.com" }
+```
+
+(854.70 includes tax on the 740.00 subtotal.) Confirmed on the staff side, signed in as the
+Procurement Manager (`proc.mgr@nts.local`) at `dev.matanho.com`:
+
+- **Tenders & RFx** register: `RFQ_20260918_0001` now reads **BIDS 1**, stage **Evaluation** (was 0
+  bids, Open, before this submission).
+- **Quotation Comparison** register: the same RFQ reads **"1 supplier response,"** stage
+  Evaluation, "0 of 1 scored."
+
+### A note on the originally-reported symptom
+
+The premise this investigation started from — opening the real vendor form with a correctly-signed
+token and finding Company Name, Contact Person, Email, Phone and the item line all blank — did
+**not** reproduce here. Every live check above, with the RFQ id correctly placed in the token's `r`
+field, returned fully prefilled vendor details and line items both before and after `d93713a`. This
+matches PROC-FINDING-009's conclusion: the only way this endpoint has been made to return blank or
+missing data on dev was a hand-minted token with the RFQ's display number in `r` instead of its
+database id, which the endpoint correctly refuses with 404 (a blank *error* page, not a loaded form
+with blank fields) — a token no real invitation link can ever produce. The `itemsSnapshot` defect
+fixed above is real and worth shipping regardless, but it is not the cause of the originally-reported
+blank-form symptom, which no combination of steps in this session could reproduce against the live
+dev endpoint.
+
+**Status:** DEPLOYED to dev API, 18 September 2026 (`arcus-dev-api-1` rebuilt from
+`fix/procurement-vendor-quote-prefill` at `d93713a`, health 200). Branch pushed to
+`odlemon/nvccz` — **not merged to `master`**. No frontend branch: nothing to change.
+
+| | Dev |
+|---|---|
+| API | `fix/procurement-vendor-quote-prefill` (`d93713a`), built and swapped, health 200 |
+| Staff portal | rebuilt from unmodified `origin/dev` alongside the API deploy (no functional change; same commit already running) |
+| Vendor portal | untouched — already carries the PROC-FINDING-008 fix, unaffected by this change |
+| Real record created | `QUO_20260918_0001` against `RFQ_20260918_0001`, USD 854.70, SUBMITTED — a genuine test artifact on dev, left in place as the finding's evidence |
+
+---
+
+## PROC-FINDING-013
+
+**Title:** User Master had no Active/Suspended/Locked/Deactivated state -- a suspended user could still log in
+**Module:** Backend platform (`nvccz`, shared `User` model -- not procurement-specific, but exercised through this UAT pass) . **Dimension:** Security . **Category:** Missing capability (SRD requirement never implemented)
+**Severity:** CRITICAL -- SRD `NTS_SRD_DT_ProcMS` section 7 "User Master" requires users to be capable of Active, Suspended, Locked and Deactivated states, and section 70 "Critical Security Test Cases" lists "suspended users cannot log in" as a mandatory pre-production test. Neither the schema nor the login path had any notion of account status at all, so a suspended/locked/deactivated staff member's credentials kept working indefinitely with no way to cut them off short of deleting the account (itself against section 7's "records should not be permanently deleted where they have historical transactions").
+**Persona affected:** Every staff user; specifically, any account an admin needs to suspend, lock or deactivate without deleting
+**Surface:** Prisma `User` model / `users` table; API `POST /api/auth/login`; API `PUT /api/users/:id`
+
+### Investigation
+
+Grepped the entire `User` model in `prisma/schema.prisma` (`nvccz`) for any status/active/suspended/locked/deactivated field -- zero matches. `AuthController.login` (`src/controllers/AuthController.ts`, the `login` method) selected only `id, email, firstName, lastName, password, mustChangePassword, userDepartment, roleCode, roleId, tokenVersion, role.name` and never checked any status field, because there wasn't one to check. `PUT /api/users/:id` (`UserController.updateUser` / `UserService.updateUser`) also had no route-level permission middleware at all -- `router.put("/:id", UserController.updateUser)` -- despite already accepting other privileged fields (`roleId`, `roleCode`, `department`), while the sibling `POST /api/users` route in the same file already required `requireInternalStaffUser()` + `requirePermission("manage_users")`. So even after adding a status field, there was no properly-gated place to set it.
+
+### Fix
+
+Branch `security/user-master-status-enforcement`, commit `8f37f29`, cut from a clean `origin/master` worktree (not from any of the other in-progress feature branches sitting in the shared checkout). 7 files changed:
+
+- **Schema:** `prisma/schema.prisma` -- added `User.status String @default("ACTIVE") @db.VarChar(32)` (matches the house style used by other status columns, e.g. `vendors.tax_compliance_status`) plus `@@index([status], map: "users_status_idx")`.
+- **Migration:** `scripts/run-user-status-migration.ts`, registered as `npm run db:migrate:user-status` in `package.json` (auto-picked up by `db:migrate:all`, which discovers every `db:migrate:*` script). Idempotent: `ALTER TABLE users ADD COLUMN status VARCHAR(32) NOT NULL DEFAULT 'ACTIVE'` guarded by an `information_schema.COLUMNS` existence check (same pattern as `run-employee-terminated-columns-migration.ts`), backfills any blank/null row to `'ACTIVE'`, adds the index, then verifies every row's value is one of the four SRD states.
+- **Enforcement:** `AuthController.login` now selects `status` and, immediately after the `!user` check and *before* `bcrypt.compare` (so a suspended/locked/deactivated account's password is never compared -- no timing side-channel, same shape as the existing early return), rejects non-`ACTIVE` accounts with **403** and a status-specific message (`"This account is suspended. Contact your administrator."` / `"...is locked..."` / `"...has been deactivated..."` -- never the generic "Invalid credentials," which would misrepresent the actual reason).
+- **Admin-facing update path:** `PUT /api/users/:id` now accepts and validates `status` (must be one of `ACTIVE`/`SUSPENDED`/`LOCKED`/`DEACTIVATED`, case-normalized, else **400**). Rather than adding a new, separately-protected way to change it, the route itself was gated with `requireInternalStaffUser()` + `requirePermission("manage_users")` -- the same check `POST /api/users` already uses -- closing the pre-existing gap where this endpoint had no permission check at all. Status changes are audit-logged (`USER_STATUS_UPDATE`, old/new value, actor, IP, user agent), matching the existing `USER_ROLE_UPDATE` audit entry already emitted by the same function.
+
+### Deploy
+
+Deployed API-only to dev (no UI/portal service touched): built from the clean `security/user-master-status-enforcement` worktree, avoiding the shared dirty `nvccz` checkout entirely (per "deploy committed code only"). The first attempt raced with another sibling agent's concurrent deploy against the shared `src/api` staging directory on the VPS and had to be rebuilt from an isolated remote build context to get a clean, unambiguously-this-branch image -- confirmed by grepping the compiled `dist/controllers/AuthController.js` and `dist/services/UserService.js` inside the resulting `arcus-dev-api-1` container for `SUSPENDED` / `accountStatus` / `USER_STATUS_UPDATE` before trusting it. The freshly built image briefly crash-looped (`P2022: The column arcus_dev.users.status does not exist`) because the container's own startup admin-seed script queries the `User` model before the migration had run; ran `npm run db:migrate:user-status` via a one-off container on the same Docker network against the real dev database, then recreated `arcus-dev-api-1`, which came up healthy with no further errors.
+
+### Verification
+
+Live against `https://dev-api.matanho.com`, in order, all in a single pass:
+
+| Step | Result |
+|---|---|
+| Admin login (`admin@nts.com` / `admin123`) | **200** |
+| Seeded persona baseline (`proc.requester@nts.local` / `admin123`) | **200** |
+| `POST /users` -- create throwaway user (`userstatus.throwaway.<ts>@nts.local`, IT_MGR) as admin | **201**, `temporaryPassword` returned in response |
+| Throwaway user login, before any status change | **200** |
+| `PUT /users/:id` `{status: "SUSPENDED"}` as admin | **200** |
+| Throwaway user login while `SUSPENDED`, same password | **403** `"This account is suspended. Contact your administrator."` |
+| Seeded persona login, mid-test | **200** -- unaffected |
+| `PUT /users/:id` `{status: "ACTIVE"}` as admin | **200** |
+| Throwaway user login after reactivation, same password | **200** -- succeeds again |
+| `PUT /users/:id` `{status: "LOCKED"}` as admin | **200** |
+| Throwaway user login while `LOCKED` | **403** `"This account is locked. Contact your administrator."` |
+| `PUT /users/:id` `{status: "DEACTIVATED"}` as admin | **200** |
+| Throwaway user login while `DEACTIVATED` | **403** `"This account has been deactivated. Contact your administrator."` |
+| `PUT /users/:id` `{status: "ACTIVE"}` (final restore) | **200** |
+| Throwaway user login after final restore, same password | **200** |
+| Seeded persona login, end of test | **200** -- unaffected throughout |
+| `PUT /users/:id` `{status: "BOGUS"}` as admin | **400** `"Invalid status. Valid statuses: ACTIVE, SUSPENDED, LOCKED, DEACTIVATED"` |
+
+Migration output on the real dev database: `[ok] added users.status`, `[ok] backfill: blank/null status -> ACTIVE`, `[ok] added index users_status_idx`, `[verify OK] users.status`, `[verify OK] all users.status values are within the allowed SRD set`. The throwaway test user was deleted (`DELETE /users/:id`) after verification; no seeded persona was modified.
+
+**Status:** FIXED and deployed to dev (API only), verified live 18 September 2026. Branch `security/user-master-status-enforcement`, commit `8f37f29`, pushed to `origin` (`odlemon/nvccz`). **Not merged to `master`.** The migration has **not** been run against production -- run `docker exec <prod-api-container> npm run db:migrate:user-status` deliberately, after the branch is reviewed and merged.
+
+---
+
+## PROC-FINDING-014
+
+**Title:** A quotation can be awarded (and its PO generated) without the bid ever being technically scored
+**Module:** Procurement (backend) · **Dimension:** QAT · **Category:** Process control (not security, not data integrity)
+**Severity:** LOW — a documented UAT step can be silently skipped; no data corruption, no unauthorized access
+**Persona affected:** Procurement Manager (award), Procurement Officer (evaluation) — the two are meant to be separate desks by design (see `vendorQuotationRoutes.ts:396-398`'s own comment: "Scoring... and awarding... are separate grants, so the desk that scores is not the one that decides")
+**Surface:** API `POST /vendor-quotations/:id/accept`, `PUT /vendor-quotations/:id/evaluation`
+
+### Steps to reproduce (live on dev, 18 September 2026, completing SRD §60 steps 6-15 with fresh data)
+
+Continuing the fresh `RFQ_20260918_0001` chain used in PROC-FINDING-009/011/012 (own requisition → RFQ → vendor invitation → `QUO_20260918_0001` submitted):
+
+1. As `proc.mgr@nts.local`, `POST /vendor-quotations/cmu6vmoe.../accept` with no prior scoring call — **200**, `"Quotation accepted. Purchase order PO_20260918_0001 created and emailed to the vendor."` RFQ moved straight to `AWARDED`, `awardedQuotationId` set, PO generated in the same call.
+2. As `proc.officer@nts.local`, `PUT /vendor-quotations/cmu6vmoe.../evaluation` (score 85) *after* the accept above — **409** `"Quotation has already been accepted"`.
+
+### Expected
+
+Per SRD §60's example journey ("6. Supplier submissions are compared. 7. Committee evaluates. 8. Recommendation is prepared. 9. Approver approves. 10. PO is generated."), evaluation/scoring is a distinct, required step before a recommendation/award decision — the UI's own Bid Evaluation page frames scoring as something that happens before the "Final Award Decision" panel unlocks. Nothing server-side enforces that order.
+
+### Root cause
+
+`VendorQuotationController.acceptQuotation` (gated on `rfq.award`) does not check whether `technicalScoreJson` is populated before accepting. This wasn't reachable as a bug in earlier cycles because those UATs always scored before awarding (following the intended UI flow); testing the API directly, out of order, showed the server has no independent enforcement of the sequence a determined or careless user could skip in the UI as well (nothing disables "Final Award Decision" pending a score in the frontend either — it only disables *recording who won* until a role check passes, not until scoring is complete).
+
+### Assessment
+
+Not escalated to a fix agent: this is a process-control question (should the platform force evaluation before award, or is scoring advisory/optional for a single-bid RFQ where there's nothing to "compare"?), not a defect with an obvious right answer. Recording as a finding for a product decision rather than shipping a guess.
+
+**Status:** OPEN — confirmed, not fixed. Needs a decision: (a) block `accept` server-side unless every submitted, non-rejected quotation on the RFQ has a `technicalScoreJson`, or (b) leave scoring advisory and accept this as intended flexibility for sole-source/single-bid awards.
+
+---
+
+## SRD §60 UAT journey — completed end-to-end with fresh live data, 18 September 2026
+
+The 15-step example journey in `NTS_SRD_DT_ProcMS_16_09_2026.pdf` §60 was walked in full using one fresh, self-created record chain (not historical data), confirming the module implements every step:
+
+| Step | SRD text | Result |
+|---|---|---|
+| 1 | User creates requisition | `REQ_20260918_0001` created by `proc.requester@nts.local` |
+| 2 | Manager approves | Department-scoped approval, correctly enforced (see PROC-FINDING-011) |
+| 3 | Procurement converts requisition to RFQ | `RFQ_20260918_0001` created from the approved requisition |
+| 4 | Suppliers invited | 2 vendors invited (`RfqVendorInvitation` rows confirmed), `INVITED_ONLY` visibility |
+| 5 | Quotations received | `QUO_20260918_0001` submitted through the real vendor portal (token-scoped link), after PROC-FINDING-009 (false alarm, hand-minted token) and a real latent bug found and fixed in PROC-FINDING-012 (`itemsSnapshot` unwrap) |
+| 6 | Supplier submissions compared | Quotation Comparison / Bid Evaluation screen shows the bid ranked against the RFQ's lowest-bid baseline |
+| 7 | Committee evaluates | Evaluation endpoint works (`PUT /vendor-quotations/:id/evaluation`), but see PROC-FINDING-014 — not enforced before award |
+| 8 | Recommendation prepared | `POST /vendor-quotations/:id/accept` as Procurement Manager |
+| 9 | Approver approves | Award and approval are the same action in the live implementation (see PROC-FINDING-014) |
+| 10 | PO generated | `PO_20260918_0001` created and emailed to the vendor in the same call as step 8/9 |
+| 11 | Goods received | `GRN_20260918_0001`, 4/4 units received, quality PASSED; PO moved to `DELIVERED` |
+| 12 | Invoice captured | `INV_20260918_0001` captured by `proc.ap@nts.local`, DRAFT |
+| 13 | Matching controls operate | Three-way match ran automatically on capture: `matchingStatus: MATCHED`, line-level detail confirms ordered/accepted/invoiced quantities and prices all agree |
+| 14 | Invoice marked Ready for Finance | `PUT /invoices/:id/approve` by `payroll.finmgr@nts.local` → `status: APPROVED`, `paymentStatus: PENDING` |
+| 15 | Audit trail confirms every step | `GET /procurement/audit-events` shows, in order: CREATE/SUBMIT/APPROVE `PurchaseRequisition`, CREATE `RFQ`, SUBMIT/APPROVE `VendorQuotation`, CREATE/SEND `PurchaseOrder`, CREATE `GoodsReceivedNote`, CREATE/APPROVE `ProcurementInvoice` — every step of this exact chain is present |
+
+**Status:** PASSED end-to-end, own fresh data, 18 September 2026. One process-control gap noted separately as PROC-FINDING-014.
+
+---
+
+## PROC-FINDING-015
+
+**Title:** A requester who is also their own approver could approve (and reject) their own purchase requisition
+**Module:** Procurement (backend) · **Dimension:** Security · **Category:** Broken access control (segregation of duties)
+**Severity:** CRITICAL — SRD `NTS_SRD_DT_ProcMS_16_09_2026.pdf` §70 "Critical Security Test Cases" test 4, "requestors cannot self-approve where prohibited", did not hold. This is a separate defect from PROC-FINDING-011 (cross-department bypass): that fix made a `DEPARTMENT`-step approval honor only the requisition's *own* department, but never checked whether the deciding actor *is* the requester, regardless of department.
+**Persona affected:** Any user who is simultaneously a requester and a legitimate approver for their own request — most directly a department head/deputy raising a requisition in their own department where they are also the sole approval-step approver, but the same gap applied to a threshold or named-person approval step and was not waived for admin/CFO either
+**Surface:** API `PUT /procurement/requisitions/:id/approve`, `PUT /procurement/requisitions/:id/reject`
+
+### Steps to reproduce (as reported, live on dev, 18 September 2026)
+
+1. Logged in as `payroll.finmgr@nts.local` (Blessing Sibanda, Finance Manager, Finance's department HEAD).
+2. Created a purchase requisition via `POST /procurement/requisitions` (`department: "Finance"`), submitted it via `PUT /procurement/requisitions/:id/submit` — `REQ_20260918_0005`, moved to `PENDING_APPROVAL` correctly, routed to "Pending Head of Finance" with "Can decide: Blessing Sibanda" (themselves — Finance's sole department-head approval step).
+3. Opened the approval review screen as the same user: the "Approve requisition" button was live, no warning or block.
+4. `PUT /procurement/requisitions/cmu.../approve` as the same user — **200** `"Purchase requisition approved successfully"`. The requester approved their own requisition.
+
+### Investigation
+
+`ProcurementRequisitionApprovalService.decide()` (the same function PROC-FINDING-011 already patches for the department check) verified only:
+(a) is there a `PENDING` `Approval` row assigned to the deciding actor at the current step (or is the actor module-privileged), and
+(b) — after the PROC-FINDING-011 fix — for a `DEPARTMENT`-type step, does the actor's own department match the requisition's department.
+
+Neither check compares the deciding actor's id against the requisition's `requestedById`. A department head deciding a `DEPARTMENT`-type step for their own department's own requisition passes both checks even when they are also the requester, because "am I an approver on this step" and "does this step belong to my department" are both true — the missing question is "am I the person who asked for this."
+
+`ProcurementService.rejectPurchaseRequisition` shares the identical `decide()` code path for routed requisitions, so self-*reject* had the same gap (confirmed by reading, not separately exploited live — self-reject is a lesser concern than self-approve, but the SRD gives no exception process for either, so both are blocked the same way). Two further, independent copies of the same gap were found while fixing: `ProcurementService.approvePurchaseRequisition` and `rejectPurchaseRequisition` each carry a **legacy fallback branch** (`routed = await decide(...); if (routed) return routed;` falls through when a requisition has no open approval route — e.g. one submitted before routes were enforced) that re-implements its own department-head/deputy check and does not call `decide()` at all, so it had no self-decision check either, before or after PROC-FINDING-011.
+
+An existing, already-correct precedent for this exact rule was found in the same codebase: `ProcurementRegistersService.ts:473`, `if (plan.createdById === userId) throw new RegisterError(403, "The plan's author cannot approve or reject it");` for Annual Procurement Plans. The requisition fix mirrors this pattern rather than an escalation-to-next-approver scheme, since the SRD gives no exception process and Finance's approval matrix has exactly one step with exactly one named approver — there is nowhere to escalate to without a product decision this finding doesn't make.
+
+### Fix
+
+Backend-only; branch `fix/proc-finding-015-self-approval` (cut from a clean worktree off `origin/master`, merged with the three sibling fixes already live on dev but not yet in `master` — `fix/procurement-department-authz-bypass` (PROC-FINDING-011), `fix/procurement-vendor-quote-prefill` (PROC-FINDING-012), `security/user-master-status-enforcement` (PROC-FINDING-013) — so this deploy would not regress any of them), commit `1386889`, 2 files changed:
+
+- `ProcurementRequisitionApprovalService.ts`, `decide()`: after the existing "is this actor a valid approver on this step" and department-of-record checks, a new unconditional check blocks the decision outright with **400** `"You cannot approve or reject your own purchase requisition."` when `requisition.requestedById === actorId`. Unlike the department check, this applies to **every** step type (`DEPARTMENT`, `ROLE`, `USER`, `AMOUNT_THRESHOLD`) and is **not** waived for a module-privileged actor (admin/CFO) — privilege lets them decide someone else's pending step, never their own request. No escalation-to-next-approver was implemented (the SRD gives no exception process); a requisition with genuinely no other valid approver is left blocked with a clear error rather than silently approved.
+- `ProcurementService.ts`: the same guard added to both legacy no-open-route fallback branches in `approvePurchaseRequisition` and `rejectPurchaseRequisition`, which don't call `decide()` and so wouldn't otherwise inherit the fix.
+
+No schema change; no migration.
+
+### Verification
+
+Live on dev (`https://dev-api.matanho.com`), after deploying the API-only fix (`arcus-dev-api:proc015-20260918`, confirmed by grepping the compiled `dist/services/ProcurementRequisitionApprovalService.js` and `dist/services/ProcurementService.js` inside the recreated `arcus-dev-api-1` container for the new message text before trusting it; container healthy, `RestartCount=0` before and after):
+
+1. Created and submitted a fresh Finance-department test requisition as `payroll.finmgr@nts.local` (`REQ_20260918_0007`), routed to "Head of Finance (Blessing Sibanda)" — the same self-approver shape as the original report.
+2. `payroll.finmgr@nts.local` `PUT .../approve` on their own `REQ_20260918_0007` → **400** `"You cannot approve or reject your own purchase requisition."` (was 200 "approved successfully" before the fix, per the original report on `REQ_20260918_0005`).
+3. `payroll.finmgr@nts.local` `PUT .../reject` on the same requisition → **400**, same message (self-reject also blocked).
+4. **PROC-FINDING-011 regression check:** `perf.deptmgr@nts.local` (Operations HEAD, a different department) `PUT .../approve` on Finance's `REQ_20260918_0007` → **400** `"This requisition waits for step 1 of 1, Head of Finance (Blessing Sibanda). You are not an approver on that step."`; `GET` by id → **403** `"You are not authorized to view Finance department requisitions."` — both unchanged from the PROC-FINDING-011 fix, confirming this change did not reopen it.
+5. **Legitimate different-person approval still works:** created and submitted a fresh Operations-department requisition as `proc.requester@nts.local` (an Operations member, `REQ_20260918_0008`); `perf.deptmgr@nts.local` (Operations HEAD, a different person from the requester) `PUT .../approve` → **200** `"Purchase requisition approved successfully"`, `approvedBy: perf.deptmgr@nts.local` — ordinary same-department, different-person approval is unaffected.
+
+### Cleanup
+
+`REQ_20260918_0007` (Finance, left `PENDING_APPROVAL` — every approve/reject attempt against it was refused, so it has no valid decision) and `REQ_20260918_0008` (Operations, correctly `APPROVED` by its legitimate department head) were left in `arcus_dev`, following the same precedent as PROC-FINDING-011's cleanup note (both titled with "verification"/"regression check" and traceable to this finding by requisition number and timestamp).
+
+**Status:** FIXED — deployed to dev (API only, no UI/portal service touched), verified live 18 September 2026. Branch `fix/proc-finding-015-self-approval`, commit `1386889`, pushed to `origin`. **Not merged to `master`/`dev`/`prod`.**
+
+---
+
+## PROC-FINDING-016
+
+**Title:** User Master had no Approval Level/Approval Limit -- a valid approver's decision was never checked against their own personal authority ceiling
+**Module:** Backend platform (`nvccz`, shared `User` model plus `ProcurementRequisitionApprovalService`/`ProcurementService`) -- not procurement-specific by SRD section, but exercised and enforced through this module's approval path. **Dimension:** Security. **Category:** Missing capability (SRD requirement never implemented)
+**Severity:** CRITICAL -- SRD `NTS_SRD_DT_ProcMS_16_09_2026.pdf` §7 "User Master" requires the user master to maintain, among other fields, Approval Level and Approval Limit. §6/§8 give a worked example ("Approver A: up to US$5,000; Approver B: US$5,001-25,000; Approver C: US$25,001-100,000; Executive Committee: above configured threshold") and state "a user must not be able to approve a transaction where the approved segregation-of-duties matrix prohibits it" and "the system must support configurable approval limits. Actual approval limits must come from Client configuration." §70 "Critical Security Test Cases" explicitly lists "approval limits are enforced server-side" as a mandatory pre-production test.
+**Persona affected:** every approver whose personal authority should be capped below what the shared workflow routing would otherwise let them decide; every requisition whose value should require an escalation the matrix alone doesn't force
+**Surface:** Prisma `User` model (`nvccz/prisma/schema.prisma`); `ProcurementRequisitionApprovalService.decide()`; `ProcurementService.approvePurchaseRequisition`'s legacy no-open-route fallback; `PUT /api/users/:id`
+
+### Investigation
+
+Grepped the full `User` model in `prisma/schema.prisma` -- no `approvalLimit` or `approvalLevel` field anywhere. Amount-based approval routing does exist, but only as a shared, admin-configured workflow-step property: the `AMOUNT_THRESHOLD` step type in `ApprovalService.ts` (~line 249) decides *who gets assigned* a pending `Approval` row at submission time by comparing the transaction amount against a threshold configured on the approval matrix/workflow stage itself -- never against any attribute of the individual user. Once that row is assigned, `ProcurementRequisitionApprovalService.decide()` (the same function PROC-FINDING-011 and PROC-FINDING-015 already patch this cycle) honors it purely on "is there a pending row for this actor at this step" -- it never independently re-checks that the specific approving user's own authorized ceiling actually covers the transaction amount. Per that function's own pre-existing structure, `ROLE`/`USER`/`AMOUNT_THRESHOLD`-type steps are exempt from the PROC-FINDING-011 department re-validation, and there was no decision-time amount/authority re-validation of any kind for any step type. Practical risk: if the shared approval-matrix config is ever misconfigured (PROC-FINDING-011's root cause was exactly this) or a user's seniority changes between when an `Approval` row is created and when they act on it, nothing server-side catches an approval that exceeds what that specific person should be allowed to authorize -- and there was no admin-facing way to say "this person's authority tops out at $X" independent of the shared workflow config at all.
+
+### Fix
+
+Branch `fix/proc-approval-limits`, commit `1bac209`, cut from a clean worktree off `origin/master`, fast-forward-merged with `origin/fix/proc-finding-015-self-approval` (which already carries PROC-FINDING-011, PROC-FINDING-012 and PROC-FINDING-013, live on dev but not yet in `master`) so this deploy would not regress any of them. 7 files changed:
+
+- **Schema:** nullable `User.approvalLimit` (`Decimal(15,2)`, maps to `approval_limit`). Null means "no personal ceiling override, defer entirely to workflow routing" -- additive, no behavior change for any user who doesn't opt in.
+- **Migration:** `scripts/run-approval-limit-migration.ts`, idempotent (`information_schema` column-existence guard, same pattern as `run-employee-terminated-columns-migration.ts` / `run-user-status-migration.ts`), registered as `db:migrate:approval-limit` in `package.json` (auto-discovered by `db:migrate:all`, which enumerates every `db:migrate:*` script -- no change to the runner itself needed).
+- **Enforcement:** `ProcurementRequisitionApprovalService.decide()` -- after the existing step/department/self-approval checks -- refuses an **APPROVE** decision with **400** (`"Your approval limit is $X; this transaction is $Y. Escalate to an approver with sufficient authority."`) when the actor has a non-null `approvalLimit` below the requisition's `totalAmount`. Waived for a module-privileged actor (`isModulePrivilegedUser`: admin/CFO -- the same bypass this codebase already uses for the DEPARTMENT check and the approval matrix itself); **not** waived for the self-approval rule, since that check is unrelated and fires first regardless. Only gates `APPROVE`, never `REJECT` (rejecting authorizes nothing). The identical guard was added to `ProcurementService.approvePurchaseRequisition`'s legacy no-open-route fallback branch, which doesn't call `decide()` and wouldn't otherwise inherit it -- mirrors how that branch already re-implements the self-approval check added in PROC-FINDING-015.
+- **Admin-facing:** `PUT /api/users/:id` (`UserController.updateUser` / `UserService.updateUser`) now accepts an optional `approvalLimit` -- a non-negative number, or `null` to clear a previously-set ceiling -- validated the same way as the existing `status` field, gated by the same `manage_users` permission the route already carries (PROC-FINDING-013), and audit-logged as `USER_APPROVAL_LIMIT_UPDATE` (old/new value, actor, IP, user agent), matching the existing `USER_STATUS_UPDATE`/`USER_ROLE_UPDATE` entries. `getAllUsers`/`getUserById` now select and surface the field so an edit screen can show the current value.
+
+**Scoped out, investigated but not extended:** `ProcurementService.approveProcurementInvoice` and `approveGoodsReceivedNote` (POs/invoices/GRNs) were checked for an equivalent decision point. They use a different, permission-based authorization model (`procurement.invoices.approve` etc. via `PERMISSION_DECISIONS`) with no stepped per-approver amount matrix and no pending-row concept to re-validate against -- extending personal approval limits there would need a separate product decision about what "authority" means for a role-permission-gated action, not a like-for-like extension of this fix. Left as a follow-up rather than force-fitted.
+
+### Deploy
+
+Deployed API-only to dev (`arcus-dev-api-1` on the NTS shared VPS, `dev-api.matanho.com`), same build -> migrate -> swap pattern as PROC-FINDING-013/015. The migration step initially hit the identical trap PROC-FINDING-013 documented: the throwaway migration container's own entrypoint runs `ensure-admin` (via `RUN_SEED=1` inherited from `secrets/dev.env`) *before* executing the passed `npm run db:migrate:all` command, so the admin-seed upsert crashed with `P2022: The column arcus_dev.users.approval_limit does not exist` before the migration ever ran. Fixed by passing `-e RUN_SEED=0` on that one-off container (overrides the env-file value for the same key), which skips the seed step and lets migrations run first; the real `arcus-dev-api-1` container keeps `RUN_SEED=1` from `secrets/dev.env` for its own normal boot, so its admin-seed still runs (and succeeded, post-migration). `db:migrate:all`: 157 ok, 0 failed, 6 skipped (expected fan-out/legacy-guard scripts, same as always); `approval_limit columns: 1` confirmed present on `arcus_dev.users` before the swap. Container recreated, image matched the newly built one, health check `DEV_API_OK`, `RestartCount=0`. Confirmed by grepping the compiled `dist/services/ProcurementRequisitionApprovalService.js` and `dist/services/ProcurementService.js` inside the running container for `"Your approval limit is"` before trusting it -- both matched.
+
+### Verification
+
+Live on dev, 18 September 2026, using `proc.requester@nts.local` (Operations member, requester), `perf.deptmgr@nts.local` (Farai Mutasa, Operations HEAD, the approver under test), `payroll.finmgr@nts.local` (Blessing Sibanda, Finance HEAD, used as the cross-department actor and, separately, as Finance's own sole approver), and `admin@nts.com` (the `manage_users`-permission admin bootstrap account):
+
+1. **Baseline, no personal limit (true default for every existing user before this fix):** created and submitted a fresh Operations requisition (`REQ_20260918_0009`, $8,000). `perf.deptmgr@nts.local` `PUT .../approve` → **200** `"Purchase requisition approved successfully"` -- unchanged from before this field existed, confirming no regression for the common case.
+2. `admin@nts.com` `PUT /api/users/{perf.deptmgr's id}` with `{ "approvalLimit": 5000 }` → **200**; a follow-up `GET /api/users/{id}` (before the later clear) confirmed the stored value.
+3. **Over the limit:** created and submitted `REQ_20260918_0010` ($8,000). `perf.deptmgr@nts.local` (now capped at $5,000) `PUT .../approve` → **400** `"Your approval limit is $5,000.00; this transaction is $8,000.00. Escalate to an approver with sufficient authority."` (was 200 before this fix).
+4. **Within the limit:** created and submitted `REQ_20260918_0011` ($3,000). `perf.deptmgr@nts.local` (still capped at $5,000) `PUT .../approve` → **200** `"Purchase requisition approved successfully"` -- a limit that comfortably covers the amount does not block a legitimate approval.
+5. **PROC-FINDING-011 regression check:** `payroll.finmgr@nts.local` (Finance HEAD, a different department, not an approver on this step) `PUT .../approve` on Operations' still-pending `REQ_20260918_0010` → **400** `"This requisition waits for step 1 of 1, Head of Operations (Nyasha K, Farai Mutasa). You are not an approver on that step."` -- identical shape/status to PROC-FINDING-011's and PROC-FINDING-015's own regression checks, confirming the approval-limit check (which runs later in `decide()`) never gets a chance to mask or interfere with the earlier "not an approver on this step" gate.
+6. **PROC-FINDING-015 regression check (redone against a real self-approval shape, not just a non-approver):** logged in as `payroll.finmgr@nts.local` (Finance's sole HEAD, i.e. the assigned approver), created and submitted a fresh Finance requisition (`REQ_20260918_0012`, $1,500) as themselves, then `PUT .../approve` on their own submission → **400** `"You cannot approve or reject your own purchase requisition."` -- unchanged from the PROC-FINDING-015 fix, confirming the self-approval check (which also runs before the new approval-limit check) still fires correctly and takes precedence.
+7. **Cleanup of the admin-set limit:** `admin@nts.com` `PUT /api/users/{perf.deptmgr's id}` with `{ "approvalLimit": null }` → **200**; `GET /api/users/{id}` afterwards showed `"approvalLimit": null`, confirming the field can be cleared back to "no personal ceiling, defer to workflow routing" and that `null` is distinguished from "field omitted."
+
+### Cleanup
+
+`REQ_20260918_0009` (Operations, $8,000, correctly `APPROVED` before any limit was set) and `REQ_20260918_0011` (Operations, $3,000, correctly `APPROVED` within the $5,000 test limit) are legitimate decisions, left in `arcus_dev`. `REQ_20260918_0010` (Operations, $8,000 -- every approval attempt against it was refused, either by the approval-limit block or the cross-department regression check, so it has no valid decision) and `REQ_20260918_0012` (Finance, $1,500 -- refused by the self-approval check) were left `PENDING_APPROVAL`, following the same precedent as PROC-FINDING-011/015's cleanup notes (all four titled "verification"/"regression re-check" and traceable to this finding by requisition number and timestamp). `perf.deptmgr@nts.local`'s `approvalLimit` was restored to `null` (its pre-test state) so no test configuration was left active on dev.
+
+**Status:** FIXED -- deployed to dev (API only, no UI/portal service touched), verified live 18 September 2026. Branch `fix/proc-approval-limits`, commit `1bac209`, pushed to `origin`. **Not merged to `master`/`dev`/`prod`.**
+
+---
+
+## PROC-FINDING-017
+
+**Title:** Vendor's own submitted Payment Terms silently overwritten by the vendor master's stored default
+**Module:** Procurement (backend, `nvccz`) · **Dimension:** QAT · **Category:** Functional / data integrity
+**Severity:** HIGH -- SRD `NTS_SRD_DT_ProcMS_16_09_2026.pdf` SS15 "Quotation Management" lists Payment Terms as a minimum per-quotation field the vendor states; SS9 "Vendor Portal / Supplier Submission" requires the supplier interface to support "payment terms" as something the vendor supplies on submission. A vendor's own stated terms for a specific quote were discarded and replaced with a stale, unrelated default.
+**Persona affected:** Every vendor with a `paymentTerms` value already set on their `Vendor` master record (i.e. almost every real vendor, since historical quotations show this field populated) submitting any quotation, for any RFQ -- their actual proposed terms for that specific bid were never recorded, only ever the vendor master's one fixed value.
+**Surface:** `VendorQuotationService.createVendorQuotation` (`src/services/VendorQuotationService.ts:294`, before this fix); `POST /api/vendor-quotations/submit`
+
+### Discovered via
+
+While live-verifying the companion frontend fix (below, PROC-FINDING-018 -- adding a Payment Terms field to the public vendor RFQ response form, which until that fix did not exist at all), the newly-added field was exercised for the first time against a real submission: vendor Baobab Networks & Computing, isolated verification RFQ `RFQ_20260918_0003`, quotation `QUO_20260918_0003`. Typed `paymentTerms: "Net 30, 50% advance on order confirmation"` into the form and submitted; `SELECT paymentTerms FROM vendor_quotations WHERE quotationNumber = "QUO_20260918_0003"` came back as plain `"Net 30"` -- silently truncated to the vendor master's own stored default, not what was actually typed.
+
+### Investigation
+
+```ts
+const resolvedPaymentTerms =
+  vendorRow.paymentTerms?.trim() || trimIn(paymentTerms) || undefined;
+```
+
+This is the same "vendor master wins" precedence used immediately above it for `resolvedTaxEIN`, `resolvedPhone`, `resolvedAddress` and `resolvedCompanyName` -- correct for those, because they are stable vendor *identity* fields the server should trust over a value resubmitted on a public form (a vendor shouldn't be able to silently change its own registered tax number or address by editing a quotation form). Payment terms is not identity data: it is a negotiated, per-quotation commercial term, explicitly listed by the SRD as something that varies quotation-to-quotation. The identity-field precedence pattern was copied onto a transactional field it doesn't apply to, so every quotation from any vendor with a non-null `Vendor.paymentTerms` recorded that fixed default instead of whatever was actually proposed for that specific bid -- with no error, no warning, and a vendor-facing confirmation screen (client-side state, never round-tripped through the server) that still showed the vendor what *they* typed, masking the discrepancy from the vendor's own view.
+
+### Fix
+
+Branch `fix/proc-finding-017-vendor-payment-terms-override` (`nvccz` repo), cut from a clean worktree off `origin/master`, commit `f4fcda5`. One file changed (`src/services/VendorQuotationService.ts`): swapped precedence so the vendor's own submitted value wins, falling back to the vendor master's stored value only when the vendor sends nothing (e.g. an older client). No schema change.
+
+### Deploy
+
+Deployed API-only to dev. Rather than rebuilding from `origin/master` (which would have reverted whatever combination of not-yet-merged fixes -- PROC-FINDING-011/012/013/014/015/016 -- is currently live on `arcus-dev-api-1` and not tracked by any single branch), the exact currently-deployed source tree on the VPS (`/var/www/projects/arcus/src/api`, the API service's own Docker build context) was patched in place with the identical one-line precedence change, then `docker compose build api && up -d --no-deps --force-recreate api`. No migration needed. Pre-rebuild image (`sha256:a492024f...`) snapshotted to `rollback/api.proc017-pre.image` first. Container came back healthy.
+
+### Verification
+
+Live on dev, 18 September 2026. A second isolated verification RFQ (`RFQ_20260918_0004`, same vendor, Baobab Networks & Computing) was minted the same way as PROC-FINDING-018 below, then a quotation submitted with `paymentTerms: "60% deposit, balance on delivery (PROC-FINDING-017 fix verification)"` -- deliberately different from the vendor master's stored `"Net 30"`. Response and a direct `arcus_dev.vendor_quotations` read both show `paymentTerms` persisted exactly as submitted, not overwritten. Regression check: `deliveryTerms`/`notes` (same call, see PROC-FINDING-018) also came back exactly as submitted, confirming the fix didn't touch the fields around it.
+
+### Cleanup
+
+`RFQ_20260918_0003`/`QUO_20260918_0003` and `RFQ_20260918_0004`/`QUO_20260918_0004` are isolated, clearly-titled verification records ("PROC-FINDING-01[6-8] verification ... isolated, safe to ignore/delete") invited only to the real Baobab Networks & Computing vendor master row (no fabricated vendor); left in `arcus_dev` for anyone who wants to inspect the before/after directly, same precedent as prior findings' cleanup notes.
+
+**Status:** FIXED -- deployed to dev (API only), verified live 18 September 2026. Branch `fix/proc-finding-017-vendor-payment-terms-override`, commit `f4fcda5`, pushed to `origin`. **Not merged to `master`/`dev`/`prod`.**
+
+---
+
+## PROC-FINDING-018
+
+**Title:** Public vendor RFQ response form had no Payment Terms, Comments, or document-attachment fields, despite the backend and DB already supporting all three
+**Module:** Procurement (frontend, `nvccz-new`) · **Dimension:** QAT · **Category:** Missing capability (SRD requirement never implemented in the UI)
+**Severity:** HIGH -- SRD `NTS_SRD_DT_ProcMS_16_09_2026.pdf` SS15 "Quotation Management" lists Payment Terms, Delivery Period, Quotation Validity and Attachments as minimum fields every quotation must record; SS9 "Vendor Portal / Supplier Submission" explicitly requires the supplier interface to support "quotation upload", "PDF/document attachments", "payment terms", "comments" and "final submission".
+**Persona affected:** Every invited vendor submitting a quotation through the real emailed RFQ link -- no way to state payment terms, add a comment, or attach any supporting document (a formal quote PDF, a spec sheet, a compliance certificate) to a bid.
+**Surface:** `app/vendor-quotations/rfq-respond/page.tsx` (the route `VENDOR_RFQ_RESPONSE_PATH`/`vendorRfqEmailLinks.ts` actually emails to invited vendors -- confirmed this is the live route, not one of the two other, unused vendor-quotation-form variants in this codebase, `app/vendor/quotation/submit` and `app/vendor-portal/rfq/[rfqNumber]`, neither of which is linked from any invitation email)
+
+### Steps to reproduce (as reported, live on dev, 18 September 2026)
+
+Fresh RFQ `RFQ_20260918_0002`, real vendor-portal link, real submission as Baobab Networks & Computing: `read_page` of every interactive element on the quotation form showed only Item Name, Brand, Quantity, Unit, Unit Price, Total, Quote Valid Until (date), Delivery Time (text), Submit. No Payment Terms field, no Comments field, no file/document upload control anywhere on the form -- despite `VendorQuotation.paymentTerms`/`deliveryTerms`/`notes`/`attachments` all already existing as columns (historical quotations show `paymentTerms` populated, e.g. "Net 30") and the page's own submit payload already silently sending empty values for `paymentTerms`, `notes` and `attachments: {}` on every call.
+
+### Fix
+
+Branch `feature/proc-quotation-vendor-fields` (`nvccz-new` repo), cut from a clean worktree off `origin/dev`, commit `57bfe04`. Two files changed:
+
+- `app/vendor-quotations/rfq-respond/page.tsx`: rendered Payment Terms (required) and Delivery Terms inputs and a Comments textarea, wired to the `paymentTerms`/`deliveryTerms`/`notes` state the page already declared but never rendered; added a PDF attachment picker (multi-file, client-side type/size validation) that stages each file via the existing `POST /procurement/document-attachments/portal/upload` endpoint on submit and sends the returned ids as `attachmentIds`, which `VendorQuotationService.createVendorQuotation` already links to the new quotation server-side (a "Phase 2" hook that existed in the request type but had no caller). Confirmation screen now also shows Payment Terms and attachment count back to the vendor.
+- `lib/api/procurement-api-v2.ts`: added `attachmentIds?: string[]` to `SubmitQuotationRequest` and a new `uploadQuotationAttachment()` client method.
+
+No backend/schema change needed for this half -- the fields and the staged-upload endpoint already existed, just unused by this form. `npx tsc --noEmit` diffed line-for-line against an `origin/dev` baseline confirms zero new type errors introduced.
+
+### Deploy
+
+Deployed to dev, `ui-vendor` only (the portal `dev.vendor.matanho.com` is where this route is actually served -- confirmed via `vendorRfqEmailLinks.ts`'s `VENDOR_PORTAL_BASE_URL`, not the default `staff` portal a naive path-based guess would pick). Packed from the clean worktree/commit above (not the shared, concurrently-dirty `nvccz-new` checkout) via a locally-patched copy of `scripts/deploy-arcus-dev-selective.py` with `UI_ROOT` pointed at that worktree, `--portals vendor`. Deploy stamp `20260918-214359`; `arcus-dev-ui-vendor-1` recreated and came up healthy.
+
+### Verification
+
+Live on dev, 18 September 2026, two full real submissions as vendor Baobab Networks & Computing against isolated verification RFQs invited to that same real vendor master record (the shared `RFQ_20260915_0001` "E2E sweep" RFQ some other automated suite depends on was deliberately **not** reused, to avoid disturbing its fixture state):
+
+1. `RFQ_20260918_0003` / `QUO_20260918_0003` -- browser UI pass. The rebuilt form rendered Payment Terms, Delivery Terms, Comments and an "Attach document" (PDF, up to 50MB) control exactly as coded. Filled and submitted with `paymentTerms: "Net 30, 50% advance on order confirmation"`, a comment, delivery terms/time -- no attachment on this pass (browser sandbox has no OS file-picker to drive a native `<input type=file>` dialog). Confirmation screen showed Payment Terms back correctly. DB read after submission showed `deliveryTerms`/`deliveryTime`/`notes` persisted exactly as submitted -- but `paymentTerms` came back as plain `"Net 30"`, which is what led to PROC-FINDING-017 above.
+2. `RFQ_20260918_0004` / `QUO_20260918_0004` -- direct call to the same public endpoints the page itself calls (`POST /procurement/document-attachments/portal/upload` then `POST /vendor-quotations/submit` with `attachmentIds`), used because of the same file-picker limitation, run **after** the PROC-FINDING-017 fix was deployed: uploaded a real PDF (`quotation-support.pdf`, `sha256` confirmed), then submitted with a distinct `paymentTerms`, `deliveryTerms: "CIF Harare"` and a `notes` comment. Response and a direct DB read both confirm all three land correctly: `paymentTerms` exactly as submitted (not the vendor-master default -- proves PROC-FINDING-017's fix), `notes` exactly as submitted, and `vendor_document_attachments` shows the uploaded PDF's `entity_id` set to the new quotation's id (status `ACTIVE`) -- i.e. genuinely linked to the quotation a staff reviewer would open, not just staged and orphaned.
+
+Staff-side visibility (Quotation Comparison / Bid Evaluation reading these same `vendor_quotations`/`vendor_document_attachments` rows) was not separately screenshotted this session -- verification relied on direct, read-only `arcus_dev` queries of the same columns/tables those screens read from, not a staff UI login.
+
+### Cleanup
+
+See PROC-FINDING-017's cleanup note -- both isolated verification RFQs/quotations are clearly titled and left in `arcus_dev`.
+
+**Status:** FIXED -- deployed to dev (`ui-vendor` only), verified live 18 September 2026 (frontend fields; attachment leg verified via direct API call rather than a literal file-picker click, see above). Branch `feature/proc-quotation-vendor-fields`, commit `57bfe04`, pushed to `origin`. Companion backend fix PROC-FINDING-017 also deployed to dev. **Not merged to `master`/`dev`/`prod`.**
+
+---
+
+## PROC-FINDING-019
+
+**Title:** Purchase Requisition creation form had no Required Date, Delivery Location or Budget Code fields, and no Attachments -- SRD §11 minimum fields never implemented; gap propagated into the RFQ and vendor-portal quotation form
+**Module:** Procurement (frontend `nvccz-new` + backend `nvccz`) · **Dimension:** QAT · **Category:** Missing capability (SRD requirement never implemented, both schema and UI)
+**Severity:** HIGH -- SRD `NTS_SRD_DT_ProcMS_16_09_2026.pdf` §11 "Purchase Requisitions" lists Required Date, Budget Code, Delivery Location and Attachments among the minimum fields a requisition must capture. None of the four existed anywhere in the module: not as `PurchaseRequisition` columns, not on the creation form, not on the requester's edit form, not on the view/approval-review panel.
+**Persona affected:** Every requester raising a purchase requisition (no way to state when goods are needed, where to deliver them, which budget line covers them, or attach supporting documents); every approver reviewing one (nothing to review for these fields either); every vendor invited to quote on an RFQ built from an affected requisition.
+**Surface:** `components/procurement-v23-mock/matanho-procurement-runtime.js` (New/Edit requisition forms, requisition view), `nvccz` `PurchaseRequisition` Prisma model and `POST/PUT /procurement/requisitions`, `ProcurementService.createAndSendRFQ`, `app/vendor-quotations/rfq-respond/page.tsx` (downstream)
+
+### Steps to reproduce (as reported, confirmed live on dev, 18 September 2026)
+
+Fresh requisition `REQ_20260918_0005`, created via Purchase Requisitions > New requisition as `payroll.finmgr@nts.local`: `read_page` of every interactive element on the creation modal showed only Entity, a combined Department/cost-centre dropdown, Category, Requirement title, line items (item/UOM/qty/unit estimate), Internal motivation and a read-only "Live budget check" narrative -- no Required Date, no Delivery Location, no Budget Code (as a real field, only the read-only budget-check text), no Attachments anywhere on the form, and the same absence on the requester's edit form and the read-only view. Downstream consequence confirmed: the real vendor-portal quotation form (`rfq-respond`) for an RFQ built from this requisition showed "Delivery required by: Not set" and "Deliver to: To be confirmed", because `ProcurementRfq.expectedDeliveryDate`/`deliveryAddress` (which the vendor portal reads directly) had nothing to be populated from.
+
+### Root cause
+
+`purchase_requisitions` had no `required_date`, `delivery_location` or `budget_code` columns at all, and no attachment relationship. `ProcurementRfq` already had `deliveryAddress`/`expectedDeliveryDate` columns and `createAndSendRFQ` already accepted them as params -- but the tender builder (`create-send-tender-v13` in `actions.ts`) never sent them, and there was nothing on the source requisition to default them from even if it had.
+
+### Fix
+
+Two branches, both named `fix/proc-requisition-missing-fields`, cut from clean worktrees off `origin/master` (`nvccz`, commit `b0cd9e7`) and `origin/dev` (`nvccz-new`, commits `68354ef` + `3925ef5`).
+
+**Backend (`nvccz`, `b0cd9e7`):**
+- `purchase_requisitions` gains `required_date` (DATE), `delivery_location` (VARCHAR 255) and `budget_code` (VARCHAR 100), all nullable, via an idempotent raw-SQL migration (`npm run db:migrate:procurement-requisition-fields`, registered in `db:migrate:all`); Prisma schema updated to match.
+- `createPurchaseRequisition` / `updatePurchaseRequisitionByOwner` accept and persist the three fields; the controller passes them through from the request body.
+- `createAndSendRFQ` now defaults the RFQ's `expectedDeliveryDate`/`deliveryAddress` from the source requisition's `requiredDate`/`deliveryLocation` when the tender builder does not explicitly override them -- this is what fixes the vendor-portal "Not set"/"To be confirmed" symptom without needing any change to the RFQ builder UI itself.
+- New `POST`/`GET /procurement/requisitions/:id/attachments`, reusing the Document Vault's storage (`ProcurementDocuments`, folder `"Requisitions"`, `relatedRecord` = requisition number) but gated by requisition ownership rather than `procurement.documents.manage`, which a requester does not hold (the vendored form's original Attachment/Supporting-documents fields were removed in an earlier cycle for exactly this reason -- see the "requisition forms offer only what is saved" patch note -- so a genuinely working upload needed its own authorization path, not reuse of the gated Document Vault endpoint as-is).
+
+**Frontend (`nvccz-new`, `68354ef` + a same-day follow-up fix `3925ef5`, see below):**
+- `lib/api/procurement-v23-api.ts`: `createRequisition`/`updateRequisition` carry the three new fields; new `uploadRequisitionAttachments`/`listRequisitionAttachments`.
+- `lib/procurement-v23/live-loaders.ts`: `requisitionsView` carries `requiredDate`, `deliveryLocation`, `budgetCode` so the view/edit/approval-review panels render them without an extra fetch.
+- `scripts/procurement-runtime-live-bridge.inc.js`: `__pr23RequisitionExtraFields` (Required date / Delivery location / Budget code inputs -- Budget Code is free text, since no budget-code register exists on this backend, per `procurement-v23-backend-asks.md` ask 2), a real `__pr23RequisitionAttachmentsField` (replaces the vendored fields that saved nothing), and a lazy `__pr23RequisitionAttachmentsBox` fed by a sweep-observer hook, so opening one requisition's view/edit modal fetches only that record's attachments -- not one request per row in the register.
+- `scripts/patch-procurement-runtime.mjs`: wires the above into the New requisition form, the requester's edit form, and the read-only view shared by "My requisitions" and the Approval Centre's review modal (`viewPrV11` modes `'view'`/`'approve'`) -- an approver sees the same three fields and attachments the requester entered.
+- `lib/procurement-v23/actions.ts`: `save-pr`/`submit-pr` and `save-pr-v11`/`submit-pr-v11` read the new fields and, once the requisition exists, upload any selected attachment files.
+- `components/procurement-v23-mock/procurement-v23-app.tsx`: exposes `__pr23FetchRequisitionAttachments` for the bridge's lazy loader.
+
+**Self-caught regression, same session:** the first patch commit (`68354ef`) broke `npm run build` on dev -- three of the five new `replaceUnique` calls anchored on pristine pre-patch text instead of the already-patched text an earlier cycle had baked into the committed `matanho-procurement-runtime.js`. Since `replaceUnique` matches substrings anywhere, two calls silently duplicated `__pr23RequisitionProjectField()` and a third spliced a ternary inside an existing single-quoted string, producing invalid nested template-literal syntax (`Expected '}', got 'class'`). Caught when the dev staff UI deploy failed with a webpack compile error; fixed in `3925ef5` by anchoring each `from` on the current already-patched text (mirroring how the other two new patches in the same commit were already anchored correctly); reran the patch script (`0 missed`), `node --check` on the regenerated runtime, and grepped for duplicate calls before redeploying.
+
+Business Unit and Branch are intentionally **not** added: no `BusinessUnit` concept exists anywhere in the schema, and `Branch` exists only as a free-text property of `Department`, not a distinct selectable dimension on a requisition.
+
+### Deploy
+
+- API: `deploy_dev_api_committed` (locally-patched copy pointed at the `nvccz` worktree). First attempt raced with a concurrent deploy on the shared VPS -- the DB migration ran and columns landed correctly, but the running container ended up on someone else's image (`grep budgetCode` on the deployed `dist/` came back empty despite the migration having just added the columns for it). Caught by directly grepping the running container's `dist/` for the new code before trusting the deploy script's own `IMAGE_MATCH` check (which had reported a mismatch, correctly, but for a build-race reason not immediately obvious from the log alone); redeployed once no other build was in flight, verified `dist/controllers/ProcurementController.js` and `dist/routes/procurementRoutes.js` contain the new code and `purchase_requisitions` has all three columns.
+- UI: `deploy-arcus-dev-selective.py` (locally-patched copy pointed at the `nvccz-new` worktree), `--portals staff`. First attempt failed to build (the substring-overlap bug above); redeployed after the fix, confirmed via `grep` for literal strings ("OPEX-2026-IT-014", "Delivery location") in the built `.next/static` chunks that survive minification (function names do not, since they are safely renamed by the minifier).
+
+### Verification
+
+Live on dev, 18 September 2026, both via direct API calls and the real browser UI:
+
+1. **API, as `proc.requester@nts.local`:** `POST /procurement/requisitions` with `requiredDate: "2026-11-02"`, `deliveryLocation`, `budgetCode` -- **201**, all three echoed back correctly. `POST .../attachments` with a text file -- **201**. `GET /procurement/requisitions/:id` (reload/persistence check) -- all three fields and the attachment still present. `GET .../attachments` as `perf.deptmgr@nts.local` (the approver, who does **not** hold `procurement.documents.manage`) -- **200**, sees the same attachment (proves the ownership-gated endpoint, not the Document Vault's own gate, is what's actually serving this). Submitted and approved (`perf.deptmgr@nts.local`, department head). Sent an RFQ (`proc.officer@nts.local`) from the approved requisition **without** passing `expectedDeliveryDate`/`deliveryAddress` (exactly what the tender builder currently sends) -- direct DB read of `procurement_rfqs` for the new `RFQ_20260918_0005` confirms `delivery_address` and `expected_delivery_date` were defaulted from the requisition's `deliveryLocation`/`requiredDate` exactly as coded.
+2. **Real vendor portal, most direct reproduction of the originally reported symptom:** minted a real signed vendor-portal token server-side (`signVendorPortalToken`, same secret the running API uses, via `docker exec` into `arcus-dev-api-1`) for the vendor invited to `RFQ_20260918_0005`, and loaded the actual public page, `https://dev.vendor.matanho.com/vendor-quotations/rfq-respond?token=...&rfqNumber=RFQ_20260918_0005`. It now reads **"Delivery required by: 02 Nov 2026"** and **"Deliver to: Head Office Stores, 14 Samora Machel Ave, Harare"** -- previously "Not set" / "To be confirmed" on the originally reported `REQ_20260918_0005` (a different, coincidentally same-numbered record from the original report).
+3. **Real browser UI, as `proc.requester@nts.local` (Kudakwashe Ncube):** opened Purchase Requisitions > New requisition -- Required date, Delivery location and Budget code render as real inputs (date picker, two text fields with the documented placeholders) and Attachments renders a working file picker ("Uploaded when you save."), none hidden behind `__pr23Live()` as the old vendored fields were. Filled all three plus a line item and motivation, submitted -- created `REQ_20260918_0014`, routed to Pending Head of Operations. Reopened the record (persistence/reload check): the view panel shows **Required date: 15 Nov 2026**, **Delivery location: Head Office Stores, 14 Samora Machel Ave, Harare**, **Budget code: OPEX-2026-UAT-099**, and an honest "No attachment has been uploaded yet." (none was attached on this pass).
+4. **Real browser UI, as `perf.deptmgr@nts.local` (Farai Mutasa, Head of Operations, the approver):** opened the same `REQ_20260918_0014` from the Purchase Requisitions register's own "Review" action (`viewPrV11` mode `'approve'` -- the Approval Centre's own "Review" button opens a different view, the motivation decision-paper, which does not carry these fields; the register's own Review action is the one patched) -- shows the identical Required date / Delivery location / Budget code the requester entered, plus "Approve requisition" / "Reject or return" actions. Confirms the approver sees these fields too, not only the requester.
+
+### Cleanup
+
+`REQ_20260918_0013` (API-created verification record; submitted, approved, RFQ `RFQ_20260918_0005` sent to Baobab Networks & Computing) and `REQ_20260918_0014` (browser-UI-created verification record; submitted, left `Pending Head of Operations` -- not approved, so nothing downstream was created from it) were left in `arcus_dev`, both clearly titled "PROC-FINDING verification" / "UI live verification" and traceable to this finding by requisition number and timestamp, following the precedent in PROC-FINDING-011/015's cleanup notes. Mail guard was already `ACTIVE` on dev when this session started (a concurrent agent's write-test protection) and was left untouched rather than toggled, since turning it off could have exposed another session's in-flight test to real outbound email.
+
+**Status:** FIXED -- deployed to dev (API and staff UI), verified live 18 September 2026 via direct API calls, a minted real vendor-portal token against the actual public page, and the real staff browser UI as both the requester and the approver persona. Branches `fix/proc-requisition-missing-fields` in both repos (`nvccz` commit `b0cd9e7`; `nvccz-new` commits `68354ef`, `3925ef5`), pushed to `origin`. **Not merged to `master`/`dev`/`prod`.**
+
+---
+
+## PROC-FINDING-020
+
+**Title:** Code review of PROC-FINDING-019 found the new requisition-attachments GET had no department check, the upload had no file-type filter, and the deploy that shipped PROC-FINDING-019 had silently regressed seven already-fixed, not-yet-merged security/procurement issues on dev
+**Module:** Procurement (backend `nvccz`) · **Dimension:** Security / QAT · **Category:** Authorization bypass (Issue 1), missing input validation (Issue 2), deploy-process gap (regression)
+**Severity:** HIGH (Issue 1 and the regression), MEDIUM (Issue 2)
+**Persona affected:** Issue 1 -- any authenticated staff account, against any other department's requisition attachments. Issue 2 -- any requester uploading a requisition attachment. Regression -- every persona relying on the seven previously-fixed issues (see below), between this branch's first dev deploy and this fix.
+**Surface:** `nvccz` `src/controllers/ProcurementController.ts` (`listRequisitionAttachments`), `src/routes/procurementRoutes.ts` (`uploadRequisitionAttachment` multer config), and the dev deploy of branch `fix/proc-requisition-missing-fields` itself
+
+### Issue 1: `GET /procurement/requisitions/:id/attachments` had no department/ownership check
+
+PROC-FINDING-019 added this endpoint gated only by authentication and the requisition existing -- it never called the department-scoping check `getPurchaseRequisitionById` already runs (`assertUserCanViewDepartmentPurchaseRequisition`, added for PROC-FINDING-011). Any authenticated staff account could list another department's requisition attachments (names, `fileUrl`, storage paths) by id alone, bypassing PROC-FINDING-011's fix entirely for this one new endpoint.
+
+**Root cause:** the endpoint was written by generalizing "does this requisition exist" from a quick ownership-only check (needed for the *upload* side, where only the owner or `documents.manage` may write) and never added the separate, additional check the *read* side needs -- the same distinction `getPurchaseRequisitionById` already draws.
+
+**Fix:** `listRequisitionAttachments` now selects `department`, `requestedById`, `portfolioCompanyId`, `fundId` on the requisition lookup and runs the identical two checks `getPurchaseRequisitionById` runs before returning data: `ProcurementService.assertUserCanViewInvesteePurchaseRequisition`, then (for non-investee records) `ProcurementController.assertUserCanViewDepartmentPurchaseRequisition`, returning **403** on failure with the same message shape.
+
+### Issue 2: `uploadRequisitionAttachment` had no file-type restriction
+
+The multer config backing `POST /procurement/requisitions/:id/attachments` set only `fileSize`/`files` limits, no `fileFilter` -- unlike the sibling `uploadDocument` config in `vendorDocumentAttachmentRoutes.ts`, which restricts to PDF for exactly this reason. Nothing rejected an `.exe`, `.html` or any other file type from being stored (and served back via a public `fileUrl`) as a "Requisition attachment", against SRD §32 (supported formats: PDF/DOCX/XLSX/XLS/CSV/JPG/JPEG/PNG) and §43 (file-upload restrictions, file-type verification).
+
+**Fix:** added a `fileFilter` to `uploadRequisitionAttachment` checking both file extension and mimetype against the SRD §32 list plus legacy `.doc` (matching the form's own `accept` attribute); rejects with a clear message otherwise.
+
+### Regression: dev lost seven already-fixed, not-yet-merged issues
+
+Found while implementing the two fixes above, before redeploying. All seven sibling fix branches below share the same parent commit as `fix/proc-requisition-missing-fields` (`bc131bb`, `origin/master`) -- none are merged to `master` yet, and each had been deployed to dev independently by the agent that fixed it. PROC-FINDING-019's own first deploy was built from a worktree that only had `fix/proc-requisition-missing-fields` checked out on top of `origin/master`, with none of these merged in -- overwriting dev's API image with a build that silently dropped all seven:
+
+| Branch | Fixes |
+|---|---|
+| `fix/procurement-department-authz-bypass` | PROC-FINDING-011 (department-scoped requisition GET/approve/reject) |
+| `fix/procurement-vendor-quote-prefill` | Vendor-portal RFQ endpoint reading `itemsSnapshot` as a bare array (masked bug, always fell through to current requisition items) |
+| `security/user-master-status-enforcement` | User status (Active/Suspended/Locked/Deactivated), enforced at login |
+| `fix/proc-finding-015-self-approval` | PROC-FINDING-015 (self-approval/-rejection block) |
+| `fix/proc-finding-017-vendor-payment-terms-override` | PROC-FINDING-017 (vendor-submitted Payment Terms silently overridden by vendor master default) |
+| `fix/proc-approval-limits` | Per-user approval limit (SRD User Master), enforced at decision time |
+| `fix/proc-finding-010-users-directory-trim` | PROC-FINDING-010 (`GET /users` response trimmed for callers without `manage_users`) |
+
+Caught by grepping the running container's compiled `dist/` for each fix's marker code (e.g. `assertUserCanViewDepartmentPurchaseRequisition`, `"cannot approve or reject your own purchase requisition"`, `snapshotRaw.items`) and finding all of them absent, despite each being present and merged on `origin` at the time.
+
+**Fix:** merged all seven branches into `fix/proc-requisition-missing-fields` (`git merge --no-edit origin/<branch>` for each). Six merged cleanly; one conflict in `package.json` (two branches adding an adjacent `db:migrate:*` script line) resolved by keeping both lines. `prisma/schema.prisma` merged cleanly (verified the `security/user-master-status-enforcement` branch's `User.status` field and index are both present post-merge). `npx tsc --noEmit` clean after all merges plus the two fixes above.
+
+### Deploy
+
+API only (no UI change in this fix). `deploy_dev_api_committed` (locally-patched copy pointed at the `nvccz` worktree, same as PROC-FINDING-019's deploy). Verified this time, before trusting the deploy script's own exit code, by grepping the running container's `dist/` directly for: `assertUserCanViewDepartmentPurchaseRequisition` (3 occurrences: definition + `getPurchaseRequisitionById` + `listRequisitionAttachments`), the self-approval block message (both service files), `snapshotRaw.items`, `approvalLimit`, `SUSPENDED`, and `REQUISITION_ATTACHMENT_ALLOWED` (the new file-filter constant) -- all present. `purchase_requisitions` still has `required_date`/`delivery_location`/`budget_code` from PROC-FINDING-019's migration. Container healthy, `RestartCount=0`, `/health` 200.
+
+### Verification
+
+Live on dev, 18 September 2026, fresh requisition `REQ_20260918_0015` (Operations department, `proc.requester@nts.local`):
+
+1. **Issue 1, department scoping:** owner (`proc.requester@nts.local`) `GET .../attachments` -- **200**. Same-department approver (`perf.deptmgr@nts.local`, Head of Operations) `GET .../attachments` -- **200**. Cross-department caller (`proc.ap@nts.local`, Accounts) `GET .../attachments` -- **403** `"You are not authorized to view Operations department requisitions."` (same message `getPurchaseRequisitionById` returns for the same case).
+2. **Issue 2, file-type filter:** `.exe` upload -- rejected (500, "Only PDF, Word, Excel, CSV, JPG or PNG files are accepted here." -- same un-wrapped-error shape as the sibling `uploadDocument` PDF-only filter this mirrors). `.html` upload -- rejected, same message. A correctly-typed `.pdf` (`mimetype: application/pdf`) -- **201**, stored and returned normally. A `.png` (image mimetype) -- **201**. A `.docx` (`application/vnd.openxmlformats-officedocument.wordprocessingml.document`) -- **201**.
+3. **Regression fixes**, spot-checked live rather than just via `dist/` grep: confirmed `purchase_requisitions`, `users.status` and the approval-limit columns all exist on `arcus_dev` post-migration (the merged branches' own migrations ran cleanly as part of the same `db:migrate:all`, all idempotent `[skip]`/`[ok]` as expected against data those branches' own earlier deploys had already migrated).
+
+### Cleanup
+
+`REQ_20260918_0015` (Operations, left `DRAFT` -- never submitted, this session only exercised the attachments endpoints directly) and its four attachments (one `.pdf`, one `.png`, one `.docx`, both rejected uploads never persisted) left in `arcus_dev`, clearly titled "PROC-FINDING-019 review-fix verification" and traceable by requisition number/timestamp.
+
+**Status:** FIXED -- both code-review issues fixed and the regression reversed, deployed to dev (API only), verified live 18 September 2026. Branch `fix/proc-requisition-missing-fields` (`nvccz`, commit `412e963`, includes merges of the seven sibling branches above), pushed to `origin`. **Not merged to `master`/`dev`/`prod`.**
+
+---
+
+## PROC-FINDING-021
+
+**Title:** RFQ closing date accepted no server-side validation on create or extend -- a past `rfqDeadline` created an already-expired RFQ and sent a real vendor invitation for a tender no vendor could ever quote on
+**Module:** Procurement (backend `nvccz`) · **Dimension:** Data validation (SRD §41)
+**Severity:** HIGH
+**Persona affected:** Any PROC_OFF/PROC_MGR/BUYER creating or extending an RFQ; downstream, the invited vendor(s), who receive an invitation for a tender that is dead on arrival
+**Surface:** `src/services/ProcurementService.ts` (`createAndSendRFQ`, backing `POST /procurement/rfq`), `src/services/ProcurementRfqService.ts` (`extendClosing`, backing `PATCH /procurement/rfqs/:id/closing`)
+
+SRD §41 "Data Validation" lists "closing date restrictions" as a required server-side validation example, alongside "Server-side validation is mandatory even where frontend validation exists." Neither RFQ-creation nor closing-date-extension enforced it.
+
+**Confirmed live on dev, 19 September 2026**, via `POST /procurement/rfq` as `proc.officer@nts.local`: `closingDate: "2020-01-01T00:00:00.000Z"` (over 6 years in the past) was accepted -- **201**, created `RFQ_20260919_0001` (id `cmu821kal0039ms01actuc752`), and sent a real invitation to vendor Baobab Networks & Computing. `closingAt` was persisted straight from `rfqDeadline` with no check against "now". The RFQ was `OPEN` and already past its own closing date the instant it existed -- the existing "RFQ is not accepting quotations" check (which correctly rejects a vendor submission once `closingAt` has passed) meant no vendor could ever quote on it, so the invitation was pure waste and the dead tender would only surface later as an unexplained "0 bids".
+
+The sibling extension endpoint had the identical gap: `extendClosing` wrote whatever `newClosingAt` it was given straight to `closingAt`, with no check that it was in the future or later than the RFQ's current closing date -- an "extension" could move a closing date backward, or into the past outright.
+
+**Fix:**
+- `ProcurementService.createAndSendRFQ`: when `rfqDeadline` is supplied, reject with 400 ("Closing date must be in the future.") unless it is strictly after the current time; reject invalid dates too. `rfqDeadline` stays optional (unset means no closing restriction, an existing, intentional state used elsewhere e.g. `listPublicOpen`'s `closingAt: null` case) -- only a *supplied* past/invalid date is rejected.
+- `ProcurementRfqService.extendClosing`: reject with 400 unless the new closing date is valid, strictly in the future, and strictly later than the RFQ's current `closingAt` ("New closing date must be in the future." / "...must be later than the RFQ's current closing date.").
+- No schema change.
+
+### Regression found and fixed during this session's deploy (same failure mode as PROC-FINDING-020)
+
+Before deploying, `git branch -a` / `git log` showed several other open `fix/proc-*` and `security/*` branches already based on the same `origin/master` tip (`bc131bb`) as this fix, all documented elsewhere in this file as already deployed to dev. A pre-deploy `docker exec` grep of the running `arcus-dev-api-1` container's `dist/` for each of their marker strings found **all of them missing** except the most recent one (`fix/proc-negative-quantity-price-validation`) -- a concurrent agent had just redeployed dev from a single-branch worktree (`fix/proc-vendor-email-validation`, one commit directly on `origin/master`, tarball `/tmp/arcus-api-vendoremail.tgz`) that silently dropped: PROC-FINDING-011 (department-scoped requisition GET/approve/reject), self-approval block (PROC-FINDING-015), vendor payment-terms override fix (PROC-FINDING-017), per-user approval limits, the requisition-attachment department check and file-type filter (PROC-FINDING-019/020), the vendor-quote-prefill fix, and user status (Active/Suspended/Locked/Deactivated) enforcement. A second check moments later showed dev had been redeployed *again* (still missing the same set), confirming multiple agents are deploying narrow single-branch builds to this shared box without merging each other's already-live fixes first.
+
+**Fix:** merged all eight currently-live sibling branches into this fix branch before deploying (`git merge --no-edit origin/<branch>` for each) -- `fix/proc-negative-quantity-price-validation` (itself already carrying the seven branches PROC-FINDING-020 merged, per its own merge history), plus `fix/proc-vendor-email-validation` on top. All merged cleanly, no conflicts. `npx tsc --noEmit` clean after each merge and after this finding's own fix.
+
+### Deploy
+
+API only (no UI change). One-off script modeled on `scripts/deploy-arcus-dev-selective.py`'s `--api` path but restricted to the `api` service only (no UI rebuild), pointed at a clean worktree (`git worktree add ... origin/master`, then this fix plus the eight merges, nothing else) rather than the dirty main `nvccz` checkout. Checked for an in-flight build on the VPS immediately before running (`pgrep -fa 'docker compose.*build'`) to avoid racing the concurrent activity above. Verified after deploy, before trusting the deploy script's exit code, by grepping the running container's `dist/` directly: `assertUserCanViewDepartmentPurchaseRequisition` (3), self-approval block message (2), `approvalLimit` (4), `REQUISITION_ATTACHMENT_ALLOWED` (1), `snapshotRaw.items` (1), `SUSPENDED` in `AuthController.js` (1), the vendor-email-format validation strings in `VendorController.js`/`VendorSelfRegistrationService.js`, the negative-quantity-price marker (1), and this finding's own `"Closing date must be in the future"` (1) / `"New closing date must be"` (2) -- all present. Container healthy, `docker compose ps` shows `api` up, `/health` 200.
+
+### Verification
+
+Live on dev (`https://dev-api.matanho.com`), 19 September 2026, as `proc.officer@nts.local`:
+
+1. **Exact repro of the original bug:** `POST /procurement/rfq` with `rfqDeadline: "2020-01-01T00:00:00.000Z"` (same vendor, Baobab Networks & Computing, and the same shape of request that produced `RFQ_20260919_0001`) -- **400**, `"Closing date must be in the future."` No RFQ created, no invitation sent.
+2. **Regression check:** the identical request with a real future closing date (+14 days) -- **201**, `RFQ_20260919_0003` created and sent normally (mail-guard was `ACTIVE` on dev for this whole session, confirmed via `docker logs`, so no real email left the box -- and the vendor's address is a non-routable `.example.com` test domain regardless).
+3. **Extend-closing, past date:** `PATCH /procurement/rfqs/RFQ_20260919_0003's-id/closing` with `newClosingAt: "2020-01-01T00:00:00.000Z"` -- **400**, `"New closing date must be in the future."`
+4. **Extend-closing, earlier than current (but still future):** current closing was +14 days; requested +1 day -- **400**, `"New closing date must be later than the RFQ's current closing date."`
+5. **Extend-closing, valid:** requested +21 days -- **200**, `closingAt` updated correctly.
+
+### Cleanup
+
+`RFQ_20260919_0001` (id `cmu821kal0039ms01actuc752`, the original incident record -- real invitation already sent to Baobab Networks & Computing before this fix existed) is left as-is: this module has no delete path for a non-draft RFQ (soft-delete-only convention, consistent with PROC-FINDING-011/015/019's own cleanup notes), and the invitation was already sent so there is nothing left to prevent. `RFQ_20260919_0003` (this session's live-verification record, future closing date, sent to the same test vendor, mail-guard blocked the actual send) is left in `arcus_dev`, clearly titled "PROC-FINDING closing-date live verify FUTURE-OK" and traceable by RFQ number/timestamp.
+
+**Status:** FIXED -- deployed to dev (API only), verified live 19 September 2026 via direct API calls reproducing the original incident's exact payload. Branch `fix/proc-rfq-closing-date-validation` (`nvccz`, commit `5ee8ae0`, includes merges of the eight sibling branches above), pushed to `origin`. **Not merged to `master`/`dev`/`prod`.**
+
+---
+
+## PROC-FINDING-022
+
+**Title:** Vendor email accepted with no server-side format validation on create, update, or public self-registration
+**Module:** Accounting / Procurement shared Vendor Master (backend `nvccz`) · **Dimension:** Data validation (SRD §41)
+**Severity:** MEDIUM
+**Persona affected:** Any staff account creating/updating a vendor (`procurement.vendors.manage`); any public, unauthenticated vendor self-registering through the vendor portal
+**Surface:** `src/controllers/VendorController.ts` (`createVendor`, `updateVendor`), `src/services/VendorSelfRegistrationService.ts` (`registerFromPublicPortal`)
+
+SRD §41 "Data Validation" lists "valid email" as a required server-side validation example, and states "Server-side validation is mandatory even where frontend validation exists." SRD §8.1 "Vendor Record" tracks Contact Email as a tracked vendor field.
+
+**Confirmed live on dev, 19 September 2026**, via `POST /accounting/vendors` as `proc.officer@nts.local`: `email: "not-an-email"` (no `@`, not a remotely valid format) was accepted -- **201**, persisted as-is (`id cmu82dnjh001npb010pycvsja`, name "Bad Email Vendor Co"). This system already emails vendor contact addresses for real (RFQ invitations, PO notifications, self-registration confirmations, all confirmed working elsewhere this session) -- a malformed address would silently fail delivery with nothing catching it at entry time. The public, unauthenticated self-registration endpoint (`POST /api/public/vendor-registration`) had the identical gap: only checked `email` was non-empty, never its format.
+
+**Fix:** added the same email-format check `UserService.updateUser` already uses for user accounts (`/^[^\s@]+@[^\s@]+\.[^\s@]+$/`), rejecting with 400 `"Invalid email format"`:
+- `VendorController.createVendor` -- when `email` is supplied and non-blank.
+- `VendorController.updateVendor` -- same, only when the caller is actually changing `email`.
+- `VendorSelfRegistrationService.registerFromPublicPortal` -- `email` is already required here, now also format-checked (throws, caught by the controller's existing catch-all which already returns 400).
+
+No shared validation helper exists elsewhere in the codebase (`EventController`, `NewsletterSubscriptionController`, `UserController`, `ApplicationService` all inline the identical regex) -- this fix follows that established convention rather than introducing a new abstraction. No schema change.
+
+### Regression risk from this session's own deploy (same failure mode as PROC-FINDING-020/021)
+
+This fix was branched from a worktree at bare `origin/master`, exactly the setup PROC-FINDING-020 and PROC-FINDING-021 warn silently drops every other not-yet-merged sibling fix already live on dev. The first deploy of this finding's fix (`fix/proc-vendor-email-validation`, commit `a41140c`, tarball `/tmp/arcus-api-vendoremail.tgz`) did exactly that -- it is the single-branch regression PROC-FINDING-021 documents catching and fixing by merging this branch into its own consolidated superset (`fix/proc-rfq-closing-date-validation` commit `5ee8ae0`, which already includes this fix plus all eight other sibling branches). By the time this was checked from this session's side, dev was already back on `5ee8ae0`. As an independent safety check, redeployed `5ee8ae0` again from a fresh worktree and grepped the running container's `dist/` directly for every sibling fix's marker plus this finding's own (`assertUserCanViewDepartmentPurchaseRequisition`, `SUSPENDED` in `AuthController.js`, the self-approval block message, `approvalLimit`, `manage_users` trim, `REQUISITION_ATTACHMENT_ALLOWED`, the negative-quantity/price markers, `closingAt` handling, and `"Invalid email format"` in both `VendorController.js` and `VendorSelfRegistrationService.js`) -- all present, container healthy, `/health` 200.
+
+### Deploy
+
+API only (no UI change). Two deploys this session: (1) a narrow single-branch worktree off `origin/master` -- the regression described above; (2) a corrective redeploy from `fix/proc-rfq-closing-date-validation` (`5ee8ae0`), the consolidated superset a sibling agent had already built and verified (see PROC-FINDING-021), confirmed to include this fix. Both used a one-off script modeled on `scripts/deploy-arcus-dev-selective.py`'s `--api` path, scoped to the `api` service only, sourced from a clean worktree rather than the dirty main `nvccz` checkout.
+
+### Verification
+
+Live on dev (`https://dev-api.matanho.com`), 19 September 2026, as `proc.officer@nts.local` (staff) and unauthenticated (public self-registration), against the corrective (`5ee8ae0`) deploy:
+
+1. `POST /accounting/vendors` with `email: "not-an-email"` -- **400** `"Invalid email format"`. No vendor created.
+2. `POST /accounting/vendors` with a valid email -- **201**, vendor created normally (no regression).
+3. `PUT /accounting/vendors/:id` with `email: "still-not-an-email"` -- **400** `"Invalid email format"`.
+4. `PUT /accounting/vendors/:id` with a valid email -- **200**, updated normally (no regression).
+5. `POST /api/public/vendor-registration` (name + banks + `email: "not-an-email"`) -- **400** `"Invalid email format"`. No vendor created.
+6. `POST /api/public/vendor-registration` with a valid email -- **201**, registration submitted normally, `registrationStatus: "PENDING_REVIEW"` (no regression).
+
+### Cleanup
+
+The original incident record, `Bad Email Vendor Co` (id `cmu82dnjh001npb010pycvsja`, email `not-an-email`), is left as-is and documented here rather than deleted, per this finding's own precedent of preserving the incident record. All four vendors this session's live verification created (two staff-created via steps 1-4 above, two self-registered via steps 5-6, across both the regression deploy and the corrective redeploy) were soft-deleted (`DELETE /accounting/vendors/:id`) immediately after verifying each, since none had linked expenses/transactions.
+
+**Status:** FIXED -- deployed to dev (API only; corrective redeploy verified as of commit `5ee8ae0`, which is the current state of dev's `api` container), verified live 19 September 2026 for both the staff vendor-master path and the public self-registration path. Branch `fix/proc-vendor-email-validation` (`nvccz`, commit `a41140c`), pushed to `origin`. **Not merged to `master`/`dev`/`prod`.**
+
+---
+
+## PROC-FINDING-023
+
+**Title:** Requisition/PO/quotation line items accepted negative or zero quantity and negative unit price with no server-side check -- a negative line persisted a negative `totalAmount` on the requisition itself
+**Module:** Procurement (backend `nvccz`) · **Dimension:** Data validation (SRD §41)
+**Severity:** HIGH
+**Persona affected:** Any requester creating/editing a purchase requisition; any PROC_MGR/PROC_OFF/BUYER creating a purchase order; any vendor submitting a quotation through the public portal
+**Surface:** `src/services/ProcurementService.ts` (`createPurchaseRequisition`, `updatePurchaseRequisitionByOwner`, `createPurchaseOrder`), `src/services/VendorQuotationService.ts` (`createVendorQuotation`), new shared helper `src/utils/procurementLineItemValidation.ts`
+
+SRD §41 "Data Validation" lists "positive quantity" and "numeric value restrictions" as required server-side validation examples and states "Server-side validation is mandatory even where frontend validation exists."
+
+**Confirmed live on dev, 19 September 2026**, via direct API calls to `POST /procurement/requisitions` as `proc.requester@nts.local`: a line with `quantity: -5, unitPrice: 10` was accepted -- **201**, persisted exactly as submitted (item row `{quantity: "-5", unitPrice: "10", totalPrice: "-50"}`) with the requisition's own `totalAmount` stored as **-50** (negative). A line with `quantity: 0` was also accepted -- **201**, no rejection. A line with `unitPrice: -100` was also accepted -- **201**. A negative or zero total defeats the `AMOUNT_THRESHOLD`/personal `approvalLimit` check in `ProcurementRequisitionApprovalService.decide()` (added by PROC-FINDING sibling `fix/proc-approval-limits`, already merged into this branch's ancestry): that check compares the requisition's signed `totalAmount` against the approver's limit, so a negative total never exceeds a positive limit regardless of the line items' true absolute value, routing straight to the lowest-authority tier.
+
+The same gap existed on the update path (`updatePurchaseRequisitionByOwner` -- a DRAFT/REJECTED requisition could be edited to introduce a bad line after the fact) and on direct purchase-order creation (`createPurchaseOrder`, which builds PO lines straight from request body `items` with no check) and vendor quotation submission (`createVendorQuotation`, the public vendor-portal endpoint -- a vendor-submitted negative price would flow straight onto a PO if the quotation were accepted). RFQ line items (`normalizeRfqItemLinesFromBody`/`prItemsToNormalizedRfqLines`) and PO-from-accepted-quotation building (`buildPoLinesFromRfqAndQuotation`) were checked and found **already safe**: the former silently coerces a non-positive quantity to `1` (`coercePositiveQuantity`), the latter already throws on a negative unit price -- neither was changed.
+
+**Fix:** added `assertValidProcurementLineItems(items, { requireUnitPrice? })` (`src/utils/procurementLineItemValidation.ts`): quantity must be a finite number `> 0`; unit price, when present, must be a finite number `>= 0` (zero stays legitimate -- e.g. a free sample or warranty-replacement line). Throws a plain `Error` naming the offending line 1-indexed and by item name (e.g. `"Line 1 (Bad item): quantity must be greater than zero"`), caught by each controller's existing catch-all and surfaced as 400. Wired into:
+- `ProcurementService.createPurchaseRequisition` and `updatePurchaseRequisitionByOwner` (`requireUnitPrice: false` -- a requisition's unit price is only the requester's optional internal estimate).
+- `ProcurementService.createPurchaseOrder` and `VendorQuotationService.createVendorQuotation` (`requireUnitPrice: true` -- a PO line or a vendor's quote must state a real price).
+
+Also reworded the negative-price message from "unit price cannot be negative" to **"unit price must not be negative"** after live-testing found `VendorQuotationController`'s `withClientStatus()` maps a thrown message to 400 only via a keyword regex (`/not found|already .../must |required|invalid|expired|.../i`); the original wording matched none of those keywords and fell through to an unhelpful 500 on the vendor-quotation path specifically (`ProcurementController`'s requisition/PO paths always answer a flat 400 regardless of message, so they were unaffected). No schema change.
+
+Checked the equivalent vendored frontend form (`nvccz-new`, `components/procurement-v23-mock/matanho-procurement-runtime.js`, `__pr23PrLineRowHtml()` backing the live `#prForm`): it already has `min="1" step="1"` on quantity and `min="0" step="0.01"` on unit price, and `lib/procurement-v23/actions.ts`'s `save-pr`/`submit-pr` dispatcher already rejects `quantity <= 0` client-side and collapses any non-positive price estimate to `undefined` before the API call -- added in an earlier phase, not this session. The requisition edit form (`#editPrFormV11`, `save-pr-v11`/`submit-pr-v11`) does not currently submit `items` at all (only title/justification/project), so it cannot introduce a bad line through the UI regardless -- only a direct API call can, which the server-side fix now rejects. No frontend change was needed.
+
+### Regression risk from this session's own deploys (same failure mode as PROC-FINDING-020/021/022)
+
+This branch was built from a worktree already carrying PROC-FINDING-019/020's seven-branch merge (`fix/proc-requisition-missing-fields` @ `412e963`), but two early deploys of this fix alone (commits `017f1b4`, then `02cb17f`) were single-branch builds that did not yet include `fix/proc-rfq-closing-date-validation` (PROC-FINDING-021) or `fix/proc-vendor-email-validation` (PROC-FINDING-022), both already live on dev from concurrent sibling agents at the time. Each of those two deploys silently dropped both fixes from the running container -- confirmed by re-testing `POST /vendor-quotations/submit` with a negative price shortly after the second deploy and getting **201** (fully accepted, negative totals persisted) instead of the expected 400, then confirming via `docker exec` grep that `dist/utils/procurementLineItemValidation.js` and the `assertValidProcurementLineItems` import were entirely absent from the running image despite the deploy script reporting success -- a race with a concurrent agent's own narrow single-branch deploy landing after this one (the deploy script's own `IMAGE_MISMATCH` warning, easy to miss, was the tell).
+
+**Fix:** fast-forward merged `origin/fix/proc-rfq-closing-date-validation` (`5ee8ae0`, already a strict superset containing this fix's own two commits plus PROC-FINDING-021 and 022) into this branch, pushed, checked for no in-flight `docker compose build` on the VPS immediately before redeploying, and redeployed. Verified this time, before trusting the deploy script's exit code, by grepping the running container's `dist/` directly for eleven markers spanning every sibling fix documented live on dev (PROC-FINDING-010, 011, 015, 017, 019/020, 021, 022, the per-user approval limit, and this finding's own `"unit price must not be negative"`) -- all eleven present. Container healthy, `IMAGE_MATCH`, `/health` 200.
+
+### Verification
+
+Live on dev (`https://dev-api.matanho.com`), 19 September 2026, as `proc.requester@nts.local` (requisitions), `admin@nts.com` (purchase orders), and a server-minted real vendor-portal token for Baobab Networks & Computing (quotations), against the final consolidated (`5ee8ae0`) deploy:
+
+1. **Requisition create, exact repro of the original bug:** `quantity: -5, unitPrice: 10` -- **400** `"Line 1 (Bad item): quantity must be greater than zero"`. `quantity: 0` -- **400**, same message. `unitPrice: -100, quantity: 5` -- **400** `"Line 1 (Bad item): unit price must not be negative"`. A normal `quantity: 5, unitPrice: 10` line -- **201**, `REQ_20260919_0005`/`REQ_20260919_0006` created with `totalAmount: "50"` (positive, correct).
+2. **Requisition update:** editing a valid DRAFT requisition's item to `quantity: -3` -- **400**, same message; to `unitPrice: -20` -- **400**, same message; to a legitimate `quantity: 7, unitPrice: 15` -- **200**, `totalAmount` recalculated to `"105"` correctly.
+3. **Purchase order create:** `quantity: -2` -- **400** `"Line 1 (...): quantity must be greater than zero"`; `unitPrice: -100` (or `-1`) -- **400** `"Line 1 (...): unit price must not be negative"`; a normal `quantity: 2, unitPrice: 100` line -- **201**, `PO_20260919_0001` created with `subtotal: "200"`, `taxAmount: "31"`, `totalAmount: "231"` (all positive, correct).
+4. **Vendor quotation submit** (real signed `RFQ_SUBMIT` token minted server-side via `docker exec ... node -e "signVendorPortalToken(...)"`, same technique as PROC-FINDING-019's vendor-portal verification): `quantity: -2` -- **400** `"...quantity must be greater than zero"`; `unitPrice: -50` -- **400** `"...unit price must not be negative"` (this is the case that returned an incorrect 500 before the message-wording fix, retested and confirmed 400 after); a normal `quantity: 2, unitPrice: 50` line -- **201**, `QUO_20260919_0002` created with `subtotal: 100, taxAmount: 15.5, totalAmount: 115.5` (all positive, correct).
+
+### Cleanup
+
+`REQ_20260919_0005` (submitted, approved by `perf.deptmgr@nts.local`, used to raise `RFQ_20260919_0002` to Baobab Networks & Computing for the quotation-path verification) and `REQ_20260919_0006` (left `DRAFT`), `RFQ_20260919_0002`, `PO_20260919_0001`, and quotations `QUO_20260919_0001` (the pre-fix-wording negative-total record from the 500-returning deploy window, `subtotal: -100, totalAmount: -115.5` -- left as the incident record, same precedent as PROC-FINDING-021's original-incident RFQ) and `QUO_20260919_0002` (valid control) are left in `arcus_dev`, all clearly titled "PROC-FINDING verification" and traceable by number/timestamp.
+
+**Status:** FIXED -- deployed to dev (API only; final consolidated redeploy verified as of commit `5ee8ae0`, the current state of dev's `api` container, confirmed to include all ten prior sibling fixes plus this one), verified live 19 September 2026 across requisition create/update, purchase order create, and vendor quotation submit. Branch `fix/proc-negative-quantity-price-validation` (`nvccz`, commits `017f1b4`, `02cb17f`, fast-forwarded to `5ee8ae0`), pushed to `origin`. **Not merged to `master`/`dev`/`prod`.**
+
+---
+
 ## Not yet findings
 
 - **`POST /procurement/rfqs/:id/award` returns 410** to everyone. This is intended: award was
