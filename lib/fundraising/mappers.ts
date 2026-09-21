@@ -600,7 +600,15 @@ export function mapCommitmentRow(
   idx = 0,
 ) {
   const status = String(raw.status || 'INDICATIVE').toUpperCase()
-  const investor = raw.investor || investorsById[String(raw.investorId)] || {}
+  // FINDING-FR-002: the commitment's own nested `investor` include (GET /fundraising/commitments)
+  // only ever carries a handful of fields (id/legalName/kycStatus/sanctionsStatus/
+  // complianceHoldActive per the backend select) while the separate investor-directory fetch
+  // (`investorsById`, from GET /fundraising/investors) has the full record. Merge with the
+  // directory record as the base so a field missing from the sparse nested include (older
+  // cached responses, a backend rollback, etc.) still falls back correctly instead of a plain
+  // `raw.investor || investorsById[...]` short-circuiting to the sparse object and silently
+  // reading as "Not Started" / not-blocked even when the investor is actually KYC-approved.
+  const investor = { ...(investorsById[String(raw.investorId)] || {}), ...(raw.investor || {}) }
   const legalName = investor.legalName || investor.name || raw.investorName || 'Investor'
   const amount = asNumber(raw.commitmentAmount)
   const fundedAmount = asNumber(raw.fundedAmount)
