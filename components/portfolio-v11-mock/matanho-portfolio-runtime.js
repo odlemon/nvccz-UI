@@ -3875,7 +3875,7 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
     wiz.maxReached = Math.max(Number(wiz.maxReached || 0), step);
     const d = wiz.draft || {};
     const steps = ['Details', 'Review'];
-    const sourceOptions = ['Dividend', 'Exit Proceeds', 'Interest', 'Other'];
+    const sourceOptions = ['Dividend', 'Exit Proceeds', 'Interest', 'Income', 'Return of Capital', 'Other'];
     const fundOptions = funds.length
       ? funds.map((f) => '<option value="' + escapeHTML(f.id || f.name) + '">' + escapeHTML(f.name) + '</option>').join('')
       : '<option value="">No funds available</option>';
@@ -3912,7 +3912,7 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
     if (!form?.reportValidity()) return;
     captureModalWizardDraft();
     const data = { ...(state.modalWizard && state.modalWizard.draft ? state.modalWizard.draft : {}), ...Object.fromEntries(new FormData(form)) };
-    const sourceMap = { 'Dividend': 'DIVIDEND', 'Exit Proceeds': 'EXIT_PROCEEDS', 'Interest': 'INTEREST', 'Other': 'OTHER' };
+    const sourceMap = { 'Dividend': 'DIVIDEND', 'Exit Proceeds': 'EXIT_PROCEEDS', 'Interest': 'INTEREST', 'Income': 'INCOME', 'Return of Capital': 'RETURN_OF_CAPITAL', 'Other': 'OTHER' };
     if (state.liveData) {
       emitIntegrationEvent('matanho:before-action', {
         action: 'api-create-distribution',
