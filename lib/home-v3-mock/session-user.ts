@@ -3,8 +3,10 @@ import type { User } from "@/lib/store/slices/authSlice"
 
 /** Shape expected by Matanho home-v3 runtime (`D.user`). */
 export type Hv3SessionUser = {
+  id: string
   name: string
   firstName: string
+  lastName: string
   role: string
   location: string
   email: string
@@ -20,11 +22,12 @@ export function initialsFromNames(firstName?: string, lastName?: string): string
 }
 
 export function buildHv3SessionUser(
-  user: Pick<User, "firstName" | "lastName" | "email" | "role"> | null,
+  user: Pick<User, "id" | "firstName" | "lastName" | "email" | "role"> | null,
   userDetails: UserDetails | null
 ): Hv3SessionUser | null {
   if (!user && !userDetails) return null
 
+  const id = userDetails?.id || user?.id || ""
   const firstName = userDetails?.firstName || user?.firstName || ""
   const lastName = userDetails?.lastName || user?.lastName || ""
   const email = userDetails?.email || user?.email || ""
@@ -51,8 +54,10 @@ export function buildHv3SessionUser(
   const location = userDetails?.userDepartment || ""
 
   return {
+    id,
     name,
     firstName: firstName || name.split(" ")[0] || "User",
+    lastName,
     role,
     location,
     email,

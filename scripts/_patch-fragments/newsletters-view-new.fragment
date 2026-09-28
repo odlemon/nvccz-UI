@@ -1,0 +1,9 @@
+  function newslettersView() {
+    if (state.newsletterMode==='reader') return newsletterReaderView();
+    const list=D.newsletters||[];
+    const featured=list[0];
+    const rest=list.slice(1);
+    const actions=`<button class="primary-btn" data-action="new-newsletter">${icon('plus')} Create newsletter</button>`;
+    return `${pageHead('Newsletters','Company newsletters and internal updates.',actions)}
+      ${list.length?`<div class="newsletter-grid newsletter-grid-v5"><main>${featured?`<section class="card featured-newsletter" data-newsletter-open="${esc(featured.id)}"><div class="newsletter-cover">${featured.imageUrl?`<img src="${esc(featured.imageUrl)}" alt="${esc(featured.title)}" style="width:100%;height:100%;object-fit:cover"/>`:`<strong>${esc(featured.title)}</strong>`}</div><div class="newsletter-copy"><div class="story-source">Latest</div><h2>${esc(featured.title)}</h2><p>${esc(excerpt(featured.content,220))}</p><div class="toolbar"><button class="primary-btn" data-newsletter-open="${esc(featured.id)}">Continue reading ${icon('arrow')}</button><span style="font-size:10px;color:var(--muted)">${esc(featured.authorName)} · ${timeAgo(featured.createdAt)}</span></div></div></section>`:''}${rest.length?`<div class="card-title" style="margin:18px 0 8px"><h3>Issue library</h3></div><div class="issue-library">${rest.map(n=>`<div class="issue-card" data-newsletter-open="${esc(n.id)}">${n.imageUrl?`<div class="issue-mini"><img src="${esc(n.imageUrl)}" alt="${esc(n.title)}" style="width:100%;height:100%;object-fit:cover;border-radius:inherit"/></div>`:`<div class="issue-mini"><strong>${esc(n.title)}</strong></div>`}<strong>${esc(n.title)}</strong><span>${esc(n.authorName)} · ${timeAgo(n.createdAt)}</span></div>`).join('')}</div>`:''}</main></div>`:`<div class="empty-state">${icon('newsletter')}<h3>No newsletters yet.</h3><p>Published newsletters will appear here.</p></div>`}`;
+  }

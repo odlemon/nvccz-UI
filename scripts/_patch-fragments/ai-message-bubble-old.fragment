@@ -1,0 +1,1 @@
+    if(!message.title) return `<article class="ai-answer-v16"><div class="ai-answer-head-v16"><div class="ai-orb-v16">${icon('sparkles')}</div><div><strong>Matanho AI</strong><span>Permission-aware answer</span></div></div><p class="ai-answer-summary-v16">${esc(message.text)}</p></article>`;

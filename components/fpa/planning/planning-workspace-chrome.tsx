@@ -1911,8 +1911,9 @@ function WorkflowStatusBar({ steps }: { steps: PlanningWorkflowStep[] }) {
 }
 
 export function formatCashRunway(months: number | null | undefined): string {
-  if (months == null || Number.isNaN(months)) return "—"
-  if (months <= 0) return "Cash Generative"
+  // Backend only nulls this field when monthly net burn is <= 0 (never negative
+  // runway) — per SRD, that state must read "Cash Generative", not a blank dash.
+  if (months == null || Number.isNaN(months) || months <= 0) return "Cash Generative"
   return `${months.toFixed(1)} Months`
 }
 

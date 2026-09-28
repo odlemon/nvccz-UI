@@ -1,0 +1,1 @@
+<div class="settings-preview"><span>Live preview</span><strong id="settingsPreviewText">Light Japandi · ${state.settings.saturation}% OLED colour · ${state.settings.density}</strong></div>

@@ -1,0 +1,1 @@
+    const aiSaved=e.target.closest('[data-ai-saved-open]'); if(aiSaved){const item=state.aiSaved[Number(aiSaved.dataset.aiSavedOpen)];if(item){state.aiMode='ask';state.aiMessages=[{role:'user',text:item.prompt||item.title},{role:'assistant',...item}];saveState();render()}return}

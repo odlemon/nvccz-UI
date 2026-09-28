@@ -270,6 +270,8 @@ export const MODULE_CONFIG: ModuleConfig[] = [
       { id: "goals-management", name: "Goals", path: "/performance/goals", icon: CiCircleCheck, description: "Goals" },
       { id: "tasks-management", name: "Tasks", path: "/performance/tasks", icon: CiViewList, description: "Tasks" },
       { id: "performance-reviews", name: "Reviews", path: "/performance/reviews", icon: CiFileOn, description: "Unified hub for self-assessments, evaluations, cycles and reports" },
+      { id: "fpa-mapping", name: "FP&A Integration", path: "/performance-legacy/configuration/fpa-mapping", icon: CiViewTable, description: "Target and Driver mappings between FP&A and KPIs" },
+      { id: "fpa-forecast-reviews", name: "Forecast Review Triggers", path: "/performance-legacy/fpa-forecast-reviews", icon: CiBellOn, description: "KPI breaches awaiting FP&A review" },
     ],
     groups: [
       {
@@ -742,6 +744,7 @@ export const MODULE_CONFIG: ModuleConfig[] = [
       { id: "fpa-home", name: "Home", path: "/forecasting", icon: CiHome, description: "FP&A executive board" },
       { id: "fpa-models", name: "Model Planning", path: "/forecasting/models", icon: CiBoxes, description: "Planning models and worksheets" },
       { id: "fpa-model-builder", name: "Model Builder", path: "/forecasting/model-builder", icon: Settings, description: "Configure planning models" },
+      { id: "fpa-scenarios", name: "Scenarios", path: "/forecasting/scenarios", icon: LineChart, description: "Scenario modelling and comparison" },
       { id: "fpa-budget", name: "Budgeting", path: "/forecasting/budget", icon: CiWallet, description: "Annual budgeting cycles" },
       { id: "fpa-rolling", name: "Forecasts", path: "/forecasting/rolling-forecast", icon: TrendingUp, description: "Rolling forecasts" },
       { id: "fpa-drivers", name: "Assumptions", path: "/forecasting/drivers", icon: CiText, description: "Assumptions and drivers" },
@@ -752,6 +755,7 @@ export const MODULE_CONFIG: ModuleConfig[] = [
       { id: "fpa-variance", name: "Variance", path: "/forecasting/variance", icon: BarChart3, description: "Actuals vs budget vs forecast" },
       { id: "fpa-reports", name: "Reports", path: "/forecasting/reports", icon: FileText, description: "Management reports" },
       { id: "fpa-workflow", name: "Workflow", path: "/forecasting/workflow", icon: CiCircleCheck, description: "Tasks and approvals" },
+      { id: "fpa-audit-logs", name: "Audit Logs", path: "/forecasting/audit", icon: ScrollText, description: "FP&A change and access history" },
       { id: "fpa-settings", name: "Settings", path: "/forecasting/settings", icon: CiSettings, description: "FP&A configuration" },
     ],
   },

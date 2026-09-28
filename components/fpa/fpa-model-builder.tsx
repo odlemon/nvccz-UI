@@ -106,6 +106,15 @@ export function FpaModelBuilder({ modelId }: { modelId?: string }) {
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
   const loadRequestRef = useRef(0)
+  /** Tracks which model id we've already bootstrapped, independent of the
+   * shared redux `bootstrapped`/`selectedModelId` flags. Those flags are
+   * also written by other FP&A pages and by this same bootstrap dispatch's
+   * own .pending/.fulfilled cycle, so gating on them was still racy under
+   * concurrent load() calls: each dispatch resets selectedVersionId/
+   * selectedScenarioId, which are in load's own dependency array, which
+   * recreates load and re-fires the mount effect below — before any single
+   * call ever reaches finally. A local, synchronous ref sidesteps that. */
+  const bootstrappedIdRef = useRef<string | null>(null)
   const [busyKey, setBusyKey] = useState<string | null>(null)
   const [moduleKey, setModuleKey] = useState<string | null>(null)
   const [selectedLeaf, setSelectedLeaf] = useState<SelectedModuleLeaf | null>(null)
@@ -343,8 +352,22 @@ export function FpaModelBuilder({ modelId }: { modelId?: string }) {
     }
     setLoading(true)
     try {
-      if (routeModelId) await dispatch(bootstrapFpaSelection(routeModelId))
-      else await dispatch(bootstrapFpaSelection(id))
+      // Only (re)bootstrap the redux selection once per model id. The prior
+      // fix here gated on the shared redux bootstrapped/selectedModelId
+      // flags, but those are written by this same dispatch's own
+      // .pending/.fulfilled cycle (and by other FP&A pages), so two
+      // concurrent load() calls could each see stale values and both
+      // re-dispatch — bootstrapFpaSelection's `.pending` reducer resets
+      // selectedScenarioId/selectedVersionId to null unconditionally, which
+      // feeds this callback's own dependency array, recreating `load` and
+      // re-firing the mount effect below indefinitely, before any single
+      // invocation ever reaches `finally`. A local, synchronous ref has no
+      // such race.
+      if (bootstrappedIdRef.current !== id) {
+        bootstrappedIdRef.current = id
+        if (routeModelId) await dispatch(bootstrapFpaSelection(routeModelId))
+        else await dispatch(bootstrapFpaSelection(id))
+      }
 
       const [mRes, liRes, dimRes, modRes, graphRes, modelDimRes] = await Promise.all([
         fpaApi.getModel(id),

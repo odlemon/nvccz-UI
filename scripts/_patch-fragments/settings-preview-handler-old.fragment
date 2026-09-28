@@ -1,0 +1,1 @@
+    if(e.target.id==='saturationRange'){rootEl.style.setProperty('--user-saturation',String(Number(e.target.value)/100));const label=document.getElementById('saturationValue');if(label)label.textContent=`${e.target.value}%`;return}

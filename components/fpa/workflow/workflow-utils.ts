@@ -663,10 +663,22 @@ export function deptProgressRows(
 
 function stageRangeLabel(stage?: FpaWorkflowStage | null): string {
   if (!stage) return ""
+  const startMs = stage.start ? new Date(stage.start).getTime() : NaN
+  const endMs = stage.end ? new Date(stage.end).getTime() : NaN
   const start = stage.start ? formatShortDate(stage.start) : ""
   const end = stage.end ? formatShortDate(stage.end) : ""
+  // Source timestamps for this stage can be inconsistent (e.g. an "opened at"
+  // recorded earlier than the record's own "created at"), which produced a
+  // range ending before it starts. Never show that — fall back to the single
+  // most informative date instead.
+  if (start && end && Number.isFinite(startMs) && Number.isFinite(endMs) && endMs < startMs) {
+    return stage.status === "DONE" ? end : `Starts ${start}`
+  }
   if (start && end) return `${start} – ${end}`
-  if (start && !end) return `Starts ${start}`
+  // A stage marked complete by sequence position but missing its own "ended
+  // at" timestamp shouldn't read "Starts X" — that phrasing implies it
+  // hasn't happened yet, which contradicts "Completed".
+  if (start && !end) return stage.status === "DONE" ? `From ${start}` : `Starts ${start}`
   if (!start && end) return end
   return ""
 }

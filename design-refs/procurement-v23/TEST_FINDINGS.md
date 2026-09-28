@@ -1960,6 +1960,7 @@ Live on dev (`https://dev-api.matanho.com`), after deploying the API-only fix an
 The two test requisitions created during discovery and verification (`cmu6uqz7j003vnz01f24nx5ij`, now incorrectly `APPROVED` by the Operations head from before the fix — left as-is; and `cmu6vos7u000io101zghaxyl5`, correctly `APPROVED` by Finance's own head after the fix) were left in `arcus_dev`. Both are titled "safe to delete" / "Post-fix verification" and are non-draft, so there is no delete endpoint for them per the SRD's soft-delete/historical-integrity rule — this matches the expected, by-design limitation, not an omission.
 
 **Status:** FIXED — deployed to dev (API only, no UI/portal service touched), verified live 18 September 2026. Branch `fix/procurement-department-authz-bypass`, commit `15d0363`, pushed to `origin`. Not merged to `master`/prod.
+**Status:** FIXED — deployed to dev (API only, no UI/portal service touched), verified live 18 September 2026. Branch `fix/procurement-department-authz-bypass`, commit `15d0363`, pushed to `origin`. Not merged to prod. Merged to `master`/`dev` as part of the 19 September 2026 consolidation (`nvccz` `dd74dea`, `nvccz-new` `dd0b2e2`). Still not deployed to production.
 
 ---
 
@@ -2148,6 +2149,7 @@ Live against `https://dev-api.matanho.com`, in order, all in a single pass:
 Migration output on the real dev database: `[ok] added users.status`, `[ok] backfill: blank/null status -> ACTIVE`, `[ok] added index users_status_idx`, `[verify OK] users.status`, `[verify OK] all users.status values are within the allowed SRD set`. The throwaway test user was deleted (`DELETE /users/:id`) after verification; no seeded persona was modified.
 
 **Status:** FIXED and deployed to dev (API only), verified live 18 September 2026. Branch `security/user-master-status-enforcement`, commit `8f37f29`, pushed to `origin` (`odlemon/nvccz`). **Not merged to `master`.** The migration has **not** been run against production -- run `docker exec <prod-api-container> npm run db:migrate:user-status` deliberately, after the branch is reviewed and merged.
+**Status:** FIXED and deployed to dev (API only), verified live 18 September 2026. Branch `security/user-master-status-enforcement`, commit `8f37f29`, pushed to `origin` (`odlemon/nvccz`). Merged to `master` as part of the 19 September 2026 consolidation (`nvccz` `dd74dea`). The migration has **not** been run against production -- run `docker exec <prod-api-container> npm run db:migrate:user-status` deliberately, after this is reviewed and scheduled for a prod deploy.
 
 ---
 
@@ -2179,6 +2181,29 @@ Per SRD §60's example journey ("6. Supplier submissions are compared. 7. Commit
 Not escalated to a fix agent: this is a process-control question (should the platform force evaluation before award, or is scoring advisory/optional for a single-bid RFQ where there's nothing to "compare"?), not a defect with an obvious right answer. Recording as a finding for a product decision rather than shipping a guess.
 
 **Status:** OPEN — confirmed, not fixed. Needs a decision: (a) block `accept` server-side unless every submitted, non-rejected quotation on the RFQ has a `technicalScoreJson`, or (b) leave scoring advisory and accept this as intended flexibility for sole-source/single-bid awards.
+Not escalated to a fix agent at the time: this is a process-control question (should the platform force evaluation before award, or is scoring advisory/optional for a single-bid RFQ where there's nothing to "compare"?), not a defect with an obvious right answer. Recorded as a finding for a product decision rather than shipping a guess.
+
+### Decision and fix (19 September 2026)
+
+Took option (a), scoped to when it actually matters: `VendorQuotationService.reviewQuotation` now blocks `ACCEPT` when the RFQ has more than one open (`SUBMITTED`/`UNDER_REVIEW`) quotation and any of them lacks a `technicalScoreJson.evaluation.score`. A sole-source/single-bid RFQ (0 or 1 open quotations) is unaffected -- there's nothing to compare, matching the SRD's own framing of scoring as a comparison step rather than an award gate in its own right, and matching option (b)'s reasoning for exactly that case. This closes the actual risk (a competitive award skipping evaluation) without inventing a new restriction for the case the original assessment explicitly said should stay flexible.
+
+Branch `fix/proc-remaining-uat-findings` (`nvccz`), commit `c9b8876`, cut from a clean worktree off `origin/master`.
+
+### Verification
+
+Live on dev, 19 September 2026, via direct API calls (own fresh data, not reused fixtures):
+
+1. Created `REQ_20260919_0008` (Operations, own requisition), approved, converted to `RFQ_20260919_0004` inviting two vendors (Baobab Networks & Computing, Granite Ridge Stationers). Both submitted quotations (`QUO_20260919_0003`, `QUO_20260919_0004`).
+2. `POST /vendor-quotations/{QUO_20260919_0003 id}/accept` as `proc.mgr@nts.local`, **neither** quotation scored -> **400** `"All submitted quotations on this RFQ must be technically scored before one can be awarded. Missing evaluation for: Baobab Networks & Computing (Pvt) Ltd, Granite Ridge Stationers (Pvt) Ltd."` (was **200** before this fix -- this is the exact finding's original repro, now blocked).
+3. Separately, a sole-source RFQ (`RFQ_20260919_0005`, single vendor invited, `QUO_20260919_0005`): `accept` with **no** scoring -> **200**, `"Quotation accepted. Purchase order PO_20260919_0002 created..."` -- confirms single-bid/sole-source flexibility is preserved exactly as intended.
+4. Back on the competitive RFQ: scored only `QUO_20260919_0003` (`PUT .../evaluation {score: 82}` as `proc.officer@nts.local`), then retried `accept` -> **still 400**, message narrowed to the one remaining unscored vendor ("Missing evaluation for: Granite Ridge Stationers (Pvt) Ltd.") -- confirms the gate checks *every* open quotation, not just the one being accepted.
+5. Scored `QUO_20260919_0004` (`score: 74`), retried `accept` -> **200**, `"...Purchase order PO_20260919_0003 created..."` -- award proceeds once every open quotation is scored.
+
+### Cleanup
+
+`REQ_20260919_0008`/`RFQ_20260919_0004`/`QUO_20260919_0003`/`QUO_20260919_0004`/`PO_20260919_0003` (competitive path, correctly awarded after both scored) and `REQ_20260919_0009`/`RFQ_20260919_0005`/`QUO_20260919_0005`/`PO_20260919_0002` (sole-source path, correctly awarded without scoring) are left in `arcus_dev`, clearly titled "PROC-FINDING-014 verification" and traceable by number/timestamp.
+
+**Status:** FIXED -- deployed to dev (API only), verified live 19 September 2026 (5 sub-cases, all passed). **Merged to `master`, not prod.**
 
 ---
 
@@ -2259,6 +2284,7 @@ Live on dev (`https://dev-api.matanho.com`), after deploying the API-only fix (`
 `REQ_20260918_0007` (Finance, left `PENDING_APPROVAL` — every approve/reject attempt against it was refused, so it has no valid decision) and `REQ_20260918_0008` (Operations, correctly `APPROVED` by its legitimate department head) were left in `arcus_dev`, following the same precedent as PROC-FINDING-011's cleanup note (both titled with "verification"/"regression check" and traceable to this finding by requisition number and timestamp).
 
 **Status:** FIXED — deployed to dev (API only, no UI/portal service touched), verified live 18 September 2026. Branch `fix/proc-finding-015-self-approval`, commit `1386889`, pushed to `origin`. **Not merged to `master`/`dev`/`prod`.**
+**Status:** FIXED — deployed to dev (API only, no UI/portal service touched), verified live 18 September 2026. Branch `fix/proc-finding-015-self-approval`, commit `1386889`, pushed to `origin`. **Merged to `master`/`dev`, not prod.** Merged to `master`/`dev` as part of the 19 September 2026 consolidation (`nvccz` `dd74dea`, `nvccz-new` `dd0b2e2`). Still not deployed to production.
 
 ---
 
@@ -2306,6 +2332,17 @@ Live on dev, 18 September 2026, using `proc.requester@nts.local` (Operations mem
 `REQ_20260918_0009` (Operations, $8,000, correctly `APPROVED` before any limit was set) and `REQ_20260918_0011` (Operations, $3,000, correctly `APPROVED` within the $5,000 test limit) are legitimate decisions, left in `arcus_dev`. `REQ_20260918_0010` (Operations, $8,000 -- every approval attempt against it was refused, either by the approval-limit block or the cross-department regression check, so it has no valid decision) and `REQ_20260918_0012` (Finance, $1,500 -- refused by the self-approval check) were left `PENDING_APPROVAL`, following the same precedent as PROC-FINDING-011/015's cleanup notes (all four titled "verification"/"regression re-check" and traceable to this finding by requisition number and timestamp). `perf.deptmgr@nts.local`'s `approvalLimit` was restored to `null` (its pre-test state) so no test configuration was left active on dev.
 
 **Status:** FIXED -- deployed to dev (API only, no UI/portal service touched), verified live 18 September 2026. Branch `fix/proc-approval-limits`, commit `1bac209`, pushed to `origin`. **Not merged to `master`/`dev`/`prod`.**
+### Scope review (19 September 2026)
+
+A code review of this fix raised a PLAUSIBLE concern: `decide()`'s approval-limit check gates any `APPROVE` decision by the requisition's `totalAmount`, regardless of whether the specific step being decided is an `AMOUNT_THRESHOLD` step or a `DEPARTMENT`/`USER`/`ROLE` step. Re-examined against the actual data model rather than guessing:
+
+- `ProcurementRequisitionApprovalService.decide()` is hard-scoped to `stageType: "PURCHASE_REQUISITION"` (the `STAGE` constant at the top of the file) -- it is never reused for a non-monetary `ApprovalRequest` kind. Every requisition that reaches this method carries a real dollar `totalAmount`, no matter which step type the workflow happened to route it through.
+- A personal approval limit (SRD §7 "User Master" Approval Limit) is defined as *that person's* authorized ceiling on approving spend, full stop -- not a property of a particular routing mechanism. `DEPARTMENT`/`USER`/`ROLE` steps still authorize the same dollar exposure a `AMOUNT_THRESHOLD` step would; the routing type only decides *who* gets asked, never *whether real money is on the line*.
+- Narrowing the check to `AMOUNT_THRESHOLD`-only steps would reopen exactly the risk this finding exists to close: a department head or named approver with a low personal limit could approve a requisition far beyond their authorized ceiling whenever the workflow happened to route it as a `DEPARTMENT`/`USER`/`ROLE` step instead of a threshold step -- which, per PROC-FINDING-011's own root cause, is a config mistake that has already happened once on this system.
+
+**Conclusion: no code change.** The current broad enforcement (any `APPROVE` decision on a `PURCHASE_REQUISITION`, any step type) is the correct behavior, not a bug. Recording this reasoning here so the concern doesn't resurface as an open question.
+
+**Status:** FIXED -- deployed to dev (API only, no UI/portal service touched), verified live 18 September 2026; scope re-confirmed correct-as-designed 19 September 2026 (no code change). Branch `fix/proc-approval-limits`, commit `1bac209`, pushed to `origin`. **Merged to `master`, not prod** (19 September 2026 consolidation, `nvccz` `dd74dea`).
 
 ---
 
@@ -2347,6 +2384,7 @@ Live on dev, 18 September 2026. A second isolated verification RFQ (`RFQ_2026091
 `RFQ_20260918_0003`/`QUO_20260918_0003` and `RFQ_20260918_0004`/`QUO_20260918_0004` are isolated, clearly-titled verification records ("PROC-FINDING-01[6-8] verification ... isolated, safe to ignore/delete") invited only to the real Baobab Networks & Computing vendor master row (no fabricated vendor); left in `arcus_dev` for anyone who wants to inspect the before/after directly, same precedent as prior findings' cleanup notes.
 
 **Status:** FIXED -- deployed to dev (API only), verified live 18 September 2026. Branch `fix/proc-finding-017-vendor-payment-terms-override`, commit `f4fcda5`, pushed to `origin`. **Not merged to `master`/`dev`/`prod`.**
+**Status:** FIXED -- deployed to dev (API only), verified live 18 September 2026. Branch `fix/proc-finding-017-vendor-payment-terms-override`, commit `f4fcda5`, pushed to `origin`. **Merged to `master`/`dev`, not prod.** Merged to `master`/`dev` as part of the 19 September 2026 consolidation (`nvccz` `dd74dea`, `nvccz-new` `dd0b2e2`). Still not deployed to production.
 
 ---
 
@@ -2389,6 +2427,7 @@ Staff-side visibility (Quotation Comparison / Bid Evaluation reading these same 
 See PROC-FINDING-017's cleanup note -- both isolated verification RFQs/quotations are clearly titled and left in `arcus_dev`.
 
 **Status:** FIXED -- deployed to dev (`ui-vendor` only), verified live 18 September 2026 (frontend fields; attachment leg verified via direct API call rather than a literal file-picker click, see above). Branch `feature/proc-quotation-vendor-fields`, commit `57bfe04`, pushed to `origin`. Companion backend fix PROC-FINDING-017 also deployed to dev. **Not merged to `master`/`dev`/`prod`.**
+**Status:** FIXED -- deployed to dev (`ui-vendor` only), verified live 18 September 2026 (frontend fields; attachment leg verified via direct API call rather than a literal file-picker click, see above). Branch `feature/proc-quotation-vendor-fields`, commit `57bfe04`, pushed to `origin`. Companion backend fix PROC-FINDING-017 also deployed to dev. **Merged to `master`/`dev`, not prod.** Merged to `master`/`dev` as part of the 19 September 2026 consolidation (`nvccz` `dd74dea`, `nvccz-new` `dd0b2e2`). Still not deployed to production.
 
 ---
 
@@ -2449,6 +2488,7 @@ Live on dev, 18 September 2026, both via direct API calls and the real browser U
 `REQ_20260918_0013` (API-created verification record; submitted, approved, RFQ `RFQ_20260918_0005` sent to Baobab Networks & Computing) and `REQ_20260918_0014` (browser-UI-created verification record; submitted, left `Pending Head of Operations` -- not approved, so nothing downstream was created from it) were left in `arcus_dev`, both clearly titled "PROC-FINDING verification" / "UI live verification" and traceable to this finding by requisition number and timestamp, following the precedent in PROC-FINDING-011/015's cleanup notes. Mail guard was already `ACTIVE` on dev when this session started (a concurrent agent's write-test protection) and was left untouched rather than toggled, since turning it off could have exposed another session's in-flight test to real outbound email.
 
 **Status:** FIXED -- deployed to dev (API and staff UI), verified live 18 September 2026 via direct API calls, a minted real vendor-portal token against the actual public page, and the real staff browser UI as both the requester and the approver persona. Branches `fix/proc-requisition-missing-fields` in both repos (`nvccz` commit `b0cd9e7`; `nvccz-new` commits `68354ef`, `3925ef5`), pushed to `origin`. **Not merged to `master`/`dev`/`prod`.**
+**Status:** FIXED -- deployed to dev (API and staff UI), verified live 18 September 2026 via direct API calls, a minted real vendor-portal token against the actual public page, and the real staff browser UI as both the requester and the approver persona. Branches `fix/proc-requisition-missing-fields` in both repos (`nvccz` commit `b0cd9e7`; `nvccz-new` commits `68354ef`, `3925ef5`), pushed to `origin`. **Merged to `master`/`dev`, not prod.** Merged to `master`/`dev` as part of the 19 September 2026 consolidation (`nvccz` `dd74dea`, `nvccz-new` `dd0b2e2`). Still not deployed to production.
 
 ---
 
@@ -2509,6 +2549,7 @@ Live on dev, 18 September 2026, fresh requisition `REQ_20260918_0015` (Operation
 `REQ_20260918_0015` (Operations, left `DRAFT` -- never submitted, this session only exercised the attachments endpoints directly) and its four attachments (one `.pdf`, one `.png`, one `.docx`, both rejected uploads never persisted) left in `arcus_dev`, clearly titled "PROC-FINDING-019 review-fix verification" and traceable by requisition number/timestamp.
 
 **Status:** FIXED -- both code-review issues fixed and the regression reversed, deployed to dev (API only), verified live 18 September 2026. Branch `fix/proc-requisition-missing-fields` (`nvccz`, commit `412e963`, includes merges of the seven sibling branches above), pushed to `origin`. **Not merged to `master`/`dev`/`prod`.**
+**Status:** FIXED -- both code-review issues fixed and the regression reversed, deployed to dev (API only), verified live 18 September 2026. Branch `fix/proc-requisition-missing-fields` (`nvccz`, commit `412e963`, includes merges of the seven sibling branches above), pushed to `origin`. **Merged to `master`/`dev`, not prod.** Merged to `master`/`dev` as part of the 19 September 2026 consolidation (`nvccz` `dd74dea`, `nvccz-new` `dd0b2e2`). Still not deployed to production.
 
 ---
 
@@ -2556,6 +2597,7 @@ Live on dev (`https://dev-api.matanho.com`), 19 September 2026, as `proc.officer
 `RFQ_20260919_0001` (id `cmu821kal0039ms01actuc752`, the original incident record -- real invitation already sent to Baobab Networks & Computing before this fix existed) is left as-is: this module has no delete path for a non-draft RFQ (soft-delete-only convention, consistent with PROC-FINDING-011/015/019's own cleanup notes), and the invitation was already sent so there is nothing left to prevent. `RFQ_20260919_0003` (this session's live-verification record, future closing date, sent to the same test vendor, mail-guard blocked the actual send) is left in `arcus_dev`, clearly titled "PROC-FINDING closing-date live verify FUTURE-OK" and traceable by RFQ number/timestamp.
 
 **Status:** FIXED -- deployed to dev (API only), verified live 19 September 2026 via direct API calls reproducing the original incident's exact payload. Branch `fix/proc-rfq-closing-date-validation` (`nvccz`, commit `5ee8ae0`, includes merges of the eight sibling branches above), pushed to `origin`. **Not merged to `master`/`dev`/`prod`.**
+**Status:** FIXED -- deployed to dev (API only), verified live 19 September 2026 via direct API calls reproducing the original incident's exact payload. Branch `fix/proc-rfq-closing-date-validation` (`nvccz`, commit `5ee8ae0`, includes merges of the eight sibling branches above), pushed to `origin`. **Merged to `master`/`dev`, not prod.** Merged to `master`/`dev` as part of the 19 September 2026 consolidation (`nvccz` `dd74dea`, `nvccz-new` `dd0b2e2`). Still not deployed to production.
 
 ---
 
@@ -2602,6 +2644,7 @@ Live on dev (`https://dev-api.matanho.com`), 19 September 2026, as `proc.officer
 The original incident record, `Bad Email Vendor Co` (id `cmu82dnjh001npb010pycvsja`, email `not-an-email`), is left as-is and documented here rather than deleted, per this finding's own precedent of preserving the incident record. All four vendors this session's live verification created (two staff-created via steps 1-4 above, two self-registered via steps 5-6, across both the regression deploy and the corrective redeploy) were soft-deleted (`DELETE /accounting/vendors/:id`) immediately after verifying each, since none had linked expenses/transactions.
 
 **Status:** FIXED -- deployed to dev (API only; corrective redeploy verified as of commit `5ee8ae0`, which is the current state of dev's `api` container), verified live 19 September 2026 for both the staff vendor-master path and the public self-registration path. Branch `fix/proc-vendor-email-validation` (`nvccz`, commit `a41140c`), pushed to `origin`. **Not merged to `master`/`dev`/`prod`.**
+**Status:** FIXED -- deployed to dev (API only; corrective redeploy verified as of commit `5ee8ae0`, which is the current state of dev's `api` container), verified live 19 September 2026 for both the staff vendor-master path and the public self-registration path. Branch `fix/proc-vendor-email-validation` (`nvccz`, commit `a41140c`), pushed to `origin`. **Merged to `master`/`dev`, not prod.** Merged to `master`/`dev` as part of the 19 September 2026 consolidation (`nvccz` `dd74dea`, `nvccz-new` `dd0b2e2`). Still not deployed to production.
 
 ---
 
@@ -2647,6 +2690,41 @@ Live on dev (`https://dev-api.matanho.com`), 19 September 2026, as `proc.request
 `REQ_20260919_0005` (submitted, approved by `perf.deptmgr@nts.local`, used to raise `RFQ_20260919_0002` to Baobab Networks & Computing for the quotation-path verification) and `REQ_20260919_0006` (left `DRAFT`), `RFQ_20260919_0002`, `PO_20260919_0001`, and quotations `QUO_20260919_0001` (the pre-fix-wording negative-total record from the 500-returning deploy window, `subtotal: -100, totalAmount: -115.5` -- left as the incident record, same precedent as PROC-FINDING-021's original-incident RFQ) and `QUO_20260919_0002` (valid control) are left in `arcus_dev`, all clearly titled "PROC-FINDING verification" and traceable by number/timestamp.
 
 **Status:** FIXED -- deployed to dev (API only; final consolidated redeploy verified as of commit `5ee8ae0`, the current state of dev's `api` container, confirmed to include all ten prior sibling fixes plus this one), verified live 19 September 2026 across requisition create/update, purchase order create, and vendor quotation submit. Branch `fix/proc-negative-quantity-price-validation` (`nvccz`, commits `017f1b4`, `02cb17f`, fast-forwarded to `5ee8ae0`), pushed to `origin`. **Not merged to `master`/`dev`/`prod`.**
+**Status:** FIXED -- deployed to dev (API only; final consolidated redeploy verified as of commit `5ee8ae0`, the current state of dev's `api` container, confirmed to include all ten prior sibling fixes plus this one), verified live 19 September 2026 across requisition create/update, purchase order create, and vendor quotation submit. Branch `fix/proc-negative-quantity-price-validation` (`nvccz`, commits `017f1b4`, `02cb17f`, fast-forwarded to `5ee8ae0`), pushed to `origin`. **Merged to `master`/`dev`, not prod.** Merged to `master`/`dev` as part of the 19 September 2026 consolidation (`nvccz` `dd74dea`, `nvccz-new` `dd0b2e2`). Still not deployed to production.
+
+---
+
+## PROC-FINDING-024
+
+**Title:** A partially-failed vendor-quotation attachment upload left already-succeeded files orphaned, unlinked to any quotation
+**Module:** Procurement (frontend `nvccz-new` + backend `nvccz`) · **Dimension:** Code review · **Category:** Data hygiene / partial-failure handling
+**Severity:** LOW -- no security or financial impact, but every failed multi-file batch left storage rows nothing would ever clean up
+**Persona affected:** Any invited vendor attaching more than one document to a quotation via the public RFQ response form, where one file in the batch fails (size, network, transient error) after another has already uploaded
+**Surface:** `app/vendor-quotations/rfq-respond/page.tsx` (`handleSubmit`'s attachment upload block); `POST /procurement/document-attachments/portal/upload`
+
+### Origin
+
+Raised as a PLAUSIBLE finding during code review of PROC-FINDING-018 (the RFQ response form's Payment Terms/attachments fix): `attachmentFiles.map(...)` was awaited via `Promise.all`, so one rejected upload rejected the whole batch immediately, but any sibling upload that had already resolved had already been persisted server-side (`VendorDocumentAttachment` row, `status: ACTIVE`, `entityId: null`) with no rollback. Retrying re-submitted the *entire* `attachmentFiles` array, including the ones already uploaded, compounding the orphan count with each retry that still contained a failing file.
+
+### Fix (19 September 2026)
+
+- **Backend** (`nvccz`, branch `fix/proc-remaining-uat-findings`, commit `c9b8876`): `VendorDocumentAttachmentService.deleteAttachment` no longer unconditionally rejects a portal actor -- it now only rejects when the attachment is already linked to a submitted record (`row.entityId` set). A new route, `DELETE /procurement/document-attachments/portal/:attachmentId` (token via query string, same pattern as the existing `portal/:attachmentId/download`), lets the public vendor portal remove a STAGED (never-linked) upload it just made. Anything already linked to a submitted quotation/invoice is still staff-only to delete, unchanged.
+- **Frontend** (`nvccz-new`, same branch, commit `05bc62a`): `handleSubmit`'s upload step switched from `Promise.all` to `Promise.allSettled`. On any failure, the files that *did* upload are rolled back (best-effort, via the new endpoint) before surfacing a single error naming exactly which file(s) failed -- so a failed batch never leaves a partial set of attachments behind, and a clean retry starts from zero rather than compounding duplicates.
+
+### Verification
+
+Live on dev, 19 September 2026, via direct calls to the same public endpoints the form itself calls (the browser sandbox has no OS file-picker to drive a real multi-file `<input type=file>` selection, same limitation noted in PROC-FINDING-018's own verification):
+
+1. **Rollback on partial failure:** uploaded a valid PDF as the sole-source RFQ's invited vendor (`RFQ_20260919_0005` token) -- **201**, staged (`entityId: null`). Uploaded a second, non-PDF file with the same token to force the batch's second call to fail -- rejected (multer's route-level PDF filter rejects it before the controller runs; the existing filter is unrelated to this fix). Called the new rollback endpoint, `DELETE /procurement/document-attachments/portal/{id}?vendorPortalToken=...`, on the first file's id -- **200**. A second delete attempt on the same id -- **404** `"Attachment not found"`, confirming it is genuinely gone (soft-deleted), not still sitting there unlinked.
+2. **Portal cannot delete a linked attachment:** created a fourth RFQ (`RFQ_20260919_0006`), uploaded a PDF with its vendor's token, then submitted `QUO_20260919_0006` with that attachment's id in `attachmentIds` (**201**, linked -- `entityId` now set). Attempted the same portal-delete endpoint on that now-linked attachment -- **403** `"Portal users cannot delete an attachment already linked to a submitted record"`, confirming the fix only relaxes the restriction for staged (never-linked) uploads and a vendor still can't retract a document from a record it has already submitted.
+
+Both the rollback mechanism and its security boundary (staff-only once linked) are confirmed working exactly as designed.
+
+### Cleanup
+
+`REQ_20260919_0010`/`RFQ_20260919_0006`/`QUO_20260919_0006` (the linked-attachment negative test, left `SUBMITTED` -- never decided, no need to) are left in `arcus_dev`, clearly titled "PROC-FINDING-024 verification". The rolled-back staged attachment left no residual row of consequence (soft-deleted, as intended).
+
+**Status:** FIXED -- deployed to dev (API and `ui-vendor`), verified live 19 September 2026. Branches `fix/proc-remaining-uat-findings` in both repos (`nvccz` `c9b8876`, `nvccz-new` `05bc62a`), pushed to `origin`. **Not yet merged to `master`/`dev`, not prod.**
 
 ---
 

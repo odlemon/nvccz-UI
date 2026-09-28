@@ -1,0 +1,1 @@
+      if(action==='ai-save-latest'){const latest=[...state.aiMessages].reverse().find(m=>m.role==='assistant');if(latest){state.aiSaved=[{...latest,savedAt:'Saved just now'},...state.aiSaved.filter(x=>x.title!==latest.title)].slice(0,12);saveState();toast('Answer saved to Matanho AI.','success');render()}return}

@@ -1,0 +1,3 @@
+    aiDraft: saved.aiDraft || {type:'Executive update',audience:'Investment team',subject:'Q3 progress update',body:''},
+    aiDraftPending: false,
+    newsBookmarks: saved.newsBookmarks || [],

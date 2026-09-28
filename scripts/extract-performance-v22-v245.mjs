@@ -1,5 +1,6 @@
 import fs from "fs"
 import path from "path"
+import { spawnSync } from "child_process"
 
 const CLIENT =
   process.env.PM245_CLIENT_PACKAGE ||
@@ -496,5 +497,22 @@ ${pages.map(([id, p, name]) => `  { id: 'pm22-${id}', page: '${id}', path: '${p}
 ] as const
 `
 fs.writeFileSync(path.join(LIB_DIR, "nav.ts"), navTs)
+
+// Always re-apply hand patches so regenerations stay safe (mirrors extract-portfolio-v25.mjs's T0.1
+// pattern, extract-investee-portal-v8.mjs's equivalent, and this module's own extract-performance-v22.mjs).
+// This is the not-yet-adopted v24.5 upgrade path -- if it's ever actually run, the current 304-hunk
+// patch script was written against the v22.1 runtime structure and may report "missed" entries against
+// a real structural change in v24.5's HTML/JS; that's expected and must be resolved by updating the
+// patch script's hunks for the new structure, not by skipping this safety net.
+const patch = spawnSync(process.execPath, ["scripts/patch-performance-runtime.mjs"], {
+  encoding: "utf8",
+  cwd: process.cwd(),
+})
+if (patch.stdout) process.stdout.write(patch.stdout)
+if (patch.stderr) process.stderr.write(patch.stderr)
+if (patch.status !== 0) {
+  console.error("patch-performance-runtime.mjs failed or reported missed hunks against the v24.5 structure -- runtime written but not confirmed patched")
+  process.exit(patch.status || 1)
+}
 
 console.log("done")

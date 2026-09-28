@@ -1,0 +1,5 @@
+  function newsletterReaderView() {
+    const n=(D.newsletters||[]).find(x=>x.id===state.selectedNewsletter)||(D.newsletters||[])[0];
+    if(!n) return `${pageHead('', '', `<button class="secondary-btn" data-newsletter-mode="library">${icon('arrow')} Back to library</button>`)}<div class="empty-state">${icon('newsletter')}<h3>Newsletter not found.</h3></div>`;
+    return `${pageHead('', '', `<button class="secondary-btn" data-newsletter-mode="library">${icon('arrow')} Back to library</button>`)}<div class="reader-layout"><main class="card card-pad">${n.imageUrl?`<div class="reader-hero"><img src="${esc(n.imageUrl)}" alt="${esc(n.title)}" style="width:100%;border-radius:12px"/></div>`:''}<div class="reader-hero"><h1>${esc(n.title)}</h1><p>${esc(n.authorName)} · ${timeAgo(n.createdAt)}</p></div><article class="reader-copy">${n.content}</article></main></div>`;
+  }

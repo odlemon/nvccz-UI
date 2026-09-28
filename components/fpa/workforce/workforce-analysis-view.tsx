@@ -527,10 +527,10 @@ export function WorkforceAnalysisView({
                           </button>
                         </td>
                         <td className="px-4 py-3 text-[#111111]">{row.entity ?? "—"}</td>
-                        <td className="px-4 py-3 text-right tabular-nums font-medium">{row.hc}</td>
-                        <td className="px-4 py-3 text-right tabular-nums text-[#111111]">{row.budgetHc}</td>
+                        <td className="px-4 py-3 text-right tabular-nums font-medium">{row.hc == null ? "—" : row.hc.toFixed(1)}</td>
+                        <td className="px-4 py-3 text-right tabular-nums text-[#111111]">{row.budgetHc == null ? "—" : row.budgetHc.toFixed(1)}</td>
                         <td className={cn("px-4 py-3 text-right tabular-nums font-medium", varHc != null && varHc > 0 ? "text-[#f04438]" : varHc != null && varHc < 0 ? "text-[#f59e0b]" : "text-[#111111]")}>
-                          {varHc == null ? "—" : `${varHc > 0 ? "+" : ""}${varHc}`}
+                          {varHc == null ? "—" : `${varHc > 0 ? "+" : ""}${varHc.toFixed(1)}`}
                         </td>
                         <td className="px-4 py-3 text-right tabular-nums">{fmtM(row.salary)}</td>
                         <td className="px-4 py-3 text-right tabular-nums text-[#111111]">{row.avgSalary == null ? "—" : `$${row.avgSalary.toFixed(0)}K`}</td>

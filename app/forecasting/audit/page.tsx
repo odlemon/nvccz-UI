@@ -1,13 +1,10 @@
 import { ModuleGuard } from "@/components/permissions/PermissionGuards"
-import { FpaComingSoon } from "@/components/fpa/fpa-coming-soon"
+import { FpaAuditLogs } from "@/components/fpa/fpa-audit-logs"
 
 export default function FpaAuditPage() {
   return (
-    <ModuleGuard moduleId="forecasting" subModuleId="fpa-home">
-      <FpaComingSoon
-          title="Audit Logs"
-          description="Material edits, approvals and lock attempts will appear here once the API is connected."
-        />
+    <ModuleGuard moduleId="forecasting" subModuleId="fpa-audit-logs">
+      <FpaAuditLogs />
     </ModuleGuard>
   )
 }

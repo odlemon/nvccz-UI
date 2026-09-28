@@ -1,0 +1,21 @@
+      if(action==='find-time'){
+        const week=calendarWeekDays();
+        const fmt=m=>`${String(Math.floor(m/60)).padStart(2,'0')}:${String(m%60).padStart(2,'0')}`;
+        const windows=[];
+        for(let d=0;d<5;d++){
+          const dayEvents=combinedWeekEvents().filter(e=>e.dayIndex===d).sort((a,b)=>a.start-b.start);
+          let cursor=8*60;
+          const dayEnd=17*60;
+          dayEvents.forEach(e=>{
+            const evStartMin=e.start.getHours()*60+e.start.getMinutes();
+            const evEndMin=e.end.getHours()*60+e.end.getMinutes();
+            if(evStartMin>cursor+29) windows.push({day:week[d].label,startMin:cursor,endMin:evStartMin});
+            cursor=Math.max(cursor,evEndMin);
+          });
+          if(dayEnd>cursor+29) windows.push({day:week[d].label,startMin:cursor,endMin:dayEnd});
+        }
+        if(!windows.length){toast('No open time found in your calendar this week (08:00–17:00).');return}
+        const first=windows[0];
+        toast(`${windows.length} open window${windows.length===1?'':'s'} in your calendar this week — next: ${esc(first.day)} ${fmt(first.startMin)}–${fmt(first.endMin)}.`,'success');
+        return;
+      }

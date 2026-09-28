@@ -97,6 +97,42 @@ export type Pv11Lp = {
   tvpi: number
   dpi: number
   color: string
+  /** Real per-fund breakdown from investmentCommitments — empty when the LP has none yet.
+   *  vintage/dpi are omitted (null) rather than invented when the backing data doesn't exist. */
+  fundBreakdown: Array<{
+    fundId: string
+    fundName: string
+    vintage: number | null
+    commitmentDate: string
+    commitment: number
+    called: number
+    distributed: number
+    unfunded: number
+    dpi: number | null
+    status: string
+  }>
+  portalUserCount: number
+  portalRoles: { viewer: number; manager: number }
+  portalUsers: Array<{ name: string; email: string; role: string; isActive: boolean }>
+  /** Real capital call / distribution transaction ledger, newest first. */
+  transactions: Array<{
+    date: string
+    type: 'Capital Call' | 'Distribution'
+    fundName: string
+    amount: number
+    paid: number
+    status: string
+  }>
+  /** Real per-client documents from the LP portal document vault. */
+  documents: Array<{
+    id: string
+    category: string
+    title: string
+    fundName: string
+    mimeType: string | null
+    sizeBytes: number | null
+    publishedAt: string | null
+  }>
 }
 
 export type Pv11Report = {

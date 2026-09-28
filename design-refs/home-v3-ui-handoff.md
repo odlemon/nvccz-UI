@@ -1,10 +1,17 @@
 # Home Version 3 — UI handoff
 
-> **Status:** Updated — Matanho Employee Hub Premium **V17.1** under `/home-v3`.  
+> **Status:** Superseded by the live build — this started as Matanho Employee Hub Premium
+> **V17.1**, mock-only, but Phases 0-9 plus a full regression pass (see
+> `design-refs/home-page/execution-plan.md` for the detailed, current record) rewired nearly every
+> page to the real backend. Routes, code paths and "no live API" claims below are historical —
+> current routes live under `/home` (not `/home-v3`; the old path still works via a legacy redirect
+> in `middleware.ts`), and the module is real-data end-to-end except for a short, explicitly-tracked
+> list of known gaps in execution-plan.md's "Round 2" section.  
 > **Source:** `C:\Users\lysp\Downloads\Matanho_Employee_Hub_Premium_v17_1`  
 > **Previous:** V10 (superseded by this extract)  
-> **Mode:** Interactive mock (client runtime + fixtures) — no live API wiring.  
-> **Comparison set:** `/` (Homepage) · `/employee-hub` (Employee Hub) · `/home-v3` (Home Version 3)
+> **Mode:** Originally an interactive mock (client runtime + fixtures); now live-wired — see
+> execution-plan.md.  
+> **Comparison set:** `/` (Homepage) · `/employee-hub` (Employee Hub) · `/home` (Home Version 3)
 
 ## What shipped (V17.1)
 
@@ -71,10 +78,14 @@ Faithful Next.js integration of the **entire** client SPA:
 ## Known deviations
 
 1. **SharedTopbar** above client shell (App Switcher for comparison).
-2. Hash routing → Next paths.
+2. Hash routing → Next paths (now `/home/...`, see execution-plan.md).
 3. Client button radii (~12px), not Arcus pills.
 4. CSS scoped under `.home-v3-root`.
-5. Mock/`localStorage` only — no live Matanho API.
+5. ~~Mock/`localStorage` only — no live Matanho API.~~ Superseded: real backend end-to-end as of
+   Phases 0-9 + the round-2 regression pass — see execution-plan.md for what's wired and the small
+   list of remaining known gaps. `localStorage` is still used as a client-side cache layer for a
+   few fields, seeded from real data on load (see `home-v3-app.tsx`'s `seed*Cache` functions), not
+   as the source of truth.
 6. `/` and `/employee-hub` unchanged.
 
 ## Public preview

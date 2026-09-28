@@ -29,6 +29,7 @@ import {
 } from "./fundraising-modals"
 import { FrSimpleWizard, ReviewList } from "./fundraising-create-wizards"
 import { fundraisingApi, asNumber, toastFrError } from "@/lib/api/fundraising-api"
+import { usersApi, type AppUser } from "@/lib/api/users-api"
 import { mapInvestorOrg } from "@/lib/fundraising/mappers"
 import { exportFundraisingCsv } from "@/lib/fundraising/export"
 
@@ -355,6 +356,18 @@ export function FundraisingInvestors() {
   const [detail, setDetail] = useState<Record<string, any> | null>(null)
   const [relationship, setRelationship] = useState<Record<string, any> | null>(null)
   const [detailLoading, setDetailLoading] = useState(false)
+  const [users, setUsers] = useState<AppUser[]>([])
+  const [loadingUsers, setLoadingUsers] = useState(false)
+
+  useEffect(() => {
+    if (!createOpen) return
+    setLoadingUsers(true)
+    usersApi
+      .getAll()
+      .then((res) => setUsers(res.data ?? []))
+      .catch(() => setUsers([]))
+      .finally(() => setLoadingUsers(false))
+  }, [createOpen])
 
   useEffect(() => {
     let cancelled = false
@@ -772,8 +785,20 @@ export function FundraisingInvestors() {
             <FrField label="Jurisdiction">
               <input className={frInputClass} value={form.jurisdiction} onChange={(e) => setForm((f) => ({ ...f, jurisdiction: e.target.value }))} />
             </FrField>
-            <FrField label="Relationship owner ID">
-              <input className={frInputClass} value={form.relationshipOwnerId} onChange={(e) => setForm((f) => ({ ...f, relationshipOwnerId: e.target.value }))} />
+            <FrField label="Relationship owner">
+              <select
+                className={frSelectClass}
+                value={form.relationshipOwnerId}
+                onChange={(e) => setForm((f) => ({ ...f, relationshipOwnerId: e.target.value }))}
+                disabled={loadingUsers}
+              >
+                <option value="">{loadingUsers ? "Loading users…" : "Select owner"}</option>
+                {users.map((user) => (
+                  <option key={user.id} value={user.id}>
+                    {[user.firstName, user.lastName].filter(Boolean).join(" ") || user.email}
+                  </option>
+                ))}
+              </select>
             </FrField>
           </div>
         </div> : step === "profile" ? <div className="grid gap-3 sm:grid-cols-2">

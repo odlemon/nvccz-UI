@@ -284,8 +284,78 @@ export function adaptCapitalCalls(
 
 export function adaptLps(raw: any[]): Pv11Lp[] {
   return (raw || []).map((c, i) => {
-    const commitment = num(c.totalCommitment ?? c.commitment ?? c.commitments?.[0]?.amount)
-    const called = num(c.cumulativeCalled ?? c.called)
+    const fundBreakdown = Array.isArray(c.investmentCommitments)
+      ? c.investmentCommitments.map((ic: any) => {
+          const icCommitment = num(ic.amount)
+          const icCalled = Array.isArray(ic.capitalCallAllocations)
+            ? ic.capitalCallAllocations.reduce((sum: number, a: any) => sum + num(a.currentCallAmount), 0)
+            : 0
+          const icDistributed = Array.isArray(ic.distributionAllocations)
+            ? ic.distributionAllocations.reduce((sum: number, a: any) => sum + num(a.shareAmount), 0)
+            : 0
+          return {
+            fundId: String(ic.fundId || ic.fund?.id || ''),
+            fundName: String(ic.fund?.name || 'Fund'),
+            vintage: ic.fund?.vintageYear != null ? num(ic.fund.vintageYear) : null,
+            commitmentDate: fmtDate(ic.effectiveDate),
+            commitment: icCommitment,
+            called: icCalled,
+            distributed: icDistributed,
+            unfunded: Math.max(0, icCommitment - icCalled),
+            dpi: icCalled > 0 ? icDistributed / icCalled : null,
+            status: String(ic.status || 'ACTIVE'),
+          }
+        })
+      : []
+    const commitmentFromApi = fundBreakdown.reduce((sum, f) => sum + f.commitment, 0)
+    const calledFromApi = fundBreakdown.reduce((sum, f) => sum + f.called, 0)
+    const distributedFromApi = fundBreakdown.reduce((sum, f) => sum + f.distributed, 0)
+    const commitment = num(c.totalCommitment ?? c.commitment ?? c.commitments?.[0]?.amount, commitmentFromApi)
+    const called = num(c.cumulativeCalled ?? c.called, calledFromApi)
+    const allRelations = Array.isArray(c.lpUserRelations) ? c.lpUserRelations : []
+    const relations = allRelations.filter((r: any) => r.isActive)
+    const portalUsers = allRelations.map((r: any) => ({
+      name: [r.user?.firstName, r.user?.lastName].filter(Boolean).join(' ') || r.user?.email || 'Portal user',
+      email: String(r.user?.email || ''),
+      role: String(r.lpRole || 'VIEWER'),
+      isActive: Boolean(r.isActive),
+    }))
+    const commitments = Array.isArray(c.investmentCommitments) ? c.investmentCommitments : []
+    const transactions: Pv11Lp['transactions'] = []
+    for (const ic of commitments) {
+      for (const a of Array.isArray(ic.capitalCallAllocations) ? ic.capitalCallAllocations : []) {
+        transactions.push({
+          date: fmtDate(a.capitalCall?.transactionDate || a.capitalCall?.paymentDueDate),
+          type: 'Capital Call',
+          fundName: String(a.capitalCall?.fund?.name || ic.fund?.name || 'Fund'),
+          amount: num(a.currentCallAmount),
+          paid: num(a.amountPaid),
+          status: String(a.status || 'PENDING'),
+        })
+      }
+      for (const a of Array.isArray(ic.distributionAllocations) ? ic.distributionAllocations : []) {
+        transactions.push({
+          date: fmtDate(a.distribution?.distributionDate),
+          type: 'Distribution',
+          fundName: String(a.distribution?.fund?.name || ic.fund?.name || 'Fund'),
+          amount: num(a.shareAmount),
+          paid: num(a.amountPaid),
+          status: String(a.status || 'PENDING'),
+        })
+      }
+    }
+    transactions.sort((x, y) => new Date(y.date).getTime() - new Date(x.date).getTime())
+    const documents: Pv11Lp['documents'] = Array.isArray(c.lpPortalDocuments)
+      ? c.lpPortalDocuments.map((d: any) => ({
+          id: String(d.id),
+          category: String(d.category || 'Other'),
+          title: String(d.title || 'Document'),
+          fundName: String(d.fund?.name || 'All Funds'),
+          mimeType: d.mimeType || null,
+          sizeBytes: d.fileSizeBytes != null ? num(d.fileSizeBytes) : null,
+          publishedAt: d.publishedAt ? fmtDate(d.publishedAt) : null,
+        }))
+      : []
     return {
       id: String(c.id),
       name: String(c.legalName || c.name || 'LP'),
@@ -293,7 +363,7 @@ export function adaptLps(raw: any[]): Pv11Lp[] {
       geography: String(c.country || c.geography || '—'),
       commitment,
       called,
-      distributed: num(c.distributed),
+      distributed: num(c.distributed, distributedFromApi),
       netIrr: num(c.netIrr),
       owner: String(c.relationshipManager || '—'),
       lastInteraction: fmtDate(c.updatedAt || c.createdAt),
@@ -303,6 +373,15 @@ export function adaptLps(raw: any[]): Pv11Lp[] {
       tvpi: num(c.tvpi, commitment > 0 ? called / commitment : 0),
       dpi: num(c.dpi),
       color: COLORS[i % COLORS.length],
+      fundBreakdown,
+      portalUserCount: relations.length,
+      portalRoles: {
+        viewer: relations.filter((r: any) => String(r.lpRole).toUpperCase() === 'VIEWER').length,
+        manager: relations.filter((r: any) => String(r.lpRole).toUpperCase() === 'MANAGER').length,
+      },
+      portalUsers,
+      transactions,
+      documents,
     }
   })
 }

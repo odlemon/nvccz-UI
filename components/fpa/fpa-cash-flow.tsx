@@ -15,6 +15,7 @@ import {
   type FpaDriver,
 } from "@/lib/api/fpa-api"
 import { useAppSelector } from "@/lib/store"
+import { formatCashRunway } from "@/components/fpa/planning/planning-workspace-chrome"
 
 const optionalNumber = (value: unknown): number | null => {
   if (value == null || value === "") return null
@@ -83,7 +84,7 @@ function mapDomain(data: FpaDomainView) {
     kpis: source ? [
       { label: "Closing Cash", value: fmtMillions(closingCash) },
       { label: "Net Cash Flow", value: netCashFlow == null ? "—" : `${netCashFlow < 0 ? "-" : "+"}$${Math.abs(netCashFlow / 1_000_000).toFixed(1)}M`, up: netCashFlow == null ? undefined : netCashFlow >= 0 },
-      { label: "Runway", value: runwayMonths == null ? "—" : `${runwayMonths.toFixed(1)} mo` },
+      { label: "Runway", value: formatCashRunway(runwayMonths) },
     ] satisfies CashKpi[] : [],
     periods,
     statementRows,

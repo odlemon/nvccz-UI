@@ -530,6 +530,14 @@ async function fundCommitment(
   return unwrapData(res)
 }
 
+async function provisionLp(commitmentId: string) {
+  const res = await apiClient.post<ApiResponse<any>>(
+    `${FR}/commitments/${commitmentId}/provision-lp`,
+    {}
+  )
+  return unwrapData(res)
+}
+
 async function listClosings(params?: { campaignId?: string; status?: string }) {
   const res = await apiClient.get<ApiResponse<any[] | FrPaginated<any>>>(
     `${FR}/closings${qs(params)}`
@@ -1269,6 +1277,7 @@ export const fundraisingApi = {
   patchCommitment,
   admitCommitment,
   fundCommitment,
+  provisionLp,
   listClosings,
   createClosing,
   getClosing,

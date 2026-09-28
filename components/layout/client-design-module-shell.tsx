@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { Suspense, useEffect, useState } from "react"
+import { Suspense, useEffect, useRef, useState } from "react"
 import { usePathname } from "next/navigation"
 import { ClientDesignAppSwitcher } from "./client-design-app-switcher"
 import { ArcusAppSwitcherProvider } from "./arcus-app-switcher-provider"
@@ -41,10 +41,47 @@ export function ClientDesignModuleShell({
   useBrandLogoOverride()
   const [currentModule, setCurrentModule] = useState(defaultModuleId)
   const pathname = usePathname()
+  const shellRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     const module = getModuleByPath(pathname)
     if (module) setCurrentModule(module.id)
+  }, [pathname])
+
+  // The mounted "-mock" module's own nav rail (".sidebar", per the shared
+  // convention in home-v3/performance-v22/portfolio-v11's *-overrides.css) is
+  // position:fixed to the viewport, so it paints outside this shell's normal
+  // flow. SharedTopbar is this div's own child, not a descendant of the
+  // mounted module, so it has no way to see that rail's width or read the
+  // module-scoped --sidebar CSS variable that sizes it. Below ~1033px the
+  // topbar's search field was drifting far enough left to render under the
+  // rail (typed text invisible, matching a real repro). Rather than guess a
+  // fixed reserved width (every module's rail is a different size, and it
+  // changes with collapse state and breakpoint), measure the actual rendered
+  // rail on a light poll and expose it as a CSS var the topbar can reserve
+  // space for. `rect.left <= -1` covers the off-canvas mobile drawer state
+  // (translateX(-100%)), where the rail's layout box is still full width but
+  // not actually visible, so nothing should be reserved for it there.
+  useEffect(() => {
+    const shellEl = shellRef.current
+    if (!shellEl) return
+    const syncSidebarWidth = () => {
+      const rail = shellEl.querySelector(".sidebar")
+      if (!rail) {
+        shellEl.style.setProperty("--reserved-sidebar-w", "0px")
+        return
+      }
+      const rect = rail.getBoundingClientRect()
+      const width = rect.left > -1 ? Math.round(rect.width) : 0
+      shellEl.style.setProperty("--reserved-sidebar-w", `${width}px`)
+    }
+    syncSidebarWidth()
+    const intervalId = window.setInterval(syncSidebarWidth, 400)
+    window.addEventListener("resize", syncSidebarWidth)
+    return () => {
+      window.clearInterval(intervalId)
+      window.removeEventListener("resize", syncSidebarWidth)
+    }
   }, [pathname])
 
   useEffect(() => {
@@ -111,6 +148,7 @@ export function ClientDesignModuleShell({
   return (
     <ArcusAppSwitcherProvider currentModule={currentModule}>
       <div
+        ref={shellRef}
         className={`flex flex-col h-dvh overflow-hidden ${backgroundClassName}`}
         data-arcus-shell
       >

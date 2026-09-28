@@ -199,7 +199,7 @@ export function FundraisingContacts() {
           ? res.value.contacts
           : []
         rawContacts.forEach((c, idx) => {
-          flattened.push(mapContactRow(c, org.legalName || org.name, flattened.length + idx))
+          flattened.push(mapContactRow(c, org.legalName || org.name, flattened.length + idx, org.relationshipOwnerName))
         })
       })
       setContacts(flattened)

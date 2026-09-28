@@ -11,7 +11,10 @@
  *   GET    /procurement/requisitions/my                   the caller's own, drafts included
  *   GET    /procurement/requisitions/pending-approval     department head's queue
  *   GET    /procurement/requisitions/:id
- *   POST   /procurement/requisitions                      {title, department, priority, justification, items[{itemName, quantity, unit}]}
+ *   POST   /procurement/requisitions                      {title, department, priority, justification, requiredDate,
+ *                                                         deliveryLocation, budgetCode, items[{itemName, quantity, unit}]}
+ *   POST   /procurement/requisitions/:id/attachments       multipart `files[]`; owner-gated, not procurement.documents.manage
+ *   GET    /procurement/requisitions/:id/attachments
  *   PUT    /procurement/requisitions/:id/submit
  *   PUT    /procurement/requisitions/:id/approve          the requisition's department HEAD or DEPUTY
  *   PUT    /procurement/requisitions/:id/reject           {rejectionReason}
@@ -222,6 +225,11 @@ export async function createRequisition(body: {
   items: { itemName: string; description?: string; quantity: number; unit?: string; unitPrice?: number }[]
 }): Promise<ProcurementRecord> {
   return unwrapData(await apiClient.post<ApiResponse<ProcurementRecord>>("/procurement/requisitions", body))
+}
+
+/** SRD §11 "Attachments": files already attached to a requisition (requester and approvers both). */
+export async function listRequisitionAttachments(id: string): Promise<ProcurementRecord[]> {
+  return unwrapData(await apiClient.get<ApiResponse<ProcurementRecord[]>>(`/procurement/requisitions/${encodeURIComponent(id)}/attachments`))
 }
 
 export async function submitRequisition(id: string): Promise<ProcurementRecord> {

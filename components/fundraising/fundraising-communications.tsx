@@ -78,8 +78,14 @@ function communicationOpportunity(item: CommRow) {
 
 function communicationOwner(item: CommRow) {
   const raw = item.raw ?? {}
+  const owner = raw.owner ?? {}
   return safeDisplayName(
-    raw.ownerName || raw.owner?.displayName || raw.owner?.fullName || raw.owner?.name || raw.createdByName,
+    raw.ownerName ||
+      owner.displayName ||
+      owner.fullName ||
+      [owner.firstName, owner.lastName].filter(Boolean).join(" ") ||
+      owner.name ||
+      raw.createdByName,
     Boolean(raw.ownerId || raw.owner || raw.createdById),
   )
 }

@@ -1,0 +1,9 @@
+  function aiBriefsPanel(){
+    const portfolioMeeting=(D.schedule||[]).find(e=>(e.title||'').toLowerCase().includes('portfolio'));
+    const activeTaskCount=(state.workTasks||[]).filter(t=>!t.done).length;
+    const projectCount=(state.workProjects||[]).length;
+    const briefs=[
+      {title:'Today’s leadership brief',meta:'Calendar + My Work + Performance',detail:'Three decisions, two risks and your most important next action.',prompt:'Prepare a leadership brief for today'},
+      {title:'Portfolio review',meta:portfolioMeeting?`${esc(portfolioMeeting.time||'')}${portfolioMeeting.location?' · '+esc(portfolioMeeting.location):''}`:'No portfolio review scheduled',detail:'Changes, unresolved risks and the decision pack in one place.',prompt:'Prepare me for today’s portfolio review'},
+      {title:'Weekly execution summary',meta:`${activeTaskCount} active task${activeTaskCount===1?'':'s'} · ${projectCount} project${projectCount===1?'':'s'}`,detail:'Progress, delivery confidence and ownership gaps.',prompt:'Summarise my priorities and risks for this week'}
+    ];

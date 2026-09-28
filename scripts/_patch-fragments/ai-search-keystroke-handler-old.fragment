@@ -1,0 +1,1 @@
+    if(e.target.id==='aiKnowledgeSearch'){const q=e.target.value.toLowerCase();document.querySelectorAll('.ai-search-result-v16').forEach(row=>{row.style.display=row.textContent.toLowerCase().includes(q)?'grid':'none'});return}

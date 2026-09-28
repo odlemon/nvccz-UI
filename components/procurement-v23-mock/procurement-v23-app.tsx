@@ -41,6 +41,7 @@ import {
   getRfqConsolidation,
   getRfqSourcing,
   requisitionLineSuggestions,
+  listRequisitionAttachments,
   getMyDashboard,
   getProcurementDashboardLive,
   getExecutiveDashboardLive,
@@ -401,6 +402,10 @@ export function ProcurementV23App() {
     // Requisition lines suggest items bought before as they are typed (SRD §3); the bridge renders, the host fetches.
     ;(window as unknown as { __pr23LineSuggestions?: (q: string) => Promise<unknown[]> }).__pr23LineSuggestions = (q: string) =>
       requisitionLineSuggestions(q).catch(() => [])
+    // SRD §11 "Attachments": the bridge renders a lazy placeholder per requisition (only the record
+    // actually opened fetches), the host answers with what has been uploaded.
+    ;(window as unknown as { __pr23FetchRequisitionAttachments?: (id: string) => Promise<unknown[]> }).__pr23FetchRequisitionAttachments = (id: string) =>
+      listRequisitionAttachments(id).catch(() => [])
 
     // The runtime rendered its vendored demo dataset synchronously. Replace it before the
     // browser paints, so no demo record is ever shown as if it were the organisation's.

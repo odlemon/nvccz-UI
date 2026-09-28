@@ -1,0 +1,10 @@
+  function aiSearchPanel(){
+    const results=[
+      {type:'Document',title:'Q3 investment deck.pptx',detail:'Updated today · My Work',icon:'newsletter',route:'my-work'},
+      {type:'Person',title:'Nyasha Moyo',detail:'Senior Investment Analyst · Available now',icon:'profile',route:'people'},
+      {type:'Discussion',title:'Q3 strategy workshop prep',detail:'17 replies · Strategy forum',icon:'forum',route:'forums'},
+      {type:'News',title:'Southern Africa expansion enters its next chapter',detail:'Matanho Newsroom · 8 min read',icon:'news',route:'news'},
+      {type:'Calendar',title:'Portfolio review',detail:'Today · 14:00 · Harare Boardroom',icon:'calendar',route:'calendar'}
+    ];
+    return `<section class="card ai-library-panel-v16"><div class="ai-section-head-v16"><div><span class="eyebrow">Universal search</span><h2>Find one answer across connected work</h2><p>Search only the sources currently enabled in your context panel.</p></div></div><form class="ai-knowledge-search-v16" id="aiSearchForm">${icon('search')}<input id="aiKnowledgeSearch" name="query" placeholder="Search people, documents, discussions and news…"/><button class="primary-btn">Search</button></form><div class="ai-result-list-v16">${results.map(r=>`<article class="ai-search-result-v16"><div class="ai-result-icon-v16">${icon(r.icon)}</div><div><span>${r.type}</span><strong>${r.title}</strong><p>${r.detail}</p></div><button class="secondary-btn" data-ai-open-route="${r.route}">Open ${icon('arrow')}</button></article>`).join('')}</div></section>`;
+  }

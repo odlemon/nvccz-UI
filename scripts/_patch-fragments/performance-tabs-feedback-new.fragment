@@ -1,0 +1,2 @@
+    const tabs=['Overview','Scorecard','Goals','Feedback'];
+    const body=state.performanceTab==='Scorecard'?performanceScorecard():state.performanceTab==='Goals'?performanceGoals(mult):state.performanceTab==='Feedback'?performanceFeedback():performanceOverview(mult);

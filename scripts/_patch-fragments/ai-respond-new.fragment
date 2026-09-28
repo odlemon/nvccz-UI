@@ -1,0 +1,10 @@
+  function aiRespond(prompt){
+    const p=String(prompt||'').trim(); if(!p)return;
+    state.aiMode='ask';
+    const historyForApi=state.aiMessages.filter(m=>!m.pending).map(m=>({role:m.role,content:m.text||m.summary||''}));
+    state.aiMessages.push({role:'user',text:p,createdAt:Date.now()});
+    state.aiMessages.push({role:'assistant',text:'Thinking…',pending:true,createdAt:Date.now()});
+    saveState(); render();
+    setTimeout(()=>{const thread=document.getElementById('aiConversation');if(thread)thread.scrollTo({top:thread.scrollHeight,behavior:'smooth'})},60);
+    emitIntegrationEvent('assistant.message.sent',{prompt:p,history:historyForApi,scope:state.aiScope,sources:state.aiContextSources});
+  }

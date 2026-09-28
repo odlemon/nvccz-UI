@@ -1,0 +1,12 @@
+  function performanceScorecard(){
+    const perf=D.performanceOverview;
+    if(!perf||!perf.available){
+      return `<div class="balanced-scorecard-page"><section class="card card-pad"><div class="work-empty-state">${icon('performance')}<strong>No active scorecard for this period.</strong><span>${esc((perf&&perf.blockedReason)||'No active performance contract found for this employee in the selected period.')}</span></div></section></div>`;
+    }
+    const goals=perf.goals||[];
+    const overall=perf.overallScore!=null?Math.round(perf.overallScore):null;
+    return `<div class="balanced-scorecard-page">
+      <section class="card bsc-summary-card"><div class="bsc-person"><div class="bsc-avatar">${avatar(D.user)}</div><div><span class="eyebrow">Personal scorecard</span><h2>${esc(D.user.name)}</h2><p>${esc(D.user.role)}${perf.periodLabel?' · '+esc(perf.periodLabel):''}${perf.contractTitle?' · '+esc(perf.contractTitle):''}</p></div></div><div class="bsc-overall"><div class="bsc-ring" style="--score:${overall||0}"><div><strong>${overall!=null?overall:'—'}</strong><span>Weighted score</span></div></div><div><strong>${esc(perf.statusLabel||'—')}</strong><span>${goals.length} goal${goals.length===1?'':'s'} in scope</span></div></div></section>
+      <section class="card card-pad"><div class="card-title"><div><span class="eyebrow">Weighted components</span><h3>Goals contributing to this score</h3></div></div>${goals.length?goals.map(g=>`<div class="bsc-contribution-row"><span>${esc(g.title)}</span><div class="progress-mini"><i style="width:${Math.min(100,g.score||0)}%"></i></div><strong>${g.score!=null?g.score+'%':'—'}</strong></div>`).join(''):`<div class="empty-state-row">No goals to show for this period.</div>`}</section>
+    </div>`;
+  }

@@ -1840,6 +1840,7 @@ export interface ForecastChartAccount {
   id?: string
   code?: string
   account_code?: string
+  account_no?: string
   name?: string
   account_name?: string
   accountType?: string | null
@@ -3217,6 +3218,12 @@ export const fpaApi = {
   ) =>
     apiClient.get<ApiResponse<ForecastChartAccount[]>>(
       `/forecast-entities/${entityId}/chart-of-accounts${qs(params)}`,
+    ),
+
+  resyncEntityCoa: (entityId: string) =>
+    apiClient.post<ApiResponse<{ entity_id: string; accounts_added: number; accounts_updated: number }>>(
+      `/forecast-entities/${entityId}/resync-coa`,
+      {},
     ),
 
   // —— Persisted FP&A settings ——

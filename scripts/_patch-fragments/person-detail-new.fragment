@@ -1,0 +1,3 @@
+function personDetail(p){
+    return `<div class="profile-hero-v4"><div class="profile-photo-large">${avatar({name:p.name,initials:(p.name||'').split(' ').map(w=>w[0]||'').join('').slice(0,2).toUpperCase()})}</div><div class="profile-identity"><h2>${esc(p.name)}</h2><p>${esc(p.role||'Team member')}<br>${esc(p.department||'')}</p></div></div><div class="profile-actions"><button class="secondary-btn" data-action="schedule-person">${icon('calendar')} Schedule time</button></div><div class="detail-section"><h4>Contact</h4><div class="detail-line">${icon('newsletter')}<span>${esc(p.email)}</span></div></div>`;
+  }

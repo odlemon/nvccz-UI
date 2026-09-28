@@ -1,0 +1,52 @@
+  function calendarWeekStart(){
+    const now=new Date();
+    const day=now.getDay();
+    const diff=(day===0?-6:1-day);
+    return new Date(now.getFullYear(),now.getMonth(),now.getDate()+diff);
+  }
+  function calendarWeekDays(){
+    const monday=calendarWeekStart();
+    const labels=['Mon','Tue','Wed','Thu','Fri'];
+    const today=new Date(); today.setHours(0,0,0,0);
+    return labels.map((lab,i)=>{
+      const d=new Date(monday.getFullYear(),monday.getMonth(),monday.getDate()+i);
+      return {label:lab+' '+d.getDate(),isToday:d.getTime()===today.getTime()};
+    });
+  }
+  function combinedWeekEvents(){
+    const monday=calendarWeekStart();
+    const mStart=new Date(monday.getFullYear(),monday.getMonth(),monday.getDate());
+    const mine=(D.myCalendarEntries||[]).map(x=>({...x,source:'mine'}));
+    const company=(D.companyEvents||[]).map(x=>({...x,source:'company'}));
+    return [...mine,...company].map(e=>{
+      const start=new Date(e.startDate);
+      const end=new Date(e.endDate||e.startDate);
+      const dayStart=new Date(start.getFullYear(),start.getMonth(),start.getDate());
+      const dayIndex=Math.round((dayStart-mStart)/86400000);
+      const durMin=Math.max(15,Math.round((end-start)/60000));
+      return {...e,start,end,dayIndex,durMin};
+    }).filter(e=>e.dayIndex>=0&&e.dayIndex<5);
+  }
+  function selectedCalendarEvent(){
+    const all=combinedWeekEvents();
+    return all.find(e=>String(e.id)===String(state.calendarSelectedEvent))||all[0]||null;
+  }
+  function calendarView() {
+    const week=calendarWeekDays();
+    const monthLabel=new Date().toLocaleDateString('en-GB',{month:'long',year:'numeric'});
+    const daysInMonth=new Date(new Date().getFullYear(),new Date().getMonth()+1,0).getDate();
+    const todayDate=new Date().getDate();
+    const selected=selectedCalendarEvent();
+    const detailToggle=`<button class="secondary-btn calendar-detail-toggle" data-action="toggle-calendar-details">${icon(state.calendarDetailsOpen?'close':'calendar')} ${state.calendarDetailsOpen?'Hide':'Show'} event details</button>`;
+    const todayLabel=new Date().toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+    const detailPane = !state.calendarDetailsOpen ? '' : (selected ? `<aside class="card calendar-side"><div class="card-title"><div><span class="eyebrow">Selected event</span><h3>${esc(selected.title)}</h3><p>${esc(selected.start.toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short'}))} · ${esc(selected.start.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}))} – ${esc(selected.end.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}))}</p></div><button class="close-btn" data-action="toggle-calendar-details" aria-label="Collapse event details">${icon('close')}</button></div>${selected.location?`<div class="detail-line">${icon('location')}<span>${esc(selected.location)}</span></div>`:''}<div class="calendar-event-actions">${selected.googleCalendarLink?`<a class="primary-btn" href="${esc(selected.googleCalendarLink)}" target="_blank" rel="noopener">${icon('message')} Join meeting</a>`:''}${selected.source==='mine'?`<button class="secondary-btn" data-action="delete-calendar-entry" data-entry-id="${esc(selected.id)}">${icon('close')} Remove</button>`:''}</div>${selected.description?`<div class="detail-section"><h4>Details</h4><p>${esc(selected.description)}</p></div>`:''}${selected.source==='company'?`<div class="detail-section"><h4>Organiser</h4><p>${esc((selected.author&&(selected.author.firstName+' '+selected.author.lastName))||'Matanho')}</p></div>`:''}</aside>` : `<aside class="card calendar-side"><div class="card-title"><h3>No events this week</h3></div><div class="empty-state-row">Nothing on your calendar right now.</div></aside>`);
+    return `${pageHead('Calendar','Plan your week, protect focus time and keep meeting context close.',`${detailToggle}<button class="secondary-btn" data-action="find-time">Find a time</button><button class="primary-btn" data-action="create-event">${icon('plus')} Create event</button>`)}<div class="calendar-layout ${state.calendarDetailsOpen?'':'details-collapsed'}"><aside class="card month-mini"><div class="card-title"><h3>${esc(monthLabel)}</h3><div>${icon('down')}</div></div><div class="month-grid">${['M','T','W','T','F','S','S',...Array.from({length:daysInMonth},(_,i)=>i+1)].map((x)=>`<span class="${x===todayDate?'active':''}">${x}</span>`).join('')}</div><div class="detail-section calendar-sources"><h4>Calendar sources</h4>${['My calendar','Company events'].map((x,i)=>`<div class="toggle-row"><span>${x}</span><button class="switch ${state.calendarSources[i]?'on':''}" data-action="calendar-source" data-index="${i}" aria-pressed="${state.calendarSources[i]}" aria-label="Toggle ${x}"></button></div>`).join('')}</div></aside><main class="card calendar-board"><div class="toolbar"><div class="segmented"><button>Day</button><button class="active">Week</button><button>Month</button></div><button class="secondary-btn small-btn">${esc(todayLabel)}</button><div class="calendar-toolbar-spacer"></div><button class="icon-only calendar-inline-detail" data-action="toggle-calendar-details" aria-label="Toggle event details">${icon(state.calendarDetailsOpen?'close':'chevron')}</button><div class="calendar-timezone">CAT</div></div><div class="calendar-scroll"><div class="week-grid"><div class="time-col"><div class="day-head">.</div>${[8,9,10,11,12,13,14,15,16,17].map((h,i)=>`<span class="time-label" style="top:${48+i*60}px">${String(h).padStart(2,'0')}:00</span>`).join('')}</div>${week.map((day,di)=>`<div class="day-col"><div class="day-head ${day.isToday?'active':''}">${esc(day.label)}</div>${calendarEventsForDay(di)}</div>`).join('')}</div></div></main>${detailPane}</div>`;
+  }
+  function calendarEventsForDay(di){
+    return combinedWeekEvents().filter(e=>e.dayIndex===di).map(e=>{
+      const top=48+(e.start.getHours()-8)*60+e.start.getMinutes();
+      const cls=e.source==='company'?'sage':(e.entryType==='focus'?'gray':'blue');
+      const timeLabel=e.start.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
+      return `<div class="cal-event ${cls}" style="top:${Math.max(0,top)}px;height:${Math.max(34,e.durMin-5)}px" data-event="${esc(e.id)}"><strong>${esc(e.title)}</strong><br>${timeLabel}</div>`;
+    }).join('');
+  }

@@ -1,0 +1,17 @@
+  function aiSearchResults(){
+    const q=(state.aiSearchQuery||'').trim().toLowerCase();
+    if(!q) return [];
+    const on=id=>state.aiContextSources[id]!==false;
+    const out=[];
+    if(on('work')) state.workTasks.forEach(t=>{ if((t.title||'').toLowerCase().includes(q)) out.push({type:'Task',title:t.title,detail:`${t.status||''} · My Work`,icon:'check',route:'my-work'}) });
+    if(on('calendar')) (D.schedule||[]).forEach(e=>{ if((e.title||'').toLowerCase().includes(q)) out.push({type:'Calendar',title:e.title,detail:`${e.time||''}${e.location?' · '+e.location:''}`,icon:'calendar',route:'calendar'}) });
+    if(on('people')) D.directory.forEach(p=>{ if((p.name||'').toLowerCase().includes(q)||(p.role||'').toLowerCase().includes(q)) out.push({type:'Person',title:p.name,detail:`${p.role||''}${p.department?' · '+p.department:''}`,icon:'profile',route:'people'}) });
+    if(on('forums')) D.forumPosts.forEach(f=>{ if((f.title||'').toLowerCase().includes(q)) out.push({type:'Discussion',title:f.title,detail:`${(f.replies||[]).length} repl${(f.replies||[]).length===1?'y':'ies'} · Forums`,icon:'forum',route:'forums'}) });
+    if(on('news')) D.newsPosts.forEach(n=>{ if((n.title||'').toLowerCase().includes(q)) out.push({type:'News',title:n.title,detail:`${n.authorName||''} · News`,icon:'news',route:'news'}) });
+    return out.slice(0,20);
+  }
+  function aiSearchPanel(){
+    const results=aiSearchResults(), q=state.aiSearchQuery||'';
+    const empty=!q?{icon:'search',title:'Search your connected work.',detail:'Find tasks, people, discussions and news across the sources enabled in your context panel.'}:(!results.length?{icon:'search',title:`No matches for "${q}".`,detail:'Try a different term, or enable more sources in the context panel.'}:null);
+    return `<section class="card ai-library-panel-v16"><div class="ai-section-head-v16"><div><span class="eyebrow">Universal search</span><h2>Find one answer across connected work</h2><p>Search only the sources currently enabled in your context panel.</p></div></div><form class="ai-knowledge-search-v16" id="aiSearchForm">${icon('search')}<input id="aiKnowledgeSearch" name="query" value="${esc(q)}" placeholder="Search people, tasks, discussions and news…"/><button class="primary-btn">Search</button></form><div class="ai-result-list-v16">${empty?`<div class="work-empty-state">${icon(empty.icon)}<strong>${esc(empty.title)}</strong><span>${esc(empty.detail)}</span></div>`:results.map(r=>`<article class="ai-search-result-v16"><div class="ai-result-icon-v16">${icon(r.icon)}</div><div><span>${r.type}</span><strong>${esc(r.title)}</strong><p>${esc(r.detail)}</p></div><button class="secondary-btn" data-ai-open-route="${r.route}">Open ${icon('arrow')}</button></article>`).join('')}</div></section>`;
+  }

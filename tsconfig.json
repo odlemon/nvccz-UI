@@ -43,7 +43,8 @@
     ".next-lp-uat/types/**/*.ts",
     ".next-procurement-preview/types/**/*.ts",
     ".next-vendor-preview/types/**/*.ts",
-    ".next-vendor-review/types/**/*.ts"
+    ".next-vendor-review/types/**/*.ts",
+    ".next-staff-home-page/types/**/*.ts"
   ],
   "exclude": [
     "node_modules"

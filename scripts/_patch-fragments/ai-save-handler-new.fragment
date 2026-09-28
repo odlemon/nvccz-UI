@@ -1,0 +1,11 @@
+      if(action==='ai-save-latest'){
+        const idxAttr=e.target.closest('[data-index]')?.dataset.index;
+        const msgIdx=idxAttr!=null?Number(idxAttr):(()=>{for(let i=state.aiMessages.length-1;i>=0;i--){if(state.aiMessages[i].role==='assistant')return i}return -1})();
+        const msg=state.aiMessages[msgIdx];
+        if(msg&&msg.role==='assistant'&&!msg.pending){
+          const promptText=msgIdx>0?(state.aiMessages[msgIdx-1].text||''):'';
+          state.aiSaved=[{...msg,savedPrompt:promptText,savedAt:'Saved just now'},...state.aiSaved.filter(x=>x.createdAt!==msg.createdAt)].slice(0,12);
+          saveState();toast('Answer saved to Matanho AI.','success');render();
+        }
+        return;
+      }

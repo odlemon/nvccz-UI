@@ -245,6 +245,8 @@ export interface SubmitQuotationRequest {
   quotationDate?: string
   notes?: string
   attachments?: any
+  /** Staged upload ids from uploadQuotationAttachment(); linked to the quotation server-side after creation. */
+  attachmentIds?: string[]
   items: Array<{
     itemName: string
     description: string
@@ -975,6 +977,32 @@ class ProcurementApiServiceV2 {
     form.append('vendorPortalToken', token)
     form.append('entityType', 'VENDOR_QUOTATION')
     return apiClient.postFormData('/procurement/document-attachments/portal/upload', form)
+  }
+
+  /**
+   * PUBLIC: stage a quotation attachment (multipart field `document`, PDF only, up to 50MB) before/while
+   * filling in the RFQ response form. Pass `vendorPortalToken` (the same token as the RFQ link) and
+   * `entityType=VENDOR_QUOTATION` in the FormData; the returned `data.id` goes into
+   * SubmitQuotationRequest.attachmentIds so the backend links it to the quotation once created.
+   * POST /procurement/document-attachments/portal/upload — see vendorDocumentAttachmentRoutes.ts (nvccz repo).
+   */
+  async uploadQuotationAttachment(formData: FormData): Promise<ProcurementResponse<{ id: string; originalFileName?: string; fileSizeBytes?: number }>> {
+    return apiClient.postFormData<ProcurementResponse<{ id: string; originalFileName?: string; fileSizeBytes?: number }>>(
+      '/procurement/document-attachments/portal/upload',
+      formData,
+    )
+  }
+
+  /**
+   * Roll back a staged attachment upload from uploadQuotationAttachment() that never got linked to a
+   * submitted quotation -- e.g. one file in a multi-file batch failed and the others must not be left
+   * orphaned. Only works while the attachment is still unlinked; the backend rejects it otherwise.
+   * DELETE /procurement/document-attachments/portal/:id — see vendorDocumentAttachmentRoutes.ts (nvccz repo).
+   */
+  async deleteQuotationAttachment(attachmentId: string, vendorPortalToken: string): Promise<ProcurementResponse<unknown>> {
+    return apiClient.delete<ProcurementResponse<unknown>>(
+      `/procurement/document-attachments/portal/${attachmentId}?vendorPortalToken=${encodeURIComponent(vendorPortalToken)}`,
+    )
   }
 
   /**
