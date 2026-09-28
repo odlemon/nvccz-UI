@@ -165,6 +165,7 @@ export type Ac52ApVendor = {
 /** Shape the runtime's v28-layer arInvoices array expects. */
 export type Ac52ArInvoice = {
   id: string
+  customerId?: string
   customer: string
   date: string
   due: string
@@ -244,6 +245,8 @@ export type Ac52Approval = {
 /** Shape the runtime's v51-layer `inventory` array expects (matanho-accounting-runtime.js invPage). */
 export type Ac52InventoryItem = {
   sku: string
+  /** Real InventoryItem.id for stock movement / adjustment writes. */
+  backendId?: string
   item: string
   category: string
   warehouse: string
@@ -476,6 +479,8 @@ export type Ac52HydratePayload = {
     arInvoices?: Ac52ArInvoice[]
     arCustomers?: Ac52ArCustomer[]
     claims?: Ac52Claim[]
+    /** Vendor + category options for the live expense claim form. */
+    expenseLookups?: { vendors: Array<{ id: string; name: string }>; categories: Array<{ id: string; name: string }> }
     inventoryItems?: Ac52InventoryItem[]
     fixedAssets?: Ac52FixedAsset[]
     investments?: Ac52Investment[]

@@ -1,4 +1,4 @@
-import { listProcurementInvoices, listPurchaseOrders, listQuotations, listRfqs } from '@/lib/api/procurement-v23-api'
+import { listProcurementInvoices, listPurchaseOrders, listQuotations, listRfqs, listVendors } from '@/lib/api/procurement-v23-api'
 import { chartOfAccountsApi } from '@/lib/api/chart-of-accounts-api'
 import { accountingApi } from '@/lib/api/accounting-api'
 import { cashbookApi } from '@/lib/api/cashbook-api'
@@ -54,80 +54,36 @@ export type Ac52ScopePlan = {
 /** Which live scopes a given accounting-v52 page needs. Extend as more pages are wired. */
 export function scopesForAc52Page(page: string): Ac52ScopePlan {
   switch (page) {
-    // Command Centre (overviewPage8 in the runtime) reads S.banks (cash), S.approvals
-    // (pending queue) and S.journals (revenue, recent ledger activity) directly, plus
-    // AR/AP totals derived from the same receivables/payables data other pages use — but
-    // this page previously had no case here at all, so it never issued its own fetch and
-    // relied entirely on whatever localStorage happened to contain from a *different* page
-    // visited earlier in the session (found live: a voided journal kept showing "Submitted"
-    // on Command Centre indefinitely, in a fresh tab, because nothing ever refetched it here).
-    case 'overview':
-      return { primary: ['journals', 'cash', 'payables', 'receivables', 'approvals'] }
-    case 'coa':
-      return { primary: ['coa'] }
-    // General Ledger and account balances are derived client-side from S.journals
-    // (see postedJournals8/ledgerRows8/accountNet8 in the runtime), so both pages
-    // need the same 'journals' scope — there is no separate GL dataset to fetch.
-    case 'journals':
-    case 'ledger':
-      return { primary: ['journals'] }
-    case 'cash':
-      // Bank balances derive from S.journals via each bank's linked GL account.
-      return { primary: ['cash', 'journals'] }
-    case 'reconciliation':
-      return { primary: ['reconciliation', 'cash', 'journals'] }
     case 'payables':
       return { primary: ['payables'] }
-    case 'receivables':
-      return { primary: ['receivables'] }
-    case 'expenses':
-      return { primary: ['expenses'] }
-    case 'inventory':
-      return { primary: ['inventory'] }
-    case 'assets':
-      return { primary: ['assets'] }
-    case 'investments':
-      return { primary: ['investments'] }
-    case 'reports':
-      return { primary: ['statements'] }
-    case 'approvals':
-      return { primary: ['approvals'] }
-    case 'fx':
-      return { primary: ['fx'] }
-    case 'recurring':
-      return { primary: ['recurring'] }
-    case 'vault':
-      return { primary: ['vault'] }
-    case 'compliance':
-      return { primary: ['compliance'] }
-    case 'consolidation':
-      return { primary: ['consolidation'] }
-    case 'close':
-      return { primary: ['close'] }
-    case 'timesheets':
-      return { primary: ['timesheets'] }
-    // CEO View (ceoPage in the runtime) had no case here either, so on a cold load it
-    // rendered its hardcoded ceoEntities fixture end to end — $6.84m group liquidity against
-    // a real $3.50m, $189.5k receivables against a real $7.8k, four legal entities against
-    // one real one. It needs the same figures Command Centre derives, plus the real entity
-    // list from the consolidation summary.
-    case 'ceo':
-      return { primary: ['journals', 'cash', 'payables', 'receivables', 'approvals', 'consolidation', 'close', 'ceo'] }
-    // Settings' "Configured banks" table reads live bank state, but without this case the
-    // page never fetched it: on a cold load it listed the mock CBZ/Stanbic/FBC banks on GL
-    // 1101-1103 instead of the real account on GL 1100. 'close' backs the periods tab.
-    case 'settings':
-      return { primary: ['cash', 'close', 'audit', 'consolidation', 'access'] }
-    case 'audit':
-      return { primary: ['audit'] }
-    // Dynamic RBAC (accessPage12) rendered an invented user register, ten invented role titles
-    // and a permission matrix of permission keys that do not exist in this system.
-    case 'access':
-      return { primary: ['access'] }
-    // Trial Balance (trialBalancePage12) computes account balances from S.accounts + S.journals
-    // directly (core12()/tb12()) — same missing-case bug as 'overview' above, same fix.
+    // Pages drawn by the live layer (scripts/accounting-live) load their own records from the server and never read
+    // the runtime's hydrated copies, so fetching those (up to 1,000 journals for the ledger pages) only slowed them.
+    case 'coa':
+    case 'journals':
+    case 'ledger':
     case 'trialbalance':
-      return { primary: ['coa', 'journals'] }
+    case 'reports':
+    case 'cash':
+    case 'reconciliation':
+    case 'receivables':
+    case 'expenses':
+    case 'assets':
+    case 'investments':
+    case 'approvals':
+    case 'fx':
+    case 'recurring':
+    case 'close':
+    case 'audit':
+    case 'access':
+    case 'settings':
+    case 'integrations':
+    case 'timesheets':
+    case 'inventory':
+    case 'compliance':
+    case 'consolidation':
+    case 'overview':
+    case 'ceo':
+    case 'vault':
     default:
       return { primary: [] }
   }
@@ -299,9 +255,11 @@ export async function loadAc52Scopes(scopes: Ac52DataScope[]): Promise<Ac52Hydra
   }
 
   if (wanted.includes('expenses')) {
-    const [expRes, usersRes] = await Promise.all([
+    const [expRes, usersRes, vendorsRows, catsRes] = await Promise.all([
       settle(accountingApi.getExpenses({ limit: 200 }), 'expenses', errors),
       settle(usersApi.getAll(), 'users', errors),
+      settle(listVendors(), 'expenseVendors', errors),
+      settle(accountingApi.getExpenseCategories({ isActive: true }), 'expenseCategories', errors),
     ])
     if (Array.isArray(expRes?.data)) {
       const userNames = new Map<string, string>()
@@ -309,6 +267,12 @@ export async function loadAc52Scopes(scopes: Ac52DataScope[]): Promise<Ac52Hydra
         for (const u of usersRes!.data!) userNames.set(u.id, `${u.firstName} ${u.lastName}`.trim())
       }
       data.claims = adaptAc52Claims(expRes!.data as any, userNames)
+    }
+    const vendorRows = Array.isArray(vendorsRows) ? vendorsRows : []
+    const catRows = Array.isArray(catsRes?.data) ? catsRes!.data : []
+    data.expenseLookups = {
+      vendors: vendorRows.map((v: any) => ({ id: v.id, name: v.name || v.vendorName || v.id })),
+      categories: catRows.map((c: any) => ({ id: c.id, name: c.name })),
     }
   }
 

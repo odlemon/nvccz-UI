@@ -27,18 +27,28 @@ import {
 
 export default function VendorPortalPage() {
   const searchParams = useSearchParams()
-  const [email, setEmail] = useState(searchParams?.get('email') || '')
-  const [rfqNumber, setRfqNumber] = useState(searchParams?.get('rfq') || '')
+  // A supplier is identified by the signed link in its invitation, not by an email address and an RFQ number anyone could type.
+  const [invitationLink, setInvitationLink] = useState(searchParams?.get('link') || '')
+  const [linkError, setLinkError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [logoError, setLogoError] = useState(false)
 
-  const handleAccess = async () => {
-    if (!email || !rfqNumber) return
-
+  const handleAccess = () => {
+    setLinkError(null)
+    const raw = invitationLink.trim()
+    if (!raw) return
     setIsSubmitting(true)
     try {
-      // Redirect to RFQ details page
-      window.location.href = `/vendor-portal/rfq/${rfqNumber}?email=${encodeURIComponent(email)}`
+      // The invitation link carries `token` and `rfqNumber`; the pasted address may be the whole link or just its query.
+      const query = raw.includes('?') ? raw.slice(raw.indexOf('?') + 1) : raw
+      const params = new URLSearchParams(query)
+      const token = params.get('token')
+      const rfqNumber = params.get('rfqNumber')
+      if (!token || !rfqNumber) {
+        setLinkError('That is not an invitation link. Paste the full link from your invitation email.')
+        return
+      }
+      window.location.href = `/vendor-quotations/rfq-respond?token=${encodeURIComponent(token)}&rfqNumber=${encodeURIComponent(rfqNumber)}`
     } finally {
       setIsSubmitting(false)
     }
@@ -101,11 +111,11 @@ export default function VendorPortalPage() {
                     <ul className="text-sm text-blue-800 space-y-1">
                       <li className="flex items-start gap-2">
                         <CheckCircle2 className="h-4 w-4 mt-0.5 shrink-0" />
-                        <span>You received an email with an RFQ number and access link</span>
+                        <span>You received an email with a personal, secure link to the request for quotation</span>
                       </li>
                       <li className="flex items-start gap-2">
                         <CheckCircle2 className="h-4 w-4 mt-0.5 shrink-0" />
-                        <span>Enter your email and RFQ number below to access the RFQ</span>
+                        <span>Open that link, or paste it below, to see only the events you are invited to</span>
                       </li>
                       <li className="flex items-start gap-2">
                         <CheckCircle2 className="h-4 w-4 mt-0.5 shrink-0" />
@@ -113,7 +123,7 @@ export default function VendorPortalPage() {
                       </li>
                       <li className="flex items-start gap-2">
                         <CheckCircle2 className="h-4 w-4 mt-0.5 shrink-0" />
-                        <span>Track your submission status via this portal</span>
+                        <span>Get a receipt for your submission and track its status from the same link</span>
                       </li>
                     </ul>
                   </div>
@@ -123,47 +133,28 @@ export default function VendorPortalPage() {
               {/* Access Form */}
               <div className="space-y-4 pt-4">
                 <div className="space-y-2">
-                  <Label htmlFor="email">
-                    Your Email Address <span className="text-red-500">*</span>
-                  </Label>
-                  <div className="relative">
-                    <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      id="email"
-                      type="email"
-                      placeholder="vendor@company.com"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      className="pl-10"
-                    />
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    Enter the email address where you received the RFQ invitation
-                  </p>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="rfqNumber">
-                    RFQ Number <span className="text-red-500">*</span>
+                  <Label htmlFor="invitationLink">
+                    Your invitation link <span className="text-red-500">*</span>
                   </Label>
                   <div className="relative">
                     <FileText className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                     <Input
-                      id="rfqNumber"
-                      placeholder="RFQ-2024-001"
-                      value={rfqNumber}
-                      onChange={(e) => setRfqNumber(e.target.value)}
+                      id="invitationLink"
+                      placeholder="Paste the link from your invitation email"
+                      value={invitationLink}
+                      onChange={(e) => setInvitationLink(e.target.value)}
                       className="pl-10"
                     />
                   </div>
+                  {linkError && <p className="text-xs text-red-600" role="alert">{linkError}</p>}
                   <p className="text-xs text-muted-foreground">
-                    Found in the email invitation you received
+                    The link is personal to your company and to one event. Do not share it.
                   </p>
                 </div>
 
                 <Button
                   onClick={handleAccess}
-                  disabled={!email || !rfqNumber || isSubmitting}
+                  disabled={!invitationLink.trim() || isSubmitting}
                   className="w-full"
                   size="lg"
                 >
@@ -171,7 +162,7 @@ export default function VendorPortalPage() {
                     'Accessing...'
                   ) : (
                     <>
-                      Access RFQ
+                      Open my invitation
                       <ArrowRight className="ml-2 h-4 w-4" />
                     </>
                   )}
@@ -200,8 +191,8 @@ export default function VendorPortalPage() {
               <div>
                 <h4 className="font-medium mb-1">Can't access your RFQ?</h4>
                 <p className="text-muted-foreground">
-                  Make sure you're using the exact email address and RFQ number from the
-                  invitation. If you're still having trouble, contact our support team.
+                  Use the full link from your invitation email. If it has expired, or your company is no longer
+                  invited to the event, contact the procurement team.
                 </p>
               </div>
 

@@ -1,0 +1,28 @@
+{
+  "url": "/accounting/ceo",
+  "title": "CEO Finance View",
+  "headings": [
+    "CEO Finance View",
+    "Enterprise performance",
+    "Entity contribution",
+    "Liquidity horizons",
+    "Executive approvals",
+    "Risk watch",
+    "Finance operating health"
+  ],
+  "tabs": [],
+  "buttons": [
+    "Board pack",
+    "Executive filters",
+    "Filters",
+    "Filters 0",
+    "Open queue",
+    "Risk cockpit"
+  ],
+  "text": "EXECUTIVE COMMAND CENTRE CEO Finance View A responsive, decision-first view of liquidity, earnings, working capital, risk, approvals and close readiness. Every figure opens the operational layer that produced it. Board pack Executive filters Group liquidity $6,840,000.00 Cash plus liquid investments +6.4% Operating profit $1,786,000.00 Consolidated YTD result +4.8% Receivables $7,800.00 Customer and mandate balances 38 DSO Payables $1,004,380.44 Approved and unapproved obligations 19 days Control risks 9 High and medium finance risks 4 high Executive approvals 4 Decisions requiring authority 2 today Filters Filters 0 Enterprise performance Actual versus board budget by month. Select the visual for an enlarged source-linked view. Aug Sep Oct Nov Dec Jan Feb Mar Apr May Jun Jul USD 000 750 350 Actual Budget Select the chart to enlarge and inspect the source series. Entity contribution Revenue, margin, cash conversion and current close status. ENTITY BUSINESS LINE REVENUE OPERATING PROFIT MARGIN CASH CLOSE Matanho Capital Partners Group services $2,480,000.00 $788,000.00 31.8% $3,120,000.00 In review Matanho Growth Fund I Private equity $1,080,000.00 $417,000.00 38.6% $1,460,000.00 In review Matanho Microfinance Lending $1,720,000.00 $414,000.00 24.1% $960,000.00 In progress Pension Administration Pensions $910,000.00 $167,000.00 18.4% $1,300,000.00 Ready Liquidity horizons Available cash, restricted balances and expected maturities. Today 90% available after forecast obligations $3.12m 30 days 74% available after forecast obligations $4.68m 60 days 62% available after forecast obligations $5.46m 90 days 51% available after forecast obligations $6.84m Executive approvals High-value decisions assigned to executive authority. Open queue Growth Fund I capital call Matanho Growth Fund I · Today 16:00 $1,250,000.00 Pension T-bill rollover Pension Administration · Today 15:30 $850,000.00 MFI warehouse facility renewal Matanho Microfinance · 02 Aug 10:00 $2,000,000.00 July board finance pack Group consolidated · Ready now Ready Risk watch Finance risks ranked by severity, exposure and owner. Risk cockpit MFI PAR30 above policy Credit risk · Matanho Microfinance High Unhedged USD/ZWG exposure Market risk · Group consolidated High Old Mutual issuer concentration Counterparty risk · Treasury Medium Close evidence incomplete Operational risk · Matanho Growth Fund I Medium Finance operating health Close, evidence, reconciliations and approval service levels. Month-end close 12 of 15 workstreams 82% Bank reconciliations 17 of 18 accounts 94% Document evidence 2 missing records 97% Approval SLA 4 nearing SLA 89%",
+  "ms": 24942,
+  "console": [
+    "Failed to fetch RSC payload for http://localhost:3120/accounting. Falling back to browser navigation. TypeError: Failed to fetch\n    at fetchServerResponse (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/components/"
+  ],
+  "failed": []
+}

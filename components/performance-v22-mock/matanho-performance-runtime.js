@@ -56,7 +56,7 @@ const rolePerms={
  'Employee':new Set(['view_self','view_strategy','view_kpi','view_tasks','update_own_tasks','view_reviews','self_reviews','peer_reviews','view_reports','view_vault','edit_own_docs','view_alerts'])
 };
 const allowed=a=>rolePerms[state.role]?.has('*')||rolePerms[state.role]?.has(a);
-const pagePerm={dashboard:null,strategy:'view_strategy',scorecards:'view_strategy',objectives:'view_kpi',tasks:'view_tasks',reviews:'view_reviews',corrective:'view_corrective',reports:'view_reports',vault:'view_vault',alerts:'view_alerts',access:'manage_roles_limited'};
+const pagePerm={dashboard:null,strategy:'view_strategy',scorecards:'view_strategy',objectives:'view_kpi',tasks:'view_tasks',reviews:'view_reviews',corrective:'view_corrective',reports:'view_reports',vault:'view_vault',alerts:'view_alerts',access:'manage_rbac'};
 const canPage=p=>!pagePerm[p]||allowed(pagePerm[p])||state.role==='SysAdmin';
 /* patched:bridge-globals */
 // Live-data bridge. The render layers below are scope-isolated IIFEs, so the only way to

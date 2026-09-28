@@ -4,6 +4,8 @@ import { updateCloseTaskStatus } from '@/lib/api/accounting-close-tasks-api'
 import { approveTimesheet, returnTimesheet } from '@/lib/api/timesheets-api'
 import { createTaxReturnPack, compileTaxReturnPack, getForecastEntities } from '@/lib/api/tax-return-pack-api'
 import { accountingApi } from '@/lib/api/accounting-api'
+import { cashbookApi } from '@/lib/api/cashbook-api'
+import { reconciliationApi } from '@/lib/api/reconciliation-api'
 import { approveApprovalRequest, rejectApprovalRequest } from '@/lib/api/approvals-api'
 import { payProcurementInvoice } from '@/lib/api/procurement-v23-api'
 import { ac52AccountTypeToBackend, ac52FinancialStatementForType } from './adapters'
@@ -232,6 +234,432 @@ async function handleApPayBill(p: ApPayBillPayload): Promise<Ac52ActionResult> {
   return { handled: true, message: `${p.billId} paid ${cents(p.amount)} to ${p.vendor ?? 'the vendor'}. The journal and cashbook entry are posted.` }
 }
 
+type InvoiceCreatePayload = {
+  customerId: string
+  date: string
+  due?: string
+  currency: string
+  net: number
+  vatRate?: number
+  description?: string
+  project?: string
+}
+
+/** Customer invoice from Receivables "New invoice" (v8 modal) — previously only mutated local mock S.invoices. */
+async function handleInvoiceCreate(p: InvoiceCreatePayload): Promise<Ac52ActionResult> {
+  if (!p.customerId) return { handled: true, error: 'Select a customer.' }
+  const net = Number(p.net) || 0
+  if (net <= 0) return { handled: true, error: 'Enter a positive net amount.' }
+  const currenciesRes = await accountingApi.getCurrencies()
+  const currency = (currenciesRes.data || []).find((c) => c.code === (p.currency || 'USD'))
+  if (!currency) return { handled: true, error: `Currency ${p.currency || 'USD'} is not configured.` }
+  const isTaxable = Number(p.vatRate || 0) > 0
+  const description = (p.description || 'Customer invoice').trim()
+  const created = await accountingApi.createInvoice({
+    customerId: p.customerId,
+    amount: net,
+    currencyId: currency.id,
+    invoiceDate: p.date || new Date().toISOString().slice(0, 10),
+    transactionDate: p.date || new Date().toISOString().slice(0, 10),
+    description,
+    isTaxable,
+    items: [{ description, quantity: 1, unitPrice: net, amount: net, taxRate: isTaxable ? Number(p.vatRate) * 100 : 0 }],
+  })
+  let inv = created.data
+  // Prefer SENT so receipts can mark-as-paid; some roles cannot post the send journal — keep the create either way.
+  if (inv?.id && inv.status === 'DRAFT') {
+    try {
+      const sent = await accountingApi.sendInvoice(inv.id)
+      inv = sent.data || inv
+    } catch (err: any) {
+      return {
+        handled: true,
+        message: `${inv?.invoiceNumber || 'Invoice'} created as draft${inv?.journalEntry?.referenceNumber ? ` · journal ${inv.journalEntry.referenceNumber}` : ''}. Send for collection needs ledger-post authority: ${err?.message || 'send failed'}.`,
+      }
+    }
+  }
+  return {
+    handled: true,
+    message: `${inv?.invoiceNumber || 'Invoice'} created${inv?.journalEntry?.referenceNumber ? ` · journal ${inv.journalEntry.referenceNumber}` : ''}${inv?.status === 'SENT' ? ' and sent' : ''}.`,
+  }
+}
+
+type CustomerCreatePayload = {
+  name: string
+  email?: string
+  phone?: string
+  taxNumber?: string
+}
+
+/** Receivables "Create customer" — master data for invoices / receipts. */
+async function handleCustomerCreate(p: CustomerCreatePayload): Promise<Ac52ActionResult> {
+  const name = (p.name || '').trim()
+  if (!name) return { handled: true, error: 'Enter the customer name.' }
+  const created = await accountingApi.createCustomer({
+    name,
+    email: p.email || undefined,
+    phone: p.phone || undefined,
+    taxNumber: p.taxNumber || undefined,
+    isActive: true,
+  })
+  const c = created.data
+  return { handled: true, message: `${c?.name || name} was added to the customer register.` }
+}
+
+type CashPostPayload = {
+  kind: 'receipt' | 'payment' | 'transfer'
+  bankId: string
+  targetBankId?: string
+  currency?: string
+  account?: string
+  vatRate?: number
+  date: string
+  reference?: string
+  amount: number
+  project?: string
+  description?: string
+  counterparty?: string
+}
+
+/** Cashbook receipt / payment / transfer from Cash "New receipt|payment|transfer" — previously only mutated local mock S.cashbook. */
+async function handleCashPost(p: CashPostPayload): Promise<Ac52ActionResult> {
+  const amount = Number(p.amount) || 0
+  if (!p.bankId) return { handled: true, error: 'Select a cashbook / bank.' }
+  if (amount <= 0) return { handled: true, error: 'Enter a positive amount.' }
+  const date = p.date || new Date().toISOString().slice(0, 10)
+  const description = (p.description || `${p.kind} cashbook entry`).trim()
+  const reference = p.reference || `${(p.kind || 'cash').toUpperCase()}-${Date.now().toString().slice(-6)}`
+  const vatCode = Number(p.vatRate || 0) > 0 ? '15%' : '0%'
+
+  if (p.kind === 'transfer') {
+    if (!p.targetBankId || p.targetBankId === p.bankId) {
+      return { handled: true, error: 'Select a different destination bank for the transfer.' }
+    }
+    await cashbookApi.createCashbookTransfer({
+      fromBankId: p.bankId,
+      toBankId: p.targetBankId,
+      amount,
+      transferDate: date,
+      description,
+      reference,
+      projectCode: p.project || undefined,
+    })
+    return { handled: true, message: `${reference} transferred ${cents(amount)} between cashbooks.` }
+  }
+
+  if (!p.account) return { handled: true, error: 'Select the contra GL account.' }
+  const accounts = (await chartOfAccountsApi.getChartOfAccounts()) as ChartOfAccount[]
+  const gl = accounts.find((a) => a.accountNo === p.account)
+  if (!gl) return { handled: true, error: `Account ${p.account} was not found in the live Chart of Accounts.` }
+
+  const body = {
+    bankId: p.bankId,
+    transactionDate: date,
+    description,
+    amount,
+    reference,
+    counterpartyType: 'GL' as const,
+    glAccountId: gl.id,
+    vatCode,
+    projectCode: p.project || undefined,
+  }
+  if (p.kind === 'payment') {
+    await cashbookApi.createCashbookPayment(body)
+    return { handled: true, message: `${reference} payment of ${cents(amount)} posted to the cashbook.` }
+  }
+  await cashbookApi.createCashbookReceipt(body)
+  return { handled: true, message: `${reference} receipt of ${cents(amount)} posted to the cashbook.` }
+}
+
+type ReceiptPostPayload = {
+  invoiceId: string
+  bankId: string
+  date: string
+  reference?: string
+  amount: number
+}
+
+/**
+ * Allocate a customer receipt against an open invoice. Posts cashbook receipt, then matches open items
+ * when possible; full clear still falls through to mark-as-paid.
+ */
+async function handleReceiptPost(p: ReceiptPostPayload): Promise<Ac52ActionResult> {
+  if (!p.invoiceId) return { handled: true, error: 'Select an invoice to allocate against.' }
+  if (!p.bankId) return { handled: true, error: 'Select the receiving bank.' }
+  const amount = Number(p.amount) || 0
+  if (amount <= 0) return { handled: true, error: 'Enter a positive allocation amount.' }
+  const invRes = await accountingApi.getInvoiceById(p.invoiceId)
+  let inv = invRes.data
+  if (!inv) return { handled: true, error: 'Invoice was not found.' }
+  const outstanding =
+    inv.outstandingAmount !== undefined && inv.outstandingAmount !== null
+      ? Number(inv.outstandingAmount)
+      : Number((inv as any).totalAmount) || Number((inv as any).total) || 0
+  if (amount > outstanding + 0.01) {
+    return { handled: true, error: `Amount exceeds the outstanding balance of ${cents(outstanding)}.` }
+  }
+  const date = p.date || new Date().toISOString().slice(0, 10)
+  const reference = p.reference || `RCPT-${Date.now().toString().slice(-6)}`
+  const receiptRes = await cashbookApi.createCashbookReceipt({
+    bankId: p.bankId,
+    transactionDate: date,
+    description: `Receipt · ${inv.invoiceNumber || inv.id}`,
+    amount,
+    reference,
+    counterpartyType: 'CUSTOMER',
+    customerId: inv.customerId,
+    vatCode: 'EXEMPT',
+  })
+  const entryId = receiptRes?.data?.id || (receiptRes as any)?.data?.entry?.id
+  const invoiceNumber = inv.invoiceNumber || p.invoiceId
+  const customerId = inv.customerId
+  if (entryId && customerId) {
+    try {
+      const openRes = await cashbookApi.getOpenItemsForCustomer(customerId)
+      const openItems = Array.isArray(openRes?.data) ? openRes.data : []
+      const match =
+        openItems.find((o) => o.id === p.invoiceId) ||
+        openItems.find((o) => o.invoiceNumber === inv!.invoiceNumber) ||
+        openItems.find((o) => String((o as any).invoiceId || '') === p.invoiceId)
+      if (match) {
+        await cashbookApi.matchOpenItems(entryId, [
+          {
+            openItemId: match.id,
+            allocatedAmount: amount,
+            discountAmount: 0,
+            description: reference,
+          },
+        ])
+        return {
+          handled: true,
+          message: `${cents(amount)} allocated to ${invoiceNumber}${amount < outstanding - 0.01 ? ' (partial)' : ''}.`,
+        }
+      }
+    } catch {
+      // Fall through to mark-as-paid when open-item match is unavailable.
+    }
+  }
+  // The receipt is posted (Dr bank, Cr receivables). It is never followed by "mark as paid": that posted a second credit
+  // to receivables for the same money. An unmatched receipt is allocated from the Receivables page.
+  return {
+    handled: true,
+    message: `${cents(amount)} receipt posted for ${invoiceNumber}; allocate it to the invoice on the Receivables page (the automatic allocation did not apply).`,
+  }
+}
+
+const FALLBACK_EXPENSE_CATEGORIES = [
+  'Salaries and Wages',
+  'Travel and Accommodation',
+  'Operations',
+  'Branding and Marketing',
+  'Office Equipment',
+]
+
+type ExpenseCreatePayload = {
+  vendorId: string
+  categoryId?: string
+  category?: string
+  amount: number
+  currency?: string
+  transactionDate: string
+  description: string
+}
+
+async function handleExpenseCreate(p: ExpenseCreatePayload): Promise<Ac52ActionResult> {
+  if (!p.vendorId) return { handled: true, error: 'Select a vendor / supplier for the expense.' }
+  const amount = Number(p.amount) || 0
+  if (amount <= 0) return { handled: true, error: 'Enter a positive amount.' }
+  const description = (p.description || '').trim()
+  if (!description) return { handled: true, error: 'Enter a description / business purpose.' }
+  const currenciesRes = await accountingApi.getCurrencies()
+  const currency = (currenciesRes.data || []).find((c) => c.code === (p.currency || 'USD'))
+  if (!currency) return { handled: true, error: `Currency ${p.currency || 'USD'} is not configured.` }
+  const category = (p.category || '').trim() || FALLBACK_EXPENSE_CATEGORIES[2]
+  const body: any = {
+    vendorId: p.vendorId,
+    amount,
+    currencyId: currency.id,
+    transactionDate: p.transactionDate || new Date().toISOString().slice(0, 10),
+    description,
+  }
+  if (p.categoryId) body.categoryId = p.categoryId
+  else body.category = category
+  const created = await accountingApi.createExpense(body)
+  const exp = created.data as any
+  return {
+    handled: true,
+    message: `${exp?.expenseNumber || 'Expense'} recorded${exp?.journalEntry?.referenceNumber ? ` · ${exp.journalEntry.referenceNumber}` : ''}.`,
+  }
+}
+
+type StockAdjustPayload = {
+  kind: 'receipt' | 'issue' | 'adjust' | 'count' | 'transfer'
+  itemId: string
+  quantity: number
+  reason?: string
+  reference?: string
+  notes?: string
+  unitCost?: number
+}
+
+async function handleStockAdjust(p: StockAdjustPayload): Promise<Ac52ActionResult> {
+  if (!p.itemId) return { handled: true, error: 'Select an inventory item.' }
+  const qty = Number(p.quantity)
+  if (!qty || Number.isNaN(qty)) return { handled: true, error: 'Enter a non-zero quantity.' }
+  if (p.kind === 'transfer') {
+    return { handled: true, error: 'Stock transfer between warehouses is not available on the live inventory API yet.' }
+  }
+  const reason = (p.reason || p.notes || `${p.kind} stock movement`).trim()
+  if (p.kind === 'adjust' || p.kind === 'count') {
+    await accountingApi.createStockAdjustment({ itemId: p.itemId, quantity: qty, reason })
+    return { handled: true, message: `Stock adjustment of ${qty} posted for the selected item.` }
+  }
+  const movementType = p.kind === 'issue' ? 'OUT' : 'IN'
+  await accountingApi.createStockMovement({
+    itemId: p.itemId,
+    movementType,
+    quantity: Math.abs(qty),
+    unitCost: p.unitCost,
+    referenceNumber: p.reference,
+    notes: reason,
+  })
+  return {
+    handled: true,
+    message: `${movementType === 'IN' ? 'Receipt' : 'Issue'} of ${Math.abs(qty)} posted to inventory.`,
+  }
+}
+
+type AssetCreatePayload = {
+  assetName: string
+  assetCode?: string
+  cost: number
+  usefulLifeYears?: number
+  depreciationMethod?: string
+  purchaseDate?: string
+  location?: string
+  vendor?: string
+  description?: string
+  assetAccountCode?: string
+  accumAccountCode?: string
+  expenseAccountCode?: string
+}
+
+async function handleAssetCreate(p: AssetCreatePayload): Promise<Ac52ActionResult> {
+  const assetName = (p.assetName || '').trim()
+  if (!assetName) return { handled: true, error: 'Enter the asset description / name.' }
+  const cost = Number(p.cost) || 0
+  if (cost <= 0) return { handled: true, error: 'Enter a positive acquisition cost.' }
+  const accounts = (await chartOfAccountsApi.getChartOfAccounts()) as ChartOfAccount[]
+  const byCode = (code?: string) => {
+    if (!code) return undefined
+    const codeOnly = code.split('·')[0].trim()
+    return accounts.find((a) => a.accountNo === codeOnly || a.accountNo === code)
+  }
+  const assetGl =
+    byCode(p.assetAccountCode) ||
+    accounts.find((a) => /fixed|ppe|property|equipment|vehicle|computer/i.test(`${a.accountName} ${a.accountNo}`)) ||
+    accounts.find((a) => a.accountType === 'ASSET')
+  const accumGl =
+    byCode(p.accumAccountCode) ||
+    accounts.find((a) => /accumulat.*deprec/i.test(a.accountName)) ||
+    accounts.find((a) => a.accountNo.startsWith('16') && a.id !== assetGl?.id)
+  const expenseGl =
+    byCode(p.expenseAccountCode) ||
+    accounts.find((a) => /depreciation expense/i.test(a.accountName)) ||
+    accounts.find((a) => /depreciation/i.test(a.accountName) && a.accountType === 'EXPENSE')
+  if (!assetGl || !accumGl || !expenseGl) {
+    return {
+      handled: true,
+      error: 'Chart of Accounts is missing fixed-asset, accumulated depreciation, or depreciation expense accounts.',
+    }
+  }
+  const methodRaw = (p.depreciationMethod || 'Straight line').toLowerCase()
+  const depreciationMethod = methodRaw.includes('reduc') || methodRaw.includes('diminish')
+    ? 'DIMINISHING_BALANCE'
+    : 'STRAIGHT_LINE'
+  const life = Number(String(p.usefulLifeYears || '5').replace(/[^\d]/g, '')) || 5
+  const assetCode = (p.assetCode || `FA-${Date.now().toString().slice(-6)}`).trim()
+  const created = await accountingApi.createAsset({
+    assetName,
+    assetCode,
+    description: (p.description || assetName).trim(),
+    cost,
+    usefulLifeYears: life,
+    depreciationMethod,
+    assetAccountId: assetGl.id,
+    accumulatedDepreciationAccountId: accumGl.id,
+    depreciationExpenseAccountId: expenseGl.id,
+    purchaseDate: p.purchaseDate || new Date().toISOString().slice(0, 10),
+    location: p.location || undefined,
+    vendor: p.vendor || undefined,
+  })
+  const a = created.data
+  return { handled: true, message: `${a?.assetCode || assetCode} · ${a?.assetName || assetName} added to the fixed asset register.` }
+}
+
+type RecurringRunPayload = { id?: string; asOf?: string }
+
+async function handleRecurringRun(p: RecurringRunPayload): Promise<Ac52ActionResult> {
+  if (!p.id) return { handled: true, error: 'Select a recurring schedule to run.' }
+  const res = await accountingApi.runRecurringJournalTemplate(p.id, p.asOf)
+  const out = res.data
+  if (out?.skipped) {
+    return { handled: true, message: `Schedule skipped${out.reason ? `: ${out.reason}` : '.'}` }
+  }
+  return {
+    handled: true,
+    message: `Recurring journal posted${out?.referenceNumber ? ` · ${out.referenceNumber}` : out?.journalEntryId ? ` · ${out.journalEntryId}` : ''}.`,
+  }
+}
+
+async function handleRecurringRunDue(p: RecurringRunPayload): Promise<Ac52ActionResult> {
+  const res = await accountingApi.runDueRecurringJournalTemplates(p.asOf)
+  const posted = res.data?.posted || []
+  const ok = posted.filter((x) => !x.skipped && !x.error).length
+  const skipped = posted.filter((x) => x.skipped || x.error).length
+  return {
+    handled: true,
+    message: `Due schedules processed: ${ok} posted${skipped ? `, ${skipped} skipped` : ''}.`,
+  }
+}
+
+type ReconSignoffPayload = {
+  bankId: string
+  statementEndBalance: number
+  statementDate?: string
+  reference?: string
+}
+
+async function handleReconSignoff(p: ReconSignoffPayload): Promise<Ac52ActionResult> {
+  if (!p.bankId) return { handled: true, error: 'Select a cashbook / bank to sign off.' }
+  const asOf = p.statementDate || new Date().toISOString().slice(0, 10)
+  const statementEndBalance = Number(p.statementEndBalance)
+  if (Number.isNaN(statementEndBalance)) {
+    return { handled: true, error: 'Statement closing balance is required to finish reconciliation.' }
+  }
+  const entriesRes = await reconciliationApi.getReconciliationEntries(p.bankId, asOf)
+  const entries = Array.isArray(entriesRes?.data) ? entriesRes.data : []
+  const selectedEntryIds = entries.filter((e) => !e.isReconciled).map((e) => e.id)
+  const sessionRes = await reconciliationApi.createDraftSession(p.bankId, {
+    statementDate: asOf,
+    statementEndBalance,
+    reference: p.reference || `REC-${asOf}`,
+    selectedEntryIds,
+  })
+  const session = sessionRes.data
+  if (!session?.id) return { handled: true, error: 'Could not create a reconciliation session.' }
+  try {
+    await reconciliationApi.finishSession(session.id)
+  } catch (err: any) {
+    await reconciliationApi.discardSession(session.id).catch(() => undefined)
+    return { handled: true, error: err?.message || 'Reconciliation could not be signed off (difference or open lines remain).' }
+  }
+  return {
+    handled: true,
+    message: `Bank reconciliation signed off for ${asOf} (${selectedEntryIds.length} cashbook line(s) cleared).`,
+  }
+}
+
 export async function handleAccountingV52Action(detail: {
   action: string
   payload: Record<string, unknown>
@@ -256,6 +684,26 @@ export async function handleAccountingV52Action(detail: {
         return await handleJournalSubmit(detail.payload as unknown as JournalSubmitPayload)
       case 'ap-pay-bill':
         return await handleApPayBill(detail.payload as unknown as ApPayBillPayload)
+      case 'invoice-create':
+        return await handleInvoiceCreate(detail.payload as unknown as InvoiceCreatePayload)
+      case 'customer-create':
+        return await handleCustomerCreate(detail.payload as unknown as CustomerCreatePayload)
+      case 'cash-post':
+        return await handleCashPost(detail.payload as unknown as CashPostPayload)
+      case 'receipt-post':
+        return await handleReceiptPost(detail.payload as unknown as ReceiptPostPayload)
+      case 'expense-create':
+        return await handleExpenseCreate(detail.payload as unknown as ExpenseCreatePayload)
+      case 'stock-adjust':
+        return await handleStockAdjust(detail.payload as unknown as StockAdjustPayload)
+      case 'asset-create':
+        return await handleAssetCreate(detail.payload as unknown as AssetCreatePayload)
+      case 'recurring-run':
+        return await handleRecurringRun(detail.payload as unknown as RecurringRunPayload)
+      case 'recurring-run-due':
+        return await handleRecurringRunDue(detail.payload as unknown as RecurringRunPayload)
+      case 'recon-signoff':
+        return await handleReconSignoff(detail.payload as unknown as ReconSignoffPayload)
       default:
         return { handled: false }
     }

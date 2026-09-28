@@ -1,0 +1,27 @@
+{
+  "url": "/accounting/vault",
+  "title": "Accounting Document Vault",
+  "headings": [
+    "Accounting Document Vault"
+  ],
+  "tabs": [],
+  "buttons": [
+    "Upload document {upload-document}",
+    "Create document {create-document}",
+    "All documents 1 governed items {select-folder}",
+    "Close evidence 1 items {select-folder}",
+    "Financial reports 0 items {select-folder}",
+    "Tax & compliance 0 items {select-folder}",
+    "Payment controls 0 items {select-folder}",
+    "Accounting policies 0 items {select-folder}",
+    "Audit room 0 items {select-folder}",
+    "Filters",
+    "audit-verification-close-evidence.txt cmtr9d2ew000 {preview-document}"
+  ],
+  "text": "GOVERNANCE Accounting Document Vault Upload, create, edit, preview, approve and retain accounting evidence with classification, access controls and complete version history. Upload document Create document All documents 1 governed items Close evidence 1 items Financial reports 0 items Tax & compliance 0 items Payment controls 0 items Accounting policies 0 items Audit room 0 items Close evidence 1 documents · retention and access controls enforced Filters DOCUMENT TYPE OWNER MODIFIED CLASSIFICATION VERSIONS STATUS ACTIONS audit-verification-close-evidence.txt cmtr9d2ew0001un3s015eczui · Close evidence File Audit Tester 2026-09-07 Internal 1 Uploaded",
+  "ms": 13257,
+  "console": [
+    "Failed to fetch RSC payload for http://localhost:3120/accounting/audit. Falling back to browser navigation. TypeError: Failed to fetch\n    at fetchServerResponse (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/compo"
+  ],
+  "failed": []
+}

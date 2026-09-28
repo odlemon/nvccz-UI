@@ -1,0 +1,34 @@
+{
+  "url": "/accounting/inventory",
+  "title": "Inventory & Usage",
+  "headings": [
+    "Know what moved, where, and why.",
+    "Units issued to projects and operations",
+    "Availability and control posture",
+    "Inventory & Usage",
+    "Physical stock flow",
+    "Inventory control register",
+    "Attention queue",
+    "Recent stock movements"
+  ],
+  "tabs": [],
+  "buttons": [
+    "Receive stock",
+    "Issue stock",
+    "Adjust",
+    "Overview",
+    "Movement ledger",
+    "Usage & projects",
+    "Replenishment",
+    "Physical counts",
+    "Valuation & GL",
+    "Transfer",
+    "Cycle count"
+  ],
+  "text": "INVENTORY OPERATIONS Know what moved, where, and why. Stock availability, project consumption, replenishment and GL valuation are kept in the same operational picture. 4.8× annualised stock turn · policy target 4.5× 82% fast moving 2 reorder risks USAGE VELOCITY Units issued to projects and operations Monthly stock issues 699u 349u 0u Aug Oct Dec Feb Apr Jun STOCK HEALTH Availability and control posture Available 82% Reserved 18% Slow moving 17% Count variance $1.24k INVENTORY SUB-LEDGER Inventory & Usage Track quantities, physical use, project consumption, replenishment, counts and valuation without losing the link to the General Ledger. Receive stock Issue stock Adjust Overview Movement ledger Usage & projects Replenishment Physical counts Valuation & GL Carrying value $2,100.00 Weighted average cost Units on hand 50 Filtered stock population 30-day movements 4 Receipts, issues and adjustments Control attention 0 Review and exception items Count difference $0.00 Unposted physical variance Search Warehouse All warehouses Main warehouse Category All categories General From To Physical stock flow Operational movement from receipt through use and financial control. Received 24 Logged movements On hand 50 Current quantity Issued 15 Logged movements Count variance $0.00 Awaiting review Reservations are not yet tracked — only logged receipts, issues and physical counts. Receive stock Issue stock Transfer Cycle count Inventory control register Full carrying value, quantity and count-control view. Select an item for movement history and accounting context. SKU / ITEM WAREHOUSE CATEGORY ON HAND UNIT COST CARRYING VALUE COUNT VARIANCE STATUS AUDIT-SKU-001 Audit verification test stock item Main warehouse General 50 $42.00 $2,100.00 0 Controlled Attention queue Only exceptions that require an accountant, warehouse custodian or controller action. No exceptions Every SKU is in Controlled status with no open count variance. Recent stock movements Every receipt, issue and adjustment retains project, counterparty and source reference. DATE MOVEMENT SKU REFERENCE PROJECT / MANDATE COUNTERPARTY QTY OWNER 2026-08-14 Issue SP-044-120 ISS-4118 Workshop Service Mandate Internal workshop -12 T. Moyo 2026-08-14 Reserve IT-006-087 RSV-0871 Technology Refresh IT -2 F. Mapfumo 2026-08-13 Receipt PPE-021-014 GRN-2391 None Safety First Supplies +24 R. Chikomba 2026-08-12 Count adjustment OFF-014-022 CNT-2026-088 Corporate Physical count -1 N. Moyo",
+  "ms": 11642,
+  "console": [
+    "Failed to fetch RSC payload for http://localhost:3120/accounting/assets. Falling back to browser navigation. TypeError: Failed to fetch\n    at fetchServerResponse (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/comp"
+  ],
+  "failed": []
+}

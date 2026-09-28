@@ -2,7 +2,7 @@
 /**
  * Start a dedicated portal dev server (same pattern as deploy/arcus docker-compose).
  *
- * Usage: node scripts/run-portal-dev.mjs [staff|lp|investee|apply]
+ * Usage: node scripts/run-portal-dev.mjs [staff|lp|investee|apply|vendor]
  *
  * Optional overrides, so a second set of instances can run alongside the default ones without
  * fighting over ports or over each other's build output:
@@ -21,11 +21,11 @@ const flag = (name) => {
 }
 
 const portal = (argv.find((a) => !a.startsWith("--")) || "staff").toLowerCase()
-const ports = { staff: 3001, lp: 3110, investee: 3120, apply: 3130 }
+const ports = { staff: 3001, lp: 3110, investee: 3120, apply: 3130, vendor: 3140 }
 const port = Number(flag("port") || process.env.PORTAL_PORT || ports[portal])
 
 if (!port) {
-  console.error(`Unknown portal "${portal}". Use: staff | lp | investee | apply`)
+  console.error(`Unknown portal "${portal}". Use: staff | lp | investee | apply | vendor`)
   process.exit(1)
 }
 

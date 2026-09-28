@@ -385,6 +385,7 @@ export function PortfolioV11App() {
         "complete-board-review",
         "confirm-release-tranche",
         "approve-disbursement",
+        "api-create-envelope",
       ])
       const actionName = String(detail.action || "")
       // Form-backed submits need the runtime handleAction to gather FormData first.

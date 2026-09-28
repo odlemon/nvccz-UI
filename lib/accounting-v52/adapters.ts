@@ -453,6 +453,7 @@ export function adaptAc52ArInvoices(rows: Invoice[]): Ac52ArInvoice[] {
     const open = r.outstandingAmount !== undefined ? Number(r.outstandingAmount) || 0 : r.status === 'PAID' || r.status === 'VOID' ? 0 : Number(r.totalAmount) || 0
     return {
       id: r.id,
+      customerId: r.customerId,
       customer: r.customer?.name || 'Unknown customer',
       date: (r.transactionDate || '').slice(0, 10),
       due: r.dueDate ? r.dueDate.slice(0, 10) : '—',
@@ -711,6 +712,7 @@ export function adaptAc52InventoryItems(rows: InventoryItem[]): Ac52InventoryIte
     const unitCost = Number(r.costOfPurchase) || 0
     return {
       sku: r.skuNumber || r.id,
+      backendId: r.id,
       item: r.itemName,
       category: 'General',
       warehouse: 'Main warehouse',

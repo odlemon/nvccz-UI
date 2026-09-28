@@ -1,0 +1,21 @@
+{
+  "url": "/accounting/consolidation",
+  "title": "Group Consolidation & Eliminations",
+  "headings": [
+    "Group Consolidation & Eliminations"
+  ],
+  "tabs": [],
+  "buttons": [
+    "Import trial balances",
+    "Run matching",
+    "Generate consolidation",
+    "Filters ▴"
+  ],
+  "text": "GROUP REPORTING Group Consolidation & Eliminations Import entity trial balances, translate currencies, reconcile intercompany positions, post eliminations and produce a controlled consolidated reporting view. Import trial balances Run matching Generate consolidation Entities loaded 1 / 1 All active entities Combined assets $78,470.66 Before eliminations Eliminations $0 Manually flagged elimination journals Consolidated assets $78,470.66 After eliminations Consolidation status Single entity Add a second entity to see real consolidation effects Filters ▴ From To Reporting currency USD ZWG ZAR Scope Full group Investment entities Operating entities Scenario Actual Budget Forecast Consolidation workflow Progressive controls from source trial balance to governed group output. 01 Load entities 1/1 entities loaded 02 Translate Functional currencies normalised 03 Match Manual intercompany review 04 Eliminate $0 flagged 05 Publish Awaiting controller approval Entity trial balances Loaded source balances and translation status. ENTITY FUNCTIONAL CURRENCY ASSETS LIABILITIES EQUITY IMPORT STATUS TRANSLATION Matanho Capital Partners USD $78,470.66 $1,045,564.55 $455,000 Live Ready Group contribution Pre-elimination contribution to consolidated assets. $0.08m Matanho Intercompany matching & elimination queue Manually-flagged elimination journals (isEliminationEntry) are netted into the consolidated total shown above. No automated intercompany matching engine exists yet — inter-entity differences are reconciled and eliminated by posting a normal journal flagged as an elimination. No intercompany relationships to reconcile — only one active entity exists today.",
+  "ms": 10260,
+  "console": [
+    "Failed to fetch RSC payload for http://localhost:3120/accounting/fx-revaluation. Falling back to browser navigation. TypeError: Failed to fetch\n    at fetchServerResponse (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/cli",
+    "API request failed: TypeError: Failed to fetch\n    at ApiClient.makeRequest (webpack-internal:///(app-pages-browser)/./lib/api/api-client.ts:153:36)\n    at ApiClient.get (webpack-internal:///(app-pages-browser)/./lib/api/api-client.ts:165:2"
+  ],
+  "failed": []
+}

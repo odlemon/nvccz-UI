@@ -169,7 +169,7 @@
   min-height: 392px; border-radius: var(--radius-lg); overflow:hidden; position:relative; border:1px solid rgba(96,78,58,.10);
   background:linear-gradient(100deg,#f5eee4 0%,#f7f1e8 50%,#eee2d2 100%); box-shadow:var(--shadow-md);
 }
-.home-v3-root .hero::before{ content:""; position:absolute; inset:0 0 0 42%; background:url('/home/assets/hero-scenes/1080p/01-sunlit-bonsai.jpg') right center/cover no-repeat; filter:saturate(.82) contrast(.96) brightness(1.06); }
+.home-v3-root .hero::before{ content:""; position:absolute; inset:0 0 0 42%; background:var(--hero-image-desktop, var(--hero-image, url('/home/assets/hero-scenes/1080p/01-sunlit-bonsai.jpg'))) right center/cover no-repeat; filter:saturate(.82) contrast(.96) brightness(1.06); }
 .home-v3-root .hero::after{ content:""; position:absolute; inset:0; background:linear-gradient(90deg,rgba(247,241,232,1) 0%,rgba(247,241,232,.97) 38%,rgba(247,241,232,.58) 55%,rgba(247,241,232,.04) 74%), linear-gradient(0deg,rgba(233,222,207,.26),transparent 45%); }
 .home-v3-root .hero-content{ position:relative; z-index:2; width:52%; min-height:392px; padding:51px 48px 40px; display:flex; flex-direction:column; }
 .home-v3-root .greeting{ display:flex; align-items:center; gap:12px; font-size:36px; font-weight:470; line-height:1.1; letter-spacing:-.045em; color:var(--navy); }
@@ -915,7 +915,7 @@
 .home-v3-root .oled-chart{ overflow:visible; }
 .home-v3-root .chart-grid{ fill:none; stroke:rgba(18,54,98,.10); stroke-width:.65; stroke-dasharray:3 5; }
 .home-v3-root .chart-glow{ fill:none; stroke-width:5; stroke-linecap:round; stroke-linejoin:round; opacity:.58; }
-.home-v3-root .chart-line{ stroke-width:2.45; filter:drop-shadow(0 2px 4px rgba(0,92,255,.18)); animation:chartDraw .9s var(--ease) both; stroke-dasharray:1; stroke-dashoffset:1; }
+.home-v3-root .chart-line{ stroke-width:2.45; filter:drop-shadow(0 2px 4px rgba(0,92,255,.18)); stroke-dasharray:none; stroke-dashoffset:0; }
 .home-v3-root .chart-point{ fill:#fff; stroke:#0073ff; stroke-width:1.35; filter:drop-shadow(0 0 3px rgba(0,111,255,.32)); }
 .home-v3-root .chart-point-last{ fill:#00b6e8; stroke:#fff; stroke-width:1.8; filter:drop-shadow(0 0 7px rgba(0,155,255,.7)); }
 @keyframes chartDraw { to { stroke-dashoffset:0; } }
@@ -1115,7 +1115,7 @@
 .home-v3-root .primary-btn{background:linear-gradient(135deg,#075dff 0%,#007eff 58%,#00a7ff 100%);box-shadow:0 11px 26px rgba(0,91,255,.22),inset 0 1px 0 rgba(255,255,255,.34)}
 .home-v3-root .primary-btn:hover{filter:saturate(1.12) brightness(1.035);transform:translateY(-1px)}
 .home-v3-root .hero{min-height:410px;background:#eae4da;isolation:isolate;box-shadow:0 24px 66px rgba(30,51,70,.14);}
-.home-v3-root .hero::before{inset:0!important;background-image:var(--hero-image)!important;background-size:cover!important;background-position:center!important;filter:saturate(var(--user-saturation)) contrast(1.035);transform:scale(1.002);transition:background-image .45s ease,filter .3s ease!important;}
+.home-v3-root .hero::before{inset:0!important;background-image:var(--hero-image-desktop, var(--hero-image))!important;background-size:cover!important;background-position:center!important;filter:saturate(var(--user-saturation)) contrast(1.035);transform:scale(1.002);transition:none!important;}
 .home-v3-root .hero::after{content:"";position:absolute;inset:0;z-index:1;background:linear-gradient(90deg,rgba(248,245,238,.98) 0%,rgba(248,245,238,.91) 27%,rgba(248,245,238,.36) 53%,rgba(7,26,54,.035) 100%);pointer-events:none;}
 .home-v3-root .hero-content{z-index:2;width:55%;min-height:410px;padding:49px 50px 37px}.home-v3-root .greeting{font-size:37px;font-weight:420;color:#071d3b}.home-v3-root .hero-time{color:#0c284b}.home-v3-root .quote{color:#1b395b;border-left-color:rgba(200,139,62,.72)}
 .home-v3-root .hero-scene-control{position:absolute;left:auto;right:28px;top:22px;z-index:4;display:flex;align-items:center;gap:8px;padding:6px;border:1px solid rgba(255,255,255,.68);border-radius:15px;background:rgba(255,255,255,.61);backdrop-filter:blur(17px) saturate(1.25);box-shadow:0 10px 28px rgba(15,43,73,.095)}
@@ -1154,7 +1154,8 @@
   background-size:cover!important;
   image-rendering:auto;
   filter:saturate(calc(var(--user-saturation) * 1.015)) contrast(1.045) brightness(1.01)!important;
-  will-change:background-image;
+  will-change:auto;
+  transition:none!important;
 }
 .home-v3-root .hero-content{
   min-height:inherit;

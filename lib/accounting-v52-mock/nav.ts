@@ -27,6 +27,9 @@ export const AC52_PAGE_TO_PATH: Record<string, string> = {
   'access': '/accounting/access',
   'integrations': '/accounting/integrations',
   'settings': '/accounting/settings',
+  'jobs': '/accounting/jobs',
+  'paymentruns': '/accounting/payment-runs',
+  'claims': '/accounting/claims',
 }
 
 export const AC52_PATH_TO_PAGE: Record<string, string> = Object.fromEntries(

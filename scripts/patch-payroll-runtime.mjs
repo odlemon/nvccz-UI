@@ -1723,6 +1723,201 @@ s = replaceOnce(
   }
 }
 
+// ---------------------------------------------------------------------------
+// 4a17b. employee drawer: suspend / reinstate / terminate have no button
+// ---------------------------------------------------------------------------
+// `suspend-employee`, `reinstate-employee` and `terminate-employee` are on the
+// API_ACTIONS allowlist, have real endpoints, and are permission-checked end
+// to end (payroll.employees.manage) — but no control anywhere in the runtime
+// ever emits one of these three data-action ids, so nobody could ever reach
+// them (found live, full-sweep audit: grep for the id across the whole
+// compiled runtime returns nothing). Adds them next to "Edit employee",
+// gated on the same status the badge already shows: Reinstate only once
+// suspended, Suspend/Terminate only while active, nothing once terminated
+// (a closed record). Suspend and Terminate confirm first — Reinstate is
+// corrective, not destructive.
+{
+  const label = "employee drawer: suspend/reinstate/terminate buttons"
+  if (s.includes("data-action=\"terminate-employee\"")) {
+    console.log(`  skip (already)  ${label}`)
+    skipped += 1
+  } else {
+    const needle =
+      "<button class=\"btn primary\" data-action=\"edit-employee\" data-record-id=\"${e.recordId||''}\">${icon('edit')}Edit employee</button>"
+    if (!s.includes(needle)) {
+      console.warn(`  MISS            ${label}`)
+      missed += 1
+    } else {
+      // Browser-side template-literal text, built with plain Node string concatenation (not a Node template
+      // literal) so every ${...} below lands in the output unevaluated, for the runtime's own JS to read when a
+      // drawer opens. No onclick/confirm on these buttons: the runtime's own document-level `[data-action]`
+      // bridge to `matanho:before-action` (search this file for "const action=el.dataset") runs in the CAPTURE
+      // phase and, for an action the React host claims with preventDefault() — suspend-employee and
+      // terminate-employee both are, being live actions — calls event.stopImmediatePropagation() on the original
+      // click BEFORE it ever reaches the button's own listeners. Two earlier versions put the confirm() directly
+      // on the button (first via `${e.name}` interpolation, which threw "e is not defined" in the inline
+      // handler's scope; then as a static string with `return false`, which doesn't stop propagation either) and
+      // both silently never ran on a real click — verified live, twice, by clicking Suspend and watching it
+      // suspend immediately with no dialog ever shown. The confirm now lives in the ONE dispatcher instead
+      // (components/payroll-v6-mock/payroll-v6-app.tsx's onBeforeAction, right after it claims the action),
+      // matching this file's own "one click dispatcher, not per-button" convention for busy state.
+      const lifecycleButtons =
+        "${e.status==='Terminated'?'':e.status==='Suspended'?" +
+        "`<button class=\"btn\" data-action=\"reinstate-employee\" data-record-id=\"${e.recordId||''}\">${icon('check')}Reinstate</button>`" +
+        ":" +
+        "`<button class=\"btn\" data-action=\"suspend-employee\" data-record-id=\"${e.recordId||''}\">${icon('lock')}Suspend</button>" +
+        "<button class=\"btn danger\" data-action=\"terminate-employee\" data-record-id=\"${e.recordId||''}\">${icon('x')}Terminate</button>`" +
+        "}"
+      const live = needle + lifecycleButtons
+      s = s.split(needle).join(live)
+      console.log(`  patched         ${label}`)
+      applied += 1
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 4a17c. run drawer: control status and calculation evidence were hardcoded
+// ---------------------------------------------------------------------------
+// `runDrawer(id)` rendered the SAME six-row checklist and the same "Ruleset
+// ZW-2026.06 / Calculation hash 74f2a90c...e81c" callout for every run, never
+// reading from `r` (the actual run) at all — found live: the 2026-09 draft's
+// own Command Centre KPI showed "Open exceptions: 0", while opening that exact
+// run's own drawer said "Exceptions: 3 critical remain open" one screen away.
+// Replaced with rows built only from fields the run object genuinely carries
+// (employees, approvalStatus, stage, rawStatus) rather than inventing
+// replacements for what isn't tracked (there is no real calculation-version or
+// per-run input-row-count field on PayrollRun) — dropped those two rows and
+// the fabricated ruleset/hash callout instead of fabricating different numbers
+// in their place.
+{
+  const label = "run drawer: control status and calculation evidence use real fields"
+  const needle1 =
+    "${[['Employee population','128 expected / 128 included','Complete'],['Input batch','1,247 rows committed','Complete'],['Calculation version','v2026.06.4 locked','Complete'],['Exceptions','3 critical remain open','Blocked'],['Maker-checker','4 of 6 controls complete','Review'],['Release authority','Not yet available','Pending']].map(x=>`<div class=\"list-row\"><div class=\"list-main\"><strong>${x[0]}</strong><span>${x[1]}</span></div>${badge(x[2])}</div>`).join('')}"
+  const needle2 =
+    "<div class=\"drawer-section\"><h3>Calculation evidence</h3><div class=\"callout blue\"><span class=\"kpi-icon\">${icon('shield')}</span><div><strong>Ruleset ZW-2026.06</strong><p>Calculation hash 74f2a90c...e81c - source inputs and rule versions retained.</p></div></div></div>"
+  if (!s.includes(needle1) && !s.includes(needle2)) {
+    console.log(`  skip (already)  ${label}`)
+    skipped += 1
+  } else if (!s.includes(needle1) || !s.includes(needle2)) {
+    console.warn(`  MISS            ${label}`)
+    missed += 1
+  } else {
+    const rows1 =
+      "${[" +
+      "['Employee population',(r.employees??0)+' employee'+(r.employees===1?'':'s')+' in this run',(r.employees>0)?'Complete':'Pending']," +
+      "['Approval',r.approvalStatus==='APPROVED'?'Approved':r.approvalStatus==='PENDING'?'Awaiting approval':r.approvalStatus==='REJECTED'?'Returned for correction':'Not yet submitted',r.approvalStatus==='APPROVED'?'Complete':r.approvalStatus==='REJECTED'?'Blocked':'Pending']," +
+      "['Run stage','Stage '+r.stage+' of 6',r.stage>=6?'Complete':'Review']," +
+      "['Release',r.rawStatus==='COMPLETED'?'Released':'Not yet released',r.rawStatus==='COMPLETED'?'Complete':'Pending']" +
+      "].map(x=>`<div class=\"list-row\"><div class=\"list-main\"><strong>${x[0]}</strong><span>${x[1]}</span></div>${badge(x[2])}</div>`).join('')}"
+    const evidence2 =
+      "<div class=\"drawer-section\"><h3>Run reference</h3><div class=\"callout blue\"><span class=\"kpi-icon\">${icon('shield')}</span><div><strong>${r.reference||r.period}</strong><p>${money(r.grossUSD)} gross across ${r.employees??0} employee${r.employees===1?'':'s'} for this period.</p></div></div></div>"
+    s = s.split(needle1).join(rows1)
+    s = s.split(needle2).join(evidence2)
+    console.log(`  patched         ${label}`)
+    applied += 1
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 4a17d. run register/drawer: variance renders the literal text "null%"
+// ---------------------------------------------------------------------------
+// adaptRuns() correctly leaves `variance` as `null` when there's no prior
+// period to compare against (the first run chronologically, or a gap in the
+// monthly sequence) rather than inventing a number — but `${r.variance}%`
+// then prints the literal string "null%" on screen. Found live: June 2026 and
+// October 2026 both showed "null%" in the run register.
+{
+  const label = "run register/drawer: variance shows — instead of null%"
+  const needle = "${r.variance>0?'+':''}${r.variance}%"
+  const count = s.split(needle).length - 1
+  if (count === 0) {
+    console.log(`  skip (already)  ${label}`)
+    skipped += 1
+  } else {
+    const live = "${r.variance==null?'—':(r.variance>0?'+':'')+r.variance+'%'}"
+    s = s.split(needle).join(live)
+    console.log(`  patched (x${count})     ${label}`)
+    applied += 1
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 4a19. employee photos: no hardcoded portraits, and users can upload their own
+// ---------------------------------------------------------------------------
+// The runtime embedded seven stock portraits keyed by mock employee ids and drew EMP-0007's for every employee
+// it had no portrait for (so every real employee showed the same stranger), plus the same portrait, captioned
+// "Tariro Moyo", as the top-bar avatar. Now: the employee's own uploaded photo (`photo`, from Employee.pictureUrl
+// via live-loaders) or their initials; the edit and new-employee forms carry a real file input.
+{
+  const label = "employee photos: real upload or initials, no hardcoded portrait"
+  const imgNeedle =
+    "const employeeImage = (employee, cls='employee-thumb') => `<img class=\"${cls}\" src=\"${v2Assets.portraits[employee.id] || v2Assets.portraits['EMP-0007']}\" alt=\"${attr(employee.name)} profile\">`;"
+  const forEachNeedle = "employees.forEach(employee => employee.photo = v2Assets.portraits[employee.id]);"
+  const topNeedle =
+    "if (topAvatar) topAvatar.innerHTML = `<img class=\"top-profile-photo\" src=\"${v2Assets.portraits['EMP-0007']}\" alt=\"Tariro Moyo\">`;"
+  if (!s.includes(imgNeedle)) {
+    console.log(`  skip (already)  ${label}`)
+    skipped += 1
+  } else if (!s.includes(forEachNeedle) || !s.includes(topNeedle)) {
+    console.warn(`  MISS            ${label}`)
+    missed += 1
+  } else {
+    // A photo that fails to load (deleted file, unreachable media host) falls back to initials in place.
+    const imgLive =
+      "const employeeImage = (employee, cls='employee-thumb') => {" +
+      "const ini=attr(employee.initials||'?');" +
+      "const box=cls==='employee-photo'?'photo-avatar employee-photo-fallback':'mini-avatar';" +
+      "if(!employee.photo)return `<div class=\"${box}\">${ini}</div>`;" +
+      "return `<img class=\"${cls}\" src=\"${attr(employee.photo)}\" alt=\"${attr(employee.name)} profile\" data-initials=\"${ini}\" data-box=\"${box}\" onerror=\"var d=document.createElement('div');d.className=this.dataset.box;d.textContent=this.dataset.initials;this.replaceWith(d)\">`};"
+    s = s.replace(imgNeedle, imgLive)
+    s = s.replace(forEachNeedle, "/* photos come from each employee's own uploaded picture (live-loaders `photo`) */")
+    s = s.replace(topNeedle, "/* top-bar avatar: the shell draws the signed-in user's own initials */")
+    console.log(`  patched         ${label}`)
+    applied += 1
+  }
+}
+
+{
+  const label = "employee forms: profile photo file input"
+  const editNeedle =
+    "<div class=\"form-field\"><label>Address</label><input id=\"editAddress\" placeholder=\"Leave blank to keep current\"></div></div>"
+  const newNeedle =
+    "<div class=\"form-field\"><label>Basic salary</label><input id=\"newBasicSalary\" type=\"number\" min=\"0\" step=\"0.01\" placeholder=\"0.00\"></div>"
+  const pic = (id, extra) =>
+    "<div class=\"form-field\" style=\"grid-column:1/-1\"><label>Profile photo</label><input id=\"" + id + "\" type=\"file\" accept=\"image/png,image/jpeg,image/webp\">" + extra + "</div>"
+  const editLive =
+    editNeedle.replace(/<\/div><\/div>$/, "</div>") +
+    pic("editPicture", "<label class=\"tiny muted\" style=\"display:flex;flex-direction:row;justify-content:flex-start;gap:8px;align-items:center;margin-top:8px\"><input id=\"editRemovePicture\" type=\"checkbox\" style=\"width:auto;height:auto;flex:none;margin:0\"> Remove current photo</label>") +
+    "</div>"
+  if (s.includes("id=\"editPicture\"") && s.includes("id=\"newPicture\"")) {
+    console.log(`  skip (already)  ${label}`)
+    skipped += 1
+  } else if (!s.includes(editNeedle) || !s.includes(newNeedle)) {
+    console.warn(`  MISS            ${label}`)
+    missed += 1
+  } else {
+    s = s.split(editNeedle).join(editLive)
+    s = s.split(newNeedle).join(newNeedle + pic("newPicture", ""))
+    console.log(`  patched         ${label}`)
+    applied += 1
+  }
+}
+
+{
+  // The seven stock portraits (base64) are dead weight once nothing reads them (see above): drop them so no
+  // hardcoded person photos ship in the bundle at all.
+  const label = "runtime: drop the embedded stock portraits"
+  const re = /portraits:\s*\{\s*'EMP-0007':'data:image\/jpeg;base64,[\s\S]*?\n\s*\}\s*\n\s*\};/
+  if (!re.test(s)) {
+    console.log(`  skip (already)  ${label}`)
+    skipped += 1
+  } else {
+    s = s.replace(re, "portraits: {}\n  };")
+    console.log(`  patched         ${label}`)
+    applied += 1
+  }
+}
 
 // ---------------------------------------------------------------------------
 // 4a18. hydrate carries accessUnavailable

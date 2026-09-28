@@ -1,0 +1,43 @@
+{
+  "url": "/accounting/general-ledger",
+  "title": "General Ledger Explorer",
+  "headings": [
+    "General Ledger Explorer",
+    "Ledger integrity is continuously enforced",
+    "General ledger transactions"
+  ],
+  "tabs": [],
+  "buttons": [
+    "New journal",
+    "Trial balance",
+    "Chart of Accounts",
+    "Export ledger",
+    "Record adjustment",
+    "Filters",
+    "27 Sept,2026 PERF-GOAL-cmuk4oxph00wpun1c6o416dl1-c {noop}",
+    "27 Sept,2026 PERF-GOAL-cmuk4eh4000sfun1c8piwejr0-c {noop}",
+    "27 Sept,2026 PERF-GOAL-cmuk4cs8f00rtun1conb19irj-c {noop}",
+    "27 Sept,2026 PERF-GOAL-cmuju52ku015oun48ho84in92-c {noop}",
+    "27 Sept,2026 PERF-GOAL-cmuju3z7s00n5un48jnqlphyh-c {noop}",
+    "27 Sept,2026 PERF-GOAL-CORRECTION-UAT-20260927 PER {noop}",
+    "27 Sept,2026 PERF-GOAL-cmujquumu00izunqcc6nnt3jg-c {noop}",
+    "27 Sept,2026 PERF-GOAL-cmujqwpvh00kpunqceilmlpoc-c {noop}",
+    "27 Sept,2026 PERF-GOAL-cmujqzthj000eunn8y993zym5-c {noop}",
+    "27 Sept,2026 PERF-GOAL-cmujriwaf003sunn8jif9hvoy-c {noop}",
+    "27 Sept,2026 PERF-GOAL-cmujruhfy00j7unqswxqf8917-c {noop}",
+    "27 Sept,2026 PERF-GOAL-cmujrtuqn000munqsutau5c0j-c {noop}",
+    "27 Sept,2026 UATSync44785-3 UATSync44785-3 1100 Ba {noop}",
+    "27 Sept,2026 UATSync44785-3 UATSync44785-3 4000 Sa {noop}",
+    "27 Sept,2026 UATSync44785-1 UATSync44785-1 1100 Ba {noop}",
+    "27 Sept,2026 UATSync44785-1 UATSync44785-1 4000 Sa {noop}",
+    "27 Sept,2026 PERF-GOAL-cmujqrup2000gunqccluc7jdj-c {noop}",
+    "27 Sept,2026 PERF-GOAL-cmujql2fy000eunswpc76c6d5-c {noop}",
+    "27 Sept,2026 PERF-GOAL-cmujq9bdz000euna4lxi4pj6w-c {noop}"
+  ],
+  "text": "MASTER ACCOUNTING RECORD General Ledger Explorer The consolidated, immutable source of truth for every sub-ledger and manual posting. Filters, account analysis and report lineage resolve to the exact journal and source record. New journal Trial balance Chart of Accounts Export ledger Record adjustment Ledger integrity is continuously enforced Every posted journal balances in base currency, retains its source, preserves maker-checker evidence and cannot be edited or deleted. Posted journals 134 Atomic journal lines 443 Trial-balance difference $322,209.92 CR Protected controls 0 Filters General ledger transactions Latest 120 journal lines. Select a line to open the balanced journal and its source evidence. DATE JOURNAL REFERENCE ACCOUNT NARRATIVE SOURCE DIMENSION DEBIT CREDIT STATUS 27 Sept,2026 PERF-GOAL-cmuk4oxph00wpun1c6o416dl1-cmuk4rogb010jun1cyyjv60x4 PERF-GOAL-cmuk4oxph00wpun1c6o416dl1-cmuk4rogb010jun1cyyjv60x4 4000 Sales Revenue Performance correction (reversal): UAT Int 76758 Fee revenue — UAT Int 76758 Revenue — -460 USD Live ledger Corporate $460.00 — Posted 27 Sept,2026 PERF-GOAL-cmuk4oxph00wpun1c6o416dl1-cmuk4rogb010jun1cyyjv60x4 PERF-GOAL-cmuk4oxph00wpun1c6o416dl1-cmuk4rogb010jun1cyyjv60x4 1100 Bank - Operating Account Performance correction (reversal): UAT Int 76758 Fee revenue — UAT Int 76758 Revenue — -460 USD Live ledger Corporate — $460.00 Posted 27 Sept,2026 PERF-GOAL-cmuk4oxph00wpun1c6o416dl1-cmuk4qgf800ylun1cvwc4s2jp PERF-GOAL-cmuk4oxph00wpun1c6o416dl1-cmuk4qgf800ylun1cvwc4s2jp 4000 Sales Revenue Performance: UAT Int 76758 Fee revenue — UAT Int 76758 Revenue — 50 USD Live ledger Corporate — $50.00 Posted 27 Sept,2026 PERF-GOAL-cmuk4oxph00wpun1c6o416dl1-cmuk4qgf800ylun1cvwc4s2jp PERF-GOAL-cmuk4oxph00wpun1c6o416dl1-cmuk4qgf800ylun1cvwc4s2jp 1100 Bank - Operating Account Performance: UAT Int 76758 Fee revenue — UAT Int 76758 Revenue — 50 USD Live ledger Corporate $50.00 — Posted 27 Sept,2026 PERF-GOAL-cmuk4oxph00wpun1c6o416dl1-cmuk4qd2a00yaun1cgjzi22sd PERF-GOAL-cmuk4oxph00wpun1c6o416dl1-cmuk4qd2a00yaun1cgjzi22sd 4000 Sales Revenue Performance: UAT Int 76758 Fee revenue — UAT Int 76758 Revenue — 10 USD Live ledger Corporate — $10.00 Posted 27 Sept,2026 PERF-GOAL-cmuk4oxph00wpun1c6o416dl1-cmuk4qd2a00yaun1cgjzi22sd PERF-GOAL-cmuk4oxph00wpun1c6o416dl1-cmuk4qd2a00yaun1cgjzi22sd 1100 Bank - Operating Account Performance: UAT Int 76758 Fee revenue — UAT Int 76758 Revenue — 10 USD Live ledger Corporate $10.00 — Posted 27 Sept,2026 PERF-GOAL-cmuk4oxph00wpun1c6o416dl1-cmuk4qbpx00y1un1c4zkqgvse PERF-GOAL-cmuk4oxph00wpun1c6o416dl1-cmuk4qbpx00y1un1c4zkqgvse 4000 Sales Revenue Performance: UAT Int 76758 Fee revenue — UAT Int 76758 Revenue — 350 USD Live ledger Corporate — $350.00 Posted 27 Sept,2026 PERF-GOAL-cmuk4oxph00wpun1c6o416dl1-cmuk4qbpx00y1un1c4zkqgvse PERF-GOAL-cmuk4oxph00wpun1c6o416dl1-cmuk4qbpx00y1un1c4zkqgvse 1100 Bank - Operating Account Performance: UAT Int 76758 Fee revenue — UAT Int 76758 Revenue — 350 USD Live ledger Corporate $350.00 — Posted 27 Sept,2026 PERF-GOAL-cmuk4oxph00wpun1c6o416dl1-cmuk4qbl400xqun1ct2rz3x2j PERF-GOAL-cmuk4oxph00wpun1c6o416dl1-cmuk4qbl400xqun1ct2rz3x2j 4000 Sales Revenue Performance: UAT Int 76758 Fee revenue — UAT Int 76758 Revenue — 50 USD Live ledger Corporate — $50.00 Posted 27 Sept,2026 PERF-GOAL-cmuk4oxph00wpun1c6o416dl1-cmuk4qbl400xqun1ct2rz3x2j PERF-GOAL-cmuk4oxph00wpun1c6o416dl1-cmuk4qbl400xqun1ct2rz3x2j 1100 Bank - Operating Account Performance: UAT Int 76758 Fee revenue — UAT Int 76758 Revenue — 50 USD Live ledger Corporate $50.00 — Posted 27 Sept,2026 PERF-GOAL-cmuk4oxph00wpun1c6o416dl1-cmuk4qbg700xfun1c676njpkx PERF-GOAL-cmuk4oxph00wpun1c6o416dl1-cmuk4qbg700xfun1c676njpkx 4000 Sales Revenue Performance correction (reversal): UAT Int 76758 Fee revenue — UAT Int 76758 Revenue — -150 USD Live ledger Corporate $150.00 — Posted 27 Sept,2026 PERF-GOAL-cmuk4oxph00wpun1c6o416dl1-cmuk4qbg700xfun1c676njpkx PERF-GOAL-cmuk4oxph00wpun1c6o416dl1-cmuk4qbg700xfun1c676njpkx 1100 Bank - Operating Account Performance correction (reversal): UAT Int 76758 Fee revenue — UAT Int 76758 Revenue — -150 USD Live ledger Corporate — $150.00 Posted 27 Sept,2026 PERF-GOAL-cmuk4oxph00wpun1c6o416dl1-cmuk4qb5200x4un1cclouvofg PERF-GOAL-cmuk4oxph00wpun1c6o416dl1-cmuk4qb5200x4un1cclouvofg 4000 Sales Revenue Performance correction (reversal): UAT Int 76758 Fee revenue — UAT Int 76758 Revenue — -100 USD Live ledger Corporate $100.00 — Posted 27 Sept,2026 PERF-GOAL-cmuk4oxph00wpun1c6o416dl1-cmuk4qb5200x4un1cclouvofg PERF-GOAL-cmuk4oxph00wpun1c6o416dl1-cmuk4qb5200x4un1cclouvofg 1100 Bank - Operating Account Performance correction (reversal): UAT Int 76758 Fee revenue — UAT Int 76758 Revenue — -100 USD Live ledger Corporate — $100.00 Posted 27 Sept,2026 PERF-GOAL-cmuk4oxph00wpun1c6o416dl1-cmuk4pig500wrun1c7czm8u4z PERF-GOAL-cmuk4oxph00wpun1c6o416dl1-cmuk4pig500wrun1c7czm8u4z 4000 Sales Revenue Performance: UAT Int 76758 Fee revenue — UAT Int 76758 Revenue — 250 USD Live ledger Corporate — $250.00 Posted 27 Sept,2026 PERF-GOAL-cmuk4oxph00wpun1c6o416dl1-cmuk4pig500wrun1c7czm8u4z PERF-GOAL-cmuk4oxph00wpun1c6o416dl1-cmuk4pig500wrun1c7czm8u4z 1100 Bank - Operating Account Performance: UAT Int 76758 Fee revenue — UAT Int 76758 Revenue — 250 USD Live ledger Corporate $250.00 — Posted 27 Sept,2026 PERF-GOAL-cmuk4eh4000sfun1c8piwejr0-cmuk4f97w00v6un1cn5ca4r4x PERF-GOAL-cmuk4eh4000sfun1c8piwejr0-cmuk4f97w00v6un1cn5ca4r4x 4000 Sales Revenue Performance correction (reversal): UAT Sync 90050 Fees — UAT Sync 90050 Fees — -100 USD Live ledger Corporate $100.00 — Posted 27 Sept,2026 PERF-GOAL-cmuk4eh4000sfun1c8piwejr0-cmuk4f97w00v6un1cn5ca4r4x PERF-GOAL-cmuk4eh4000sfun1c8piwejr0-cmuk4f97w00v6un1cn5ca4r4x 1100 Bank - Operating Account Performance correction (reversal): UAT Sync 90050 Fees — UAT Sync 90050 Fees — -100 USD Live ledger Corporate — $100.00 Posted 27 Sept,2026 PERF-GOAL-cmuk4eh4000sfun1c8piwejr0-cmuk4f5cq00udun1c63ptvrls PERF-GOAL-cmuk4eh4000sfun1c8piwejr0-cmuk4f5cq00udun1c",
+  "ms": 33667,
+  "console": [
+    "API request failed: TypeError: Failed to fetch\n    at ApiClient.makeRequest (webpack-internal:///(app-pages-browser)/./lib/api/api-client.ts:153:36)\n    at ApiClient.get (webpack-internal:///(app-pages-browser)/./lib/api/api-client.ts:165:2"
+  ],
+  "failed": []
+}

@@ -122,3 +122,6 @@ scripts/relink-singapore-ui-api.py
 scripts/run-nvccz-deploy-when-ready.py
 scripts/run-vps-deploy.py
 scripts/vps-deploy-helper.py
+
+# local page-dump output from scripts/payroll-page-dump.mjs
+.payroll-dumps*/

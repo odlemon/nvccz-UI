@@ -240,6 +240,9 @@ export interface SubmitQuotationRequest {
   paymentTerms?: string
   deliveryTerms?: string
   deliveryTime?: string
+  deliveryPeriodDays?: number
+  quotationReference?: string
+  quotationDate?: string
   notes?: string
   attachments?: any
   items: Array<{
@@ -946,6 +949,32 @@ class ProcurementApiServiceV2 {
    */
   async getRfqInvitation(token: string): Promise<ProcurementResponse<any>> {
     return apiClient.get<ProcurementResponse<any>>(`/procurement/vendor-portal/rfq?token=${encodeURIComponent(token)}`)
+  }
+
+  /**
+   * Clarifications this supplier may see: those sent to every invitee, those sent to it, and its own questions.
+   * GET /procurement/vendor-portal/clarifications?token=
+   */
+  async getPortalClarifications(token: string): Promise<ProcurementResponse<{ id: string; from: 'Procurement' | 'You'; body: string; attachmentUrl: string | null; createdAt: string }[]>> {
+    return apiClient.get(`/procurement/vendor-portal/clarifications?token=${encodeURIComponent(token)}`)
+  }
+
+  /** Ask a question about the event while it is open. POST /procurement/vendor-portal/clarifications */
+  async askPortalClarification(token: string, body: string): Promise<ProcurementResponse<any>> {
+    return apiClient.post('/procurement/vendor-portal/clarifications', { token, body })
+  }
+
+  /**
+   * Stage a supporting file (quotation PDF, price list, technical sheet) with the supplier's own link; it is linked to the
+   * quotation when it is submitted (attachmentIds).
+   */
+  async uploadPortalAttachment(token: string, file: File, envelope?: 'TECHNICAL' | 'COMMERCIAL'): Promise<ProcurementResponse<{ id: string; originalFileName: string }>> {
+    const form = new FormData()
+    form.append('document', file)
+    if (envelope) form.append('envelope', envelope)
+    form.append('vendorPortalToken', token)
+    form.append('entityType', 'VENDOR_QUOTATION')
+    return apiClient.postFormData('/procurement/document-attachments/portal/upload', form)
   }
 
   /**

@@ -67,7 +67,7 @@ const PERMISSIONS: Record<Exclude<PerfTier, "none">, string[]> = {
     "view_org", "view_strategy", "view_kpi", "view_tasks", "view_reviews", "initiate_reviews",
     "manage_reviews", "view_corrective", "create_corrective", "view_reports",
     "generate_reports", "view_compliance", "generate_compliance", "view_vault", "edit_hr_docs",
-    "edit_report_docs", "view_alerts", "view_audit", "manage_roles_limited",
+    "edit_report_docs", "view_alerts", "view_audit",
   ],
   manager: [
     "view_team", "view_strategy", "view_kpi", "manage_team_kpi", "view_tasks",

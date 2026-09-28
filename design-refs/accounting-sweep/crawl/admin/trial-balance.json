@@ -1,0 +1,22 @@
+{
+  "url": "/accounting/trial-balance",
+  "title": "Trial Balance",
+  "headings": [
+    "Trial Balance",
+    "Trial Balance register"
+  ],
+  "tabs": [],
+  "buttons": [
+    "Back to ledger",
+    "Preview controlled TB",
+    "Export workbook",
+    "Filters",
+    "+"
+  ],
+  "text": "PERIOD INTEGRITY Trial Balance A pronounced multi-currency integrity workspace. Expand an account to see unsquashed contributing transactions, then open the complete journal or account history. Back to ledger Preview controlled TB Export workbook Total debits $5,567,363.31 Filtered debit balances Total credits $5,889,573.23 Filtered credit balances Difference $322,209.92 CR Must be zero before publication Accounts displayed 16 Current filter population Journal population 297 Contributing journal lines Publication gate Blocked Statement publishing control Filters Trial Balance register Select a line to expand contributing transactions. Select a header to sort the visible population. ACCOUNT / LINE ITEM TYPE NATURAL BALANCE DEBIT CREDIT CLOSING BALANCE CONTROL TRANSACTIONS Current Asset + 1000 · Cash and Cash Equivalents Posting account · 1 contributing records Current Asset Debit $0.00 $2,400.00 $2,400.00 CR Active 1 + 1100 · Bank - Operating Account Posting account · 115 contributing records Current Asset Debit $105,290.00 $3,889,869.34 $3,784,579.34 CR Active 115 + 1200 · Accounts Receivable Posting account · 1 contributing records Current Asset Debit $7,800.00 $0.00 $7,800.00 Active 1 + 1210 · Capital Contributions Receivable Posting account · 2 contributing records Current Asset Debit $455,000.00 $100,000.00 $355,000.00 Active 2 Non-current Asset + 1501 · Portfolio Investments Posting account · 2 contributing records Non-current Asset Debit $3,500,000.00 $0.00 $3,500,000.00 Active 2 + 1510 · Office Equipment Posting account · 2 contributing records Non-current Asset Debit $2,650.00 $0.00 $2,650.00 Active 2 Current Liability + 2000 · Accounts Payable Posting account · 47 contributing records Current Liability Credit $64,830.15 $250.00 $64,580.15 CR Active 47 + 2150 · PAYE Payable Posting account · 14 contributing records Current Liability Credit $0.00 $819,678.16 $819,678.16 Active 14 + 2160 · NSSA / Pension Payable Posting account · 14 contributing records Current Liability Credit $0.00 $81,628.40 $81,628.40 Active 14 + 2170 · SDL Payable Posting account · 14 contributing records Current Liability Credit $0.00 $13,051.81 $13,051.81 Active 14 + 2250 · Net Wages Payable Posting account · 1 contributing records Current Liability Credit $0.00 $114,605.52 $114,605.52 Active 1 + 2400 · Distributions Payable to LPs Posting account · 2 contributing records Current Liability Credit $318,819.19 $400,000.00 $81,180.81 Active 2 Equity + 3010 · Partners Capital - Uncalled Posting account · 1 contributing records Equity Credit $0.00 $455,000.00 $455,000.00 Active 1 Revenue + 4000 · Sales Revenue Posting account · 65 contributing records Revenue Credit $5,040.00 $13,090.00 $8,050.00 Active 65 + 4100 · Dividend Income Posting account · 1 contributing records Revenue Credit $400,000.00 $0.00 $400,000.00 CR Active 1 Expense + 5010 · Payroll Expense (Gross Pay) Posting account · 15 contributing records Expense Debit $707,933.97 $0.00 $707,933.97 Active 15",
+  "ms": 10799,
+  "console": [
+    "API request failed: TypeError: Failed to fetch\n    at ApiClient.makeRequest (webpack-internal:///(app-pages-browser)/./lib/api/api-client.ts:153:36)\n    at ApiClient.get (webpack-internal:///(app-pages-browser)/./lib/api/api-client.ts:165:2"
+  ],
+  "failed": []
+}

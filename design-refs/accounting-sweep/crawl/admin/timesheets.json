@@ -1,0 +1,33 @@
+{
+  "url": "/accounting/timesheets",
+  "title": "Timesheets & Projects",
+  "headings": [
+    "Timesheets & Projects",
+    "Time becomes margin.",
+    "Approved billable value",
+    "Utilisation by project",
+    "Weekly time review",
+    "Finance review queue",
+    "Project commercial position"
+  ],
+  "tabs": [],
+  "buttons": [
+    "Command",
+    "Timesheets",
+    "Projects",
+    "Profitability",
+    "Billing readiness",
+    "Hours awaiting review 0h 0 submitted timesheets",
+    "Billable utilisation 0% Current review population",
+    "Unbilled WIP $0.00 Approved time not yet invoiced",
+    "Evidence gaps — Not yet tracked",
+    "Import timesheets",
+    "Approve selected",
+    "Filters ▴",
+    "Review & approve"
+  ],
+  "text": "PROJECT ACCOUNTING Timesheets & Projects Review submitted time, evidence, project economics, cost allocation and billing readiness from one layered workspace. Command Timesheets Projects Profitability Billing readiness WORK ECONOMICS Time becomes margin. Submitted hours are connected to evidence, cost allocation, WIP, customer billing and project economics. — no timesheet hours captured yet 0 submissions 0 reviews BILLABLE CONVERSION Approved billable value Billable value is not stored period by period, so no conversion trend can be drawn. MANDATE PERFORMANCE Utilisation by project No hours are captured against a project yet. Hours awaiting review 0h 0 submitted timesheets Billable utilisation 0% Current review population Unbilled WIP $0.00 Approved time not yet invoiced Evidence gaps — Not yet tracked Import timesheets Approve selected Filters ▴ From To Employee All employees Project All projects Audit Verification Client Engagement Status All statuses Submitted Approved Review Returned Weekly time review Click a row to inspect the submitted timesheet; approve or return it from there. Review & approve No timesheets pending review this week. Finance review queue Timesheets currently submitted or returned for correction. Nothing awaiting finance review. Project commercial position Projects combine approved effort, WIP and billing readiness without repeating the time register. cmtrca2ym0001unr4eqcfkzbn Audit Verification Client Engagement Billable — Unbilled WIP $0.00 Margin — Open detail View →",
+  "ms": 8285,
+  "console": [],
+  "failed": []
+}

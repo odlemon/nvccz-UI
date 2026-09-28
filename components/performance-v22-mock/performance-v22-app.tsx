@@ -52,7 +52,10 @@ export function PerformanceV22App() {
       shellHtml: PERFORMANCE_V22_SHELL_HTML,
       initialPage,
       onNavigate: (page: string) => {
-        const path = PM22_PAGE_TO_PATH[page] || "/performance"
+        // Unknown page ids must not fall back to /performance — that snaps the UI back to
+        // Command Centre and reads as "click takes you back" (see pathToPm22Page / Access bounce).
+        const path = PM22_PAGE_TO_PATH[page]
+        if (!path) return
         if (pathnameRef.current !== path) router.push(path)
       },
     })

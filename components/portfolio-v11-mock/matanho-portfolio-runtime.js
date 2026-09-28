@@ -174,12 +174,12 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
       { id: 'period-close', label: 'Period Close & GL', icon: 'check-circle' }
     ]},
     { label: 'REPORTING & RECORDS', items: [
+      { id: 'e-signatures', label: 'E-Signatures', icon: 'edit', count: true },
+      { id: 'documents-vault', label: 'Documents Vault', icon: 'folder', count: true },
+      { id: 'reports-vault', label: 'Reports Vault', icon: 'file-chart', count: true },
       { id: 'reporting', label: 'Reporting Schedules', icon: 'calendar', count: true },
       { id: 'fund-performance', label: 'Fund Performance', icon: 'file-chart' },
       { id: 'lps', label: 'LP Management', icon: 'users', count: true },
-      { id: 'documents-vault', label: 'Documents Vault', icon: 'folder', count: true },
-      { id: 'reports-vault', label: 'Reports Vault', icon: 'file-chart', count: true },
-      { id: 'e-signatures', label: 'E-Signatures', icon: 'edit', count: true },
       { id: 'mailer-lists', label: 'Mailer Lists', icon: 'mail', count: true }
     ]},
     { label: 'WORKSPACE', items: [
@@ -5304,7 +5304,31 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
       case 'add-signature-recipient': { showModal('Add Signature Recipient','Add a person, role, authentication method and signing order.',`<form id="v11SignatureRecipientForm"><div class="form-grid"><div class="form-field"><label class="required">Full name</label><input name="name" required></div><div class="form-field"><label class="required">Email</label><input name="email" type="email" required></div><div class="form-field"><label class="required">Signing role</label><input name="role" required></div><div class="form-field"><label>Authentication</label><select name="auth"><option>Email + OTP</option><option>Passkey</option></select></div></div></form>`,`${button('Cancel','open-envelope','','arrow-left',`data-id="${state.selectedEnvelopeId}"`)}${button('Add recipient','submit-signature-recipient','primary','plus')}`,{variant:'wizard',size:'md',rail:['Identity','Role','Security','Order'],eyebrow:'Envelope recipient'});return; }
       case 'submit-signature-recipient': { const form=$('#v11SignatureRecipientForm');if(!form?.reportValidity())return;const data=Object.fromEntries(new FormData(form));const env=signatureEnvelopes.find(item=>item.id===state.selectedEnvelopeId)||signatureEnvelopes[0];env.recipients.push([data.name,data.role,'Pending']);closeOverlays();toast('Recipient added',`${data.name} was added to ${env.id}.`);showSignatureStudio(env.documentId,env.id);return; }
       case 'new-signature-envelope': v11ShowNewEnvelope();return;
-      case 'submit-new-envelope': { const form=$('#v11EnvelopeForm');if(!form?.reportValidity())return;const data=Object.fromEntries(new FormData(form));const doc=documents.find(item=>item.id===data.documentId)||documents[0];const env={id:`ENV-${String(100+signatureEnvelopes.length)}`,documentId:doc.id,document:doc.name,subject:data.subject,recipients:[[data.recipientName,data.recipientRole,'Pending']],progress:0,status:'Draft',sent:'Not sent',expires:data.expires||'15 Aug 2026'};signatureEnvelopes.unshift(env);state.selectedEnvelopeId=env.id;closeOverlays();toast('Envelope created',`${env.id} is ready for field placement.`);showSignatureStudio(env.documentId,env.id);return; }
+      case 'submit-new-envelope': {
+        const form=$('#v11EnvelopeForm');
+        if(!form?.reportValidity())return;
+        const data=Object.fromEntries(new FormData(form));
+        const doc=documents.find(item=>item.id===data.documentId)||documents[0];
+        const documentType=(/term\s*sheet/i.test(doc?.name||'')?'TERM_SHEET':/nda/i.test(doc?.name||'')?'NDA':/shareholder/i.test(doc?.name||'')?'SHAREHOLDERS_AGREEMENT':'AGREEMENT');
+        const detail={
+          action:'api-create-envelope',
+          dataset:{
+            documentType,
+            type:documentType,
+            subject:data.subject,
+            documentId:doc?.id||'',
+            recipientName:data.recipientName||'',
+            recipientEmail:data.recipientEmail||'',
+            recipientRole:data.recipientRole||'Signer',
+            expires:data.expires||'',
+          },
+          state:{},
+        };
+        const proceed=window.dispatchEvent(new CustomEvent('matanho:before-action',{detail,cancelable:true}));
+        if(!proceed){closeOverlays();return;}
+        const env={id:`ENV-${String(100+signatureEnvelopes.length)}`,documentId:doc?.id,document:doc?.name||data.subject,subject:data.subject,recipients:[[data.recipientName,data.recipientRole||'Signer','Pending']],progress:0,status:'Draft',sent:'Not sent',expires:data.expires||'—'};
+        signatureEnvelopes.unshift(env);state.selectedEnvelopeId=env.id;closeOverlays();toast('Envelope created',`${env.id} is ready for field placement.`);showSignatureStudio(env.documentId,env.id);return;
+      }
       case 'send-signature-envelope': { const env=signatureEnvelopes.find(item=>item.id===state.selectedEnvelopeId)||signatureEnvelopes[0];env.status='Sent';env.sent='01 Aug 2026';closeOverlays();toast('Envelope sent',`${env.id} was securely routed to ${env.recipients.length} recipient${env.recipients.length===1?'':'s'}.`);render();return; }
       case 'save-signature-draft': toast('Signature draft saved',`${state.signatureFields.length} fields and the current recipient order were saved.`);return;
       case 'send-signature-reminder': case 'send-signature-reminders': toast('Reminder sent','Pending recipients were notified using the configured delivery policy.');return;

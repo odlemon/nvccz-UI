@@ -1,0 +1,33 @@
+{
+  "url": "/accounting/bank-reconciliation",
+  "title": "Bank Reconciliation",
+  "headings": [
+    "Bank Reconciliation",
+    "Reconciliation health",
+    "Statement-to-ledger bridge",
+    "Match assistant",
+    "Bank statement",
+    "Cashbook & General Ledger"
+  ],
+  "tabs": [],
+  "buttons": [
+    "Import statement",
+    "Run auto-match",
+    "Matanho Capital - USD Operating Account USD",
+    "Filters ▴",
+    "Comparison workbench",
+    "Exceptions",
+    "Internal modules",
+    "Matching rules",
+    "Sign-off",
+    "Maximise comparison",
+    "Auto-match suggestions",
+    "Create adjustment"
+  ],
+  "text": "CASH CONTROL Bank Reconciliation A proper reconciliation cockpit for external bank evidence, Accounting GL candidates, ERP sub-ledgers, exceptions, matching automation and independent sign-off. Import statement Run auto-match Matanho Capital - USD Operating Account USD Statement balance $-3,784,579 Matanho Capital - USD Operating Account Ledger balance $-3,784,579 GL 1100 · live Difference $0 Must resolve before sign-off Match coverage 0% By absolute transaction value Open exceptions 0 Assigned and due Internal modules 3/5 matched 2 need review Filters ▴ From To Currency All currencies USD ZWG ZAR Status All lines Matched Suggested Unmatched Exception Amount tolerance Exact $2 $5 $25 Date window Same day ±1 day ±3 days ±7 days Comparison workbench Exceptions Internal modules Matching rules Sign-off 1 Import Statement evidence retained 2 Match 0 matched · 0 suggested 3 Investigate 0 open exceptions 4 Adjust Draft controlled corrections 5 Sign off Independent reviewer 0% matched by value Reconciliation health 0 matched, 0 suggested and 0 unresolved lines in the current population. Matched $0 Suggested $0 Open $0 Statement-to-ledger bridge Closing balance comparison Bank statement $-3,784,579 Accounting ledger $-3,784,579 Unexplained closing difference $0 Match assistant Highest-confidence unresolved candidates No suggested matches All current suggestions have been resolved. Comparison workbench Open any line for full evidence, journal candidate and audit history. Maximise comparison Auto-match suggestions Create adjustment EXTERNAL EVIDENCE Bank statement Matanho Capital - USD Operating Account · direct feed + retained source file Closing balance $-3,784,579 DATE BANK REFERENCE NARRATIVE AMOUNT STATUS COMPARE ⇄ TRACE ACCOUNTING SOURCE OF TRUTH Cashbook & General Ledger Posted records · source-linked journals Closing balance $-3,784,579 DATE LEDGER CANDIDATE NARRATIVE AMOUNT CONFIDENCE Matching policy Reference + amount + date Amount tolerance $2.00 Date window ±3 days Last bank feed 11 Aug · 14:22 Reviewer Rudo Kaseke",
+  "ms": 14011,
+  "console": [
+    "Failed to fetch RSC payload for http://localhost:3120/accounting/cash-book. Falling back to browser navigation. TypeError: Failed to fetch\n    at fetchServerResponse (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/c"
+  ],
+  "failed": []
+}

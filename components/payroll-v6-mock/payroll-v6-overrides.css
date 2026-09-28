@@ -104,3 +104,16 @@
 .payroll-v6-root .access-user-table .status {
   white-space: nowrap;
 }
+
+/* Activity timelines (Command Centre, employee audit history, ...): `.timeline` sets padding-left:20px, which
+   replaced the card-body padding shorthand, so the dots and the vertical rail sat ON the card's left border and
+   the text touched the edge with no top/right inset. Inset the whole rail with margin (the rail and dots are
+   positioned relative to the timeline box, so they move with it). */
+.payroll-v6-root .card-body.timeline {
+  margin: 14px 16px 2px 16px;
+  padding: 0 0 0 20px;
+}
+.payroll-v6-root .card-body.timeline .timeline-item > div {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}

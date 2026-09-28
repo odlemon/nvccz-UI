@@ -797,7 +797,8 @@ export interface CogsResponse {
 
 export interface StockAdjustmentRequest {
   itemId: string
-  adjustmentQuantity: number
+  /** Signed quantity change (positive = increase, negative = decrease). BE reads `quantity`. */
+  quantity: number
   reason: string
   notes?: string
 }

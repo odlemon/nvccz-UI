@@ -121,7 +121,7 @@ const routePermissions: Record<string, { module: string; subModule?: string }> =
   '/performance/kpi-analytics': { module: 'performance-v22', subModule: 'pm22-objectives' },
   '/performance/kpi-management': { module: 'performance-v22', subModule: 'pm22-objectives' },
   '/performance/timesheets': { module: 'performance-v22', subModule: 'pm22-tasks' },
-  '/performance/settings': { module: 'performance-v22', subModule: 'pm22-access' },
+  '/performance/settings': { module: 'performance-v22', subModule: 'pm22-settings' },
   '/performance/performance-reports': { module: 'performance-v22', subModule: 'pm22-reports' },
   '/performance/themes': { module: 'performance-v22', subModule: 'pm22-strategy' },
   '/performance/risks': { module: 'performance-v22', subModule: 'pm22-strategy' },

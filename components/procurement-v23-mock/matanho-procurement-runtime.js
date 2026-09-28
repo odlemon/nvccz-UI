@@ -175,8 +175,8 @@ const state={page:(typeof initialPage==='string'&&initialPage)?initialPage:'dash
   {name:'Auditor',users:4,permissions:[0,0,0,0,0,1]}
  ]
 };
-const money=n=>(n===null||n===undefined||n===''||!Number.isFinite(Number(n)))?'\u2014':new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',maximumFractionDigits:0}).format(n);
-const status=s=>{let c=/approved|matched|ready|accepted|posted|published|prequalified|active|in use/i.test(s)?'green':/blocked|blacklisted|expired|rejected|held|variance/i.test(s)?'red':/pending|review|conditional|clarification|opening|warning|revision/i.test(s)?'amber':'blue';return `<span class="status ${c}">${s}</span>`};
+const money=(n,cur)=>(n===null||n===undefined||n===''||!Number.isFinite(Number(n)))?'\u2014':new Intl.NumberFormat('en-US',{style:'currency',currency:(typeof cur==='string'&&/^[A-Za-z]{3}$/.test(cur))?cur.toUpperCase():'USD',maximumFractionDigits:0}).format(n);
+const status=s=>{let c=/approved|matched|ready|accepted|posted|published|prequalified|active|in use|issued|awarded|^open$|delivered/i.test(s)?'green':/blocked|blacklisted|expired|rejected|held|variance|cancelled/i.test(s)?'red':/pending|review|conditional|clarification|opening|warning|revision|awaiting|under evaluation|returned/i.test(s)?'amber':/^closed$|^draft$/i.test(s)?'gray':'blue';return `<span class="status ${c}">${s}</span>`};
 const btn=(label,action,kind='',ico='')=>`<button class="btn ${kind}" data-action="${action}">${ico?icon(ico):''}${label}</button>`;
 const pageHead=(eyebrow,title,desc,actions='')=>`<div class="page-head"><div><div class="eyebrow">${eyebrow}</div><h1>${title}</h1><p>${desc}</p></div><div class="actions">${actions}</div></div>`;
 const kpi=(label,value,sub,ico='report',page='')=>{[value,sub]=__pr23Kpi(label,value,sub);if(value===__PR23_HIDDEN_KPI)return '';return `<article class="kpi" ${page?`data-page="${page}"`:''}><div class="kpi-top"><span class="kpi-label">${label}</span><span class="kpi-icon">${icon(ico)}</span></div><div class="kpi-value">${value}</div><div class="kpi-sub">${sub}</div></article>`};
@@ -295,7 +295,7 @@ function __pr23Percentages(segments) {
 function __pr23CycleSegments() {
   const req = state.requisitions || [], ten = state.tenders || [], ord = state.orders || [], grn = state.grns || [], inv = state.invoices || [];
   const planning = req.filter(r => r.rawStatus === 'DRAFT' || r.rawStatus === 'PENDING_APPROVAL').length;
-  const sourcing = req.filter(r => r.rawStatus === 'APPROVED').length + ten.filter(t => t.stage === 'Published' || t.stage === 'Evaluation').length;
+  const sourcing = req.filter(r => r.rawStatus === 'APPROVED').length + ten.filter(t => ['PUBLISHED', 'OPEN', 'CLOSED', 'UNDER_EVALUATION', 'AWAITING_APPROVAL'].includes(String(t.rawStatus || '').toUpperCase())).length;
   const fulfilment = ord.filter(o => !/Delivered|Billed|Cancelled/i.test(o.status)).length
     + grn.filter(g => g.rawStatus === 'RECEIVED').length
     + inv.filter(i => i.status === 'Pending approval').length;
@@ -355,8 +355,8 @@ function __pr23VendorHistoryCard(v) {
     + kpi('Invoices received', canInvoices ? h.invoices.length : '—', canInvoices ? `${flagged} flagged for review` : 'Invoices are not visible to your role', 'invoice')
     + kpi('On-time delivery', onTime, h.receiptsTimed ? `${h.receiptsOnTime} of ${h.receiptsTimed} receipts by the order's delivery date` : 'No receipt against a delivery date yet', 'receive')
     + `</div>`;
-  const orderRows = h.orders.slice(0, 8).map(o => `<tr><td><strong>${__pr23Esc(o.id)}</strong></td><td>${__pr23Esc(o.date)}</td><td class="money">${money(o.amount)}</td><td>${status(o.status)}</td></tr>`);
-  const invoiceRows = h.invoices.slice(0, 8).map(i => `<tr><td><strong>${__pr23Esc(i.id)}</strong>${i.supplierRef ? `<br><span class="muted">Supplier ref ${__pr23Esc(i.supplierRef)}</span>` : ''}</td><td>${__pr23Esc(i.date)}</td><td class="money">${money(i.amount)}</td><td>${status(i.match)}</td><td>${i.flagged ? status('Flagged') : status(i.status)}</td></tr>`);
+  const orderRows = h.orders.slice(0, 8).map(o => `<tr><td><strong>${__pr23Esc(o.id)}</strong></td><td>${__pr23Esc(o.date)}</td><td class="money">${money(o.amount,o.currency)}</td><td>${status(o.status)}</td></tr>`);
+  const invoiceRows = h.invoices.slice(0, 8).map(i => `<tr><td><strong>${__pr23Esc(i.id)}</strong>${i.supplierRef ? `<br><span class="muted">Supplier ref ${__pr23Esc(i.supplierRef)}</span>` : ''}</td><td>${__pr23Esc(i.date)}</td><td class="money">${money(i.amount,i.currency)}</td><td>${status(i.match)}</td><td>${i.flagged ? status('Flagged') : status(i.status)}</td></tr>`);
   const itemRows = h.items.slice(0, 10).map(it => {
     const change = it.first ? ((it.last - it.first) / it.first) * 100 : 0;
     return `<tr><td>${__pr23Esc(it.item)}</td><td>${it.orders}</td><td class="money">${__pr23Cents(it.first)}</td><td class="money">${__pr23Cents(it.last)}</td><td>${it.orders > 1 ? `${change > 0 ? '+' : ''}${change.toFixed(1)}%` : '—'}</td></tr>`;
@@ -381,18 +381,30 @@ function __pr23VendorEditModal(id) {
   const v = (state.vendors || []).find(x => x.id === id);
   if (!v) return;
   const value = x => (x == null || x === '—' ? '' : __pr23Esc(String(x)));
+  const currencies = (((__pr23Live() || {}).currencies) || []).map(c => c.code);
+  const sel = (name, options, current, blank) => `<select name="${name}">${blank ? `<option value="">${blank}</option>` : ''}${options.map(o => `<option${String(o).toUpperCase() === String(current || '').toUpperCase() ? ' selected' : ''}>${__pr23Esc(o)}</option>`).join('')}</select>`;
+  const riskCurrent = v.riskRating && v.riskRating !== '—' ? v.riskRating.toUpperCase() : '';
   const body = `<form id="vendorEditFormV23" class="form-grid"><input type="hidden" name="vendorId" value="${__pr23Esc(v.id)}">`
-    + formField('Legal name', `<input name="name" value="${value(v.name)}" required maxlength="191">`, 'full')
+    + formField('Legal entity name', `<input name="name" value="${value(v.name)}" required maxlength="191">`, 'full')
+    + formField('Trading name', `<input name="tradingName" value="${value(v.tradingName)}" maxlength="191">`)
+    + formField('Registration number', `<input name="registrationNumber" value="${value(v.registrationNumber)}" maxlength="64">`)
+    + formField('Tax identification number (TIN)', `<input name="tin" value="${value(v.tin)}" maxlength="64">`)
+    + formField('VAT number', `<input name="vat" value="${value(v.vat)}" maxlength="64">`)
     // Category decides which RFQs can invite the vendor (it must match the requisition's); a vendor that registered itself
     // may arrive without one, so staff set it here.
-    + formField('Category', `<select name="category" required><option value="">Choose a category</option>${[...new Set([...__PR23_BASE_CATEGORIES, ...(v.category && v.category !== '—' ? [v.category] : [])])].map(c => `<option${c === v.category ? ' selected' : ''}>${__pr23Esc(c)}</option>`).join('')}</select>`)
-    + formField('Contact person', `<input name="contact" value="${value(v.contact)}" maxlength="191">`)
-    + formField('Email', `<input name="email" type="email" value="${value(v.email)}" maxlength="191">`)
-    + formField('Phone', `<input name="phone" value="${value(v.phone)}" maxlength="64">`)
+    + formField('Vendor category', `<select name="category" required><option value="">Choose a category</option>${[...new Set([...__PR23_BASE_CATEGORIES, ...(v.category && v.category !== '—' ? [v.category] : [])])].map(c => `<option${c === v.category ? ' selected' : ''}>${__pr23Esc(c)}</option>`).join('')}</select>`)
+    + formField('Other commodity / service categories', `<input name="commodities" value="${__pr23Esc((v.commodityCategories || []).join(', '))}" maxlength="300" placeholder="Comma separated">`)
+    + formField('Risk classification', sel('risk', __PR23_RISK_OPTIONS, riskCurrent, 'Not classified'))
+    + formField('Country', `<input name="country" value="${value(v.country)}" maxlength="64">`)
+    + formField('Primary contact', `<input name="contact" value="${value(v.contact)}" maxlength="191">`)
+    + formField('Contact email', `<input name="email" type="email" value="${value(v.email)}" maxlength="191">`)
+    + formField('Telephone', `<input name="phone" value="${value(v.phone)}" maxlength="64">`)
     + formField('Payment terms', `<input name="paymentTerms" value="${value(v.paymentTerms)}" placeholder="e.g. 30 days from invoice" maxlength="191">`)
-    + formField('Address', `<textarea name="address" rows="2" maxlength="500">${value(v.address)}</textarea>`, 'full')
+    + formField('Currency', currencies.length ? sel('currency', currencies, v.currency, 'Not set') : `<input name="currency" value="${value(v.currency)}" maxlength="8">`)
     + formField('Tax clearance (ITF263) expiry', `<input name="taxExpiry" type="date" value="${value(v.taxExpiry)}">`)
-    + `</form><p class="muted" style="margin:10px 0 0">Bank details are changed by Finance. Blacklisting and registration approval are separate actions on the vendor.</p>`;
+    + formField('Registered address', `<textarea name="address" rows="2" maxlength="500">${value(v.address)}</textarea>`, 'full')
+    + formField('Notes', `<textarea name="notes" rows="2" maxlength="2000">${__pr23Esc(v.notes || '')}</textarea>`, 'full')
+    + `</form><p class="muted" style="margin:10px 0 0">Status is changed with the status buttons on the vendor, with a reason, and is audited. Bank details are changed by Finance.</p>`;
   openModal('Edit vendor profile', v.name, body, btn('Save changes', 'save-vendor-profile-v23', 'primary'));
 }
 
@@ -429,18 +441,28 @@ __pr23On(document, 'click', event => {
  * a requisition's. Saved by register-vendor-confirm (lib/procurement-v23/actions.ts), which reads these names from #vendorForm.
  */
 function __pr23VendorRegisterModal() {
+  const currencies = (((__pr23Live() || {}).currencies) || []).map(c => c.code);
+  const risks = __PR23_RISK_OPTIONS;
   const body = `<form id="vendorForm" class="form-grid">`
-    + formField('Legal name', '<input name="name" required maxlength="191" placeholder="e.g. Jacaranda Office Supplies (Pvt) Ltd">', 'full')
-    + formField('Category', `<select name="category" required><option value="">Choose a category</option>${__PR23_BASE_CATEGORIES.map(c => `<option>${__pr23Esc(c)}</option>`).join('')}</select>`)
-    + formField('Contact person', '<input name="contact" required maxlength="191">')
-    + formField('Email', '<input name="email" type="email" required maxlength="191">')
-    + formField('Phone', '<input name="phone" maxlength="64" placeholder="+263 …">')
-    + formField('Payment terms', '<input name="paymentTerms" maxlength="191" placeholder="e.g. 30 days from invoice">')
-    + formField('BP number', '<input name="bp" maxlength="64">')
+    + formField('Legal entity name', '<input name="name" required maxlength="191" placeholder="e.g. Jacaranda Office Supplies (Pvt) Ltd">', 'full')
+    + formField('Trading name', '<input name="tradingName" maxlength="191">')
+    + formField('Registration number', '<input name="registrationNumber" maxlength="64">')
+    + formField('Tax identification number (TIN)', '<input name="tin" maxlength="64">')
     + formField('VAT number', '<input name="vat" maxlength="64">')
+    + formField('BP number', '<input name="bp" maxlength="64">')
+    + formField('Vendor category', `<select name="category" required><option value="">Choose a category</option>${__PR23_BASE_CATEGORIES.map(c => `<option>${__pr23Esc(c)}</option>`).join('')}</select>`)
+    + formField('Other commodity / service categories', '<input name="commodities" maxlength="300" placeholder="Comma separated, e.g. Stationery, Printing">')
+    + formField('Risk classification', `<select name="risk"><option value="">Not classified</option>${risks.map(r => `<option value="${r}">${r.charAt(0) + r.slice(1).toLowerCase()}</option>`).join('')}</select>`)
+    + formField('Country', '<input name="country" maxlength="64" placeholder="e.g. Zimbabwe">')
+    + formField('Primary contact', '<input name="contact" required maxlength="191">')
+    + formField('Contact email', '<input name="email" type="email" required maxlength="191">')
+    + formField('Telephone', '<input name="phone" maxlength="64" placeholder="+263 …">')
+    + formField('Payment terms', '<input name="paymentTerms" maxlength="191" placeholder="e.g. 30 days from invoice">')
+    + formField('Currency', currencies.length ? `<select name="currency"><option value="">Not set</option>${currencies.map(c => `<option>${__pr23Esc(c)}</option>`).join('')}</select>` : '<input name="currency" maxlength="8" placeholder="e.g. USD">')
     + formField('Tax clearance (ITF263) expiry', '<input name="taxExpiry" type="date">')
-    + formField('Address', '<textarea name="address" rows="2" maxlength="500"></textarea>', 'full')
-    + `</form><p class="muted" style="margin:10px 0 0">An RFQ invites a vendor only when its category matches the requisition's. Bank details are added by Finance.</p>`;
+    + formField('Registered address', '<textarea name="address" rows="2" maxlength="500"></textarea>', 'full')
+    + formField('Notes', '<textarea name="notes" rows="2" maxlength="2000"></textarea>', 'full')
+    + `</form><p class="muted" style="margin:10px 0 0">A new vendor is a Draft: it is submitted for review, then approved by someone else, before it can be invited to an RFQ, awarded, issued a purchase order or paid. Bank details are added by Finance.</p>`;
   openModal('Register vendor', 'A vendor staff add directly; vendors can also register themselves on the vendor portal.', body, btn('Register vendor', 'register-vendor-confirm', 'primary'));
 }
 
@@ -466,7 +488,7 @@ function __pr23InvoicesToReviewCard() {
       + (i.reviewReasons.length > 3 ? `<li class="muted">and ${i.reviewReasons.length - 3} more</li>` : '');
     const sourceId = __pr23InvoiceSourceId(i);
     const openMatch = sourceId ? __pr23SmallButton('Open match', 'select-match-tender-v5', sourceId, 'arrow') : '';
-    return `<tr><td><strong>${__pr23Esc(i.id)}</strong><br><span class="muted">${__pr23Esc(i.vendor)}</span></td><td>${__pr23Esc(i.po)}</td><td class="money">${money(i.amount)}</td><td><ul style="margin:0;padding-left:16px">${reasons}</ul></td><td>${openMatch}</td></tr>`;
+    return `<tr><td><strong>${__pr23Esc(i.id)}</strong><br><span class="muted">${__pr23Esc(i.vendor)}</span></td><td>${__pr23Esc(i.po)}</td><td class="money">${money(i.amount,i.currency)}</td><td><ul style="margin:0;padding-left:16px">${reasons}</ul></td><td>${openMatch}</td></tr>`;
   });
   const body = rows.length
     ? table(['Invoice', 'Purchase order', 'Amount', 'Why it needs review', ''], rows)
@@ -595,100 +617,397 @@ function __pr23QuoteLabel(recordId) {
   return q ? `${q.vendor} (${q.id})` : recordId;
 }
 
-/** A tender's bids: the comparison matrix when it was loaded, otherwise the quotations alone. */
-function __pr23EvaluationRows(tenderId) {
-  const ev = (state.evaluationLive || {})[tenderId];
-  if (ev && Array.isArray(ev.rows)) return ev;
-  const rows = (state.quotationsLive || []).filter(q => q.rfq === tenderId);
-  return { rows, priceWeight: null, technicalWeight: null, complete: false };
-}
 
 function __pr23EvaluationPageHtml(t) {
   if (!t) return `<div class="page">${pageHead('Governed decisioning', 'Bid Evaluation', 'The selected tender is no longer in your register.', btn('Back to tender list', 'back-evaluations'))}</div>`;
-  const ev = __pr23EvaluationRows(t.id);
-  const rows = ev.rows;
-  const canScore = __pr23Can('quotations.manage');
-  const open = rows.filter(r => r.open);
-  const scored = rows.filter(r => r.evaluationScore != null).length;
-  const lowest = rows.reduce((m, r) => (r.amount != null && (m == null || r.amount < m.amount) ? r : m), null);
-  const top = ev.complete ? rows.reduce((m, r) => (r.weighted != null && (m == null || r.weighted > m.weighted) ? r : m), null) : null;
-  const awarded = rows.find(r => r.rawStatus === 'ACCEPTED');
-  const pct = v => (v == null ? '—' : `${Math.round(v * 100)}%`);
-  const scoreCell = r => canScore && r.open
-    ? `<input type="number" min="0" max="100" step="1" data-score-quote="${__pr23Esc(r.recordId)}" data-score-was="${r.evaluationScore == null ? '' : r.evaluationScore}" value="${r.evaluationScore == null ? '' : r.evaluationScore}" placeholder="0–100" style="width:84px">`
-    : (r.evaluationScore == null ? '<span class="muted">Not scored</span>' : `${r.evaluationScore}%`);
-  const tableRows = rows.map((r, i) => `<tr><td><strong>${i + 1}</strong></td><td><strong>${__pr23Esc(r.vendor)}</strong><br><span class="muted">${__pr23Esc(r.id)}</span></td><td>${scoreCell(r)}</td><td>${r.priceScore == null ? '—' : `${Math.round(r.priceScore)}%`}</td><td><strong>${r.weighted == null ? 'Not scored' : `${r.weighted.toFixed(1)}%`}</strong></td><td class="money">${money(r.amount)}</td><td>${status(r.status)}</td></tr>`);
-  const actions = btn('Back to tender list', 'back-evaluations') + (canScore && open.length ? btn('Save scores', 'save-scores', 'primary') : '');
-  return `<div class="page">${pageHead('Governed decisioning', `${__pr23Esc(t.id)} Bid Evaluation`, `${__pr23Esc(t.title)} · ${__pr23Esc(t.entity)} · ${rows.length} submitted bid${rows.length === 1 ? '' : 's'}`, actions)}
- <div class="notice" style="margin-bottom:14px"><div><strong>How bids are ranked</strong><p>The technical score is the evaluation team's, entered here; a vendor's own declarations are not counted. The price score is relative to the lowest bid. The weighted score appears once every bid is scored.</p></div></div>
- <div class="grid kpis">${kpi('Bids received', rows.length, `${open.length} open for decision`, 'vendor')}${kpi('Bids scored', `${scored} of ${rows.length}`, ev.complete ? 'Every bid has a technical score' : 'Score every bid to rank them', 'evaluate')}${kpi('Technical weighting', pct(ev.technicalWeight), 'Set on the RFQ', 'evaluate')}${kpi('Price weighting', pct(ev.priceWeight), 'Relative to the lowest bid', 'account')}${kpi('Lowest bid', lowest ? money(lowest.amount) : '—', lowest ? lowest.vendor : 'No bids yet', 'account')}${kpi(awarded ? 'Awarded to' : 'Top weighted score', awarded ? awarded.vendor : (top ? `${top.weighted.toFixed(1)}%` : '—'), awarded ? `${awarded.id} accepted` : (top ? top.vendor : 'Waiting for scores'), 'approve')}</div>
- ${card('Quotation and bid comparison', canScore && open.length ? 'Enter a technical score from 0 to 100 for each bid, then save.' : 'Scores, prices and weighted ranking for this tender', table(['Rank', 'Vendor', 'Technical', 'Price', 'Weighted score', 'Bid total', 'Status'], tableRows.length ? tableRows : ['<tr><td colspan="7" class="muted">No quotations have been submitted for this tender.</td></tr>']))}</div>`;
+  return __pr23SourcingWorkspace(t.id, 'evaluation');
 }
 
-/** Open quotations a tender can be awarded to, for the V6 award panel. */
-function __pr23AwardOptions(tenderId) {
-  if (!tenderId) return [];
-  const ev = __pr23EvaluationRows(tenderId);
-  if (ev.rows.some(r => r.rawStatus === 'ACCEPTED')) return [];
-  const open = ev.rows.filter(r => r.open);
-  const top = ev.complete ? open.reduce((m, r) => (r.weighted != null && (m == null || r.weighted > m.weighted) ? r : m), null) : null;
-  return open.map(r => ({
-    name: `${r.vendor} (${r.id})`,
-    value: r.recordId,
-    score: r.weighted == null ? null : Number(r.weighted.toFixed(1)),
-    total: r.amount,
-    recommended: Boolean(top && top.recordId === r.recordId),
-  }));
-}
+/** The V6 award panel is retired: an award follows an approved recommendation, made on the event's own page. */
+function __pr23AwardOptions() { return []; }
 
 function __pr23AwardClosedHtml(tenderId) {
-  const awarded = tenderId ? __pr23EvaluationRows(tenderId).rows.find(r => r.rawStatus === 'ACCEPTED') : null;
-  const message = awarded
-    ? `${awarded.vendor} was awarded (${awarded.id}); its purchase order has been raised.`
-    : !__pr23Can('rfq.award')
-      ? 'Recording the winning bidder needs the award permission (Procurement Manager).'
-      : 'No open quotation is available to award.';
-  return `<section class="award-panel-v6"><div class="layer-toolbar"><div><span class="eyebrow">Final award decision</span><h3 style="margin:4px 0">${awarded ? 'Awarded' : 'No award to record'}</h3><p class="muted">${__pr23Esc(message)}</p></div></div></section>`;
+  const t = (state.tenders || []).find(x => x.id === tenderId);
+  const message = t && t.stage === 'Awarded'
+    ? 'This event has been awarded.'
+    : 'An award follows an approved recommendation. Prepare it on the event\'s Award recommendation tab; it goes through the configured approvers, then the award is finalised.';
+  return `<section class="award-panel-v6"><div class="layer-toolbar"><div><span class="eyebrow">Final award decision</span><h3 style="margin:4px 0">${t && t.stage === 'Awarded' ? 'Awarded' : 'Award recommendation'}</h3><p class="muted">${__pr23Esc(message)}</p></div></div></section>`;
 }
 
 // ---------------------------------------------------------------- quotation comparison
 
-/** Status chip for a tender in the comparison register: awarded, or how many bids are scored. */
+/** Status chip for a tender in the comparison register, from the server's phase. */
 function __pr23QuotationChip(tenderId) {
-  const rows = __pr23EvaluationRows(tenderId).rows;
-  if (rows.some(r => r.rawStatus === 'ACCEPTED')) return '<span class="vendor-doc-chip-v6 valid">Awarded</span>';
-  const scored = rows.filter(r => r.evaluationScore != null).length;
-  return `<span class="vendor-doc-chip-v6 ${rows.length && scored === rows.length ? 'valid' : 'expiring'}">${scored} of ${rows.length} scored</span>`;
+  const t = (state.tenders || []).find(x => x.id === tenderId);
+  if (!t) return '';
+  if (t.stage === 'Awarded') return '<span class="vendor-doc-chip-v6 valid">Awarded</span>';
+  if (t.phase === 'OPEN') return '<span class="vendor-doc-chip-v6 expiring">Sealed until the deadline</span>';
+  if (t.phase === 'CLOSED_SEALED') return '<span class="vendor-doc-chip-v6 expiring">Awaiting opening</span>';
+  return '<span class="vendor-doc-chip-v6 valid">Opened</span>';
 }
 
-/** The tender's real quotations side by side: totals, terms, scores and quoted line prices. */
 function __pr23QuotationWorkspaceHtml(id) {
-  const back = `<div class="breadcrumbs"><button data-action="back-quotation-list-v5">Quotation Comparison</button><i>›</i><span>${__pr23Esc(id)}</span></div>`;
-  const t = (state.tenders || []).find(x => x.id === id);
-  if (!t) return `<div class="page">${back}${pageHead('Tender-specific comparison', 'Tender not found', 'This tender is no longer in your register.', '')}</div>`;
-  const rows = __pr23EvaluationRows(t.id).rows;
-  const extreme = (vals, pick) => { const nums = vals.filter(v => v != null); return nums.length > 1 ? pick(...nums) : null; };
-  const shade = (v, vals, higherIsBetter) => {
-    if (v == null) return '';
-    if (v === extreme(vals, higherIsBetter ? Math.max : Math.min)) return 'quote-best-v7';
-    if (v === extreme(vals, higherIsBetter ? Math.min : Math.max)) return 'quote-worst-v7';
-    return '';
+  return __pr23SourcingWorkspace(id, 'comparison');
+}
+
+// ---------------------------------------------------------------- sourcing: capture, opening, comparison, evaluation, award (SRD §15-§20)
+
+/**
+ * The sourcing workspace of one event. Data comes from state.sourcingV23[rfqRecordId], loaded by the host when the event is
+ * opened (window.__pr23Sourcing.load). The server decides what each person may see: a sealed event's page shows a count and
+ * the reason, and nothing of the submissions is ever in the page's data.
+ */
+const __PR23_PHASE_LABEL = { OPEN: 'Sealed until the deadline', CLOSED_SEALED: 'Closed, awaiting opening', OPENED: 'Opened' };
+const __PR23_METHOD_CHIP = { VENDOR_PORTAL: 'Vendor portal', STAFF_CAPTURE: 'Captured by procurement' };
+
+function __pr23DateTime(iso) {
+  const d = new Date(iso);
+  if (!iso || Number.isNaN(d.getTime())) return '—';
+  return `${d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })} ${d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}`;
+}
+
+function __pr23SrcOf(tenderId) {
+  const t = (state.tenders || []).find(x => x.id === tenderId || x.recordId === tenderId);
+  if (!t) return { tender: null, data: null };
+  const data = (state.sourcingV23 || {})[t.recordId] || null;
+  if (!data && window.__pr23Sourcing && typeof window.__pr23Sourcing.load === 'function') window.__pr23Sourcing.load(t.recordId);
+  return { tender: t, data };
+}
+
+function __pr23SrcTab(tenderId, entry) {
+  const tabs = state.sourcingTabV23 || (state.sourcingTabV23 = {});
+  if (!tabs[tenderId]) tabs[tenderId] = entry;
+  return tabs[tenderId];
+}
+
+function __pr23CurrencyAmount(v, code) {
+  return v == null ? '—' : `${__pr23Cents(v)}${code ? ` ${__pr23Esc(code)}` : ''}`;
+}
+
+function __pr23SourcingWorkspace(tenderId, entry) {
+  const back = entry === 'evaluation'
+    ? '<div class="breadcrumbs"><button data-action="back-evaluations">Bid Evaluation</button><i>›</i><span>' + __pr23Esc(tenderId) + '</span></div>'
+    : '<div class="breadcrumbs"><button data-action="back-quotation-list-v5">Quotation Comparison</button><i>›</i><span>' + __pr23Esc(tenderId) + '</span></div>';
+  const { tender, data } = __pr23SrcOf(tenderId);
+  if (!tender) return `<div class="page">${back}${pageHead('Sourcing event', 'Event not found', 'This event is no longer in your register.', '')}</div>`;
+  if (!data || data.loading) return `<div class="page">${back}${pageHead('Sourcing event', __pr23Esc(tender.title), __pr23Esc(tender.id), '')}<div class="card"><div class="card-body"><p class="muted" data-sourcing-loading>Loading the event…</p></div></div></div>`;
+  if (data.error) return `<div class="page">${back}${pageHead('Sourcing event', __pr23Esc(tender.title), __pr23Esc(tender.id), '')}<div class="notice"><div><strong>The event could not be loaded</strong><p>${__pr23Esc(data.error)}</p></div></div></div>`;
+  const s = data.state;
+  // A sealed or unreleased event opens on its overview; a released one opens where the person came from.
+  const released = s.phase === 'OPENED' && s.level !== 'COUNT';
+  const tab = __pr23SrcTab(tenderId, released ? (entry === 'evaluation' ? 'evaluation' : 'comparison') : 'overview');
+  const tabs = [['overview', 'Overview'], ['comparison', 'Submissions and comparison'], ['evaluation', 'Evaluation'], ['recommendation', 'Award recommendation']];
+  const tabBar = `<div class="settings-tabs-v5" style="margin-bottom:14px">${tabs.map(([k, l]) => `<button class="tab ${tab === k ? 'active' : ''}" data-action="sourcing-tab-v23" data-id="${__pr23Esc(tenderId)}" data-tab="${k}">${l}</button>`).join('')}</div>`;
+  const phaseChip = `<span class="status ${s.phase === 'OPENED' ? 'green' : 'amber'}">${__pr23Esc(__PR23_PHASE_LABEL[s.phase] || s.phase)}</span>`;
+  const head = pageHead(entry === 'evaluation' ? 'Governed decisioning' : 'Tender-specific comparison', __pr23Esc(tender.title),
+    `${__pr23Esc(tender.id)} · ${s.submissions} submission${s.submissions === 1 ? '' : 's'} · closes ${__pr23Esc(tender.close)}`, phaseChip);
+  const body = tab === 'comparison' ? __pr23SrcComparison(tender, data)
+    : tab === 'evaluation' ? __pr23SrcEvaluation(tender, data)
+      : tab === 'recommendation' ? __pr23SrcRecommendation(tender, data)
+        : __pr23SrcOverview(tender, data);
+  return `<div class="page">${back}${head}${tabBar}${body}</div>`;
+}
+
+function __pr23SrcOverview(tender, data) {
+  const s = data.state;
+  const sealedNote = s.level === 'COUNT'
+    ? `<div class="notice" style="margin-bottom:14px"><div><strong>${s.phase === 'OPENED' ? 'Submissions are not released to you' : 'Submissions are sealed'}</strong><p>${__pr23Esc(s.reason || '')} ${s.submissions} submission${s.submissions === 1 ? ' is' : 's are'} held; nothing more is visible to anyone yet.</p></div></div>`
+    : '';
+  const open = s.opening;
+  const openingCard = open
+    ? card('Bid opening', 'The formal opening record. It is fixed once written and cannot be altered.',
+      `<div class="card-body"><div class="source-meta"><div><span>Opened</span><strong>${__pr23Esc(__pr23DateTime(open.openedAt))}</strong></div><div><span>Opened by</span><strong>${__pr23Esc((open.openedBy && open.openedBy.name) || '—')}</strong></div><div><span>Submissions</span><strong>${open.submissionsCount}</strong></div><div><span>Record hash</span><strong title="${__pr23Esc(open.recordSha256 || '')}">${__pr23Esc(String(open.recordSha256 || '').slice(0, 12))}…</strong></div></div>`
+      + `<h4 style="margin:14px 0 6px">Present at the opening</h4>` + __pr23LinesTable(['Name', 'Role', 'Type'], (open.attendees || []).map(a => `<tr><td>${__pr23Esc(a.name)}</td><td>${__pr23Esc(a.role || '—')}</td><td>${a.external ? 'External observer' : 'Staff'}</td></tr>`)) + (open.notes ? `<p style="margin:10px 0 0">${__pr23Esc(open.notes)}</p>` : '') + '</div>')
+    : card('Bid opening', 'Sealed submissions are opened by an authorised user after the closing deadline, in the presence of recorded attendees.',
+      `<div class="card-body"><p style="margin:0 0 10px">${s.phase === 'OPEN' ? `Submissions stay sealed until the deadline (${__pr23Esc(tender.close)}).` : 'The deadline has passed. The bids have not yet been opened.'}</p>${s.can.open && s.phase === 'CLOSED_SEALED' ? __pr23ActionButton('Open bids', 'open-bids-modal-v23', tender.recordId, 'primary', 'approve') : (s.phase === 'CLOSED_SEALED' ? '<p class="muted" style="margin:0">Only a user holding the bid-opening authority can open them.</p>' : '')}</div>`);
+  const critRows = (s.criteria || []).map(c => `<tr><td><strong>${__pr23Esc(c.name)}</strong><br><span class="muted">${c.kind === 'PRICE' ? 'Commercial' : __pr23Esc(__pr23Label(c.category))}</span></td><td>${c.kind === 'PASS_FAIL' ? (c.mandatory ? 'Pass or fail · mandatory' : 'Pass or fail') : c.kind === 'PRICE' ? 'Price · computed' : `Scored 0 to ${c.maxScore}`}</td><td>${c.kind === 'PASS_FAIL' ? '—' : `${c.weight}%`}</td></tr>`);
+  const canSetup = s.can.manage && s.phase !== 'OPENED' && !s.rfq.criteriaLockedAt;
+  const setup = card('Evaluation set-up', s.rfq.criteriaLockedAt ? 'Criteria are locked from the moment the bids are opened.' : 'Criteria and the committee are set before the bids are opened.',
+    `<div class="card-body">${critRows.length ? __pr23LinesTable(['Criterion', 'How it is assessed', 'Weight'], critRows) : '<p class="muted" style="margin:0">No criteria are set.</p>'}
+      <div class="source-meta" style="margin-top:12px"><div><span>Mode</span><strong>${s.rfq.evaluationMode === 'TWO_ENVELOPE' ? 'Two envelope: prices are released to an evaluator after their technical scorecard' : 'Single envelope'}</strong></div><div><span>Pass rule</span><strong>${s.rfq.passRule === 'MAJORITY' ? 'Majority of evaluators' : 'Every evaluator'}</strong></div><div><span>Evaluators needed</span><strong>${s.rfq.minEvaluators}</strong></div></div>
+      <h4 style="margin:14px 0 6px">Committee</h4>${__pr23LinesTable(['Member', 'Role', 'Declaration', 'Scorecard'], (s.committee || []).map(m => `<tr><td>${__pr23Esc(m.name)}</td><td>${__pr23Esc(__pr23Label(m.role))}</td><td>${m.recused ? '<span class="status red">Recused</span>' : m.declared ? __pr23Esc(((s.declarationOptions || []).find(o => o.code === m.declaration) || {}).label || m.declaration) : '<span class="muted">Not yet declared</span>'}</td><td>${m.scorecardSubmittedAt ? `Submitted ${__pr23Esc(__pr23DateTime(m.scorecardSubmittedAt))}` : '<span class="muted">Not submitted</span>'}</td></tr>`).concat((s.committee || []).length ? [] : ['<tr><td colspan="4" class="muted">No committee has been appointed.</td></tr>']))}
+      ${canSetup ? `<div style="margin-top:12px;display:flex;gap:8px;flex-wrap:wrap">${__pr23ActionButton('Set criteria', 'criteria-modal-v23', tender.recordId, 'primary', 'settings')}${__pr23ActionButton('Appoint committee', 'committee-modal-v23', tender.recordId, '', 'user')}</div>` : ''}</div>`);
+  const capture = s.can.capture && s.phase !== 'OPENED'
+    ? card('Capture a quotation', 'For a quotation that arrived by an approved alternative channel. It is recorded exactly like a portal submission, with the supplier\'s original document kept.',
+      `<div class="card-body">${__pr23ActionButton('Capture quotation', 'capture-modal-v23', tender.recordId, 'primary', 'upload')}</div>`) : '';
+  return sealedNote + `<div class="grid kpis">${kpi('Phase', __pr23PhaseWord(s.phase), s.reason || 'Submissions released by role', 'audit')}${kpi('Submissions', s.submissions, s.phase === 'OPENED' ? 'Received' : 'Held sealed', 'vendor')}${kpi('Your access', s.level === 'FULL' ? 'Full' : s.level === 'EVALUATOR' ? 'Evaluator' : 'Count only', s.priceVisible ? 'Prices visible' : 'Prices not released to you', 'evaluate')}${kpi('Evaluation', `${(s.committee || []).filter(m => m.scorecardSubmittedAt).length} of ${(s.committee || []).filter(m => !m.recused).length}`, 'Scorecards submitted', 'approve')}</div><div style="height:14px"></div>${openingCard}<div style="height:14px"></div>${setup}${capture ? `<div style="height:14px"></div>${capture}` : ''}`;
+}
+
+function __pr23PhaseWord(p) { return p === 'OPEN' ? 'Sealed' : p === 'CLOSED_SEALED' ? 'Awaiting opening' : 'Opened'; }
+
+function __pr23SrcComparison(tender, data) {
+  const c = data.comparison;
+  const s = data.state;
+  if (!c) return '<div class="notice"><div><strong>The comparison could not be loaded</strong><p>Refresh the page.</p></div></div>';
+  if (c.level === 'COUNT') {
+    return `<div class="notice"><div><strong>${c.phase === 'OPENED' ? 'Not released to you' : 'Sealed'}</strong><p>${__pr23Esc(c.reason || '')}</p><p>${c.submissions} submission${c.submissions === 1 ? '' : 's'} received.</p></div></div>`;
+  }
+  const cols = c.columns || [];
+  const head = `<th>Measure</th>${cols.map(col => `<th><strong>${__pr23Esc(col.supplier.name)}</strong><br><span class="muted">${__pr23Esc(col.quotationNumber)}${col.quotationReference ? ` · ${__pr23Esc(col.quotationReference)}` : ''}</span><br><span class="vendor-doc-chip-v6 ${col.submissionMethod === 'STAFF_CAPTURE' ? 'expiring' : 'valid'}">${__pr23Esc(__PR23_METHOD_CHIP[col.submissionMethod] || col.submissionMethod)}${col.captureChannel ? ` · ${__pr23Esc(__pr23Label(col.captureChannel))}` : ''}</span><br><span class="muted">${__pr23Esc(__pr23DateTime(col.submittedAt))}</span>${col.disqualified ? `<br><span class="status red">Failed: ${__pr23Esc((col.failedCriteria || []).join(', '))}</span>` : ''}${col.comparable === false ? `<br><span class="status amber">Not comparable</span>` : ''}</th>`).join('')}`;
+  const cell = (row, col) => {
+    const v = row.values[col.quotationId];
+    if (v == null) return `<td class="muted">${c.priceVisible || !['quotedAmount', 'currency', 'comparableAmount', 'vat', 'commercialScore', 'totalScore'].includes(row.key) ? '—' : 'Withheld'}</td>`;
+    switch (row.key) {
+      case 'quotedAmount': return `<td class="money">${__pr23Cents(v)}</td>`;
+      case 'comparableAmount': return `<td class="money">${__pr23Cents(v)}</td>`;
+      case 'vat': return `<td>${__pr23Cents(v.amount)}${v.rate != null ? `<br><span class="muted">${(v.rate * 100).toFixed(1).replace(/\.0$/, '')}%</span>` : ''}</td>`;
+      case 'deliveryPeriod': return `<td>${__pr23Esc(v.text || '—')}${v.days != null ? `<br><span class="muted">${v.days} days</span>` : ''}</td>`;
+      case 'validity': return `<td>${v.validUntil ? __pr23Esc(__pr23DayLabel(v.validUntil)) : '—'}${v.expired ? '<br><span class="status red">Expired</span>' : ''}</td>`;
+      case 'compliance': return `<td>${v === 'PASSED' ? '<span class="status green">Passed</span>' : v === 'FAILED' ? '<span class="status red">Failed</span>' : v === 'NOT_REQUIRED' ? '<span class="muted">Not required</span>' : '<span class="status amber">Pending</span>'}</td>`;
+      case 'technicalScore': case 'commercialScore': case 'totalScore': return `<td><strong>${Number(v).toFixed(2)}</strong></td>`;
+      default: return `<td>${__pr23Esc(v)}</td>`;
+    }
   };
-  const pct = v => (v == null ? '—' : `${Math.round(v)}%`);
-  const totals = rows.map(r => r.amount), techs = rows.map(r => r.evaluationScore), prices = rows.map(r => r.priceScore), weights = rows.map(r => r.weighted);
-  const quoteRows = rows.map(r => `<tr><td><strong>${__pr23Esc(r.vendor)}</strong><br><span class="muted">${__pr23Esc(r.id)}</span></td><td class="${shade(r.amount, totals, false)}">${money(r.amount)}</td><td>${__pr23Esc(r.deliveryTime || '—')}</td><td>${__pr23Esc(r.paymentTerms || '—')}</td><td class="${shade(r.evaluationScore, techs, true)}">${pct(r.evaluationScore)}</td><td class="${shade(r.priceScore, prices, true)}">${pct(r.priceScore)}</td><td class="${shade(r.weighted, weights, true)}"><strong>${r.weighted == null ? 'Not scored' : `${r.weighted.toFixed(1)}%`}</strong></td><td>${status(r.status)}</td></tr>`);
-  const names = [...new Set(rows.flatMap(r => (r.items || []).map(i => i.itemName)))];
-  const lineRows = names.map(name => {
-    const amounts = rows.map(r => ((r.items || []).find(i => i.itemName === name) || {}).lineTotal ?? null);
-    const quantity = (rows.flatMap(r => r.items || []).find(i => i.itemName === name) || {}).quantity;
-    return `<tr><td><strong>${__pr23Esc(name)}</strong></td><td>${quantity == null ? '—' : quantity}</td>${amounts.map(a => `<td class="${shade(a, amounts, false)}">${money(a)}</td>`).join('')}</tr>`;
+  const bodyRows = (c.rows || []).map(r => `<tr><td><strong>${__pr23Esc(r.label)}</strong></td>${cols.map(col => cell(r, col)).join('')}</tr>`).join('');
+  const docRows = cols.map(col => `<tr><td><strong>${__pr23Esc(col.supplier.name)}</strong></td><td>${((c.documents || {})[col.quotationId] || []).map(d => `<div style="margin-bottom:4px"><button class="btn small" data-action="download-quotation-doc-v23" data-path="${__pr23Esc(d.downloadPath)}" data-name="${__pr23Esc(d.fileName)}">${__pr23Esc(d.fileName)}</button> <span class="muted">${__pr23Esc(__pr23Label(d.envelope))} · v${d.version}${d.status === 'SUPERSEDED' ? ' · superseded' : ''} · ${__pr23Esc(d.sha256.slice(0, 10))}…</span></div>`).join('') || '<span class="muted">No document is released to you.</span>'}</td></tr>`);
+  const fx = c.fx
+    ? `<div class="notice" style="margin-bottom:14px"><div><strong>Currencies</strong><p>${__pr23Esc(c.fx.basis)}${c.fx.reportingCurrencyCode ? ` into ${__pr23Esc(c.fx.reportingCurrencyCode)}` : ''} as at ${__pr23Esc(__pr23DateTime(c.fx.asOf))}. ${(c.fx.rates || []).filter(x => x.currency !== c.fx.reportingCurrencyCode).map(x => x.rate != null ? `${__pr23Esc(x.currency)} at ${x.rate}${x.source === 'STATED' ? ` (stated: ${__pr23Esc(x.reason || '')})` : ''}` : `${__pr23Esc(x.currency)}: no rate on record, so not comparable`).join('; ')}</p>${s.can.open && (c.fx.rates || []).some(x => x.source === 'MISSING') ? (c.fx.rates || []).filter(x => x.source === 'MISSING').map(x => __pr23ActionButton(`State a rate for ${x.currency}`, 'fx-modal-v23', `${tender.recordId}|${x.currency}`, '', 'settings')).join(' ') : ''}</div></div>`
+    : '';
+  const advisory = c.advisory
+    ? `<div class="notice" style="margin-bottom:14px"><div><strong>Advisory ranking</strong><p>${__pr23Esc(c.advisory.notice)} ${c.advisory.ranking.map(r => `${r.rank}. ${__pr23Esc(r.supplier)}`).join(' · ')}</p></div></div>`
+    : `<div class="notice" style="margin-bottom:14px"><div><strong>No supplier is selected by the system</strong><p>${__pr23Esc(c.autoSelectionNotice)}${c.evaluation && !c.evaluation.complete ? ' A ranking appears when the evaluation is complete.' : ''}</p></div></div>`;
+  const priceNote = c.priceNotice ? `<div class="notice" style="margin-bottom:14px"><div><strong>Prices are not yet released to you</strong><p>${__pr23Esc(c.priceNotice)}.</p></div></div>` : '';
+  return advisory + fx + priceNote
+    + card('Supplier comparison', 'One column per supplier. Everything shown is what your role is released to see.', `<div class="table-wrap"><table style="min-width:620px"><thead><tr>${head}</tr></thead><tbody>${bodyRows || `<tr><td colspan="${cols.length + 1}" class="muted">No submissions.</td></tr>`}</tbody></table></div>`)
+    + '<div style="height:14px"></div>'
+    + card('Original documents', 'What each supplier submitted, exactly as received. A document opens from here, checked against its recorded checksum.', table(['Supplier', 'Documents'], docRows.length ? docRows : ['<tr><td colspan="2" class="muted">No submissions.</td></tr>']));
+}
+
+function __pr23SrcEvaluation(tender, data) {
+  const s = data.state;
+  const me = s.me;
+  const parts = [];
+  if (s.phase !== 'OPENED') {
+    parts.push(`<div class="notice"><div><strong>Evaluation opens with the bids</strong><p>${__pr23Esc(s.reason || '')} Members of the committee confirm their declaration and score once the bids are opened.</p></div></div>`);
+  }
+  if (me) {
+    // Declaration
+    const opts = s.declarationOptions || [];
+    if (me.recused) parts.push(`<div class="notice"><div><strong>You are recused from this evaluation</strong><p>You have no access to its submissions and your marks are not counted.</p></div></div>`);
+    else if (!me.declaration || !me.scorecardSubmittedAt) {
+      parts.push(card('Your declaration', me.declaration ? 'You can change it until you submit your scorecard.' : 'Required before you can see submissions or score.',
+        `<form id="declarationFormV23" class="form-grid" onsubmit="return false"><input type="hidden" name="rfqId" value="${__pr23Esc(tender.recordId)}">${opts.map(o => `<div class="field full"><label style="display:flex;gap:8px;align-items:flex-start"><input type="radio" name="code" value="${__pr23Esc(o.code)}" ${me.declaration === o.code ? 'checked' : ''}><span><strong>${__pr23Esc(o.label)}</strong><br><span class="muted">${__pr23Esc(o.statement)}</span></span></label></div>`).join('')}<div class="field full"><label>Details (needed for a disclosure or a recusal)</label><textarea name="details" rows="2"></textarea></div><div class="field full">${__pr23ActionButton('Confirm declaration', 'declare-v23', tender.recordId, 'primary', 'approve')}</div></form>`));
+    }
+  }
+  const cons = data.consolidation;
+  if (me && !me.recused && me.declaration && s.phase === 'OPENED') parts.push(__pr23SrcScorecard(tender, data));
+  if (cons && s.level !== 'COUNT') parts.push(__pr23SrcConsolidation(tender, data));
+  if (!me && s.level === 'COUNT') parts.push(`<div class="notice"><div><strong>You are not on this evaluation committee</strong><p>Committee members see the scorecard here after the bids are opened.</p></div></div>`);
+  return parts.join('<div style="height:14px"></div>');
+}
+
+function __pr23SrcScorecard(tender, data) {
+  const s = data.state;
+  const c = data.comparison;
+  const card1 = data.scorecard || { submittedAt: null, scores: [], notes: [] };
+  const criteria = (s.criteria || []).filter(x => x.kind !== 'PRICE');
+  if (!c || !(c.columns || []).length) return card('Your scorecard', '', '<div class="card-body"><p class="muted" style="margin:0">There are no submissions to score.</p></div>');
+  const locked = Boolean(card1.submittedAt);
+  const val = (q, cr) => (card1.scores || []).find(x => x.quotationId === q && x.criterionId === cr);
+  const blocks = c.columns.map(col => {
+    const rows = criteria.map(cr => {
+      const v = val(col.quotationId, cr.id);
+      const input = cr.kind === 'PASS_FAIL'
+        ? `<select name="pass" data-criterion="${__pr23Esc(cr.id)}" ${locked ? 'disabled' : ''}><option value="">Choose</option><option value="true"${v && v.passed === true ? ' selected' : ''}>Pass</option><option value="false"${v && v.passed === false ? ' selected' : ''}>Fail</option></select>`
+        : `<input type="number" min="0" max="${cr.maxScore}" step="0.5" name="score" data-criterion="${__pr23Esc(cr.id)}" value="${v && v.score != null ? __pr23Esc(v.score) : ''}" style="width:90px" ${locked ? 'disabled' : ''} placeholder="0-${cr.maxScore}">`;
+      return `<tr><td><strong>${__pr23Esc(cr.name)}</strong><br><span class="muted">${cr.kind === 'PASS_FAIL' ? (cr.mandatory ? 'Mandatory pass or fail' : 'Pass or fail') : `Weight ${cr.weight}%`}</span></td><td>${input}</td></tr>`;
+    }).join('');
+    const note = (card1.notes || []).find(n => n.quotationId === col.quotationId);
+    return `<div class="card" style="margin-bottom:12px" data-scorecard-quote="${__pr23Esc(col.quotationId)}"><div class="card-head"><div><h3>${__pr23Esc(col.supplier.name)}</h3><p class="muted">${__pr23Esc(col.quotationNumber)}</p></div>${locked ? '' : __pr23ActionButton('Save marks', 'save-scores-v23', `${tender.recordId}|${col.quotationId}`, '', 'approve')}</div><div class="card-body">${__pr23LinesTable(['Criterion', 'Your mark'], [rows])}<label style="display:block;margin-top:8px;font-size:12px">Comments<textarea name="comment" rows="2" style="width:100%" ${locked ? 'disabled' : ''}>${__pr23Esc(note ? note.comment || '' : '')}</textarea></label></div></div>`;
+  }).join('');
+  const priceNote = s.priceVisible ? '' : '<div class="notice" style="margin-bottom:12px"><div><strong>Prices are released after you submit</strong><p>This is a two-envelope evaluation: you score the technical submissions first, then the prices are released to you.</p></div></div>';
+  return card('Your scorecard', locked ? `Submitted ${__pr23DateTime(card1.submittedAt)}. It is now fixed.` : 'Score every criterion for every bid, save, then submit. The price criterion is computed; you do not score it.',
+    `<div class="card-body">${priceNote}${blocks}${locked ? '' : `<div>${__pr23ActionButton('Submit scorecard', 'submit-scorecard-v23', tender.recordId, 'primary', 'approve')}</div>`}</div>`);
+}
+
+function __pr23SrcConsolidation(tender, data) {
+  const cons = data.consolidation;
+  const s = data.state;
+  const names = new Map(((data.comparison && data.comparison.columns) || []).map(c => [c.quotationId, c.supplier.name]));
+  if (cons.resultsWithheld) return card('Committee result', '', `<div class="card-body"><p class="muted" style="margin:0">The committee's result is shown once you have submitted your own scorecard, so scoring stays independent.</p></div>`);
+  const critHeads = (cons.criteria || []).filter(c => c.kind !== 'PRICE');
+  const rows = (cons.rows || []).map(r => {
+    const cells = critHeads.map(c => { const p = (r.perCriterion || []).find(x => x.criterionId === c.id); return `<td>${!p ? '—' : c.kind === 'PASS_FAIL' ? (p.passed == null ? '—' : p.passed ? 'Pass' : '<span class="status red">Fail</span>') : (p.mark == null ? '—' : Number(p.mark).toFixed(2))}</td>`; }).join('');
+    return `<tr><td><strong>${__pr23Esc(names.get(r.quotationId) || r.quotationId)}</strong>${r.disqualified ? `<br><span class="status red">Excluded: ${__pr23Esc((r.failedCriteria || []).join(', '))}</span>` : ''}</td>${cells}<td>${r.technicalScore == null ? '—' : Number(r.technicalScore).toFixed(2)}</td><td>${r.commercialScore == null ? '—' : Number(r.commercialScore).toFixed(2)}</td><td><strong>${r.totalScore == null ? '—' : Number(r.totalScore).toFixed(2)}</strong></td><td>${r.advisoryRank ? `${r.advisoryRank} <span class="muted">advisory</span>` : '—'}</td></tr>`;
   });
-  const actions = `<button class="btn primary" data-action="open-evaluation" data-id="${__pr23Esc(t.id)}">Open bid evaluation</button>`;
-  return `<div class="page">${back}${pageHead('Tender-specific comparison', __pr23Esc(t.title), `${__pr23Esc(t.id)} · ${__pr23Esc(t.entity)} · ${rows.length} supplier response${rows.length === 1 ? '' : 's'}`, actions)}
- <div class="comparison-colour-key-v7"><span><i class="best"></i>Best result for this line or measure</span><span><i class="worst"></i>Weakest result</span><em>Scores come from Bid Evaluation; shading is advisory and the award is the authorised user's decision.</em></div>
- ${card('Quotation comparison', 'Totals include VAT as quoted; line prices below exclude it', table(['Vendor', 'Total', 'Delivery', 'Payment terms', 'Technical', 'Price', 'Weighted', 'Status'], quoteRows.length ? quoteRows : ['<tr><td colspan="8" class="muted">No quotations have been submitted for this tender.</td></tr>']))}
- <div style="height:14px"></div>
- ${card('Line-item comparison', 'Quantity × unit price as quoted by each vendor', table(['Item', 'Quantity', ...rows.map(r => __pr23Esc(r.vendor))], lineRows.length ? lineRows : [`<tr><td colspan="${2 + rows.length}" class="muted">No line items were quoted.</td></tr>`]))}</div>`;
+  const ind = (cons.individual || []).length
+    ? `<h4 style="margin:14px 0 6px">Individual scorecards</h4>${__pr23LinesTable(['Evaluator', ...critHeads.map(c => __pr23Esc(c.name))], (cons.individual || []).flatMap(ev => (cons.rows || []).map(r => `<tr><td>${__pr23Esc(ev.name)}<br><span class="muted">${__pr23Esc(names.get(r.quotationId) || '')}</span></td>${critHeads.map(c => { const x = ev.scores.find(y => y.quotationId === r.quotationId && y.criterionId === c.id); return `<td>${!x ? '—' : c.kind === 'PASS_FAIL' ? (x.passed ? 'Pass' : 'Fail') : x.score}</td>`; }).join('')}</tr>`)))}`
+    : '';
+  const status = `${cons.countedEvaluators} scorecard${cons.countedEvaluators === 1 ? '' : 's'} counted${cons.pendingEvaluators.length ? `; waiting for ${cons.pendingEvaluators.map(n => __pr23Esc(n)).join(', ')}` : ''}. ${cons.complete ? 'The evaluation is complete.' : 'The evaluation is not complete.'}`;
+  return card('Committee result', 'Marks are the average of the counted evaluators. The technical score weights the scored criteria; the commercial score is the price mark; the total weights both. Recused members are not counted.',
+    `<div class="card-body"><p style="margin:0 0 10px">${status}</p>${__pr23LinesTable(['Supplier', ...critHeads.map(c => __pr23Esc(c.name)), 'Technical', 'Commercial', 'Total', 'Rank'], rows.length ? rows : ['<tr><td colspan="9" class="muted">No submissions.</td></tr>'])}${ind}</div>`);
+}
+
+function __pr23SrcRecommendation(tender, data) {
+  const s = data.state;
+  const rec = s.recommendation;
+  const cons = data.consolidation;
+  const c = data.comparison;
+  const parts = [];
+  if (s.phase !== 'OPENED') return `<div class="notice"><div><strong>Nothing to recommend yet</strong><p>${__pr23Esc(s.reason || '')}</p></div></div>`;
+  if (rec) {
+    const route = rec.route ? __pr23LinesTable(['Step', 'Approvers', 'Status'], rec.route.steps.map(st => `<tr><td>${st.stepNumber}. ${__pr23Esc(st.name)}</td><td>${st.approvers.map(a => __pr23Esc(a.name)).join(', ')}</td><td>${__pr23Esc(__pr23Label(st.status))}</td></tr>`)) : '<p class="muted" style="margin:0">Not yet submitted to the approval route.</p>';
+    const hist = (rec.decisions || []).length ? `<h4 style="margin:14px 0 6px">Decision history</h4>${__pr23LinesTable(['When', 'Who', 'Action', 'Comments'], rec.decisions.map(d => `<tr><td>${__pr23Esc(__pr23DateTime(d.at))}</td><td>${__pr23Esc(d.actor ? d.actor.name : '—')}</td><td>${__pr23Esc(__pr23Label(d.action))}</td><td>${__pr23Esc(d.comments || '—')}</td></tr>`))}` : '';
+    const sum = rec.evaluationSummary && rec.evaluationSummary.bids ? `<h4 style="margin:14px 0 6px">Evaluation summary</h4>${__pr23LinesTable(['Supplier', 'Amount', 'Technical', 'Commercial', 'Total', 'Rank'], rec.evaluationSummary.bids.map(b => `<tr><td>${__pr23Esc(b.supplier)}${b.quotationId === (rec.recommendedQuotation && rec.recommendedQuotation.id) ? ' <span class="status green">Recommended</span>' : ''}${b.disqualified ? ' <span class="status red">Excluded</span>' : ''}</td><td class="money">${__pr23CurrencyAmount(b.amount, b.currencyCode)}</td><td>${b.technicalScore == null ? '—' : Number(b.technicalScore).toFixed(2)}</td><td>${b.commercialScore == null ? '—' : Number(b.commercialScore).toFixed(2)}</td><td>${b.totalScore == null ? '—' : Number(b.totalScore).toFixed(2)}</td><td>${b.advisoryRank || '—'}</td></tr>`))}` : '';
+    const isPreparer = rec.preparedBy && (state.currentUserV6 && false);
+    parts.push(card(`Award recommendation, version ${rec.version}`, `${__pr23Label(rec.status)} · prepared by ${rec.preparedBy && rec.preparedBy.name ? rec.preparedBy.name : '—'}`,
+      `<div class="card-body"><div class="source-meta"><div><span>Event</span><strong>${__pr23Esc(tender.id)}</strong></div><div><span>Recommended supplier</span><strong>${__pr23Esc(rec.recommendedQuotation ? (rec.recommendedQuotation.companyName || rec.recommendedQuotation.vendorName) : '—')}</strong></div><div><span>Recommended amount</span><strong>${__pr23CurrencyAmount(rec.recommendedAmount, rec.currencyCode)}</strong></div><div><span>Status</span><strong>${__pr23Esc(__pr23Label(rec.status))}</strong></div></div>
+      <h4 style="margin:14px 0 6px">Procurement justification</h4><p style="margin:0">${__pr23Esc(rec.justification || '')}</p>
+      ${rec.deviations ? `<h4 style="margin:14px 0 6px">Deviations and exceptions</h4><p style="margin:0">${__pr23Esc(rec.deviations)}</p>` : ''}
+      ${(rec.supportingDocuments || []).length ? `<h4 style="margin:14px 0 6px">Supporting documents</h4><p style="margin:0">${rec.supportingDocuments.map(d => __pr23Esc(d.fileName)).join(', ')}</p>` : ''}
+      ${sum}<h4 style="margin:14px 0 6px">Approval route</h4>${route}${hist}
+      ${rec.status === 'DRAFT' && s.can.manage ? `<div style="margin-top:12px">${__pr23ActionButton('Submit for approval', 'submit-recommendation-v23', tender.recordId, 'primary', 'approve')}</div>` : ''}
+      ${rec.status === 'PENDING_APPROVAL' ? `<div class="field full" style="margin-top:12px"><label>Your comments (required to reject)</label><textarea id="recDecisionCommentV23" rows="2" style="width:100%"></textarea></div><div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">${__pr23ActionButton('Approve', 'decide-recommendation-v23', `${tender.recordId}|APPROVE`, 'primary', 'approve')}${__pr23ActionButton('Reject', 'decide-recommendation-v23', `${tender.recordId}|REJECT`, 'danger')}<span class="muted" style="align-self:center">Only an approver on the step it is at can decide.</span></div>` : ''}
+      ${rec.status === 'APPROVED' && s.can.award && rec.recommendedQuotation ? `<div style="margin-top:12px">${__pr23ActionButton('Finalise the award', 'finalise-award-v23', `${tender.recordId}|${rec.recommendedQuotation.id}`, 'primary', 'approve')}</div>` : ''}</div>`));
+  }
+  const canPrepare = (s.can.manage || s.can.award) && (!rec || ['DRAFT', 'REJECTED', 'SUPERSEDED'].includes(rec.status));
+  if (canPrepare) {
+    const rows = (cons && cons.rows) || [];
+    const names = new Map(((c && c.columns) || []).map(x => [x.quotationId, x.supplier.name]));
+    const eligible = rows.filter(r => !r.disqualified && r.totalScore != null);
+    const top = eligible.find(r => r.advisoryRank === 1);
+    const blocked = !cons || !cons.complete;
+    parts.push(card(rec ? 'Prepare a new version' : 'Prepare the award recommendation', 'The amount and currency are taken from the quotation; the recommendation goes through the configured approval route before any award.',
+      blocked
+        ? `<div class="card-body"><p style="margin:0">The evaluation is not complete${cons && cons.pendingEvaluators && cons.pendingEvaluators.length ? `: waiting for ${cons.pendingEvaluators.map(n => __pr23Esc(n)).join(', ')}` : ''}. A recommendation can be prepared once every non-recused member has submitted their scorecard.</p></div>`
+        : `<form id="recommendationFormV23" class="form-grid" onsubmit="return false"><input type="hidden" name="rfqId" value="${__pr23Esc(tender.recordId)}"><div class="field full"><label>Recommended supplier</label><select name="quotationId" required><option value="">Choose a supplier</option>${eligible.map(r => `<option value="${__pr23Esc(r.quotationId)}">${__pr23Esc(names.get(r.quotationId) || r.quotationId)} · total ${Number(r.totalScore).toFixed(2)}${r.advisoryRank ? ` · advisory rank ${r.advisoryRank}` : ''}</option>`).join('')}</select></div><div class="field full"><label>Procurement justification</label><textarea name="justification" rows="3" required></textarea></div><div class="field full"><label>Deviations and exceptions ${top ? `(required if not ${__pr23Esc(names.get(top.quotationId) || 'the highest-scoring bid')})` : ''}</label><textarea name="deviations" rows="2"></textarea></div>${((c && c.documents) ? Object.entries(c.documents).flatMap(([q, ds]) => ds.map(d => ({ q, d }))) : []).length ? `<div class="field full"><label>Supporting documents</label>${Object.entries(c.documents).flatMap(([q, ds]) => ds.map(d => `<label style="display:flex;gap:6px;align-items:center"><input type="checkbox" name="doc" value="${__pr23Esc(d.id)}"> ${__pr23Esc(names.get(q) || '')}: ${__pr23Esc(d.fileName)}</label>`)).join('')}</div>` : ''}<div class="field full">${__pr23ActionButton('Save recommendation', 'prepare-recommendation-v23', tender.recordId, 'primary', 'approve')}</div></form>`));
+  }
+  if (!rec && !canPrepare) parts.push('<div class="notice"><div><strong>No recommendation has been prepared</strong><p>An authorised procurement officer prepares it once the evaluation is complete.</p></div></div>');
+  return parts.join('<div style="height:14px"></div>');
+}
+
+// ---------------------------------------------------------------- sourcing: modals
+
+function __pr23SrcOfRfq(rfqRecordId) {
+  return (state.sourcingV23 || {})[rfqRecordId] || null;
+}
+
+function __pr23PeopleOptions(data, exclude) {
+  return ((data && data.state && data.state.people) || []).filter(p => !exclude || !exclude.includes(p.id))
+    .map(p => `<option value="${__pr23Esc(p.id)}">${__pr23Esc(p.name)}${p.department ? ` · ${__pr23Esc(p.department)}` : ''}</option>`).join('');
+}
+
+/** Formal opening of the bids: the opener plus the people present, all recorded on an opening record that cannot be changed. */
+function __pr23OpenBidsModal(rfqRecordId) {
+  const data = __pr23SrcOfRfq(rfqRecordId);
+  if (!data || !data.state) return;
+  const need = (data.state.settings && data.state.settings.minAttendees) || 2;
+  const rows = [1, 2, 3, 4].map(i => `<div class="form-grid" data-attendee-row style="grid-template-columns:2fr 1fr 1fr;gap:8px;margin-bottom:6px"><select name="attendeeUser"><option value="">${i === 1 ? 'Choose a person present' : 'Another person present (optional)'}</option>${__pr23PeopleOptions(data)}</select><input name="attendeeName" placeholder="Or an external observer's name"><input name="attendeeRole" placeholder="Role or organisation"></div>`).join('');
+  openModal('Open the bids', `${data.state.rfq.rfqNumber} · ${data.state.submissions} submission${data.state.submissions === 1 ? '' : 's'}`,
+    `<form id="openBidsFormV23" class="form-grid"><input type="hidden" name="rfqId" value="${__pr23Esc(rfqRecordId)}"><div class="notice full"><div><strong>What opening does</strong><p>It records the time, you as the person who opened them, and everyone present. It cannot be changed afterwards. The submissions are then released to procurement and to the evaluators who have declared, by role. You are recorded as the person who opened them; add the others present, so that at least ${need} people are on record including you.</p></div></div><div class="field full"><label>Present at the opening</label>${rows}</div><div class="field full"><label>Notes</label><textarea name="notes" rows="2"></textarea></div></form>`,
+    btn('Cancel', 'close-overlay') + btn('Open the bids', 'open-bids-v23', 'primary'));
+}
+
+function __pr23CriteriaRowHtml(c) {
+  c = c || {};
+  const kind = c.kind || 'SCORED';
+  return `<tr data-criterion-row><td><input name="cName" value="${__pr23Esc(c.name || '')}" placeholder="Criterion" style="width:100%"></td><td><select name="cKind"><option value="SCORED"${kind === 'SCORED' ? ' selected' : ''}>Scored</option><option value="PASS_FAIL"${kind === 'PASS_FAIL' ? ' selected' : ''}>Pass or fail</option><option value="PRICE"${kind === 'PRICE' ? ' selected' : ''}>Price (computed)</option></select></td><td><input name="cWeight" type="number" min="0" max="100" step="0.5" value="${c.weight != null ? __pr23Esc(c.weight) : ''}" style="width:72px"></td><td><input name="cMax" type="number" min="1" step="1" value="${c.maxScore != null ? __pr23Esc(c.maxScore) : 10}" style="width:64px"></td><td><label style="display:flex;gap:4px;align-items:center"><input type="checkbox" name="cMandatory"${c.mandatory ? ' checked' : ''}>Mandatory</label></td><td><button type="button" class="btn small" data-action="remove-criterion-row-v23">Remove</button></td></tr>`;
+}
+
+function __pr23CriteriaModal(rfqRecordId) {
+  const data = __pr23SrcOfRfq(rfqRecordId);
+  if (!data || !data.state) return;
+  const s = data.state;
+  const rows = (s.criteria || []).map(__pr23CriteriaRowHtml).join('') || __pr23CriteriaRowHtml({ name: 'Price', kind: 'PRICE', weight: 40 }) + __pr23CriteriaRowHtml({ name: 'Technical capability', kind: 'SCORED', weight: 60, maxScore: 10 });
+  openModal('Evaluation criteria', `${s.rfq.rfqNumber} · weights of the scored and price criteria must total 100`,
+    `<form id="criteriaFormV23"><input type="hidden" name="rfqId" value="${__pr23Esc(rfqRecordId)}"><div style="overflow-x:auto"><table style="width:100%;font-size:13px"><thead><tr><th>Criterion</th><th>Type</th><th>Weight %</th><th>Max mark</th><th></th><th></th></tr></thead><tbody id="criteriaRowsV23">${rows}</tbody></table></div><div style="margin:10px 0"><button type="button" class="btn small" data-action="add-criterion-row-v23">Add a criterion</button>${s.settings && s.settings.hasDefaultCriteria ? ' <button type="button" class="btn small" data-action="default-criteria-v23" data-id="' + __pr23Esc(rfqRecordId) + '">Use the standard set</button>' : ''}</div><div class="form-grid"><div class="field"><label>Evaluation mode</label><select name="evaluationMode"><option value="SINGLE_ENVELOPE"${s.rfq.evaluationMode !== 'TWO_ENVELOPE' ? ' selected' : ''}>Single envelope</option><option value="TWO_ENVELOPE"${s.rfq.evaluationMode === 'TWO_ENVELOPE' ? ' selected' : ''}>Two envelope: prices after the technical scorecard</option></select></div><div class="field"><label>A pass or fail criterion passes when</label><select name="passRule"><option value="ALL"${s.rfq.passRule !== 'MAJORITY' ? ' selected' : ''}>Every evaluator passes it</option><option value="MAJORITY"${s.rfq.passRule === 'MAJORITY' ? ' selected' : ''}>A majority of evaluators pass it</option></select></div><div class="field"><label>Scorecards needed before the evaluation is complete</label><input name="minEvaluators" type="number" min="1" value="${__pr23Esc(s.rfq.minEvaluators || 1)}"></div></div></form>`,
+    btn('Cancel', 'close-overlay') + btn('Save criteria', 'save-criteria-v23', 'primary'));
+}
+
+function __pr23CommitteeModal(rfqRecordId) {
+  const data = __pr23SrcOfRfq(rfqRecordId);
+  if (!data || !data.state) return;
+  const s = data.state;
+  const current = (s.committee || []).map(m => m.userId);
+  const rows = (s.people || []).map(p => {
+    const m = (s.committee || []).find(x => x.userId === p.id);
+    return `<tr data-member-row data-user="${__pr23Esc(p.id)}"><td><input type="checkbox" name="member"${m ? ' checked' : ''}></td><td><strong>${__pr23Esc(p.name)}</strong><br><span class="muted">${__pr23Esc(p.department || '')}</span></td><td><select name="role"><option value="MEMBER"${!m || m.role !== 'CHAIR' ? ' selected' : ''}>Member</option><option value="CHAIR"${m && m.role === 'CHAIR' ? ' selected' : ''}>Chair</option></select></td></tr>`;
+  }).join('');
+  openModal('Evaluation committee', `${s.rfq.rfqNumber} · one chair at most; a member who has begun scoring cannot be removed`,
+    `<form id="committeeFormV23"><input type="hidden" name="rfqId" value="${__pr23Esc(rfqRecordId)}"><input id="committeeFilterV23" placeholder="Filter by name or department" style="width:100%;margin-bottom:8px"><div style="max-height:320px;overflow:auto"><table style="width:100%;font-size:13px"><tbody>${rows}</tbody></table></div></form>`,
+    btn('Cancel', 'close-overlay') + btn('Save committee', 'save-committee-v23', 'primary'));
+  const f = document.querySelector('#committeeFilterV23');
+  if (f) f.addEventListener('input', () => { const q = f.value.trim().toLowerCase(); document.querySelectorAll('#committeeFormV23 [data-member-row]').forEach(r => { r.style.display = !q || r.textContent.toLowerCase().includes(q) ? '' : 'none'; }); });
+}
+
+function __pr23CaptureLineRowHtml(l) {
+  l = l || {};
+  return `<tr data-capture-line><td><input name="item" value="${__pr23Esc(l.itemName || '')}" placeholder="Item" style="width:100%"></td><td><input name="qty" type="number" min="0" step="any" value="${l.quantity != null ? __pr23Esc(l.quantity) : ''}" style="width:80px"></td><td><input name="uom" value="${__pr23Esc(l.unit || '')}" style="width:70px"></td><td><input name="price" type="number" min="0" step="any" value="" style="width:100px" placeholder="Unit price"></td><td><button type="button" class="btn small" data-action="remove-capture-line-v23">Remove</button></td></tr>`;
+}
+
+/** §15 second route: a quotation that arrived by an approved alternative channel, captured on the supplier's behalf. */
+function __pr23CaptureModal(rfqRecordId) {
+  const data = __pr23SrcOfRfq(rfqRecordId);
+  if (!data || !data.state) return;
+  const s = data.state;
+  const tender = (state.tenders || []).find(t => t.recordId === rfqRecordId) || {};
+  const suppliers = (s.invitedSuppliers || []).map(v => `<option value="${__pr23Esc(v.id)}">${__pr23Esc(v.name)}</option>`).join('');
+  const channels = (s.captureChannels || []).map(c => `<option value="${__pr23Esc(c)}">${__pr23Esc(__pr23Label(c))}</option>`).join('');
+  const curr = (((__pr23Live() || {}).currencies) || []).map(c => `<option>${__pr23Esc(c.code)}</option>`).join('');
+  const lines = ((tender.items || tender.lines || []).length ? (tender.items || tender.lines) : [{}]).map(i => __pr23CaptureLineRowHtml({ itemName: i.itemName || i.description, quantity: i.quantity, unit: i.unit })).join('');
+  const two = s.rfq.evaluationMode === 'TWO_ENVELOPE';
+  openModal('Capture a quotation', `${s.rfq.rfqNumber} · recorded exactly like a portal submission`,
+    `<form id="captureFormV23" class="form-grid"><input type="hidden" name="rfqId" value="${__pr23Esc(rfqRecordId)}">
+<div class="field"><label>Supplier</label><select name="vendorId" required><option value="">Choose an invited supplier</option>${suppliers}</select></div>
+<div class="field"><label>Received by</label><select name="channel" required><option value="">Choose the channel</option>${channels}</select></div>
+<div class="field"><label>Received on</label><input type="datetime-local" name="receivedAt" required></div>
+<div class="field"><label>Why it was captured here</label><input name="reason" placeholder="For example: the supplier could not reach the portal" required></div>
+<div class="field"><label>Quotation reference</label><input name="quotationReference"></div>
+<div class="field"><label>Quotation date</label><input type="date" name="quotationDate"></div>
+<div class="field"><label>Currency</label><select name="currencyCode" required>${curr}</select></div>
+<div class="field"><label>VAT rate in percent</label><input type="number" name="vatRate" min="0" max="100" step="0.01" placeholder="Leave empty for the standard rate"></div>
+<div class="field"><label>Valid until</label><input type="date" name="validUntil" required></div>
+<div class="field"><label>Payment terms</label><input name="paymentTerms"></div>
+<div class="field"><label>Delivery period</label><input name="deliveryTime" placeholder="For example: 3 weeks"></div>
+<div class="field"><label>Delivery period in days</label><input type="number" name="deliveryPeriodDays" min="0" step="1"></div>
+<div class="field full"><label>Lines</label><div style="overflow-x:auto"><table style="width:100%;font-size:13px"><thead><tr><th>Item</th><th>Quantity</th><th>Unit</th><th>Unit price</th><th></th></tr></thead><tbody id="captureLinesV23">${lines}</tbody></table></div><button type="button" class="btn small" data-action="add-capture-line-v23" style="margin-top:6px">Add a line</button></div>
+<div class="field"><label>Total stated on the supplier's document</label><input type="number" name="declaredTotalAmount" min="0" step="any" placeholder="Checked against the lines"></div>
+<div class="field full"><label>Notes</label><textarea name="notes" rows="2"></textarea></div>
+<div class="field full"><label>${two ? 'Commercial document' : 'Supplier\'s original quotation'} (PDF)</label><input type="file" name="documents" accept=".pdf" multiple></div>
+${two ? '<div class="field full"><label>Technical document (PDF)</label><input type="file" name="technicalDocuments" accept=".pdf" multiple></div>' : ''}</form>`,
+    btn('Cancel', 'close-overlay') + btn('Capture quotation', 'capture-quotation-v23', 'primary'));
+}
+
+function __pr23FxModal(idPair) {
+  const [rfqRecordId, currency] = String(idPair).split('|');
+  const data = __pr23SrcOfRfq(rfqRecordId);
+  if (!data || !data.comparison || !data.comparison.fx) return;
+  const rc = data.comparison.fx.reportingCurrencyCode || 'the reporting currency';
+  openModal(`State an exchange rate for ${currency}`, `${data.state.rfq.rfqNumber}`,
+    `<form id="fxFormV23" class="form-grid"><input type="hidden" name="rfqId" value="${__pr23Esc(rfqRecordId)}"><input type="hidden" name="currency" value="${__pr23Esc(currency)}"><div class="field"><label>1 ${__pr23Esc(currency)} equals (${__pr23Esc(rc)})</label><input type="number" name="rate" min="0" step="any" required></div><div class="field full"><label>Reason and source of the rate</label><textarea name="reason" rows="2" required></textarea></div></form>`,
+    btn('Cancel', 'close-overlay') + btn('Record the rate', 'save-fx-v23', 'primary'));
+}
+
+// ---------------------------------------------------------------- sourcing: approval centre prompts and configuration
+
+/** Approval Centre's "recommendation" prompt: the evidence an approver needs to decide an award. */
+function __pr23RecommendationPromptHtml(p) {
+  const rows = [
+    ['Event', `${p.record || ''}`], ['Recommended supplier', p.supplier || '—'], ['Recommended amount', __pr23CurrencyAmount(p.amount, p.currencyCode)], ['Version', p.version || '—'], ['Deviations and exceptions', p.deviations || 'None stated'],
+  ].map(([k, v]) => `<tr><td><strong>${__pr23Esc(k)}</strong></td><td>${__pr23Esc(v)}</td></tr>`);
+  return `${table(['Field', 'Value'], rows)}<p class="muted" style="margin-top:8px">The full evaluation, comparison and documents are on the event's Award recommendation tab.</p>`;
+}
+
+/** Award route editor and declaration wording, in Configuration. */
+function __pr23AwardConfigHtml() {
+  const m = state.awardMatrixV23;
+  const opts = state.declarationOptionsV23 || [];
+  const route = !m
+    ? '<p class="muted" style="margin:0">The award route could not be loaded.</p>'
+    : (m.steps || []).length
+      ? table(['Step', 'Approver', 'Applies to', 'Delegation', 'Approval level', 'Held today by'], __pr23MatrixRowsHtml(m.steps))
+      : '<p class="muted" style="margin:0">No award route is configured, so a recommendation cannot be submitted yet.</p>';
+  const wording = __pr23LinesTable(['Wording', 'Statement', 'Effect', ''], opts.map(o => `<tr><td><strong>${__pr23Esc(o.label)}</strong></td><td>${__pr23Esc(o.statement)}</td><td>${__pr23Esc(o.effect === 'CLEAR' ? 'No conflict' : o.effect === 'DISCLOSED' ? 'Conflict disclosed' : 'Recusal')}${o.active === false ? ' · inactive' : ''}</td><td><button class="btn small" data-action="edit-declaration-v23" data-id="${__pr23Esc(o.id)}">Edit</button></td></tr>`));
+  return card('Award approval route', 'Who must approve an award recommendation, in order, before a supplier can be awarded.', `<div class="card-body">${route}${m && m.canEdit ? `<div style="margin-top:10px">${__pr23ActionButton('Edit the route', 'edit-approval-matrix-v23', '', 'primary', 'settings').replace('<button class="btn primary"', '<button class="btn primary" data-stage="AWARD_RECOMMENDATION"')}</div>` : '<p class="muted" style="margin:10px 0 0">Only an administrator or the Chief Financial Officer can change the route.</p>'}</div>`)
+    + '<div style="height:14px"></div>'
+    + card('Evaluator declaration wording', 'What an evaluator confirms before scoring. Changes apply to declarations made from then on.', `<div class="card-body">${wording}<div style="margin-top:10px"><button class="btn small primary" data-action="edit-declaration-v23">Add wording</button></div></div>`);
+}
+
+function __pr23DeclarationModal(id) {
+  const o = (state.declarationOptionsV23 || []).find(x => x.id === id) || {};
+  openModal(o.id ? 'Edit declaration wording' : 'Add declaration wording', 'Shown to evaluators before they can score',
+    `<form id="declarationWordingFormV23" class="form-grid"><input type="hidden" name="id" value="${__pr23Esc(o.id || '')}"><div class="field"><label>Label</label><input name="label" value="${__pr23Esc(o.label || '')}" required></div><div class="field"><label>Effect</label><select name="effect"><option value="CLEAR"${o.effect === 'CLEAR' ? ' selected' : ''}>No conflict: may score</option><option value="DISCLOSED"${o.effect === 'DISCLOSED' ? ' selected' : ''}>Conflict disclosed: may score, recorded</option><option value="RECUSE"${o.effect === 'RECUSE' ? ' selected' : ''}>Recusal: may not see or score</option></select></div><div class="field full"><label>Statement the evaluator confirms</label><textarea name="statement" rows="3" required>${__pr23Esc(o.statement || '')}</textarea></div><div class="field"><label style="display:flex;gap:6px;align-items:center"><input type="checkbox" name="requiresDetails"${o.requiresDetails ? ' checked' : ''}>Details are required</label></div><div class="field"><label style="display:flex;gap:6px;align-items:center"><input type="checkbox" name="active"${o.active === false ? '' : ' checked'}>Offered to evaluators</label></div></form>`,
+    btn('Cancel', 'close-overlay') + btn('Save wording', 'save-declaration-wording-v23', 'primary'));
 }
 
 // ---------------------------------------------------------------- notifications and settings
@@ -716,20 +1035,37 @@ function __pr23NotificationsHtml() {
  */
 /** Configuration's two views: the signed-in person's procurement permissions, and the requisition approval matrix. */
 function __pr23SettingsTabsHtml(tab) {
-  return `<div class="settings-tabs-v5" style="margin-bottom:14px"><button class="tab ${tab === 'permissions' ? 'active' : ''}" data-action="settings-tab" data-id="permissions">Your permissions</button><button class="tab ${tab === 'approvals' ? 'active' : ''}" data-action="settings-tab" data-id="approvals">Approval matrix</button></div>`;
+  return `<div class="settings-tabs-v5" style="margin-bottom:14px"><button class="tab ${tab === 'permissions' ? 'active' : ''}" data-action="settings-tab" data-id="permissions">Your permissions</button><button class="tab ${tab === 'approvals' ? 'active' : ''}" data-action="settings-tab" data-id="approvals">Approval matrix</button><button class="tab ${tab === 'award' ? 'active' : ''}" data-action="settings-tab" data-id="award">Award and evaluation</button><button class="tab ${tab === 'p2p' ? 'active' : ''}" data-action="settings-tab" data-id="p2p">Matching, receipts and AI</button><button class="tab ${tab === 'numbering' ? 'active' : ''}" data-action="settings-tab" data-id="numbering">Numbering</button><button class="tab ${tab === 'currency' ? 'active' : ''}" data-action="settings-tab" data-id="currency">Currency</button><button class="tab ${tab === 'notifications' ? 'active' : ''}" data-action="settings-tab" data-id="notifications">Notifications</button></div>`;
 }
 
 function __pr23SettingsPageHtml() {
   const head = pageHead('Configuration', 'Configuration, RBAC and Access', 'Procurement roles, permissions and user assignments are managed centrally in Admin, so one change applies across every module.', '<a class="btn primary" href="/admin" target="_blank" rel="noopener">Open Admin</a>');
   // "Approval matrix" on the Approval Centre opens this tab (the runtime sets settingsTab to 'approvals').
   if (state.settingsTab === 'approvals') return `<div class="page">${head}${__pr23SettingsTabsHtml('approvals')}${__pr23ApprovalMatrixHtml()}</div>`;
+  if (state.settingsTab === 'p2p') return `<div class="page">${head}${__pr23SettingsTabsHtml('p2p')}${__pr23P2pSettingsHtml()}</div>`;
+  if (state.settingsTab === 'award') return `<div class="page">${head}${__pr23SettingsTabsHtml('award')}${__pr23AwardConfigHtml()}</div>`;
+  if (state.settingsTab === 'numbering') return `<div class="page">${head}${__pr23SettingsTabsHtml('numbering')}${__pr23NumberingTabHtml()}</div>`;
+  if (state.settingsTab === 'currency') return `<div class="page">${head}${__pr23SettingsTabsHtml('currency')}${__pr23CurrencyTabHtml()}</div>`;
+  if (state.settingsTab === 'notifications') return `<div class="page">${head}${__pr23SettingsTabsHtml('notifications')}${__pr23NotificationsTabHtml()}</div>`;
   const access = (__pr23Live() || {}).access || {};
   const grants = (access.permissions || []).map(p => String(p).replace('procurement.', ''));
   const rows = grants.map(g => `<tr><td><strong>${__pr23Esc(g)}</strong></td><td>${status('Granted')}</td></tr>`);
   const dept = access.department ? `${access.department}${access.departmentRole ? ` · ${access.departmentRole}` : ''}` : 'No department';
+  const human = v => (v ? String(v).replace(/_/g, ' ').toLowerCase().replace(/^./, c => c.toUpperCase()) : '');
+  const authorityRows = [
+    ['Procurement function', human(access.procurementFunction) || 'Not set: your role decides'],
+    ['Access profile', human(access.accessProfile) || 'Standard'],
+    ['Approval level', access.approvalLevel != null ? String(access.approvalLevel) : 'Not set'],
+    ['Approval limit', access.approvalLimit != null ? __pr23Cents(access.approvalLimit) : 'No limit'],
+    ['Delegated approver', access.delegatedApprover ? access.delegatedApprover.name : 'None'],
+    ['Cost centre', access.costCentre || 'Not set'],
+    ['Branch / business unit', [access.branch, access.businessUnit].filter(Boolean).join(' · ') || 'Not set'],
+    ['Segregation-of-duties restrictions', (access.sodRestrictions || []).length ? access.sodRestrictions.map(human).join(', ') : 'None beyond the standing rule: you cannot approve what you raised'],
+  ].map(([k, v]) => `<tr><td><strong>${__pr23Esc(k)}</strong></td><td>${__pr23Esc(v)}</td></tr>`);
   return `<div class="page">${head}${__pr23SettingsTabsHtml('permissions')}
  <div class="notice" style="margin-bottom:14px"><div><strong>Managed in Admin → Roles</strong><p>Each procurement action has its own permission, for example procurement.orders.manage to raise purchase orders or procurement.rfq.award to award a tender. Grant or remove them on a role in Admin; the change applies the next time the module loads.</p></div></div>
  <div class="grid kpis">${kpi('Your role', __pr23Esc(access.roleName || '—'), __pr23Esc(dept), 'settings')}${kpi('Procurement permissions', grants.length, 'Granted to your role', 'approve')}</div>
+ ${card('Your authority', 'From your user record in Admin: it limits what you can approve and who is asked when you are away', table(['Setting', 'Value'], authorityRows))}
  ${card('Your procurement permissions', 'What your role can do in this module', table(['Permission', 'Status'], rows.length ? rows : ['<tr><td colspan="2" class="muted">Your role holds no procurement permissions. You can still raise and track your own requisitions.</td></tr>']))}</div>`;
 }
 
@@ -752,11 +1088,13 @@ function __pr23ApprovalRouteHtml(route) {
   const label = { APPROVED: 'Approved', REJECTED: 'Rejected', WAITING: 'Waiting', UPCOMING: 'Not yet', NOT_REACHED: 'Not reached' };
   const when = iso => (iso ? __pr23DayTimeLabel(iso) : '');
   const rows = route.steps.map(s => {
-    const people = (s.approvers || []).map(p => p.name).join(', ');
+    const people = (s.approvers || []).filter(p => !p.status || p.status === 'PENDING').map(p => p.name).join(', ');
+    const routing = (s.approvers || []).filter(p => p.note && /^(Routed to delegate|Escalated)/i.test(p.note)).map(p => `${p.name}: ${p.note}`);
+    const routed = routing.length ? `<br><span class="muted">${__pr23Esc(routing.join(' · '))}</span>` : '';
     const decided = s.decidedBy
       ? `${__pr23Esc(s.decidedBy)}${s.onBehalfOf ? ` <span class="muted">for ${__pr23Esc(s.onBehalfOf)}</span>` : ''}<br><span class="muted">${__pr23Esc(when(s.decidedAt))}</span>${s.status === 'REJECTED' && s.comments ? `<br><span class="muted">${__pr23Esc(s.comments)}</span>` : ''}`
       : `<span class="muted">${s.status === 'NOT_REACHED' ? 'Not needed after the rejection' : `Can decide: ${__pr23Esc(people)}`}</span>`;
-    return `<tr><td>${s.position}</td><td><strong>${__pr23Esc(s.who)}</strong>${s.aboveAmount != null ? `<br><span class="muted">Above ${__pr23Cents(s.aboveAmount)}</span>` : ''}</td><td>${status(label[s.status] || s.status)}</td><td>${decided}</td></tr>`;
+    return `<tr><td>${s.position}</td><td><strong>${__pr23Esc(s.who)}</strong>${s.aboveAmount != null ? `<br><span class="muted">Above ${__pr23Cents(s.aboveAmount)}</span>` : ''}</td><td>${status(label[s.status] || s.status)}</td><td>${decided}${routed}</td></tr>`;
   });
   const summary = route.waitingOn
     ? `Waiting on step ${route.currentPosition} of ${route.totalSteps}: ${route.waitingOn.who}`
@@ -796,7 +1134,7 @@ function __pr23RequisitionDocument(pr, isMotivation) {
 }
 
 function __pr23MatrixRowsHtml(steps) {
-  return (steps || []).map(s => `<tr><td>${s.stepNumber}</td><td><strong>${__pr23Esc(s.who)}</strong></td><td>${s.aboveAmount != null ? `Only above ${__pr23Cents(s.aboveAmount)}` : 'Every requisition'}</td><td>${(s.people || []).length ? s.people.map(p => `<div>${__pr23Esc(p)}</div>`).join('') : '<span class="muted">Nobody holds this step, so requisitions reaching it are refused at submission</span>'}</td></tr>`);
+  return (steps || []).map(s => `<tr><td>${s.stepNumber}</td><td><strong>${__pr23Esc(s.who)}</strong></td><td>${[s.aboveAmount != null ? `Only above ${__pr23Cents(s.aboveAmount)}` : '', __pr23RuleSummary(s.matchRules)].filter(Boolean).map(x => __pr23Esc(x)).join('<br>') || 'Every requisition'}</td><td>${s.canDelegate ? 'May delegate' : 'No delegation'}</td><td>${s.minApprovalLevel != null ? `Level ${s.minApprovalLevel} or higher` : 'Any'}</td><td>${(s.people || []).length ? s.people.map(p => `<div>${__pr23Esc(p)}</div>`).join('') : '<span class="muted">Nobody holds this step, so requisitions reaching it are refused at submission</span>'}</td></tr>`);
 }
 
 /** Configuration, Approval matrix: the requisition route in force, and the decisions made by permission instead. */
@@ -805,13 +1143,13 @@ function __pr23ApprovalMatrixHtml() {
   if (!m) {
     return '<div class="notice"><div><strong>The approval matrix could not be loaded</strong><p>Refresh the page. If it still does not load, the procurement service is not answering.</p></div></div>';
   }
-  const heads = ['Step', 'Approver', 'Applies to', 'Held today by'];
+  const heads = ['Step', 'Approver', 'Applies to', 'Delegation', 'Approval level', 'Held today by'];
   const notice = `<div class="notice" style="margin-bottom:14px"><div><strong>How the route works</strong><p>A submitted requisition goes through the steps in order, and any one person on a step decides it. A step with an amount applies only when the requisition's estimated total is above it, so a larger requisition needs a further level. A requisition is refused at submission when a step that applies has nobody to decide it. A change applies to requisitions submitted afterwards; one already waiting keeps the route it was given.${m.canEdit ? '' : ' Only an administrator or the Chief Financial Officer can change the route.'}</p></div></div>`;
   const rows = __pr23MatrixRowsHtml(m.steps);
   const route = card(
     'Requisition approval route',
     m.updatedAt ? `Last changed ${__pr23DayLabel(m.updatedAt)}` : 'Who approves a purchase requisition',
-    table(heads, rows.length ? rows : ['<tr><td colspan="4" class="muted">No route is set. Each requisition is decided by the head of its department, or its deputy.</td></tr>']),
+    table(heads, rows.length ? rows : ['<tr><td colspan="6" class="muted">No route is set. Each requisition is decided by the head of its department, or its deputy.</td></tr>']),
     m.canEdit ? __pr23ActionButton('Edit route', 'edit-approval-matrix-v23', '', 'primary', 'settings') : '',
   );
   const auto = m.invoiceAutoApproval || { enabled: false, limit: null };
@@ -832,12 +1170,13 @@ function __pr23ApprovalMatrixHtml() {
     'Not routed in steps: a role that holds the permission makes the decision. Permissions are granted per role in Admin, Roles.',
     table(['Decision', 'Permission', 'Roles holding it'], (m.permissionDecisions || []).map(d => `<tr><td><strong>${__pr23Esc(d.label)}</strong></td><td><code>${__pr23Esc(d.permission)}</code></td><td>${d.roles.length ? d.roles.map(r => `${__pr23Esc(r.name)} <span class="muted">(${r.people} ${r.people === 1 ? 'person' : 'people'})</span>`).join('<br>') : '<span class="muted">No role holds it</span>'}</td></tr>`)),
   );
-  return notice + route + overrides.join('') + autoCard + decisions;
+  return notice + route + overrides.join('') + autoCard + decisions + __pr23BudgetPolicyHtml();
 }
 
+let __pr23MatrixSource = null;
 function __pr23MatrixStepRowHtml(step, index) {
-  const m = state.approvalMatrixV23 || {};
-  const s = step || { kind: 'DEPARTMENT_HEAD', department: null, deputy: false, roleCode: null, userId: null, aboveAmount: null };
+  const m = __pr23MatrixSource || state.approvalMatrixV23 || {};
+  const s = step || { kind: 'DEPARTMENT_HEAD', department: null, deputy: false, roleCode: null, userId: null, aboveAmount: null, canDelegate: false, matchRules: {} };
   const opt = (value, text, selected) => `<option value="${__pr23Esc(value)}"${selected ? ' selected' : ''}>${__pr23Esc(text)}</option>`;
   const kinds = [['DEPARTMENT_HEAD', 'Department head'], ['ROLE', 'Role'], ['USER', 'Named person']].map(([v, t]) => opt(v, t, s.kind === v)).join('');
   const departments = opt('', "The requester's department", !s.department) + (m.departments || []).map(d => opt(d, d, s.department === d)).join('');
@@ -846,7 +1185,7 @@ function __pr23MatrixStepRowHtml(step, index) {
   const people = opt('', 'Choose a person', !s.userId) + (m.people || []).map(p => opt(p.id, [p.name, p.role, p.department].filter(Boolean).join(' · '), s.userId === p.id)).join('');
   const hide = k => (s.kind === k ? '' : ' hidden');
   const cell = 'style="padding:6px 8px;vertical-align:middle"';
-  return `<tr data-matrix-step><td ${cell} data-matrix-position>${index + 1}</td><td ${cell}><select name="kind" aria-label="Who decides">${kinds}</select></td><td ${cell}><span data-kind="DEPARTMENT_HEAD"${hide('DEPARTMENT_HEAD')}><select name="department" aria-label="Department">${departments}</select> <select name="deputy" aria-label="Head or deputy">${headOrDeputy}</select></span><span data-kind="ROLE"${hide('ROLE')}><select name="roleCode" aria-label="Role">${roles}</select></span><span data-kind="USER"${hide('USER')}><select name="userId" aria-label="Person">${people}</select></span></td><td ${cell}><input name="aboveAmount" type="number" min="0" step="0.01" placeholder="Every requisition" aria-label="Only above this amount" value="${s.aboveAmount != null ? __pr23Esc(s.aboveAmount) : ''}" style="width:140px"></td><td ${cell}><button class="btn small" type="button" data-action="remove-matrix-step-v23">Remove</button></td></tr>`;
+  return `<tr data-matrix-step><td ${cell} data-matrix-position>${index + 1}</td><td ${cell}><select name="kind" aria-label="Who decides">${kinds}</select></td><td ${cell}><span data-kind="DEPARTMENT_HEAD"${hide('DEPARTMENT_HEAD')}><select name="department" aria-label="Department">${departments}</select> <select name="deputy" aria-label="Head or deputy">${headOrDeputy}</select></span><span data-kind="ROLE"${hide('ROLE')}><select name="roleCode" aria-label="Role">${roles}</select></span><span data-kind="USER"${hide('USER')}><select name="userId" aria-label="Person">${people}</select></span></td><td ${cell}><input name="aboveAmount" type="number" min="0" step="0.01" placeholder="Every requisition" aria-label="Only above this amount" value="${s.aboveAmount != null ? __pr23Esc(s.aboveAmount) : ''}" style="width:140px"></td><td ${cell}><input name="minApprovalLevel" type="number" min="0" max="99" step="1" placeholder="Any" aria-label="Minimum approval level" value="${s.minApprovalLevel != null ? __pr23Esc(s.minApprovalLevel) : ''}" style="width:90px"></td><td ${cell}><label style="display:flex;gap:6px;align-items:center;white-space:nowrap"><input type="checkbox" name="canDelegate"${s.canDelegate ? ' checked' : ''}> May delegate</label></td><td style="padding:6px 8px;vertical-align:top;min-width:280px">${__pr23MatrixConditionsHtml(s)}</td><td ${cell}><button class="btn small" type="button" data-action="remove-matrix-step-v23">Remove</button></td></tr>`;
 }
 
 /** Step numbers follow the rows; step 1 applies to every requisition, so its amount is cleared and locked. */
@@ -866,19 +1205,22 @@ function __pr23MatrixRenumber() {
   });
 }
 
-function __pr23ApprovalMatrixModal() {
-  const m = state.approvalMatrixV23;
+function __pr23ApprovalMatrixModal(stage) {
+  const award = stage === 'AWARD_RECOMMENDATION';
+  const po = stage === 'PURCHASE_ORDER';
+  const m = award ? state.awardMatrixV23 : po ? state.poMatrixV23 : state.approvalMatrixV23;
+  __pr23MatrixSource = m || null;
   if (!m || !m.canEdit) {
     if (typeof toast === 'function') toast('Not permitted', 'Only an administrator or the Chief Financial Officer can change the approval matrix.');
     return;
   }
   const steps = m.steps.length ? m.steps : [null];
   const rows = steps.map((s, i) => __pr23MatrixStepRowHtml(s, i)).join('');
-  const th = ['Step', 'Who decides', 'Which', 'Only above ($)', ''].map(h => `<th style="padding:6px 8px;text-align:left;font-size:11px;letter-spacing:.04em;text-transform:uppercase;white-space:nowrap">${h}</th>`).join('');
+  const th = ['Step', 'Who decides', 'Which', 'Only above ($)', 'Min. approval level', 'Delegation', 'Applies when', ''].map(h => `<th style="padding:6px 8px;text-align:left;font-size:11px;letter-spacing:.04em;text-transform:uppercase;white-space:nowrap">${h}</th>`).join('');
   openModal(
-    'Edit requisition approval route',
-    'Who approves a purchase requisition, step by step',
-    `<form id="approvalMatrixFormV23" onsubmit="return false"><p class="muted" style="margin:0 0 10px">Steps run in order, and any one person on a step decides it. Leave the amount empty for a step that applies to every requisition. The route applies to requisitions submitted after you save.</p><div style="overflow-x:auto;max-width:100%"><table style="width:100%;min-width:0;border-collapse:collapse;font-size:13px"><thead><tr>${th}</tr></thead><tbody>${rows}</tbody></table></div><div style="margin-top:10px"><button class="btn small" type="button" data-action="add-matrix-step-v23">Add step</button></div></form>`,
+    award ? 'Edit award approval route' : po ? 'Edit purchase order approval route' : 'Edit requisition approval route',
+    award ? 'Who must approve an award recommendation, step by step' : po ? 'Who approves a purchase order before it is sent to the supplier' : 'Who approves a purchase requisition, step by step',
+    `<form id="approvalMatrixFormV23" data-stage="${award ? 'AWARD_RECOMMENDATION' : po ? 'PURCHASE_ORDER' : ''}" onsubmit="return false"><p class="muted" style="margin:0 0 10px">Steps run in order, and any one person on a step decides it. Leave the amount empty for a step that applies to every requisition. A minimum approval level limits the step to approvers whose user record holds at least that level. Conditions narrow a step to requisitions that match all of them; at least one step must apply to every requisition. The route applies to requisitions submitted after you save.</p><div style="overflow-x:auto;max-width:100%"><table style="width:100%;min-width:0;border-collapse:collapse;font-size:13px"><thead><tr>${th}</tr></thead><tbody>${rows}</tbody></table></div><div style="margin-top:10px"><button class="btn small" type="button" data-action="add-matrix-step-v23">Add step</button></div></form>`,
     btn('Cancel', 'close-overlay') + btn('Save route', 'save-approval-matrix-v23', 'primary'),
   );
   __pr23MatrixRenumber();
@@ -892,7 +1234,7 @@ __pr23On(document, 'click', event => {
   event.stopImmediatePropagation();
   const act = control.dataset.action;
   if (act === 'edit-approval-matrix-v23') {
-    __pr23ApprovalMatrixModal();
+    __pr23ApprovalMatrixModal(control.dataset.stage || '');
     return;
   }
   const body = document.querySelector('#approvalMatrixFormV23 tbody');
@@ -918,6 +1260,374 @@ __pr23On(document, 'change', event => {
   if (row) row.querySelectorAll('[data-kind]').forEach(el => { el.hidden = el.dataset.kind !== select.value; });
 }, true);
 
+// ---------------------------------------------------------------- sourcing controls that stay in the page
+
+__pr23On(document, 'click', event => {
+  const control = event.target && event.target.closest && event.target.closest('[data-action]');
+  if (!control) return;
+  const act = control.dataset.action;
+  const local = ['po-details-v23', 'po-preview-v23', 'override-modal-v23', 'return-invoice-modal-v23', 'handoff-history-v23', 'handoff-filter-v23', 'ai-open-v23', 'preview-po-v6', 'open-match-detail-v5', 'sourcing-tab-v23', 'open-bids-modal-v23', 'criteria-modal-v23', 'committee-modal-v23', 'capture-modal-v23', 'fx-modal-v23', 'edit-declaration-v23', 'add-criterion-row-v23', 'remove-criterion-row-v23', 'add-capture-line-v23', 'remove-capture-line-v23'];
+  if (!local.includes(act)) return;
+  if ((act === 'preview-po-v6' || act === 'open-match-detail-v5') && !__pr23Live()) return;
+  event.preventDefault();
+  event.stopImmediatePropagation();
+  const id = control.dataset.id || '';
+  if (act === 'po-details-v23') return __pr23PoDetailsModal(id);
+  if (act === 'po-preview-v23' || act === 'preview-po-v6') return __pr23PoPdfModal(id);
+  if (act === 'override-modal-v23') return __pr23OverrideModal(id, '');
+  if (act === 'return-invoice-modal-v23') return __pr23ReturnInvoiceModal(id);
+  if (act === 'handoff-history-v23') return __pr23HandoffHistoryModal(id);
+  if (act === 'handoff-filter-v23') { state.handoffFilterV23 = id; render(); return; }
+  if (act === 'ai-open-v23') { state.aiOpenV23 = id; render(); return; }
+  if (act === 'open-match-detail-v5') return __pr23MatchDetailModal(id);
+  if (act === 'sourcing-tab-v23') { (state.sourcingTabV23 || (state.sourcingTabV23 = {}))[id] = control.dataset.tab; render(); return; }
+  if (act === 'open-bids-modal-v23') return __pr23OpenBidsModal(id);
+  if (act === 'criteria-modal-v23') return __pr23CriteriaModal(id);
+  if (act === 'committee-modal-v23') return __pr23CommitteeModal(id);
+  if (act === 'capture-modal-v23') return __pr23CaptureModal(id);
+  if (act === 'fx-modal-v23') return __pr23FxModal(id);
+  if (act === 'edit-declaration-v23') return __pr23DeclarationModal(id);
+  if (act === 'add-criterion-row-v23') { const b = document.querySelector('#criteriaRowsV23'); if (b) b.insertAdjacentHTML('beforeend', __pr23CriteriaRowHtml({ kind: 'SCORED', maxScore: 10 })); return; }
+  if (act === 'add-capture-line-v23') { const b = document.querySelector('#captureLinesV23'); if (b) b.insertAdjacentHTML('beforeend', __pr23CaptureLineRowHtml()); return; }
+  const row = control.closest('[data-criterion-row], [data-capture-line]');
+  if (row && row.parentElement.children.length > 1) row.remove();
+}, true);
+
+
+// ---------------------------------------------------------------- §21-§25, §29-§31: purchase orders, receipts, invoices, matching, handoff, AI
+
+const __PR23_HANDOFF_LABEL = { READY_FOR_FINANCE: 'Ready for Finance', SUBMITTED: 'Submitted to Finance', ACCEPTED: 'Accepted', REJECTED: 'Returned', PAID: 'Paid', CLOSED: 'Closed' };
+const __PR23_HANDOFF_TONE = { READY_FOR_FINANCE: 'amber', SUBMITTED: 'blue', ACCEPTED: 'green', REJECTED: 'red', PAID: 'green', CLOSED: 'gray' };
+const __PR23_PO_APPROVAL_LABEL = { NOT_REQUIRED: '', REQUIRED: 'Approval required', PENDING: 'Awaiting approval', APPROVED: 'Approved', REJECTED: 'Rejected' };
+const __PR23_EXCEPTION_LABEL = {
+  MISSING_PO: 'Missing purchase order', MISSING_RECEIPT: 'Missing receipt', QTY_MISMATCH: 'Quantity mismatch', VALUE_MISMATCH: 'Value mismatch',
+  TAX_MISMATCH: 'Tax mismatch', EXCESS_INVOICE: 'Excess invoice', DUPLICATE_INVOICE: 'Duplicate invoice', POSSIBLE_DUPLICATE: 'Possible duplicate', LINE_NOT_ON_PO: 'Line not on the order',
+};
+const __PR23_AI_DOC_LABEL = { QUOTATION: 'Quotation', INVOICE: 'Invoice', COMPANY_PROFILE: 'Company profile', TAX_CLEARANCE: 'Tax clearance certificate', SUPPLIER_REGISTRATION: 'Supplier registration document', TECHNICAL_SUBMISSION: 'Technical submission', DELIVERY_NOTE: 'Delivery note', PRICE_SCHEDULE: 'Price schedule', OTHER: 'Other supporting document' };
+
+function __pr23P2pCfg() { return (state.p2pConfigV23 && state.p2pConfigV23.settings) || null; }
+function __pr23Chip(label, tone) { return `<span class="status ${tone || 'gray'}">${__pr23Esc(label)}</span>`; }
+
+// ------------------------------------------------------------ purchase orders
+
+function __pr23PoApprovalChip(o) {
+  const label = __PR23_PO_APPROVAL_LABEL[o.approvalStatus] || '';
+  if (!label) return '';
+  return __pr23Chip(label, o.approvalStatus === 'APPROVED' ? 'green' : o.approvalStatus === 'REJECTED' ? 'red' : 'amber');
+}
+
+/** The approval a purchase order is in, shown beside its status. */
+function __pr23PoStatusChip(o) {
+  return o.approvalStatus && o.approvalStatus !== 'NOT_REQUIRED' ? ' ' + __pr23PoApprovalChip(o) : '';
+}
+
+/** Extra controls on a purchase order's register row: the approval it needs, and its details. */
+function __pr23PoRowActions(o) {
+  const rec = __pr23Esc(o.recordId);
+  const draft = ['DRAFT', 'PENDING'].includes(String(o.rawStatus || '').toUpperCase());
+  const needs = draft && o.approvalStatus === 'REQUIRED';
+  return `${__pr23SmallButton('Details', 'po-details-v23', o.recordId, 'audit')}${needs && __pr23Can('orders.manage') ? __pr23SmallButton('Submit for approval', 'submit-po-approval-v23', o.recordId, 'approve') : ''}`;
+}
+
+/** The purchase order as the server renders it: the same file is previewed, downloaded and emailed to the supplier. */
+function __pr23PoPdfModal(orderId) {
+  const o = (state.orders || []).find(x => x.id === orderId || x.recordId === orderId);
+  if (!o) return;
+  const brand = state.p2pConfigV23 && state.p2pConfigV23.brand;
+  openModal(`Purchase order ${o.id}`, `${brand ? brand.name + ' letterhead · ' : ''}the same document the supplier receives`,
+    '<div id="poPdfBodyV23" style="min-height:60vh"><p class="muted">Preparing the document…</p></div>',
+    btn('Close', 'close-overlay') + `<button class="btn primary" data-action="download-po-pdf-v23" data-id="${__pr23Esc(o.recordId)}" data-name="${__pr23Esc(o.id)}">Download PDF</button>`);
+  const box = document.querySelector('#poPdfBodyV23');
+  const p2p = window.__pr23P2p;
+  if (!p2p || !p2p.poPdfUrl) { if (box) box.innerHTML = '<div class="notice"><div><strong>The document could not be shown</strong><p>Try again shortly.</p></div></div>'; return; }
+  p2p.poPdfUrl(o.recordId).then(url => {
+    const b = document.querySelector('#poPdfBodyV23');
+    if (b) b.innerHTML = `<iframe title="Purchase order ${__pr23Esc(o.id)}" src="${url}" style="width:100%;height:68vh;border:1px solid var(--line,#e5e7eb);border-radius:8px"></iframe>`;
+  }).catch(e => {
+    const b = document.querySelector('#poPdfBodyV23');
+    if (b) b.innerHTML = `<div class="notice"><div><strong>The document could not be produced</strong><p>${__pr23Esc((e && e.message) || 'The server did not return it.')}</p></div></div>`;
+  });
+}
+
+/** Everything a purchase order carries: its references, accounting codes, terms, lines and approvals. */
+function __pr23PoDetailsModal(recordId) {
+  const o = (state.orders || []).find(x => x.recordId === recordId);
+  if (!o) return;
+  const dash = v => (v == null || v === '' ? '—' : __pr23Esc(v));
+  const meta = [
+    ['PO number', o.id], ['Vendor', o.vendor], ['Vendor code', o.vendorCode], ['Currency', o.currency], ['Linked requisition', o.requisition], ['Linked RFQ / tender', o.rfq], ['Linked award', o.quotation],
+    ['Cost centre', o.costCentre], ['Budget code', o.budgetCode], ['GL code', o.glCode], ['Payment terms', o.paymentTerms], ['Delivery date', o.delivery], ['Delivery address', o.shippingAddress], ['Status', o.status],
+  ].map(([k, v]) => `<div><span>${__pr23Esc(k)}</span><strong>${dash(v)}</strong></div>`).join('');
+  const lines = (o.items || []).map(i => `<tr><td>${__pr23Esc(i.itemName)}</td><td>${i.quantity == null ? '—' : i.quantity}${i.unit ? ' ' + __pr23Esc(i.unit) : ''}</td><td>${__pr23Cents(i.unitPrice)}</td><td>${__pr23Cents((i.quantity || 0) * (i.unitPrice || 0))}</td><td>${i.received || 0}</td><td>${i.pending == null ? '—' : i.pending}</td></tr>`);
+  const totals = `<div class="source-meta" style="margin-top:10px"><div><span>Subtotal</span><strong>${o.subtotal == null ? '—' : __pr23Cents(o.subtotal)}</strong></div><div><span>VAT</span><strong>${o.taxAmount == null ? '—' : __pr23Cents(o.taxAmount)}</strong></div><div><span>Total</span><strong>${__pr23Cents(o.amount)}</strong></div></div>`;
+  openModal(`Purchase order ${o.id}`, `${o.vendor} · ${o.status}`,
+    `<div class="source-meta" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr));margin-bottom:12px">${meta}</div>${__pr23LinesTable(['Item', 'Ordered', 'Unit price', 'Amount', 'Received', 'Outstanding'], lines)}${totals}${o.purchaseConditions ? `<h4 style="margin:14px 0 4px">Purchase conditions</h4><p style="margin:0">${__pr23Esc(o.purchaseConditions)}</p>` : ''}<h4 style="margin:14px 0 4px">Approvals</h4><div id="poApprovalsV23"><p class="muted">Loading…</p></div>`,
+    btn('Close', 'close-overlay') + `<button class="btn" data-action="po-preview-v23" data-id="${__pr23Esc(o.recordId)}">Preview the document</button>` + __pr23LifecycleButtons('po', o));
+  const p2p = window.__pr23P2p;
+  if (p2p && p2p.poApprovals) {
+    p2p.poApprovals(o.recordId).then(a => {
+      const box = document.querySelector('#poApprovalsV23');
+      if (!box) return;
+      box.innerHTML = (a.approvals || []).length
+        ? (a.approvals || []).map(s => `<div style="margin-bottom:8px"><strong>${__pr23Esc(s.label)}</strong> ${__pr23Chip(String(s.status).replace(/_/g, ' ').toLowerCase(), /APPROVED/.test(s.status) ? 'green' : /REJECT/.test(s.status) ? 'red' : 'amber')}${(s.decisions || []).length ? __pr23LinesTable(['When', 'Who', 'Action', 'Comments'], s.decisions.map(d => `<tr><td>${__pr23Esc(__pr23DateTime(d.at))}</td><td>${__pr23Esc(d.actor || '—')}</td><td>${__pr23Esc(__pr23Label(d.action))}</td><td>${__pr23Esc(d.comments || '—')}</td></tr>`)) : ''}</div>`).join('')
+        : '<p class="muted" style="margin:0">No approval is recorded for this order.</p>';
+    }).catch(() => { const box = document.querySelector('#poApprovalsV23'); if (box) box.innerHTML = '<p class="muted">The approvals could not be loaded.</p>'; });
+  }
+}
+
+/** The §21 fields a direct order can state; blank means it takes them from the requisition and the budget line. */
+function __pr23PoExtraFieldsHtml() {
+  return '<div class="field"><label>Cost centre <span class="muted">(from the requisition when blank)</span></label><input name="costCentre" maxlength="128"></div><div class="field"><label>Budget code <span class="muted">(from the requisition when blank)</span></label><input name="budgetCode" maxlength="64"></div><div class="field"><label>GL code <span class="muted">(from the budget line when blank)</span></label><input name="glCode" maxlength="64"></div><div class="field full"><label>Purchase conditions</label><textarea name="purchaseConditions" rows="2" placeholder="Conditions of purchase that go on the order"></textarea></div>';
+}
+
+// ------------------------------------------------------------ receipts (goods and services)
+
+function __pr23GrnLinesHtml(poRecordId) {
+  const o = (state.orders || []).find(x => x.recordId === poRecordId);
+  if (!o) return '<p class="muted">Select a purchase order.</p>';
+  const rows = (o.items || []).map(i => {
+    const id = __pr23Esc(i.id);
+    const outstanding = i.pending != null ? i.pending : Math.max(0, Number(i.quantity || 0) - Number(i.received || 0));
+    const svcHint = /service|install|consult|maintenance|labour|licen/i.test(String(i.itemName || '')) || String(i.unit || '').toLowerCase() === 'job';
+    return `<tr data-grn-row="${id}"><td><strong>${__pr23Esc(i.itemName)}</strong><br><span class="muted">${i.quantity == null ? '—' : i.quantity} ordered · ${outstanding} outstanding</span></td>
+<td><select data-grn-line-type="${id}"><option value="GOODS"${svcHint ? '' : ' selected'}>Goods</option><option value="SERVICE"${svcHint ? ' selected' : ''}>Service</option></select></td>
+<td data-goods-cells="${id}"${svcHint ? ' hidden' : ''}><div style="display:flex;gap:4px;flex-wrap:wrap"><label style="font-size:11px">Received<input type="number" min="0" step="0.01" data-grn-received="${id}" value="${outstanding}" style="width:70px"></label><label style="font-size:11px">Accepted<input type="number" min="0" step="0.01" data-grn-accepted="${id}" value="${outstanding}" style="width:70px"></label><label style="font-size:11px">Rejected<input type="number" min="0" step="0.01" data-grn-rejected="${id}" value="0" style="width:70px"></label></div></td>
+<td data-service-cells="${id}"${svcHint ? '' : ' hidden'}><div style="display:grid;gap:4px"><input data-grn-milestone="${id}" placeholder="What was completed" style="min-width:180px"><div style="display:flex;gap:4px"><label style="font-size:11px">From<input type="date" data-grn-svc-start="${id}"></label><label style="font-size:11px">To<input type="date" data-grn-svc-end="${id}"></label></div><label style="font-size:11px">Amount confirmed<input type="number" min="0" step="0.01" data-grn-svc-amount="${id}" style="width:110px"></label><label style="font-size:11px">Evidence (completion certificate, timesheet)<input type="file" data-grn-svc-file="${id}" multiple></label></div></td></tr>`;
+  });
+  return __pr23LinesTable(['Order line', 'Type', 'What arrived or was completed'], rows)
+    + '<p class="muted" style="margin-top:8px">Goods: accepted plus rejected must equal the quantity received, and nothing beyond the over-delivery tolerance is accepted. Services need no quantity: state what was completed, the period, the amount confirmed and attach the evidence. Rejected goods stay outstanding.</p>';
+}
+
+function __pr23GrnModal() {
+  const open = (state.orders || []).filter(o => __PR23_RECEIVABLE.includes(String(o.rawStatus || '').toUpperCase()));
+  if (!open.length) {
+    openModal('Record goods or service receipt', 'Receipts are recorded against a purchase order that has been sent to the vendor.', '<p class="muted">No purchase order is awaiting delivery.</p>', btn('Close', 'close-overlay'));
+    return;
+  }
+  const today = new Date().toISOString().slice(0, 10);
+  const options = open.map(o => `<option value="${__pr23Esc(o.recordId)}">${__pr23Esc(o.id)} · ${__pr23Esc(o.vendor)}</option>`).join('');
+  openModal(
+    'Record goods or service receipt',
+    'Record what arrived against the purchase order. Partial receipts are recorded as they happen; what is still outstanding is recalculated each time.',
+    `<form id="grnFormV23" class="form-grid"><div class="field"><label>Purchase order</label><select name="po" id="grnPoV23">${options}</select></div><div class="field"><label>Received on</label><input type="date" name="receivedDate" value="${today}" required></div><div class="field"><label>Delivery note number</label><input name="deliveryNoteNumber" maxlength="128"></div><div class="field"><label>Received at (location)</label><input name="locationName" maxlength="191" placeholder="For example: Harare warehouse"></div><div class="field full"><label>Lines</label><div id="grnLinesV23">${__pr23GrnLinesHtml(open[0].recordId)}</div></div><div class="field full"><label>Delivery note and other attachments</label><input type="file" name="receiptFiles" multiple accept=".pdf,.png,.jpg,.jpeg,.webp,.doc,.docx,.xls,.xlsx,.csv"></div><div class="field full"><label>Comments</label><textarea name="comments" rows="2"></textarea></div></form>`,
+    btn('Cancel', 'close-overlay') + btn('Record receipt', 'create-grn-confirm', 'primary'),
+  );
+}
+
+// ------------------------------------------------------------ invoices
+
+/** Receipts of an order that an invoice can name (a rejected receipt cannot be invoiced against). */
+function __pr23ReceiptOptions(poRecordId) {
+  const opts = (state.grns || []).filter(g => g.poRecordId === poRecordId && String(g.rawStatus || '').toUpperCase() !== 'REJECTED');
+  return '<option value="">No specific receipt</option>' + opts.map(g => `<option value="${__pr23Esc(g.recordId)}">${__pr23Esc(g.id)} · ${__pr23Esc(g.received)}${g.deliveryNote ? ' · DN ' + __pr23Esc(g.deliveryNote) : ''}</option>`).join('');
+}
+
+/** The §23 fields beside the lines: the supplier's own number, the receipt, terms and the figures it states. */
+function __pr23InvoiceExtraFieldsHtml(poRecordId) {
+  const o = (state.orders || []).find(x => x.recordId === poRecordId) || {};
+  return `<div class="field"><label>Supplier's invoice number</label><input name="supplierInvoiceNumber" required maxlength="128" placeholder="The number printed on the supplier's invoice" data-ai-target="invoiceNumber"></div><div class="field"><label>Receipt this bills</label><select name="grnId" id="invoiceGrnV23">${__pr23ReceiptOptions(poRecordId)}</select></div><div class="field"><label>Payment terms</label><input name="paymentTerms" value="${__pr23Esc(o.paymentTerms || '')}" maxlength="191"></div><div class="field"><label>VAT on the supplier's invoice <span class="muted">(blank: worked out at the order's rate)</span></label><input type="number" name="statedTax" min="0" step="0.01"></div><div class="field"><label>Total on the supplier's invoice <span class="muted">(checked against the lines)</span></label><input type="number" name="statedTotal" min="0" step="0.01"></div>`;
+}
+
+/** The match of one invoice, in the seven checks: what was found, in words, with the tolerances that applied. */
+function __pr23MatchDetailModal(invoiceId) {
+  const inv = (state.invoices || []).find(i => i.id === invoiceId || i.recordId === invoiceId);
+  if (!inv) return;
+  const ex = inv.matchExceptions || [];
+  const byType = {};
+  ex.forEach(e => { (byType[e.type] = byType[e.type] || []).push(e); });
+  const checks = [['MISSING_PO', 'Purchase order found'], ['MISSING_RECEIPT', 'Receipt recorded'], ['QTY_MISMATCH', 'Quantity within what was accepted'], ['VALUE_MISMATCH', 'Value within tolerance'], ['TAX_MISMATCH', 'Tax as the order implies'], ['EXCESS_INVOICE', 'Not over-billed across invoices'], ['DUPLICATE_INVOICE', 'Not a duplicate']];
+  const rows = checks.map(([type, label]) => {
+    const hits = (byType[type] || []).concat(type === 'DUPLICATE_INVOICE' ? (byType.POSSIBLE_DUPLICATE || []) : []).concat(type === 'QTY_MISMATCH' ? (byType.LINE_NOT_ON_PO || []) : []);
+    return `<tr><td>${__pr23Esc(label)}</td><td>${hits.length ? __pr23Chip('Exception', 'red') : __pr23Chip('Passed', 'green')}</td><td>${hits.length ? hits.map(h => __pr23Esc(h.message)).join('<br>') : '<span class="muted">Nothing to report</span>'}</td></tr>`;
+  });
+  const tol = inv.matchTolerances;
+  const tolLine = tol ? `Tolerances applied: unit price ${tol.priceVariancePct}%, invoice value ${tol.valueTolerancePct}%, VAT ${tol.taxTolerancePct}%, quantity ${tol.quantityTolerancePct}%, rounding ${__pr23Cents(tol.amountTolerance)}.` : '';
+  const lineRows = (inv.matchLines || []).map(l => `<tr><td>${__pr23Esc(l.itemName)}</td><td>${l.orderedQty == null ? '—' : l.orderedQty}</td><td>${l.acceptedQty == null ? '—' : l.acceptedQty}</td><td>${l.billedOnOthers || 0}</td><td>${l.invoicedQty}</td><td>${l.poUnitPrice == null ? '—' : __pr23Cents(l.poUnitPrice)}</td><td>${__pr23Cents(l.invoiceUnitPrice)}</td><td>${__pr23Chip(l.status === 'MATCHED' ? 'Matches' : l.status === 'VARIANCE' ? 'Variance' : 'No match', l.status === 'MATCHED' ? 'green' : 'red')}</td></tr>`);
+  const canApprove = __pr23Can('invoices.approve') && String(inv.rawStatus || '').toUpperCase() !== 'APPROVED' && !['REJECTED', 'PAID'].includes(String(inv.rawStatus || '').toUpperCase());
+  const canOverride = __pr23Can('invoices.override_match');
+  const blocking = ex.some(e => e.severity === 'BLOCKING');
+  const actions = btn('Close', 'close-overlay')
+    + (canApprove ? `<button class="btn" data-action="rematch-invoice-v23" data-id="${__pr23Esc(inv.recordId)}">Re-run the match</button>` : '')
+    + (canApprove && !blocking ? `<button class="btn primary" data-action="approve-invoice-v23" data-id="${__pr23Esc(inv.recordId)}">Approve</button>` : '')
+    + (canApprove && blocking && canOverride ? `<button class="btn primary" data-action="override-modal-v23" data-id="${__pr23Esc(inv.recordId)}">Approve over the exceptions…</button>` : '');
+  openModal(`Match: ${inv.id}`, `${inv.vendor} · ${inv.po}${inv.supplierInvoiceNumber ? ' · supplier invoice ' + inv.supplierInvoiceNumber : ''}`,
+    `<div class="notice" style="margin-bottom:12px"><div><strong>${blocking ? 'Open exceptions' : ex.length ? 'Warnings only' : 'Matched'}</strong><p>${blocking ? 'This invoice cannot be approved or paid until its exceptions are resolved' + (canOverride ? ', or approved over with a written reason.' : ', or a Finance Manager approves over them with a written reason.') : ex.length ? 'The match raised warnings for a person to read.' : 'Every check passed.'} ${__pr23Esc(tolLine)}</p></div></div>${__pr23LinesTable(['Check', 'Result', 'Detail'], rows)}${lineRows.length ? `<h4 style="margin:14px 0 6px">Line by line</h4>${__pr23LinesTable(['Item', 'Ordered', 'Accepted', 'Billed before', 'Invoiced', 'Order price', 'Invoice price', ''], lineRows)}` : ''}${inv.matchOverrideReason ? `<div class="notice" style="margin-top:12px"><div><strong>Approved over exceptions</strong><p>${__pr23Esc(inv.matchOverrideReason)}</p></div></div>` : ''}`,
+    actions);
+}
+
+function __pr23OverrideModal(invoiceRecordId, message) {
+  const inv = (state.invoices || []).find(i => i.recordId === invoiceRecordId);
+  openModal('Approve over match exceptions', inv ? `${inv.id} · ${inv.vendor}` : '',
+    `<form id="matchOverrideFormV23" class="form-grid"><input type="hidden" name="invoiceId" value="${__pr23Esc(invoiceRecordId)}"><div class="notice full"><div><strong>This invoice has open exceptions</strong><p>${__pr23Esc(message || '')}</p></div></div><div class="field full"><label>Why it is right to approve it anyway</label><textarea name="reason" rows="3" required minlength="10" placeholder="For example: balance delivered Monday; the receipt follows, agreed with the supplier"></textarea></div><p class="muted full">Your reason, your name and the exceptions are recorded. It covers only the exceptions you see now.</p></form>`,
+    btn('Cancel', 'close-overlay') + btn('Approve over the exceptions', 'confirm-override-approve-v23', 'primary'));
+}
+
+// ------------------------------------------------------------ finance handoff (Accounts: the payments tab)
+
+function __pr23HandoffActions(i) {
+  const s = i.handoff;
+  const rec = i.recordId;
+  const b = (label, to, kind) => `<button class="btn small ${kind || ''}" data-action="finance-handoff-v23" data-id="${__pr23Esc(rec)}" data-status="${to}">${label}</button>`;
+  const out = [];
+  if (s === 'READY_FOR_FINANCE' && (__pr23Can('invoices.approve') || __pr23Can('invoices.pay'))) out.push(b('Submit to Finance', 'SUBMITTED', 'primary'));
+  if (s === 'SUBMITTED' && __pr23Can('invoices.pay')) out.push(b('Accept', 'ACCEPTED', 'primary'), `<button class="btn small" data-action="return-invoice-modal-v23" data-id="${__pr23Esc(rec)}">Return</button>`);
+  if (s === 'REJECTED' && (__pr23Can('invoices.approve') || __pr23Can('invoices.pay') || __pr23Can('intake.manage'))) out.push(b('Back to Ready for Finance', 'READY_FOR_FINANCE'));
+  if (s === 'ACCEPTED' && i.payable && __pr23Can('invoices.pay')) out.push(`<button class="btn small primary" data-action="record-payment-v23" data-id="${__pr23Esc(rec)}">Record payment</button>`);
+  if (s === 'PAID' && (__pr23Can('invoices.pay') || __pr23Can('invoices.approve'))) out.push(b('Close', 'CLOSED'));
+  out.push(`<button class="btn small" data-action="handoff-history-v23" data-id="${__pr23Esc(rec)}">History</button>`);
+  return out.join(' ');
+}
+
+/** Approved invoices and where each stands in the handoff to Finance. Replaces the fixture payment batches. */
+function __pr23PayablesTable() {
+  const filter = state.handoffFilterV23 || 'ALL';
+  const approved = (state.invoices || []).filter(i => String(i.rawStatus || '').toUpperCase() === 'APPROVED' || i.handoff);
+  const counts = {};
+  approved.forEach(i => { counts[i.handoff || 'NONE'] = (counts[i.handoff || 'NONE'] || 0) + 1; });
+  const tabs = ['ALL', 'READY_FOR_FINANCE', 'SUBMITTED', 'ACCEPTED', 'REJECTED', 'PAID', 'CLOSED'].map(k => `<button class="tab ${filter === k ? 'active' : ''}" data-action="handoff-filter-v23" data-id="${k}">${k === 'ALL' ? 'All' : __PR23_HANDOFF_LABEL[k]} <span class="muted">${k === 'ALL' ? approved.length : counts[k] || 0}</span></button>`).join('');
+  const rows = approved.filter(i => filter === 'ALL' || i.handoff === filter).map(i => `<tr><td><strong class="link">${__pr23Esc(i.id)}</strong>${i.supplierInvoiceNumber ? `<br><span class="muted">Supplier: ${__pr23Esc(i.supplierInvoiceNumber)}</span>` : ''}</td><td>${__pr23Esc(i.vendor)}</td><td>${__pr23Esc(i.po)}</td><td class="money">${money(i.amount || 0)}</td><td>${__pr23Esc(i.currency || '')}</td><td>${__pr23Esc(i.due)}</td><td>${i.handoff ? __pr23Chip(__PR23_HANDOFF_LABEL[i.handoff] || i.handoff, __PR23_HANDOFF_TONE[i.handoff]) : '<span class="muted">Not started</span>'}${i.handoffReturnReason && i.handoff === 'REJECTED' ? `<br><span class="muted">${__pr23Esc(i.handoffReturnReason)}</span>` : ''}</td><td><div class="actions">${__pr23HandoffActions(i)}</div></td></tr>`);
+  if (!approved.length) return __pr23NoData('No invoice has been approved yet, so nothing has been handed to Finance.');
+  return `<div class="settings-tabs-v5" style="margin-bottom:12px">${tabs}</div>${rows.length ? table(['Invoice', 'Vendor', 'Purchase order', 'Amount', 'Currency', 'Due', 'Handoff', ''], rows) : __pr23NoData('No invoice is in that state.')}`;
+}
+
+function __pr23HandoffHistoryModal(invoiceRecordId) {
+  const inv = (state.invoices || []).find(i => i.recordId === invoiceRecordId);
+  openModal('Finance handoff', inv ? `${inv.id} · ${inv.vendor}` : '', '<div id="handoffBodyV23"><p class="muted">Loading…</p></div>', btn('Close', 'close-overlay'));
+  const p2p = window.__pr23P2p;
+  if (!p2p || !p2p.handoff) return;
+  p2p.handoff(invoiceRecordId).then(h => {
+    const box = document.querySelector('#handoffBodyV23');
+    if (!box) return;
+    const order = ['READY_FOR_FINANCE', 'SUBMITTED', 'ACCEPTED', 'PAID', 'CLOSED'];
+    const at = order.indexOf(h.status === 'REJECTED' ? 'SUBMITTED' : h.status);
+    const strip = `<div class="workflow-strip" style="margin-bottom:12px">${order.map((s, i) => `<div class="workflow-step ${i < at ? 'done' : i === at ? 'current' : ''}"><strong>${__PR23_HANDOFF_LABEL[s]}</strong></div>`).join('')}</div>`;
+    box.innerHTML = `${strip}${h.status === 'REJECTED' ? `<div class="notice" style="margin-bottom:12px"><div><strong>Returned</strong><p>${__pr23Esc(h.returnReason || '')}</p></div></div>` : ''}${(h.history || []).length ? __pr23LinesTable(['When', 'From', 'To', 'By', 'Comment'], h.history.map(x => `<tr><td>${__pr23Esc(__pr23DateTime(x.at))}</td><td>${__pr23Esc(__PR23_HANDOFF_LABEL[x.from] || '—')}</td><td>${__pr23Esc(__PR23_HANDOFF_LABEL[x.to] || x.to)}</td><td>${__pr23Esc(x.by || 'System')}</td><td>${__pr23Esc(x.comment || '—')}</td></tr>`)) : '<p class="muted">No handoff has started: the invoice is not approved yet.</p>'}`;
+  }).catch(() => { const box = document.querySelector('#handoffBodyV23'); if (box) box.innerHTML = '<p class="muted">The history could not be loaded.</p>'; });
+}
+
+function __pr23ReturnInvoiceModal(invoiceRecordId) {
+  const inv = (state.invoices || []).find(i => i.recordId === invoiceRecordId);
+  openModal('Return invoice to procurement', inv ? `${inv.id} · ${inv.vendor}` : '',
+    `<form id="returnInvoiceFormV23" class="form-grid"><input type="hidden" name="invoiceId" value="${__pr23Esc(invoiceRecordId)}"><div class="field full"><label>Why it is returned</label><textarea name="reason" rows="3" required minlength="3"></textarea></div></form>`,
+    btn('Cancel', 'close-overlay') + btn('Return the invoice', 'confirm-return-invoice-v23', 'primary'));
+}
+
+// ------------------------------------------------------------ configuration: matching, receipts and AI
+
+function __pr23P2pSettingsHtml() {
+  const c = __pr23P2pCfg();
+  const canEdit = __pr23Can('audit.view');
+  if (!c) return '<div class="notice"><div><strong>The configuration could not be loaded</strong><p>Refresh the page. If it still does not load, the procurement service is not answering.</p></div></div>';
+  const dis = canEdit ? '' : ' disabled';
+  const num = (name, v, step, label, hint) => `<div class="field"><label>${label}${hint ? ` <span class="muted">${hint}</span>` : ''}</label><input type="number" name="${name}" min="0" step="${step}" value="${v == null ? '' : __pr23Esc(v)}"${dis}></div>`;
+  const types = ['QUOTATION', 'INVOICE', 'COMPANY_PROFILE', 'TAX_CLEARANCE', 'SUPPLIER_REGISTRATION', 'TECHNICAL_SUBMISSION', 'DELIVERY_NOTE', 'PRICE_SCHEDULE', 'OTHER'];
+  const matching = card('Three-way matching and receipts', 'Tolerances decide whether a difference is an exception. Enforcement decides what an exception does.',
+    `<form id="p2pMatchFormV23" class="form-grid" onsubmit="return false" style="padding:14px 16px">
+      ${num('matchPriceVariancePct', c.matchPriceVariancePct, '0.1', 'Unit price tolerance (%)', 'invoice price against the order')}
+      ${num('matchValueTolerancePct', c.matchValueTolerancePct, '0.1', 'Invoice value tolerance (%)', 'subtotal against the order')}
+      ${num('matchTaxTolerancePct', c.matchTaxTolerancePct, '0.1', 'VAT tolerance (%)', 'against the order\'s rate')}
+      ${num('matchQtyTolerancePct', c.matchQtyTolerancePct, '0.1', 'Quantity tolerance (%)', 'invoiced against accepted')}
+      ${num('matchAmountToleranceAbs', c.matchAmountToleranceAbs, '0.01', 'Rounding tolerance (amount)', 'always allowed')}
+      ${num('overDeliveryTolerancePct', c.overDeliveryTolerancePct, '0.1', 'Over-receipt tolerance (%)', 'above the quantity ordered')}
+      <div class="field"><label>An invoice with open exceptions</label><select name="matchEnforcement"${dis}><option value="ENFORCE"${c.matchEnforcement === 'ENFORCE' ? ' selected' : ''}>Cannot be approved or paid (a Finance Manager may override with a reason)</option><option value="WARN"${c.matchEnforcement === 'WARN' ? ' selected' : ''}>Shows a warning only</option></select></div>
+      <div class="field"><label style="display:flex;gap:8px;align-items:center"><input type="checkbox" name="poApprovalRequired"${c.poApprovalRequired ? ' checked' : ''}${dis}> Purchase orders need approval before they are sent</label></div>
+      ${canEdit ? `<div class="field full">${btn('Save matching settings', 'save-p2p-settings-v23', 'primary', '')}</div>` : '<p class="muted full">Only an administrator or an auditor changes these settings.</p>'}
+    </form>`);
+  const po = state.poMatrixV23;
+  const route = card('Purchase order approval route', c.poApprovalRequired ? 'Who approves a purchase order before it goes to the supplier.' : 'Not in use: purchase orders are sent without approval. Switch it on above.',
+    `<div class="card-body">${po && (po.steps || []).length ? table(['Step', 'Approver', 'Applies to', 'Delegation', 'Approval level', 'Held today by'], __pr23MatrixRowsHtml(po.steps)) : '<p class="muted" style="margin:0">No purchase order approval route is set.</p>'}${po && po.canEdit ? `<div style="margin-top:10px"><button class="btn primary" data-action="edit-approval-matrix-v23" data-stage="PURCHASE_ORDER">Edit the route</button></div>` : ''}</div>`);
+  const ai = card('AI assistance', 'Optional. Switched off, nothing here is used and everything else in procurement works as normal.',
+    `<form id="p2pAiFormV23" class="form-grid" onsubmit="return false" style="padding:14px 16px">
+      <div class="field full"><label style="display:flex;gap:8px;align-items:center"><input type="checkbox" name="aiEnabled"${c.aiEnabled ? ' checked' : ''}${dis}> AI assistance is on</label></div>
+      ${num('aiMonthlyDocumentLimit', c.aiMonthlyDocumentLimit, '1', 'Documents per month', 'blank for no limit')}
+      ${num('aiMonthlyCallLimit', c.aiMonthlyCallLimit, '1', 'Model calls per month', 'blank for no limit')}
+      <div class="field full"><label>Approved user groups <span class="muted">(role codes, comma separated; blank for every role with the AI grant)</span></label><input name="aiAllowedRoleCodes" value="${__pr23Esc((c.aiAllowedRoleCodes || []).join(', '))}"${dis}></div>
+      <div class="field full"><label>Permitted document types <span class="muted">(none ticked: every type)</span></label><div style="display:flex;gap:12px;flex-wrap:wrap">${types.map(t => `<label style="display:flex;gap:4px;align-items:center;font-size:13px"><input type="checkbox" name="aiType" value="${t}"${(c.aiAllowedDocumentTypes || []).includes(t) ? ' checked' : ''}${dis}>${__pr23Esc(__PR23_AI_DOC_LABEL[t])}</label>`).join('')}</div></div>
+      ${canEdit ? `<div class="field full">${btn('Save AI settings', 'save-ai-settings-v23', 'primary', '')}</div>` : ''}
+    </form>`);
+  const u = state.aiUsageV23;
+  const usage = u
+    ? card('AI usage', `Last ${u.days} days. This month: ${u.thisMonth.documents} document${u.thisMonth.documents === 1 ? '' : 's'}${u.limits.monthlyDocuments != null ? ` of ${u.limits.monthlyDocuments}` : ''} and ${u.thisMonth.calls} model call${u.thisMonth.calls === 1 ? '' : 's'}${u.limits.monthlyCalls != null ? ` of ${u.limits.monthlyCalls}` : ''}.`,
+      `<div class="card-body"><div class="grid kpis" style="margin-bottom:12px">${kpi('Documents processed', u.totals.documentsProcessed, 'Read successfully', 'document')}${kpi('Model calls', u.totals.modelCalls, 'Approximate usage', 'audit')}${kpi('Failures', u.totals.failures, 'Could not be read', 'audit')}${kpi('Blocked', u.totals.blocked, 'Off, group, type or limit', 'approve')}</div>
+        ${(u.byUser || []).length ? `<h4 style="margin:6px 0">By user</h4>${__pr23LinesTable(['User', 'Documents', 'Calls', 'Failures', 'Blocked'], u.byUser.map(r => `<tr><td>${__pr23Esc(r.key)}</td><td>${r.documents}</td><td>${r.calls}</td><td>${r.failures}</td><td>${r.blocked}</td></tr>`))}` : ''}
+        <h4 style="margin:14px 0 6px">Recent activity</h4>${(u.recent || []).length ? __pr23LinesTable(['When', 'Requested by', 'Document', 'Type', 'Result', 'Calls', 'Detail'], u.recent.slice(0, 25).map(r => `<tr><td>${__pr23Esc(__pr23DateTime(r.at))}</td><td>${__pr23Esc(r.user)}</td><td>${__pr23Esc(r.documentName || '—')}</td><td>${__pr23Esc(__PR23_AI_DOC_LABEL[r.documentType] || r.documentType || '—')}</td><td>${__pr23Chip(r.status === 'SUCCESS' ? 'Processed' : r.status === 'FAILED' ? 'Failed' : 'Blocked', r.status === 'SUCCESS' ? 'green' : r.status === 'FAILED' ? 'red' : 'amber')}</td><td>${r.modelCalls}</td><td>${__pr23Esc(r.error || (r.durationMs != null ? `${(r.durationMs / 1000).toFixed(1)} s` : ''))}</td></tr>`)) : '<p class="muted" style="margin:0">Nothing has been processed yet.</p>'}</div>`)
+    : '';
+  return matching + '<div style="height:14px"></div>' + route + '<div style="height:14px"></div>' + ai + (usage ? '<div style="height:14px"></div>' + usage : '');
+}
+
+// ------------------------------------------------------------ AI document review (§29): value, source, confirmation
+
+function __pr23AiBanner() {
+  const s = state.aiStatusV23;
+  if (!s) return '';
+  if (!s.enabled) return `<div class="notice" style="margin-bottom:14px"><div><strong>AI assistance is switched off</strong><p>${__pr23Esc(s.reason || '')} Enter documents by hand; nothing else changes.</p></div></div>`;
+  if (!s.canUse) return `<div class="notice" style="margin-bottom:14px"><div><strong>AI assistance is not available to you now</strong><p>${__pr23Esc(s.reason || '')}</p></div></div>`;
+  return `<div class="notice" style="margin-bottom:14px"><div><strong>AI-assisted, not authorised decisions</strong><p>AI reads a document and proposes values. A person checks each one against the document. Nothing is saved to a record, awarded, approved or paid because AI read it. ${s.limits.monthlyDocuments != null ? `This month: ${s.month.documents} of ${s.limits.monthlyDocuments} documents.` : ''}</p></div></div>`;
+}
+
+function __pr23AiReviewHtml() {
+  const s = state.aiStatusV23;
+  if (!s) return card('Document review (AI-assisted)', '', '<div class="card-body"><p class="muted">The AI status could not be loaded.</p></div>');
+  const list = state.aiExtractionsV23 || [];
+  const open = list.find(e => e.id === state.aiOpenV23) || null;
+  const allowed = (s.allowedDocumentTypes || []).map(t => `<option value="${t}">${__pr23Esc(__PR23_AI_DOC_LABEL[t] || t)}</option>`).join('');
+  const usable = s.enabled && s.canUse && __pr23Can('ai.use');
+  const upload = `<div class="card-body">${__pr23AiBanner()}${__pr23Can('ai.use') ? '' : '<div class="notice" style="margin-bottom:14px"><div><strong>Your role does not have the AI grant</strong><p>Ask an administrator for procurement.ai.use.</p></div></div>'}<form id="aiReviewFormV23" class="form-grid" onsubmit="return false"><div class="field"><label>Document type</label><select name="documentType"${usable ? '' : ' disabled'}>${allowed}</select></div><div class="field"><label>Document (PDF, scan or photo)</label><input type="file" name="document" accept="application/pdf,.pdf,image/png,image/jpeg,image/webp,image/tiff" ${usable ? '' : 'disabled'}></div></form><div style="margin-top:12px">${usable ? btn('Read the document', 'ai-extract-v23', 'primary', 'document') : ''}</div></div>`;
+  const recent = list.length ? __pr23LinesTable(['When', 'Document', 'Type', 'Status', ''], list.slice(0, 8).map(e => `<tr><td>${__pr23Esc(__pr23DateTime(e.createdAt))}</td><td>${__pr23Esc(e.fileName || '—')}</td><td>${__pr23Esc(__PR23_AI_DOC_LABEL[e.documentType] || e.documentType)}</td><td>${__pr23Chip(e.status === 'REVIEWED' ? 'Reviewed' : e.status === 'DISCARDED' ? 'Discarded' : `${e.undecided} to decide`, e.status === 'REVIEWED' ? 'green' : e.status === 'DISCARDED' ? 'gray' : 'amber')}</td><td><button class="btn small" data-action="ai-open-v23" data-id="${__pr23Esc(e.id)}">Open</button></td></tr>`)) : '<p class="muted" style="margin:0">You have not asked AI to read a document yet.</p>';
+  return card('Document review (AI-assisted)', 'Quotations, invoices, certificates, registration documents, delivery notes and price schedules: read, then checked by you.', upload)
+    + '<div style="height:14px"></div>' + card('Your readings', 'Only you see the readings you asked for.', `<div class="card-body">${recent}</div>`)
+    + (open ? '<div style="height:14px"></div>' + __pr23AiExtractionCard(open) : '');
+}
+
+function __pr23ProvChip(f) {
+  if (f.provenance === 'HUMAN_CONFIRMED') return '<span class="pr23-prov pr23-prov-human">Human-confirmed</span>';
+  if (f.provenance === 'REJECTED') return '<span class="pr23-prov pr23-prov-rejected">Rejected</span>';
+  return '<span class="pr23-prov pr23-prov-ai">AI-extracted, not confirmed</span>';
+}
+
+function __pr23AiExtractionCard(e) {
+  const editing = e.status === 'PENDING_REVIEW';
+  const rows = (e.fields || []).map(f => {
+    const value = f.aiValue == null ? '<span class="muted">Not found in the document</span>' : `<div class="pr23-ai-value">${__pr23Esc(f.aiValue)}</div>${f.provenance !== 'REJECTED' && f.status === 'PENDING' ? '<div>' + __pr23ProvChip(f) + '</div>' : ''}`;
+    const source = f.evidence
+      ? `<blockquote class="pr23-src">“${__pr23Esc(f.evidence)}”</blockquote><span class="muted">Original document${f.page ? `, page ${f.page}` : ''}</span> ${f.sourceVerified === false ? '<span class="pr23-prov pr23-prov-warn">Not found in the document: check it</span>' : f.sourceVerified ? '<span class="muted">· found in the document</span>' : ''}`
+      : '<span class="muted">No source given</span>';
+    let confirm;
+    if (!editing) {
+      confirm = f.provenance === 'HUMAN_CONFIRMED' ? `<div class="pr23-ai-value">${__pr23Esc(f.confirmedValue)}</div>${__pr23ProvChip(f)}` : f.provenance === 'REJECTED' ? __pr23ProvChip(f) : '<span class="muted">Not confirmed</span>';
+    } else {
+      const decided = f.status !== 'PENDING' && f.status !== 'MISSING';
+      const shown = decided ? (f.humanValue == null ? '' : f.humanValue) : (f.aiValue == null ? '' : f.aiValue);
+      confirm = `${decided ? `<div style="margin-bottom:6px">${__pr23ProvChip(f)}${f.provenance === 'HUMAN_CONFIRMED' ? ` <strong>${__pr23Esc(f.confirmedValue)}</strong>` : ''}</div>` : ''}<input data-ai-input="${__pr23Esc(f.key)}" value="${__pr23Esc(shown)}" placeholder="Your value" style="width:100%;margin-bottom:6px"><div style="display:flex;gap:4px;flex-wrap:wrap">${f.aiValue != null ? `<button class="btn small" data-action="ai-decide-v23" data-id="${__pr23Esc(e.id)}|${__pr23Esc(f.key)}|ACCEPT">Accept</button>` : ''}<button class="btn small" data-action="ai-decide-v23" data-id="${__pr23Esc(e.id)}|${__pr23Esc(f.key)}|${f.aiValue != null ? 'CORRECT' : 'MANUAL'}">${f.aiValue != null ? 'Use my value' : 'Enter value'}</button>${f.aiValue != null ? `<button class="btn small" data-action="ai-decide-v23" data-id="${__pr23Esc(e.id)}|${__pr23Esc(f.key)}|REJECT">Reject</button>` : ''}</div>`;
+    }
+    return `<tr data-ai-field="${__pr23Esc(f.key)}"><td><strong>${__pr23Esc(f.label)}</strong></td><td>${value}</td><td>${source}</td><td>${confirm}</td></tr>`;
+  });
+  const notes = [
+    ...(e.missing || []).length ? [`<div class="notice" style="margin-bottom:10px"><div><strong>Expected information not found</strong><p>${e.missing.map(m => __pr23Esc(m.label)).join(', ')}</p></div></div>`] : [],
+    ...(e.inconsistencies || []).length ? [`<div class="notice" style="margin-bottom:10px"><div><strong>Things that do not add up</strong><p>${e.inconsistencies.map(x => `${x.source === 'AI' ? 'AI noted: ' : 'Checked: '}${__pr23Esc(x.message)}`).join('<br>')}</p></div></div>`] : [],
+  ].join('');
+  const confirmed = e.status === 'REVIEWED' && e.confirmed ? `<div class="notice" style="margin-top:12px"><div><strong>Confirmed by you</strong><p>${Object.entries(e.confirmed).map(([k, v]) => `${__pr23Esc((e.fields.find(f => f.key === k) || {}).label || k)}: ${__pr23Esc(v)}`).join('<br>') || 'Nothing was confirmed.'}</p></div></div>` : '';
+  const actions = `<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">${e.hasSource ? `<button class="btn" data-action="ai-source-v23" data-id="${__pr23Esc(e.id)}">Open the original document</button>` : ''}${editing ? btn('Finish the review', 'ai-complete-v23', 'primary', 'approve').replace('data-action="ai-complete-v23"', `data-action="ai-complete-v23" data-id="${__pr23Esc(e.id)}"`) + `<button class="btn" data-action="ai-discard-v23" data-id="${__pr23Esc(e.id)}">Discard</button>` : ''}</div>`;
+  return card(`${e.fileName || 'Document'}: ${__PR23_AI_DOC_LABEL[e.documentType] || e.documentType}`, e.status === 'REVIEWED' ? 'Review complete' : e.status === 'DISCARDED' ? 'Discarded' : `${e.undecided} value${e.undecided === 1 ? '' : 's'} still to decide`,
+    `<div class="card-body"><div class="notice" style="margin-bottom:12px"><div><strong>AI-assisted reading${e.model ? ' (' + __pr23Esc(e.model) + ')' : ''}</strong><p>${__pr23Esc(e.label)} <span class="pr23-prov pr23-prov-src">Original</span> <span class="pr23-prov pr23-prov-ai">AI-extracted</span> <span class="pr23-prov pr23-prov-human">Human-confirmed</span> are the three kinds of value on this screen.</p></div></div>${e.summary ? `<p style="margin:0 0 12px"><span class="muted">AI's summary:</span> ${__pr23Esc(e.summary)}</p>` : ''}${notes}<div class="table-wrap"><table style="min-width:720px"><thead><tr><th>Field</th><th>AI extracted value</th><th>Original source</th><th>Your confirmation</th></tr></thead><tbody>${rows.join('')}</tbody></table></div>${confirmed}${actions}</div>`);
+}
+
+/** What the match found across the invoices of a chain, from the real match results. Replaces the fixture trend and cause charts. */
+function __pr23MatchInsightsHtml(chain) {
+  const invoices = (chain && chain.invoices) || [];
+  const counts = {};
+  let clean = 0;
+  invoices.forEach(i => {
+    const ex = i.matchExceptions || [];
+    if (!ex.length && i.matchExceptions) clean += 1;
+    ex.forEach(e => { counts[e.type] = (counts[e.type] || 0) + 1; });
+  });
+  const rows = Object.keys(__PR23_EXCEPTION_LABEL).map(k => `<tr><td>${__pr23Esc(__PR23_EXCEPTION_LABEL[k])}</td><td>${counts[k] || 0}</td></tr>`);
+  const cfg = __pr23P2pCfg();
+  const tol = cfg ? `Unit price ${cfg.matchPriceVariancePct}%, invoice value ${cfg.matchValueTolerancePct}%, VAT ${cfg.matchTaxTolerancePct}%, quantity ${cfg.matchQtyTolerancePct}%. ${cfg.matchEnforcement === 'ENFORCE' ? 'An invoice with an open exception cannot be approved or paid.' : 'Exceptions warn but do not block.'}` : '';
+  return `<div class="grid two" style="margin-bottom:14px">${card('Match exceptions in this chain', `${invoices.length} invoice${invoices.length === 1 ? '' : 's'}, ${clean} matched cleanly. ${tol}`, `<div class="card-body">${__pr23LinesTable(['Exception', 'Invoices'], rows)}</div>`)}${card('Where each invoice stands', 'Match result and finance handoff', `<div class="card-body">${invoices.length ? __pr23LinesTable(['Invoice', 'Match', 'Handoff'], invoices.map(i => `<tr><td>${__pr23Esc(i.id)}</td><td>${__pr23Esc(i.match)}${(i.matchExceptions || []).length ? ` · ${(i.matchExceptions || []).length} exception${(i.matchExceptions || []).length === 1 ? '' : 's'}` : ''}</td><td>${i.handoff ? __pr23Esc(__PR23_HANDOFF_LABEL[i.handoff] || i.handoff) : '<span class="muted">Not approved yet</span>'}</td></tr>`)) : '<p class="muted" style="margin:0">No invoice has been captured for this chain yet.</p>'}</div>`)}</div>`;
+}
+
 // ---------------------------------------------------------------- goods received
 
 const __PR23_RECEIVABLE = ['SENT', 'ACKNOWLEDGED', 'APPROVED', 'PARTIALLY_RECEIVED', 'PARTIALLY_DELIVERED'];
@@ -932,34 +1642,7 @@ function __pr23LinesTable(heads, rows) {
   return `<div style="overflow-x:auto;max-width:100%"><table style="width:100%;min-width:0;border-collapse:collapse;font-size:13px"><thead><tr>${th}</tr></thead><tbody>${body}</tbody></table></div>`;
 }
 
-function __pr23GrnLinesHtml(poRecordId) {
-  const o = (state.orders || []).find(x => x.recordId === poRecordId);
-  if (!o) return '<p class="muted">Select a purchase order.</p>';
-  const rows = (o.items || []).map(i => {
-    const remaining = Math.max(0, Number(i.quantity || 0) - Number(i.received || 0));
-    const id = __pr23Esc(i.id);
-    return `<tr><td><strong>${__pr23Esc(i.itemName)}</strong></td><td>${i.quantity == null ? '—' : i.quantity}</td><td>${i.received || 0}</td><td><input type="number" min="0" step="0.01" data-grn-received="${id}" value="${remaining}" style="width:64px"></td><td><input type="number" min="0" step="0.01" data-grn-accepted="${id}" value="${remaining}" style="width:64px"></td><td><input type="number" min="0" step="0.01" data-grn-rejected="${id}" value="0" style="width:64px"></td></tr>`;
-  });
-  // Short headers and narrow inputs: the modal body is narrower than the page table.
-  return __pr23LinesTable(['Item', 'Ordered', 'Before', 'Received', 'Accepted', 'Rejected'], rows);
-}
 
-/** Record GRN against a real purchase order, replacing the fixture modal. */
-function __pr23GrnModal() {
-  const open = (state.orders || []).filter(o => __PR23_RECEIVABLE.includes(String(o.rawStatus || '').toUpperCase()));
-  if (!open.length) {
-    openModal('Record goods received note', 'Receipts are recorded against a purchase order that has been sent to the vendor.', '<p class="muted">No purchase order is awaiting delivery.</p>', btn('Close', 'close-overlay'));
-    return;
-  }
-  const today = new Date().toISOString().slice(0, 10);
-  const options = open.map(o => `<option value="${__pr23Esc(o.recordId)}">${__pr23Esc(o.id)} · ${__pr23Esc(o.vendor)}</option>`).join('');
-  openModal(
-    'Record goods received note',
-    'Enter what arrived against the purchase order. On each line, accepted plus rejected must equal the quantity received.',
-    `<form id="grnFormV23" class="form-grid"><div class="field"><label>Purchase order</label><select name="po" id="grnPoV23">${options}</select></div><div class="field"><label>Received on</label><input type="date" name="receivedDate" value="${today}" required></div><div class="field full"><label>Lines</label><div id="grnLinesV23">${__pr23GrnLinesHtml(open[0].recordId)}</div></div></form>`,
-    btn('Cancel', 'close-overlay') + btn('Create GRN', 'create-grn-confirm', 'primary'),
-  );
-}
 
 /** The organisation named on generated documents; the letterhead comes from its company profile. */
 function __pr23OrgName() {
@@ -1128,7 +1811,7 @@ function __pr23InvoiceLinesHtml(poRecordId) {
     return `<tr><td><strong>${__pr23Esc(i.itemName)}</strong></td><td>${i.quantity == null ? '—' : i.quantity}</td><td>${i.received || 0}</td><td><input type="number" min="0" step="0.01" data-inv-qty="${id}" data-inv-name="${__pr23Esc(i.itemName)}" value="${qty}" style="width:70px"></td><td><input type="number" min="0" step="0.01" data-inv-price="${id}" value="${i.unitPrice == null ? '' : i.unitPrice}" style="width:90px"></td></tr>`;
   });
   return __pr23LinesTable(['Item', 'Ordered', 'Received', 'Quantity', 'Unit price'], rows)
-    + '<p class="muted" style="margin-top:8px">VAT is applied at the active rate when the invoice is saved, and the invoice number is assigned then.</p>';
+    + '<p class="muted" style="margin-top:8px">The invoice is recorded under the supplier\'s own number. Its VAT is the figure you state above, or the order\'s rate when you leave it blank.</p>';
 }
 
 /** Capture a supplier invoice against a real purchase order, replacing the fixture form. */
@@ -1147,7 +1830,7 @@ function __pr23InvoiceCaptureModal(tenderId) {
   openModal(
     'Capture supplier invoice',
     'Capture the supplier invoice against its purchase order. It goes to Finance for approval once saved.',
-    `<form id="invoiceCaptureV23" class="form-grid"><div class="field"><label>Purchase order</label><select name="po" id="invoicePoV23">${options}</select></div><div class="field"><label>Invoice date</label><input type="date" name="invoiceDate" value="${iso(new Date())}" required></div><div class="field"><label>Due date</label><input type="date" name="dueDate" value="${iso(new Date(Date.now() + 30 * 86400000))}"></div><div class="field full"><label>Invoice lines</label><div id="invoiceLinesV23">${__pr23InvoiceLinesHtml(open[0].recordId)}</div></div></form>`,
+    `<form id="invoiceCaptureV23" class="form-grid"><div class="field"><label>Purchase order</label><select name="po" id="invoicePoV23">${options}</select></div><div class="field"><label>Invoice date</label><input type="date" name="invoiceDate" value="${iso(new Date())}" required></div><div class="field"><label>Due date</label><input type="date" name="dueDate" value="${iso(new Date(Date.now() + 30 * 86400000))}"></div>${__pr23InvoiceExtraFieldsHtml(open[0].recordId)}<div class="field full"><label>Invoice lines</label><div id="invoiceLinesV23">${__pr23InvoiceLinesHtml(open[0].recordId)}</div></div></form>`,
     btn('Cancel', 'close-overlay') + btn('Capture invoice', 'confirm-capture-invoice-v5', 'primary'),
   );
   __pr23PrefillCaptureFromExtraction();
@@ -1267,7 +1950,7 @@ function __pr23ProcessingHtml(result) {
     const iso = d => d.toISOString().slice(0, 10);
     const options = orders.map(o => `<option value="${__pr23Esc(o.recordId)}"${o.recordId === poId ? ' selected' : ''}>${__pr23Esc(o.id)} · ${__pr23Esc(o.vendor)}</option>`).join('');
     const canApprove = __pr23Can('invoices.approve') && __pr23Can('intake.manage');
-    form = `<form id="invoiceCaptureV23" class="form-grid" onsubmit="return false"><div class="field"><label>Purchase order</label><select name="po" id="invoicePoV23">${options}</select></div><div class="field"><label>Invoice date</label><input type="date" name="invoiceDate" value="${iso(new Date())}" required></div><div class="field"><label>Due date</label><input type="date" name="dueDate" value="${iso(new Date(Date.now() + 30 * 86400000))}"></div><div class="field full"><label>Invoice lines</label><div id="invoiceLinesV23">${__pr23InvoiceLinesHtml(poId)}</div></div><div class="field full"><label>Why it needs review (for Flag for review)</label><textarea id="invoiceReviewNoteV23" rows="2" placeholder="For example: the chair price is above what was agreed"></textarea></div></form><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">${btn('Save invoice', 'confirm-capture-invoice-v5', 'primary', 'invoice')}${canApprove ? btn('Save and approve', 'confirm-capture-approve-invoice-v23', '', 'approve') : ''}${btn('Flag for review', 'confirm-capture-flag-invoice-v23', '', 'audit')}</div>${canApprove ? '' : '<p class="muted" style="margin-top:6px">Approving is Finance\'s: a saved invoice goes to them, and a flagged one goes to its reviewers with your reason.</p>'}`;
+    form = `<form id="invoiceCaptureV23" class="form-grid" onsubmit="return false"><div class="field"><label>Purchase order</label><select name="po" id="invoicePoV23">${options}</select></div><div class="field"><label>Invoice date</label><input type="date" name="invoiceDate" value="${iso(new Date())}" required></div><div class="field"><label>Due date</label><input type="date" name="dueDate" value="${iso(new Date(Date.now() + 30 * 86400000))}"></div>${__pr23InvoiceExtraFieldsHtml(poId)}<div class="field full"><label>Invoice lines</label><div id="invoiceLinesV23">${__pr23InvoiceLinesHtml(poId)}</div></div><div class="field full"><label>Why it needs review (for Flag for review)</label><textarea id="invoiceReviewNoteV23" rows="2" placeholder="For example: the chair price is above what was agreed"></textarea></div></form><div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">${btn('Save invoice', 'confirm-capture-invoice-v5', 'primary', 'invoice')}${canApprove ? btn('Save and approve', 'confirm-capture-approve-invoice-v23', '', 'approve') : ''}${btn('Flag for review', 'confirm-capture-flag-invoice-v23', '', 'audit')}</div>${canApprove ? '' : '<p class="muted" style="margin-top:6px">Approving is Finance\'s: a saved invoice goes to them, and a flagged one goes to its reviewers with your reason.</p>'}`;
   } else {
     form = `<div class="notice"><div><strong>No purchase order chosen</strong><p>Choose the order above and read the invoice again to capture it here, or capture it by hand.</p></div></div><div style="margin-top:12px">${btn('Capture this invoice', 'capture-invoice-v5', 'primary', 'invoice')}</div>`;
   }
@@ -1340,8 +2023,9 @@ function __pr23AiCapturePage() {
     'Reads the supplier’s invoice — a PDF, a scan or a photo — and hands the fields to the capture form. Every figure stays yours to check before anything is saved.',
     btn('Capture by hand', 'capture-invoice-v5', '', 'invoice'),
   )}
-    ${card('Upload the invoice', 'One invoice at a time', upload)}
-    ${card('Invoice processing', 'The document beside what was read: check each field, then save, approve or flag it for review', result)}</div>`;
+    ${__pr23AiBanner()}${card('Upload the invoice', 'One invoice at a time', upload)}
+    ${card('Invoice processing', 'The document beside what was read: check each field, then save, approve or flag it for review', result)}
+    <div style="height:14px"></div>${__pr23AiReviewHtml()}</div>`;
 }
 
 /** Carry the reading into the capture form: the invoice date, and unit prices where the lines line up. */
@@ -1448,7 +2132,7 @@ function __pr23PoModal(existingId) {
   openModal(
     'Create purchase order',
     'Raise an order directly from an approved requisition, without an RFQ. Save it as a draft, or save and send it to the vendor.',
-    `<form id="poFormV23" class="form-grid"><div class="field full"><label>Approved requisition</label><select name="requisition" id="poSourceV23" required>${sourceOptions}</select></div><div class="field"><label>Vendor</label><select name="vendor" required>${vendorOptions}</select></div><div class="field"><label>Expected delivery</label><input type="date" name="delivery" value="${__pr23DateOffset(14)}"></div><div class="field"><label>Payment terms</label><input name="paymentTerms" value="Net 30"></div><div class="field"><label>Delivery address</label><input name="shippingAddress"></div><div class="field full"><label>Order lines</label><div id="poLinesV23">${__pr23PoLinesHtml(sources[0].recordId)}</div></div></form>`,
+    `<form id="poFormV23" class="form-grid"><div class="field full"><label>Approved requisition</label><select name="requisition" id="poSourceV23" required>${sourceOptions}</select></div><div class="field"><label>Vendor</label><select name="vendor" required>${vendorOptions}</select></div><div class="field"><label>Expected delivery</label><input type="date" name="delivery" value="${__pr23DateOffset(14)}"></div><div class="field"><label>Payment terms</label><input name="paymentTerms" value="Net 30"></div><div class="field"><label>Delivery address</label><input name="shippingAddress"></div>${__pr23PoExtraFieldsHtml()}<div class="field full"><label>Order lines</label><div id="poLinesV23">${__pr23PoLinesHtml(sources[0].recordId)}</div></div></form>`,
     btn('Cancel', 'close-overlay') + btn('Save draft', 'save-po-v6') + btn('Save and send to vendor', 'submit-po-v6', 'primary'),
   );
 }
@@ -1491,8 +2175,10 @@ function __pr23PaymentModal(preselectId) {
 // ---------------------------------------------------------------- annual procurement plans
 
 const __PR23_PLAN_CATEGORIES = ['Technology', 'Office supplies', 'Furniture', 'Facilities', 'Fleet', 'Medical', 'Agriculture', 'Professional services'];
-const __PR23_PLAN_METHODS = ['Open tender', 'Restricted tender', 'RFQ', 'Framework', 'Direct procurement'];
+const __PR23_PLAN_METHODS = ['Open tender', 'Restricted tender', 'RFQ', 'Single source', 'Direct purchase', 'Framework call off'];
 const __pr23Options = (list, selected) => list.map(x => `<option ${x === selected ? 'selected' : ''}>${__pr23Esc(x)}</option>`).join('');
+// A method is stored as a code (OPEN_TENDER) and shown as words (Open tender).
+const __pr23MethodSelected = m => { const s = String(m == null ? '' : m).replace(/_/g, ' ').toLowerCase(); return __PR23_PLAN_METHODS.find(x => x.toLowerCase() === s) || ''; };
 const __pr23PlanEditable = p => ['DRAFT', 'REJECTED'].includes(String((p && p.rawStatus) || '').toUpperCase());
 
 function __pr23PlanLineRows(count) {
@@ -1513,7 +2199,7 @@ function __pr23PlanModal(planId) {
   openModal(
     plan ? `Edit ${plan.id}` : 'Create annual procurement plan',
     plan ? 'Change the plan header. Lines are added with Add plan item.' : 'Create the plan with its budget and first requirements. It stays a draft until you submit it for budget approval.',
-    `<form id="planFormV23" class="form-grid"><input type="hidden" name="recordId" value="${__pr23Esc(plan ? plan.recordId : '')}"><div class="field full"><label>Plan name</label><input name="name" required value="${__pr23Esc(plan ? plan.name : '')}"></div><div class="field"><label>Department</label><select name="department">${__pr23Options(['All departments', ...(live.departments || [])], plan ? (plan.department || 'All departments') : ((live.access && live.access.department) || 'All departments'))}</select></div><div class="field"><label>Financial year</label><select name="fiscalYear">${__pr23Options(plan && plan.fiscalYear && !years.includes(plan.fiscalYear) ? [plan.fiscalYear, ...years] : years, plan ? plan.fiscalYear : years[0])}</select></div><div class="field"><label>Budget ceiling</label><input type="number" name="budget" min="1" step="0.01" required value="${plan ? plan.budget : ''}"></div><div class="field"><label>Currency</label><select name="currency">${__pr23Options(['USD', 'ZiG', 'ZAR'])}</select></div><div class="field full"><label>Planning assumptions</label><textarea name="notes">${__pr23Esc(plan ? plan.notes || '' : '')}</textarea></div>${lines}</form>`,
+    `<form id="planFormV23" class="form-grid"><input type="hidden" name="recordId" value="${__pr23Esc(plan ? plan.recordId : '')}"><div class="field full"><label>Plan name</label><input name="name" required value="${__pr23Esc(plan ? plan.name : '')}"></div><div class="field"><label>Department</label><select name="department">${__pr23Options(['All departments', ...(live.departments || [])], plan ? (plan.department || 'All departments') : ((live.access && live.access.department) || 'All departments'))}</select></div><div class="field"><label>Financial year</label><select name="fiscalYear">${__pr23Options(plan && plan.fiscalYear && !years.includes(plan.fiscalYear) ? [plan.fiscalYear, ...years] : years, plan ? plan.fiscalYear : years[0])}</select></div><div class="field"><label>Budget ceiling</label><input type="number" name="budget" min="1" step="0.01" required value="${plan ? plan.budget : ''}"></div><div class="field"><label>Currency</label><select name="currency">${__pr23Options((live.currencies || []).map(c => c.code), plan ? plan.currencyCode : (live.currencies && live.currencies[0] ? live.currencies[0].code : undefined))}</select></div><div class="field"><label>Business unit</label><input name="businessUnit" value="${__pr23Esc(plan && plan.businessUnit ? plan.businessUnit : '')}"></div><div class="field full"><label>Planning assumptions</label><textarea name="notes">${__pr23Esc(plan ? plan.notes || '' : '')}</textarea></div>${lines}</form>`,
     btn('Cancel', 'close-overlay') + btn('Save draft', 'save-plan-v5') + btn(plan ? 'Save changes' : 'Create plan', 'create-plan-confirm-v5', 'primary'),
   );
 }
@@ -1532,7 +2218,7 @@ function __pr23PlanItemModal() {
   openModal(
     'Add procurement plan item',
     'The estimated value counts against the plan budget when the plan is submitted.',
-    `<form id="planItemFormV23" class="form-grid"><div class="field full"><label>Plan</label><select name="plan" required>${planOptions}</select></div><div class="field full"><label>Requirement</label><input name="description" required></div><div class="field"><label>Category</label><select name="category">${__pr23Options(__PR23_PLAN_CATEGORIES)}</select></div><div class="field"><label>Quarter</label><select name="quarter">${__pr23Options(['Q1', 'Q2', 'Q3', 'Q4'])}</select></div><div class="field"><label>Sourcing method</label><select name="method">${__pr23Options(__PR23_PLAN_METHODS)}</select></div><div class="field"><label>Estimated value</label><input type="number" name="estimatedValue" min="0" step="0.01" required></div><div class="field"><label>Department</label><select name="department">${__pr23Options(departmentOptions)}</select></div></form>`,
+    `<form id="planItemFormV23" class="form-grid"><div class="field full"><label>Plan</label><select name="plan" required>${planOptions}</select></div><div class="field full"><label>Requirement</label><input name="description" required></div><div class="field"><label>Category</label><select name="category">${__pr23Options(__PR23_PLAN_CATEGORIES)}</select></div><div class="field"><label>Quarter</label><select name="quarter">${__pr23Options(['Q1', 'Q2', 'Q3', 'Q4'])}</select></div><div class="field"><label>Sourcing method</label><select name="method">${__pr23Options(__PR23_PLAN_METHODS)}</select></div><div class="field"><label>Estimated value</label><input type="number" name="estimatedValue" min="0" step="0.01" required></div><div class="field"><label>Department</label><select name="department">${__pr23Options(departmentOptions)}</select></div><div class="field"><label>Business unit</label><input name="businessUnit" value="${__pr23Esc(null && null.businessUnit ? null.businessUnit : '')}"></div><div class="field"><label>Budget code</label><input name="budgetCode" list="prBudgetCodesV23" autocomplete="off" value="${__pr23Esc(null && null.budgetCode ? null.budgetCode : '')}"><datalist id="prBudgetCodesV23">${[...new Set(__pr23ActiveBudgets().map(b => b.budgetCode))].map(c => `<option value="${__pr23Esc(c)}"></option>`).join('')}</datalist></div><div class="field"><label>Cost centre</label><input name="costCentre" value="${__pr23Esc(null && null.costCentre ? null.costCentre : '')}"></div><div class="field"><label>Currency</label><select name="lineCurrency">${__pr23Options((live.currencies || []).map(c => c.code), null && null.currencyCode ? null.currencyCode : undefined)}</select></div><div class="field"><label>Planned start</label><input type="date" name="plannedStartDate" value="${__pr23Esc(null && null.plannedStart ? null.plannedStart : '')}"></div><div class="field"><label>Required delivery</label><input type="date" name="requiredDeliveryDate" value="${__pr23Esc(null && null.requiredDelivery ? null.requiredDelivery : '')}"></div><div class="field"><label>Responsible officer</label><select name="responsibleOfficerId"><option value="">Choose an officer</option>${(__pr23ROpts().people || []).map(u => `<option value="${__pr23Esc(u.id)}"${null && null.responsibleOfficerId === u.id ? ' selected' : ''}>${__pr23Esc(u.name)}${u.department ? ` · ${__pr23Esc(u.department)}` : ''}</option>`).join('')}</select></div></form>`,
     btn('Cancel', 'close-overlay') + btn('Save item', 'save-plan-item', 'primary'),
   );
 }
@@ -1559,7 +2245,7 @@ function __pr23EditPlanItemModal(id) {
   openModal(
     `Edit ${item.id}`,
     plan ? `${plan.id} · ${plan.name}` : 'Plan line',
-    `<form id="planItemEditFormV23" class="form-grid"><input type="hidden" name="itemId" value="${__pr23Esc(item.recordId)}"><input type="hidden" name="planId" value="${__pr23Esc(item.planRecordId)}"><div class="field full"><label>Requirement</label><input name="description" required value="${__pr23Esc(item.description)}"></div><div class="field"><label>Category</label><select name="category">${__pr23Options(__PR23_PLAN_CATEGORIES, item.category)}</select></div><div class="field"><label>Quarter</label><select name="quarter">${__pr23Options(['Q1', 'Q2', 'Q3', 'Q4'], item.quarter)}</select></div><div class="field"><label>Sourcing method</label><select name="method">${__pr23Options(__PR23_PLAN_METHODS, item.method)}</select></div><div class="field"><label>Estimated value</label><input type="number" name="estimatedValue" min="0" step="0.01" required value="${Number(item.budget) || 0}"></div><div class="field"><label>Department</label><select name="department">${__pr23Options(departmentOptions, dept)}</select></div></form>`,
+    `<form id="planItemEditFormV23" class="form-grid"><input type="hidden" name="itemId" value="${__pr23Esc(item.recordId)}"><input type="hidden" name="planId" value="${__pr23Esc(item.planRecordId)}"><div class="field full"><label>Requirement</label><input name="description" required value="${__pr23Esc(item.description)}"></div><div class="field"><label>Category</label><select name="category">${__pr23Options(__PR23_PLAN_CATEGORIES, item.category)}</select></div><div class="field"><label>Quarter</label><select name="quarter">${__pr23Options(['Q1', 'Q2', 'Q3', 'Q4'], item.quarter)}</select></div><div class="field"><label>Sourcing method</label><select name="method">${__pr23Options(__PR23_PLAN_METHODS, __pr23MethodSelected(item.method))}</select></div><div class="field"><label>Estimated value</label><input type="number" name="estimatedValue" min="0" step="0.01" required value="${Number(item.budget) || 0}"></div><div class="field"><label>Department</label><select name="department">${__pr23Options(departmentOptions, dept)}</select></div><div class="field"><label>Business unit</label><input name="businessUnit" value="${__pr23Esc(item && item.businessUnit ? item.businessUnit : '')}"></div><div class="field"><label>Budget code</label><input name="budgetCode" list="prBudgetCodesV23" autocomplete="off" value="${__pr23Esc(item && item.budgetCode ? item.budgetCode : '')}"><datalist id="prBudgetCodesV23">${[...new Set(__pr23ActiveBudgets().map(b => b.budgetCode))].map(c => `<option value="${__pr23Esc(c)}"></option>`).join('')}</datalist></div><div class="field"><label>Cost centre</label><input name="costCentre" value="${__pr23Esc(item && item.costCentre ? item.costCentre : '')}"></div><div class="field"><label>Currency</label><select name="lineCurrency">${__pr23Options((live.currencies || []).map(c => c.code), item && item.currencyCode ? item.currencyCode : undefined)}</select></div><div class="field"><label>Planned start</label><input type="date" name="plannedStartDate" value="${__pr23Esc(item && item.plannedStart ? item.plannedStart : '')}"></div><div class="field"><label>Required delivery</label><input type="date" name="requiredDeliveryDate" value="${__pr23Esc(item && item.requiredDelivery ? item.requiredDelivery : '')}"></div><div class="field"><label>Responsible officer</label><select name="responsibleOfficerId"><option value="">Choose an officer</option>${(__pr23ROpts().people || []).map(u => `<option value="${__pr23Esc(u.id)}"${item && item.responsibleOfficerId === u.id ? ' selected' : ''}>${__pr23Esc(u.name)}${u.department ? ` · ${__pr23Esc(u.department)}` : ''}</option>`).join('')}</select></div></form>`,
     btn('Cancel', 'close-overlay') + btn('Save changes', 'save-plan-item-edit-v23', 'primary'),
   );
 }
@@ -1578,11 +2264,31 @@ function __pr23EditTenderModal(id) {
     return;
   }
   const closing = t.closingAt ? new Date(t.closingAt).toISOString().slice(0, 16) : '';
+  // Once the deadline has passed suppliers' submissions are locked: extending is no longer possible, and only a formal
+  // reopen (a reason, a new deadline; audited) lets them submit again.
+  const rawStatus = String(t.rawStatus || '').toUpperCase();
+  // SRD §40: an awarded or cancelled event is final; nothing on it changes.
+  if (['AWARDED', 'CANCELLED', 'COMPLETED'].includes(rawStatus)) {
+    openModal(`${t.id}`, t.title || 'Tender', `<div class="notice"><div><strong>${__pr23Esc(t.stage)}</strong><p>${rawStatus === 'CANCELLED' ? 'A cancelled sourcing event is final. It cannot be changed, reopened or published.' : 'An awarded sourcing event is final. Its award and its purchase order are managed from their own records.'}</p></div></div>`, btn('Close', 'close-overlay'));
+    return;
+  }
+  const notSent = ['DRAFT', 'APPROVED'].includes(rawStatus);
+  const closedAlready = !notSent && ((t.closingAt && new Date(t.closingAt).getTime() <= Date.now()) || ['CLOSED', 'UNDER_EVALUATION', 'AWAITING_APPROVAL'].includes(rawStatus) || /closed/i.test(String(t.stage || t.status || '')));
+  if (closedAlready) {
+    const suggested = new Date(Date.now() + 3 * 86400000).toISOString().slice(0, 16);
+    openModal(
+      `Reopen ${t.id}`,
+      t.title || 'Tender',
+      `<form id="editTenderFormV23" class="form-grid"><input type="hidden" name="tenderId" value="${__pr23Esc(t.id)}"><div class="field full"><label>Tender / RFx title</label><input value="${__pr23Esc(t.title || '')}" readonly></div><div class="field full"><label>New closing date and time</label><input type="datetime-local" name="closing" required value="${__pr23Esc(suggested)}"></div><div class="field full"><label>Why is it being reopened? (required, kept in the audit trail)</label><textarea name="reason" rows="3" required minlength="10" maxlength="1000"></textarea></div></form><p class="muted" style="margin:10px 0 0">The deadline has passed, so suppliers' submissions are locked. Reopening lets every invited supplier submit a revised quotation again (each replaces their previous one) and sends them a fresh link. It cannot be done once a quotation has been accepted.</p>`,
+      btn('Cancel', 'close-overlay') + btn('Reopen event', 'reopen-rfq-v23', 'primary') + __pr23LifecycleButtons('tender', t),
+    );
+    return;
+  }
   openModal(
     `Edit ${t.id}`,
     t.title || 'Tender',
     `<form id="editTenderFormV23" class="form-grid"><input type="hidden" name="tenderId" value="${__pr23Esc(t.id)}"><div class="field full"><label>Tender / RFx title</label><input value="${__pr23Esc(t.title || '')}" readonly></div><div class="field"><label>Method</label><input value="${__pr23Esc(t.method || '')}" readonly></div><div class="field"><label>Stage</label><input value="${__pr23Esc(t.stage || '')}" readonly></div><div class="field full"><label>Closing date and time</label><input type="datetime-local" name="closing" required value="${__pr23Esc(closing)}"></div></form><p class="muted" style="margin:10px 0 0">Title, method and scope are set when a tender is sent and are not editable afterwards; the closing date can still change.</p>`,
-    btn('Cancel', 'close-overlay') + btn('Save changes', 'extend-rfq-closing-v23', 'primary'),
+    btn('Cancel', 'close-overlay') + btn('Save changes', 'extend-rfq-closing-v23', 'primary') + __pr23LifecycleButtons('tender', t),
   );
 }
 
@@ -1594,6 +2300,290 @@ function __pr23PlanStrip(p) {
   const decided = s === 'APPROVED' || s === 'REJECTED';
   return `<div class="workflow-strip">${step('1. Draft', `${lines} line${lines === 1 ? '' : 's'} planned`, s === 'DRAFT' ? 'current' : 'done')}${step('2. Budget approval', s === 'DRAFT' ? 'Not yet submitted' : s === 'SUBMITTED' ? 'Awaiting a budget approver' : 'Decided', s === 'SUBMITTED' ? 'current' : decided ? 'done' : '')}${step(s === 'REJECTED' ? '3. Returned' : '3. Approved baseline', s === 'REJECTED' ? p.rejectionReason || 'Returned for changes' : s === 'APPROVED' ? 'Plan approved' : 'Pending', decided ? 'current' : '')}</div>`;
 }
+
+// ---------------------------------------------------------------- requisition planning, budget and decisions (SRD §10-§12)
+
+/** "PENDING_APPROVAL" -> "Pending approval". */
+function __pr23Label(code) {
+  const s = String(code == null ? '' : code).replace(/_/g, ' ').trim().toLowerCase();
+  return s ? s.charAt(0).toUpperCase() + s.slice(1) : '';
+}
+
+function __pr23ROpts() {
+  return state.requisitionOptionsV23 || { procurementMethods: [], riskLevels: [], exceptionTypes: [], currencies: [], people: [], policy: { suggestedVendorPolicy: 'ALLOWED_APPROVED_ONLY', budgetCheckMode: 'ENFORCE', planLinkPolicy: 'OPTIONAL' } };
+}
+
+function __pr23CodeOptions(list, selected, blank) {
+  const first = blank ? `<option value="">${__pr23Esc(blank)}</option>` : '';
+  return first + (list || []).map(c => `<option value="${__pr23Esc(c)}"${String(selected || '').toUpperCase() === String(c).toUpperCase() ? ' selected' : ''}>${__pr23Esc(__pr23Label(c))}</option>`).join('');
+}
+
+/** The current year's active budget lines, for the budget code and cost centre pickers. */
+function __pr23ActiveBudgets() {
+  const year = String(new Date().getFullYear());
+  return (state.budgetsV23 || []).filter(b => b.status === 'ACTIVE' && String(b.financialYear).includes(year));
+}
+
+/**
+ * SRD §11 header fields beyond title, category and project: currency, required date, procurement method, risk, exception
+ * type, budget code and cost centre, branch, business unit, delivery, the plan line drawn on, and (where policy permits) a
+ * suggested vendor. `r` prefills the requester's edit form.
+ */
+function __pr23RequisitionPlanningFields(r) {
+  const o = __pr23ROpts();
+  const cur = r || {};
+  const budgets = __pr23ActiveBudgets();
+  const codes = [...new Set(budgets.map(b => b.budgetCode))];
+  const centres = [...new Set(budgets.map(b => b.costCentre).filter(Boolean))];
+  const currency = (o.currencies || []).map(c => `<option value="${__pr23Esc(c.id)}"${(cur.currencyId ? cur.currencyId === c.id : c.isDefault) ? ' selected' : ''}>${__pr23Esc(c.code)} · ${__pr23Esc(c.name)}</option>`).join('');
+  const today = new Date().toISOString().slice(0, 10);
+  const lines = (state.planLinesV23 || []);
+  const currentLine = cur.planItemId && !lines.some(l => l.id === cur.planItemId) ? `<option value="${__pr23Esc(cur.planItemId)}" selected>The line already linked</option>` : '';
+  const planOptions = '<option value="">Not linked to a plan line</option>' + currentLine + lines.map(l => `<option value="${__pr23Esc(l.id)}"${cur.planItemId === l.id ? ' selected' : ''}>${__pr23Esc(l.planNumber)} · ${__pr23Esc(l.requirement)} · ${__pr23Cents(l.remaining)} left</option>`).join('');
+  const policy = o.policy || {};
+  const approvedVendors = (state.vendors || []).filter(v => v.transactable);
+  const vendorField = policy.suggestedVendorPolicy === 'NOT_ALLOWED'
+    ? ''
+    : formField(policy.suggestedVendorPolicy === 'ONLY_FOR_SOLE_SOURCE' ? 'Suggested vendor · sole source only' : 'Suggested vendor',
+      `<select name="suggestedVendor"><option value="">None</option>${approvedVendors.map(v => `<option value="${__pr23Esc(v.recordId)}"${cur.suggestedVendorId === v.recordId ? ' selected' : ''}>${__pr23Esc(v.name)}</option>`).join('')}</select>`);
+  return formField('Currency', `<select name="currencyId" required>${currency}</select>`)
+    + formField('Required date', `<input type="date" name="requiredDate" required min="${today}" value="${__pr23Esc(cur.requiredDate || '')}">`)
+    + formField('Procurement method', `<select name="procurementMethod">${__pr23CodeOptions(o.procurementMethods, cur.procurementMethod, 'Not decided')}</select>`)
+    + formField('Risk level', `<select name="riskLevel">${__pr23CodeOptions(o.riskLevels, cur.riskLevel, 'Not assessed')}</select>`)
+    + formField('Exception type', `<select name="exceptionType">${__pr23CodeOptions((o.exceptionTypes || []).filter(x => x !== 'NONE'), cur.exceptionType, 'None')}</select>`)
+    + formField('Budget code', `<input name="budgetCode" list="prBudgetCodesV23" autocomplete="off" value="${__pr23Esc(cur.budgetCode || '')}"><datalist id="prBudgetCodesV23">${codes.map(c => `<option value="${__pr23Esc(c)}"></option>`).join('')}</datalist>`)
+    + formField('Cost centre', `<input name="costCentre" list="prCostCentresV23" autocomplete="off" value="${__pr23Esc(cur.costCentre || '')}"><datalist id="prCostCentresV23">${centres.map(c => `<option value="${__pr23Esc(c)}"></option>`).join('')}</datalist>`)
+    + formField('Branch', `<input name="branch" value="${__pr23Esc(cur.branch || '')}">`)
+    + formField('Business unit', `<input name="businessUnit" value="${__pr23Esc(cur.businessUnit || '')}">`)
+    + formField('Delivery location', `<input name="deliveryLocation" value="${__pr23Esc(cur.deliveryLocation || '')}">`)
+    + formField('Annual plan line', `<select name="planItem">${planOptions}</select>`, 'full')
+    + vendorField
+    + __pr23RequisitionAttachmentsField(r);
+}
+
+/** Files on a requisition: the ones already attached (removable while it is editable) and a picker for more. */
+function __pr23RequisitionAttachmentsField(r) {
+  const files = (r && r.attachments) || [];
+  const size = n => (n == null ? '' : n >= 1048576 ? `${(n / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`);
+  const list = files.map(f => `<div style="display:flex;gap:10px;align-items:center;margin-bottom:6px"><a href="${__pr23Esc(f.fileUrl)}" target="_blank" rel="noopener">${__pr23Esc(f.fileName)}</a><span class="muted">${__pr23Esc(size(f.fileSizeBytes))}</span>${r ? __pr23ActionButton('Remove', 'remove-pr-attachment-v23', r.recordId, '', '').replace('data-action="remove-pr-attachment-v23"', `data-action="remove-pr-attachment-v23" data-attachment="${__pr23Esc(f.id)}"`) : ''}</div>`).join('');
+  return formField('Attachments', `${list}<input type="file" name="attachments" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.png,.jpg,.jpeg,.txt">`, 'full');
+}
+
+/** The requisition's files as links, for the read-only view. */
+function __pr23RequisitionAttachmentsMeta(r) {
+  const files = r.attachments || [];
+  if (!files.length) return '';
+  return `<div><span>Attachments</span><strong>${files.map(f => `<a href="${__pr23Esc(f.fileUrl)}" target="_blank" rel="noopener">${__pr23Esc(f.fileName)}</a>`).join('<br>')}</strong></div>`;
+}
+
+/** Live position of the requisition's budget code and plan line, redrawn as the form changes. */
+function __pr23BudgetNotice() {
+  return '<p id="prPositionV23" class="muted">No budget code entered.</p>';
+}
+
+function __pr23RefreshPosition() {
+  const box = document.getElementById('prPositionV23');
+  if (!box) return;
+  const form = box.closest('form');
+  const field = n => (form && form.querySelector(`[name="${n}"]`) ? form.querySelector(`[name="${n}"]`).value.trim() : '');
+  const total = [...document.querySelectorAll('#prLinesV23 [data-pr-line]')].reduce((t, row) => t + Number(row.querySelector('[name="qty"]')?.value || 0) * Number(row.querySelector('[name="price"]')?.value || 0), 0);
+  const lines = [];
+  const code = field('budgetCode');
+  const cc = field('costCentre');
+  const mode = (__pr23ROpts().policy || {}).budgetCheckMode;
+  if (code) {
+    const rows = __pr23ActiveBudgets().filter(b => b.budgetCode === code && (b.costCentre === cc || !b.costCentre));
+    const line = rows.find(b => b.costCentre && b.costCentre === cc) || rows.find(b => !b.costCentre);
+    if (!line) lines.push(`No active budget for ${code}${cc ? ` and ${cc}` : ''} this year.`);
+    else lines.push(`Budget ${code}${line.costCentre ? ` · ${line.costCentre}` : ''}: ${__pr23Cents(line.available)} available of ${__pr23Cents(line.amount)}.${total > line.available + 0.005 ? ` This requisition, at ${__pr23Cents(total)}, is above it${mode === 'ENFORCE' ? ' and will not submit' : ''}.` : ''}`);
+  } else if (mode === 'ENFORCE') lines.push('A budget code is needed before this can be submitted.');
+  const planId = field('planItem');
+  const pl = planId ? (state.planLinesV23 || []).find(l => l.id === planId) : null;
+  if (pl) lines.push(`Plan line ${pl.planNumber}: ${__pr23Cents(pl.remaining)} left of ${__pr23Cents(pl.estimatedValue)}.${total > pl.remaining + 0.005 ? ' This requisition is above what remains.' : ''}`);
+  box.innerHTML = lines.length ? lines.map(l => __pr23Esc(l)).join('<br>') : 'No budget code entered.';
+}
+__pr23On(document, 'input', event => {
+  if (event.target && event.target.closest && event.target.closest('#prForm, #editPrFormV11')) __pr23RefreshPosition();
+}, __pr23Sig);
+__pr23On(document, 'change', event => {
+  if (event.target && event.target.closest && event.target.closest('#prForm, #editPrFormV11')) __pr23RefreshPosition();
+}, __pr23Sig);
+
+/** The requester's edit form carries the requisition's lines too, so an amendment can change them. */
+function __pr23RequisitionLinesEditor(r) {
+  const items = r && r.items && r.items.length ? r.items : [null];
+  const rows = items.map(i => __pr23PrLineRowHtml(i)).join('');
+  return `<div class="field full"><label>Line items</label><div class="table-wrap"><table style="min-width:560px"><thead><tr><th>Item</th><th>UOM</th><th>Qty</th><th>Unit estimate</th><th>Total</th></tr></thead><tbody id="prLinesV23">${rows}</tbody><tfoot><tr><td colspan="5"><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">${btn('Add line', 'add-pr-line-v23', '', 'plus')}${btn('Remove last line', 'remove-pr-line-v23')}<span class="muted" id="prLinesTotalV23" style="margin-left:auto">Estimated total —</span></div></td></tr></tfoot></table></div></div>`;
+}
+
+/** Read-only summary of the header fields and where the requisition stands against its plan line and budget. */
+function __pr23RequisitionPlanningMeta(r) {
+  const o = __pr23ROpts();
+  const item = (label, value) => `<div><span>${__pr23Esc(label)}</span><strong>${__pr23Esc(value == null || value === '' ? '—' : value)}</strong></div>`;
+  const vendor = r.suggestedVendorId ? ((state.vendors || []).find(v => v.recordId === r.suggestedVendorId) || {}).name || 'Named vendor' : null;
+  const pos = r.position || null;
+  const budget = pos && pos.budget ? `${pos.budget.budgetCode}${pos.budget.costCentre ? ` · ${pos.budget.costCentre}` : ''}: ${__pr23Cents(pos.budget.available)} available of ${__pr23Cents(pos.budget.amount)}` : (r.budgetCode ? `${r.budgetCode}: no active budget` : null);
+  const plan = pos && pos.plan ? `${pos.plan.planNumber} · ${pos.plan.requirement}: ${__pr23Cents(pos.plan.remaining)} left of ${__pr23Cents(pos.plan.planned)}` : null;
+  return item('Currency', r.currency) + item('Required date', r.requiredDate ? __pr23DayLabel(r.requiredDate) : null)
+    + item('Procurement method', __pr23Label(r.procurementMethod)) + item('Risk level', __pr23Label(r.riskLevel)) + item('Exception type', __pr23Label(r.exceptionType))
+    + item('Budget code', r.budgetCode) + item('Cost centre', r.costCentre) + item('Branch', r.branch) + item('Business unit', r.businessUnit)
+    + item('Delivery location', r.deliveryLocation) + item('Budget position', budget) + item('Annual plan line', plan || (r.planItemId ? 'Linked' : null))
+    + (vendor ? item('Suggested vendor', vendor) : '') + __pr23RequisitionAttachmentsMeta(r) + (r.resubmissionCount ? item('Resubmitted', `${r.resubmissionCount} time${r.resubmissionCount === 1 ? '' : 's'}`) : '');
+}
+
+const __PR23_DECISION_LABEL = { SUBMITTED: 'Submitted', RESUBMITTED: 'Resubmitted', APPROVED: 'Approved', REJECTED: 'Rejected', RETURNED: 'Returned for amendment', COMMENTED: 'Comment', DELEGATED: 'Delegated', ESCALATED: 'Escalated' };
+
+/** Every submission, decision, comment and hand-over on the requisition: who, what, when, why, and the status before and after. */
+function __pr23RequisitionDecisionHtml(r) {
+  const list = r.decisions || [];
+  const raw = String(r.rawStatus || '').toUpperCase();
+  const banner = (raw === 'RETURNED' || raw === 'REJECTED') && r.returnReason
+    ? `<div class="notice" style="margin-top:14px"><div><strong>${raw === 'RETURNED' ? 'Returned for amendment' : 'Rejected'}</strong><p>${__pr23Esc(r.returnReason)}</p></div></div>`
+    : '';
+  if (!list.length) return banner;
+  const stamp = iso => { const d = new Date(iso); return Number.isNaN(d.getTime()) ? '—' : `${d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })} ${d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}`; };
+  const rows = list.map(d => `<tr><td>${__pr23Esc(stamp(d.at))}</td><td>${__pr23Esc(d.actor ? d.actor.name : 'System')}${d.onBehalfOf ? `<br><span class="muted">for ${__pr23Esc(d.onBehalfOf.name)}</span>` : ''}</td><td><strong>${__pr23Esc(__PR23_DECISION_LABEL[d.action] || __pr23Label(d.action))}</strong>${d.action === 'DELEGATED' && d.detail && d.detail.delegatedTo ? `<br><span class="muted">to ${__pr23Esc(d.detail.delegatedTo)}</span>` : ''}</td><td>${__pr23Esc(d.stepName || '—')}</td><td>${__pr23Esc(d.comments || '—')}</td><td>${__pr23Esc(__pr23Label(d.previousStatus) || '—')} → ${__pr23Esc(__pr23Label(d.resultingStatus) || '—')}</td></tr>`);
+  return banner + `<div style="margin-top:14px"><h4 style="margin:0 0 8px">Decision history</h4>${__pr23LinesTable(['When', 'Who', 'Action', 'Step', 'Comments', 'Status'], rows)}</div>`;
+}
+
+/** Reject / return for amendment / comment: the requisition approver's decision form, with no pre-written reason. */
+function __pr23DecisionModal(kind, id) {
+  const isPrompt = kind === 'prompt';
+  const prompt = isPrompt ? (state.approvalPromptsV6 || []).find(x => x.id === id) : null;
+  const r = isPrompt ? (prompt && prompt.kind === 'requisition' ? (state.requisitions || []).find(x => x.recordId === prompt.targetId) : null) : (state.requisitions || []).find(x => x.id === id);
+  const supportsReturn = Boolean(r);
+  const record = isPrompt ? (prompt && prompt.record) : (r && r.id);
+  if (!record) return;
+  const options = supportsReturn
+    ? '<option value="reject">Reject requisition</option><option value="return">Return for amendment</option><option value="comment">Comment only, keep it pending</option>'
+    : '<option value="reject">Reject</option>';
+  openModal(
+    supportsReturn ? 'Reject, return or comment' : 'Reject',
+    `${record}${r ? ` · ${r.title}` : ''}`,
+    `<form id="${isPrompt ? 'rejectApprovalFormV6' : 'rejectPrFormV11'}" class="form-grid"><div class="field full"><label>Decision</label><select name="decision">${options}</select></div><div class="field full"><label>Comments</label><textarea name="reason" rows="4" required></textarea></div></form>`,
+    btn('Cancel', 'close-overlay') + __pr23ActionButton('Confirm', isPrompt ? 'confirm-reject-approval-v6' : 'confirm-reject-pr-v11', id, 'primary')
+  );
+}
+
+/** Hand the approver's step to someone else: only where the step allows it, and only to people who could approve it themselves. */
+function __pr23DelegateModal(kind, id) {
+  const isPrompt = kind === 'prompt';
+  const prompt = isPrompt ? (state.approvalPromptsV6 || []).find(x => x.id === id) : null;
+  const r = isPrompt ? (prompt && prompt.kind === 'requisition' ? (state.requisitions || []).find(x => x.recordId === prompt.targetId) : null) : (state.requisitions || []).find(x => x.id === id);
+  if (!r) return;
+  const d = r.delegate;
+  const foot = btn('Cancel', 'close-overlay');
+  if (!d || !d.canDelegate) {
+    openModal('Delegate approval', `${r.id} · ${r.title}`, `<p>Delegation is not enabled on this approval step${d && d.step ? `: ${__pr23Esc(d.step)}` : ''}. An administrator can enable it in the approval matrix.</p>`, foot);
+    return;
+  }
+  const people = (d.people || []).map(p => `<option value="${__pr23Esc(p.id)}"${p.eligible ? '' : ' disabled'}>${__pr23Esc(p.name)}${p.department ? ` · ${__pr23Esc(p.department)}` : ''}${p.eligible ? '' : ` — ${__pr23Esc(p.reason || 'not eligible')}`}</option>`).join('');
+  openModal(
+    'Delegate approval',
+    `${r.id} · ${r.title}`,
+    `<form id="delegateRequisitionFormV23" class="form-grid"><div class="field full"><label>Delegate to</label><select name="delegate" required><option value="">Choose a person</option>${people}</select></div><div class="field full"><label>Reason</label><textarea name="reason" rows="3" required></textarea></div></form>`,
+    foot + __pr23ActionButton('Delegate', 'confirm-delegate-pr-v23', r.recordId, 'primary')
+  );
+}
+
+// The requisition approver's own controls: capture phase, and the click ends here, so the vendored fixture modals never open.
+__pr23On(document, 'click', event => {
+  if (!__pr23Live()) return;
+  const control = event.target && event.target.closest && event.target.closest('[data-action="reject-pr-v11"], [data-action="reject-approval-v6"], [data-action="delegate-pr-v11"], [data-action="delegate-approval-v6"]');
+  if (!control) return;
+  event.preventDefault();
+  event.stopImmediatePropagation();
+  const act = control.dataset.action;
+  const id = control.dataset.id;
+  if (act === 'reject-pr-v11') __pr23DecisionModal('requisition', id);
+  else if (act === 'reject-approval-v6') __pr23DecisionModal('prompt', id);
+  else if (act === 'delegate-pr-v11') __pr23DelegateModal('requisition', id);
+  else __pr23DelegateModal('prompt', id);
+}, true);
+
+/** The §10 plan-line columns beyond the vendored register: budget code, officer, delivery, and what requisitions have drawn. */
+const __PR23_PLAN_LINE_HEADS = ['Budget code', 'Officer', 'Delivery', 'Drawn', 'Remaining'];
+function __pr23PlanItemExtraCells(i) {
+  return `<td>${__pr23Esc(i.budgetCode || '—')}</td><td>${__pr23Esc(i.responsibleOfficer || '—')}</td><td>${i.requiredDelivery ? __pr23Esc(__pr23DayLabel(i.requiredDelivery)) : '—'}</td><td class="money">${__pr23Cents(i.consumed || 0)}${i.requisitionCount ? `<br><span class="muted">${i.requisitionCount} requisition${i.requisitionCount === 1 ? '' : 's'}</span>` : ''}</td><td class="money">${__pr23Cents(i.remaining != null ? i.remaining : i.budget)}</td>`;
+}
+
+/** Short sentence for a step's routing conditions, for the matrix table. */
+function __pr23RuleSummary(rules) {
+  const r = rules || {};
+  const parts = [];
+  const add = (label, list) => { if (list && list.length) parts.push(`${label}: ${list.map(x => __pr23Label(x) || x).join(', ')}`); };
+  add('Department', r.departments); add('Business unit', r.businessUnits); add('Cost centre', r.costCentres); add('Category', r.categories);
+  add('Branch', r.branches); add('Method', r.methods); add('Risk', r.riskLevels); add('Exception', r.exceptionTypes);
+  if (r.amountMin != null || r.amountMax != null) parts.push(`Amount: ${r.amountMin != null ? `from ${__pr23Cents(r.amountMin)}` : ''}${r.amountMin != null && r.amountMax != null ? ' ' : ''}${r.amountMax != null ? `up to ${__pr23Cents(r.amountMax)}` : ''}`);
+  return parts.join(' · ');
+}
+
+/** The routing conditions editor of one matrix step: which requisitions it applies to. */
+function __pr23MatrixConditionsHtml(s) {
+  const o = __pr23ROpts();
+  const m = state.approvalMatrixV23 || {};
+  const rules = s.matchRules || {};
+  const multi = (name, list, chosen, size) => `<select name="${name}" multiple size="${size || 4}" style="min-width:150px">${(list || []).map(c => `<option value="${__pr23Esc(c)}"${(chosen || []).map(x => String(x).toUpperCase()).includes(String(c).toUpperCase()) ? ' selected' : ''}>${__pr23Esc(__pr23Label(c) || c)}</option>`).join('')}</select>`;
+  const text = (name, chosen, ph) => `<input name="${name}" placeholder="${__pr23Esc(ph)}" value="${__pr23Esc((chosen || []).join(', '))}">`;
+  const lab = (t, inner) => `<label style="display:flex;flex-direction:column;gap:3px;font-size:12px">${t}${inner}</label>`;
+  const summary = __pr23RuleSummary(rules);
+  return `<details data-matrix-conditions${summary ? ' open' : ''}><summary style="cursor:pointer">${summary ? __pr23Esc(summary) : 'Every requisition'}</summary><div style="display:grid;grid-template-columns:repeat(2,minmax(150px,1fr));gap:8px;margin-top:8px">`
+    + lab('Departments', multi('ruleDepartments', m.departments, rules.departments))
+    + lab('Methods', multi('ruleMethods', o.procurementMethods, rules.methods))
+    + lab('Risk levels', multi('ruleRiskLevels', o.riskLevels, rules.riskLevels))
+    + lab('Exception types', multi('ruleExceptionTypes', (o.exceptionTypes || []).filter(x => x !== 'NONE'), rules.exceptionTypes))
+    + lab('Business units', text('ruleBusinessUnits', rules.businessUnits, 'Comma separated'))
+    + lab('Cost centres', text('ruleCostCentres', rules.costCentres, 'Comma separated'))
+    + lab('Categories', text('ruleCategories', rules.categories, 'Comma separated'))
+    + lab('Branches', text('ruleBranches', rules.branches, 'Comma separated'))
+    + lab('Amount from', `<input name="ruleAmountMin" type="number" min="0" step="0.01" value="${rules.amountMin != null ? __pr23Esc(rules.amountMin) : ''}">`)
+    + lab('Amount up to', `<input name="ruleAmountMax" type="number" min="0" step="0.01" value="${rules.amountMax != null ? __pr23Esc(rules.amountMax) : ''}">`)
+    + `</div></details>`;
+}
+
+/** Budget master and requisition policy, on the Configuration approval-matrix page. */
+function __pr23BudgetPolicyHtml() {
+  const m = state.approvalMatrixV23 || {};
+  const o = __pr23ROpts();
+  const p = o.policy || {};
+  const canEdit = Boolean(m.canEdit);
+  const rows = (state.budgetsV23 || []).map(b => `<tr><td><strong>${__pr23Esc(b.budgetCode)}</strong></td><td>${__pr23Esc(b.costCentre || 'Whole code')}</td><td>${__pr23Esc(b.financialYear)}</td><td class="money">${__pr23Cents(b.amount)}</td><td class="money">${__pr23Cents(b.committed)}</td><td class="money">${__pr23Cents(b.available)}</td><td>${__pr23Esc(b.currencyCode || '—')}</td><td>${__pr23Esc(__pr23Label(b.status))}</td>${canEdit ? `<td>${__pr23ActionButton('Edit', 'edit-budget-v23', b.id, '', 'edit')}</td>` : ''}</tr>`);
+  const heads = ['Budget code', 'Cost centre', 'Year', 'Amount', 'Committed', 'Available', 'Currency', 'Status'].concat(canEdit ? [''] : []);
+  const budgets = card('Budgets', 'The budget codes and cost centres a requisition draws on. Committed is what in-flight and approved requisitions hold.',
+    table(heads, rows.length ? rows : [`<tr><td colspan="${heads.length}" class="muted">No budget has been set up.</td></tr>`]),
+    canEdit ? __pr23ActionButton('Add budget', 'edit-budget-v23', '', 'primary', 'plus') : '');
+  const sel = (name, list, chosen) => `<select name="${name}">${list.map(([v, t]) => `<option value="${v}"${chosen === v ? ' selected' : ''}>${__pr23Esc(t)}</option>`).join('')}</select>`;
+  const lab = (t, inner) => `<label style="display:flex;flex-direction:column;gap:4px;font-size:12px">${t}${inner}</label>`;
+  const body = canEdit
+    ? `<form id="requisitionPolicyFormV23" onsubmit="return false" style="display:flex;gap:14px;align-items:flex-end;flex-wrap:wrap;padding:14px 16px">`
+      + lab('Requisition number format', `<input name="prNumberFormat" value="${__pr23Esc(p.prNumberFormat || 'PR-{YYYY}-{######}')}" style="width:190px">`)
+      + lab('Budget check', sel('budgetCheckMode', [['ENFORCE', 'Block over-budget requisitions'], ['WARN', 'Warn, but allow'], ['OFF', 'Off']], p.budgetCheckMode))
+      + lab('Plan link', sel('planLinkPolicy', [['OPTIONAL', 'Optional'], ['REQUIRED', 'Required, or an exception type']], p.planLinkPolicy))
+      + lab('Suggested vendor', sel('suggestedVendorPolicy', [['NOT_ALLOWED', 'Not allowed'], ['ALLOWED_APPROVED_ONLY', 'Approved vendors only'], ['ONLY_FOR_SOLE_SOURCE', 'Sole source only']], p.suggestedVendorPolicy))
+      + __pr23ActionButton('Save', 'save-requisition-policy-v23', '', 'primary', 'approve') + `</form>`
+    : `<div style="padding:14px 16px"><p style="margin:0">Number format ${__pr23Esc(p.prNumberFormat || 'PR-{YYYY}-{######}')} · budget check ${__pr23Esc(__pr23Label(p.budgetCheckMode))} · plan link ${__pr23Esc(__pr23Label(p.planLinkPolicy))} · suggested vendor ${__pr23Esc(__pr23Label(p.suggestedVendorPolicy))}.</p></div>`;
+  return card('Requisition policy', 'Numbering, budget check, plan linkage and the suggested-vendor rule, applied to every requisition.', body) + budgets;
+}
+
+/** Add or edit a budget line. */
+function __pr23BudgetModal(id) {
+  const b = id ? (state.budgetsV23 || []).find(x => x.id === id) : null;
+  const o = __pr23ROpts();
+  const year = String(new Date().getFullYear());
+  openModal(
+    b ? `Edit budget ${b.budgetCode}` : 'Add budget',
+    'A budget code, optionally narrowed to one cost centre, for a financial year.',
+    `<form id="budgetFormV23" class="form-grid"><input type="hidden" name="id" value="${__pr23Esc(b ? b.id : '')}"><div class="field"><label>Financial year</label><input name="financialYear" required value="${__pr23Esc(b ? b.financialYear : year)}"></div><div class="field"><label>Budget code</label><input name="budgetCode" required value="${__pr23Esc(b ? b.budgetCode : '')}"></div><div class="field"><label>Cost centre</label><input name="costCentre" placeholder="Whole code" value="${__pr23Esc(b ? b.costCentre : '')}"></div><div class="field"><label>Amount</label><input name="amount" type="number" min="0" step="0.01" required value="${b ? __pr23Esc(b.amount) : ''}"></div><div class="field"><label>Currency</label><select name="currencyCode">${(o.currencies || []).map(c => `<option value="${__pr23Esc(c.code)}"${(b ? b.currencyCode === c.code : c.isDefault) ? ' selected' : ''}>${__pr23Esc(c.code)}</option>`).join('')}</select></div><div class="field"><label>Status</label><select name="status"><option value="ACTIVE"${!b || b.status === 'ACTIVE' ? ' selected' : ''}>Active</option><option value="INACTIVE"${b && b.status === 'INACTIVE' ? ' selected' : ''}>Inactive</option></select></div><div class="field full"><label>Description</label><input name="description" value="${__pr23Esc(b && b.description ? b.description : '')}"></div></form>`,
+    btn('Cancel', 'close-overlay') + btn('Save budget', 'save-budget-v23', 'primary')
+  );
+}
+__pr23On(document, 'click', event => {
+  const control = event.target && event.target.closest && event.target.closest('[data-action="edit-budget-v23"]');
+  if (!control) return;
+  event.preventDefault();
+  event.stopImmediatePropagation();
+  __pr23BudgetModal(control.dataset.id || '');
+}, true);
 
 // ---------------------------------------------------------------- contracts
 
@@ -1653,6 +2643,8 @@ function __pr23ExportRows(title) {
   if (pick(/vendor|supplier/i)) return [['Vendor', 'Category', 'BP number', 'VAT number', 'Status', 'Tax clearance', 'Email', 'Spend'], ...(state.vendors || []).map(v => [v.name, v.category, v.bp, v.vat, v.status, v.itf, n(v.email), v.spend])];
   if (pick(/contract/i)) return [['Contract', 'Title', 'Vendor', 'Value', 'Start', 'End', 'Status'], ...(state.contractsV6 || []).map(c => [c.id, c.title, c.vendor, c.value, n(c.start), n(c.end), c.status])];
   if (pick(/plan|budget/i)) return [['Line', 'Plan', 'Requirement', 'Department', 'Category', 'Quarter', 'Method', 'Estimated value', 'Status'], ...(state.planItems || []).map(i => [i.id, i.plan, i.description, i.entity, i.category, i.quarter, i.method, i.budget, i.status])];
+  if (pick(/spend|commitment|department spend|category spend/i)) return [['Purchase order', 'Vendor', 'Department', 'Category', 'Amount', 'Currency', 'Status'], ...(state.orders || []).map(o => [o.id, o.vendor, o.entity, n(o.spendCategory), o.amount, n(o.currency), o.status])];
+  if (pick(/exception|discrepanc|three-way|3-way|match exception/i)) return [['Invoice', 'Vendor', 'Purchase order', 'Amount', 'Match', 'Status', 'Due'], ...(state.invoices || []).filter(i => /block|discrep|variance|await|mismatch/i.test(String(i.match || '') + String(i.status || ''))).map(i => [i.id, i.vendor, n(i.po), i.amount, i.match, i.status, n(i.due)])];
   if (pick(/invoice/i)) return [['Invoice', 'Vendor', 'Purchase order', 'Amount', 'Match', 'Status', 'Due'], ...(state.invoices || []).map(i => [i.id, i.vendor, n(i.po), i.amount, i.match, i.status, n(i.due)])];
   if (pick(/\border|\bPO\b/i)) return [['Purchase order', 'Vendor', 'Department', 'Amount', 'Currency', 'Status', 'Delivery'], ...(state.orders || []).map(o => [o.id, o.vendor, o.entity, o.amount, n(o.currency), o.status, n(o.delivery)])];
   if (pick(/requisition|demand/i)) return [['Requisition', 'Title', 'Department', 'Estimate', 'Status', 'Requested by'], ...(state.requisitions || []).map(r => [r.id, r.title, r.entity, n(r.amount), r.status, r.owner])];
@@ -1716,40 +2708,8 @@ function __pr23ExportFile(format, title) {
 
 // ---------------------------------------------------------------- accounts payable tab
 
-/** Approved and paid invoices, replacing the two fixture payment batches. */
-function __pr23PayablesTable() {
-  const rows = (state.invoices || [])
-    .filter(i => String(i.rawStatus || '').toUpperCase() === 'APPROVED')
-    .map(i => `<tr><td><strong class="link">${__pr23Esc(i.id)}</strong></td><td>${__pr23Esc(i.vendor)}</td><td>${__pr23Esc(i.po)}</td><td class="money">${money(i.amount || 0)}</td><td>${__pr23Esc(i.currency || '')}</td><td>${__pr23Esc(i.due)}</td><td>${status(i.status)}</td><td>${i.payable && __pr23Can('invoices.pay') ? `<button class="btn small" data-action="record-payment-v23" data-id="${__pr23Esc(i.recordId)}">Record payment</button>` : ''}</td></tr>`);
-  if (!rows.length) return __pr23NoData('No invoice has been approved for payment yet.');
-  return table(['Invoice', 'Vendor', 'Purchase order', 'Amount', 'Currency', 'Due', 'Status', ''], rows);
-}
 
 // ---------------------------------------------------------------- requisition budget check
-
-/**
- * The requisition form's budget notice, from approved annual plans for the requester's department
- * this year: plan budget less what is already ordered. With no approved plan it says so; it never
- * blocks the request, because no budget control exists on the backend.
- */
-function __pr23BudgetNotice() {
-  const live = __pr23Live() || {};
-  const dept = live.access && live.access.department;
-  const year = String(new Date().getFullYear());
-  // A requester usually cannot read plans, and an empty list would read as "no plan exists".
-  if (!__pr23Can('plans.view') && !__pr23Can('plans.manage') && !__pr23Can('plans.approve')) {
-    return '<p>Your department head approves this request against the approved annual plan; plan budgets are not shown to your role.</p>';
-  }
-  const plans = (state.plans || []).filter(p => String(p.rawStatus || '').toUpperCase() === 'APPROVED'
-    && (!p.department || p.department === dept) && String(p.fiscalYear || '').includes(year));
-  if (!plans.length) {
-    return `<p>No approved procurement plan covers ${__pr23Esc(dept || 'your department')} for FY ${year}, so this request is not checked against a budget.</p>`;
-  }
-  const budget = plans.reduce((t, p) => t + Number(p.budget || 0), 0);
-  const committed = plans.reduce((t, p) => t + Number(p.committed || 0), 0);
-  const label = plans.length === 1 ? __pr23Esc(plans[0].id) : `${plans.length} approved plans`;
-  return `<p>Remaining against ${label}: ${money(budget - committed)} of ${money(budget)} (${money(committed)} already ordered). The approver sees this figure; it does not block the request.</p>`;
-}
 
 // ---------------------------------------------------------------- requisition line items
 
@@ -1759,9 +2719,14 @@ function __pr23BudgetNotice() {
  * estimate nobody had given. In a live session the requester adds as many lines as the request needs, and
  * the unit estimate is optional and starts empty.
  */
-function __pr23PrLineRowHtml() {
-  const uoms = ['Each', 'Box', 'Ream', 'Pack', 'Lot', 'Month'].map(u => `<option>${u}</option>`).join('');
-  return `<tr data-pr-line><td><input name="item" required placeholder="What is needed"></td><td><select name="uom">${uoms}</select></td><td><input name="qty" type="number" min="1" step="1" value="1" required style="width:80px"></td><td><input name="price" type="number" min="0" step="0.01" placeholder="Optional" style="width:110px"></td><td data-pr-line-total>—</td></tr>`;
+function __pr23PrLineRowHtml(item) {
+  const chosen = item && item.unit ? String(item.unit) : '';
+  const units = ['Each', 'Box', 'Ream', 'Pack', 'Lot', 'Month'];
+  if (chosen && !units.some(u => u.toLowerCase() === chosen.toLowerCase())) units.push(chosen);
+  const uoms = units.map(u => `<option${u.toLowerCase() === chosen.toLowerCase() ? ' selected' : ''}>${__pr23Esc(u)}</option>`).join('');
+  const qty = item && item.quantity ? item.quantity : 1;
+  const price = item && item.unitPrice ? item.unitPrice : '';
+  return `<tr data-pr-line><td><input name="item" required placeholder="What is needed" value="${__pr23Esc(item ? item.itemName : '')}"></td><td><select name="uom">${uoms}</select></td><td><input name="qty" type="number" min="1" step="1" value="${__pr23Esc(qty)}" required style="width:80px"></td><td><input name="price" type="number" min="0" step="0.01" placeholder="Optional" value="${__pr23Esc(price)}" style="width:110px"></td><td data-pr-line-total>—</td></tr>`;
 }
 
 /** The lines table body, with Add line / Remove last line in the footer rather than inside a row. */
@@ -1954,6 +2919,15 @@ __pr23On(document, 'change', event => {
     }
     return;
   }
+  if (target && target.dataset && target.dataset.grnLineType) {
+    const id = target.dataset.grnLineType;
+    const svc = target.value === 'SERVICE';
+    const goods = document.querySelector(`[data-goods-cells="${CSS.escape(id)}"]`);
+    const service = document.querySelector(`[data-service-cells="${CSS.escape(id)}"]`);
+    if (goods) goods.hidden = svc;
+    if (service) service.hidden = !svc;
+    return;
+  }
   if (!target || !target.id) return;
   if (target.id === 'grnPoV23') {
     const box = document.querySelector('#grnLinesV23');
@@ -1962,6 +2936,11 @@ __pr23On(document, 'change', event => {
   if (target.id === 'invoicePoV23') {
     const box = document.querySelector('#invoiceLinesV23');
     if (box) box.innerHTML = __pr23InvoiceLinesHtml(target.value);
+    const grn = document.querySelector('#invoiceGrnV23');
+    if (grn) grn.innerHTML = __pr23ReceiptOptions(target.value);
+    const order = (state.orders || []).find(x => x.recordId === target.value);
+    const terms = document.querySelector('#invoiceCaptureV23 [name="paymentTerms"]');
+    if (terms && order) terms.value = order.paymentTerms || '';
   }
   if (target.id === 'poSourceV23') {
     const box = document.querySelector('#poLinesV23');
@@ -1986,9 +2965,9 @@ __pr23On(document, 'change', event => {
 
 /** Pages that need a view grant; any page not listed is open to every staff user. */
 const __PR23_PAGE_GRANTS = {
-  dashboard: ['dashboard.view'],
   analytics: ['dashboard.view'],
-  reports: ['dashboard.view'],
+  // the Command Centre opens for everyone: what it shows is decided by role (executive, procurement or personal work)
+  reports: ['reports.view'],
   plan: ['plans.view', 'plans.manage', 'plans.approve'],
   tenders: ['rfq.view', 'rfq.manage'],
   quotations: ['quotations.view', 'quotations.manage'],
@@ -2023,7 +3002,9 @@ function __pr23PageAllowed(page) {
   const access = live && live.access;
   if (!access || access.isPrivileged) return true;
   const grants = __PR23_PAGE_GRANTS[page];
-  return !grants || grants.some(__pr23Can);
+  if (!grants || grants.some(__pr23Can)) return true;
+  // A member of an evaluation committee holds no procurement grants, yet must reach the events they sit on (SRD 18-19).
+  return (page === 'quotations' || page === 'evaluation') && (state.tenders || []).some(t => t.member);
 }
 
 /** The audit card's line, saying which slice of the loaded trail the page shows. */
@@ -2110,7 +3091,7 @@ function __pr23SupportDocument(a, kind) {
       return { name: __PR23_SUPPORT_LABELS.evaluation, content: `<h1>Quotation comparison</h1><p class="doc-lead">${e(a.record)}</p><p>${rfq ? `No quotations have been submitted for ${e(rfq)}.` : `No quotation comparison applies to a ${e(type)}.`}</p>` };
     }
     const rows = [...quotes].sort((x, y) => (x.amount ?? Infinity) - (y.amount ?? Infinity))
-      .map(q => `<tr><td>${e(q.vendor)}</td><td>${e(q.id)}</td><td>${money(q.amount)}</td><td>${q.evaluationScore == null ? 'Not scored' : e(q.evaluationScore)}</td><td>${e(q.status)}</td></tr>`).join('');
+      .map(q => `<tr><td>${e(q.vendor)}</td><td>${e(q.id)}</td><td>${money(q.amount,q.currency)}</td><td>${q.evaluationScore == null ? 'Not scored' : e(q.evaluationScore)}</td><td>${e(q.status)}</td></tr>`).join('');
     return {
       name: __PR23_SUPPORT_LABELS.evaluation,
       content: `<h1>Quotation comparison</h1><p class="doc-lead">The quotations submitted for ${e(rfq)}, lowest total first.</p><table><thead><tr><th>Vendor</th><th>Quotation</th><th>Total</th><th>Evaluation score</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table><h2>Basis of the recommendation</h2><p>${e(a.reason || 'The lowest total submitted.')}</p>`,
@@ -2140,12 +3121,12 @@ function __pr23AwardMemo(a, t) {
     .sort((x, y) => (x.amount ?? Infinity) - (y.amount ?? Infinity));
   const winner = String(a.title || '').replace(/^Award to\s+/i, '') || (quotes[0] && quotes[0].vendor) || '—';
   const pair = cells => `<tr>${cells.map(([k, v]) => `<th>${e(k)}</th><td>${v}</td>`).join('')}</tr>`;
-  const rows = quotes.map((q, i) => `<tr><td>${e(q.vendor)}</td><td>${e(q.id)}</td><td>${money(q.amount)}</td><td>${q.evaluationScore == null ? 'Not scored' : e(q.evaluationScore)}</td><td>${i + 1}</td></tr>`).join('');
+  const rows = quotes.map((q, i) => `<tr><td>${e(q.vendor)}</td><td>${e(q.id)}</td><td>${money(q.amount,q.currency)}</td><td>${q.evaluationScore == null ? 'Not scored' : e(q.evaluationScore)}</td><td>${i + 1}</td></tr>`).join('');
   return `<h1>Tender Award Approval Memorandum</h1><p class="doc-lead">Award decision for ${e((t && t.title) || a.record)}.</p>`
-    + `<table><tbody>${pair([['RFQ reference', e(rfq)], ['Department', e((t && t.entity) || a.entity || '—')]])}${pair([['Method', e((t && t.method) || '—')], ['Closing date', e((t && t.close) || '—')]])}${pair([['Requisition estimate', money(t && t.value)], ['Recommended bidder', e(winner)]])}${pair([['Proposed award value', money(a.amount)], ['Approval role', e(a.role || '—')]])}</tbody></table>`
+    + `<table><tbody>${pair([['RFQ reference', e(rfq)], ['Department', e((t && t.entity) || a.entity || '—')]])}${pair([['Method', e((t && t.method) || '—')], ['Closing date', e((t && t.close) || '—')]])}${pair([['Requisition estimate', money(t && t.value)], ['Recommended bidder', e(winner)]])}${pair([['Proposed award value', money(a.amount,a.currency)], ['Approval role', e(a.role || '—')]])}</tbody></table>`
     + `<h2>1. Quotations received</h2>${quotes.length ? `<p>${quotes.length} quotation${quotes.length === 1 ? ' was' : 's were'} submitted through the vendors' invitation links, ranked here by total.</p><table><thead><tr><th>Vendor</th><th>Quotation</th><th>Total</th><th>Evaluation score</th><th>Rank by total</th></tr></thead><tbody>${rows}</tbody></table>` : '<p>No submitted quotation is recorded for this RFQ.</p>'}`
     + `<h2>2. Basis of the recommendation</h2><p>${e(a.reason || 'The lowest total submitted.')}</p>`
-    + `<h2>3. Decision requested</h2><p>Approve the award to <strong>${e(winner)}</strong> for <strong>${money(a.amount)}</strong>. Approving accepts the quotation and raises the purchase order; rejecting leaves the RFQ in evaluation.</p>`
+    + `<h2>3. Decision requested</h2><p>Approve the award to <strong>${e(winner)}</strong> for <strong>${money(a.amount,a.currency)}</strong>. Approving accepts the quotation and raises the purchase order; rejecting leaves the RFQ in evaluation.</p>`
     + `<h2>4. Before approving</h2><ul><li>The vendor's tax clearance and company documents on the Vendor Registry are current.</li><li>No conflict of interest is known to the approver.</li></ul>`;
 }
 
@@ -2326,7 +3307,8 @@ function __pr23TrimLiveForms() {
  */
 function __pr23WireTableTools() {
   document.querySelectorAll('#workspace .table-tools').forEach(tt => {
-    if (tt.dataset.pr23Wired) return;
+    // the list toolbar (search, filters, sorting) does its own filtering; wiring it here too would filter twice
+    if (tt.dataset.pr23Wired || tt.classList.contains('pr23-list-tools') || tt.classList.contains('pr23-tbl-pager')) return;
     tt.dataset.pr23Wired = '1';
     const table = tt.parentElement && tt.parentElement.querySelector('table');
     if (!table) return;
@@ -2473,7 +3455,7 @@ function __pr23FlagLabels(inv) {
 function __pr23DashboardSrdHtml() {
   const reqsForMe = (state.requisitions || []).filter(r => r.awaitingMe && String(r.rawStatus || '').toUpperCase() === 'PENDING_APPROVAL');
   const others = Math.max(0, (state.approvalPromptsV6 || []).length - reqsForMe.length);
-  const awaiting = card('Awaiting my approval', 'Requisitions waiting for your decision', `<div class="card-body"><div data-page="approvals" style="cursor:pointer"><div data-dash-awaiting style="font-size:44px;font-weight:700;line-height:1">${reqsForMe.length}</div><p class="muted" style="margin:6px 0 0">${reqsForMe.length === 1 ? 'requisition' : 'requisitions'} pending your approval${others ? ` · ${others} other decision${others === 1 ? '' : 's'} waiting` : ''}</p></div><div class="list" style="margin-top:10px">${reqsForMe.slice(0, 3).map(r => `<div class="list-row" data-page="approvals" style="cursor:pointer"><div class="list-main"><strong>${__pr23Esc(r.title)}</strong><span>${__pr23Esc(r.id)} · ${__pr23Esc(r.department || r.entity)}${r.amount != null ? ` · ${money(r.amount)}` : ''}</span></div>${status(r.status)}</div>`).join('')}<div class="list-row" data-page="approvals" style="cursor:pointer"><div class="list-main"><strong>Open the approval list</strong><span>Every decision waiting on you</span></div></div></div></div>`);
+  const awaiting = card('Awaiting my approval', 'Requisitions waiting for your decision', `<div class="card-body"><div data-page="approvals" style="cursor:pointer"><div data-dash-awaiting style="font-size:44px;font-weight:700;line-height:1">${reqsForMe.length}</div><p class="muted" style="margin:6px 0 0">${reqsForMe.length === 1 ? 'requisition' : 'requisitions'} pending your approval${others ? ` · ${others} other decision${others === 1 ? '' : 's'} waiting` : ''}</p></div><div class="list" style="margin-top:10px">${reqsForMe.slice(0, 3).map(r => `<div class="list-row" data-page="approvals" style="cursor:pointer"><div class="list-main"><strong>${__pr23Esc(r.title)}</strong><span>${__pr23Esc(r.id)} · ${__pr23Esc(r.department || r.entity)}${r.amount != null ? ` · ${money(r.amount,r.currency)}` : ''}</span></div>${status(r.status)}</div>`).join('')}<div class="list-row" data-page="approvals" style="cursor:pointer"><div class="list-main"><strong>Open the approval list</strong><span>Every decision waiting on you</span></div></div></div></div>`);
 
   const range = state.dashSpendRangeV23 || 'quarter';
   const start = __pr23RangeStart(range);
@@ -2506,7 +3488,7 @@ function __pr23DashboardSrdHtml() {
   const poBody = !__pr23Can('orders.view')
     ? '<div class="card-body"><p class="muted">Your role does not read purchase orders.</p></div>'
     : recent.length
-      ? table(['PO', 'Vendor', 'Ordered', 'Amount', 'Status', ''], recent.map(o => `<tr><td><strong>${__pr23Esc(o.id)}</strong></td><td>${__pr23Esc(o.vendor)}</td><td>${__pr23DayLabel(o.orderDate)}</td><td class="money">${money(o.amount)}</td><td>${status(o.status)}</td><td>${__pr23SmallButton('Quick view', 'preview-po-v6', o.id, 'eye')}</td></tr>`))
+      ? table(['PO', 'Vendor', 'Ordered', 'Amount', 'Status', ''], recent.map(o => `<tr><td><strong>${__pr23Esc(o.id)}</strong></td><td>${__pr23Esc(o.vendor)}</td><td>${__pr23DayLabel(o.orderDate)}</td><td class="money">${money(o.amount,o.currency)}</td><td>${status(o.status)}</td><td>${__pr23SmallButton('Quick view', 'preview-po-v6', o.id, 'eye')}</td></tr>`))
       : '<div class="card-body"><p class="muted">No purchase order has been raised yet.</p></div>';
   const pos = card('Recent purchase orders', 'The latest orders and where each stands', poBody);
 
@@ -2545,6 +3527,8 @@ function __pr23OrderFilters() {
 
 /** SRD §5 Phase 2: the purchase order register filters by vendor, order date and status. */
 function __pr23FilteredOrders() {
+  // the list toolbar (search, filters, sorting, export) covers what this row did
+  if (__pr23Live()) return state.orders || [];
   const f = __pr23OrderFilters();
   return (state.orders || []).filter(o => {
     if (f.vendor && o.vendor !== f.vendor) return false;
@@ -2557,6 +3541,7 @@ function __pr23FilteredOrders() {
 }
 
 function __pr23OrderFiltersHtml() {
+  if (__pr23Live()) return '';
   const f = __pr23OrderFilters();
   const all = state.orders || [];
   const uniq = xs => [...new Set(xs.filter(x => x && x !== '—'))].sort((a, b) => String(a).localeCompare(String(b)));
@@ -2596,25 +3581,57 @@ __pr23On(document, 'click', event => {
 /** Filter choices built from the records loaded now, so every choice matches something. */
 function __pr23FilterOptions(kind) {
   const uniq = xs => [...new Set(xs.filter(v => v && v !== '—'))].sort((a, b) => String(a).localeCompare(String(b)));
+  // Quotation Comparison shows RFQ *stages* (Awarded / Evaluation / …), not PR/invoice statuses
+  // like Rejected — keep the shared bar's status list page-scoped so Apply can mean something.
   if (kind === 'status') {
+    if (state.page === 'quotations') {
+      return ['All statuses', ...uniq((state.tenders || []).filter(t => Number(t.bids) > 0).map(t => t.stage))];
+    }
     return ['All statuses', ...uniq(['requisitions', 'tenders', 'orders', 'grns', 'invoices', 'plans', 'contractsV6', 'documents', 'vendors']
       .flatMap(k => (state[k] || []).map(r => r.status || r.stage)))];
   }
   // Real procurement category (Office Supplies, Technology, ...), not department: requisitions/orders/grns/plans'
   // `.entity` is department (procurement has no legal-entity dimension), so this picked "Operations"/"Finance"
   // under a "category" label and never matched a vendor row at all (it did not even read the vendors array).
-  if (kind === 'category') return ['All categories', ...uniq(['vendors', 'requisitions', 'tenders'].flatMap(k => (state[k] || []).map(r => r.category)))];
+  if (kind === 'category') {
+    if (state.page === 'quotations') {
+      return ['All categories', ...uniq((state.tenders || []).filter(t => Number(t.bids) > 0).map(t => t.category))];
+    }
+    return ['All categories', ...uniq(['vendors', 'requisitions', 'tenders'].flatMap(k => (state[k] || []).map(r => r.category)))];
+  }
   const year = new Date().getFullYear();
   return ['All years', `FY ${year - 1}`, `FY ${year}`, `FY ${year + 1}`];
 }
 
-/**
- * Apply the filter bar to the page's tables: a row stays when its text carries the chosen status,
- * department and year. Returns what happened, for the toast. KPI cards and charts are not filtered,
- * and the message says so rather than claiming they were.
- */
+/** RFQs with supplier responses, optionally narrowed by the shared filter bar. */
+function __pr23QuotationCandidates() {
+  let rows = (state.tenders || []).filter(t => Number(t.bids) > 0);
+  if (!state.filterApplied) return rows;
+  const f = state.filters || {};
+  if (f.category && f.category !== 'All categories') {
+    rows = rows.filter(t => String(t.category || '') === String(f.category));
+  }
+  if (f.status && f.status !== 'All statuses') {
+    rows = rows.filter(t => String(t.stage || '') === String(f.status));
+  }
+  if (f.period && f.period !== 'All years') {
+    const y = String(f.period).match(/\d{4}/);
+    if (y) rows = rows.filter(t => String(t.close || t.closingAt || '').includes(y[0]));
+  }
+  return rows;
+}
+
 function __pr23ApplyTableFilters() {
   const f = state.filters || {};
+  // Quotation Comparison already filtered state.tenders at render via __pr23QuotationCandidates.
+  if (state.page === 'quotations' && !state.quotationTender) {
+    const rows = [...document.querySelectorAll('[data-quote-row-v7]')];
+    const bits = [];
+    if (f.status && f.status !== 'All statuses') bits.push(f.status);
+    if (f.category && f.category !== 'All categories') bits.push(f.category);
+    if (f.period && f.period !== 'All years') bits.push(f.period);
+    return `${rows.length} sourcing event${rows.length === 1 ? '' : 's'} match ${bits.length ? bits.join(', ') : 'every filter'}. KPI cards above still cover every record.`;
+  }
   const want = [];
   if (f.status && f.status !== 'All statuses') want.push(f.status);
   if (f.category && f.category !== 'All categories') want.push(f.category);
@@ -2811,7 +3828,7 @@ function __pr23AnalysisHero(kind) {
   if (kind === 'cycle') {
     const up = v => String(v || '').toUpperCase();
     const open = (state.requisitions || []).filter(r => ['PENDING_APPROVAL', 'APPROVED'].includes(up(r.rawStatus))).length
-      + (state.tenders || []).filter(t => t.stage === 'Published' || t.stage === 'Evaluation').length
+      + (state.tenders || []).filter(t => ['PUBLISHED', 'OPEN', 'CLOSED', 'UNDER_EVALUATION', 'AWAITING_APPROVAL'].includes(String(t.rawStatus || '').toUpperCase())).length
       + orders.filter(o => ['DRAFT', 'APPROVED', 'SENT', 'ACKNOWLEDGED', 'PARTIALLY_DELIVERED'].includes(up(o.rawStatus))).length
       + (state.invoices || []).filter(i => up(i.rawStatus) === 'DRAFT').length;
     return hero(`${open} open procurement record${open === 1 ? '' : 's'}`, 'Requisitions awaiting a decision or sourcing, tenders in market, orders not yet delivered and invoices awaiting approval. Service levels are not tracked yet.', '—');
@@ -2827,7 +3844,7 @@ function __pr23MyQueueHtml() {
   if (!prompts.length) {
     return '<div class="list-row"><div class="list-main"><strong>Nothing awaits your decision</strong><span>Requisitions, awards, receipts, invoices and plans you can decide appear here.</span></div></div>';
   }
-  return prompts.map(a => `<div class="list-row" data-page="approvals" style="cursor:pointer"><div class="list-main"><strong>${__pr23Esc(a.title)}</strong><span>${__pr23Esc(a.type)} · ${__pr23Esc(a.record)}${a.amount != null ? ` · ${money(a.amount)}` : ''}</span></div>${status('Awaiting me')}</div>`).join('');
+  return prompts.map(a => `<div class="list-row" data-page="approvals" style="cursor:pointer"><div class="list-main"><strong>${__pr23Esc(a.title)}</strong><span>${__pr23Esc(a.type)} · ${__pr23Esc(a.record)}${a.amount != null ? ` · ${money(a.amount,a.currency)}` : ''}</span></div>${status('Awaiting me')}</div>`).join('');
 }
 
 /**
@@ -2894,13 +3911,1893 @@ function __pr23CountryKnown(vendor) {
   const c = vendor && vendor.country;
   return Boolean(c && c !== '—');
 }
+
+// ---------------------------------------------------------------- Vendor Master (SRD §8): registry, profile, lifecycle, documents, banking
+//
+// The live Vendor Registry and vendor profile. Everything on them comes from the API (state.vendors is the vendor list with
+// documents and banking, state.vendorOptionsV23 the statuses, lifecycle moves and document types). A control the caller may
+// not use is not offered; the server refuses it anyway (permission per move, reason where required, audited).
+
+const __PR23_V_TONE = { APPROVED: 'green', PENDING_REVIEW: 'amber', PENDING_APPROVAL: 'amber', DRAFT: 'blue', SUSPENDED: 'amber', BLOCKED: 'red', EXPIRED: 'red', INACTIVE: 'blue' };
+const __PR23_C_TONE = { COMPLIANT: 'green', EXPIRING_SOON: 'amber', NON_COMPLIANT: 'red', PENDING: 'blue' };
+const __PR23_C_LABEL = { COMPLIANT: 'Compliant', EXPIRING_SOON: 'Expiring soon', NON_COMPLIANT: 'Non-compliant', PENDING: 'Pending' };
+const __PR23_DOC_TONE = { VALID: 'green', EXPIRING: 'amber', EXPIRED: 'red', NO_EXPIRY: 'blue' };
+const __PR23_DOC_LABEL = { VALID: 'Valid', EXPIRING: 'Expiring soon', EXPIRED: 'Expired', NO_EXPIRY: 'No expiry' };
+const __PR23_APPROVAL_LABEL = { NOT_SUBMITTED: 'Not submitted', PENDING_APPROVAL: 'Pending approval', APPROVED: 'Approved', REJECTED: 'Rejected' };
+const __PR23_RISK_OPTIONS = ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'];
+
+function __pr23VOpts() {
+  return state.vendorOptionsV23 || {};
+}
+
+function __pr23VStatusLabel(code) {
+  const s = (__pr23VOpts().statuses || []).find(x => x.code === code);
+  return s ? s.label : String(code || '').replace(/_/g, ' ').toLowerCase().replace(/^./, c => c.toUpperCase());
+}
+
+function __pr23VChip(code) {
+  return `<span class="status ${__PR23_V_TONE[code] || 'blue'}">${__pr23Esc(__pr23VStatusLabel(code))}</span>`;
+}
+
+function __pr23CChip(code) {
+  return `<span class="status ${__PR23_C_TONE[code] || 'blue'}">${__pr23Esc(__PR23_C_LABEL[code] || code)}</span>`;
+}
+
+function __pr23DocChip(stateCode) {
+  return `<span class="status ${__PR23_DOC_TONE[stateCode] || 'blue'}">${__pr23Esc(__PR23_DOC_LABEL[stateCode] || stateCode)}</span>`;
+}
+
+/** Whether the signed-in user may make a lifecycle move that needs `manage` or `approve` (administrators always may). */
+function __pr23VCan(needs) {
+  const live = __pr23Live();
+  return __pr23Can(needs === 'approve' ? 'vendors.approve' : 'vendors.manage') || Boolean(live && live.access && live.access.isPrivileged);
+}
+
+/** The moves the vendor's lifecycle allows from its current status that this user may make. */
+function __pr23VMoves(v) {
+  const t = (__pr23VOpts().transitions || {})[v.vendorStatusCode] || [];
+  return t.filter(m => __pr23VCan(m.needs));
+}
+
+function __pr23VFilter() {
+  return state.__pr23VF || (state.__pr23VF = { q: '', status: '', comp: '' });
+}
+
+function __pr23VText(v) {
+  return [v.vendorCode, v.name, v.tradingName, v.registrationNumber, v.tin, v.vat, v.contact, v.email, v.category, (v.commodityCategories || []).join(' ')]
+    .filter(x => x && x !== '—').join(' ').toLowerCase();
+}
+
+function __pr23VMatches(v, f) {
+  if (f.status && v.vendorStatusCode !== f.status) return false;
+  if (f.comp && v.complianceStatus !== f.comp) return false;
+  if (f.q && !__pr23VText(v).includes(f.q)) return false;
+  return true;
+}
+
+function __pr23VendorRegistryLive() {
+  const vs = state.vendors || [];
+  const f = __pr23VFilter();
+  const opts = __pr23VOpts();
+  const n = fn => vs.filter(fn).length;
+  const canRun = __pr23VCan('manage') || __pr23VCan('approve');
+  const head = pageHead('Supplier master', 'Vendor Registry',
+    'The central vendor master: identity, classification, status, compliance and banking. Only an Approved, compliant vendor can be invited to an RFQ, awarded, issued a purchase order or paid.',
+    __pr23ActionButton('Register vendor', 'register-vendor', '', 'primary', 'plus')
+      + (canRun ? __pr23ActionButton('Run compliance check', 'run-compliance-reminders-v6', '', '', 'mail') : '')
+      + __pr23ActionButton('Vendor portal', 'vendor-portal', '', '', 'vendor'));
+  const kpis = `<div class="grid kpis">`
+    + kpi('Registered vendors', vs.length, `${n(v => v.vendorStatusCode === 'APPROVED')} approved`, 'vendor')
+    + kpi('Can transact', n(v => v.transactable), 'Approved, fully approved and compliant', 'approve')
+    + kpi('In onboarding', n(v => ['DRAFT', 'PENDING_REVIEW', 'PENDING_APPROVAL'].includes(v.vendorStatusCode)), 'Draft, review or approval', 'report')
+    + kpi('Suspended / blocked', n(v => ['SUSPENDED', 'BLOCKED'].includes(v.vendorStatusCode)), 'Cannot be invited, awarded or paid', 'audit')
+    + kpi('Expiring / expired', n(v => ['EXPIRING_SOON', 'NON_COMPLIANT'].includes(v.complianceStatus)), 'Tax clearance or documents', 'audit')
+    + `</div>`;
+  const statusOptions = `<option value="">All statuses (${vs.length})</option>` + (opts.statuses || []).map(s => `<option value="${__pr23Esc(s.code)}"${f.status === s.code ? ' selected' : ''}>${__pr23Esc(s.label)} (${n(v => v.vendorStatusCode === s.code)})</option>`).join('');
+  const compOptions = `<option value="">Any compliance</option>` + Object.keys(__PR23_C_LABEL).map(c => `<option value="${c}"${f.comp === c ? ' selected' : ''}>${__PR23_C_LABEL[c]} (${n(v => v.complianceStatus === c)})</option>`).join('');
+  const toolbar = `<div class="filterbar" id="vendorToolbarV23"><input type="search" data-vfilter="q" placeholder="Search name, code, TIN, category…" value="${__pr23Esc(f.q)}" aria-label="Search vendors" style="min-width:260px"><select data-vfilter="status" aria-label="Vendor status">${statusOptions}</select><select data-vfilter="comp" aria-label="Compliance status">${compOptions}</select><span class="muted" id="vendorCountV23"></span></div>`;
+  const rows = vs.map(v => {
+    const shown = __pr23VMatches(v, f);
+    const banks = (v.banks || []).length;
+    const risk = v.riskRating && v.riskRating !== '—' ? `<br><span class="muted">Risk: ${__pr23Esc(v.riskRating)}</span>` : '';
+    const commodities = (v.commodityCategories || []).length ? `<br><span class="muted">${__pr23Esc(v.commodityCategories.join(', '))}</span>` : '';
+    const issue = (v.complianceIssues || [])[0] || (v.complianceWarnings || [])[0] || '';
+    const bankCell = banks ? `${banks} account${banks === 1 ? '' : 's'}` : (__pr23Can('vendors.banks.view') ? '<span class="muted">None recorded</span>' : '<span class="muted">Held by Finance</span>');
+    return `<tr data-vrow data-id="${__pr23Esc(v.id)}" data-vstatus="${__pr23Esc(v.vendorStatusCode)}" data-vcomp="${__pr23Esc(v.complianceStatus)}" data-vtext="${__pr23Esc(__pr23VText(v))}"${shown ? '' : ' style="display:none"'}>`
+      + `<td><strong class="link" data-action="open-vendor-v6" data-id="${__pr23Esc(v.id)}">${__pr23Esc(v.vendorCode)}</strong><br><strong>${__pr23Esc(v.name)}</strong>${v.tradingName && v.tradingName !== '—' ? `<br><span class="muted">t/a ${__pr23Esc(v.tradingName)}</span>` : ''}</td>`
+      + `<td>${__pr23Esc(v.contact)}<br><span class="muted">${__pr23Esc([v.email, v.phone].filter(x => x && x !== '—').join(' · ') || '—')}</span></td>`
+      + `<td>${__pr23Esc(v.category)}${commodities}${risk}</td>`
+      + `<td>${__pr23VChip(v.vendorStatusCode)}<br><span class="muted">Approval: ${__pr23Esc(__PR23_APPROVAL_LABEL[v.approvalStatus] || v.approvalStatus)}</span></td>`
+      + `<td>${__pr23CChip(v.complianceStatus)}<br><span class="muted">${v.taxExpiry ? `Tax clearance to ${__pr23Esc(__pr23DayLabel(v.taxExpiry))}` : 'No tax clearance on file'}</span>${issue ? `<br><span class="muted">${__pr23Esc(issue)}</span>` : ''}</td>`
+      + `<td>${bankCell}</td>`
+      + `<td><div class="actions"><button class="btn small" data-action="open-vendor-v6" data-id="${__pr23Esc(v.id)}">Open</button></div></td></tr>`;
+  });
+  const empty = `<div id="vendorEmptyV23" class="pr23-empty-row" style="padding:18px;text-align:center;color:#64748b"${vs.length && rows.length && vs.some(v => __pr23VMatches(v, f)) ? ' hidden' : ''}>${vs.length ? 'No vendor matches these filters.' : 'No vendors are registered yet.'}</div>`;
+  const regs = __pr23VendorRegistrationsCard();
+  return `<div class="page">${head}${regs}${kpis}${card('Vendors', 'Filter by status or compliance; open a vendor for its full record.', `${toolbar}<div class="table-wrap"><table id="vendorRegistryTableV23"><thead><tr>${['Vendor', 'Contact', 'Classification', 'Vendor status', 'Compliance', 'Banking', ''].map(h => `<th>${h}</th>`).join('')}</tr></thead><tbody>${rows.join('')}</tbody></table></div>${empty}`)}</div>`;
+}
+
+/** Applied straight to the rows on input/change, and remembered, so a redraw keeps the filter. */
+function __pr23VApplyFilters() {
+  const bar = document.getElementById('vendorToolbarV23');
+  if (!bar) return;
+  const val = k => { const el = bar.querySelector(`[data-vfilter="${k}"]`); return el ? String(el.value || '') : ''; };
+  const f = state.__pr23VF = { q: val('q').trim().toLowerCase(), status: val('status'), comp: val('comp') };
+  let shown = 0;
+  const rows = [...document.querySelectorAll('#vendorRegistryTableV23 tbody tr[data-vrow]')];
+  for (const r of rows) {
+    const ok = (!f.status || r.dataset.vstatus === f.status) && (!f.comp || r.dataset.vcomp === f.comp) && (!f.q || (r.dataset.vtext || '').includes(f.q));
+    r.style.display = ok ? '' : 'none';
+    if (ok) shown += 1;
+  }
+  const count = document.getElementById('vendorCountV23');
+  if (count) count.textContent = `${shown} of ${rows.length}`;
+  const empty = document.getElementById('vendorEmptyV23');
+  if (empty) { empty.hidden = shown > 0 || rows.length === 0; empty.textContent = 'No vendor matches these filters.'; }
+}
+for (const type of ['input', 'change']) {
+  __pr23On(document, type, event => {
+    const c = event.target && event.target.closest && event.target.closest('[data-vfilter]');
+    if (c && __pr23Live()) __pr23VApplyFilters();
+  }, true);
+}
+
+function __pr23VRow(label, value) {
+  const empty = value == null || value === '' || value === '—';
+  return `<div class="field"><label>${__pr23Esc(label)}</label><input value="${empty ? '' : __pr23Esc(value)}" placeholder="—" readonly></div>`;
+}
+
+function __pr23VendorDetailLive(v) {
+  const moves = __pr23VMoves(v);
+  const canManage = __pr23VCan('manage');
+  const canBankEdit = __pr23Can('vendors.banks.manage') || Boolean((__pr23Live() || {}).access && __pr23Live().access.isPrivileged);
+  const docs = v.docs || [];
+  const banks = v.banks || [];
+  const moveButtons = moves.map(m => `<button class="btn${m.to === 'APPROVED' ? ' primary' : (['BLOCKED', 'SUSPENDED', 'INACTIVE'].includes(m.to) ? ' danger' : '')}" data-action="vendor-status-move-v23" data-id="${__pr23Esc(v.id)}" data-to="${__pr23Esc(m.to)}">${__pr23Esc(m.to === 'APPROVED' && v.vendorStatusCode !== 'PENDING_APPROVAL' ? 'Reinstate as Approved' : (m.to === 'PENDING_REVIEW' ? 'Submit for review' : (m.to === 'PENDING_APPROVAL' ? 'Send for approval' : `Move to ${m.label}`)))}</button>`).join('');
+  const head = pageHead('Vendor profile', v.name,
+    [v.vendorCode, v.category, v.country].filter(x => x && x !== '—').join(' | '),
+    (canManage ? __pr23ActionButton('Edit profile', 'edit-vendor-v6', v.id, '', 'edit') : '') + moveButtons + __pr23ActionButton('Open vendor portal', 'vendor-portal-v6', v.id, '', 'vendor') + (canManage ? __pr23ActionButton('Delete vendor', 'delete-vendor-v23', v.id, 'danger') : ''));
+  const docCounts = { VALID: 0, EXPIRING: 0, EXPIRED: 0 };
+  for (const d of docs) if (docCounts[d.expiryState] != null) docCounts[d.expiryState] += 1;
+  const kpis = `<div class="grid kpis">`
+    + kpi('Vendor status', __pr23VStatusLabel(v.vendorStatusCode), v.statusReason && !String(v.statusReason).startsWith('AUTO:') ? v.statusReason : `Approval: ${__PR23_APPROVAL_LABEL[v.approvalStatus] || v.approvalStatus}`, 'vendor')
+    + kpi('Compliance', __PR23_C_LABEL[v.complianceStatus] || v.complianceStatus, (v.complianceIssues || [])[0] || (v.complianceWarnings || [])[0] || 'Tax clearance and documents in date', 'audit')
+    + kpi('Tax clearance', v.taxStatus === 'ACTIVE' ? 'Current' : (v.taxStatus === 'EXPIRED' ? 'Expired' : 'Pending'), v.taxExpiry ? `Expires ${__pr23DayLabel(v.taxExpiry)}` : 'No expiry on file', 'audit')
+    + kpi('Documents', docs.length, `${docCounts.VALID} valid · ${docCounts.EXPIRING} expiring · ${docCounts.EXPIRED} expired`, 'document')
+    + kpi('Risk', v.riskRating && v.riskRating !== '—' ? v.riskRating : 'Not classified', 'Risk classification', 'report')
+    + kpi('Lifetime spend', money(v.spend), 'Across authorised entities', 'account')
+    + `</div>`;
+
+  const uses = (v.transactable
+    ? '<p style="margin:0">This vendor is Approved and compliant: it can be invited to RFQs, awarded, issued purchase orders and paid.</p>'
+    : `<p style="margin:0 0 8px"><strong>This vendor cannot be invited to an RFQ, awarded, issued a purchase order or paid</strong> because:</p><ul style="margin:0;padding-left:18px">${(v.blockedReasons || []).map(r => `<li>${__pr23Esc(r.charAt(0).toUpperCase() + r.slice(1))}</li>`).join('') || '<li>Its record is incomplete.</li>'}</ul>`)
+    + ((v.complianceWarnings || []).length && v.transactable ? `<p class="muted" style="margin:8px 0 0">Watch: ${__pr23Esc(v.complianceWarnings.join('; '))}.</p>` : '');
+  const gate = card('What this vendor can be used for', 'Enforced on every RFQ invitation, award, purchase order and payment — not only shown here.', `<div class="card-body">${uses}${moves.length ? '' : '<p class="muted" style="margin:10px 0 0">Your role cannot change this vendor\'s status.</p>'}</div>`);
+
+  const commodities = (v.commodityCategories || []).join(', ');
+  const profile = card('Vendor master record', 'Identity, registration, classification, contact and commercial terms.',
+    `<div class="card-body"><div class="form-grid">`
+      + __pr23VRow('Vendor code', v.vendorCode) + __pr23VRow('Legal entity name', v.name) + __pr23VRow('Trading name', v.tradingName)
+      + __pr23VRow('Registration number', v.registrationNumber) + __pr23VRow('Tax identification number (TIN)', v.tin) + __pr23VRow('VAT number', v.vat) + __pr23VRow('BP number', v.bp)
+      + __pr23VRow('Vendor category', v.category) + __pr23VRow('Commodity / service categories', commodities) + __pr23VRow('Risk classification', v.riskRating)
+      + __pr23VRow('Country', v.country) + __pr23VRow('Primary contact', v.contact) + __pr23VRow('Contact email', v.email) + __pr23VRow('Telephone', v.phone)
+      + __pr23VRow('Payment terms', v.paymentTerms) + __pr23VRow('Currency', v.currency) + __pr23VRow('Onboarding date', v.onboardingDate)
+      + `<div class="field full"><label>Registered address</label><input value="${__pr23Esc(v.address && v.address !== '—' ? v.address : '')}" placeholder="—" readonly></div>`
+      + `<div class="field full"><label>Notes</label><textarea rows="2" readonly placeholder="—">${__pr23Esc(v.notes || '')}</textarea></div>`
+      + `</div></div>`);
+
+  // The change-expiry control sits beside the date (a visible button), not in the last column: the module folds a table's last-column
+  // buttons into a row menu, which would hide the one thing this card is for.
+  const docRows = docs.map(d => `<tr><td><strong>${__pr23Esc(d.typeLabel)}</strong>${d.number ? `<br><span class="muted">No. ${__pr23Esc(d.number)}</span>` : ''}<br><span class="muted">${__pr23Esc(d.fileName)}</span></td><td>${d.issueDate ? __pr23Esc(__pr23DayLabel(d.issueDate)) : '—'}</td><td>${d.expiryDate ? __pr23Esc(__pr23DayLabel(d.expiryDate)) : '<span class="muted">Not set</span>'}${canManage ? `<br><button class="btn small" data-action="vendor-doc-edit-v23" data-id="${__pr23Esc(v.id)}" data-doc="${__pr23Esc(d.id)}">Change expiry &amp; alert</button>` : ''}</td><td>${__pr23DocChip(d.expiryState)}</td><td>${d.notifyDaysBefore != null ? `${d.notifyDaysBefore} days` : `<span class="muted">${__pr23Esc(String(__pr23VOpts().expiryNoticeDays || 30))} days (default)</span>`}</td><td>${d.fileUrl ? `<a class="btn small" href="${__pr23Esc(d.fileUrl)}" target="_blank" rel="noopener">View</a>` : ''}</td></tr>`);
+  const documents = card('Supporting documents', `Certificates, licences, insurance and compliance documents. Set an expiry date per document: authorised users are alerted ${__pr23Esc(String(__pr23VOpts().expiryNoticeDays || 30))} days before by default, and an expired document takes the vendor out of use until it is renewed.`,
+    table(['Document', 'Issued', 'Expires', 'State', 'Alert before expiry', ''], docRows.length ? docRows : ['<tr><td colspan="6" class="muted">No document is on file for this vendor.</td></tr>']),
+    canManage ? `<button class="btn primary" data-action="vendor-doc-add-v23" data-id="${__pr23Esc(v.id)}">Add document</button>` : '');
+
+  const mask = n => { const s = String(n || ''); return s.length <= 4 ? '****' : `****${s.slice(-4)}`; };
+  const bankRows = banks.map(b => `<tr><td><strong>${__pr23Esc(b.bankName)}</strong>${b.isPrimary ? ' <span class="status green">Primary</span>' : ''}</td><td>${__pr23Esc(b.accountName)}</td><td>${__pr23Esc(mask(b.accountNumber))}</td><td>${__pr23Esc(b.branchCode)}</td><td>${__pr23Esc(b.swiftCode)}</td><td>${__pr23Esc(b.currencyCode)}</td></tr>`);
+  const canSeeBanks = __pr23Can('vendors.banks.view') || Boolean((__pr23Live() || {}).access && __pr23Live().access.isPrivileged);
+  const banking = card('Banking details', 'Payments go to the account recorded here. Finance manages these, because bank details are what a payment-redirection fraud changes.',
+    canSeeBanks
+      ? table(['Institution', 'Account name', 'Account number', 'Branch', 'SWIFT / BIC', 'Currency'], bankRows.length ? bankRows : ['<tr><td colspan="6" class="muted">No bank account is recorded, so this vendor cannot be paid by bank.</td></tr>'])
+      : '<div class="card-body"><p class="muted" style="margin:0">Banking details are held by Finance and are not shown to your role.</p></div>',
+    canBankEdit ? `<button class="btn primary" data-action="vendor-bank-add-v23" data-id="${__pr23Esc(v.id)}">Add bank account</button>` : '');
+
+  return `<div class="page"><div class="breadcrumbs"><button data-action="back-vendors-v6">Vendor Registry</button><i>›</i><strong>${__pr23Esc(v.name)}</strong></div>${head}${kpis}${gate}<div style="height:14px"></div>${profile}<div style="height:14px"></div>${documents}<div style="height:14px"></div>${banking}<div style="height:14px"></div>${__pr23VendorHistoryCard(v)}</div>`;
+}
+
+/** Status move: every change of status names its reason where the lifecycle requires one, and is audited. */
+function __pr23VendorStatusModal(id, to) {
+  const v = (state.vendors || []).find(x => x.id === id);
+  const move = v && __pr23VMoves(v).find(m => m.to === to);
+  if (!v || !move) return toast('Not available', 'That move is not allowed from the vendor\'s current status, or your role cannot make it.');
+  const consequence = {
+    SUSPENDED: 'While suspended the vendor cannot be invited to an RFQ, awarded, issued a purchase order or paid, and its supplier links stop working.',
+    BLOCKED: 'A blocked vendor cannot be invited, awarded, issued a purchase order, paid or record invoices.',
+    INACTIVE: 'An inactive vendor is kept on record with its history but cannot be used. To use it again it returns to Draft and goes through review and approval.',
+    APPROVED: v.vendorStatusCode === 'PENDING_APPROVAL' ? 'Approval makes the vendor available for RFQs, awards, purchase orders and payments. Someone other than the person who sent it for approval must approve.' : 'The vendor is available again for RFQs, awards, purchase orders and payments.',
+    EXPIRED: 'An expired vendor cannot transact until its clearance or documents are renewed.',
+    DRAFT: 'The vendor goes back to Draft and must be reviewed and approved again.',
+  }[to] || '';
+  const body = `<form id="vendorStatusFormV23"><input type="hidden" name="vendorId" value="${__pr23Esc(v.id)}"><input type="hidden" name="to" value="${__pr23Esc(to)}">`
+    + `<p style="margin:0 0 10px">${__pr23Esc(v.name)}: <strong>${__pr23Esc(__pr23VStatusLabel(v.vendorStatusCode))}</strong> → <strong>${__pr23Esc(move.label)}</strong></p>`
+    + (consequence ? `<p class="muted" style="margin:0 0 10px">${__pr23Esc(consequence)}</p>` : '')
+    + formField(move.reasonRequired ? 'Reason (required, kept in the audit trail)' : 'Note (optional)', `<textarea name="reason" rows="3" maxlength="1000"${move.reasonRequired ? ' required' : ''}></textarea>`, 'full')
+    + `</form>`;
+  openModal('Change vendor status', v.name, body, btn('Confirm', 'confirm-vendor-status-v23', to === 'APPROVED' ? 'primary' : (['BLOCKED', 'SUSPENDED', 'INACTIVE'].includes(to) ? 'danger' : 'primary')));
+}
+
+function __pr23VendorDocModal(vendorId, docId) {
+  const v = (state.vendors || []).find(x => x.id === vendorId);
+  if (!v) return;
+  const d = docId ? (v.docs || []).find(x => x.id === docId) : null;
+  const types = (__pr23VOpts().documentTypes || []);
+  const notice = __pr23VOpts().expiryNoticeDays || 30;
+  const body = `<form id="vendorDocFormV23"><input type="hidden" name="vendorId" value="${__pr23Esc(v.id)}"><input type="hidden" name="docId" value="${__pr23Esc(d ? d.id : '')}"><div class="form-grid">`
+    + (d
+      ? formField('Document', `<input value="${__pr23Esc(d.typeLabel)}" readonly>`, 'full')
+      : formField('Document type', `<select name="documentType" required><option value="">Choose a type</option>${types.map(t => `<option value="${__pr23Esc(t.code)}">${__pr23Esc(t.label)}</option>`).join('')}</select>`)
+        + formField('File', '<input name="file" type="file" accept=".pdf,.png,.jpg,.jpeg,.doc,.docx" required>'))
+    + formField('Document number', `<input name="number" maxlength="64" value="${__pr23Esc(d ? d.number : '')}">`)
+    + formField('Issue date', `<input name="issueDate" type="date" value="${__pr23Esc(d ? d.issueDate : '')}">`)
+    + formField('Expiry date', `<input name="expiryDate" type="date" value="${__pr23Esc(d ? d.expiryDate : '')}">`)
+    + formField('Alert this many days before expiry', `<input name="notify" type="number" min="0" max="730" step="1" placeholder="${notice} (default)" value="${d && d.notifyDaysBefore != null ? __pr23Esc(d.notifyDaysBefore) : ''}">`)
+    + `</div></form><p class="muted" style="margin:10px 0 0">Authorised users are notified before the expiry date, and again when it passes. A document with an expiry date in the past makes the vendor non-compliant until it is renewed. Renewing the date re-arms the alert.</p>`;
+  openModal(d ? 'Document expiry and alert' : 'Add vendor document', v.name, body, btn(d ? 'Save' : 'Upload', 'save-vendor-document-v23', 'primary'));
+}
+
+function __pr23VendorBankModal(vendorId) {
+  const v = (state.vendors || []).find(x => x.id === vendorId);
+  if (!v) return;
+  const currencies = (((__pr23Live() || {}).currencies) || []).map(c => c.code);
+  const body = `<form id="vendorBankFormV23"><input type="hidden" name="vendorId" value="${__pr23Esc(v.id)}"><div class="form-grid">`
+    + formField('Financial institution', '<input name="bankName" required maxlength="191">')
+    + formField('Account name', `<input name="accountName" required maxlength="191" value="${__pr23Esc(v.name)}">`)
+    + formField('Account number', '<input name="accountNumber" required maxlength="64" inputmode="numeric">')
+    + formField('Branch code', '<input name="branchCode" required maxlength="64">')
+    + formField('SWIFT / BIC', '<input name="swiftCode" required maxlength="32">')
+    + formField('IBAN (if applicable)', '<input name="iban" maxlength="64">')
+    + formField('Currency', currencies.length ? `<select name="currencyCode" required>${currencies.map(c => `<option${c === v.currency ? ' selected' : ''}>${__pr23Esc(c)}</option>`).join('')}</select>` : `<input name="currencyCode" required maxlength="8" value="${__pr23Esc(v.currency && v.currency !== '—' ? v.currency : 'USD')}">`)
+    + `<div class="field"><label><input type="checkbox" name="isPrimary" checked> Primary account</label></div>`
+    + `</div></form><p class="muted" style="margin:10px 0 0">Branch code, SWIFT/BIC and currency are required for a payment to succeed. This account becomes the destination of bank payments to the vendor.</p>`;
+  openModal('Add bank account', v.name, body, btn('Save bank account', 'save-vendor-bank-v23', 'primary'));
+}
+
+__pr23On(document, 'click', event => {
+  const c = event.target && event.target.closest && event.target.closest('[data-action="vendor-status-move-v23"],[data-action="vendor-doc-add-v23"],[data-action="vendor-doc-edit-v23"],[data-action="vendor-bank-add-v23"]');
+  if (!c || !__pr23Live()) return;
+  event.preventDefault();
+  event.stopImmediatePropagation();
+  const a = c.dataset.action;
+  if (a === 'vendor-status-move-v23') __pr23VendorStatusModal(c.dataset.id, c.dataset.to);
+  else if (a === 'vendor-doc-add-v23') __pr23VendorDocModal(c.dataset.id, '');
+  else if (a === 'vendor-doc-edit-v23') __pr23VendorDocModal(c.dataset.id, c.dataset.doc);
+  else __pr23VendorBankModal(c.dataset.id);
+}, true);
+
+
+// ---------------------------------------------------------------- §32 document vault: real files, previewed and versioned
+
+const __PR23_DOC_ACCEPT = '.pdf,.docx,.xlsx,.xls,.csv,.jpg,.jpeg,.png';
+const __PR23_DOC_FOLDERS = ['General', 'Annual Plans', 'Tenders & Bids', 'Contracts & Awards', 'Orders & GRNs', 'Invoices & AP', 'Audit Evidence', 'Vendor Submissions'];
+const __PR23_DOC_TYPES = ['Supporting document', 'Quotation', 'Invoice', 'Delivery note', 'Contract', 'Tax clearance', 'Company profile', 'Technical proposal', 'Price schedule', 'Evaluation evidence', 'Vendor compliance document'];
+const __PR23_RECORD_PAGE = { PURCHASE_REQUISITION: 'requisitions', RFQ: 'tenders', QUOTATION: 'quotations', PURCHASE_ORDER: 'orders', GRN: 'receiving', INVOICE: 'invoices', CONTRACT: 'contracts', PLAN: 'plan', VENDOR: 'vendors' };
+const __PR23_RECORD_LABEL = { PURCHASE_REQUISITION: 'Requisition', RFQ: 'RFQ', QUOTATION: 'Quotation', PURCHASE_ORDER: 'Purchase order', GRN: 'Goods receipt', INVOICE: 'Invoice', CONTRACT: 'Contract', PLAN: 'Annual plan', VENDOR: 'Vendor' };
+
+const __pr23StoredDoc = key => (state.documents || []).find(d => d.stored && (d.id === key || d.recordId === key));
+
+function __pr23Bytes(n) {
+  if (n == null || !Number.isFinite(Number(n))) return '—';
+  const v = Number(n);
+  if (v < 1024) return `${v} B`;
+  if (v < 1024 * 1024) return `${(v / 1024).toFixed(v < 10240 ? 1 : 0)} KB`;
+  return `${(v / 1024 / 1024).toFixed(1)} MB`;
+}
+
+/** The line under a document's name in the vault: what the file is and what it belongs to (real values, not a caption). */
+function __pr23DocSubline(d) {
+  const parts = [(d.extension || '').toUpperCase(), __pr23Bytes(d.sizeBytes)];
+  if (d.relatedRecord) parts.push(`for ${d.relatedRecord}`);
+  return __pr23Esc(parts.filter(Boolean).join(' · '));
+}
+
+/** Every record a document can be filed against, by the number a person knows it by: what the upload form offers. */
+function __pr23DocRecordOptions() {
+  const out = [];
+  (state.orders || []).forEach(o => out.push([o.id, 'Purchase order']));
+  (state.tenders || []).forEach(t => out.push([t.id, 'RFQ']));
+  (state.requisitions || []).forEach(r => out.push([r.id, 'Requisition']));
+  (state.invoices || []).forEach(i => out.push([i.id, 'Invoice']));
+  (state.grns || []).forEach(g => out.push([g.id, 'Goods receipt']));
+  (state.contracts || []).forEach(c => out.push([c.id, 'Contract']));
+  (state.plans || []).forEach(p => out.push([p.id, 'Annual plan']));
+  (state.vendors || []).forEach(v => out.push([v.name, 'Vendor']));
+  const seen = new Set();
+  return out.filter(([n]) => n && !seen.has(n) && seen.add(n)).map(([n, k]) => `<option value="${__pr23Esc(n)}">${__pr23Esc(k)}</option>`).join('');
+}
+
+function __pr23DocUploadModal(folder) {
+  if (!__pr23Can('documents.manage')) { toast('Not allowed', 'Your role cannot upload documents.'); return; }
+  const folders = [...new Set([...__PR23_DOC_FOLDERS, ...(state.documents || []).map(d => d.folder).filter(Boolean)])];
+  const chosen = folders.includes(folder) ? folder : 'General';
+  openModal('Upload document', 'Uploaded by you now; the server records who, when and the file\'s checksum.',
+    `<form id="docUploadFormV23" class="form-grid">
+      <div class="field full"><label>Files</label><input type="file" name="files" multiple required accept="${__PR23_DOC_ACCEPT}"><span class="muted" style="font-size:12px">PDF, DOCX, XLSX, XLS, CSV, JPG, JPEG or PNG, up to 100 MB each.</span></div>
+      <div class="field"><label>Name <span class="muted">(the file name when blank)</span></label><input name="name" maxlength="255"></div>
+      <div class="field"><label>Folder</label><select name="folder">${folders.map(f => `<option${f === chosen ? ' selected' : ''}>${__pr23Esc(f)}</option>`).join('')}</select></div>
+      <div class="field"><label>Document type</label><input name="type" list="docTypesV23" maxlength="64" placeholder="Supporting document"><datalist id="docTypesV23">${__PR23_DOC_TYPES.map(t => `<option value="${__pr23Esc(t)}">`).join('')}</datalist></div>
+      <div class="field"><label>Related transaction</label><input name="record" list="docRecordsV23" autocomplete="off" placeholder="Search by number or vendor name"><datalist id="docRecordsV23">${__pr23DocRecordOptions()}</datalist></div>
+      <div class="field"><label>Classification</label><select name="classification"><option>Internal</option><option>Confidential</option><option>Restricted</option><option>Public</option></select></div>
+      <div class="field full"><label>Description</label><textarea name="description" rows="2" maxlength="1000"></textarea></div>
+    </form>`,
+    btn('Cancel', 'close-overlay') + btn('Upload', 'confirm-doc-upload-v23', 'primary', 'plus'));
+}
+
+function __pr23DocVersionModal(recordId) {
+  const d = __pr23StoredDoc(recordId);
+  if (!d) return;
+  if (!__pr23Can('documents.manage')) { toast('Not allowed', 'Your role cannot upload document versions.'); return; }
+  openModal('Upload new version', `${d.name} · current ${d.version}`,
+    `<form id="docVersionFormV23" class="form-grid">
+      <div class="field full"><label>Revised file</label><input type="file" name="file" required accept="${__PR23_DOC_ACCEPT}"><span class="muted" style="font-size:12px">The earlier versions are kept and stay retrievable.</span></div>
+      <div class="field full"><label>What changed</label><textarea name="note" rows="2" maxlength="500"></textarea></div>
+    </form>`,
+    btn('Cancel', 'close-overlay') + `<button class="btn primary" data-action="confirm-doc-version-v23" data-id="${__pr23Esc(d.recordId)}">Upload version</button>`);
+}
+
+function __pr23DocDownload(recordId, versionNo) {
+  const docs = window.__pr23Docs;
+  if (!docs) { toast('Not available', 'The document service is not connected.'); return; }
+  docs.download(recordId, versionNo).catch(e => toast('The download failed', __pr23Esc((e && e.message) || 'The server did not return the file.')));
+}
+
+/** The vault document as the server holds it: the real file in the browser, with its metadata and every version beside it. */
+function __pr23DocPreviewModal(key, versionNo) {
+  const d = __pr23StoredDoc(key);
+  if (!d) return false;
+  const docs = window.__pr23Docs;
+  const link = d.relatedLink;
+  const meta = [
+    ['UID', d.id], ['Format', (d.extension || '').toUpperCase() || '—'], ['Size', __pr23Bytes(d.sizeBytes)], ['Version', d.version], ['Status', d.status],
+    ['Uploaded by', d.owner], ['Uploaded on', d.uploadedAt ? __pr23DateTime(d.uploadedAt) : d.date], ['Folder', d.folder], ['Type', d.type], ['Classification', d.classification || '—'],
+  ].map(([k, v]) => `<div><dt>${k}</dt><dd>${__pr23Esc(v == null || v === '' ? '—' : v)}</dd></div>`).join('');
+  const related = link
+    ? `<div><dt>Related transaction</dt><dd><button class="link" style="background:none;border:0;padding:0;cursor:pointer" data-action="open-related-v23" data-type="${__pr23Esc(link.type)}" data-id="${__pr23Esc(link.id)}" data-number="${__pr23Esc(link.number)}">${__pr23Esc(link.label)}</button> <span class="muted">${__pr23Esc(__PR23_RECORD_LABEL[link.type] || '')}</span></dd></div>`
+    : '<div><dt>Related transaction</dt><dd class="muted">None</dd></div>';
+  openModal(d.name, `${d.id} · ${d.version}${versionNo ? ` · showing v${versionNo}.0` : ''}`,
+    `<div class="pr23-doc-layout">
+      <div class="pr23-doc-canvas" id="docCanvasV23"><p class="muted">Opening the document…</p></div>
+      <aside class="pr23-doc-meta"><h4>Document details</h4><dl>${meta}${related}</dl><h4 style="margin-top:16px">Versions</h4><div id="docVersionsV23"><p class="muted">Loading the history…</p></div></aside>
+    </div>`,
+    btn('Close', 'close-overlay') +
+    `<button class="btn" data-action="doc-download-v23" data-id="${__pr23Esc(d.recordId)}"${versionNo ? ` data-v="${versionNo}"` : ''}>Download</button>` +
+    (__pr23Can('documents.manage') ? `<button class="btn" data-action="upload-doc-version-v23" data-id="${__pr23Esc(d.recordId)}">Upload new version</button>` : ''));
+  const modal = document.querySelector('#modalLayer .modal');
+  if (modal) modal.classList.add('modal-v11-full');
+  const canvas = () => document.querySelector('#docCanvasV23');
+  const fail = (title, message) => { const c = canvas(); if (c) c.innerHTML = `<div class="notice"><div><strong>${__pr23Esc(title)}</strong><p>${__pr23Esc(message)}</p></div></div>`; };
+  if (!docs) { fail('The document could not be shown', 'The document service is not connected.'); return true; }
+
+  docs.preview(d.recordId, versionNo).then(p => {
+    const c = canvas();
+    if (!c) return;
+    if (p.kind === 'pdf') {
+      return docs.fileUrl(d.recordId, versionNo).then(url => { const c2 = canvas(); if (c2) c2.innerHTML = `<iframe class="pr23-doc-frame" title="${__pr23Esc(d.name)}" src="${url}"></iframe>`; });
+    }
+    if (p.kind === 'image') {
+      return docs.fileUrl(d.recordId, versionNo).then(url => { const c2 = canvas(); if (c2) c2.innerHTML = `<div class="pr23-doc-image"><img alt="${__pr23Esc(d.name)}" src="${url}"></div>`; });
+    }
+    if (p.html) {
+      // Converted on the server to plain HTML; shown in a frame that runs no scripts.
+      c.innerHTML = `<iframe class="pr23-doc-frame" sandbox title="${__pr23Esc(d.name)}" srcdoc="${__pr23Esc(p.html)}"></iframe>`;
+      return;
+    }
+    fail('This file cannot be shown in the browser', p.message || 'Download it to open it.');
+  }).catch(e => fail('The document could not be opened', (e && e.message) || 'The server did not return it.'));
+
+  docs.detail(d.recordId).then(full => {
+    const box = document.querySelector('#docVersionsV23');
+    if (!box) return;
+    const rows = (full.versions || []).map(v => `<div class="pr23-doc-version${v.isCurrent ? ' current' : ''}">
+      <div><strong>${__pr23Esc(v.versionLabel)}</strong>${v.isCurrent ? ' ' + __pr23Chip('Current', 'green') : ''}<br><span class="muted">${__pr23Esc(v.uploadedByName || '—')} · ${__pr23Esc(__pr23DateTime(v.uploadedAt))} · ${__pr23Esc(__pr23Bytes(v.fileSizeBytes))}</span>${v.changeNote ? `<br><span>${__pr23Esc(v.changeNote)}</span>` : ''}</div>
+      <div class="pr23-doc-version-actions"><button class="btn small" data-action="doc-version-preview-v23" data-id="${__pr23Esc(d.recordId)}" data-v="${v.versionNo}">View</button><button class="btn small" data-action="doc-download-v23" data-id="${__pr23Esc(d.recordId)}" data-v="${v.versionNo}">Download</button></div>
+    </div>`).join('');
+    box.innerHTML = rows || '<p class="muted">No versions are recorded.</p>';
+  }).catch(() => { const box = document.querySelector('#docVersionsV23'); if (box) box.innerHTML = '<p class="muted">The version history could not be loaded.</p>'; });
+  return true;
+}
+
+/**
+ * Opens the record a document belongs to, in its own page, not a copy of it. Moving to another page remounts the runtime, so the
+ * request is handed over on window: whichever runtime is on the page when it has loaded picks it up and opens the record.
+ */
+function __pr23OpenRecord(type, id, number) {
+  const page = __PR23_RECORD_PAGE[type];
+  if (!page) return;
+  window.__pr23PendingOpen = { type, id, number, at: Date.now(), settledAt: 0 };
+  navigate(page);
+  __pr23PollPendingOpen();
+}
+
+function __pr23TryOpenRecord(pend) {
+  const { type, id, number } = pend;
+  const find = (rows, ...keys) => (rows || []).find(r => keys.some(k => r && r[k] != null && (String(r[k]) === String(id) || (number && String(r[k]) === String(number)))));
+  // Open a record the way a person does: through the same action or row the page itself offers.
+  const fire = (action, rid) => { const b = document.createElement('button'); b.dataset.action = action; b.dataset.id = rid; b.style.display = 'none'; document.body.appendChild(b); b.click(); b.remove(); return true; };
+  const clickRow = (kind, rid) => { const r = document.querySelector(`[data-record="${kind}"][data-id="${rid}"]`); if (!r) return false; r.click(); return true; };
+  if (type === 'PURCHASE_ORDER') { const o = find(state.orders, 'recordId', 'id'); if (o) { __pr23PoDetailsModal(o.recordId); return true; } }
+  if (type === 'INVOICE') { const i = find(state.invoices, 'recordId', 'id'); if (i) { __pr23MatchDetailModal(i.recordId); return true; } }
+  if (type === 'RFQ') { const t = find(state.tenders, 'recordId', 'id'); if (t) return clickRow('tender', t.id); }
+  if (type === 'PURCHASE_REQUISITION') { const r = find(state.requisitions, 'recordId', 'id'); if (r) return fire('view-pr-v11', r.id); }
+  if (type === 'VENDOR') { const v = find(state.vendors, 'recordId', 'name', 'id'); if (v) return fire('open-vendor-v6', v.id); }
+  if (type === 'GRN') { const g = find(state.grns, 'recordId', 'id'); if (g) return clickRow('grn', g.id); }
+  if (type === 'CONTRACT') { const c = find(state.contracts, 'recordId', 'id'); if (c) return clickRow('contract', c.id); }
+  if (type === 'PLAN') { const p = find(state.plans, 'recordId', 'id'); if (p) return fire('open-plan-detail-v5', p.id); }
+  return false;
+}
+
+function __pr23PollPendingOpen() {
+  const app = document.querySelector('#app');
+  let tries = 0;
+  const timer = setInterval(() => {
+    tries += 1;
+    const pend = window.__pr23PendingOpen;
+    // This runtime is gone (the page was replaced), or the request is done or stale: stop.
+    if (!pend || !app || !app.isConnected || tries > 150 || Date.now() - pend.at > 25000) { clearInterval(timer); return; }
+    const page = __PR23_RECORD_PAGE[pend.type];
+    const segment = { orders: 'purchase-orders', receiving: 'goods-received' }[page] || page;
+    if (!String(location.pathname).includes(`/${segment}`) || state.page !== page) return;
+    // A moment after the address has settled, so the page's own re-render cannot close what is opened.
+    if (!pend.settledAt) { pend.settledAt = Date.now(); return; }
+    if (Date.now() - pend.settledAt < 700) return;
+    try { if (__pr23TryOpenRecord(pend)) { window.__pr23PendingOpen = null; clearInterval(timer); } } catch (e) { /* the page is still loading: try again */ }
+  }, 200);
+}
+if (window.__pr23PendingOpen) __pr23PollPendingOpen();
+
+function __pr23DocMenu(button, key) {
+  const d = __pr23StoredDoc(key);
+  const root = document.querySelector('#activityRoot');
+  if (!d || !root) return;
+  root.innerHTML = '';
+  const rect = button.getBoundingClientRect();
+  const menu = document.createElement('div');
+  menu.className = 'document-actions-menu-v11';
+  menu.style.top = `${Math.min(innerHeight - 300, rect.bottom + 6)}px`;
+  menu.style.left = `${Math.max(8, Math.min(innerWidth - 230, rect.right - 220))}px`;
+  const item = (label, action, extra = '') => `<button data-action="${action}" data-id="${__pr23Esc(d.recordId)}"${extra}><span>${label}</span></button>`;
+  const manage = __pr23Can('documents.manage');
+  const link = d.relatedLink;
+  menu.innerHTML = item('Preview document', 'preview-doc-v11', ` data-stored="1"`).replace(`data-id="${__pr23Esc(d.recordId)}"`, `data-id="${__pr23Esc(d.id)}"`)
+    + item('Download', 'doc-download-v23')
+    + (manage ? item('Upload new version', 'upload-doc-version-v23') : '')
+    + item('Version history', 'preview-doc-v11', ' data-stored="1"').replace(`data-id="${__pr23Esc(d.recordId)}"`, `data-id="${__pr23Esc(d.id)}"`)
+    + (link ? `<button data-action="open-related-v23" data-type="${__pr23Esc(link.type)}" data-id="${__pr23Esc(link.id)}" data-number="${__pr23Esc(link.number)}"><span>Open ${__pr23Esc(__PR23_RECORD_LABEL[link.type] || 'record').toLowerCase()} ${__pr23Esc(link.number)}</span></button>` : '')
+    + (manage && d.rawStatus !== 'approved' ? item('Mark approved', 'doc-status-v23', ' data-status="approved"') : '')
+    + (manage && d.rawStatus !== 'archived' ? item('Archive', 'doc-status-v23', ' data-status="archived"') : '');
+  root.append(menu);
+}
+
+__pr23On(document, 'click', event => {
+  if (!__pr23Live()) return;
+  const control = event.target && event.target.closest && event.target.closest('[data-action]');
+  if (!control) return;
+  const act = control.dataset.action;
+  const id = control.dataset.id || '';
+  const stored = (act === 'preview-doc-v11' || act === 'doc-menu-v11' || act === 'upload-doc-version-v11' || act === 'download-doc-v11') && __pr23StoredDoc(id);
+  const own = ['upload-document-v5', 'upload-document-v6', 'doc-download-v23', 'doc-version-preview-v23', 'upload-doc-version-v23', 'open-related-v23'].includes(act);
+  if (!stored && !own) return;
+  event.preventDefault();
+  event.stopImmediatePropagation();
+  document.querySelector('#activityRoot')?.replaceChildren();
+  if (act === 'upload-document-v5' || act === 'upload-document-v6') return __pr23DocUploadModal(id);
+  if (act === 'preview-doc-v11') return __pr23DocPreviewModal(id);
+  if (act === 'doc-menu-v11') return __pr23DocMenu(control, id);
+  if (act === 'upload-doc-version-v11' || act === 'upload-doc-version-v23') return __pr23DocVersionModal(__pr23StoredDoc(id) ? __pr23StoredDoc(id).recordId : id);
+  if (act === 'download-doc-v11' || act === 'doc-download-v23') { const d = __pr23StoredDoc(id); return __pr23DocDownload(d ? d.recordId : id, control.dataset.v ? Number(control.dataset.v) : undefined); }
+  if (act === 'doc-version-preview-v23') return __pr23DocPreviewModal(id, Number(control.dataset.v));
+  if (act === 'open-related-v23') { closeOverlay(); return __pr23OpenRecord(control.dataset.type, id, control.dataset.number); }
+}, true);
+
+
+// ---------------------------------------------------------------- §33 audit trail: paged, filtered, with previous and new values
+
+const __PR23_AUDIT_RECORD_TYPES = { PurchaseRequisition: 'Requisition', ProcurementRfq: 'RFQ', RFQ: 'RFQ', VendorQuotation: 'Quotation', PurchaseOrder: 'Purchase order', GoodsReceivedNote: 'Goods receipt', ProcurementInvoice: 'Invoice', Vendor: 'Vendor', VendorBank: 'Vendor bank', ProcurementPlan: 'Annual plan', ProcurementContract: 'Contract', ProcurementDocument: 'Document', VendorInvoiceIntake: 'Invoice reading', ProcurementSettings: 'Settings', ApprovalMatrix: 'Approval route', Approval: 'Approval', Role: 'Role', User: 'User', StoredFile: 'Stored file', ProcurementAudit: 'Audit trail' };
+const __PR23_AUDIT_TONE = { LOGIN: 'gray', LOGOUT: 'gray', CREATE: 'blue', EDIT: 'amber', SUBMIT: 'blue', APPROVE: 'green', REJECT: 'red', RETURN: 'amber', ASSIGN: 'blue', FILE_UPLOAD: 'blue', FILE_DOWNLOAD: 'gray', PERMISSION_CHANGE: 'red', USER_CHANGE: 'amber', VENDOR_CHANGE: 'amber', WORKFLOW_CHANGE: 'amber', INTEGRATION: 'gray', AI_PROCESSING: 'gray', CLOSE: 'gray', OTHER: 'gray' };
+
+function __pr23AuditState() {
+  return state.auditV23 || (state.auditV23 = { filters: { eventType: '', userId: '', entityType: '', from: '', to: '', q: '' }, page: 1, pageSize: 25, rows: [], pagination: null, loading: false, error: null, facets: null, key: null, expanded: {} });
+}
+
+function __pr23AuditParams(a) {
+  const f = a.filters;
+  return { eventType: f.eventType, userId: f.userId, entityType: f.entityType, from: f.from, to: f.to, q: f.q };
+}
+
+function __pr23AuditLoad(force) {
+  const a = __pr23AuditState();
+  const audit = window.__pr23Audit;
+  if (!audit) return;
+  const key = JSON.stringify([__pr23AuditParams(a), a.page, a.pageSize]);
+  if (!force && a.key === key) return;
+  a.key = key;
+  a.loading = true;
+  a.error = null;
+  audit.query({ ...__pr23AuditParams(a), page: a.page, pageSize: a.pageSize }).then(res => {
+    if (a.key !== key) return;
+    a.rows = res.data || [];
+    a.pagination = res.pagination;
+    a.loading = false;
+    if (state.page === 'audit') render();
+  }).catch(e => {
+    if (a.key !== key) return;
+    a.loading = false;
+    a.error = (e && e.message) || 'The audit trail could not be loaded.';
+    if (state.page === 'audit') render();
+  });
+  if (!a.facets && !a.facetsLoading) {
+    a.facetsLoading = true;
+    audit.facets({}).then(f => { a.facets = f; a.facetsLoading = false; if (state.page === 'audit') render(); }).catch(() => { a.facetsLoading = false; });
+  }
+}
+
+/** A recorded value, shown as what it is: a few field: value pairs, the whole thing when the row is opened. */
+function __pr23AuditValue(v, open) {
+  if (v == null || (typeof v === 'object' && !Object.keys(v).length)) return '<span class="muted">—</span>';
+  if (typeof v !== 'object') return __pr23Esc(String(v));
+  if (v._truncated) return `<span class="muted">A large value (${Number(v._characters).toLocaleString('en-GB')} characters). Choose Show all values to read it.</span>`;
+  const short = x => { const s = typeof x === 'object' ? JSON.stringify(x) : String(x); return s.length > 60 ? s.slice(0, 57) + '…' : s; };
+  const entries = Object.entries(v);
+  const shown = open ? entries : entries.slice(0, 3);
+  return shown.map(([k, x]) => `<div class="pr23-audit-kv"><span>${__pr23Esc(k)}</span> ${__pr23Esc(open ? (typeof x === 'object' ? JSON.stringify(x, null, 1) : String(x)) : short(x))}</div>`).join('')
+    + (!open && entries.length > 3 ? `<span class="muted">+${entries.length - 3} more</span>` : '');
+}
+
+function __pr23AuditDevice(ua) {
+  const s = String(ua || '');
+  if (!s) return '';
+  const os = /Windows/i.test(s) ? 'Windows' : /Mac OS|Macintosh/i.test(s) ? 'macOS' : /Android/i.test(s) ? 'Android' : /iPhone|iPad|iOS/i.test(s) ? 'iOS' : /Linux/i.test(s) ? 'Linux' : '';
+  const br = /Edg\//.test(s) ? 'Edge' : /Chrome\//.test(s) ? 'Chrome' : /Firefox\//.test(s) ? 'Firefox' : /Safari\//.test(s) ? 'Safari' : /^node/i.test(s) ? 'Server' : '';
+  return [br, os].filter(Boolean).join(' on ') || s.slice(0, 40);
+}
+
+function __pr23AuditPageLive() {
+  const a = __pr23AuditState();
+  const canView = __pr23Can('audit.view');
+  if (!canView) {
+    return `<div class="page">${pageHead('Assurance', 'Audit & Compliance', 'Immutable event history.', '')}${__pr23NoData('The audit trail is not visible to your role.')}</div>`;
+  }
+  setTimeout(() => __pr23AuditLoad(false), 0);
+  const p = a.pagination;
+  const f = a.filters;
+  const facets = a.facets;
+  const opt = (value, label, current) => `<option value="${__pr23Esc(value)}"${String(current) === String(value) ? ' selected' : ''}>${__pr23Esc(label)}</option>`;
+  const events = (facets ? facets.eventTypes : []).map(e => opt(e.value, `${e.label} (${e.count})`, f.eventType)).join('');
+  const actors = (facets ? facets.actors : []).map(u => opt(u.id, `${u.name} (${u.count})`, f.userId)).join('');
+  const recTypes = Object.entries(__PR23_AUDIT_RECORD_TYPES).map(([k, v]) => opt(k, v, f.entityType)).join('');
+  const filters = `<div class="table-tools pr23-audit-filters" id="auditFiltersV23">
+    <select id="auditEventTypeV23" aria-label="Event"><option value="">All events</option>${events}</select>
+    <select id="auditUserV23" aria-label="User"><option value="">All users</option>${actors}</select>
+    <select id="auditEntityV23" aria-label="Record type"><option value="">All records</option>${recTypes}</select>
+    <label class="pr23-audit-date">From <input type="date" id="auditFromV23" value="${__pr23Esc(f.from)}"></label>
+    <label class="pr23-audit-date">To <input type="date" id="auditToV23" value="${__pr23Esc(f.to)}"></label>
+    <input id="auditSearchV23" type="search" placeholder="Search action, record, user or IP" value="${__pr23Esc(f.q)}" style="min-width:220px">
+    ${btn('Apply', 'audit-apply-v23', '', 'filter')}${btn('Reset', 'audit-reset-v23')}
+  </div>`;
+  const total = p ? p.total : null;
+  const active = Object.values(f).some(Boolean);
+  const liveKpis = (__pr23Live() || {}).kpis || {};
+  const todayKpi = liveKpis['Events today'] && !liveKpis['Events today'].hidden ? liveKpis['Events today'] : null;
+  const kpis = `<div class="grid kpis">${kpi(active ? 'Events matching' : 'Events recorded', total == null ? '…' : Number(total).toLocaleString('en-GB'), active ? 'With the filters applied' : 'Everything on the trail', 'audit')}${todayKpi ? kpi('Events today', todayKpi.value, todayKpi.sub || 'Recorded today', 'audit') : ''}${a.rows[0] ? kpi('Latest event', __pr23DateTime(a.rows[0].occurredAt), `${a.rows[0].actorName || 'System'} · ${a.rows[0].eventLabel}`, 'audit') : ''}</div>`;
+  let body;
+  if (a.error) body = `<div class="notice"><div><strong>The audit trail could not be loaded</strong><p>${__pr23Esc(a.error)}</p></div></div><div style="margin-top:10px">${btn('Try again', 'audit-retry-v23', 'primary')}</div>`;
+  else if (a.loading && !a.rows.length) body = '<p class="muted" style="padding:18px">Loading the audit trail…</p>';
+  else if (!a.rows.length) body = __pr23NoData(active ? 'No events match these filters.' : 'No events have been recorded yet.');
+  else {
+    const rows = a.rows.map(r => {
+      const open = !!a.expanded[r.id];
+      const more = (r.previousValue || r.newValue) ? `<br><button class="link" style="background:none;border:0;padding:0;cursor:pointer" data-action="audit-expand-v23" data-id="${__pr23Esc(r.id)}">${open ? 'Show less' : 'Show all values'}</button>` : '';
+      const rec = `${__pr23Esc(r.entityLabel || r.entityId || '—')}<br><span class="muted">${__pr23Esc(__PR23_AUDIT_RECORD_TYPES[r.entityType] || r.entityType)} · <span title="${__pr23Esc(r.entityId)}">${__pr23Esc(String(r.entityId || '').slice(-8))}</span></span>${more}`;
+      return `<tr data-audit-row="${__pr23Esc(r.id)}"><td style="white-space:nowrap">${__pr23Esc(__pr23DateTime(r.occurredAt))}</td><td>${__pr23Esc(r.actorName || 'System')}</td><td>${__pr23Chip(r.eventLabel, __PR23_AUDIT_TONE[r.eventType] || 'gray')}</td><td><code>${__pr23Esc(r.action)}</code></td><td>${rec}</td><td class="pr23-audit-vals">${__pr23AuditValue(r.previousValue, open)}</td><td class="pr23-audit-vals">${__pr23AuditValue(r.newValue, open)}</td><td>${__pr23Esc(r.ipAddress || '—')}<br><span class="muted" title="${__pr23Esc(r.userAgent || '')}">${__pr23Esc(__pr23AuditDevice(r.userAgent))}</span></td></tr>`;
+    }).join('');
+    const from = (p.page - 1) * p.pageSize + 1;
+    const to = Math.min(p.total, p.page * p.pageSize);
+    const size = [25, 50, 100, 200].map(n => opt(n, `${n} per page`, a.pageSize)).join('');
+    body = `<div class="table-wrap"><table class="pr23-audit-table"><thead><tr><th>Timestamp</th><th>User</th><th>Event</th><th>Action</th><th>Record</th><th>Previous value</th><th>New value</th><th>IP / device</th></tr></thead><tbody>${rows}</tbody></table></div>
+    <div class="table-tools" style="justify-content:space-between;margin-top:10px"><span class="muted">Showing ${from.toLocaleString('en-GB')}–${to.toLocaleString('en-GB')} of ${p.total.toLocaleString('en-GB')}, newest first · Page ${p.page} of ${p.totalPages}${a.loading ? ' · loading…' : ''}</span>
+      <div class="actions"><select id="auditPageSizeV23" aria-label="Rows per page">${size}</select>${btn('First', 'audit-first-v23')}${btn('Previous', 'audit-prev-v23')}${btn('Next', 'audit-next-v23')}${btn('Last', 'audit-last-v23')}</div></div>`;
+  }
+  return `<div class="page">${pageHead('Assurance', 'Audit & Compliance', 'Every recorded action: who did what, to which record, from where, and what changed.', btn('Export audit trail', 'audit-export-v23', '', 'download'))}
+    <div class="notice" style="margin-bottom:14px"><span class="kpi-icon">${icon('audit')}</span><div><strong>Immutable audit record</strong><p>The trail is append-only. Entries cannot be edited or deleted by any user; a correction is a new entry.</p></div></div>
+    ${filters}${kpis}${card('Audit event stream', 'Filtered and paged on the server', `<div class="card-body">${body}</div>`)}</div>`;
+}
+
+function __pr23AuditReloadFromFilters() {
+  const a = __pr23AuditState();
+  const v = id => (document.querySelector(id) || {}).value || '';
+  a.filters = { eventType: v('#auditEventTypeV23'), userId: v('#auditUserV23'), entityType: v('#auditEntityV23'), from: v('#auditFromV23'), to: v('#auditToV23'), q: v('#auditSearchV23').trim() };
+  a.page = 1;
+  a.expanded = {};
+  a.loading = true;
+  render();
+  __pr23AuditLoad(true);
+}
+
+__pr23On(document, 'click', event => {
+  const control = event.target && event.target.closest && event.target.closest('[data-action]');
+  if (!control || state.page !== 'audit') return;
+  const act = control.dataset.action;
+  if (!/^audit-(apply|reset|prev|next|first|last|expand|export|retry)-v23$/.test(act)) return;
+  event.preventDefault();
+  event.stopImmediatePropagation();
+  const a = __pr23AuditState();
+  const last = a.pagination ? a.pagination.totalPages : 1;
+  const go = page => { a.page = Math.min(Math.max(1, page), last); a.expanded = {}; a.loading = true; render(); __pr23AuditLoad(true); };
+  if (act === 'audit-apply-v23') return __pr23AuditReloadFromFilters();
+  if (act === 'audit-reset-v23') { a.filters = { eventType: '', userId: '', entityType: '', from: '', to: '', q: '' }; a.page = 1; a.expanded = {}; a.loading = true; render(); return __pr23AuditLoad(true); }
+  if (act === 'audit-retry-v23') { a.loading = true; render(); return __pr23AuditLoad(true); }
+  if (act === 'audit-first-v23') return go(1);
+  if (act === 'audit-prev-v23') return go(a.page - 1);
+  if (act === 'audit-next-v23') return go(a.page + 1);
+  if (act === 'audit-last-v23') return go(last);
+  if (act === 'audit-expand-v23') {
+    const rid = control.dataset.id;
+    const row = a.rows.find(r => r.id === rid);
+    const clipped = row && [row.previousValue, row.newValue].some(v => v && v._truncated);
+    if (!a.expanded[rid] && clipped && window.__pr23Audit && window.__pr23Audit.detail) {
+      control.classList.add('pr23-busy');
+      window.__pr23Audit.detail(rid).then(full => { row.previousValue = full.previousValue; row.newValue = full.newValue; a.expanded[rid] = true; render(); })
+        .catch(e => { control.classList.remove('pr23-busy'); toast('The event could not be opened', __pr23Esc((e && e.message) || 'The server did not return it.')); });
+      return;
+    }
+    a.expanded[rid] = !a.expanded[rid];
+    return render();
+  }
+  if (act === 'audit-export-v23') {
+    const audit = window.__pr23Audit;
+    if (!audit) return;
+    control.classList.add('pr23-busy');
+    audit.exportCsv(__pr23AuditParams(a)).catch(e => toast('The export failed', __pr23Esc((e && e.message) || 'The server did not return the file.'))).finally(() => control.classList.remove('pr23-busy'));
+  }
+}, true);
+
+__pr23On(document, 'change', event => {
+  const t = event.target;
+  if (!t || state.page !== 'audit') return;
+  if (t.matches('#auditEventTypeV23, #auditUserV23, #auditEntityV23, #auditFromV23, #auditToV23')) return __pr23AuditReloadFromFilters();
+  if (t.matches('#auditPageSizeV23')) { const a = __pr23AuditState(); a.pageSize = Number(t.value) || 25; a.page = 1; a.loading = true; render(); __pr23AuditLoad(true); }
+}, true);
+
+__pr23On(document, 'keydown', event => {
+  if (event.key === 'Enter' && event.target && event.target.matches && event.target.matches('#auditSearchV23')) { event.preventDefault(); __pr23AuditReloadFromFilters(); }
+}, true);
+
+
+// ---------------------------------------------------------------- Document Vault: "Recent controlled documents" paged
+
+/**
+ * Called by the vault's own filter pass once it has decided which rows match (those not hidden). Shows one page of them and keeps
+ * a pager under the table. Returns how many documents match, so the count beside the filters stays the total.
+ */
+function __pr23DocPaginate() {
+  const rows = [...document.querySelectorAll('[data-doc-row-v11]')];
+  if (!rows.length) return 0;
+  const matches = rows.filter(r => !r.hidden);
+  const filters = ['#docSearchV11', '#docTypeV11', '#docStatusV11', '#docOwnerV11'].map(id => (document.querySelector(id) || {}).value || '').join('|');
+  if (state.docFilterSigV23 !== filters) { state.docFilterSigV23 = filters; state.docPageV23 = 1; }
+  const size = state.docPageSizeV23 || 25;
+  const pages = Math.max(1, Math.ceil(matches.length / size));
+  const page = Math.min(Math.max(1, state.docPageV23 || 1), pages);
+  state.docPageV23 = page;
+  matches.forEach((r, i) => { r.hidden = !(i >= (page - 1) * size && i < page * size); });
+  const table = rows[0].closest('table');
+  const anchor = table && (table.closest('.table-wrap') || table.parentElement);
+  if (!anchor) return matches.length;
+  let pager = document.querySelector('#docPagerV23');
+  if (!pager) { pager = document.createElement('div'); pager.id = 'docPagerV23'; pager.className = 'table-tools'; pager.style.cssText = 'justify-content:space-between;margin:10px 14px 14px'; anchor.insertAdjacentElement('afterend', pager); }
+  if (!matches.length) { pager.hidden = true; return 0; }
+  pager.hidden = false;
+  const from = (page - 1) * size + 1;
+  const to = Math.min(matches.length, page * size);
+  const sizes = [10, 25, 50, 100].map(n => `<option value="${n}"${n === size ? ' selected' : ''}>${n} per page</option>`).join('');
+  pager.innerHTML = `<span class="muted">Showing ${from}–${to} of ${matches.length}, newest first · Page ${page} of ${pages}</span>
+    <div class="actions"><select id="docPageSizeV23" aria-label="Documents per page">${sizes}</select>
+      <button class="btn small" data-action="doc-page-v23" data-to="first"${page === 1 ? ' disabled' : ''}>First</button>
+      <button class="btn small" data-action="doc-page-v23" data-to="prev"${page === 1 ? ' disabled' : ''}>Previous</button>
+      <button class="btn small" data-action="doc-page-v23" data-to="next"${page === pages ? ' disabled' : ''}>Next</button>
+      <button class="btn small" data-action="doc-page-v23" data-to="last"${page === pages ? ' disabled' : ''}>Last</button></div>`;
+  return matches.length;
+}
+
+function __pr23DocRepage() {
+  // re-run the vault's filter pass, which repages
+  const box = document.querySelector('#docSearchV11');
+  if (box) box.dispatchEvent(new Event('input', { bubbles: true }));
+}
+
+__pr23On(document, 'click', event => {
+  const control = event.target && event.target.closest && event.target.closest('[data-action="doc-page-v23"]');
+  if (!control) return;
+  event.preventDefault();
+  event.stopImmediatePropagation();
+  if (control.disabled) return;
+  const total = [...document.querySelectorAll('[data-doc-row-v11]')].length;
+  const size = state.docPageSizeV23 || 25;
+  const to = control.dataset.to;
+  const cur = state.docPageV23 || 1;
+  // the last page is worked out from the rows that match the filters, which the pager text already states
+  const pages = Number((document.querySelector('#docPagerV23 .muted') || {}).textContent.match(/Page \d+ of (\d+)/)?.[1] || 1);
+  state.docPageV23 = to === 'first' ? 1 : to === 'prev' ? cur - 1 : to === 'next' ? cur + 1 : pages;
+  void total; void size;
+  __pr23DocRepage();
+}, true);
+
+__pr23On(document, 'change', event => {
+  if (!event.target || !event.target.matches || !event.target.matches('#docPageSizeV23')) return;
+  state.docPageSizeV23 = Number(event.target.value) || 25;
+  state.docPageV23 = 1;
+  __pr23DocRepage();
+}, true);
+
+
+// ---------------------------------------------------------------- every data table in the workspace is paged
+
+const __PR23_TABLE_PAGE_SIZE = 25;
+
+function __pr23TableKey(table, index) {
+  const card = table.closest('.card');
+  const title = card ? ((card.querySelector('.card-head h3, h3, .card-head strong') || {}).textContent || '') : '';
+  const heads = [...table.querySelectorAll('thead th')].map(h => h.textContent.trim()).join('|');
+  return `${state.page}#${index}#${title.trim()}#${heads}`;
+}
+
+/**
+ * Pages every table on the page that holds more rows than fit: one page of the rows the page's own filters let through, with a
+ * pager under the table. The rows a page's filters hide stay hidden; the pager only hides the rows beyond the current page, by a
+ * class of its own, so the two never undo each other. Tables with their own pager (the audit trail, the vault list) are left alone.
+ */
+function __pr23PaginateTables() {
+  if (!__pr23Live()) return;
+  const root = document.querySelector('#workspace');
+  if (!root) return;
+  try { __pr23ListEnhance(); } catch (e) { if (window.console) console.warn('list toolbar', e); }
+  const pages = state.tablePagesV23 || (state.tablePagesV23 = {});
+  [...root.querySelectorAll('table')].forEach((table, index) => {
+    const body = table.tBodies[0];
+    if (!body || table.closest('.pr23-audit-table') || table.querySelector('[data-doc-row-v11]') || table.hasAttribute('data-no-page')) return;
+    // a row whose only cell spans the table is the detail of the row above it: it moves with it
+    const groups = [];
+    [...body.rows].forEach(r => {
+      if (r.classList.contains('pr23-lf-empty')) return;
+      const spans = r.cells.length === 1 && Number(r.cells[0].colSpan) > 2;
+      if (spans && groups.length) groups[groups.length - 1].push(r); else groups.push([r]);
+    });
+    const key = __pr23TableKey(table, index);
+    const cfg = pages[key] || (pages[key] = { page: 1, size: __PR23_TABLE_PAGE_SIZE, total: -1 });
+    // rows a page's own filter hides (inline display:none, as the vendor registry does) are not candidates for a page either
+    const candidates = groups.filter(g => !g[0].hidden && g[0].style.display !== 'none' && !g[0].classList.contains('pr23-lf-hide'));
+    const total = candidates.length;
+    if (cfg.total !== total) { cfg.total = total; cfg.page = 1; }
+    const pageCount = Math.max(1, Math.ceil(total / cfg.size));
+    cfg.page = Math.min(Math.max(1, cfg.page), pageCount);
+    const paged = total > cfg.size;
+    candidates.forEach((g, i) => {
+      const hide = paged && !(i >= (cfg.page - 1) * cfg.size && i < cfg.page * cfg.size);
+      g.forEach(r => r.classList.toggle('pr23-pg-hide', hide));
+    });
+    groups.filter(g => g[0].hidden).forEach(g => g.forEach(r => r.classList.remove('pr23-pg-hide')));
+    const anchor = table.closest('.table-wrap') || table;
+    let pager = anchor.nextElementSibling && anchor.nextElementSibling.classList.contains('pr23-tbl-pager') ? anchor.nextElementSibling : null;
+    if (!paged && cfg.size === __PR23_TABLE_PAGE_SIZE) { if (pager) pager.remove(); return; }
+    if (!pager) { pager = document.createElement('div'); pager.className = 'pr23-tbl-pager table-tools'; anchor.insertAdjacentElement('afterend', pager); }
+    pager.dataset.key = key;
+    const from = total ? (cfg.page - 1) * cfg.size + 1 : 0;
+    const to = Math.min(total, cfg.page * cfg.size);
+    const sizes = [10, 25, 50, 100].map(n => `<option value="${n}"${n === cfg.size ? ' selected' : ''}>${n} per page</option>`).join('');
+    pager.innerHTML = `<span class="muted">Showing ${from}–${to} of ${total} · Page ${cfg.page} of ${pageCount}</span>
+      <div class="actions"><select aria-label="Rows per page">${sizes}</select>
+        <button class="btn small" data-action="tbl-page-v23" data-to="first"${cfg.page === 1 ? ' disabled' : ''}>First</button>
+        <button class="btn small" data-action="tbl-page-v23" data-to="prev"${cfg.page === 1 ? ' disabled' : ''}>Previous</button>
+        <button class="btn small" data-action="tbl-page-v23" data-to="next"${cfg.page === pageCount ? ' disabled' : ''}>Next</button>
+        <button class="btn small" data-action="tbl-page-v23" data-to="last"${cfg.page === pageCount ? ' disabled' : ''}>Last</button></div>`;
+  });
+}
+
+__pr23On(document, 'click', event => {
+  const control = event.target && event.target.closest && event.target.closest('[data-action="tbl-page-v23"]');
+  if (!control) {
+    // a filter button (Apply, Clear ...) can change which rows a table holds: page again once it has done its work
+    if (event.target && event.target.closest && event.target.closest('#workspace') && !(event.target.closest('.pr23-tbl-pager'))) setTimeout(__pr23PaginateTables, 150);
+    return;
+  }
+  event.preventDefault();
+  event.stopImmediatePropagation();
+  if (control.disabled) return;
+  const pager = control.closest('.pr23-tbl-pager');
+  const cfg = pager && (state.tablePagesV23 || {})[pager.dataset.key];
+  if (!cfg) return;
+  const last = Math.max(1, Math.ceil(cfg.total / cfg.size));
+  const to = control.dataset.to;
+  cfg.page = to === 'first' ? 1 : to === 'prev' ? cfg.page - 1 : to === 'next' ? cfg.page + 1 : last;
+  __pr23PaginateTables();
+}, true);
+
+__pr23On(document, 'change', event => {
+  const t = event.target;
+  if (t && t.closest && t.closest('.pr23-tbl-pager')) {
+    const cfg = (state.tablePagesV23 || {})[t.closest('.pr23-tbl-pager').dataset.key];
+    if (cfg) { cfg.size = Number(t.value) || __PR23_TABLE_PAGE_SIZE; cfg.page = 1; __pr23PaginateTables(); }
+    return;
+  }
+  if (t && t.closest && t.closest('#workspace')) setTimeout(__pr23PaginateTables, 60);
+}, true);
+
+__pr23On(document, 'input', event => {
+  if (event.target && event.target.closest && event.target.closest('#workspace') && !event.target.closest('.pr23-tbl-pager')) setTimeout(__pr23PaginateTables, 60);
+}, true);
+
+
+// ================================================================ SRD §34-§40: dashboards, reports, settings, lifecycle, lists
+// One store on window, so it survives the host remount every navigation causes (a drill-down from the dashboard lands on the
+// Reports page with its filters set).
+
+function __pr23Ins() {
+  // one person's dashboards, drills and filters are never shown to the next person who signs in on the same page
+  const uid = ((__pr23Live() || {}).access || {}).userId || null;
+  if (window.__pr23InsStore && uid && window.__pr23InsStore.uid && window.__pr23InsStore.uid !== uid) { window.__pr23InsStore = null; window.__pr23ListStoreV23 = null; }
+  if (window.__pr23InsStore && uid && !window.__pr23InsStore.uid) window.__pr23InsStore.uid = uid;
+  if (!window.__pr23InsStore) {
+    window.__pr23InsStore = {
+      uid,
+      dash: { view: null, me: null, data: {}, preset: '12m', from: '', to: '', convertTo: '', loading: false, error: null, key: '', loadedKey: '' },
+      rep: { list: null, sel: null, filters: {}, data: null, page: 1, pageSize: 25, convertTo: '', loading: false, error: null, key: '', loadedKey: '', filtersOpen: true },
+      cfg: { rules: null, numbering: null, fx: null, rates: null, log: null, logFilter: {}, logPage: 1, errors: {}, loading: {}, statuses: null },
+    };
+  }
+  return window.__pr23InsStore;
+}
+function __pr23InsApi() { return window.__pr23Insights || null; }
+/**
+ * Redraws the page when something has loaded. What the person has typed into a filter or a form meanwhile is put back, so a
+ * result arriving does not wipe their input; a reset, a new report or a drill sets `__pr23FormReset` to start clean.
+ */
+const __PR23_KEEP = '[data-rep23],[data-dash23],[data-num23],[data-rule],[data-rule-param],[data-log23],#pr23FxForm [name],#pr23RateForm [name]';
+function __pr23FormKey(el) {
+  const d = el.dataset || {};
+  for (const k of ['rep23', 'dash23', 'num23', 'rule', 'ruleParam', 'log23']) if (d[k] !== undefined) return `${k}:${d[k]}`;
+  const f = el.closest && el.closest('#pr23FxForm,#pr23RateForm');
+  return f && el.name ? `${f.id}:${el.name}` : null;
+}
+function __pr23InsRedraw(page) {
+  if (__pr23Abort.signal.aborted) return;
+  if (page && state.page !== page) return;
+  const snap = new Map();
+  if (!window.__pr23FormReset) document.querySelectorAll(__PR23_KEEP).forEach(el => { const k = __pr23FormKey(el); if (k) snap.set(k, el.type === 'checkbox' ? el.checked : el.value); });
+  window.__pr23FormReset = false;
+  render();
+  if (snap.size) document.querySelectorAll(__PR23_KEEP).forEach(el => { const k = __pr23FormKey(el); if (k && snap.has(k) && !el.disabled) { if (el.type === 'checkbox') el.checked = snap.get(k); else if (el.value !== snap.get(k)) el.value = snap.get(k); } });
+}
+function __pr23InsMsg(e) { return String((e && e.message) || e || 'Something went wrong').replace(/\s+/g, ' ').slice(0, 240); }
+
+// ---------------------------------------------------------------- money, each amount in its own currency
+
+function __pr23Amt(n, code, digits) {
+  if (n == null || n === '' || !Number.isFinite(Number(n))) return '—';
+  const d = digits == null ? 2 : digits;
+  if (!code || code === 'UNSPECIFIED') return Number(n).toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d });
+  try { return new Intl.NumberFormat('en-US', { style: 'currency', currency: code, minimumFractionDigits: d, maximumFractionDigits: d }).format(Number(n)); }
+  catch (_) { return `${code} ${Number(n).toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d })}`; }
+}
+function __pr23Short(n) {
+  const v = Math.abs(Number(n) || 0);
+  const s = v >= 1e9 ? (v / 1e9).toFixed(1) + 'B' : v >= 1e6 ? (v / 1e6).toFixed(1) + 'M' : v >= 1e3 ? (v / 1e3).toFixed(v >= 1e4 ? 0 : 1) + 'k' : String(Math.round(v * 10) / 10);
+  return (Number(n) < 0 ? '-' : '') + s.replace(/\.0(?=[kMB]|$)/, '');
+}
+/** Each currency on its own line: "USD 1,500.00", "ZIG 26,000.00". Never added together. */
+function __pr23ByCurrencyHtml(by) {
+  const rows = Object.entries(by || {}).sort((a, b) => b[1].amount - a[1].amount);
+  if (!rows.length) return '<span class="muted">No value</span>';
+  return rows.map(([c, v]) => `<div class="pr23-cur-line" title="${__pr23Esc(v.count)} record(s)"><span class="pr23-cur-code">${__pr23Esc(c === 'UNSPECIFIED' ? 'No currency' : c)}</span> <strong>${__pr23Amt(v.amount, c)}</strong></div>`).join('');
+}
+/** The converted figure with the rates behind it, or the currencies that could not be converted. */
+function __pr23ConvertedHtml(m) {
+  if (!m || !m.converted) return '';
+  const un = Object.keys(m.unconverted || {});
+  const rates = (m.converted.rates || []).map(r => `${r.from}→${r.to} ${Number(r.rate).toFixed(6).replace(/0+$/, '').replace(/\.$/, '')} (${__pr23Esc(r.date)}, ${__pr23Esc(String(r.source || '').toLowerCase())}${r.via ? `, via ${__pr23Esc(r.via)}` : ''})`).join(' · ');
+  const parts = [];
+  const present = Object.keys(m.byCurrency || {});
+  if (m.mixed || (m.converted.rates || []).length || present.some(c => c !== m.converted.currency)) parts.push(`<div class="pr23-conv"><span class="muted">Converted into ${__pr23Esc(m.converted.currency)}:</span> <strong>${__pr23Amt(m.converted.total, m.converted.currency)}</strong></div>`);
+  if (rates) parts.push(`<div class="muted pr23-rates">Rates used: ${rates}</div>`);
+  if (un.length) parts.push(`<div class="pr23-unconv">Not converted (no exchange rate): ${un.map(c => `${__pr23Esc(c === 'UNSPECIFIED' ? 'no currency' : c)} ${__pr23Amt(m.unconverted[c].amount, c)}`).join(', ')}</div>`);
+  return parts.join('');
+}
+
+// ---------------------------------------------------------------- charts (SVG, labelled, drill-down)
+
+const __PR23_PALETTE = ['#4f46e5', '#0ea5e9', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#14b8a6', '#f97316', '#64748b', '#ec4899'];
+
+function __pr23NiceMax(v) {
+  if (!(v > 0)) return 1;
+  const p = Math.pow(10, Math.floor(Math.log10(v)));
+  const f = v / p;
+  return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 2.5 ? 2.5 : f <= 5 ? 5 : 10) * p;
+}
+function __pr23DrillAttrs(drill) {
+  return drill && drill.report ? ` data-act23="drill" data-report="${__pr23Esc(drill.report)}" data-filters="${__pr23Esc(JSON.stringify(drill.filters || {}))}" style="cursor:pointer"` : '';
+}
+function __pr23ChartFrame(title, note, body, legend) {
+  return `<figure class="pr23-chart" aria-label="${__pr23Esc(title)}"><figcaption><strong>${__pr23Esc(title)}</strong>${note ? `<span class="muted">${note}</span>` : ''}</figcaption>${body}${legend || ''}</figure>`;
+}
+/** Horizontal bars: one per label, value at the end, ticks on the value axis. `fmt` shows a value; `axisTitle` names the axis. */
+function __pr23ChartBars(items, o) {
+  o = o || {};
+  const rows = (items || []).filter(i => Number(i.value) > 0).slice(0, o.limit || 10);
+  if (!rows.length) return __pr23ChartFrame(o.title, o.note, __pr23NoData(o.empty || 'Nothing to chart for this period.'));
+  const fmt = o.fmt || (v => __pr23Short(v));
+  const max = __pr23NiceMax(Math.max(...rows.map(r => Number(r.value))));
+  const W = 640, labelW = 170, valueW = 86, top = 6, rowH = 30, axisH = 34;
+  const plot = W - labelW - valueW;
+  const H = top + rows.length * rowH + axisH;
+  const ticks = [0, 0.25, 0.5, 0.75, 1].map(f => ({ x: labelW + f * plot, v: max * f }));
+  const grid = ticks.map(t => `<line x1="${t.x}" x2="${t.x}" y1="${top}" y2="${top + rows.length * rowH}" stroke="#e2e8f0" stroke-width="1"/><text x="${t.x}" y="${top + rows.length * rowH + 15}" text-anchor="middle" font-size="11" fill="#64748b">${__pr23Esc(fmt(t.v))}</text>`).join('');
+  const bars = rows.map((r, i) => {
+    const y = top + i * rowH;
+    const w = Math.max(2, (Number(r.value) / max) * plot);
+    const label = String(r.label || '—');
+    const shown = label.length > 26 ? label.slice(0, 25) + '…' : label;
+    return `<g${__pr23DrillAttrs(r.drill)} class="pr23-bar"><title>${__pr23Esc(label)}: ${__pr23Esc(o.tip ? o.tip(r) : fmt(r.value))}${r.drill ? ' (click to see the records)' : ''}</title>
+      <text x="${labelW - 8}" y="${y + rowH / 2 + 4}" text-anchor="end" font-size="12" fill="#0f172a">${__pr23Esc(shown)}</text>
+      <rect x="${labelW}" y="${y + 5}" width="${w}" height="${rowH - 10}" rx="4" fill="${__PR23_PALETTE[i % __PR23_PALETTE.length]}"/>
+      <text x="${labelW + w + 6}" y="${y + rowH / 2 + 4}" font-size="12" fill="#334155">${__pr23Esc(fmt(r.value))}${r.flag ? ' *' : ''}</text></g>`;
+  }).join('');
+  const axis = o.axisTitle ? `<text x="${labelW + plot / 2}" y="${H - 2}" text-anchor="middle" font-size="11" fill="#64748b">${__pr23Esc(o.axisTitle)}</text>` : '';
+  return __pr23ChartFrame(o.title, o.note, `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${__pr23Esc(o.title)}" style="width:100%;height:auto;max-height:${H + 20}px">${grid}${bars}${axis}</svg>`);
+}
+/** Grouped columns over labels (months), one series per currency: the series are shown side by side, never stacked into one total. */
+function __pr23ChartColumns(labels, series, o) {
+  o = o || {};
+  const live = (series || []).filter(s => (s.data || []).some(v => Number(v) > 0));
+  if (!labels || !labels.length || !live.length) return __pr23ChartFrame(o.title, o.note, __pr23NoData(o.empty || 'Nothing to chart for this period.'));
+  const W = 640, H = 300, left = 58, right = 12, top = 12, bottom = 54;
+  const plotW = W - left - right, plotH = H - top - bottom;
+  const max = __pr23NiceMax(Math.max(...live.flatMap(s => s.data.map(Number))));
+  const gw = plotW / labels.length;
+  const bw = Math.min(34, (gw * 0.8) / live.length);
+  const grid = [0, 0.25, 0.5, 0.75, 1].map(f => { const y = top + plotH - f * plotH; return `<line x1="${left}" x2="${W - right}" y1="${y}" y2="${y}" stroke="#e2e8f0"/><text x="${left - 6}" y="${y + 4}" text-anchor="end" font-size="11" fill="#64748b">${__pr23Esc(__pr23Short(max * f))}</text>`; }).join('');
+  const cols = labels.map((lab, li) => live.map((s, si) => {
+    const v = Number(s.data[li]) || 0;
+    const h = (v / max) * plotH;
+    const x = left + li * gw + (gw - bw * live.length) / 2 + si * bw;
+    const name = s.name === 'UNSPECIFIED' ? 'No currency' : s.name;
+    return v > 0 ? `<g${__pr23DrillAttrs(o.drill && o.drill(lab, s))} class="pr23-bar"><title>${__pr23Esc(lab)} · ${__pr23Esc(name)}: ${__pr23Esc(__pr23Amt(v, s.name))}</title><rect x="${x}" y="${top + plotH - h}" width="${bw - 2}" height="${Math.max(1, h)}" rx="3" fill="${__PR23_PALETTE[si % __PR23_PALETTE.length]}"/></g>` : '';
+  }).join('')).join('');
+  const xl = labels.map((lab, li) => `<text x="${left + li * gw + gw / 2}" y="${top + plotH + 16}" text-anchor="middle" font-size="11" fill="#334155">${__pr23Esc(String(lab))}</text>`).join('');
+  const axes = `<text transform="rotate(-90)" x="${-(top + plotH / 2)}" y="13" text-anchor="middle" font-size="11" fill="#64748b">${__pr23Esc(o.yTitle || 'Amount')}</text><text x="${left + plotW / 2}" y="${H - 8}" text-anchor="middle" font-size="11" fill="#64748b">${__pr23Esc(o.xTitle || 'Month')}</text>`;
+  const legend = `<div class="pr23-legend">${live.map((s, i) => `<span><i style="background:${__PR23_PALETTE[i % __PR23_PALETTE.length]}"></i>${__pr23Esc(s.name === 'UNSPECIFIED' ? 'No currency' : s.name)}</span>`).join('')}</div>`;
+  return __pr23ChartFrame(o.title, o.note, `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${__pr23Esc(o.title)}" style="width:100%;height:auto">${grid}${cols}${xl}${axes}</svg>`, legend);
+}
+function __pr23ChartDonut(items, o) {
+  o = o || {};
+  const rows = (items || []).filter(i => Number(i.value) > 0);
+  if (!rows.length) return __pr23ChartFrame(o.title, o.note, __pr23NoData(o.empty || 'Nothing to chart for this period.'));
+  const total = rows.reduce((t, r) => t + Number(r.value), 0);
+  const R = 84, r = 50, cx = 110, cy = 100;
+  let a0 = -Math.PI / 2;
+  const arcs = rows.map((row, i) => {
+    const frac = Number(row.value) / total;
+    const a1 = a0 + Math.min(frac, 0.9999) * 2 * Math.PI;
+    const large = a1 - a0 > Math.PI ? 1 : 0;
+    const p = (rad, a) => `${cx + rad * Math.cos(a)} ${cy + rad * Math.sin(a)}`;
+    const d = `M ${p(R, a0)} A ${R} ${R} 0 ${large} 1 ${p(R, a1)} L ${p(r, a1)} A ${r} ${r} 0 ${large} 0 ${p(r, a0)} Z`;
+    a0 = a1;
+    return `<path d="${d}" fill="${__PR23_PALETTE[i % __PR23_PALETTE.length]}"${__pr23DrillAttrs(row.drill)} class="pr23-bar"><title>${__pr23Esc(row.label)}: ${__pr23Esc(row.value)} (${Math.round(frac * 1000) / 10}%)</title></path>`;
+  }).join('');
+  const centre = `<text x="${cx}" y="${cy - 2}" text-anchor="middle" font-size="22" font-weight="700" fill="#0f172a">${__pr23Esc(total)}</text><text x="${cx}" y="${cy + 16}" text-anchor="middle" font-size="11" fill="#64748b">${__pr23Esc(o.unit || 'in total')}</text>`;
+  const legend = `<div class="pr23-legend pr23-legend-list">${rows.map((row, i) => `<span${__pr23DrillAttrs(row.drill)}><i style="background:${__PR23_PALETTE[i % __PR23_PALETTE.length]}"></i>${__pr23Esc(row.label)} <strong>${__pr23Esc(row.value)}</strong> <em class="muted">${Math.round((Number(row.value) / total) * 1000) / 10}%</em></span>`).join('')}</div>`;
+  return __pr23ChartFrame(o.title, o.note, `<svg viewBox="0 0 220 200" role="img" aria-label="${__pr23Esc(o.title)}" style="width:100%;max-width:240px;height:auto;display:block;margin:0 auto">${arcs}${centre}</svg>`, legend);
+}
+
+// ---------------------------------------------------------------- the dashboards
+
+const __PR23_PRESETS = [['month', 'This month'], ['quarter', 'This quarter'], ['year', 'This year'], ['12m', 'Last 12 months'], ['all', 'All time'], ['custom', 'Custom dates']];
+const __PR23_VIEW_LABEL = { executive: 'Executive', procurement: 'Procurement', mine: 'My work' };
+
+function __pr23DashQuery(d) {
+  const q = {};
+  if (d.preset === 'custom') { if (d.from) q.from = d.from; if (d.to) q.to = d.to; } else q.preset = d.preset;
+  if (d.convertTo) q.convertTo = d.convertTo;
+  return q;
+}
+function __pr23DashLoad(force) {
+  const api = __pr23InsApi();
+  const d = __pr23Ins().dash;
+  if (!api || d.loading) return;
+  const go = () => {
+    const key = `${d.view}|${JSON.stringify(__pr23DashQuery(d))}`;
+    d.key = key;
+    if (d.view === 'mine' || (!force && d.data[key] && d.loadedKey === key)) { __pr23InsRedraw('dashboard'); return; }
+    d.loading = true; d.error = null; __pr23InsRedraw('dashboard');
+    api.dashboard(d.view, __pr23DashQuery(d))
+      .then(res => { d.data[key] = res; d.loadedKey = key; d.error = null; })
+      .catch(e => { d.error = __pr23InsMsg(e); })
+      .finally(() => { d.loading = false; __pr23InsRedraw('dashboard'); });
+  };
+  if (d.me) { go(); return; }
+  d.loading = true; __pr23InsRedraw('dashboard');
+  api.me()
+    .then(me => { d.me = me; if (!d.view || !me.views.includes(d.view)) d.view = me.defaultView; })
+    .catch(e => { d.error = __pr23InsMsg(e); })
+    .finally(() => { d.loading = false; if (d.me) go(); else __pr23InsRedraw('dashboard'); });
+}
+
+function __pr23Tile(label, body, sub, drill, ico, page) {
+  const nav = page ? ` data-page="${page}" style="cursor:pointer"` : '';
+  return `<article class="kpi pr23-tile"${__pr23DrillAttrs(drill)}${nav}><div class="kpi-top"><span class="kpi-label">${__pr23Esc(label)}</span><span class="kpi-icon">${icon(ico || 'report')}</span></div><div class="kpi-value pr23-tile-value">${body}</div><div class="kpi-sub">${sub || ''}</div></article>`;
+}
+function __pr23Days(d) {
+  if (d == null) return '—';
+  const days = Number(d);
+  if (days >= 1) return `${Math.round(days * 10) / 10} day${days === 1 ? '' : 's'}`;
+  const hours = days * 24;
+  if (hours >= 1) return `${Math.round(hours * 10) / 10} h`;
+  const mins = Math.round(hours * 60);
+  return mins < 1 ? 'under a minute' : `${mins} min`;
+}
+
+function __pr23DashFilters(d, kind) {
+  const fx = (__pr23Live() || {}).currencies || [];
+  const opt = (v, t, cur) => `<option value="${__pr23Esc(v)}"${String(cur) === String(v) ? ' selected' : ''}>${__pr23Esc(t)}</option>`;
+  return `<div class="table-tools pr23-dash-filters" id="pr23DashFilters">
+    <label>Period <select data-dash23="preset" aria-label="Period">${__PR23_PRESETS.map(([v, t]) => opt(v, t, d.preset)).join('')}</select></label>
+    <label class="pr23-audit-date">From <input type="date" data-dash23="from" value="${__pr23Esc(d.from)}"${d.preset === 'custom' ? '' : ' disabled'}></label>
+    <label class="pr23-audit-date">To <input type="date" data-dash23="to" value="${__pr23Esc(d.to)}"${d.preset === 'custom' ? '' : ' disabled'}></label>
+    <label>Show totals in <select data-dash23="convertTo" aria-label="Currency for converted totals">${opt('', 'Reporting currency', d.convertTo)}${fx.map(c => opt(c.code, c.code, d.convertTo)).join('')}</select></label>
+    <button class="btn" data-act23="dash-apply">${icon('filter')}Apply</button><button class="btn" data-act23="dash-reset">Reset</button></div>`;
+}
+
+function __pr23DashProcurementHtml(data) {
+  const t = data.tiles || {};
+  const c = data.charts || {};
+  const tiles = [];
+  tiles.push(__pr23Tile('Open requisitions', `<span>${Number(t.openRequisitions.value).toLocaleString('en-GB')}</span>`, 'Draft, submitted, under review, returned or approved', t.openRequisitions.drill, 'requisition'));
+  const pp = t.pendingApprovals.parts;
+  tiles.push(__pr23Tile('Pending approvals', `<span>${Number(t.pendingApprovals.value).toLocaleString('en-GB')}</span>`, `${pp.requisitions} requisitions · ${pp.purchaseOrders} orders · ${pp.invoices} invoices`, t.pendingApprovals.drill, 'approve'));
+  tiles.push(__pr23Tile('RFQs in progress', `<span>${Number(t.rfqsInProgress.value).toLocaleString('en-GB')}</span>`, (t.rfqsInProgress.byStatus || []).map(s => `${__pr23Esc(s.label)} ${s.count}`).join(' · ') || 'None', t.rfqsInProgress.drill, 'tender'));
+  const cl = t.tendersClosingSoon;
+  tiles.push(__pr23Tile('Tenders closing soon', `<span>${cl.value}</span>`, cl.items.length ? cl.items.slice(0, 3).map(i => `${__pr23Esc(i.reference)} · ${__pr23Esc(__pr23DateTime(i.closing))}`).join('<br>') : `None in the next ${cl.withinDays} days`, cl.drill, 'clock'));
+  tiles.push(__pr23Tile('Evaluations pending', `<span>${t.evaluationsPending.value}</span>`, 'Events with committee scorecards outstanding', t.evaluationsPending.drill, 'evaluation'));
+  tiles.push(__pr23Tile('Purchase orders issued', `<span>${Number(t.purchaseOrdersIssued.value).toLocaleString('en-GB')}</span>`, 'In the selected period', t.purchaseOrdersIssued.drill, 'order'));
+  const vc = t.vendorComplianceExceptions;
+  tiles.push(__pr23Tile('Vendor compliance exceptions', `<span>${vc.value}</span>`, vc.value ? `${vc.expiredDocuments} expired document(s)${vc.items.length ? '<br>' + vc.items.slice(0, 2).map(i => `${__pr23Esc(i.name)}: ${__pr23Esc(String(i.reason).replace(/_/g, ' ').toLowerCase())}`).join('<br>') : ''}` : 'Every supplier is compliant', vc.drill, 'vendor'));
+  const sp = t.procurementSpend;
+  tiles.push(__pr23Tile('Procurement spend', `<div class="pr23-money-stack">${__pr23ByCurrencyHtml(sp.byCurrency)}</div>`, `${sp.orders} orders${__pr23ConvertedHtml(sp)}`, sp.drill, 'report'));
+  tiles.push(__pr23Tile('Cycle time', `<span>${__pr23Days(t.cycleTime.approvalDays)}</span>`, `Requisition to approval, average of ${t.cycleTime.sample} approved`, t.cycleTime.drill, 'clock'));
+  const sv = t.savingsVariance;
+  tiles.push(__pr23Tile('Savings / variance', sv.available && sv.byCurrency.length ? sv.byCurrency.map(r => `<div class="pr23-cur-line"><span class="pr23-cur-code">${__pr23Esc(r.currency)}</span> <strong style="color:${r.variance <= 0 ? '#059669' : '#dc2626'}">${r.variance <= 0 ? '' : '+'}${__pr23Amt(r.variance, r.currency)}</strong></div>`).join('') : '<span class="muted">No comparable orders</span>',
+    sv.available && sv.byCurrency.length ? sv.byCurrency.map(r => `${r.requisitions} requisitions: ordered ${__pr23Amt(r.ordered, r.currency, 0)} against an estimate of ${__pr23Amt(r.estimate, r.currency, 0)} (${r.pct}%)`).join('<br>') : 'Orders raised from requisitions that carry an estimate', null, 'report'));
+  const od = t.overdueActivities;
+  tiles.push(__pr23Tile('Overdue activities', `<span style="color:${od.value ? '#dc2626' : 'inherit'}">${od.value}</span>`, `${od.parts.rfqsPastClosing} events past closing · ${od.parts.deliveriesLate} late deliveries · ${od.parts.invoicesPastDue} invoices past due · ${od.parts.approvalsWaitingOver.count} approvals waiting over ${od.parts.approvalsWaitingOver.hours} h`, od.drill, 'alert'));
+  const months = c.spendByMonth;
+  const charts = [
+    __pr23ChartColumns(months.labels, months.series, { title: 'Committed spend by month', note: 'Each currency on its own; never added together', yTitle: 'Order value', xTitle: 'Month ordered', drill: (lab, s) => ({ report: 'procurement-spend', filters: { from: `${lab}-01`, to: `${lab}-${String(new Date(Date.UTC(Number(String(lab).slice(0, 4)), Number(String(lab).slice(5, 7)), 0)).getUTCDate()).padStart(2, '0')}`, currency: s.name === 'UNSPECIFIED' ? '' : s.name } }) }),
+    __pr23ChartBars((c.requisitionsByStatus.data || []).map(x => ({ label: x.label, value: x.value, drill: x.drill })), { title: 'Requisitions by status', fmt: v => String(v), axisTitle: 'Number of requisitions', empty: 'No requisitions in this period.' }),
+    __pr23ChartBars((c.purchaseOrdersByStatus.data || []).map(x => ({ label: x.label, value: x.value, drill: x.drill })), { title: 'Purchase orders by status', fmt: v => String(v), axisTitle: 'Number of orders', empty: 'No orders in this period.' }),
+    __pr23ChartDonut((c.sourcingPipeline.data || []).map(x => ({ label: x.label, value: x.value, drill: x.drill })), { title: 'Sourcing events in progress', unit: 'events', empty: 'No sourcing event is in progress.' }),
+  ];
+  return `<div class="grid kpis pr23-tiles">${tiles.join('')}</div><div class="grid two pr23-charts">${charts.map(x => `<section class="card"><div class="card-body">${x}</div></section>`).join('')}</div>`;
+}
+
+function __pr23DashExecutiveHtml(data) {
+  const t = data.tiles || {};
+  const c = data.charts || {};
+  const v = t.totalProcurementValue;
+  const vol = t.procurementVolume;
+  const ct = t.cycleTime;
+  const pa = t.pendingApprovals;
+  const ex = t.exceptionTransactions;
+  const vc = t.vendorConcentration;
+  const tiles = [
+    __pr23Tile('Total procurement value', `<div class="pr23-money-stack">${__pr23ByCurrencyHtml(v.byCurrency)}</div>`, `${v.orders} orders${__pr23ConvertedHtml(v)}`, v.drill, 'report'),
+    __pr23Tile('Procurement volume', `<span>${Number(vol.orders).toLocaleString('en-GB')}</span>`, `orders · ${vol.requisitions} requisitions · ${vol.sourcingEvents} sourcing events · ${vol.suppliersUsed} suppliers`, vol.drill, 'order'),
+    __pr23Tile('Pending approvals', `<span>${Number(pa.count).toLocaleString('en-GB')}</span>`, `${pa.parts.requisitions} requisitions · ${pa.parts.purchaseOrders} orders · ${pa.parts.invoices} invoices<div class="pr23-money-stack">${__pr23ByCurrencyHtml(pa.value.byCurrency)}</div>`, pa.drill, 'approve'),
+    __pr23Tile('Exception transactions', `<span>${ex.total}</span>`, `${ex.invoiceExceptions} invoice exceptions · ${ex.matchOverrides} match overrides · ${ex.policyBlocks} policy blocks`, ex.drill, 'alert'),
+    __pr23Tile('Cycle time', `<span>${__pr23Days(ct.total)}</span>`, `Requisition to issued order, ${ct.sample} completed: approval ${__pr23Days(ct.toApproval)} · sourcing ${__pr23Days(ct.toSourcing)} · order ${__pr23Days(ct.toOrder)} · issue ${__pr23Days(ct.toIssue)}`, ct.drill, 'clock'),
+    __pr23Tile('Vendor concentration', `<span>${vc.top3Pct == null ? '—' : vc.top3Pct + '%'}</span>`, `of spend with the top 3 of ${vc.suppliers} suppliers · top 1: ${vc.top1Pct}% · top 5: ${vc.top5Pct}% · HHI ${vc.herfindahl}<br><span class="muted">${__pr23Esc(vc.basis)}</span>`, vc.drill, 'vendor'),
+  ];
+  const money = (row) => __pr23Amt(row.value, data.tiles.totalProcurementValue.targetCurrency, 0);
+  const spendChart = (ch, axisTitle) => __pr23ChartBars((ch.data || []).map(x => ({ label: x.label, value: x.value, drill: x.drill, flag: x.hasUnconverted, byCurrency: x.byCurrency })), {
+    title: ch.title, axisTitle, note: 'Converted with the stated rates; an asterisk marks a bar that leaves out spend with no rate', fmt: v => __pr23Short(v),
+    tip: r => `${__pr23Amt(r.value, v.targetCurrency, 2)} — ${Object.entries(r.byCurrency || {}).map(([k, x]) => `${k} ${__pr23Amt(x.amount, k, 0)}`).join(', ')}`,
+    empty: 'No orders in this period.',
+  });
+  void money;
+  const split = c.sourcingMethodSplit;
+  const charts = [
+    spendChart(c.spendByCategory, `Spend (${v.targetCurrency})`),
+    spendChart(c.spendByDepartment, `Spend (${v.targetCurrency})`),
+    spendChart(c.spendBySupplier, `Spend (${v.targetCurrency})`),
+    __pr23ChartDonut((split.data || []).map(x => ({ label: x.label, value: x.value, drill: x.drill })), { title: 'Sourcing method split', unit: 'events', empty: 'No sourcing events in this period.' }),
+  ];
+  return `<div class="grid kpis pr23-tiles">${tiles.join('')}</div><div class="grid two pr23-charts">${charts.map(x => `<section class="card"><div class="card-body">${x}</div></section>`).join('')}</div>`;
+}
+
+function __pr23DashMineHtml(me) {
+  const m = me.mine;
+  const st = m.requisitions || {};
+  const labels = { DRAFT: 'Draft', SUBMITTED: 'Submitted', PENDING_APPROVAL: 'Under review', RETURNED: 'Returned', REJECTED: 'Rejected', APPROVED: 'Approved', RFQ_SENT: 'Converted to sourcing', CONVERTED_TO_PO: 'Converted to sourcing', CANCELLED: 'Cancelled', CLOSED: 'Closed' };
+  const tiles = [
+    __pr23Tile('My requisitions', `<span>${m.requisitionsTotal}</span>`, `${m.drafts} draft · ${m.returned} returned for amendment`, null, 'requisition', 'requisitions'),
+    __pr23Tile('Awaiting my approval', `<span>${m.approvalsAwaitingMe}</span>`, 'Decisions waiting on you', null, 'approve', 'approvals'),
+    __pr23Tile('Evaluations to score', `<span>${m.evaluationsAwaitingMe}</span>`, 'Sourcing events where your scorecard is outstanding', null, 'evaluation', 'evaluation'),
+    __pr23Tile('My open orders', `<span>${m.myOpenOrders}</span>`, 'Purchase orders you raised that are not yet issued', null, 'order', 'orders'),
+  ];
+  const chart = __pr23ChartBars(Object.entries(st).map(([k, n]) => ({ label: labels[k] || k, value: n })), { title: 'My requisitions by status', fmt: v => String(v), axisTitle: 'Number of requisitions', empty: 'You have not raised a requisition yet.' });
+  return `<div class="grid kpis pr23-tiles">${tiles.join('')}</div><section class="card"><div class="card-body">${chart}</div></section>`;
+}
+
+function __pr23DashboardLive() {
+  const ins = __pr23Ins();
+  const d = ins.dash;
+  setTimeout(() => { if (!d.loading && (!d.me || d.key !== `${d.view}|${JSON.stringify(__pr23DashQuery(d))}` || (d.view !== 'mine' && d.loadedKey !== d.key && !d.error))) __pr23DashLoad(false); }, 0);
+  const views = d.me ? d.me.views : [];
+  const tabs = views.length > 1 ? `<div class="settings-tabs-v5 pr23-dash-tabs" style="margin-bottom:14px">${views.map(v => `<button class="tab ${d.view === v ? 'active' : ''}" data-act23="dash-view" data-view="${v}">${__PR23_VIEW_LABEL[v]} dashboard</button>`).join('')}</div>` : '';
+  const key = `${d.view}|${JSON.stringify(__pr23DashQuery(d))}`;
+  const data = d.data[key];
+  let body;
+  if (d.error) body = `<div class="notice"><div><strong>The dashboard could not be loaded</strong><p>${__pr23Esc(d.error)}</p></div></div><div style="margin-top:10px"><button class="btn primary" data-act23="dash-retry">Try again</button></div>`;
+  else if (d.view === 'mine' && d.me) body = __pr23DashMineHtml(d.me);
+  else if (!data) body = '<p class="muted" style="padding:18px">Loading the dashboard…</p>';
+  else body = (d.view === 'executive' ? __pr23DashExecutiveHtml(data) : __pr23DashProcurementHtml(data));
+  const period = data && data.period ? `<span class="muted">${__pr23Esc(data.period.from)} to ${__pr23Esc(data.period.to)}${data.generatedAt ? ` · as at ${__pr23Esc(__pr23DateTime(data.generatedAt))}` : ''}</span>` : '';
+  const title = d.view === 'executive' ? 'Executive dashboard' : d.view === 'mine' ? 'My procurement work' : 'Command Centre';
+  const desc = d.view === 'executive' ? 'Organisation-wide procurement value, volume, cycle time, exceptions and supplier concentration.' : d.view === 'mine' ? 'Your requisitions, the decisions waiting on you and the evaluations you sit on.' : 'Requisitions, approvals, sourcing, orders, compliance and spend, live from the records.';
+  return `<div class="page">${pageHead('Procurement operations', title, desc, `<button class="btn" data-act23="dash-retry">${icon('refresh')}Refresh</button>`)}${tabs}${d.view === 'mine' ? '' : __pr23DashFilters(d, d.view)}${d.view === 'mine' ? '' : `<div style="margin:0 0 12px">${period}${d.loading ? ' <span class="muted">· refreshing…</span>' : ''}</div>`}${body}</div>`;
+}
+
+// ---------------------------------------------------------------- reports (SRD §37)
+
+const __PR23_REPORT_FILTER_LABEL = { department: 'Department', supplier: 'Supplier', category: 'Category', currency: 'Currency', status: 'Status' };
+
+function __pr23RepLoadList() {
+  const api = __pr23InsApi();
+  const r = __pr23Ins().rep;
+  if (!api || r.loadingList || r.list) return;
+  r.loadingList = true; r.error = null;
+  api.reports()
+    .then(list => { r.list = list; if (!r.sel && list.length) r.sel = list[0].key; })
+    .catch(e => { r.error = __pr23InsMsg(e); })
+    .finally(() => { r.loadingList = false; if (r.list && !r.data) __pr23RepRun(false); else __pr23InsRedraw('reports'); });
+}
+function __pr23RepRun(force) {
+  const api = __pr23InsApi();
+  const r = __pr23Ins().rep;
+  if (!api || !r.sel) return;
+  const key = JSON.stringify([r.sel, r.filters, r.page, r.pageSize, r.convertTo]);
+  if (!force && r.loadedKey === key && r.data) return;
+  r.loading = true; r.error = null; r.key = key;
+  __pr23InsRedraw('reports');
+  api.report(r.sel, r.filters, r.page, r.pageSize, r.convertTo)
+    .then(res => { if (r.key === key) { r.data = res; r.loadedKey = key; } })
+    .catch(e => { if (r.key === key) { r.error = __pr23InsMsg(e); r.data = null; } })
+    .finally(() => { if (r.key === key) r.loading = false; __pr23InsRedraw('reports'); });
+}
+
+function __pr23RepCell(col, v) {
+  if (v == null || v === '') return '<span class="muted">—</span>';
+  if (col.type === 'money') return `<span class="money">${Number(v).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>`;
+  if (col.type === 'percent') return `${Number(v).toLocaleString('en-US', { maximumFractionDigits: 1 })}%`;
+  if (col.type === 'number') return Number(v).toLocaleString('en-US');
+  if (col.type === 'date') return __pr23Esc(String(v).slice(0, 10));
+  if (col.type === 'datetime') return __pr23Esc(String(v).replace('T', ' ').slice(0, 16));
+  return __pr23Esc(v);
+}
+
+function __pr23ReportTotalsHtml(rep) {
+  const m = rep.summary && rep.summary.money;
+  if (!m) return '';
+  const others = rep.summary.otherMoney ? Object.entries(rep.summary.otherMoney).map(([k, per]) => {
+    const label = (rep.columns.find(c => c.key === k) || {}).label || k;
+    return `<div><span class="muted">${__pr23Esc(label)}</span> ${Object.entries(per).map(([c, a]) => `<span class="pr23-cur-code">${__pr23Esc(c === 'UNSPECIFIED' ? 'No currency' : c)}</span> <strong>${__pr23Amt(a, c)}</strong>`).join(' · ')}</div>`;
+  }).join('') : '';
+  return `<div class="pr23-report-totals"><strong>Totals</strong><div class="muted" style="margin-bottom:6px">Each currency is totalled on its own and never added to another.</div><div class="pr23-money-stack">${__pr23ByCurrencyHtml(m.byCurrency)}</div>${others}${__pr23ConvertedHtml(m)}</div>`;
+}
+
+function __pr23ReportsPageLive() {
+  const ins = __pr23Ins();
+  const r = ins.rep;
+  if (!__pr23Can('reports.view')) return `<div class="page">${pageHead('Reporting', 'Procurement Reports', 'Registers, spend analysis and controls.', '')}${__pr23NoData('Reports are not available to your role.')}</div>`;
+  setTimeout(() => { if (!r.list && !r.loadingList && !r.error) __pr23RepLoadList(); else if (r.list && r.sel && !r.loading && r.loadedKey !== JSON.stringify([r.sel, r.filters, r.page, r.pageSize, r.convertTo]) && !r.error) __pr23RepRun(false); }, 0);
+  const canExport = __pr23Can('reports.export');
+  const opt = (v, t, cur) => `<option value="${__pr23Esc(v)}"${String(cur) === String(v) ? ' selected' : ''}>${__pr23Esc(t)}</option>`;
+  const list = r.list || [];
+  const def = list.find(x => x.key === r.sel);
+  const picker = list.length ? `<div class="pr23-report-list" role="tablist" aria-label="Reports">${list.map(x => `<button class="pr23-report-item${x.key === r.sel ? ' active' : ''}" data-act23="rep-select" data-key="${__pr23Esc(x.key)}" title="${__pr23Esc(x.description)}"><strong>${__pr23Esc(x.name)}</strong><span>${__pr23Esc(x.description)}</span></button>`).join('')}</div>` : '';
+  let filters = '';
+  if (def) {
+    const f = r.filters || {};
+    const fx = (__pr23Live() || {}).currencies || [];
+    const depts = (__pr23Live() || {}).departments || [];
+    const has = n => def.filters.includes(n);
+    filters = `<div class="table-tools pr23-report-filters" id="pr23RepFilters">
+      ${has('date') ? `<label class="pr23-audit-date">From <input type="date" data-rep23="from" value="${__pr23Esc(f.from || '')}"></label><label class="pr23-audit-date">To <input type="date" data-rep23="to" value="${__pr23Esc(f.to || '')}"></label>` : ''}
+      ${has('department') ? `<label>Department <select data-rep23="department"><option value="">All departments</option>${depts.map(x => opt(x, x, f.department)).join('')}</select></label>` : ''}
+      ${has('supplier') ? `<label>Supplier <input type="search" data-rep23="supplier" placeholder="Name contains" value="${__pr23Esc(f.supplier || '')}"></label>` : ''}
+      ${has('category') ? `<label>Category <input type="search" data-rep23="category" placeholder="Category" value="${__pr23Esc(f.category || '')}"></label>` : ''}
+      ${has('currency') ? `<label>Currency <select data-rep23="currency"><option value="">All currencies</option>${fx.map(c => opt(c.code, c.code, f.currency)).join('')}</select></label>` : ''}
+      ${has('status') ? `<label>Status <input type="search" data-rep23="status" placeholder="Status" value="${__pr23Esc(f.status || '')}"></label>` : ''}
+      ${def.hasMoney ? `<label>Convert into <select data-rep23="convertTo"><option value="">Reporting currency</option>${fx.map(c => opt(c.code, c.code, r.convertTo)).join('')}</select></label>` : ''}
+      <button class="btn primary" data-act23="rep-apply">${icon('filter')}Apply</button><button class="btn" data-act23="rep-reset">Reset</button></div>`;
+  }
+  let result;
+  if (r.error) result = `<div class="notice"><div><strong>The report could not be produced</strong><p>${__pr23Esc(r.error)}</p></div></div><div style="margin-top:10px"><button class="btn primary" data-act23="rep-retry">Try again</button></div>`;
+  else if (!r.data || r.loading && !r.data) result = '<p class="muted" style="padding:18px">Running the report…</p>';
+  else {
+    const rep = r.data;
+    const pageCount = Math.max(1, Math.ceil(rep.total / rep.pageSize));
+    const head = rep.columns.map(c => `<th${['money', 'number', 'percent'].includes(c.type) ? ' style="text-align:right"' : ''}>${__pr23Esc(c.label)}</th>`).join('');
+    const noWrap = c => (['money', 'number', 'percent', 'date', 'datetime'].includes(c.type) ? ' style="white-space:nowrap' + (['money', 'number', 'percent'].includes(c.type) ? ';text-align:right' : '') + '"' : '');
+    const rows = rep.rows.map(row => `<tr>${rep.columns.map(c => `<td${noWrap(c)}>${__pr23RepCell(c, row[c.key])}</td>`).join('')}</tr>`).join('');
+    const applied = Object.entries(rep.filters || {}).map(([k, v]) => `${k}: ${v}`).join(' · ');
+    const sizes = [10, 25, 50, 100, 200].map(n => opt(n, `${n} per page`, r.pageSize)).join('');
+    const from = rep.total ? (rep.page - 1) * rep.pageSize + 1 : 0;
+    const to = Math.min(rep.total, rep.page * rep.pageSize);
+    result = `${r.loading ? '<div class="muted" style="padding:0 0 6px">Refreshing…</div>' : ''}
+      <div class="table-tools" style="justify-content:space-between"><span class="muted">${rep.total.toLocaleString('en-GB')} row${rep.total === 1 ? '' : 's'}${applied ? ` · ${__pr23Esc(applied)}` : ' · no filters'} · run ${__pr23Esc(__pr23DateTime(rep.generatedAt))}</span>
+        <div class="actions">${canExport ? ['pdf', 'xlsx', 'csv'].map(f => `<button class="btn" data-act23="rep-export" data-format="${f}">${icon('download')}${f.toUpperCase()}</button>`).join('') : '<span class="muted">Export is not available to your role</span>'}</div></div>
+      ${rep.rows.length ? `<div class="table-wrap"><table data-no-page="1"><thead><tr>${head}</tr></thead><tbody>${rows}</tbody></table></div>` : __pr23NoData('No records match these filters.')}
+      <div class="table-tools" style="justify-content:space-between;margin-top:10px"><span class="muted">Showing ${from}–${to} of ${rep.total.toLocaleString('en-GB')} · Page ${rep.page} of ${pageCount}</span>
+        <div class="actions"><select data-rep23="pageSize" aria-label="Rows per page">${sizes}</select>
+          <button class="btn small" data-act23="rep-page" data-to="first"${rep.page === 1 ? ' disabled' : ''}>First</button><button class="btn small" data-act23="rep-page" data-to="prev"${rep.page === 1 ? ' disabled' : ''}>Previous</button>
+          <button class="btn small" data-act23="rep-page" data-to="next"${rep.page >= pageCount ? ' disabled' : ''}>Next</button><button class="btn small" data-act23="rep-page" data-to="last"${rep.page >= pageCount ? ' disabled' : ''}>Last</button></div></div>
+      ${__pr23ReportTotalsHtml(rep)}`;
+  }
+  const body = !list.length && !r.error ? '<p class="muted" style="padding:18px">Loading the reports…</p>' : `<div class="pr23-reports-layout">${picker}<div class="pr23-report-main">${def ? `<h3 style="margin:0 0 2px">${__pr23Esc(def.name)}</h3><p class="muted" style="margin:0 0 10px">${__pr23Esc(def.description)}</p>` : ''}${filters}${result}</div></div>`;
+  return `<div class="page">${pageHead('Reporting', 'Procurement Reports', 'Registers, spend analysis and control reports across requisitions, sourcing, orders, invoices and suppliers.', '')}${body}</div>`;
+}
+
+// ---------------------------------------------------------------- handlers: dashboards and reports
+
+function __pr23Read(sel) { const el = document.querySelector(sel); return el ? el.value : ''; }
+
+function __pr23DrillTo(reportKey, filters) {
+  window.__pr23FormReset = true;
+  const r = __pr23Ins().rep;
+  r.sel = reportKey;
+  const f = {};
+  for (const [k, v] of Object.entries(filters || {})) if (v != null && String(v).trim() !== '') f[k] = String(v);
+  r.filters = f;
+  r.page = 1; r.data = null; r.loadedKey = ''; r.error = null;
+  navigate('reports');
+}
+
+async function __pr23InsBusy(control, fn) {
+  if (control) { if (control.classList.contains('pr23-busy')) return; control.classList.add('pr23-busy'); }
+  try { return await fn(); } finally { if (control) control.classList.remove('pr23-busy'); }
+}
+
+__pr23On(document, 'click', event => {
+  const t = event.target && event.target.closest && event.target.closest('[data-act23]');
+  if (!t) return;
+  const act = t.dataset.act23;
+  const ins = __pr23Ins();
+  const d = ins.dash;
+  const r = ins.rep;
+  const stop = () => { event.preventDefault(); event.stopImmediatePropagation(); };
+  switch (act) {
+    case 'drill': { stop(); let f = {}; try { f = JSON.parse(t.dataset.filters || '{}'); } catch (_) { /* none */ } __pr23DrillTo(t.dataset.report, f); break; }
+    case 'dash-view': stop(); d.view = t.dataset.view; d.error = null; render(); break;
+    case 'dash-apply': {
+      stop();
+      d.preset = __pr23Read('[data-dash23="preset"]') || d.preset;
+      d.from = __pr23Read('[data-dash23="from"]'); d.to = __pr23Read('[data-dash23="to"]');
+      d.convertTo = __pr23Read('[data-dash23="convertTo"]');
+      if (d.preset === 'custom' && d.from && d.to && d.from > d.to) { toast('Check the dates', 'The From date is after the To date.'); break; }
+      d.error = null; d.loadedKey = ''; __pr23DashLoad(true); break;
+    }
+    case 'dash-reset': stop(); window.__pr23FormReset = true; Object.assign(d, { preset: '12m', from: '', to: '', convertTo: '', error: null, loadedKey: '' }); __pr23DashLoad(true); break;
+    case 'dash-retry': stop(); d.error = null; d.loadedKey = ''; __pr23DashLoad(true); break;
+    case 'rep-select': stop(); window.__pr23FormReset = true; r.sel = t.dataset.key; r.filters = {}; r.page = 1; r.data = null; r.loadedKey = ''; r.error = null; __pr23RepRun(true); break;
+    case 'rep-apply': {
+      stop();
+      const f = {};
+      document.querySelectorAll('[data-rep23]').forEach(el => { const k = el.dataset.rep23; if (['pageSize', 'convertTo'].includes(k)) return; if (String(el.value).trim()) f[k] = String(el.value).trim(); });
+      if (f.from && f.to && f.from > f.to) { toast('Check the dates', 'The From date is after the To date.'); break; }
+      r.filters = f; r.convertTo = __pr23Read('[data-rep23="convertTo"]'); r.page = 1; __pr23RepRun(true); break;
+    }
+    case 'rep-reset': stop(); window.__pr23FormReset = true; r.filters = {}; r.convertTo = ''; r.page = 1; __pr23RepRun(true); break;
+    case 'rep-retry': stop(); r.error = null; if (!r.list) __pr23RepLoadList(); else __pr23RepRun(true); break;
+    case 'rep-page': {
+      stop();
+      const rep = r.data; if (!rep || t.disabled) break;
+      const last = Math.max(1, Math.ceil(rep.total / rep.pageSize));
+      const to = t.dataset.to;
+      r.page = to === 'first' ? 1 : to === 'prev' ? Math.max(1, r.page - 1) : to === 'next' ? Math.min(last, r.page + 1) : last;
+      __pr23RepRun(true); break;
+    }
+    case 'rep-export': {
+      stop();
+      const api = __pr23InsApi();
+      if (!api) break;
+      __pr23InsBusy(t, () => api.exportReport(r.sel, t.dataset.format, r.data ? r.data.filters : r.filters, r.convertTo || undefined))
+        .then(name => { if (name) toast('Report exported', name); })
+        .catch(e => toast('Export failed', __pr23InsMsg(e)));
+      break;
+    }
+    default: break;
+  }
+}, true);
+
+__pr23On(document, 'change', event => {
+  const t = event.target;
+  if (!t || !t.dataset) return;
+  if (t.dataset.dash23 === 'preset') {
+    document.querySelectorAll('[data-dash23="from"],[data-dash23="to"]').forEach(el => { el.disabled = t.value !== 'custom'; });
+  }
+  if (t.dataset.rep23 === 'pageSize') { const r = __pr23Ins().rep; r.pageSize = Number(t.value) || 25; r.page = 1; __pr23RepRun(true); }
+}, true);
+
+// ---------------------------------------------------------------- Configuration tabs: numbering, currency, notifications (SRD §34, §38, §39)
+
+const __PR23_CFG_LOADERS = {
+  numbering: api => api.numbering(),
+  fx: api => api.fx(),
+  rates: api => api.rates(),
+  rules: api => api.rules(),
+};
+function __pr23CfgLoad(kinds, force) {
+  const api = __pr23InsApi();
+  const c = __pr23Ins().cfg;
+  if (!api) return;
+  kinds.forEach(k => {
+    // a load that failed is not repeated on every redraw: "Try again" reloads it
+    if (!__PR23_CFG_LOADERS[k] || c.loading[k] || (!force && (c[k] || c.errors[k]))) return;
+    c.loading[k] = true; c.errors[k] = null;
+    __PR23_CFG_LOADERS[k](api)
+      .then(v => { c[k] = v; })
+      .catch(e => { c.errors[k] = __pr23InsMsg(e); })
+      .finally(() => { c.loading[k] = false; __pr23InsRedraw('settings'); });
+  });
+}
+function __pr23CfgNotice(kind) {
+  const c = __pr23Ins().cfg;
+  return c.errors[kind] ? `<div class="notice"><div><strong>Could not load</strong><p>${__pr23Esc(c.errors[kind])}</p></div></div><div style="margin:8px 0"><button class="btn" data-act23="cfg-reload" data-kinds="${kind}">Try again</button></div>` : '';
+}
+function __pr23CfgCanEdit() { return __pr23Can('audit.view'); }
+
+/** What a number format produces next, worked out the way the server does it (for the example beside each format). */
+function __pr23NumberExample(format, n) {
+  const d = new Date();
+  return String(format || '').replace(/\{YYYY\}/gi, String(d.getUTCFullYear())).replace(/\{MM\}/gi, String(d.getUTCMonth() + 1).padStart(2, '0')).replace(/\{DD\}/gi, String(d.getUTCDate()).padStart(2, '0')).replace(/\{(#+)\}/g, (_m, h) => String(n || 1).padStart(h.length, '0'));
+}
+function __pr23NumberProblem(format) {
+  if (!/\{#{1,12}\}/.test(format)) return 'Include a counter such as {######}.';
+  if ((format.match(/\{#+\}/g) || []).length > 1) return 'Only one counter is allowed.';
+  const rest = format.replace(/\{(YYYY|MM|DD)\}/gi, '').replace(/\{#+\}/g, '');
+  if (/[{}]/.test(rest)) return 'Only {YYYY}, {MM}, {DD} and one {###…} counter are supported.';
+  if (format.length > 64) return 'Too long (64 characters at most).';
+  if (!/^[A-Za-z0-9_\-\/{}#]+$/.test(format)) return 'Use letters, digits, - _ / and the placeholders only.';
+  return '';
+}
+
+function __pr23NumberingTabHtml() {
+  __pr23CfgLoad(['numbering']);
+  const c = __pr23Ins().cfg;
+  const edit = __pr23CfgCanEdit();
+  if (c.errors.numbering) return __pr23CfgNotice('numbering');
+  if (!c.numbering) return '<p class="muted" style="padding:18px">Loading the numbering formats…</p>';
+  const rows = c.numbering.map(n => `<tr data-num-row="${__pr23Esc(n.key)}"><td><strong>${__pr23Esc(n.label)}</strong></td>
+    <td>${edit ? `<input data-num23="${__pr23Esc(n.key)}" value="${__pr23Esc(n.format)}" style="min-width:260px;font-family:monospace" aria-label="${__pr23Esc(n.label)} format" maxlength="64">` : `<code>${__pr23Esc(n.format)}</code>`}<div class="pr23-field-error" data-num-error="${__pr23Esc(n.key)}" role="alert"></div></td>
+    <td data-num-example="${__pr23Esc(n.key)}"><code>${__pr23Esc(__pr23NumberExample(n.format, 1))}</code></td><td class="muted"><code>${__pr23Esc(n.defaultFormat)}</code></td></tr>`).join('');
+  return `${card('Reference numbers', 'Every reference the module issues follows one format. {YYYY} {MM} {DD} are the date and {####} the counter, padded to as many digits as there are #. The counter starts again when the date part changes. A new format applies to references issued from then on; existing references are never renumbered. The counter is one shared sequence, so two records created at the same instant never get the same number.',
+    `<div class="table-wrap"><table data-no-page="1"><thead><tr><th>Reference</th><th>Format</th><th>Example (first number)</th><th>Built-in format</th></tr></thead><tbody>${rows}</tbody></table></div>
+    ${edit ? `<div style="padding:12px 16px"><button class="btn primary" data-act23="num-save">${icon('approve')}Save formats</button> <button class="btn" data-act23="num-reset">Use the built-in formats</button></div>` : '<p class="muted" style="padding:12px 16px">Your role can read the formats but not change them.</p>'}`)}`;
+}
+
+function __pr23CurrencyTabHtml() {
+  __pr23CfgLoad(['fx', 'rates']);
+  const c = __pr23Ins().cfg;
+  const edit = __pr23CfgCanEdit();
+  if (c.errors.fx) return __pr23CfgNotice('fx');
+  if (!c.fx) return '<p class="muted" style="padding:18px">Loading the currency settings…</p>';
+  const s = c.fx.settings;
+  const opt = (v, t, cur) => `<option value="${__pr23Esc(v)}"${String(cur) === String(v) ? ' selected' : ''}>${__pr23Esc(t)}</option>`;
+  const cur = c.fx.currencies || [];
+  const settings = card('Reporting currency and exchange rates', 'Every transaction keeps its own currency. Totals over records in different currencies are shown per currency, and converted into the reporting currency only through a rate below, with the rate, its date and its source shown beside the figure. With no usable rate, the amount is left out of the converted total and listed as not converted.',
+    `<form id="pr23FxForm" onsubmit="return false" class="dense-form-grid" style="padding:14px 16px">
+      <div class="field"><label>Reporting currency</label><select name="reportingCurrency"${edit ? '' : ' disabled'}>${cur.map(x => opt(x.code, `${x.code} · ${x.name}`, s.reportingCurrency)).join('')}</select></div>
+      <div class="field"><label>Where rates come from</label><select name="source"${edit ? '' : ' disabled'}>${opt('TABLE', 'The rate table below (entered by hand)', s.source)}${opt('URL', 'A rate service (URL), falling back to the table', s.source)}</select></div>
+      <div class="field span2" data-fx-url${s.source === 'URL' ? '' : ' hidden'}><label>Rate service URL</label><input name="sourceUrl" value="${__pr23Esc(s.sourceUrl || '')}" placeholder="https://rates.example.com/{date}?from={from}&to={to}"${edit ? '' : ' disabled'}><small class="muted">{date} {from} {to} are filled in. The answer must carry a "rate", or "rates" by currency code.</small></div>
+      <div class="field"><label>Oldest rate that may be used (days)</label><input name="maxAgeDays" type="number" min="0" max="3650" step="1" value="${__pr23Esc(s.maxAgeDays)}"${edit ? '' : ' disabled'}></div>
+      ${edit ? `<div class="field span2"><button class="btn primary" data-act23="fx-save">${icon('approve')}Save currency settings</button></div>` : ''}
+    </form>`);
+  const rates = c.rates || [];
+  const rateRows = rates.map(r => `<tr><td>${__pr23Esc(r.date)}</td><td><strong>${__pr23Esc(r.from)}</strong> → <strong>${__pr23Esc(r.to)}</strong></td><td class="money">${__pr23Esc(Number(r.rate).toFixed(6).replace(/0+$/, '').replace(/\.$/, ''))}</td><td>${__pr23Chip(String(r.source || 'TABLE').toLowerCase(), r.source === 'URL' ? 'blue' : 'gray')}</td>${edit ? `<td><button class="btn small danger" data-act23="rate-delete" data-id="${__pr23Esc(r.id)}">Remove</button></td>` : ''}</tr>`).join('');
+  const today = new Date().toISOString().slice(0, 10);
+  const add = edit ? `<form id="pr23RateForm" onsubmit="return false" class="table-tools" style="padding:12px 16px;align-items:flex-end;gap:10px;flex-wrap:wrap">
+      <label>From <select name="from">${cur.map(x => opt(x.code, x.code, '')).join('')}</select></label>
+      <label>To <select name="to">${cur.map(x => opt(x.code, x.code, s.reportingCurrency)).join('')}</select></label>
+      <label>Rate <input name="rate" type="number" min="0" step="any" placeholder="1 unit of From equals …" style="width:180px"></label>
+      <label>Date <input name="date" type="date" value="${today}"></label>
+      <button class="btn primary" data-act23="rate-save">${icon('plus')}Add rate</button></form>` : '';
+  const ratesCard = card('Rate table', 'The most recent rate on or before the transaction date is used; the inverse rate is used when only the opposite direction is on file.',
+    `${add}${c.errors.rates ? __pr23CfgNotice('rates') : c.rates ? `<div class="table-wrap"><table><thead><tr><th>Date</th><th>Pair</th><th>Rate</th><th>Source</th>${edit ? '<th></th>' : ''}</tr></thead><tbody>${rateRows || `<tr><td colspan="${edit ? 5 : 4}" class="muted" style="text-align:center;padding:18px">No exchange rate has been entered. Amounts in a currency other than the reporting currency are shown separately until one is.</td></tr>`}</tbody></table></div>` : '<p class="muted" style="padding:18px">Loading the rates…</p>'}`);
+  return settings + ratesCard;
+}
+
+const __PR23_LOG_STATUS = { SENT: 'green', BLOCKED: 'amber', FAILED: 'red', SKIPPED: 'gray', DISABLED: 'gray' };
+
+function __pr23NotificationsTabHtml() {
+  __pr23CfgLoad(['rules']);
+  const c = __pr23Ins().cfg;
+  const edit = __pr23CfgCanEdit();
+  if (c.errors.rules) return __pr23CfgNotice('rules');
+  if (!c.rules) return '<p class="muted" style="padding:18px">Loading the notification rules…</p>';
+  const rows = c.rules.map(r => {
+    const params = Object.entries(r.paramLabels || {}).map(([k, label]) => `<label style="display:block;font-size:12px">${__pr23Esc(label)} <input type="number" min="0" max="3650" step="1" data-rule-param="${__pr23Esc(r.key)}:${__pr23Esc(k)}" value="${__pr23Esc((r.params || {})[k])}" style="width:74px"${edit ? '' : ' disabled'}></label>`).join('');
+    const sw = (field, label) => `<label class="pr23-switch" title="${__pr23Esc(label)}"><input type="checkbox" data-rule="${__pr23Esc(r.key)}:${field}"${r[field] ? ' checked' : ''}${edit ? '' : ' disabled'} aria-label="${__pr23Esc(r.label)}: ${__pr23Esc(label)}"><span></span></label>`;
+    return `<tr data-rule-row="${__pr23Esc(r.key)}"><td><strong>${__pr23Esc(r.label)}</strong></td><td class="muted">${__pr23Esc(r.audience)}</td><td>${sw('enabled', 'Send this notification')}</td><td>${sw('inApp', 'In the app')}</td><td>${sw('email', 'By email')}</td><td>${params || '<span class="muted">—</span>'}</td></tr>`;
+  }).join('');
+  const rules = card('Notification rules', 'One rule per event. Switching a rule off stops that notification, in the app and by email; the decision is recorded in the log below.',
+    `<div class="table-wrap"><table data-no-page="1"><thead><tr><th>Event</th><th>Who is told</th><th>Send</th><th>In app</th><th>Email</th><th>Timing</th></tr></thead><tbody>${rows}</tbody></table></div>
+    ${edit ? `<div style="padding:12px 16px"><button class="btn primary" data-act23="rules-save">${icon('approve')}Save rules</button> <button class="btn" data-act23="jobs-run">Run the timed checks now</button></div>` : '<p class="muted" style="padding:12px 16px">Your role can read the rules but not change them.</p>'}`);
+  return rules + __pr23NotificationLogHtml();
+}
+
+function __pr23NotificationLogLoad(force) {
+  const api = __pr23InsApi();
+  const c = __pr23Ins().cfg;
+  if (!api || c.loading.log) return;
+  const key = JSON.stringify([c.logFilter, c.logPage]);
+  if (!force && c.logKey === key && c.log) return;
+  c.logKey = key; c.loading.log = true; c.errors.log = null;
+  api.log({ ...c.logFilter, page: c.logPage, pageSize: 15 })
+    .then(v => { c.log = v; })
+    .catch(e => { c.errors.log = __pr23InsMsg(e); })
+    .finally(() => { c.loading.log = false; __pr23InsRedraw('settings'); });
+}
+function __pr23NotificationLogHtml() {
+  const c = __pr23Ins().cfg;
+  if (!__pr23Can('audit.view')) return '';
+  setTimeout(() => { if (!c.loading.log && c.logKey !== JSON.stringify([c.logFilter, c.logPage])) __pr23NotificationLogLoad(false); }, 0);
+  const opt = (v, t, cur) => `<option value="${__pr23Esc(v)}"${String(cur || '') === String(v) ? ' selected' : ''}>${__pr23Esc(t)}</option>`;
+  const events = (c.rules || []).map(r => opt(r.key, r.label, c.logFilter.event)).join('');
+  const filters = `<div class="table-tools" style="padding:12px 16px"><select data-log23="event" aria-label="Event"><option value="">All events</option>${events}</select>
+    <select data-log23="status" aria-label="What happened"><option value="">Any outcome</option>${Object.keys(__PR23_LOG_STATUS).map(s => opt(s, s.charAt(0) + s.slice(1).toLowerCase(), c.logFilter.status)).join('')}</select>
+    <select data-log23="channel" aria-label="Channel"><option value="">Any channel</option>${opt('IN_APP', 'In app', c.logFilter.channel)}${opt('EMAIL', 'Email', c.logFilter.channel)}</select>
+    <button class="btn" data-act23="log-apply">${icon('filter')}Apply</button><button class="btn" data-act23="log-reset">Reset</button></div>`;
+  let body;
+  if (c.errors.log) body = `<div class="notice" style="margin:12px 16px"><div><strong>The log could not be loaded</strong><p>${__pr23Esc(c.errors.log)}</p></div></div>`;
+  else if (!c.log) body = '<p class="muted" style="padding:18px">Loading the log…</p>';
+  else {
+    const l = c.log;
+    const label = key => ((c.rules || []).find(r => r.key === key) || {}).label || key;
+    const rows = l.items.map(x => `<tr><td style="white-space:nowrap">${__pr23Esc(__pr23DateTime(x.createdAt))}</td><td>${__pr23Esc(label(x.eventKey))}</td><td>${__pr23Esc(x.channel === 'ALL' ? 'Both' : x.channel === 'IN_APP' ? 'In app' : 'Email')}</td><td>${__pr23Esc(x.recipientEmail || '—')}</td><td>${__pr23Chip(x.status.charAt(0) + x.status.slice(1).toLowerCase(), __PR23_LOG_STATUS[x.status] || 'gray')}</td><td class="muted">${__pr23Esc(x.reason || '')}</td></tr>`).join('');
+    const pages = Math.max(1, Math.ceil(l.total / l.pageSize));
+    body = `${l.items.length ? `<div class="table-wrap"><table data-no-page="1"><thead><tr><th>When</th><th>Event</th><th>Channel</th><th>Recipient</th><th>Outcome</th><th>Note</th></tr></thead><tbody>${rows}</tbody></table></div>` : __pr23NoData('Nothing has been recorded for these filters.')}
+      <div class="table-tools" style="justify-content:space-between;padding:10px 16px"><span class="muted">${l.total.toLocaleString('en-GB')} entries · Page ${l.page} of ${pages}${c.loading.log ? ' · refreshing…' : ''}</span><div class="actions"><button class="btn small" data-act23="log-page" data-to="prev"${l.page <= 1 ? ' disabled' : ''}>Previous</button><button class="btn small" data-act23="log-page" data-to="next"${l.page >= pages ? ' disabled' : ''}>Next</button></div></div>`;
+  }
+  return card('Notification log', 'Every decision the dispatcher took: sent, held by the mail guard (outbound mail is blocked unless a redirect inbox is set), failed, skipped, or switched off.', filters + body);
+}
+
+// ---------------------------------------------------------------- handlers: configuration
+
+__pr23On(document, 'input', event => {
+  const t = event.target;
+  if (t && t.dataset && t.dataset.num23) {
+    const key = t.dataset.num23;
+    const problem = __pr23NumberProblem(t.value.trim());
+    const err = document.querySelector(`[data-num-error="${key}"]`);
+    if (err) err.textContent = problem;
+    const ex = document.querySelector(`[data-num-example="${key}"]`);
+    if (ex) ex.innerHTML = problem ? '<span class="muted">—</span>' : `<code>${__pr23Esc(__pr23NumberExample(t.value.trim(), 1))}</code>`;
+  }
+}, true);
+
+__pr23On(document, 'change', event => {
+  const t = event.target;
+  if (!t || !t.matches) return;
+  if (t.matches('#pr23FxForm [name="source"]')) { const box = document.querySelector('[data-fx-url]'); if (box) box.hidden = t.value !== 'URL'; }
+  if (t.dataset && t.dataset.log23) { const c = __pr23Ins().cfg; if (t.value) c.logFilter[t.dataset.log23] = t.value; else delete c.logFilter[t.dataset.log23]; }
+}, true);
+
+function __pr23CfgErr(control, title, e) { toast(title, __pr23InsMsg(e)); if (control) control.classList.remove('pr23-busy'); }
+
+__pr23On(document, 'click', event => {
+  const t = event.target && event.target.closest && event.target.closest('[data-act23]');
+  if (!t) return;
+  const act = t.dataset.act23;
+  const api = __pr23InsApi();
+  const c = __pr23Ins().cfg;
+  const stop = () => { event.preventDefault(); event.stopImmediatePropagation(); };
+  switch (act) {
+    case 'cfg-reload': stop(); __pr23CfgLoad((t.dataset.kinds || '').split(','), true); break;
+    case 'num-reset': { stop(); window.__pr23FormReset = true; (c.numbering || []).forEach(n => { const el = document.querySelector(`[data-num23="${n.key}"]`); if (el) { el.value = n.defaultFormat; el.dispatchEvent(new Event('input', { bubbles: true })); } }); break; }
+    case 'num-save': {
+      stop();
+      const formats = {};
+      let bad = null;
+      (c.numbering || []).forEach(n => { const el = document.querySelector(`[data-num23="${n.key}"]`); if (!el) return; const v = el.value.trim(); const p = __pr23NumberProblem(v); if (p && !bad) bad = `${n.label}: ${p}`; if (v !== n.format) formats[n.key] = v; });
+      if (bad) { toast('Check the formats', bad); break; }
+      if (!Object.keys(formats).length) { toast('Nothing to save', 'No format was changed.'); break; }
+      __pr23InsBusy(t, () => api.saveNumbering(formats)).then(v => { window.__pr23FormReset = true; c.numbering = v; toast('Formats saved', 'New references follow them from now on.'); __pr23InsRedraw('settings'); }).catch(e => toast('Formats not saved', __pr23InsMsg(e)));
+      break;
+    }
+    case 'fx-save': {
+      stop();
+      const f = document.querySelector('#pr23FxForm');
+      const v = n => (f.querySelector(`[name="${n}"]`) || {}).value;
+      const body = { reportingCurrency: v('reportingCurrency'), source: v('source'), sourceUrl: v('sourceUrl') || '', maxAgeDays: Number(v('maxAgeDays')) };
+      if (!Number.isInteger(body.maxAgeDays) || body.maxAgeDays < 0) { toast('Check the age', 'Give a whole number of days.'); break; }
+      __pr23InsBusy(t, () => api.saveFx(body)).then(s => { c.fx.settings = s; toast('Currency settings saved', `Reporting currency ${s.reportingCurrency}.`); __pr23InsRedraw('settings'); }).catch(e => toast('Settings not saved', __pr23InsMsg(e)));
+      break;
+    }
+    case 'rate-save': {
+      stop();
+      const f = document.querySelector('#pr23RateForm');
+      const v = n => (f.querySelector(`[name="${n}"]`) || {}).value;
+      const body = { from: v('from'), to: v('to'), rate: Number(v('rate')), date: v('date') };
+      if (body.from === body.to) { toast('Check the pair', 'Choose two different currencies.'); break; }
+      if (!(body.rate > 0)) { toast('Check the rate', 'The rate must be greater than zero.'); break; }
+      __pr23InsBusy(t, () => api.saveRate(body)).then(() => { toast('Rate saved', `${body.from} → ${body.to} on ${body.date}`); c.rates = null; __pr23CfgLoad(['rates'], true); }).catch(e => toast('Rate not saved', __pr23InsMsg(e)));
+      break;
+    }
+    case 'rate-delete': stop(); __pr23InsBusy(t, () => api.deleteRate(t.dataset.id)).then(() => { c.rates = null; __pr23CfgLoad(['rates'], true); }).catch(e => toast('Rate not removed', __pr23InsMsg(e))); break;
+    case 'rules-save': {
+      stop();
+      const patch = {};
+      document.querySelectorAll('[data-rule]').forEach(el => { const [key, field] = el.dataset.rule.split(':'); (patch[key] = patch[key] || {})[field] = el.checked; });
+      document.querySelectorAll('[data-rule-param]').forEach(el => { const [key, p] = el.dataset.ruleParam.split(':'); const n = Number(el.value); (patch[key] = patch[key] || {}).params = { ...((patch[key] || {}).params || {}), [p]: n }; });
+      for (const [k, v] of Object.entries(patch)) for (const n of Object.values(v.params || {})) if (!Number.isFinite(n) || n < 0 || n > 3650) { toast('Check the timing', `${(c.rules.find(r => r.key === k) || {}).label}: use a number between 0 and 3650.`); return; }
+      __pr23InsBusy(t, () => api.saveRules(patch)).then(v => { window.__pr23FormReset = true; c.rules = v; toast('Rules saved', 'They apply to the next notification.'); c.logKey = ''; __pr23InsRedraw('settings'); }).catch(e => toast('Rules not saved', __pr23InsMsg(e)));
+      break;
+    }
+    case 'jobs-run': stop(); __pr23InsBusy(t, () => fetchJobs()).catch(() => undefined); break;
+    case 'log-apply': stop(); c.logPage = 1; c.logKey = ''; __pr23NotificationLogLoad(true); break;
+    case 'log-reset': stop(); window.__pr23FormReset = true; c.logFilter = {}; c.logPage = 1; c.logKey = ''; __pr23NotificationLogLoad(true); break;
+    case 'log-page': stop(); if (t.disabled) break; c.logPage = Math.max(1, c.logPage + (t.dataset.to === 'next' ? 1 : -1)); __pr23NotificationLogLoad(true); break;
+    default: break;
+  }
+  function fetchJobs() {
+    return (window.__pr23Insights.runJobs ? window.__pr23Insights.runJobs() : Promise.reject(new Error('Not available')))
+      .then(r => { toast('Timed checks run', `Deadline notices ${(r.deadline || {}).sent || 0} · overdue evaluations ${(r.evaluationOverdue || {}).sent || 0} · escalations ${(r.escalation || {}).sent || 0}`); c.logKey = ''; __pr23NotificationLogLoad(true); })
+      .catch(e => toast('The checks did not run', __pr23InsMsg(e)));
+  }
+}, true);
+
+// ---------------------------------------------------------------- statuses and their lifecycle actions (SRD §40)
+
+function __pr23StatusesLoad() {
+  const api = __pr23InsApi();
+  const c = __pr23Ins().cfg;
+  if (!api || c.statuses || c.loading.statuses) return;
+  c.loading.statuses = true;
+  api.statuses().then(v => { c.statuses = v; }).catch(() => undefined).finally(() => { c.loading.statuses = false; });
+}
+/** Whether the status map lets a record go from `raw` to `to`. Until the map has loaded nothing is offered. */
+function __pr23Allowed(kind, raw, to) {
+  const s = (__pr23Ins().cfg.statuses || []).find(x => x.kind === kind);
+  return !!(s && (s.transitions[String(raw || '').toUpperCase()] || []).includes(to));
+}
+
+function __pr23LifeButton(label, life, id, kind) {
+  return `<button class="btn${kind ? ' ' + kind : ''}" data-act23="life" data-life="${life}" data-id="${__pr23Esc(id)}">${__pr23Esc(label)}</button>`;
+}
+/** The status actions this person may take on the record, and only those the status map allows from where it stands. */
+function __pr23LifecycleButtons(kind, rec) {
+  if (!__pr23Live() || !rec) return '';
+  __pr23StatusesLoad();
+  const raw = String(rec.rawStatus || '').toUpperCase();
+  const me = ((__pr23Live() || {}).access || {}).userId;
+  const out = [];
+  if (kind === 'requisition') {
+    const manager = __pr23Can('rfq.manage') || __pr23Can('orders.manage');
+    if (__pr23Allowed('REQUISITION', raw, 'CANCELLED') && (rec.requestedById === me || manager)) out.push(__pr23LifeButton('Cancel requisition', 'cancel-requisition', rec.recordId, 'danger'));
+    if (__pr23Allowed('REQUISITION', raw, 'CLOSED') && manager) out.push(__pr23LifeButton('Close requisition', 'close-requisition', rec.recordId));
+  } else if (kind === 'tender') {
+    const m = __pr23Can('rfq.manage');
+    if (raw === 'DRAFT' && (__pr23Can('rfq.award') || m)) out.push(__pr23LifeButton('Approve', 'approve-rfq', rec.recordId, 'primary'));
+    if (['DRAFT', 'APPROVED'].includes(raw) && m) out.push(__pr23LifeButton('Publish and send invitations', 'publish-rfq', rec.recordId, 'primary'));
+    if (__pr23Allowed('RFQ', raw, 'CLOSED') && raw === 'OPEN' && m) out.push(__pr23LifeButton('Close now', 'close-rfq', rec.recordId));
+    if (__pr23Allowed('RFQ', raw, 'CANCELLED') && m) out.push(__pr23LifeButton('Cancel event', 'cancel-rfq', rec.recordId, 'danger'));
+  } else if (kind === 'po') {
+    const m = __pr23Can('orders.manage');
+    if (__pr23Allowed('PURCHASE_ORDER', raw, 'CANCELLED') && m) out.push(__pr23LifeButton('Cancel order', 'cancel-po', rec.recordId, 'danger'));
+    if (__pr23Allowed('PURCHASE_ORDER', raw, 'CLOSED') && m) out.push(__pr23LifeButton('Close order', 'close-po', rec.recordId));
+  }
+  return out.join('');
+}
+
+const __PR23_LIFE_TEXT = {
+  'cancel-requisition': { title: 'Cancel this requisition', ask: 'Why is it being cancelled?', done: 'Requisition cancelled', needsReason: true, danger: true, sure: 'Cancelled is final: the requisition cannot be reopened, edited or submitted again.' },
+  'close-requisition': { title: 'Close this requisition', ask: 'Note (optional)', done: 'Requisition closed', needsReason: false, sure: 'Closed is final: the requisition cannot be reopened or changed.' },
+  'cancel-rfq': { title: 'Cancel this sourcing event', ask: 'Why is it being cancelled?', done: 'Sourcing event cancelled', needsReason: true, danger: true, sure: 'Cancelled is final. Its requisition goes back to Approved so it can be sourced again.' },
+  'cancel-po': { title: 'Cancel this purchase order', ask: 'Why is it being cancelled?', done: 'Purchase order cancelled', needsReason: true, danger: true, sure: 'Cancelled is final. An order with goods received or an invoice against it cannot be cancelled.' },
+  'close-po': { title: 'Close this purchase order', ask: 'Note (optional)', done: 'Purchase order closed', needsReason: false, sure: 'Closed is final: nothing more can be received or invoiced against it.' },
+  'close-rfq': { title: 'Close this sourcing event now', ask: '', done: 'Sourcing event closed', needsReason: false, sure: 'Suppliers can no longer respond. It moves on to opening and evaluation.' },
+};
+
+function __pr23RunLife(control, life, id, reason) {
+  const api = __pr23InsApi();
+  if (!api) return;
+  const text = __PR23_LIFE_TEXT[life] || {};
+  const done = { 'approve-rfq': 'Sourcing event approved', 'publish-rfq': 'Sourcing event published' }[life] || text.done || 'Done';
+  __pr23InsBusy(control, () => api.lifecycle(life, id, reason))
+    .then(() => { if (typeof closeOverlay === 'function') closeOverlay(); toast(done, life === 'publish-rfq' ? 'Invitations have been sent.' : 'The change is recorded in the status history.'); if (api.reload) api.reload(); })
+    .catch(e => toast('Not changed', __pr23InsMsg(e)));
+}
+
+__pr23On(document, 'click', event => {
+  const t = event.target && event.target.closest && event.target.closest('[data-act23="life"],[data-act23="life-confirm"]');
+  if (!t) return;
+  event.preventDefault(); event.stopImmediatePropagation();
+  const life = t.dataset.life;
+  if (t.dataset.act23 === 'life-confirm') {
+    const reason = (document.querySelector('#pr23LifeReason') || {}).value || '';
+    const cfg = __PR23_LIFE_TEXT[life] || {};
+    if (cfg.needsReason && !reason.trim()) { toast('Give a reason', 'It is kept with the record.'); return; }
+    __pr23RunLife(t, life, t.dataset.id, reason.trim());
+    return;
+  }
+  const cfg = __PR23_LIFE_TEXT[life];
+  if (!cfg) { __pr23RunLife(t, life, t.dataset.id); return; }
+  openModal(cfg.title, cfg.sure,
+    `<div class="notice" style="margin-bottom:12px"><div><strong>${cfg.danger ? 'This cannot be undone' : 'Are you sure?'}</strong><p>${__pr23Esc(cfg.sure)}</p></div></div>${cfg.ask ? `<div class="field full"><label>${__pr23Esc(cfg.ask)}</label><textarea id="pr23LifeReason" rows="3" maxlength="1000"${cfg.needsReason ? ' required' : ''}></textarea></div>` : ''}`,
+    btn('Keep it as it is', 'close-overlay') + `<button class="btn ${cfg.danger ? 'danger' : 'primary'}" data-act23="life-confirm" data-life="${life}" data-id="${__pr23Esc(t.dataset.id)}">${__pr23Esc(cfg.title)}</button>`);
+}, true);
+
+// ---------------------------------------------------------------- lists: search, filters, sorting, export (SRD §36)
+
+const __PR23_LIST_PAGES = {
+  requisitions: ['requisitions'], tenders: ['tenders'], quotations: ['tenders', 'quotationsLive'], orders: ['orders'], receiving: ['grns'],
+  invoices: ['invoices'], vendors: ['vendors'], contracts: ['contractsV6'], plan: ['plans', 'planItems'], approvals: ['approvalPromptsV6'],
+};
+const __PR23_DATE_KEYS = ['createdAt', 'orderDate', 'invoiceDate', 'closingAt', 'received', 'start', 'requiredDate', 'submittedAt', 'date', 'due'];
+function __pr23ListStore() { return window.__pr23ListStoreV23 || (window.__pr23ListStoreV23 = {}); }
+
+function __pr23RecDate(r) {
+  for (const k of __PR23_DATE_KEYS) {
+    const v = r[k];
+    if (!v || v === '—') continue;
+    const d = new Date(v);
+    if (!Number.isNaN(d.getTime())) return d.toISOString().slice(0, 10);
+  }
+  return '';
+}
+function __pr23RecAmount(r) {
+  for (const k of ['amount', 'value', 'total', 'budget', 'spend']) {
+    if (r[k] != null && r[k] !== '—' && Number.isFinite(Number(r[k]))) return Number(r[k]);
+  }
+  return null;
+}
+function __pr23RecFacet(r, name) {
+  const pick = (...keys) => { for (const k of keys) if (r[k] != null && String(r[k]).trim() && r[k] !== '—') return String(r[k]); return ''; };
+  if (name === 'status') return pick('status', 'stage');
+  if (name === 'department') return pick('department', 'entity');
+  if (name === 'category') return pick('category', 'spendCategory');
+  if (name === 'supplier') return pick('vendor', 'supplier', 'vendorName');
+  if (name === 'requester') return pick('owner', 'requester', 'receivedBy');
+  if (name === 'currency') return pick('currency');
+  return '';
+}
+function __pr23RecSearchText(r, rowText) {
+  const parts = [rowText || ''];
+  for (const [k, v] of Object.entries(r)) {
+    if (v == null || typeof v === 'object' || /^(id|recordId)$/.test(k) && false) continue;
+    parts.push(String(v));
+  }
+  if (Array.isArray(r.items)) parts.push(r.items.map(i => i && i.itemName).filter(Boolean).join(' '));
+  return parts.join(' ').toLowerCase();
+}
+function __pr23CellValue(text) {
+  const t = String(text || '').trim();
+  if (!t || t === '—') return { kind: 'empty' };
+  const n = Number(t.replace(/[^0-9.\-]/g, ''));
+  // a figure, with or without a currency symbol or code before or after it ("$1,500", "ZIG 26,000", "12%")
+  if (/^[A-Za-z$€£\s]{0,4}[-+]?[$€£]?\s*[\d,]+(\.\d+)?\s*[A-Za-z]{0,3}%?$/.test(t) && Number.isFinite(n)) return { kind: 'num', v: n };
+  if (/\d/.test(t) && /[A-Za-z]{3}|\d{4}-\d{2}-\d{2}/.test(t)) { const d = Date.parse(t); if (!Number.isNaN(d) && /\b(19|20)\d{2}\b/.test(t)) return { kind: 'date', v: d }; }
+  return { kind: 'text', v: t.toLowerCase() };
+}
+function __pr23CompareCells(a, b) {
+  if (a.kind === 'empty' && b.kind === 'empty') return 0;
+  if (a.kind === 'empty') return 1;
+  if (b.kind === 'empty') return -1;
+  if (a.kind === b.kind && a.kind !== 'text') return a.v - b.v;
+  return String(a.v).localeCompare(String(b.v), undefined, { numeric: true });
+}
+
+function __pr23ListToolbarHtml(key, st, facets, hasDate, hasAmount, shown, total, slim) {
+  const opt = (v, t, cur) => `<option value="${__pr23Esc(v)}"${String(cur || '') === String(v) ? ' selected' : ''}>${__pr23Esc(t)}</option>`;
+  // a filter list of more than sixty values is not a filter: the search box finds those
+  const sel = (name, label) => facets[name] && facets[name].length > 1 && facets[name].length <= 60 ? `<select data-lf="${name}" aria-label="${label}"><option value="">All ${label.toLowerCase()}</option>${facets[name].map(v => opt(v, v, st[name])).join('')}</select>` : '';
+  const active = Object.entries(st).some(([k, v]) => v && !['sortCol', 'sortDir'].includes(k));
+  if (slim) return `<div class="table-tools pr23-list-tools" data-list-key="${__pr23Esc(key)}"><button class="btn" data-act23="lf-export">${icon('download')}Export CSV</button><span class="muted pr23-lf-count" data-lf-count>${total} record${total === 1 ? '' : 's'}</span></div>`;
+  return `<div class="table-tools pr23-list-tools" data-list-key="${__pr23Esc(key)}">
+    <input type="search" data-lf="q" placeholder="Search reference, supplier, requester, department, category, status…" value="${__pr23Esc(st.q || '')}" aria-label="Search this list" style="min-width:280px;flex:1 1 280px">
+    ${sel('status', 'Statuses')}${sel('department', 'Departments')}${sel('category', 'Categories')}${sel('supplier', 'Suppliers')}${sel('requester', 'Requesters')}${sel('currency', 'Currencies')}
+    ${hasDate ? `<label class="pr23-audit-date">From <input type="date" data-lf="from" value="${__pr23Esc(st.from || '')}"></label><label class="pr23-audit-date">To <input type="date" data-lf="to" value="${__pr23Esc(st.to || '')}"></label>` : ''}
+    ${hasAmount ? `<label class="pr23-audit-date">Value from <input type="number" min="0" step="any" data-lf="min" value="${__pr23Esc(st.min || '')}" style="width:96px"></label><label class="pr23-audit-date">to <input type="number" min="0" step="any" data-lf="max" value="${__pr23Esc(st.max || '')}" style="width:96px"></label>` : ''}
+    <button class="btn" data-act23="lf-clear"${active ? '' : ' disabled'}>Clear filters</button>
+    <button class="btn" data-act23="lf-export">${icon('download')}Export CSV</button>
+    <span class="muted pr23-lf-count" data-lf-count>${shown === total ? `${total} record${total === 1 ? '' : 's'}` : `${shown} of ${total}`}</span></div>`;
+}
+
+function __pr23ListEnhance() {
+  if (!__pr23Live()) return;
+  const arrays = __PR23_LIST_PAGES[state.page];
+  const root = document.querySelector('#workspace');
+  if (!arrays || !root) return;
+  __pr23StatusesLoad();
+  const byId = new Map();
+  arrays.forEach(name => (state[name] || []).forEach(r => { if (r && r.id != null) byId.set(String(r.id), r); if (r && r.recordId) byId.set(String(r.recordId), r); }));
+  const store = __pr23ListStore();
+  [...root.querySelectorAll('table')].forEach((table, ti) => {
+    const body = table.tBodies[0];
+    if (!body || table.closest('.pr23-audit-table') || table.querySelector('[data-doc-row-v11]') || table.hasAttribute('data-no-page') || table.closest('.modal, .drawer, [role="dialog"]')) return;
+    const groups = [];
+    [...body.rows].forEach(r => {
+      if (r.classList.contains('pr23-empty-row')) return;
+      const spans = r.cells.length === 1 && Number(r.cells[0].colSpan) > 2;
+      if (spans && groups.length) groups[groups.length - 1].rows.push(r); else groups.push({ rows: [r], head: r });
+    });
+    if (!groups.length) return;
+    groups.forEach(g => {
+      const row = g.head;
+      // the record's reference is on the row (a data attribute) or in the first bold / link text that names one
+      const ids = [row.dataset.id, row.dataset.recordId, row.dataset.poIdV11, ...[...row.querySelectorAll('strong, .link, a')].slice(0, 5).map(e => e.textContent), row.cells[1] && row.cells[1].textContent, row.cells[0] && row.cells[0].textContent];
+      g.rec = null;
+      for (const c of ids) { const rec = c && byId.get(String(c).trim()); if (rec) { g.rec = rec; break; } }
+    });
+    const matched = groups.filter(g => g.rec).length;
+    // a table that is not a list of these records (a summary, a breakdown) gets no toolbar
+    if (matched < Math.max(1, Math.ceil(groups.length * 0.6))) return;
+    const key = `${state.page}#${ti}`;
+    const st = store[key] || (store[key] = { q: '' });
+    const facets = {};
+    ['status', 'department', 'category', 'supplier', 'requester', 'currency'].forEach(n => { facets[n] = [...new Set(groups.map(g => g.rec ? __pr23RecFacet(g.rec, n) : '').filter(Boolean))].sort((a, b) => a.localeCompare(b)); });
+    const hasDate = groups.some(g => g.rec && __pr23RecDate(g.rec));
+    const hasAmount = groups.some(g => g.rec && __pr23RecAmount(g.rec) != null);
+    groups.forEach(g => { g.text = g.rec ? __pr23RecSearchText(g.rec, g.head.textContent) : g.head.textContent.toLowerCase(); });
+    const anchor = table.closest('.table-wrap') || table;
+    const built = anchor.previousElementSibling;
+    if (built && built.classList.contains('pr23-list-tools') && built.__pr23Table === table && built.__pr23Count === groups.length) return;
+    // a decorative search/filter row that filters nothing is replaced by this one
+    const prev = anchor.previousElementSibling;
+    if (prev && prev.classList.contains('table-tools') && !prev.classList.contains('pr23-list-tools') && prev.querySelector('input:not([data-lf])') && ![...prev.querySelectorAll('input,select')].some(i => Object.keys(i.dataset).length)) prev.remove();
+    let bar = anchor.previousElementSibling && anchor.previousElementSibling.classList.contains('pr23-list-tools') ? anchor.previousElementSibling : null;
+    if (bar) bar.remove();
+    anchor.insertAdjacentHTML('beforebegin', __pr23ListToolbarHtml(key, st, facets, hasDate, hasAmount, groups.length, groups.length, state.page === 'vendors'));
+    bar = anchor.previousElementSibling;
+    bar.__pr23Groups = groups;
+    bar.__pr23Table = table;
+    bar.__pr23Count = groups.length;
+    __pr23ListSortHeaders(table, st);
+    __pr23ListApply(bar);
+    if (st.sortCol != null) __pr23ListSort(table, groups, st);
+  });
+}
+
+function __pr23ListApply(bar) {
+  if (!bar || !bar.__pr23Groups) return;
+  const st = __pr23ListStore()[bar.dataset.listKey];
+  const q = String(st.q || '').trim().toLowerCase();
+  const terms = q ? q.split(/\s+/) : [];
+  const min = st.min !== '' && st.min != null ? Number(st.min) : null;
+  const max = st.max !== '' && st.max != null ? Number(st.max) : null;
+  let shown = 0;
+  bar.__pr23Groups.forEach(g => {
+    const r = g.rec;
+    let ok = terms.every(t => g.text.includes(t));
+    if (ok && r) {
+      for (const n of ['status', 'department', 'category', 'supplier', 'requester', 'currency']) if (st[n] && __pr23RecFacet(r, n) !== st[n]) { ok = false; break; }
+      if (ok && (st.from || st.to)) { const d = __pr23RecDate(r); if (!d || (st.from && d < st.from) || (st.to && d > st.to)) ok = false; }
+      if (ok && (min != null || max != null)) { const a = __pr23RecAmount(r); if (a == null || (min != null && a < min) || (max != null && a > max)) ok = false; }
+    } else if (ok && !r && (st.status || st.department || st.category || st.supplier || st.requester || st.from || st.to || min != null || max != null)) ok = false;
+    g.rows.forEach(row => row.classList.toggle('pr23-lf-hide', !ok));
+    if (ok) shown += 1;
+  });
+  const count = bar.querySelector('[data-lf-count]');
+  if (count) count.textContent = shown === bar.__pr23Groups.length ? `${shown} record${shown === 1 ? '' : 's'}` : `${shown} of ${bar.__pr23Groups.length}`;
+  const clear = bar.querySelector('[data-act23="lf-clear"]');
+  if (clear) clear.disabled = !Object.entries(st).some(([k, v]) => v && !['sortCol', 'sortDir'].includes(k));
+  const table = bar.__pr23Table;
+  const empty = table.tBodies[0].querySelector('.pr23-lf-empty');
+  if (!shown && !empty) table.tBodies[0].insertAdjacentHTML('beforeend', `<tr class="pr23-lf-empty"><td colspan="${table.tHead ? table.tHead.rows[0].cells.length : 1}" class="muted" style="text-align:center;padding:18px">No record matches these filters.</td></tr>`);
+  if (shown && empty) empty.remove();
+  setTimeout(__pr23PaginateTables, 0);
+}
+
+function __pr23ListSortHeaders(table, st) {
+  if (!table.tHead) return;
+  [...table.tHead.rows[0].cells].forEach((th, i) => {
+    if (!th.textContent.trim() || th.querySelector('input')) return;
+    th.classList.add('pr23-sortable');
+    th.dataset.sortCol = String(i);
+    th.setAttribute('aria-sort', st.sortCol === i ? (st.sortDir === 'desc' ? 'descending' : 'ascending') : 'none');
+    th.title = 'Sort by this column';
+    th.querySelector('.pr23-sort-ind') || th.insertAdjacentHTML('beforeend', '<span class="pr23-sort-ind" aria-hidden="true"></span>');
+    th.querySelector('.pr23-sort-ind').textContent = st.sortCol === i ? (st.sortDir === 'desc' ? ' ▼' : ' ▲') : '';
+  });
+}
+function __pr23ListSort(table, groups, st) {
+  const body = table.tBodies[0];
+  const col = st.sortCol;
+  const dir = st.sortDir === 'desc' ? -1 : 1;
+  const keyed = groups.map((g, i) => ({ g, i, v: __pr23CellValue(g.head.cells[col] ? g.head.cells[col].textContent : '') }));
+  keyed.sort((a, b) => dir * __pr23CompareCells(a.v, b.v) || a.i - b.i);
+  const tail = body.querySelector('.pr23-lf-empty');
+  keyed.forEach(k => k.g.rows.forEach(r => body.insertBefore(r, tail)));
+}
+
+__pr23On(document, 'input', event => {
+  const t = event.target;
+  if (!t || !t.dataset || !t.dataset.lf) return;
+  const bar = t.closest('.pr23-list-tools');
+  if (!bar) return;
+  const st = __pr23ListStore()[bar.dataset.listKey];
+  if (!st) return;
+  st[t.dataset.lf] = t.value;
+  __pr23ListApply(bar);
+}, true);
+__pr23On(document, 'change', event => {
+  const t = event.target;
+  if (!t || !t.dataset || !t.dataset.lf || t.tagName === 'INPUT' && t.type === 'search') return;
+  const bar = t.closest('.pr23-list-tools');
+  if (!bar) return;
+  const st = __pr23ListStore()[bar.dataset.listKey];
+  if (!st) return;
+  st[t.dataset.lf] = t.value;
+  __pr23ListApply(bar);
+}, true);
+
+function __pr23CsvCell(v) { const s = String(v == null ? '' : v).replace(/\s+/g, ' ').trim(); return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; }
+
+__pr23On(document, 'click', event => {
+  const th = event.target && event.target.closest && event.target.closest('th.pr23-sortable');
+  if (th && !event.target.closest('button, a, input')) {
+    const table = th.closest('table');
+    const bar = table && table.closest('#workspace') && [...document.querySelectorAll('.pr23-list-tools')].find(b => b.__pr23Table === table);
+    if (bar) {
+      const st = __pr23ListStore()[bar.dataset.listKey];
+      const i = Number(th.dataset.sortCol);
+      if (st.sortCol === i) st.sortDir = st.sortDir === 'desc' ? 'asc' : 'desc'; else { st.sortCol = i; st.sortDir = 'asc'; }
+      __pr23ListSortHeaders(table, st);
+      __pr23ListSort(table, bar.__pr23Groups, st);
+      setTimeout(__pr23PaginateTables, 0);
+    }
+    return;
+  }
+  const t = event.target && event.target.closest && event.target.closest('[data-act23="lf-clear"],[data-act23="lf-export"]');
+  if (!t) return;
+  event.preventDefault(); event.stopImmediatePropagation();
+  const bar = t.closest('.pr23-list-tools');
+  const st = __pr23ListStore()[bar.dataset.listKey];
+  if (t.dataset.act23 === 'lf-clear') {
+    const keep = { sortCol: st.sortCol, sortDir: st.sortDir };
+    Object.keys(st).forEach(k => delete st[k]);
+    Object.assign(st, { q: '' }, keep);
+    bar.querySelectorAll('[data-lf]').forEach(el => { el.value = ''; });
+    __pr23ListApply(bar);
+    return;
+  }
+  const table = bar.__pr23Table;
+  const heads = [...table.tHead.rows[0].cells].map(c => c.textContent.replace(/[▲▼]/g, '').trim());
+  const keepCols = heads.map((h, i) => h && !/^(actions?)$/i.test(h) ? i : -1).filter(i => i >= 0);
+  const lines = [keepCols.map(i => __pr23CsvCell(heads[i])).join(',')];
+  bar.__pr23Groups.filter(g => !g.head.classList.contains('pr23-lf-hide') && !g.head.hidden).forEach(g => lines.push(keepCols.map(i => __pr23CsvCell(g.head.cells[i] ? g.head.cells[i].innerText : '')).join(',')));
+  const blob = new Blob(['﻿' + lines.join('\r\n') + '\r\n'], { type: 'text/csv;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `${state.page}-${new Date().toISOString().slice(0, 10)}.csv`;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+  toast('List exported', `${lines.length - 1} record${lines.length === 2 ? '' : 's'} in ${a.download}`);
+}, true);
 /* END_PROCUREMENT_LIVE_BRIDGE */
-function dashboardPage(){
+function dashboardPage(){if(__pr23Live())return __pr23DashboardLive();
  const approvals=__pr23Live()?(state.approvalPromptsV6||[]).length:state.requisitions.filter(x=>/Pending|review/i.test(x.status)).length;
  return `<div class="page">${pageHead('Procurement operations','Command Centre','Enterprise-wide procurement activity, annual plan execution, sourcing, fulfilment and accounting hand-offs.',btn('New record','new-menu','primary','plus')+btn('Activity','activity-menu','','more'))}${filterBar()}
  <div class="grid kpis">${kpi('Approved plan',money(8240000),'FY 2026 consolidated budget','plan','plan')}${kpi('Committed spend',money(5120000),'62.1% of approved plan','order','orders')}${kpi('Open tenders','8','5 require action this week','tender','tenders')}${kpi('Pending approvals',approvals,'Across PR, PO and awards','approve','approvals')}${kpi('Vendors','482','31 due for compliance review','vendor','vendors')}${kpi('AP exposure',money(2480000),'Approved and pending invoices','account','accounts')}</div>
  ${__pr23Live()?__pr23DashboardSrdHtml():''}<div class="grid two" style="margin-bottom:14px">${card('Plan, commitment and actual spend','Click any month to inspect entity, category and transaction detail',`<div class="card-body">${lineChart('spend-trend')}<div class="legend"><span><i style="background:#55536f"></i>Committed spend</span><span><i style="background:#11866f"></i>Actual spend</span></div></div>`,btn('View analysis','analytics','small'))}${card('Procurement cycle status','Interactive pipeline distribution',`<div class="card-body donut-wrap">${__pr23Live()?__pr23CycleDonutHtml():'<div class="donut chart-click" data-chart="cycle-status"><div class="donut-center"><strong>287</strong><span>active records</span></div></div>'}</div>`)}</div>
- <div class="grid three">${card('Spend by category','Share of managed spend',`<div class="card-body">${bars([['Technology',84],['Medical',73],['Agriculture',61],['Fleet',49],['Facilities',38]],'category-spend')}</div>`)}${card('My approval queue','Time-sensitive decisions',`<div class="card-body list">${__pr23Live()?__pr23MyQueueHtml():state.requisitions.slice(0,4).map(r=>`<div class="list-row" data-record="requisition" data-id="${r.id}"><div class="list-main"><strong>${r.title}</strong><span>${r.id} · ${r.entity} · ${money(r.amount)}</span></div>${status(r.status)}</div>`).join('')}</div>`)}${card('Control and system activity','Exceptions, documents and accounting hand-offs',`<div class="card-body list">${__pr23Live()?__pr23ControlActivity():`<div class="list-row" data-page="invoices"><div class="list-main"><strong>Invoice price variance</strong><span>INV-98430 blocked at 2.4%</span></div>${status('Blocked')}</div><div class="list-row" data-page="accounts"><div class="list-main"><strong>Asset transfer queue</strong><span>2 GRNs awaiting accounting classification</span></div>${status('Pending')}</div><div class="list-row" data-page="vendors"><div class="list-main"><strong>ITF263 expiry review</strong><span>31 vendors need updated tax clearance</span></div>${status('Review')}</div><div class="list-row" data-page="reports"><div class="list-main"><strong>ZPPB statutory report</strong><span>July dataset is ready to preview</span></div>${status('Ready')}</div>`}</div>`)}</div></div>`
+ <div class="grid three">${card('Spend by category','Share of managed spend',`<div class="card-body">${bars([['Technology',84],['Medical',73],['Agriculture',61],['Fleet',49],['Facilities',38]],'category-spend')}</div>`)}${card('My approval queue','Time-sensitive decisions',`<div class="card-body list">${__pr23Live()?__pr23MyQueueHtml():state.requisitions.slice(0,4).map(r=>`<div class="list-row" data-record="requisition" data-id="${r.id}"><div class="list-main"><strong>${r.title}</strong><span>${r.id} · ${r.entity} · ${money(r.amount,r.currency)}</span></div>${status(r.status)}</div>`).join('')}</div>`)}${card('Control and system activity','Exceptions, documents and accounting hand-offs',`<div class="card-body list">${__pr23Live()?__pr23ControlActivity():`<div class="list-row" data-page="invoices"><div class="list-main"><strong>Invoice price variance</strong><span>INV-98430 blocked at 2.4%</span></div>${status('Blocked')}</div><div class="list-row" data-page="accounts"><div class="list-main"><strong>Asset transfer queue</strong><span>2 GRNs awaiting accounting classification</span></div>${status('Pending')}</div><div class="list-row" data-page="vendors"><div class="list-main"><strong>ITF263 expiry review</strong><span>31 vendors need updated tax clearance</span></div>${status('Review')}</div><div class="list-row" data-page="reports"><div class="list-main"><strong>ZPPB statutory report</strong><span>July dataset is ready to preview</span></div>${status('Ready')}</div>`}</div>`)}</div></div>`
 }
 function planPage(){
  const planRows=state.plans.map(p=>`<tr data-record="plan" data-id="${p.id}"><td><strong class="link">${p.id}</strong><br><span class="muted">${p.name}</span></td><td>${p.entity}</td><td class="money">${money(p.budget)}</td><td class="money">${money(p.committed)}</td><td><div class="progress"><span style="width:${Math.min(100,p.committed/p.budget*100)}%"></span></div></td><td>${p.version}</td><td>${status(p.status)}</td><td><button class="btn small" data-action="plan-activity" data-id="${p.id}">${icon('more')}Activity</button></td></tr>`);
@@ -2911,20 +5808,20 @@ function planPage(){
  <div style="height:14px"></div>${card('Approved plan line items','Each item can become a requisition, RFQ or tender after approval',`${table(['Item','Requirement','Entity','Category','Quarter','Method','Budget','Status'],itemRows)}`)}</div>`
 }
 function requisitionsPage(){
- const rows=state.requisitions.map(r=>`<tr data-record="requisition" data-id="${r.id}"><td><strong class="link">${r.id}</strong></td><td>${r.title}</td><td>${r.type}</td><td>${r.entity}</td><td>${r.category}</td><td class="money">${money(r.amount)}</td>${__pr23Live()?'':`<td>${/Warning/.test(r.budget)?status(r.budget):`<span style="color:var(--green)">${r.budget}</span>`}</td>`}<td>${status(r.status)}</td><td>${r.owner}</td></tr>`);
+ const rows=state.requisitions.map(r=>`<tr data-record="requisition" data-id="${r.id}"><td><strong class="link">${r.id}</strong></td><td>${r.title}</td><td>${r.type}</td><td>${r.entity}</td><td>${r.category}</td><td class="money">${money(r.amount,r.currency)}</td>${__pr23Live()?'':`<td>${/Warning/.test(r.budget)?status(r.budget):`<span style="color:var(--green)">${r.budget}</span>`}</td>`}<td>${status(r.status)}</td><td>${r.owner}</td></tr>`);
  return `<div class="page">${pageHead('Demand intake','Purchase Requisitions','Internal departments, investees and subsidiaries submit controlled requests with line items, motivation documents, budget validation and approval routing.',btn('New requisition','create-requisition','primary','plus')+btn('Import CSV lines','import-pr'))}${filterBar()}
  <div class="grid kpis">${kpi('Open requisitions','14','4 external investee requests','requisition')}${kpi('Pending department head','6','Median wait 1.8 days','approve')}${kpi('Budget warnings','3','Requirements exceed remaining budget','account')}${kpi('Approved for sourcing','5','One-click PR to RFQ','tender')}${kpi('Returned drafts','2','Rejection reason mandatory','document')}${kpi('Department isolation','Active','Cost-centre visibility enforced','settings')}</div>
  ${card('Requisition register','Opaque IDs, departmental isolation, budget controls and attached motivation evidence',`<div class="table-tools"><input placeholder="Search requisitions"><select><option>Internal + external</option><option>Internal</option><option>Investee</option><option>Subsidiary</option></select><select><option>All cost centres</option><option>IT & Digital</option><option>Clinical Services</option><option>Farm Operations</option></select></div>${table(['PR number','Requirement','Source','Entity','Category','Estimate',...(__pr23Live()?[]:['Budget check']),'Status','Owner'],rows)}`)}</div>`
 }
 function tendersPage(){
- const rows=state.tenders.map(t=>`<tr data-record="tender" data-id="${t.id}"><td><strong class="link">${t.id}</strong></td><td>${t.title}</td><td>${t.entity}</td><td>${t.method}</td><td class="money">${money(t.value)}</td><td>${t.bids}</td><td>${t.close}</td><td>${status(t.stage)}</td><td><button class="btn small" data-action="tender-activity" data-id="${t.id}">${icon('more')}Activity</button></td></tr>`);
+ const rows=state.tenders.map(t=>`<tr data-record="tender" data-id="${t.id}"><td><strong class="link">${t.id}</strong></td><td>${t.title}</td><td>${t.entity}</td><td>${t.method}</td><td class="money">${money(t.value,t.currency)}</td><td>${t.bids}</td><td>${t.close}</td><td>${status(t.stage)}</td><td><button class="btn small" data-action="tender-activity" data-id="${t.id}">${icon('more')}Activity</button></td></tr>`);
  return `<div class="page">${pageHead('Competitive sourcing','Tenders & RFx','Create RFQs, RFPs and tenders; invite eligible vendors; manage clarifications, sealed submissions, opening and award progression.',btn('Create tender','create-tender','primary','plus')+btn('Invite vendors','invite-vendors','','mail'))}${filterBar()}
  <div class="grid kpis">${kpi('Active tenders','8','Across five sourcing stages','tender')}${kpi('Vendor invitations','146','Blacklisted vendors excluded','mail')}${kpi('Secure submissions','32','Timestamped and sealed','document')}${kpi('Closing this week','3','Committee reminders active','approve')}${kpi('Clarifications','11','All responses shared equally','document')}${kpi('Value in market',money(5205000),'Open sourcing exposure','account')}</div>
  ${card('Tender register','Select a tender for summary, secure vendor form, clarifications, opening committee and document trail',`<div class="table-tools"><input placeholder="Search tenders"><select><option>All methods</option><option>Open tender</option><option>Restricted tender</option><option>RFQ</option><option>RFP</option></select><select><option>All stages</option><option>Draft</option><option>Published</option><option>Evaluation</option></select></div>${table(['Tender','Description','Entity','Method','Estimate','Bids','Closing','Stage',''],rows)}`)}</div>`
 }
 function evaluationPage(){
  if(!state.evaluationTender){
-  const rows=state.tenders.filter(t=>t.bids>0&&(!__pr23Live()||t.stage==='Evaluation')).map(t=>`<tr data-action="open-evaluation" data-id="${t.id}"><td><strong class="link">${t.id}</strong></td><td>${t.title}</td><td>${t.entity}</td><td>${t.bids}</td><td>${t.close}</td><td>${status(t.stage)}</td><td><button class="btn small" data-action="open-evaluation" data-id="${t.id}">${icon('arrow')}Evaluate bids</button></td></tr>`);
+  const rows=state.tenders.filter(t=>t.bids>0&&(!__pr23Live()||['OPEN','CLOSED','UNDER_EVALUATION','AWAITING_APPROVAL'].includes(String(t.rawStatus||'').toUpperCase()))).map(t=>`<tr data-action="open-evaluation" data-id="${t.id}"><td><strong class="link">${t.id}</strong></td><td>${t.title}</td><td>${t.entity}</td><td>${t.bids}</td><td>${t.close}</td><td>${status(t.stage)}</td><td><button class="btn small" data-action="open-evaluation" data-id="${t.id}">${icon('arrow')}Evaluate bids</button></td></tr>`);
   return `<div class="page">${pageHead('Governed decisioning','Bid Evaluation','Select a tender first. The evaluation workspace opens only after a tender is chosen, preserving committee context and tender-specific criteria.',btn('Configure criteria','evaluation-settings')+btn('Export evaluation register','export-evaluations','','download'))}${filterBar()}<div class="grid kpis">${kpi('Awaiting evaluation','5','Qualified tenders with closed bids','evaluate')}${kpi('Committee sessions','3','Scheduled this week','approve')}${kpi('Declarations complete','96%','Conflict declarations received','audit')}${kpi('Technical threshold','70%','Default, configurable by tender','settings')}${kpi('Recommendations pending','2','Awaiting approval','approve')}${kpi('Evaluated value',money(3090000),'Current active evaluations','account')}</div>${card('Tenders ready for evaluation','Click a tender to open bid comparison, criteria scoring and recommendation controls',table(['Tender','Description','Entity','Bids','Closing','Stage',''],rows))}</div>`
  }
  const t=state.tenders.find(x=>x.id===state.evaluationTender)||state.tenders[0];
@@ -2945,19 +5842,19 @@ function vendorsPage(){
  ${card('Vendor master','Duplicate BP/VAT detection, mandatory banking fields, category filtering and immutable bank-change audit',`<div class="table-tools"><input placeholder="Search vendor, BP or VAT"><select><option>All categories</option><option>Technology</option><option>Medical</option><option>Fleet</option></select><select><option>All statuses</option><option>Prequalified</option><option>Due diligence</option><option>Blacklisted</option></select></div>${table(['Vendor ID','Vendor','Category','BP number','Currency','Tax clearance','Rating','Historical spend','Status'],rows)}`)}</div>`
 }
 function contractsPage(){
- const rows=state.tenders.filter(t=>/Evaluation|Award|Recommendation/.test(t.stage)).map((t,i)=>`<tr data-record="contract" data-id="CTR-2026-0${81+i}"><td><strong class="link">CTR-2026-0${81+i}</strong></td><td>${t.title}</td><td>${['TechNova Solutions','MedEquip Africa','Grant Thornton Advisory'][i%3]}</td><td>${t.entity}</td><td class="money">${money(t.value)}</td><td>${i===0?'31 Jul 2027':'30 Jun 2027'}</td><td>${status(i===1?'Awaiting signature':'Active')}</td><td><button class="btn small" data-action="send-signature" data-id="CTR-2026-0${81+i}">${icon('signature')}eSign</button></td></tr>`);
+ const rows=state.tenders.filter(t=>/Evaluation|Award|Recommendation/.test(t.stage)).map((t,i)=>`<tr data-record="contract" data-id="CTR-2026-0${81+i}"><td><strong class="link">CTR-2026-0${81+i}</strong></td><td>${t.title}</td><td>${['TechNova Solutions','MedEquip Africa','Grant Thornton Advisory'][i%3]}</td><td>${t.entity}</td><td class="money">${money(t.value,t.currency)}</td><td>${i===0?'31 Jul 2027':'30 Jun 2027'}</td><td>${status(i===1?'Awaiting signature':'Active')}</td><td><button class="btn small" data-action="send-signature" data-id="CTR-2026-0${81+i}">${icon('signature')}eSign</button></td></tr>`);
  return `<div class="page">${pageHead('Awards and obligations','Contracts & Awards','Generate award notices and contracts from approved recommendations, route eSignatures and monitor value, obligations, renewals and variations.',btn('Create contract','create-contract','primary','plus')+btn('Signature queue','signature-queue','','signature'))}${filterBar()}<div class="grid kpis">${kpi('Active contracts','86','Group and entity agreements','contract')}${kpi('Awaiting signature','6','Internal and vendor signers','signature')}${kpi('Renewals in 90 days','12','Owner reminders enabled','document')}${kpi('Committed value',money(4270000),'Current portfolio','account')}${kpi('Variations pending','4','Approval thresholds enforced','approve')}${kpi('Supplier obligations','94%','On-time compliance','vendor')}</div>${card('Contract register','Select a contract to view award basis, documents, eSignature envelope and obligation history',table(['Contract','Description','Vendor','Entity','Value','Expiry','Status',''],rows))}</div>`
 }
 function ordersPage(){
- const rows=state.orders.map(o=>`<tr data-record="order" data-id="${o.id}"><td><strong class="link">${o.id}</strong></td><td>${o.vendor}</td><td>${o.entity}</td><td class="money">${money(o.amount)}</td><td>${o.asset?status('Fixed asset'):'Expense / inventory'}</td><td>${o.delivery}</td><td>${status(o.status)}</td><td><button class="btn small" data-action="preview-po" data-id="${o.id}">${icon('eye')}Preview</button></td></tr>`);
+ const rows=state.orders.map(o=>`<tr data-record="order" data-id="${o.id}"><td><strong class="link">${o.id}</strong></td><td>${o.vendor}</td><td>${o.entity}</td><td class="money">${money(o.amount,o.currency)}</td><td>${o.asset?status('Fixed asset'):'Expense / inventory'}</td><td>${o.delivery}</td><td>${status(o.status)}</td><td><button class="btn small" data-action="preview-po" data-id="${o.id}">${icon('eye')}Preview</button></td></tr>`);
  return `<div class="page">${pageHead('Committed procurement','Purchase Orders','Generate controlled PO PDFs from approved awards or requisitions, route digital signatures, email vendors and track acknowledgement and delivery.',btn('Create PO','create-po','primary','plus')+btn('Email selected','email-po','','mail'))}${filterBar()}<div class="grid kpis">${kpi('Open POs','156','Across all entities','order')}${kpi('Value outstanding',money(2480000),'Committed not fully received','account')}${kpi('Awaiting acknowledgement','14','Vendor reminders active','mail')}${kpi('Asset purchases','23','Require registry transfer after GRN','transfer')}${kpi('Overdue deliveries','9','Escalated to owners','audit')}${kpi('Signed digitally','92%','UID and signature certificate','signature')}</div>${card('Purchase order register','PO document, vendor delivery, accounting classification and receiving progress',table(['PO number','Vendor','Entity','Amount','Classification','Expected delivery','Status',''],rows))}</div>`
 }
 function receivingPage(){
- const rows=state.grns.map(g=>`<tr data-record="grn" data-id="${g.id}"><td><strong class="link">${g.id}</strong></td><td>${g.po}</td><td>${g.item}</td><td>${g.entity}</td><td class="money">${money(g.value)}</td><td>${g.asset?status('Fixed asset candidate'):'Inventory / expense'}</td><td>${status(g.status)}</td><td>${g.asset?`<button class="btn small" data-action="transfer-asset" data-id="${g.id}" ${g.transferred?'disabled':''}>${icon('transfer')}${g.transferred?'Transferred':'Transfer to accounting'}</button>`:''}</td></tr>`);
+ const rows=state.grns.map(g=>`<tr data-record="grn" data-id="${g.id}"><td><strong class="link">${g.id}</strong></td><td>${g.po}</td><td>${g.item}</td><td>${g.entity}</td><td class="money">${money(g.value,g.currency)}</td><td>${g.asset?status('Fixed asset candidate'):'Inventory / expense'}</td><td>${status(g.status)}</td><td>${g.asset?`<button class="btn small" data-action="transfer-asset" data-id="${g.id}" ${g.transferred?'disabled':''}>${icon('transfer')}${g.transferred?'Transferred':'Transfer to accounting'}</button>`:''}</td></tr>`);
  return `<div class="page">${pageHead('Receipt and inspection','Receiving & Inspection','Record GRNs against POs, inspect quantities and quality, update inventory and transfer qualifying assets to accounting and the fixed asset registry.',btn('Record GRN','record-grn','primary','plus')+btn('Scan delivery note','scan-delivery'))}${filterBar()}<div class="grid kpis">${kpi('Receipts today','18','Across 6 locations','receive')}${kpi('Pending inspection','31','Quality or quantity review','approve')}${kpi('Asset transfer queue','2','Accounting classification required','transfer','accounts')}${kpi('Discrepancies','7','Quantity or quality exceptions','audit')}${kpi('Third-party GRNs','4','Confirmed by investee portal','vendor')}${kpi('On-time receipt','88%','Against PO delivery date','report')}</div>${card('Goods received notes','Accepted fixed assets can create accounting journals and fixed asset registry records',table(['GRN','PO','Item / service','Entity','Value','Classification','Status','Action'],rows))}</div>`
 }
 function invoicesPage(){
- const rows=state.invoices.map(i=>`<tr data-record="invoice" data-id="${i.id}"><td><strong class="link">${i.id}</strong></td><td>${i.vendor}</td><td>${i.po}</td><td class="money">${money(i.amount)}</td><td>${status(i.match)}</td><td>${i.tax}</td><td>${status(i.status)}</td><td><button class="btn small" data-action="preview-invoice" data-id="${i.id}">${icon('eye')}Review</button></td></tr>`);
+ const rows=state.invoices.map(i=>`<tr data-record="invoice" data-id="${i.id}"><td><strong class="link">${i.id}</strong></td><td>${i.vendor}</td><td>${i.po}</td><td class="money">${money(i.amount,i.currency)}</td><td>${status(i.match)}</td><td>${i.tax}</td><td>${status(i.status)}</td><td><button class="btn small" data-action="preview-invoice" data-id="${i.id}">${icon('eye')}Review</button></td></tr>`);
  return `<div class="page">${pageHead('Invoice automation','Invoices & 3-Way Match','OCR captures invoice fields, AI compares invoice, PO and GRN, and exceptions block payment before approved liabilities transfer to Accounts Payable.',btn('Upload invoice','upload-invoice','primary','plus')+btn('Process OCR queue','run-ocr'))}${filterBar()}<div class="grid kpis">${kpi('Invoices captured','186','OCR confidence 93.7%','invoice')}${kpi('Matched','102','Ready for approval or AP','approve')}${kpi('Exceptions','15','Price, quantity or missing GRN','audit')}${kpi('WHT required','6','30% where ITF263 missing','account')}${kpi('VAT input',money(286400),'Extracted for tax accounting','account')}${kpi('Invoice exposure',money(2480000),'Approved and pending','account')}</div><div class="grid two" style="margin-bottom:14px">${card('Match outcome trend','Interactive monthly matching performance',`<div class="card-body">${lineChart('invoice-match')}</div>`)}${card('Exception causes','Click a cause for the invoice-level register',`<div class="card-body">${bars([['Price variance',72],['Missing GRN',54],['Quantity variance',43],['Duplicate invoice',24],['Tax exception',18]],'invoice-exceptions')}</div>`)}</div>${card('Invoice register','OCR result, three-way match, tax treatment and accounting transfer status',table(['Invoice','Vendor','PO','Amount','Match result','Tax','Status',''],rows))}</div>`
 }
 function accountsPage(){
@@ -2991,7 +5888,7 @@ function approvalsPage(){
  ].map(a=>`<tr data-record="approval" data-id="${a[0]}"><td><strong class="link">${a[0]}</strong></td><td>${a[1]}</td><td>${a[2]}</td><td>${a[3]}</td><td class="money">${money(a[4])}</td><td>${a[5]}</td><td>${a[6]}</td><td>${status(a[7])}</td><td><button class="btn small" data-action="approve-record" data-id="${a[0]}">Review</button></td></tr>`);
  return `<div class="page">${pageHead('Delegated authority','Approval Centre','Centralised approvals for plans, requisitions, tenders, contracts, purchase orders, invoices, payments and fixed asset capitalisation.',btn('Approval matrix','approval-matrix')+btn('My delegation','set-delegation'))}${filterBar()}<div class="grid kpis">${kpi('Awaiting me','11','Across 7 workflow types','approve')}${kpi('Within SLA','82%','Target 90%','report')}${kpi('SoD conflicts blocked','3','Creator cannot approve own record','audit')}${kpi('Board vote items','2','Selected approver methodology','vendor')}${kpi('eSign required','6','Final approval documents','signature')}${kpi('Delegations active','4','Time-bound and audited','settings')}</div>${card('Approval queue','Reviewing an item opens its own context; approval is blocked when segregation of duties is violated',table(['Approval','Type','Record','Entity','Amount','Current step','Age','Priority',''],rows))}</div>`
 }
-function auditPage(){
+function auditPage(){if(__pr23Live())return __pr23AuditPageLive();
  const rows=(__pr23Live()?(state.auditEventsLive||[]).slice((state.__pr23AuditPage||0)*50,(state.__pr23AuditPage||0)*50+50):[
   ['AUD-88291','Vendor bank account changed','VEN-00482 · TechNova Solutions','S. Chikowore','01 Aug 2026 05:11','High priority'],
   ['AUD-88290','Tender bid envelope opened','TN-2026-013 · Committee session','Committee 03','01 Aug 2026 04:46','Controlled'],
@@ -3018,7 +5915,7 @@ function settingsPage(){
 }
 function analyticsPage(){
  const title=state.analyticsTitle||'Procurement Analytics';
- return `<div class="page">${pageHead('Granular drill-down',title,'Filtered transactional detail with supporting charts, entity exposure, category movement and record-level evidence.',btn('Back','go-back')+btn('Export analysis','download-analysis','','download'))}${filterBar()}<div class="grid kpis">${kpi('Records','287','Current filtered population','document')}${kpi('Gross value',money(5120000),'Current filter selection','account')}${kpi('Average cycle','8.4 days','Requisition to PO','report')}${kpi('Within plan','91%','Budget-aligned value','plan')}${kpi('Exceptions','15','Require owner action','audit')}${kpi('Forecast variance','4.8%','Against approved plan','report')}</div><div class="grid two" style="margin-bottom:14px">${card('Trend by period','Click a point to inspect the underlying month',`<div class="card-body">${lineChart('analytics-detail')}</div>`)}${card('Entity contribution','Filtered value distribution',`<div class="card-body">${bars([['Matanho Holdings',88],['Lumina Health Group',73],['Kariba Agro Limited',62],['Kudu Logistics',49],['Nyanga Hospitality',36]],'analytics-entities')}</div>`)}</div>${card('Underlying records','Granular records that support the selected visual',table(['Record','Type','Entity','Category','Owner','Value','Status'],state.tenders.slice(0,5).map(t=>`<tr data-record="tender" data-id="${t.id}"><td><strong class="link">${t.id}</strong></td><td>Tender</td><td>${t.entity}</td><td>${t.category}</td><td>${t.owner}</td><td>${money(t.value)}</td><td>${status(t.stage)}</td></tr>`)))}</div>`
+ return `<div class="page">${pageHead('Granular drill-down',title,'Filtered transactional detail with supporting charts, entity exposure, category movement and record-level evidence.',btn('Back','go-back')+btn('Export analysis','download-analysis','','download'))}${filterBar()}<div class="grid kpis">${kpi('Records','287','Current filtered population','document')}${kpi('Gross value',money(5120000),'Current filter selection','account')}${kpi('Average cycle','8.4 days','Requisition to PO','report')}${kpi('Within plan','91%','Budget-aligned value','plan')}${kpi('Exceptions','15','Require owner action','audit')}${kpi('Forecast variance','4.8%','Against approved plan','report')}</div><div class="grid two" style="margin-bottom:14px">${card('Trend by period','Click a point to inspect the underlying month',`<div class="card-body">${lineChart('analytics-detail')}</div>`)}${card('Entity contribution','Filtered value distribution',`<div class="card-body">${bars([['Matanho Holdings',88],['Lumina Health Group',73],['Kariba Agro Limited',62],['Kudu Logistics',49],['Nyanga Hospitality',36]],'analytics-entities')}</div>`)}</div>${card('Underlying records','Granular records that support the selected visual',table(['Record','Type','Entity','Category','Owner','Value','Status'],state.tenders.slice(0,5).map(t=>`<tr data-record="tender" data-id="${t.id}"><td><strong class="link">${t.id}</strong></td><td>Tender</td><td>${t.entity}</td><td>${t.category}</td><td>${t.owner}</td><td>${money(t.value,t.currency)}</td><td>${status(t.stage)}</td></tr>`)))}</div>`
 }
 const pages={dashboard:dashboardPage,plan:planPage,requisitions:requisitionsPage,tenders:tendersPage,evaluation:evaluationPage,vendors:vendorsPage,contracts:contractsPage,orders:ordersPage,receiving:receivingPage,invoices:invoicesPage,intake:__pr23AiCapturePage,accounts:accountsPage,documents:documentsPage,reports:reportsPage,approvals:approvalsPage,audit:auditPage,settings:settingsPage,analytics:analyticsPage};
 function renderNav(){
@@ -3050,11 +5947,11 @@ function activityMenu(el,id='Current workspace'){
 }
 function detailDrawer(type,id){
  let x,title,body,foot='';
- if(type==='requisition'){x=state.requisitions.find(v=>v.id===id);title=x?.title||id;body=`<div class="notice"><span class="kpi-icon">${icon('requisition')}</span><div><strong>${id}</strong><p>${x.entity} · ${x.type} request · ${money(x.amount)}</p></div></div><div style="height:14px"></div><div class="form-grid"><div class="field"><label>Status</label><div>${status(x.status)}</div></div><div class="field"><label>Budget check</label><div>${x.budget}</div></div><div class="field"><label>Category</label><div>${x.category}</div></div><div class="field"><label>Owner</label><div>${x.owner}</div></div><div class="field full"><label>Attached motivation</label><button class="btn" data-action="preview-document" data-id="MOT-${id}">${icon('eye')}Preview internal motivation.pdf</button></div></div><div style="height:14px"></div>${card('Workflow','Department head → Budget owner → Procurement → CFO where required',`<div class="card-body list"><div class="list-row"><div class="list-main"><strong>Submitted</strong><span>31 Jul 2026 · ${x.owner}</span></div>${status('Complete')}</div><div class="list-row"><div class="list-main"><strong>Current approval</strong><span>${x.status}</span></div>${status('Pending')}</div></div>`)}`;foot=btn('Reject with reason','reject-pr','danger')+btn('Convert to RFQ','pr-to-rfq')+btn('Approve','approve-pr','primary')}
- if(type==='tender'){x=state.tenders.find(v=>v.id===id);title=x?.title||id;body=`<div class="grid four"><div><span class="muted">Tender</span><strong style="display:block">${x.id}</strong></div><div><span class="muted">Estimate</span><strong style="display:block">${money(x.value)}</strong></div><div><span class="muted">Bids</span><strong style="display:block">${x.bids}</strong></div><div><span class="muted">Stage</span><div>${status(x.stage)}</div></div></div><div style="height:16px"></div>${card('Sourcing workflow','Secure external bid submission and controlled opening',`<div class="card-body list"><div class="list-row" data-action="invite-vendors"><div class="list-main"><strong>Vendor invitations</strong><span>Eligible suppliers only; blacklisted suppliers excluded</span></div>${status('Active')}</div><div class="list-row" data-action="vendor-bid-preview" data-id="${x.id}"><div class="list-main"><strong>System-generated vendor bid form</strong><span>Technical, commercial, declarations and eSignature</span></div>${icon('arrow')}</div><div class="list-row" data-page="evaluation"><div class="list-main"><strong>Bid evaluation</strong><span>Open only after committee bid opening</span></div>${icon('arrow')}</div></div>`)}`;foot=btn('Preview tender pack','preview-document')+btn('Invite vendors','invite-vendors')+btn('Open evaluation','drawer-to-evaluation','primary')}
+ if(type==='requisition'){x=state.requisitions.find(v=>v.id===id);title=x?.title||id;body=`<div class="notice"><span class="kpi-icon">${icon('requisition')}</span><div><strong>${id}</strong><p>${x.entity} · ${x.type} request · ${money(x.amount,x.currency)}</p></div></div><div style="height:14px"></div><div class="form-grid"><div class="field"><label>Status</label><div>${status(x.status)}</div></div><div class="field"><label>Budget check</label><div>${x.budget}</div></div><div class="field"><label>Category</label><div>${x.category}</div></div><div class="field"><label>Owner</label><div>${x.owner}</div></div><div class="field full"><label>Attached motivation</label><button class="btn" data-action="preview-document" data-id="MOT-${id}">${icon('eye')}Preview internal motivation.pdf</button></div></div><div style="height:14px"></div>${card('Workflow','Department head → Budget owner → Procurement → CFO where required',`<div class="card-body list"><div class="list-row"><div class="list-main"><strong>Submitted</strong><span>31 Jul 2026 · ${x.owner}</span></div>${status('Complete')}</div><div class="list-row"><div class="list-main"><strong>Current approval</strong><span>${x.status}</span></div>${status('Pending')}</div></div>`)}`;foot=btn('Reject with reason','reject-pr','danger')+btn('Convert to RFQ','pr-to-rfq')+btn('Approve','approve-pr','primary')}
+ if(type==='tender'){x=state.tenders.find(v=>v.id===id);title=x?.title||id;body=`<div class="grid four"><div><span class="muted">Tender</span><strong style="display:block">${x.id}</strong></div><div><span class="muted">Estimate</span><strong style="display:block">${money(x.value,x.currency)}</strong></div><div><span class="muted">Bids</span><strong style="display:block">${x.bids}</strong></div><div><span class="muted">Stage</span><div>${status(x.stage)}</div></div></div><div style="height:16px"></div>${card('Sourcing workflow','Secure external bid submission and controlled opening',`<div class="card-body list"><div class="list-row" data-action="invite-vendors"><div class="list-main"><strong>Vendor invitations</strong><span>Eligible suppliers only; blacklisted suppliers excluded</span></div>${status('Active')}</div><div class="list-row" data-action="vendor-bid-preview" data-id="${x.id}"><div class="list-main"><strong>System-generated vendor bid form</strong><span>Technical, commercial, declarations and eSignature</span></div>${icon('arrow')}</div><div class="list-row" data-page="evaluation"><div class="list-main"><strong>Bid evaluation</strong><span>Open only after committee bid opening</span></div>${icon('arrow')}</div></div>`)}`;foot=btn('Preview tender pack','preview-document')+btn('Invite vendors','invite-vendors')+btn('Open evaluation','drawer-to-evaluation','primary')}
  if(type==='vendor'){x=state.vendors.find(v=>v.id===id);title=x?.name||id;body=`<div class="grid four"><div><span class="muted">Vendor ID</span><strong style="display:block">${x.id}</strong></div><div><span class="muted">Rating</span><strong style="display:block">${x.rating} / 5</strong></div><div><span class="muted">Currency</span><strong style="display:block">${x.currency}</strong></div><div>${status(x.status)}</div></div><div style="height:15px"></div><div class="form-grid"><div class="field"><label>BP number</label><input value="${x.bp}" readonly></div><div class="field"><label>VAT number</label><input value="${x.vat}" readonly></div><div class="field"><label>Category</label><input value="${x.category}" readonly></div><div class="field"><label>ITF263</label><input value="${x.itf}" readonly></div><div class="field full"><label>Bank detail changes</label><div class="notice"><div><strong>High-priority audit monitoring enabled</strong><p>Every bank account edit requires maker-checker approval and triggers a notification.</p></div></div></div></div>`;foot=btn('View documents','open-folder')+btn('Edit vendor','edit-vendor','primary')}
- if(type==='grn'){x=state.grns.find(v=>v.id===id);title=`${x.id} · ${x.item}`;body=`<div class="notice"><span class="kpi-icon">${icon('receive')}</span><div><strong>${x.status}</strong><p>${x.po} · ${x.entity} · ${money(x.value)}</p></div></div><div style="height:14px"></div><div class="form-grid"><div class="field"><label>Classification</label><select id="assetClass"><option>Fixed asset</option><option>Inventory</option><option>Operating expense</option><option>Project WIP</option></select></div><div class="field"><label>Asset category</label><select><option>Medical Equipment</option><option>IT Equipment</option><option>Plant & Machinery</option><option>Vehicles</option></select></div><div class="field"><label>Useful life</label><input value="5 years"></div><div class="field"><label>Location</label><input value="${x.entity}"></div><div class="field full"><label>Accounting preview</label><div class="notice"><div><strong>Debit 1400 Fixed Assets WIP · Credit 2011 Accrued Liabilities</strong><p>The journal and provisional asset record are created together after approval.</p></div></div></div></div>`;foot=btn('Cancel','close-overlay')+btn('Transfer to accounting & asset registry','confirm-asset-transfer','primary')}
- if(type==='invoice'){x=state.invoices.find(v=>v.id===id);title=`Invoice ${x.id}`;body=`<div class="split"><div class="doc-preview" style="min-height:360px"><div class="paper" style="min-height:430px;padding:30px"><h2>INVOICE</h2><p><strong>${x.vendor}</strong></p><p>Invoice: ${x.id}<br>Purchase Order: ${x.po}</p><h2>${money(x.amount)}</h2></div></div><div><div class="field"><label>Vendor</label><input value="${x.vendor}"></div><div class="field"><label>PO number</label><input value="${x.po}"></div><div class="field"><label>Total</label><input value="${x.amount}"></div><div class="field"><label>AI match result</label><div>${status(x.match)}</div></div><div class="field"><label>Tax logic</label><input value="${x.tax}"></div></div></div>`;foot=btn('Flag for review','flag-invoice','danger')+btn('Approve to AP','approve-invoice','primary')}
+ if(type==='grn'){x=state.grns.find(v=>v.id===id);title=`${x.id} · ${x.item}`;body=`<div class="notice"><span class="kpi-icon">${icon('receive')}</span><div><strong>${x.status}</strong><p>${x.po} · ${x.entity} · ${money(x.value,x.currency)}</p></div></div><div style="height:14px"></div><div class="form-grid"><div class="field"><label>Classification</label><select id="assetClass"><option>Fixed asset</option><option>Inventory</option><option>Operating expense</option><option>Project WIP</option></select></div><div class="field"><label>Asset category</label><select><option>Medical Equipment</option><option>IT Equipment</option><option>Plant & Machinery</option><option>Vehicles</option></select></div><div class="field"><label>Useful life</label><input value="5 years"></div><div class="field"><label>Location</label><input value="${x.entity}"></div><div class="field full"><label>Accounting preview</label><div class="notice"><div><strong>Debit 1400 Fixed Assets WIP · Credit 2011 Accrued Liabilities</strong><p>The journal and provisional asset record are created together after approval.</p></div></div></div></div>`;foot=btn('Cancel','close-overlay')+btn('Transfer to accounting & asset registry','confirm-asset-transfer','primary')}
+ if(type==='invoice'){x=state.invoices.find(v=>v.id===id);title=`Invoice ${x.id}`;body=`<div class="split"><div class="doc-preview" style="min-height:360px"><div class="paper" style="min-height:430px;padding:30px"><h2>INVOICE</h2><p><strong>${x.vendor}</strong></p><p>Invoice: ${x.id}<br>Purchase Order: ${x.po}</p><h2>${money(x.amount,x.currency)}</h2></div></div><div><div class="field"><label>Vendor</label><input value="${x.vendor}"></div><div class="field"><label>PO number</label><input value="${x.po}"></div><div class="field"><label>Total</label><input value="${x.amount}"></div><div class="field"><label>AI match result</label><div>${status(x.match)}</div></div><div class="field"><label>Tax logic</label><input value="${x.tax}"></div></div></div>`;foot=btn('Flag for review','flag-invoice','danger')+btn('Approve to AP','approve-invoice','primary')}
  if(type==='plan'||type==='plan-item'||type==='order'||type==='contract'||type==='journal'||type==='asset'||type==='payment'||type==='approval'||type==='audit'||type==='document'||type==='report'){title=id;body=`<div class="notice"><span class="kpi-icon">${icon('document')}</span><div><strong>${id}</strong><p>Controlled metadata, workflow history, related documents and audit evidence are available for this record.</p></div></div><div style="height:14px"></div>${card('Record metadata','Current version and workflow context',`<div class="card-body list"><div class="list-row"><div class="list-main"><strong>Entity</strong><span>Group Consolidated</span></div></div><div class="list-row"><div class="list-main"><strong>Owner</strong><span>Group Procurement</span></div></div><div class="list-row"><div class="list-main"><strong>Last updated</strong><span>01 Aug 2026 05:14</span></div></div><div class="list-row" data-action="view-history" data-id="${id}"><div class="list-main"><strong>Audit history</strong><span>12 recorded events</span></div>${icon('arrow')}</div></div>`)}`;foot=btn('Preview document','preview-document')+btn('Activity','record-activity')}
  openDrawer(title,type.replace('-',' '),body,foot)
 }
@@ -3064,7 +5961,7 @@ function previewReport(id){const r=state.reports.find(x=>x.id===id)||state.repor
 function formField(label,input,full=''){return `<div class="field ${full}"><label>${label}</label>${input}</div>`}
 function createPlanModal(){openModal('Create annual procurement plan','Create the plan header, then add requirements and submit through the approval workflow.',`<form id="planForm" class="form-grid">${formField('Plan name','<input name="name" required value="FY 2027 Procurement Plan">')}${formField('Entity',`<select name="entity">${entities.map(x=>`<option>${x[1]}</option>`).join('')}</select>`)}${formField('Financial year','<select name="year"><option>FY 2027</option><option>FY 2026</option></select>')}${formField('Currency','<select name="currency"><option>USD</option><option>ZiG</option><option>ZAR</option></select>')}${formField('Budget ceiling','<input name="budget" type="number" required value="1000000">')}${formField('Plan owner','<input name="owner" value="Group Procurement">')}${formField('Planning assumptions','<textarea name="notes">Capture strategic priorities, demand assumptions and known funding constraints.</textarea>','full')}</form>`,btn('Save draft','save-plan')+btn('Create & add items','create-plan-confirm','primary'))}
 function addPlanItemModal(){if(__pr23Live())return __pr23PlanItemModal();openModal('Add procurement plan item','Budget validation and sourcing method are captured before submission.',`<form id="planItemForm" class="form-grid">${formField('Requirement','<input name="description" required>','full')}${formField('Entity',`<select name="entity">${entities.slice(1).map(x=>`<option>${x[1]}</option>`).join('')}</select>`)}${formField('Category','<select name="category"><option>Technology</option><option>Medical</option><option>Agriculture</option><option>Fleet</option><option>Facilities</option></select>')}${formField('Quarter','<select name="quarter"><option>Q1</option><option>Q2</option><option>Q3</option><option>Q4</option></select>')}${formField('Sourcing method','<select name="method"><option>Open tender</option><option>Restricted tender</option><option>Competitive quotations</option><option>Framework</option></select>')}${formField('Estimated budget','<input name="budget" type="number" required>')}${formField('Cost centre','<input name="cost" value="CC-1001">')}${formField('Business justification','<textarea name="notes"></textarea>','full')}</form>`,btn('Save item','save-plan-item','primary'))}
-function requisitionModal(){openModal('New purchase requisition',__pr23Live()?'Raise a request with its lines and justification. It is routed for approval when you submit it.':'Create an internal, investee or subsidiary request with line items, budget check and approval routing.',`<form id="prForm" class="form-grid">${__pr23Live()?'':formField('Request source','<select name="type"><option>Internal</option><option>Investee</option><option>Subsidiary</option></select>')}${__pr23Live()?__pr23RequisitionEntityField()+__pr23RequisitionDepartmentField()+__pr23RequisitionProjectField():formField('Entity',`<select name="entity">${entities.slice(1).map(x=>`<option>${x[1]}</option>`).join('')}</select>`)+formField('Department / cost centre','<select name="cost"><option>IT & Digital / CC-1001</option><option>Finance / CC-1002</option><option>Operations / CC-2001</option></select>')}${(__pr23Live()?formField('Category','<select name="category" required>'+__pr23RequisitionCategoryOptions()+'</select>'):formField('Category','<select name="category"><option>Technology</option><option>Medical</option><option>Agriculture</option><option>Facilities</option><option>Fleet</option></select>'))}${formField('Requirement title','<input name="title" required>','full')}<div class="field full"><label>Line items</label><div class="table-wrap"><table style="min-width:650px"><thead><tr><th>Item</th><th>UOM</th><th>Qty</th><th>Unit estimate</th><th>Total</th></tr></thead>${__pr23Live()?__pr23PrLinesTbody():`<tbody><tr><td><input name="item" required></td><td><select name="uom"><option>Each</option><option>Box</option><option>Lot</option><option>Month</option></select></td><td><input name="qty" type="number" value="1"></td><td><input name="price" type="number" value="1000"></td><td>$1,000</td></tr></tbody>`}</table></div></div>${formField('Internal motivation','<textarea name="motivation" required></textarea>','full')}${__pr23Live()?'':formField('Attachment','<input type="file" accept=".pdf,.doc,.docx,.xlsx,.csv">','full')}<div class="field full"><div class="notice"><div><strong>Live budget check</strong>${__pr23Live()?__pr23BudgetNotice():'<p>Remaining budget: $86,400. The request will warn or block according to the cost-centre control.</p>'}</div></div></div></form>`,btn('Save draft','save-pr')+btn('Submit for approval','submit-pr','primary'))}
+function requisitionModal(){openModal('New purchase requisition',__pr23Live()?'Raise a request with its lines and justification. It is routed for approval when you submit it.':'Create an internal, investee or subsidiary request with line items, budget check and approval routing.',`<form id="prForm" class="form-grid">${__pr23Live()?'':formField('Request source','<select name="type"><option>Internal</option><option>Investee</option><option>Subsidiary</option></select>')}${__pr23Live()?__pr23RequisitionEntityField()+__pr23RequisitionDepartmentField()+__pr23RequisitionProjectField()+__pr23RequisitionPlanningFields():formField('Entity',`<select name="entity">${entities.slice(1).map(x=>`<option>${x[1]}</option>`).join('')}</select>`)+formField('Department / cost centre','<select name="cost"><option>IT & Digital / CC-1001</option><option>Finance / CC-1002</option><option>Operations / CC-2001</option></select>')}${(__pr23Live()?formField('Category','<select name="category" required>'+__pr23RequisitionCategoryOptions()+'</select>'):formField('Category','<select name="category"><option>Technology</option><option>Medical</option><option>Agriculture</option><option>Facilities</option><option>Fleet</option></select>'))}${formField('Requirement title','<input name="title" required>','full')}<div class="field full"><label>Line items</label><div class="table-wrap"><table style="min-width:650px"><thead><tr><th>Item</th><th>UOM</th><th>Qty</th><th>Unit estimate</th><th>Total</th></tr></thead>${__pr23Live()?__pr23PrLinesTbody():`<tbody><tr><td><input name="item" required></td><td><select name="uom"><option>Each</option><option>Box</option><option>Lot</option><option>Month</option></select></td><td><input name="qty" type="number" value="1"></td><td><input name="price" type="number" value="1000"></td><td>$1,000</td></tr></tbody>`}</table></div></div>${formField('Internal motivation','<textarea name="motivation" required></textarea>','full')}${__pr23Live()?'':formField('Attachment','<input type="file" accept=".pdf,.doc,.docx,.xlsx,.csv">','full')}<div class="field full"><div class="notice"><div><strong>Live budget check</strong>${__pr23Live()?__pr23BudgetNotice():'<p>Remaining budget: $86,400. The request will warn or block according to the cost-centre control.</p>'}</div></div></div></form>`,btn('Save draft','save-pr')+btn('Submit for approval','submit-pr','primary'));if(__pr23Live()){__pr23PrLinesRecalc();__pr23RefreshPosition()}}
 function vendorModal(){if(__pr23Live())return __pr23VendorRegisterModal();openModal('Register vendor','Zimbabwe vendor controls include duplicate BP/VAT validation, mandatory bank details, currency and tax clearance.',`<form id="vendorForm" class="form-grid">${formField('Legal name','<input name="name" required>')}${formField('Category','<select name="category"><option>Technology</option><option>Medical</option><option>Facilities</option><option>Fleet</option></select>')}${formField('BP number','<input name="bp" required>')}${formField('VAT number','<input name="vat" required>')}${formField('Bank','<input name="bank" required>')}${formField('Branch code','<input name="branch" required>')}${formField('Default currency','<select name="currency"><option>USD</option><option>ZiG</option><option>ZAR</option></select>')}${formField('ITF263 expiry','<input name="itf" type="date">')}${formField('Certificate of incorporation','<input type="file">')}${formField('CR14 / current company extract','<input type="file">')}</form>`,btn('Cancel','close-overlay')+btn('Validate & register','register-vendor-confirm','primary'))}
 function inviteVendorsModal(){const eligible=state.vendors.filter(v=>v.status!=='Blacklisted');openModal('Invite vendors to bid','Only category-eligible, non-blacklisted suppliers are available. The system emails a unique secure bid-form link.',`<div class="notice" style="margin-bottom:14px"><span class="kpi-icon">${icon('mail')}</span><div><strong>Secure system-generated bid form</strong><p>Each vendor receives an individual expiring link. Submissions are timestamped, sealed and cannot be edited after closing.</p></div></div><div class="list">${eligible.map(v=>`<label class="list-row"><input type="checkbox" checked> <div class="list-main"><strong>${v.name}</strong><span>${v.category} · ${v.currency} · ${v.status}</span></div><span>${v.rating}/5</span></label>`).join('')}</div>`,btn('Preview vendor form','vendor-bid-preview')+btn(`Email ${eligible.length} invitations`,'send-invitations','primary','mail'))}
 function vendorBidPreview(id='TN-2026-014'){if(__pr23Live())return __pr23VendorBidPreview(arguments[0]);openModal('Vendor Bid Submission Form',`${id} · secure external form preview`,`<div class="notice" style="margin-bottom:14px"><div><strong>Unique vendor link · expires at tender close</strong><p>Vendor identity and tender reference are locked by the invitation token.</p></div></div><div class="form-grid">${formField('Vendor','<input value="TechNova Solutions" readonly>')}${formField('Tender','<input value="'+id+'" readonly>')}${formField('Technical response','<textarea placeholder="Structured response to mandatory and scored criteria"></textarea>','full')}${formField('Bid currency','<select><option>USD</option><option>ZiG</option><option>ZAR</option></select>')}${formField('Total bid price','<input type="number" value="1280000">')}${formField('Delivery period','<input value="12 weeks">')}${formField('Warranty / support','<input value="36 months">')}${formField('Commercial schedule','<input type="file" accept=".xlsx,.csv,.pdf">','full')}${formField('Declarations','<label><input type="checkbox"> I declare the bid is accurate and disclose all conflicts.</label>','full')}${formField('Authorised signature','<input placeholder="Type authorised signatory name">','full')}</div>`,btn('Save draft','vendor-save-draft')+btn('Seal & submit bid','vendor-submit-bid','primary','signature'))}
@@ -3416,22 +6313,22 @@ window.MatanhoProcurement=Object.freeze({version:'8.0.0',navigate,render,getStat
 
   function planListPageV5(){
     const planRows=state.plans.map(p=>`<tr data-action="open-plan-detail-v5" data-id="${p.id}"><td><strong class="link">${p.id}</strong><span class="row-tools-inline">${smallAction('Edit','edit-plan-v5',p.id)}${smallAction('Preview','preview-document',p.id)}</span><br><span class="muted">${esc(p.name)}</span></td><td>${esc(p.entity)}</td><td class="money">${money(p.budget)}</td><td class="money">${money(p.committed)}</td><td><div class="progress"><span style="width:${Math.min(100,p.committed/p.budget*100)}%"></span></div></td><td>${esc(p.version)}</td><td>${status(p.status)}</td><td>${smallAction('Open','open-plan-detail-v5',p.id,'arrow')}</td></tr>`);
-    const itemRows=state.planItems.map(i=>`<tr data-record="plan-item" data-id="${i.id}"><td><strong class="link">${i.id}</strong><span class="row-tools-inline">${smallAction('Edit','edit-plan-item-v23',i.id)}</span></td><td>${esc(i.description)}</td><td>${esc(i.entity)}</td><td>${esc(i.category)}</td><td>${esc(i.quarter)}</td><td>${esc(i.method)}</td><td class="money">${money(i.budget)}</td><td>${status(i.status)}</td></tr>`);
+    const itemRows=state.planItems.map(i=>`<tr data-record="plan-item" data-id="${i.id}"><td><strong class="link">${i.id}</strong><span class="row-tools-inline">${smallAction('Edit','edit-plan-item-v23',i.id)}</span></td><td>${esc(i.description)}</td><td>${esc(i.entity)}</td><td>${esc(i.category)}</td><td>${esc(i.quarter)}</td><td>${esc(i.method)}</td><td class="money">${money(i.budget)}</td>${__pr23Live()?__pr23PlanItemExtraCells(i):''}<td>${status(i.status)}</td></tr>`);
     return `<div class="page">${pageHead('Strategy and budget','Annual Procurement Planning','Create granular entity plans, consolidate subsidiary and investee submissions, validate budgets and route the complete plan for approval.',actionButton('Create plan','create-plan-v5','','primary','plus')+actionButton('Add plan item','add-plan-item','','','plus')+actionButton('Submit plan & budget','submit-plan')+actionButton('Import prior year','import-plan'))}${filterBar()}
       <div class="grid kpis">${kpi('Consolidated budget',money(8240000),'7 entities included','plan')}${kpi('Submitted plans','6 of 7','One entity outstanding','approve')}${kpi('Budget coverage','93.6%','Funded planned requirements','report')}${kpi('Strategic tenders','12','Above delegated thresholds','tender')}${kpi('Plan amendments','4','Version history retained','document')}${kpi('Unfunded exposure',money(528000),'Requires budget decision','account')}</div>
       ${card('Procurement plans','Open a plan to edit its assumptions, requirements, funding, approvals and controlled documents.',`<div class="table-tools"><input placeholder="Search plans"><select><option>All entities</option>${entities.slice(1).map(x=>`<option>${x[1]}</option>`).join('')}</select><select><option>All statuses</option><option>Draft</option><option>Under review</option><option>Approved</option></select></div>${table(['Plan','Entity','Budget','Committed','Execution','Version','Status',''],planRows)}`)}
-      <div style="height:14px"></div>${card('Plan requirement register','Approved requirements can be converted to requisitions, RFQs or tenders.',table(['Item','Requirement','Entity','Category','Quarter','Method','Budget','Status'],itemRows))}</div>`;
+      <div style="height:14px"></div>${card('Plan requirement register','Approved requirements can be converted to requisitions, RFQs or tenders.',table(['Item','Requirement','Entity','Category','Quarter','Method','Budget',...(__pr23Live()?__PR23_PLAN_LINE_HEADS:[]),'Status'],itemRows))}</div>`;
   }
   function planDetailPageV5(id){
     const p=state.plans.find(x=>x.id===id)||state.plans[0];
     const items=__pr23Live()?state.planItems.filter(x=>x.planRecordId===p.recordId):state.planItems.filter((x,i)=>x.entity===p.entity||p.entity==='Group Consolidated'||i<3);
-    const rows=items.map(i=>`<tr><td><strong>${i.id}</strong></td><td>${esc(i.description)}</td><td>${esc(i.category)}</td><td>${esc(i.quarter)}</td><td>${esc(i.method)}</td><td>${money(i.budget)}</td><td>${status(i.status)}</td><td>${smallAction('Edit','edit-plan-item-v23',i.id)}</td></tr>`);
+    const rows=items.map(i=>`<tr><td><strong>${i.id}</strong></td><td>${esc(i.description)}</td><td>${esc(i.category)}</td><td>${esc(i.quarter)}</td><td>${esc(i.method)}</td><td>${money(i.budget)}</td>${__pr23Live()?__pr23PlanItemExtraCells(i):''}<td>${status(i.status)}</td><td>${smallAction('Edit','edit-plan-item-v23',i.id)}</td></tr>`);
     return `<div class="page"><div class="breadcrumbs"><button data-action="back-plan-list-v5">Annual Procurement Plans</button><i>›</i><span>${p.id}</span><i>›</i><strong>${esc(p.name)}</strong></div>
       ${pageHead('Plan workspace',p.name,`${p.entity} · ${p.version} · owned by ${p.owner}`,actionButton('Edit plan','edit-plan-v5',p.id,'primary','document')+actionButton('Add requirement','add-plan-item','','','plus')+actionButton('Preview controlled plan','preview-document',p.id,'','eye')+actionButton('Submit','submit-plan'))}
       ${__pr23Live()?__pr23PlanStrip(p):'<div class="workflow-strip"><div class="workflow-step done"><strong>1. Demand collection</strong><span>Completed by 7 entities</span></div><div class="workflow-step done"><strong>2. Budget validation</strong><span>93.6% funded</span></div><div class="workflow-step current"><strong>3. Procurement review</strong><span>4 items need action</span></div><div class="workflow-step"><strong>4. CFO review</strong><span>Pending</span></div><div class="workflow-step"><strong>5. Committee approval</strong><span>Pending</span></div><div class="workflow-step"><strong>6. Baseline issued</strong><span>Not started</span></div></div>'}
       <div class="grid kpis">${kpi('Plan budget',money(p.budget),'Approved ceiling','plan')}${kpi('Committed',money(p.committed),'Current commitments','order')}${kpi('Available',money(p.budget-p.committed),'Uncommitted capacity','account')}${kpi('Requirements',items.length,'Current plan lines','requisition')}${kpi('Funding gaps','2','Budget decision required','audit')}${kpi('Approval SLA','2.4 days','Current workflow estimate','approve')}</div>
       <div class="grid two" style="margin-bottom:14px">${card('Execution forecast','Monthly planned, committed and actual spend',`<div class="card-body">${lineChart('plan-execution')}</div>`)}${card('Plan governance','Owners, funding and approval evidence',`<div class="card-body list"><div class="list-row" data-action="edit-plan-v5" data-id="${p.id}"><div class="list-main"><strong>Planning assumptions</strong><span>Demand, inflation, currency and implementation dependencies</span></div>${icon('arrow')}</div><div class="list-row" data-action="preview-document" data-id="${p.id}"><div class="list-main"><strong>Controlled plan document</strong><span>Editable letterhead, version and approval record</span></div>${icon('arrow')}</div><div class="list-row" data-page="approvals"><div class="list-main"><strong>Approval workflow</strong><span>Entity, Group Procurement, CFO and committee</span></div>${icon('arrow')}</div></div>`)}</div>
-      ${card('Plan requirements','Edit, classify, fund or convert each approved item.',table(['Item','Requirement','Category','Quarter','Sourcing method','Budget','Status',''],rows))}</div>`;
+      ${card('Plan requirements','Edit, classify, fund or convert each approved item.',table(['Item','Requirement','Category','Quarter','Sourcing method','Budget',...(__pr23Live()?__PR23_PLAN_LINE_HEADS:[]),'Status',''],rows))}</div>`;
   }
   function planPageV5(){return state.planDetail?planDetailPageV5(state.planDetail):planListPageV5()}
 
@@ -3489,7 +6386,7 @@ window.MatanhoProcurement=Object.freeze({version:'8.0.0',navigate,render,getStat
     const candidates=state.tenders.filter(t=>t.bids>0);
     return `<div class="page">${pageHead('Commercial analysis','Quotation Comparison','Choose the actual tender or RFQ first. The system then opens the tender-specific quotations, line items, commercial normalisation and recommendation workspace.',actionButton('Create RFQ','create-tender','','primary','plus')+actionButton('Import quotations','import-quotations-v5','','','plus'))}${filterBar()}
       <div class="grid kpis">${kpi('Events with quotations',candidates.length,'Available for comparison','tender')}${kpi('Supplier responses','32','Structured portal submissions','vendor')}${kpi('Late responses','2','Excluded unless formally reopened','audit')}${kpi('Technical threshold','70%','Default configurable minimum','evaluate')}${kpi('Potential savings',money(486000),'Against internal estimates','account')}${kpi('Recommendations due','3','Within the next 5 days','approve')}</div>
-      ${card('Select a tender or RFQ','Quotation comparison is always tied to the selected sourcing event and its approved evaluation criteria.',`<div class="source-card-grid card-body">${candidates.map((t,i)=>`<button class="source-card" data-action="select-quotation-tender-v5" data-id="${t.id}"><div class="source-top"><span class="status ${/Evaluation|opening/i.test(t.stage)?'amber':'blue'}">${esc(t.stage)}</span><span class="muted">${esc(t.id)}</span></div><h3>${esc(t.title)}</h3><p>${esc(t.entity)} · ${esc(t.method)}</p><div class="source-meta"><div><span>Responses</span><strong>${t.bids}</strong></div><div><span>Estimate</span><strong>${money(t.value)}</strong></div><div><span>Closing</span><strong>${esc(t.close)}</strong></div></div></button>`).join('')}</div>`)}</div>`;
+      ${card('Select a tender or RFQ','Quotation comparison is always tied to the selected sourcing event and its approved evaluation criteria.',`<div class="source-card-grid card-body">${candidates.map((t,i)=>`<button class="source-card" data-action="select-quotation-tender-v5" data-id="${t.id}"><div class="source-top"><span class="status ${/Evaluation|opening/i.test(t.stage)?'amber':'blue'}">${esc(t.stage)}</span><span class="muted">${esc(t.id)}</span></div><h3>${esc(t.title)}</h3><p>${esc(t.entity)} · ${esc(t.method)}</p><div class="source-meta"><div><span>Responses</span><strong>${t.bids}</strong></div><div><span>Estimate</span><strong>${money(t.value,t.currency)}</strong></div><div><span>Closing</span><strong>${esc(t.close)}</strong></div></div></button>`).join('')}</div>`)}</div>`;
   }
   function quotationWorkspaceV5(id){
     const t=state.tenders.find(x=>x.id===id)||(__pr23Live()?__pr23MatchSources().find(x=>x.id===id):null)||state.tenders[0];
@@ -3526,16 +6423,16 @@ window.MatanhoProcurement=Object.freeze({version:'8.0.0',navigate,render,getStat
     const po=__chain?(__chain.orders[0]||{id:'—',vendor:'No purchase order yet',amount:null,delivery:'—'}):state.orders[Math.abs(state.tenders.indexOf(t))%state.orders.length];
     const grn=__chain?(__chain.grns[0]||{id:'—',item:'Not received',value:null,status:'Not received',asset:false}):(state.grns.find(g=>g.po===po.id)||state.grns[0]);
     const inv=__chain?(__chain.invoices[0]||{id:'—',amount:null,tax:'—',match:'No invoice'}):(state.invoices.find(i=>i.po===po.id)||state.invoices[0]);
-    const rows=(__chain?__chain.invoices:state.invoices).map(i=>`<tr data-record="invoice" data-id="${i.id}"><td><strong class="link">${i.id}</strong><span class="row-tools-inline">${smallAction('Preview','preview-invoice-v5',i.id,'eye')}</span></td><td>${esc(i.vendor)}</td><td>${esc(i.po)}</td><td class="money">${money(i.amount)}</td><td>${status(i.match)}</td><td>${esc(i.tax)}</td><td>${status(i.status)}</td><td>${smallAction('Open match','open-match-detail-v5',i.id,'arrow')}</td></tr>`);
+    const rows=(__chain?__chain.invoices:state.invoices).map(i=>`<tr data-record="invoice" data-id="${i.id}"><td><strong class="link">${i.id}</strong><span class="row-tools-inline">${smallAction('Preview','preview-invoice-v5',i.id,'eye')}</span></td><td>${esc(i.vendor)}</td><td>${esc(i.po)}</td><td class="money">${money(i.amount,i.currency)}</td><td>${status(i.match)}</td><td>${esc(i.tax)}</td><td>${status(i.status)}</td><td>${smallAction('Open match','open-match-detail-v5',i.id,'arrow')}</td></tr>`);
     return `<div class="page"><div class="breadcrumbs"><button data-action="back-match-list-v5">Invoices & 3-Way Match</button><i>›</i><span>${t.id}</span><i>›</i><strong>${esc(t.title)}</strong></div>
       ${pageHead('Tender-specific P2P chain',t.title,`${t.id} · ${t.entity} · source-to-payment document chain`,actionButton('Upload invoice','upload-invoice-v5',t.id,'primary','plus')+(__pr23Can('intake.manage')?actionButton('Capture invoice','capture-invoice-v5',t.id,'','invoice'):'')+(__pr23Can('invoices.pay')?actionButton('Record payment','record-payment-v23',t.id,'','account'):'')+actionButton('AI invoice capture','run-ocr-v5',t.id)+actionButton('Activity','activity-menu',t.id,'','more'))}
       <div class="workflow-strip"><div class="workflow-step done"><strong>Tender</strong><span>${t.id}</span></div><div class="workflow-step done"><strong>Award</strong><span>Approved supplier</span></div><div class="workflow-step done"><strong>Purchase order</strong><span>${po.id}</span></div><div class="workflow-step done"><strong>Goods receipt</strong><span>${grn.id}</span></div><div class="workflow-step current"><strong>Invoice & match</strong><span>${inv.id}</span></div><div class="workflow-step"><strong>Accounts payable</strong><span>${/Matched/.test(inv.match)?'Ready':'Exception held'}</span></div></div>
       <div class="match-triptych" style="margin-bottom:14px">
-        <section class="match-panel"><div class="match-head"><strong>Purchase Order</strong>${status('Controlled')}</div><div class="match-body"><div class="match-lines"><div class="match-line"><span>PO number</span><strong>${po.id}</strong></div><div class="match-line"><span>Vendor</span><strong>${esc(po.vendor)}</strong></div><div class="match-line"><span>Order value</span><strong>${money(po.amount)}</strong></div><div class="match-line"><span>Delivery date</span><strong>${esc(po.delivery)}</strong></div></div><div class="actions" style="margin-top:12px">${smallAction('Preview','preview-document',po.id,'eye')}${smallAction('Edit','edit-record-v5',po.id)}</div></div></section>
-        <section class="match-panel"><div class="match-head"><strong>Goods Received Note</strong>${status(grn.status)}</div><div class="match-body"><div class="match-lines"><div class="match-line"><span>GRN number</span><strong>${grn.id}</strong></div><div class="match-line"><span>Received item</span><strong>${esc(grn.item)}</strong></div><div class="match-line"><span>Accepted value</span><strong>${money(grn.value)}</strong></div><div class="match-line"><span>Classification</span><strong>${grn.asset?'Fixed asset candidate':'Inventory / expense'}</strong></div></div><div class="actions" style="margin-top:12px">${smallAction('Preview','preview-document',grn.id,'eye')}${smallAction('Edit','edit-record-v5',grn.id)}</div></div></section>
-        <section class="match-panel"><div class="match-head"><strong>Supplier Invoice</strong>${status(inv.match)}</div><div class="match-body"><div class="match-lines"><div class="match-line"><span>Invoice number</span><strong>${inv.id}</strong></div><div class="match-line"><span>Captured total</span><strong>${money(inv.amount)}</strong></div><div class="match-line"><span>Tax treatment</span><strong>${esc(inv.tax)}</strong></div><div class="match-line"><span>${__pr23Live()?'Document reading':'OCR confidence'}</span><strong>${__pr23Live()?__pr23Esc(__pr23ReadingLabel(inv)):'93.7%'}</strong></div></div><div class="actions" style="margin-top:12px">${smallAction('Preview','preview-invoice-v5',inv.id,'eye')}</div></div></section>
+        <section class="match-panel"><div class="match-head"><strong>Purchase Order</strong>${status('Controlled')}</div><div class="match-body"><div class="match-lines"><div class="match-line"><span>PO number</span><strong>${po.id}</strong></div><div class="match-line"><span>Vendor</span><strong>${esc(po.vendor)}</strong></div><div class="match-line"><span>Order value</span><strong>${money(po.amount,po.currency)}</strong></div><div class="match-line"><span>Delivery date</span><strong>${esc(po.delivery)}</strong></div></div><div class="actions" style="margin-top:12px">${smallAction('Preview','preview-document',po.id,'eye')}${smallAction('Edit','edit-record-v5',po.id)}</div></div></section>
+        <section class="match-panel"><div class="match-head"><strong>Goods Received Note</strong>${status(grn.status)}</div><div class="match-body"><div class="match-lines"><div class="match-line"><span>GRN number</span><strong>${grn.id}</strong></div><div class="match-line"><span>Received item</span><strong>${esc(grn.item)}</strong></div><div class="match-line"><span>Accepted value</span><strong>${money(grn.value,grn.currency)}</strong></div><div class="match-line"><span>Classification</span><strong>${grn.asset?'Fixed asset candidate':'Inventory / expense'}</strong></div></div><div class="actions" style="margin-top:12px">${smallAction('Preview','preview-document',grn.id,'eye')}${smallAction('Edit','edit-record-v5',grn.id)}</div></div></section>
+        <section class="match-panel"><div class="match-head"><strong>Supplier Invoice</strong>${status(inv.match)}</div><div class="match-body"><div class="match-lines"><div class="match-line"><span>Invoice number</span><strong>${inv.id}</strong></div><div class="match-line"><span>Captured total</span><strong>${money(inv.amount,inv.currency)}</strong></div><div class="match-line"><span>Tax treatment</span><strong>${esc(inv.tax)}</strong></div><div class="match-line"><span>${__pr23Live()?'Document reading':'OCR confidence'}</span><strong>${__pr23Live()?__pr23Esc(__pr23ReadingLabel(inv)):'93.7%'}</strong></div></div><div class="actions" style="margin-top:12px">${smallAction('Preview','preview-invoice-v5',inv.id,'eye')}</div></div></section>
       </div>
-      <div class="grid two" style="margin-bottom:14px">${card('Match outcome trend','Click a point for a month-specific match register.',`<div class="card-body">${lineChart('invoice-match')}</div>`)}${card('Exception causes','Click a cause for the underlying invoice and variance records.',`<div class="card-body">${bars([['Price variance',72],['Missing GRN',54],['Quantity variance',43],['Duplicate invoice',24],['Tax exception',18]],'invoice-exceptions')}</div>`)}</div>
+      ${__pr23Live()?__pr23MatchInsightsHtml(__chain):`<div class="grid two" style="margin-bottom:14px">${card('Match outcome trend','Click a point for a month-specific match register.',`<div class="card-body">${lineChart('invoice-match')}</div>`)}${card('Exception causes','Click a cause for the underlying invoice and variance records.',`<div class="card-body">${bars([['Price variance',72],['Missing GRN',54],['Quantity variance',43],['Duplicate invoice',24],['Tax exception',18]],'invoice-exceptions')}</div>`)}</div>`}
       ${card('Invoice register for selected procurement chain','OCR output, match result, tax treatment, approval and accounting hand-off.',table(['Invoice','Vendor','PO','Amount','Match result','Tax','Status',''],rows))}</div>`;
   }
   function invoicesPageV5(){return state.matchTender?matchWorkspaceV5(state.matchTender):matchSelectionPageV5()}
@@ -3613,10 +6510,10 @@ window.MatanhoProcurement=Object.freeze({version:'8.0.0',navigate,render,getStat
   }
 
   function analysisRecordsTable(kind){
-    if(kind==='invoice') return table(['Invoice','Vendor','PO','Amount','Exception','Owner','Status'],state.invoices.map(i=>`<tr data-record="invoice" data-id="${i.id}"><td><strong class="link">${i.id}</strong></td><td>${esc(i.vendor)}</td><td>${esc(i.po)}</td><td>${money(i.amount)}</td><td>${esc(i.match)}</td><td>Finance / AP</td><td>${status(i.status)}</td></tr>`));
+    if(kind==='invoice') return table(['Invoice','Vendor','PO','Amount','Exception','Owner','Status'],state.invoices.map(i=>`<tr data-record="invoice" data-id="${i.id}"><td><strong class="link">${i.id}</strong></td><td>${esc(i.vendor)}</td><td>${esc(i.po)}</td><td>${money(i.amount,i.currency)}</td><td>${esc(i.match)}</td><td>Finance / AP</td><td>${status(i.status)}</td></tr>`));
     if(kind==='report') return table(['Report','Audience','Frequency','Formats','Last delivery','Status'],state.reports.map(r=>`<tr><td><strong>${esc(r.name)}</strong></td><td>Executive + entity owners</td><td>${r.status==='Scheduled'?'Monthly':'On demand'}</td><td>PDF · Excel · CSV</td><td>31 Jul 2026</td><td>${status(r.status)}</td></tr>`));
     if(kind==='category') return table(['Category','Planned','Committed','Actual','Savings','Open events','Top supplier'],[['Technology',2180000,1840000,1660000,182000,3,'TechNova Solutions'],['Medical',1920000,1420000,1160000,96000,2,'MedEquip Africa'],['Agriculture',1260000,860000,610000,74000,2,'GreenGrid Energy'],['Fleet',880000,710000,525000,63000,1,'OmniFleet Parts'],['Facilities',740000,310000,246000,41000,2,'BuildCore Zimbabwe']].map(r=>`<tr><td><strong>${r[0]}</strong></td><td>${money(r[1])}</td><td>${money(r[2])}</td><td>${money(r[3])}</td><td>${money(r[4])}</td><td>${r[5]}</td><td>${r[6]}</td></tr>`));
-    return table(['Record','Type','Entity','Category','Owner','Value','Status'],state.tenders.map(t=>`<tr data-record="tender" data-id="${t.id}"><td><strong class="link">${t.id}</strong></td><td>Tender</td><td>${esc(t.entity)}</td><td>${esc(t.category)}</td><td>${esc(t.owner)}</td><td>${money(t.value)}</td><td>${status(t.stage)}</td></tr>`));
+    return table(['Record','Type','Entity','Category','Owner','Value','Status'],state.tenders.map(t=>`<tr data-record="tender" data-id="${t.id}"><td><strong class="link">${t.id}</strong></td><td>Tender</td><td>${esc(t.entity)}</td><td>${esc(t.category)}</td><td>${esc(t.owner)}</td><td>${money(t.value,t.currency)}</td><td>${status(t.stage)}</td></tr>`));
   }
   function analyticsPageV5(){if(__pr23Live())return __pr23AnalyticsHtml();
     const context=state.analysisContext||'spend-trend';
@@ -3661,11 +6558,11 @@ window.MatanhoProcurement=Object.freeze({version:'8.0.0',navigate,render,getStat
     let title=x.title||x.name||x.item||id, subtitle=`${type.replaceAll('-',' ')} · ${id}`, body='', foot='';
     if(type==='tender'){
       const t=state.tenders.find(v=>v.id===id)||state.tenders[0];
-      body=`<div class="plan-summary-strip"><div><span>Entity</span><strong>${esc(t.entity)}</strong></div><div><span>Method</span><strong>${esc(t.method)}</strong></div><div><span>Estimate</span><strong>${money(t.value)}</strong></div><div><span>Responses</span><strong>${t.bids}</strong></div><div><span>Stage</span><strong>${esc(t.stage)}</strong></div></div><div style="height:14px"></div>${card('Tender workspaces','Open the correct tender-specific layer.',`<div class="card-body list"><div class="list-row" data-action="select-quotation-tender-v5" data-id="${t.id}"><div class="list-main"><strong>Quotation comparison</strong><span>Commercial schedules, line items and recommendation</span></div>${icon('arrow')}</div><div class="list-row" data-action="open-evaluation" data-id="${t.id}"><div class="list-main"><strong>Bid evaluation</strong><span>Committee criteria, scoring and evidence</span></div>${icon('arrow')}</div><div class="list-row" data-action="select-match-tender-v5" data-id="${t.id}"><div class="list-main"><strong>Purchase order and invoice chain</strong><span>PO, GRN, invoice and three-way match</span></div>${icon('arrow')}</div><div class="list-row" data-action="preview-document" data-id="TPL-TDR-01"><div class="list-main"><strong>Tender pack</strong><span>Preview or edit controlled document</span></div>${icon('arrow')}</div></div>`)}`;
+      body=`<div class="plan-summary-strip"><div><span>Entity</span><strong>${esc(t.entity)}</strong></div><div><span>Method</span><strong>${esc(t.method)}</strong></div><div><span>Estimate</span><strong>${money(t.value,t.currency)}</strong></div><div><span>Responses</span><strong>${t.bids}</strong></div><div><span>Stage</span><strong>${esc(t.stage)}</strong></div></div><div style="height:14px"></div>${card('Tender workspaces','Open the correct tender-specific layer.',`<div class="card-body list"><div class="list-row" data-action="select-quotation-tender-v5" data-id="${t.id}"><div class="list-main"><strong>Quotation comparison</strong><span>Commercial schedules, line items and recommendation</span></div>${icon('arrow')}</div><div class="list-row" data-action="open-evaluation" data-id="${t.id}"><div class="list-main"><strong>Bid evaluation</strong><span>Committee criteria, scoring and evidence</span></div>${icon('arrow')}</div><div class="list-row" data-action="select-match-tender-v5" data-id="${t.id}"><div class="list-main"><strong>Purchase order and invoice chain</strong><span>PO, GRN, invoice and three-way match</span></div>${icon('arrow')}</div><div class="list-row" data-action="preview-document" data-id="TPL-TDR-01"><div class="list-main"><strong>Tender pack</strong><span>Preview or edit controlled document</span></div>${icon('arrow')}</div></div>`)}`;
       foot=actionButton('Edit tender','edit-record-v5',id)+actionButton('Invite vendors','invite-vendors',id)+actionButton('Open quotations','select-quotation-tender-v5',id,'primary');
     } else if(type==='invoice'){
       const i=state.invoices.find(v=>v.id===id)||state.invoices[0];
-      body=`<div class="notice"><div><strong>${esc(i.match)}</strong><p>Payment remains ${/Matched/.test(i.match)?'eligible after approval':'blocked until the exception is resolved'}.</p></div></div><div style="height:14px"></div><div class="match-lines"><div class="match-line"><span>Vendor</span><strong>${esc(i.vendor)}</strong></div><div class="match-line"><span>Purchase order</span><strong>${esc(i.po)}</strong></div><div class="match-line"><span>Invoice value</span><strong>${money(i.amount)}</strong></div><div class="match-line"><span>Tax</span><strong>${esc(i.tax)}</strong></div><div class="match-line"><span>Status</span><strong>${esc(i.status)}</strong></div></div>`;
+      body=`<div class="notice"><div><strong>${esc(i.match)}</strong><p>Payment remains ${/Matched/.test(i.match)?'eligible after approval':'blocked until the exception is resolved'}.</p></div></div><div style="height:14px"></div><div class="match-lines"><div class="match-line"><span>Vendor</span><strong>${esc(i.vendor)}</strong></div><div class="match-line"><span>Purchase order</span><strong>${esc(i.po)}</strong></div><div class="match-line"><span>Invoice value</span><strong>${money(i.amount,i.currency)}</strong></div><div class="match-line"><span>Tax</span><strong>${esc(i.tax)}</strong></div><div class="match-line"><span>Status</span><strong>${esc(i.status)}</strong></div></div>`;
       foot=actionButton('Preview invoice','preview-invoice-v5',id)+actionButton('Edit capture','edit-record-v5',id)+actionButton('Open match','open-match-detail-v5',id,'primary');
     } else if(type==='vendor'){
       const v=state.vendors.find(q=>q.id===id)||state.vendors[0];
@@ -3673,7 +6570,7 @@ window.MatanhoProcurement=Object.freeze({version:'8.0.0',navigate,render,getStat
       foot=actionButton('Edit vendor','edit-record-v5',id)+actionButton('Upload KYC','upload-record-file-v5',id)+actionButton('Send request','send-record-v5',id,'primary','mail');
     } else if(type==='requisition'){
       const r=state.requisitions.find(q=>q.id===id)||state.requisitions[0];
-      body=`<div class="plan-summary-strip"><div><span>Source</span><strong>${esc(r.type)}</strong></div><div><span>Entity</span><strong>${esc(r.entity)}</strong></div><div><span>Category</span><strong>${esc(r.category)}</strong></div><div><span>Estimate</span><strong>${money(r.amount)}</strong></div>${__pr23Live()?'':`<div><span>Budget</span><strong>${esc(r.budget)}</strong></div>`}</div><div style="height:14px"></div>${card('Approval and sourcing readiness','Request motivation, attachments and budget evidence.',`<div class="card-body list"><div class="list-row"><div class="list-main"><strong>Approval status</strong><span>${esc(r.status)}</span></div>${status(r.status)}</div><div class="list-row" data-action="preview-document" data-id="${r.id}"><div class="list-main"><strong>Internal motivation</strong><span>Preview the controlled request document</span></div>${icon('arrow')}</div></div>`)}`;
+      body=`<div class="plan-summary-strip"><div><span>Source</span><strong>${esc(r.type)}</strong></div><div><span>Entity</span><strong>${esc(r.entity)}</strong></div><div><span>Category</span><strong>${esc(r.category)}</strong></div><div><span>Estimate</span><strong>${money(r.amount,r.currency)}</strong></div>${__pr23Live()?'':`<div><span>Budget</span><strong>${esc(r.budget)}</strong></div>`}</div><div style="height:14px"></div>${card('Approval and sourcing readiness','Request motivation, attachments and budget evidence.',`<div class="card-body list"><div class="list-row"><div class="list-main"><strong>Approval status</strong><span>${esc(r.status)}</span></div>${status(r.status)}</div><div class="list-row" data-action="preview-document" data-id="${r.id}"><div class="list-main"><strong>Internal motivation</strong><span>Preview the controlled request document</span></div>${icon('arrow')}</div></div>`)}`;
       foot=actionButton('Edit request','edit-record-v5',id)+actionButton('Upload attachment','upload-record-file-v5',id)+actionButton('Send request','send-record-v5',id,'primary','mail');
     } else {
       const fields=Object.entries(x).slice(0,8).map(([k,v])=>`<div class="match-line"><span>${esc(k.replaceAll('_',' '))}</span><strong>${typeof v==='number'?money(v):esc(v)}</strong></div>`).join('');
@@ -3792,7 +6689,7 @@ window.MatanhoProcurement=Object.freeze({version:'8.0.0',navigate,render,getStat
     'open-match-detail-v5': a => {
       const i=state.invoices.find(x=>x.id===a.dataset.id)||state.invoices[0];
       const varianceCard=card('Variance and resolution','Every variance has an owner, decision and audit history.',`<div class="card-body">${bars([['Quantity',100],['Unit price',/variance/i.test(i.match)?76:100],['Tax',100],['Vendor',100],['PO reference',100]],'match-record')}</div>`,actionButton('Approve match','approve-match-v5',i.id,'primary')+actionButton('Create exception','create-match-exception-v5',i.id));
-      openWideModal(`3-Way Match · ${i.id}`,`${i.vendor} · ${i.po}`,`<div class="match-triptych"><section class="match-panel"><div class="match-head"><strong>Purchase Order</strong>${status('Controlled')}</div><div class="match-body"><div class="match-lines"><div class="match-line"><span>PO</span><strong>${i.po}</strong></div><div class="match-line"><span>Ordered value</span><strong>${money(i.amount)}</strong></div><div class="match-line"><span>Quantity</span><strong>1 lot</strong></div></div></div></section><section class="match-panel"><div class="match-head"><strong>Goods Receipt</strong>${status('Accepted')}</div><div class="match-body"><div class="match-lines"><div class="match-line"><span>GRN</span><strong>${state.grns[0].id}</strong></div><div class="match-line"><span>Accepted value</span><strong>${money(i.amount)}</strong></div><div class="match-line"><span>Inspection</span><strong>Passed</strong></div></div></div></section><section class="match-panel"><div class="match-head"><strong>Invoice</strong>${status(i.match)}</div><div class="match-body"><div class="match-lines"><div class="match-line"><span>Invoice</span><strong>${i.id}</strong></div><div class="match-line"><span>Captured value</span><strong>${money(i.amount)}</strong></div><div class="match-line"><span>Tax</span><strong>${i.tax}</strong></div></div></div></section></div><div style="height:14px"></div>${varianceCard}`,'','xl');
+      openWideModal(`3-Way Match · ${i.id}`,`${i.vendor} · ${i.po}`,`<div class="match-triptych"><section class="match-panel"><div class="match-head"><strong>Purchase Order</strong>${status('Controlled')}</div><div class="match-body"><div class="match-lines"><div class="match-line"><span>PO</span><strong>${i.po}</strong></div><div class="match-line"><span>Ordered value</span><strong>${money(i.amount,i.currency)}</strong></div><div class="match-line"><span>Quantity</span><strong>1 lot</strong></div></div></div></section><section class="match-panel"><div class="match-head"><strong>Goods Receipt</strong>${status('Accepted')}</div><div class="match-body"><div class="match-lines"><div class="match-line"><span>GRN</span><strong>${state.grns[0].id}</strong></div><div class="match-line"><span>Accepted value</span><strong>${money(i.amount,i.currency)}</strong></div><div class="match-line"><span>Inspection</span><strong>Passed</strong></div></div></div></section><section class="match-panel"><div class="match-head"><strong>Invoice</strong>${status(i.match)}</div><div class="match-body"><div class="match-lines"><div class="match-line"><span>Invoice</span><strong>${i.id}</strong></div><div class="match-line"><span>Captured value</span><strong>${money(i.amount,i.currency)}</strong></div><div class="match-line"><span>Tax</span><strong>${i.tax}</strong></div></div></div></section></div><div style="height:14px"></div>${varianceCard}`,'','xl');
     },
     'approve-match-v5': a => {const i=state.invoices.find(x=>x.id===a.dataset.id);if(i){i.match='Matched';i.status='Ready for AP'}closeOverlay();render();toast('Match approved','The invoice is ready for approval and Accounts Payable transfer.')},
     'create-match-exception-v5': a => {closeOverlay();toast('Exception created',`${a.dataset.id} remains blocked and the responsible owner was notified.`)},
@@ -3899,7 +6796,7 @@ window.MatanhoProcurement=Object.freeze({version:'8.0.0',navigate,render,getStat
   pages.invoices=invoicesPageV5;
   pages.settings=settingsPageV5;
   pages.documents=documentsPageV5;
-  pages.reports=reportsPageV5;
+  pages.reports=function(){return __pr23Live()?__pr23ReportsPageLive():reportsPageV5()};
   pages.analytics=analyticsPageV5;
 
   function enhanceCurrentPageV5(){
@@ -4144,13 +7041,13 @@ window.MatanhoProcurement=Object.freeze({version:'8.0.0',navigate,render,getStat
   const planPageV5RefV6=pages.plan;
   function planPageV6(){ return state.planViewV6==='actuals'?planActualsPageV6():planPageV5RefV6(); }
 
-  function vendorRegisterPageV6(){
+  function vendorRegisterPageV6(){if(__pr23Live())return __pr23VendorRegistryLive();
     const rows=state.vendors.map(v=>{const rule=taxRuleV6(v);const missing=v.complianceDocs.filter(d=>['Missing','Expired'].includes(d.status)).length;return `<tr>${__pr23Live()?`<td><strong class="link">${esc(v.name)}</strong></td><td>${esc(v.contact)}<br><span class="muted">${esc([v.email,v.phone].filter(x=>x&&x!=='—').join(' · ')||'—')}</span></td>`:`<td><strong class="link">${esc(v.id)}</strong></td><td><strong>${esc(v.name)}</strong><br><span class="muted">${esc(v.country)} | ${esc(v.email)}</span></td>`}<td>${esc(v.category)}</td><td>${esc(v.bp)}</td>${__pr23Live()?'':`<td>${esc(v.currency)}</td>`}<td>${vendorStatusChipV6(v)}<br><span class="muted">${v.taxExpiry?fmtDateV6(v.taxExpiry):'No approved expiry'}</span></td><td>${missing?status(`${missing} missing`):(__pr23Live()&&!(v.complianceDocs||[]).length?status('Not on file'):status('Complete'))}</td><td>${__pr23Live()&&(v.rating==null||v.rating==='—')?'<span class="muted">Not rated</span>':`${v.rating} / 5`}</td><td>${status(v.status)}</td><td><div class="actions">${smallAction('Open','open-vendor-v6',v.id)}${smallAction('Request docs','request-vendor-docs-v6',v.id,'mail')}${smallAction('Message','message-vendor-v6',v.id,'mail')}</div></td></tr>`});
     const expiring=state.vendors.filter(v=>{const r=taxRuleV6(v);return ['Expiring','Expired','Missing'].includes(r.status)});
     const messages=state.vendorMessagesV6.slice(0,4).map(m=>`<div class="list-row" data-action="open-vendor-message-v6" data-id="${m.id}"><div class="list-main"><strong>${esc(m.vendor)} | ${esc(m.subject)}</strong><span>${esc(m.direction)} | ${esc(m.date)} | ${m.attachments.length} attachment(s)</span></div>${status(m.status)}</div>`).join('');
     return `<div class="page">${pageHead('Supplier master and communications','Vendor Registry','Register suppliers, request company and compliance records, receive vendor documents and messages, monitor tax-clearance expiry and enforce purchasing rules.',actionV6('Register vendor','register-vendor','', 'primary','plus')+actionV6('Request compliance','request-vendor-docs-v6','','','mail')+actionV6('Vendor portal','vendor-portal','','','vendor')+actionV6('Run reminders','run-compliance-reminders-v6','','','mail'))}${filterBar()}${__pr23Live()?__pr23VendorRegistrationsCard():''}<div class="grid kpis">${kpi('Registered vendors',state.vendors.length,'Controlled master records','vendor')}${kpi('Current tax clearance',state.vendors.filter(v=>taxRuleV6(v).status==='Valid').length,'Approved ITF263 records','approve')}${kpi('Expiring / expired',expiring.length,__pr23Live()?'Tax clearance expired or expiring':'Automated reminders active','audit')}${kpi('Missing documents',vendorComplianceCountV6('Missing'),'Company, tax or banking evidence','document')}${kpi('Inbound messages',state.vendorMessagesV6.filter(m=>m.direction==='Inbound').length,'Vendor portal and email intake','mail')}${kpi('Pending compliance requests',state.vendorRequestsV6.filter(r=>r.status!=='Complete').length,'Tracked until approved','report')}</div><div class="grid two" style="margin-bottom:14px">${card('Compliance status','Every doughnut segment includes a visible legend and can be selected.',`<div class="card-body donut-wrap"><div class="donut chart-click" data-chart="vendor-compliance" style="background:${__pr23Live()?__pr23VendorCompliance().gradient:'conic-gradient(#0f8f78 0 46%,#b87518 46% 67%,#c54a58 67% 84%,#d9dde5 84% 100%)'}"><div class="donut-center"><strong>${state.vendors.length}</strong><span>vendors</span></div></div><div class="donut-legend-v6"><button data-action="vendor-compliance-filter-v6" data-id="Valid"><i style="background:#0f8f78"></i><span>Current</span><strong>${__pr23Live()?__pr23VendorCompliance().pct.Valid+'%':'46%'}</strong></button><button data-action="vendor-compliance-filter-v6" data-id="Expiring"><i style="background:#b87518"></i><span>Expiring</span><strong>${__pr23Live()?__pr23VendorCompliance().pct.Expiring+'%':'21%'}</strong></button><button data-action="vendor-compliance-filter-v6" data-id="Expired"><i style="background:#c54a58"></i><span>Expired / missing</span><strong>${__pr23Live()?__pr23VendorCompliance().pct.Expired+'%':'17%'}</strong></button><button data-action="vendor-compliance-filter-v6" data-id="Review"><i style="background:#d9dde5"></i><span>Under review</span><strong>${__pr23Live()?__pr23VendorCompliance().pct.Review+'%':'16%'}</strong></button></div></div>`)}${card('Vendor communication inbox','Receive messages, updated documents, clarifications and contract correspondence.',`<div class="card-body list">${messages}</div>`,smallAction('Open inbox','open-vendor-inbox-v6'))}</div><div class="compliance-grid-v6" style="margin-bottom:14px"><article class="compliance-card-v6"><span class="metric">${vendorComplianceCountV6('Valid')}</span><h4>Valid documents</h4><p>Approved statutory, company, banking and tax evidence.</p></article><article class="compliance-card-v6"><span class="metric">${vendorComplianceCountV6('Expiring')}</span><h4>Expiring soon</h4><p>Reminder schedule at 90, 60, 30 and 7 days.</p></article><article class="compliance-card-v6"><span class="metric">${vendorComplianceCountV6('Expired')}</span><h4>Expired</h4><p>Purchase and payment tax controls are displayed automatically.</p></article><article class="compliance-card-v6"><span class="metric">${state.vendorMessagesV6.reduce((n,m)=>n+m.attachments.length,0)}</span><h4>Received attachments</h4><p>Stored in the controlled Vendor Submissions folder.</p></article></div>${card('Vendor registry','Open a vendor to review profile, documents, tax rules, communications, performance and transaction history.',table(__pr23Live()?['Vendor','Contact','Category','BP number','Tax clearance','Document gaps','Rating','Status','Actions']:['Vendor ID','Vendor','Category','BP number','Currency','Tax clearance','Document gaps','Rating','Status','Actions'],rows))}</div>`;
   }
-  function vendorDetailPageV6(v){
+  function vendorDetailPageV6(v){if(__pr23Live())return __pr23VendorDetailLive(v);
     const docs=v.complianceDocs.map(d=>`<tr><td><strong>${esc(d.type)}</strong></td><td>${esc(d.version)}</td><td>${esc(d.updated)}</td><td>${status(d.status)}</td><td><div class="actions">${smallAction('Preview','preview-vendor-doc-v6',`${v.id}|${d.type}`,'eye')}${smallAction('Upload replacement','vendor-upload-doc-v6',`${v.id}|${d.type}`,'plus')}${smallAction('Request update','request-vendor-docs-v6',v.id,'mail')}</div></td></tr>`);
     const msgs=state.vendorMessagesV6.filter(m=>m.vendor===v.name).map(m=>`<tr><td>${esc(m.date)}</td><td>${esc(m.direction)}</td><td><strong>${esc(m.subject)}</strong><br><span class="muted">${esc(m.body.slice(0,95))}${m.body.length>95?'...':''}</span></td><td>${m.attachments.map(a=>`<span class="vendor-doc-chip-v6 valid">${esc(a)}</span>`).join('')||'-'}</td><td>${status(m.status)}</td><td>${smallAction('Open','open-vendor-message-v6',m.id)}</td></tr>`);
     return `<div class="page"><div class="breadcrumbs"><button data-action="back-vendors-v6">Vendor Registry</button><i>›</i><strong>${esc(v.name)}</strong></div>${pageHead('Vendor profile',v.name,__pr23Live()?[v.bp,v.category,v.email].filter(x=>x&&x!=='—').join(' | '):`${v.id} | ${v.category} | ${v.country}`,actionV6('Edit profile','edit-vendor-v6',v.id,'primary')+actionV6('Request documents','request-vendor-docs-v6',v.id,'','mail')+actionV6('Open vendor portal','vendor-portal-v6',v.id,'','vendor')+actionV6('Send message','message-vendor-v6',v.id,'','mail')+(__pr23Live()?actionV6('Delete vendor','delete-vendor-v23',v.id,'danger'):''))}<div class="grid kpis">${kpi('Vendor rating',__pr23Live()&&(v.rating==null||v.rating==='—')?'Not rated':`${v.rating} / 5`,'Historical delivery and quality','vendor')}${kpi('Lifetime spend',money(v.spend),'Across authorised entities','account')}${kpi('Tax clearance',taxRuleV6(v).status,v.taxExpiry?`Expires ${fmtDateV6(v.taxExpiry)}`:'No approved document','audit')}${kpi('Compliance documents',v.complianceDocs.filter(d=>d.status==='Valid').length,`${v.complianceDocs.length} tracked records`,'document')}${kpi('Open requests',state.vendorRequestsV6.filter(r=>r.vendor===v.name&&r.status!=='Complete').length,'Automated reminders active','mail')}${kpi('Messages',state.vendorMessagesV6.filter(m=>m.vendor===v.name).length,'Inbound and outbound','mail')}</div><div class="grid two" style="margin-bottom:14px">${card('Purchase tax and compliance rule','Displayed on purchase contracts, POs, invoices and payment review.',`<div class="card-body">${taxRuleCardV6(v)}<div class="actions" style="margin-top:12px">${actionV6('Send compliance reminder','send-vendor-reminder-v6',v.id,'','mail')}${actionV6('Preview PO clause','preview-tax-clause-v6',v.id,'','eye')}</div></div>`)}${card('Company profile','Editable vendor master information and controlled change history.',`<div class="card-body"><div class="form-grid"><div class="field"><label>Legal name</label><input value="${esc(v.name)}" readonly></div><div class="field"><label>Vendor ID</label><input value="${esc(v.id)}" readonly></div><div class="field"><label>BP number</label><input value="${esc(v.bp)}" readonly></div><div class="field"><label>VAT number</label><input value="${esc(v.vat)}" readonly></div><div class="field"><label>Primary contact</label><input value="${esc(v.contact)}" readonly></div><div class="field"><label>Email</label><input value="${esc(v.email)}" readonly></div>${__pr23Live()?`<div class="field"><label>Phone</label><input value="${esc(v.phone)}" readonly></div><div class="field"><label>Payment terms</label><input value="${esc(v.paymentTerms)}" readonly></div><div class="field full"><label>Address</label><input value="${esc(v.address)}" readonly></div>`:''}</div></div>`)}</div>${__pr23Live()?'':card('Compliance document register','Vendors can upload current documents through the secure portal; internal reviewers approve or reject each version.',table(['Document','Version','Updated','Status','Actions'],docs))}<div style="height:14px"></div>${__pr23Live()?__pr23VendorHistoryCard(v):''}${__pr23Live()?'':card('Vendor communications and received documents','Messages and files received from the vendor are retained against the vendor record and in the Document Vault.',table(['Date','Direction','Subject','Attachments','Status',''],msgs.length?msgs:[`<tr><td colspan="6">No communication records.</td></tr>`]))}</div>`;
@@ -4163,8 +7060,8 @@ window.MatanhoProcurement=Object.freeze({version:'8.0.0',navigate,render,getStat
     let content='';
     if(state.approvalTabV6==='mine'||state.approvalTabV6==='group'){
       const list=state.approvalTabV6==='mine'?pending:state.approvalPromptsV6;
-      const cards=list.slice(0,6).map(a=>`<article class="approval-prompt-v6 ${a.priority.toLowerCase()}"><div style="display:flex;justify-content:space-between;gap:8px"><span class="eyebrow">${esc(a.type)}</span>${status(a.priority)}</div><h4>${esc(a.title)}</h4><p>${esc(a.record)} | ${esc(a.entity)}</p><div class="approval-facts-v6"><div><span>Decision role</span><strong>${esc(a.role)}</strong></div><div><span>Due</span><strong>${esc(a.due)}</strong></div><div><span>Value</span><strong>${a.amount?money(a.amount):'N/A'}</strong></div><div><span>eSignature</span><strong>${a.esign?'Required':'Not required'}</strong></div></div><div class="actions">${smallAction('Review','open-approval-v6',a.id,'eye')}${smallAction('Approve','approve-prompt-v6',a.id,'approve')}${smallAction('Delegate','delegate-approval-v6',a.id)}</div></article>`).join('');
-      const rows=list.map(a=>`<tr><td><strong class="link">${esc(a.id)}</strong></td><td>${esc(a.type)}</td><td><strong>${esc(a.title)}</strong><br><span class="muted">${esc(a.record)}</span></td><td>${esc(a.entity)}</td><td>${a.amount?money(a.amount):'-'}</td><td>${esc(a.role)}</td><td>${esc(a.due)}</td><td>${status(a.priority)}</td><td>${status(a.status)}</td><td><div class="actions">${smallAction('Review','open-approval-v6',a.id,'eye')}${smallAction('Approve','approve-prompt-v6',a.id)}${smallAction('Reject','reject-prompt-v6',a.id)}</div></td></tr>`);
+      const cards=list.slice(0,6).map(a=>`<article class="approval-prompt-v6 ${a.priority.toLowerCase()}"><div style="display:flex;justify-content:space-between;gap:8px"><span class="eyebrow">${esc(a.type)}</span>${status(a.priority)}</div><h4>${esc(a.title)}</h4><p>${esc(a.record)} | ${esc(a.entity)}</p><div class="approval-facts-v6"><div><span>Decision role</span><strong>${esc(a.role)}</strong></div><div><span>Due</span><strong>${esc(a.due)}</strong></div><div><span>Value</span><strong>${a.amount?money(a.amount,a.currency):'N/A'}</strong></div><div><span>eSignature</span><strong>${a.esign?'Required':'Not required'}</strong></div></div><div class="actions">${smallAction('Review','open-approval-v6',a.id,'eye')}${smallAction('Approve','approve-prompt-v6',a.id,'approve')}${smallAction('Delegate','delegate-approval-v6',a.id)}</div></article>`).join('');
+      const rows=list.map(a=>`<tr><td><strong class="link">${esc(a.id)}</strong></td><td>${esc(a.type)}</td><td><strong>${esc(a.title)}</strong><br><span class="muted">${esc(a.record)}</span></td><td>${esc(a.entity)}</td><td>${a.amount?money(a.amount,a.currency):'-'}</td><td>${esc(a.role)}</td><td>${esc(a.due)}</td><td>${status(a.priority)}</td><td>${status(a.status)}</td><td><div class="actions">${smallAction('Review','open-approval-v6',a.id,'eye')}${smallAction('Approve','approve-prompt-v6',a.id)}${smallAction('Reject','reject-prompt-v6',a.id)}</div></td></tr>`);
       content=`<div class="approval-prompt-grid-v6">${cards}</div><div style="height:14px"></div>${card('Approval queue','Every prompt includes the record, supporting documents, authority check, segregation-of-duties result and eSignature requirement.',table(['Approval','Type','Record','Entity','Value','Role','Due','Priority','Status','Actions'],rows))}`;
     }
     if(state.approvalTabV6==='esign'){
@@ -4213,11 +7110,11 @@ window.MatanhoProcurement=Object.freeze({version:'8.0.0',navigate,render,getStat
     {id:'CTR-2026-079',tender:'TN-2026-012',title:'Solar Irrigation Supply Framework',vendor:'GreenGrid Energy',entity:'Kariba Agro Limited',value:860000,start:'2026-08-01',end:'2027-07-31',status:'Compliance review'}
   ];
   function ordersPageV6(){
-    const rows=(__pr23Live()?__pr23FilteredOrders():state.orders).map(o=>{const v=state.vendors.find(x=>x.name===o.vendor);const rule=taxRuleV6(v);return `<tr><td><strong class="link">${esc(o.id)}</strong></td><td>${esc(o.vendor)}</td><td>${esc(o.entity)}</td><td>${money(o.amount)}</td><td>${__pr23Live()?__pr23DayLabel(o.orderDate):(o.asset?'Fixed asset':'Goods / services')}</td><td>${vendorStatusChipV6(v||{})}</td><td>${rule.withholding?`${rule.withholding}% WHT`:'Standard'}</td><td>${esc(o.delivery)}</td><td>${status(o.status)}</td><td><div class="actions">${smallAction('Preview','preview-po-v6',o.id,'eye')}${smallAction('Edit','edit-po-v6',o.id)}${smallAction('Send','send-po-v6',o.id,'mail')}${__pr23Live()?'':smallAction('eSign','esign-new-v6',o.id,'signature')}</div></td></tr>`});
-    return `<div class="page">${pageHead('Committed procurement','Purchase Orders','Generate controlled purchase orders from approved awards or requisitions. Vendor tax-clearance and configured withholding rules are evaluated before approval and shown on the PO.',actionV6('Create PO','create-po','','primary','plus')+actionV6('Send selected','email-po','','','mail')+(__pr23Live()?'':actionV6('Signature queue','signature-queue','','','signature')))}${__pr23Live()?'':filterBar()}<div class="grid kpis">${kpi('Open POs',state.orders.filter(o=>!/Delivered|Billed|Cancelled/i.test(o.status)).length,'Not yet delivered, billed or cancelled','order')}${kpi('Value outstanding',money(state.orders.filter(o=>!/Delivered|Billed|Cancelled/i.test(o.status)).reduce((n,o)=>n+(Number(o.amount)||0),0)),'Committed not fully received','account')}${kpi('Tax alerts',state.orders.filter(o=>taxRuleV6(o.vendor).withholding>0).length,'Missing or expired clearance','audit')}${kpi('Asset purchases',state.orders.filter(o=>o.asset).length,'Transfer after accepted GRN','transfer')}${kpi('Awaiting acknowledgement','1','Vendor reminder active','mail')}${__pr23Live()?'':kpi('eSign coverage','100%','Controlled approval documents','signature')}</div><div class="notice" style="margin-bottom:14px"><span class="kpi-icon">${icon('audit')}</span><div><strong>Tax compliance is evaluated at purchase creation</strong><p>The purchase order carries the vendor compliance status, configured tax rule, approval evidence and any required withholding clause. Automated reminders do not bypass the control.</p></div></div>${__pr23Live()?__pr23OrderFiltersHtml():''}${card('Purchase order register',__pr23Live()?'Every purchase order your role can see. The filters narrow this register; the cards above cover every order.':'Preview, edit, send, sign and monitor every controlled purchase order.',table(['PO','Vendor','Entity','Amount',__pr23Live()?'Ordered':'Classification','Tax clearance','Tax rule','Delivery','Status','Actions'],__pr23Live()&&!rows.length?__pr23OrderEmptyRows():rows))}</div>`;
+    const rows=(__pr23Live()?__pr23FilteredOrders():state.orders).map(o=>{const v=state.vendors.find(x=>x.name===o.vendor);const rule=taxRuleV6(v);return `<tr><td><strong class="link">${esc(o.id)}</strong></td><td>${esc(o.vendor)}</td><td>${esc(o.entity)}</td><td>${money(o.amount,o.currency)}</td><td>${__pr23Live()?__pr23DayLabel(o.orderDate):(o.asset?'Fixed asset':'Goods / services')}</td><td>${vendorStatusChipV6(v||{})}</td><td>${rule.withholding?`${rule.withholding}% WHT`:'Standard'}</td><td>${esc(o.delivery)}</td><td>${status(o.status)}${__pr23Live()?__pr23PoStatusChip(o):''}</td><td><div class="actions">${smallAction('Preview','preview-po-v6',o.id,'eye')}${smallAction('Edit','edit-po-v6',o.id)}${smallAction('Send','send-po-v6',o.id,'mail')}${__pr23Live()?__pr23PoRowActions(o):smallAction('eSign','esign-new-v6',o.id,'signature')}</div></td></tr>`});
+    return `<div class="page">${pageHead('Committed procurement','Purchase Orders','Generate controlled purchase orders from approved awards or requisitions. Vendor tax-clearance and configured withholding rules are evaluated before approval and shown on the PO.',actionV6('Create PO','create-po','','primary','plus')+actionV6('Send selected','email-po','','','mail')+(__pr23Live()?'':actionV6('Signature queue','signature-queue','','','signature')))}${__pr23Live()?'':filterBar()}<div class="grid kpis">${kpi('Open POs',state.orders.filter(o=>!/Delivered|Billed|Cancelled/i.test(o.status)).length,'Not yet delivered, billed or cancelled','order')}${kpi('Value outstanding',money(state.orders.filter(o=>!/Delivered|Billed|Cancelled/i.test(o.status)).reduce((n,o)=>n+(Number(o.amount)||0),0)),'Committed not fully received','account')}${kpi('Tax alerts',state.orders.filter(o=>taxRuleV6(o.vendor).withholding>0).length,'Missing or expired clearance','audit')}${kpi('Asset purchases',state.orders.filter(o=>o.asset).length,'Transfer after accepted GRN','transfer')}${kpi('Awaiting acknowledgement','1','Vendor reminder active','mail')}${__pr23Live()?'':kpi('eSign coverage','100%','Controlled approval documents','signature')}</div><div class="notice" style="margin-bottom:14px"><span class="kpi-icon">${icon('audit')}</span><div><strong>Tax compliance is evaluated at purchase creation</strong><p>The purchase order carries the vendor compliance status, configured tax rule, approval evidence and any required withholding clause. Automated reminders do not bypass the control.</p></div></div>${__pr23Live()?__pr23OrderFiltersHtml():''}${card('Purchase order register',__pr23Live()?'Every purchase order your role can see.':'Preview, edit, send, sign and monitor every controlled purchase order.',table(['PO','Vendor','Entity','Amount',__pr23Live()?'Ordered':'Classification','Tax clearance','Tax rule','Delivery','Status','Actions'],__pr23Live()&&!rows.length?__pr23OrderEmptyRows():rows))}</div>`;
   }
   function contractsPageV6(){
-    const rows=state.contractsV6.map(c=>{const v=state.vendors.find(x=>x.name===c.vendor);const rule=taxRuleV6(v);return `<tr>${__pr23Live()&&c.kind==='award'?`<td><span class="muted">Not yet contracted</span></td><td><strong>${esc(c.title)}</strong><br><span class="muted">Award on ${esc(c.tender)} · ${esc(c.id)}</span></td>`:`<td><strong class="link">${esc(c.id)}</strong></td><td><strong>${esc(c.title)}</strong><br><span class="muted">${esc(c.tender)}</span></td>`}<td>${esc(c.vendor)}</td><td>${esc(c.entity)}</td><td>${money(c.value)}</td><td>${vendorStatusChipV6(v||{})}</td><td>${rule.withholding?`${rule.withholding}% withholding clause`:'Standard clause'}</td><td>${fmtDateV6(c.end)}</td><td>${status(c.status)}</td><td><div class="actions">${smallAction('Preview','preview-contract-v6',c.id,'eye')}${smallAction('Edit','edit-contract-v6',c.id)}${smallAction('Send','send-document',c.id,'mail')}${smallAction('eSign','esign-new-v6',c.id,'signature')}</div></td></tr>`});
+    const rows=state.contractsV6.map(c=>{const v=state.vendors.find(x=>x.name===c.vendor);const rule=taxRuleV6(v);return `<tr>${__pr23Live()&&c.kind==='award'?`<td><span class="muted">Not yet contracted</span></td><td><strong>${esc(c.title)}</strong><br><span class="muted">Award on ${esc(c.tender)} · ${esc(c.id)}</span></td>`:`<td><strong class="link">${esc(c.id)}</strong></td><td><strong>${esc(c.title)}</strong><br><span class="muted">${esc(c.tender)}</span></td>`}<td>${esc(c.vendor)}</td><td>${esc(c.entity)}</td><td>${money(c.value,c.currency)}</td><td>${vendorStatusChipV6(v||{})}</td><td>${rule.withholding?`${rule.withholding}% withholding clause`:'Standard clause'}</td><td>${fmtDateV6(c.end)}</td><td>${status(c.status)}</td><td><div class="actions">${smallAction('Preview','preview-contract-v6',c.id,'eye')}${smallAction('Edit','edit-contract-v6',c.id)}${smallAction('Send','send-document',c.id,'mail')}${smallAction('eSign','esign-new-v6',c.id,'signature')}</div></td></tr>`});
     return `<div class="page">${pageHead('Awards and obligations','Contracts & Awards','Create contracts from the user-approved award decision, apply vendor compliance and tax clauses, route eSignatures and monitor obligations.',actionV6('Create contract','create-contract','','primary','plus')+actionV6('Signature queue','signature-queue','','','signature'))}${filterBar()}<div class="grid kpis">${kpi('Active contracts',state.contractsV6.filter(c=>c.status==='Active').length,'Current register','contract')}${kpi('Awaiting signature',state.contractsV6.filter(c=>/signature/i.test(c.status)).length,'Internal and external signers','signature')}${kpi('Compliance reviews',state.contractsV6.filter(c=>taxRuleV6(c.vendor).status!=='Valid').length,'Tax or company documents','audit')}${kpi('Contract value',money(state.contractsV6.reduce((n,c)=>n+c.value,0)),'Controlled portfolio','account')}${kpi('Renewals in 90 days','0','Reminder schedule configured','document')}${kpi('Vendor obligations','94%','On-time compliance','vendor')}</div>${card('Contract register','The final winner is selected by the authorised user; contracts then follow delegated approval and eSignature.',table(['Contract','Description','Vendor','Entity','Value','Tax clearance','Tax clause','Expiry','Status','Actions'],rows))}</div>`;
   }
 
@@ -4301,7 +7198,7 @@ window.MatanhoProcurement=Object.freeze({version:'8.0.0',navigate,render,getStat
   function approvalDetailV6(id){
     const a=state.approvalPromptsV6.find(x=>x.id===id)||state.approvalPromptsV6[0];
     const chain=a.type==='Annual plan'?['Group Procurement Lead','CFO','CEO']:a.type==='Tender award'?['Evaluation Committee','CFO','CEO']:['Business Owner','Finance Control',a.role];
-    openV6Modal(`Approval · ${a.record}`,`${a.type} | ${a.entity}`, `<div class="grid two"><section class="card"><div class="card-body"><span class="eyebrow">Decision summary</span><h2 style="margin:7px 0">${esc(a.title)}</h2><p>${esc(a.reason)}</p><div class="source-meta"><div><span>Amount</span><strong>${a.amount?money(a.amount):'Non-financial'}</strong></div><div><span>Required role</span><strong>${esc(a.role)}</strong></div><div><span>Due</span><strong>${esc(a.due)}</strong></div><div><span>Priority</span><strong>${esc(a.priority)}</strong></div></div><h4>Approver statement</h4><textarea id="approvalCommentV6" style="width:100%;min-height:110px">I have reviewed the supporting documents, budget position, procurement method, conflicts and recommendations. My decision is based on the information presented and remains subject to the approved delegated authority.</textarea></div></section><section class="card"><div class="card-body"><span class="eyebrow">Approval sequence</span><div class="esign-timeline-v6" style="margin-top:14px">${chain.map((x,i)=>`<div class="esign-step-v6 ${i===chain.length-1?'current':'done'}"><div class="esign-dot-v6">${i+1}</div><div><strong>${esc(x)}</strong><span>${i===chain.length-1?`Awaiting ${esc(a.approver)}`:'Completed and audit-stamped'}</span></div></div>`).join('')}</div><h4>Supporting documents</h4><div>${['Decision paper','Budget evidence','Evaluation or transaction report','Conflict declaration'].map(x=>`<span class="vendor-doc-chip-v6 valid">${icon('document')}${x}</span>`).join('')}</div></div></section></div>`,actionV6('Preview record','preview-approval-record-v6',a.id,'','eye')+actionV6('Delegate','delegate-approval-v6',a.id)+actionV6('Reject / return','reject-approval-v6',a.id)+actionV6(a.esign?'Approve & eSign':'Approve','approve-prompt-v6',a.id,'primary',a.esign?'signature':'approve'),'full');
+    openV6Modal(`Approval · ${a.record}`,`${a.type} | ${a.entity}`, `<div class="grid two"><section class="card"><div class="card-body"><span class="eyebrow">Decision summary</span><h2 style="margin:7px 0">${esc(a.title)}</h2><p>${esc(a.reason)}</p><div class="source-meta"><div><span>Amount</span><strong>${a.amount?money(a.amount,a.currency):'Non-financial'}</strong></div><div><span>Required role</span><strong>${esc(a.role)}</strong></div><div><span>Due</span><strong>${esc(a.due)}</strong></div><div><span>Priority</span><strong>${esc(a.priority)}</strong></div></div><h4>Approver statement</h4><textarea id="approvalCommentV6" style="width:100%;min-height:110px">I have reviewed the supporting documents, budget position, procurement method, conflicts and recommendations. My decision is based on the information presented and remains subject to the approved delegated authority.</textarea></div></section><section class="card"><div class="card-body"><span class="eyebrow">Approval sequence</span><div class="esign-timeline-v6" style="margin-top:14px">${chain.map((x,i)=>`<div class="esign-step-v6 ${i===chain.length-1?'current':'done'}"><div class="esign-dot-v6">${i+1}</div><div><strong>${esc(x)}</strong><span>${i===chain.length-1?`Awaiting ${esc(a.approver)}`:'Completed and audit-stamped'}</span></div></div>`).join('')}</div><h4>Supporting documents</h4><div>${['Decision paper','Budget evidence','Evaluation or transaction report','Conflict declaration'].map(x=>`<span class="vendor-doc-chip-v6 valid">${icon('document')}${x}</span>`).join('')}</div></div></section></div>`,actionV6('Preview record','preview-approval-record-v6',a.id,'','eye')+(__pr23Live()&&a.kind!=='requisition'?'':actionV6('Delegate','delegate-approval-v6',a.id))+actionV6('Reject / return','reject-approval-v6',a.id)+actionV6(a.esign?'Approve & eSign':'Approve','approve-prompt-v6',a.id,'primary',a.esign?'signature':'approve'),'full');
   }
   function rejectApprovalModalV6(id){
     const a=state.approvalPromptsV6.find(x=>x.id===id);if(!a)return;
@@ -4313,7 +7210,7 @@ window.MatanhoProcurement=Object.freeze({version:'8.0.0',navigate,render,getStat
   }
   function notificationsV6(){
     const expiring=state.vendors.filter(v=>['expiring','expired','missing'].includes(taxRuleV6(v).state));
-    openV6Modal('Notifications and Approval Prompts','Actionable approvals, vendor compliance and document activity', `<div class="grid two"><section class="card"><div class="card-head"><div><h3>Approvals requiring attention</h3><p>Role-aware prompts from the dedicated Approval Centre.</p></div>${actionV6('Open Approval Centre','nav-v6','approvals','primary','approve')}</div><div class="card-body list">${state.approvalPromptsV6.filter(a=>a.status!=='Approved').map(a=>`<div class="list-row"><div class="list-main"><strong>${esc(a.title)}</strong><span>${esc(a.role)} · ${esc(a.due)} · ${a.amount?money(a.amount):'Non-financial'}</span></div><div class="actions">${status(a.priority)}${smallAction('Review','open-approval-v6',a.id)}</div></div>`).join('')}</div></section><section class="card"><div class="card-head"><div><h3>Vendor compliance</h3><p>Expiry, missing-document and inbound-submission alerts.</p></div>${actionV6('Send reminders','run-compliance-reminders-v6','','','mail')}</div><div class="card-body list">${expiring.map(v=>{const r=taxRuleV6(v);return `<div class="list-row"><div class="list-main"><strong>${esc(v.name)}</strong><span>${esc(r.title)} · ${r.withholding?`${r.withholding}% withholding rule`:r.detail}</span></div>${smallAction('Review','open-vendor-v6',v.id)}</div>`}).join('')}<div class="list-row"><div class="list-main"><strong>New vendor documents received</strong><span>GreenGrid Energy submitted ITF263 and company profile</span></div>${smallAction('Open inbox','vendor-inbox-v6')}</div></div></section></div>`,actionV6('Mark non-action items read','mark-notifications-v6'),'full');
+    openV6Modal('Notifications and Approval Prompts','Actionable approvals, vendor compliance and document activity', `<div class="grid two"><section class="card"><div class="card-head"><div><h3>Approvals requiring attention</h3><p>Role-aware prompts from the dedicated Approval Centre.</p></div>${actionV6('Open Approval Centre','nav-v6','approvals','primary','approve')}</div><div class="card-body list">${state.approvalPromptsV6.filter(a=>a.status!=='Approved').map(a=>`<div class="list-row"><div class="list-main"><strong>${esc(a.title)}</strong><span>${esc(a.role)} · ${esc(a.due)} · ${a.amount?money(a.amount,a.currency):'Non-financial'}</span></div><div class="actions">${status(a.priority)}${smallAction('Review','open-approval-v6',a.id)}</div></div>`).join('')}</div></section><section class="card"><div class="card-head"><div><h3>Vendor compliance</h3><p>Expiry, missing-document and inbound-submission alerts.</p></div>${actionV6('Send reminders','run-compliance-reminders-v6','','','mail')}</div><div class="card-body list">${expiring.map(v=>{const r=taxRuleV6(v);return `<div class="list-row"><div class="list-main"><strong>${esc(v.name)}</strong><span>${esc(r.title)} · ${r.withholding?`${r.withholding}% withholding rule`:r.detail}</span></div>${smallAction('Review','open-vendor-v6',v.id)}</div>`}).join('')}<div class="list-row"><div class="list-main"><strong>New vendor documents received</strong><span>GreenGrid Energy submitted ITF263 and company profile</span></div>${smallAction('Open inbox','vendor-inbox-v6')}</div></div></section></div>`,actionV6('Mark non-action items read','mark-notifications-v6'),'full');
   }
 
   function documentSendModalV6(id){
@@ -4530,7 +7427,7 @@ window.MatanhoProcurement=Object.freeze({version:'8.0.0',navigate,render,getStat
     'edit-tender-v23':a=>__pr23EditTenderModal(a.dataset.id),
     'audit-page-prev':()=>{state.__pr23AuditPage=Math.max(0,(state.__pr23AuditPage||0)-1);render()},
     'audit-page-next':()=>{const total=(state.auditEventsLive||[]).length;const last=Math.max(0,Math.ceil(total/50)-1);state.__pr23AuditPage=Math.min(last,(state.__pr23AuditPage||0)+1);render()},
-    'preview-po-v6':a=>{const o=state.orders.find(x=>x.id===a.dataset.id);const v=state.vendors.find(x=>x.name===o?.vendor);const r=taxRuleV6(v);previewDocV6({id:o.id,name:`Purchase Order ${o.id}`,version:'Issued copy',status:o.status,owner:'Group Procurement',content:`<h1>Purchase Order</h1><p><strong>Supplier:</strong> ${esc(o.vendor)}</p><p><strong>Purchasing entity:</strong> ${esc(o.entity)}</p><p><strong>Order value:</strong> ${money(o.amount)}</p><h2>Order and tax conditions</h2><p>${esc(r.poClause)}</p><h2>Supply requirements</h2><p>The Supplier shall deliver the approved goods or services in accordance with the specifications, delivery dates, warranties and acceptance criteria. No variation is effective unless approved in writing.</p><h2>Payment</h2><p>Payment is subject to receipt, inspection, a valid tax invoice, applicable matching controls and the configured approval workflow.</p>`})},
+    'preview-po-v6':a=>{const o=state.orders.find(x=>x.id===a.dataset.id);const v=state.vendors.find(x=>x.name===o?.vendor);const r=taxRuleV6(v);previewDocV6({id:o.id,name:`Purchase Order ${o.id}`,version:'Issued copy',status:o.status,owner:'Group Procurement',content:`<h1>Purchase Order</h1><p><strong>Supplier:</strong> ${esc(o.vendor)}</p><p><strong>Purchasing entity:</strong> ${esc(o.entity)}</p><p><strong>Order value:</strong> ${money(o.amount,o.currency)}</p><h2>Order and tax conditions</h2><p>${esc(r.poClause)}</p><h2>Supply requirements</h2><p>The Supplier shall deliver the approved goods or services in accordance with the specifications, delivery dates, warranties and acceptance criteria. No variation is effective unless approved in writing.</p><h2>Payment</h2><p>Payment is subject to receipt, inspection, a valid tax invoice, applicable matching controls and the configured approval workflow.</p>`})},
     'preview-po-form-v6':()=>previewDocV6('TPL-PO-01'),
     'save-po-v6':()=>{const f=$('#poFormV6');if(!f?.reportValidity())return;const d=new FormData(f);let o=state.orders.find(x=>x.id===d.get('id'));if(!o){o={id:'PO-2026-'+String(590+state.orders.length),status:'Draft'};state.orders.unshift(o)}o.vendor=d.get('vendor');o.entity=d.get('entity');o.amount=Number(d.get('amount'));o.delivery=fmtDateV6(d.get('delivery'));o.asset=d.get('classification')==='Fixed asset';closeOverlay();render();toast('Purchase order saved',`${o.id} was saved with the vendor compliance and tax rule snapshot.`)},
     'submit-po-v6':()=>{const f=$('#poFormV6');if(!f?.reportValidity())return;const d=new FormData(f);const v=state.vendors.find(x=>x.name===d.get('vendor'));const rule=taxRuleV6(v);closeOverlay();state.approvalPromptsV6.unshift({id:'APR-'+Date.now(),type:'Purchase order',record:'PO-DRAFT',title:`Purchase order for ${v.name}`,entity:d.get('entity'),amount:Number(d.get('amount')),role:Number(d.get('amount'))>5000?'CFO':'Department Approver',approver:Number(d.get('amount'))>5000?'Tinashe Chaka':'Panashe Mlambo',due:'Today',priority:rule.state==='valid'?'Normal':'High',status:'Awaiting me',esign:true,reason:`PO approval with ${rule.withholding}% withholding rule`});render();toast('PO submitted','The responsible approver received an in-app and email prompt.')},
@@ -4541,7 +7438,7 @@ window.MatanhoProcurement=Object.freeze({version:'8.0.0',navigate,render,getStat
     'create-contract-v6':()=>contractModalV6(),
     'create-contract':()=>contractModalV6(),
     'edit-contract-v6':a=>contractModalV6(a.dataset.id),
-    'preview-contract-v6':a=>{const c=state.contractsV6.find(x=>x.id===a.dataset.id);const v=state.vendors.find(x=>x.name===c?.vendor);previewDocV6({id:c.id,name:c.title,version:'Current draft',status:c.status,owner:'Legal and Procurement',content:`<h1>${esc(c.title)}</h1><p><strong>Purchaser:</strong> ${esc(c.entity)}</p><p><strong>Supplier:</strong> ${esc(c.vendor)}</p><p><strong>Contract value:</strong> ${money(c.value)}</p><h2>1. Appointment and scope</h2><p>The Purchaser appoints the Supplier to provide the goods, services and deliverables described in the schedules, and the Supplier accepts the appointment on the terms of this Agreement.</p><h2>2. Compliance and tax</h2><p>${esc(taxRuleV6(v).contractClause)}</p><h2>3. Delivery, acceptance and warranties</h2><p>Deliverables are subject to inspection and written acceptance. The Supplier warrants quality, conformity, title, professional skill and compliance with applicable law.</p><h2>4. Fees and payment</h2><p>Payment is due after valid invoicing, successful controls and acceptance. The Purchaser may withhold disputed amounts and statutory deductions.</p><h2>5. Confidentiality, data protection and audit</h2><p>The Supplier shall protect confidential information, maintain appropriate controls and provide records reasonably required for audit.</p><h2>6. Termination</h2><p>Either party may terminate for material breach not remedied within the agreed cure period. The Purchaser may terminate immediately for fraud, corruption, sanctions or serious compliance failure.</p>`})},
+    'preview-contract-v6':a=>{const c=state.contractsV6.find(x=>x.id===a.dataset.id);const v=state.vendors.find(x=>x.name===c?.vendor);previewDocV6({id:c.id,name:c.title,version:'Current draft',status:c.status,owner:'Legal and Procurement',content:`<h1>${esc(c.title)}</h1><p><strong>Purchaser:</strong> ${esc(c.entity)}</p><p><strong>Supplier:</strong> ${esc(c.vendor)}</p><p><strong>Contract value:</strong> ${money(c.value,c.currency)}</p><h2>1. Appointment and scope</h2><p>The Purchaser appoints the Supplier to provide the goods, services and deliverables described in the schedules, and the Supplier accepts the appointment on the terms of this Agreement.</p><h2>2. Compliance and tax</h2><p>${esc(taxRuleV6(v).contractClause)}</p><h2>3. Delivery, acceptance and warranties</h2><p>Deliverables are subject to inspection and written acceptance. The Supplier warrants quality, conformity, title, professional skill and compliance with applicable law.</p><h2>4. Fees and payment</h2><p>Payment is due after valid invoicing, successful controls and acceptance. The Purchaser may withhold disputed amounts and statutory deductions.</p><h2>5. Confidentiality, data protection and audit</h2><p>The Supplier shall protect confidential information, maintain appropriate controls and provide records reasonably required for audit.</p><h2>6. Termination</h2><p>Either party may terminate for material breach not remedied within the agreed cure period. The Purchaser may terminate immediately for fraud, corruption, sanctions or serious compliance failure.</p>`})},
     'preview-contract-form-v6':()=>previewDocV6('TPL-CONTRACT-01'),
     'save-contract-v6':()=>{const f=$('#contractFormV6');if(!f?.reportValidity())return;const d=new FormData(f);let c=state.contractsV6.find(x=>x.id===d.get('id'));if(!c){c={id:'CTR-2026-'+String(82+state.contractsV6.length),status:'Draft'};state.contractsV6.unshift(c)}c.tender=String(d.get('tender')).split(' · ')[0];c.title=d.get('title');c.entity=d.get('entity');c.vendor=d.get('vendor');c.value=Number(d.get('value'));c.start=d.get('start');c.end=d.get('end');closeOverlay();render();toast('Contract draft saved',`${c.id} contains the current tax, performance, payment and signing clauses.`)},
     'save-and-esign-contract-v6':()=>{const f=$('#contractFormV6');if(!f?.reportValidity())return;const d=new FormData(f);closeOverlay();esignBuilderV6(d.get('id')||'TPL-CONTRACT-01')},
@@ -4868,8 +7765,8 @@ window.MatanhoProcurement=Object.freeze({version:'8.0.0',navigate,render,getStat
   const shadeClassV7=(value,values,higher=true)=>{const best=higher?Math.max(...values):Math.min(...values),worst=higher?Math.min(...values):Math.max(...values);return value===best?'quote-best-v7':value===worst?'quote-worst-v7':''};
 
   function quotationSelectionPageV7(){
-    const candidates=state.tenders.filter(t=>t.bids>0);
-    const rows=candidates.map((t,i)=>`<tr data-action="select-quotation-tender-v5" data-id="${esc(t.id)}" data-quote-row-v7 data-stage="${esc(t.stage)}" data-entity="${esc(t.entity)}" data-search="${esc((t.id+' '+t.title+' '+t.entity+' '+t.category+' '+t.owner).toLowerCase())}"><td><strong class="link">${esc(t.id)}</strong><br><span class="muted">${esc(t.title)}</span></td><td>${esc(t.entity)}</td><td>${esc(t.category)}</td><td>${esc(t.method)}</td><td class="money">${money(t.value)}</td><td><strong>${t.bids}</strong><br><span class="muted">supplier responses</span></td><td>${status(t.stage)}</td><td>${esc(t.close)}</td><td>${esc(t.owner)}</td><td>${__pr23Live()?__pr23QuotationChip(t.id):`<span class="vendor-doc-chip-v6 ${i===0?'valid':i===1?'expiring':'valid'}">${i===1?'1 compliance review':'Ready'}</span>`}</td><td>${smallAction('Open comparison','select-quotation-tender-v5',t.id,'arrow')}</td></tr>`);
+    const candidates=(typeof __pr23QuotationCandidates==='function'?__pr23QuotationCandidates():state.tenders.filter(t=>t.bids>0));
+    const rows=candidates.map((t,i)=>`<tr data-action="select-quotation-tender-v5" data-id="${esc(t.id)}" data-quote-row-v7 data-stage="${esc(t.stage)}" data-entity="${esc(t.entity)}" data-search="${esc((t.id+' '+t.title+' '+t.entity+' '+t.category+' '+t.owner).toLowerCase())}"><td><strong class="link">${esc(t.id)}</strong><br><span class="muted">${esc(t.title)}</span></td><td>${esc(t.entity)}</td><td>${esc(t.category)}</td><td>${esc(t.method)}</td><td class="money">${money(t.value,t.currency)}</td><td><strong>${t.bids}</strong><br><span class="muted">supplier responses</span></td><td>${status(t.stage)}</td><td>${esc(t.close)}</td><td>${esc(t.owner)}</td><td>${__pr23Live()?__pr23QuotationChip(t.id):`<span class="vendor-doc-chip-v6 ${i===0?'valid':i===1?'expiring':'valid'}">${i===1?'1 compliance review':'Ready'}</span>`}</td><td>${smallAction('Open comparison','select-quotation-tender-v5',t.id,'arrow')}</td></tr>`);
     return `<div class="page">${pageHead('Commercial analysis','Quotation Comparison','Select a tender or RFQ from the register. The detailed comparison opens only after a sourcing event is selected.',actionButton('Create RFQ','create-tender','','primary','plus')+actionButton('Import quotations','import-quotations-v5','','','plus'))}${filterBar()}<div class="grid kpis">${kpi('Events with quotations',candidates.length,'Ready for review','tender')}${kpi('Supplier responses',candidates.reduce((n,t)=>n+t.bids,0),'Structured portal submissions','vendor')}${kpi('Compliance reviews','3','Before comparison or award','audit')}${kpi('Technical threshold','70%','Default configurable minimum','evaluate')}${kpi('Potential savings',money(486000),'Against internal estimates','account')}${kpi('Recommendations due','3','Within the next 5 days','approve')}</div>${card('Tender and RFQ register','Click any line to open its tender-specific quotation comparison, scoring metrics and line-item analysis.',`<div class="table-tools quotation-list-tools-v7"><input id="quotationSearchV7" placeholder="Search tender, entity, category or owner"><select id="quotationStageV7"><option>All stages</option>${[...new Set(candidates.map(t=>t.stage))].map(x=>`<option>${esc(x)}</option>`).join('')}</select><select id="quotationEntityV7"><option>All entities</option>${[...new Set(candidates.map(t=>t.entity))].map(x=>`<option>${esc(x)}</option>`).join('')}</select><span class="muted">${candidates.length} sourcing events</span></div>${table(['Tender / RFQ','Entity','Category','Method','Estimate','Responses','Stage','Closing','Owner','Readiness',''],rows)}`)}</div>`;
   }
 
@@ -4895,7 +7792,7 @@ window.MatanhoProcurement=Object.freeze({version:'8.0.0',navigate,render,getStat
 
   function rejectRequisitionModalV7(id){
     const r=state.requisitions.find(x=>x.id===id);if(!r)return;
-    openV6Modal('Reject or return purchase requisition',`${r.id} · ${r.title}`, `<form id="rejectRequisitionFormV7"><div class="notice"><span class="kpi-icon">${icon('requisition')}</span><div><strong>${esc(r.entity)} · ${money(r.amount)}</strong><p>The reason is written to the immutable decision history and sent to the requester and procurement owner.</p></div></div><div class="dense-form-grid" style="margin-top:14px">${formField('Decision','<select name="decision"><option>Reject requisition</option><option>Return for correction</option><option>Request more information</option></select>')}${formField('Reason category','<select name="category"><option>Budget unavailable or exceeded</option><option>Insufficient business justification</option><option>Specification requires revision</option><option>Duplicate or already planned requirement</option><option>Incorrect sourcing method</option><option>Other</option></select>')}${formField('Detailed reason','<textarea name="reason" required>Please revise the supporting motivation, specification and budget evidence before resubmission.</textarea>','full')}${formField('Notify','<label class="check-line-v7"><input name="notifyRequester" type="checkbox" checked> Requester and department owner</label>')}${formField('Also notify','<label class="check-line-v7"><input name="notifyProcurement" type="checkbox" checked> Procurement and relevant approvers</label>')}</div></form>`,actionV6('Confirm decision','confirm-reject-requisition-v7',id,'primary','approve'),'xl');
+    openV6Modal('Reject or return purchase requisition',`${r.id} · ${r.title}`, `<form id="rejectRequisitionFormV7"><div class="notice"><span class="kpi-icon">${icon('requisition')}</span><div><strong>${esc(r.entity)} · ${money(r.amount,r.currency)}</strong><p>The reason is written to the immutable decision history and sent to the requester and procurement owner.</p></div></div><div class="dense-form-grid" style="margin-top:14px">${formField('Decision','<select name="decision"><option>Reject requisition</option><option>Return for correction</option><option>Request more information</option></select>')}${formField('Reason category','<select name="category"><option>Budget unavailable or exceeded</option><option>Insufficient business justification</option><option>Specification requires revision</option><option>Duplicate or already planned requirement</option><option>Incorrect sourcing method</option><option>Other</option></select>')}${formField('Detailed reason','<textarea name="reason" required>Please revise the supporting motivation, specification and budget evidence before resubmission.</textarea>','full')}${formField('Notify','<label class="check-line-v7"><input name="notifyRequester" type="checkbox" checked> Requester and department owner</label>')}${formField('Also notify','<label class="check-line-v7"><input name="notifyProcurement" type="checkbox" checked> Procurement and relevant approvers</label>')}</div></form>`,actionV6('Confirm decision','confirm-reject-requisition-v7',id,'primary','approve'),'xl');
   }
   handlers['reject-requisition-v7']=a=>rejectRequisitionModalV7(a.dataset.id);
   handlers['confirm-reject-requisition-v7']=a=>{
@@ -4966,7 +7863,7 @@ window.MatanhoProcurement=Object.freeze({version:'8.0.0',navigate,render,getStat
           <table><tbody>
             <tr><th>Requisition reference</th><td>${escV11(pr.id)}</td><th>Request source</th><td>${escV11(pr.type)}</td></tr>
             <tr><th>Entity</th><td>${escV11(pr.entity)}</td><th>Category</th><td>${escV11(pr.category)}</td></tr>
-            <tr><th>Estimated value</th><td>${money(pr.amount)}</td><th>Budget check</th><td>${escV11(pr.budget)}</td></tr>
+            <tr><th>Estimated value</th><td>${money(pr.amount,pr.currency)}</td><th>Budget check</th><td>${escV11(pr.budget)}</td></tr>
             <tr><th>Requester</th><td>${escV11(pr.owner)}</td><th>Current status</th><td>${escV11(pr.status)}</td></tr>
           </tbody></table>
           <h2>1. Business requirement</h2>
@@ -4974,7 +7871,7 @@ window.MatanhoProcurement=Object.freeze({version:'8.0.0',navigate,render,getStat
           <h2>2. Business justification</h2>
           <p>The requirement supports continuity of operations, service delivery and the approved departmental work plan. Delaying the procurement may increase operating risk, create service interruptions or result in avoidable cost escalation.</p>
           <h2>3. Budget and value assessment</h2>
-          <p>The estimated value is ${money(pr.amount)}. The current budget control result is <strong>${escV11(pr.budget)}</strong>. Final commitment remains subject to budget-owner confirmation and the applicable delegated authority.</p>
+          <p>The estimated value is ${money(pr.amount,pr.currency)}. The current budget control result is <strong>${escV11(pr.budget)}</strong>. Final commitment remains subject to budget-owner confirmation and the applicable delegated authority.</p>
           <h2>4. Recommended procurement route</h2>
           <p>Procurement should validate the specification, confirm the sourcing threshold and proceed using the approved competitive method. Any exception must be documented and approved before commitment.</p>
           <h2>5. Approval record</h2>
@@ -4987,13 +7884,13 @@ window.MatanhoProcurement=Object.freeze({version:'8.0.0',navigate,render,getStat
       id: tender.id,
       name: `${tender.id} - ${tender.title}`,
       type: 'Tender pack', version:'v3.0', owner:tender.owner, status:tender.stage, date:tender.close,
-      content:`<h1>Invitation to Tender</h1><p class="doc-lead-v11">${escV11(tender.title)}</p><table><tbody><tr><th>Tender reference</th><td>${escV11(tender.id)}</td><th>Entity</th><td>${escV11(tender.entity)}</td></tr><tr><th>Procurement method</th><td>${escV11(tender.method)}</td><th>Estimated value</th><td>${money(tender.value)}</td></tr><tr><th>Closing date</th><td>${escV11(tender.close)}</td><th>Category</th><td>${escV11(tender.category)}</td></tr></tbody></table><h2>1. Invitation</h2><p>Eligible suppliers are invited to submit a complete, compliant and competitively priced bid through the secure Matanho vendor portal before the stated closing date.</p><h2>2. Scope of requirement</h2><p>The successful bidder shall provide the goods, implementation, documentation, training, warranty and support specified in the controlled technical schedules.</p><h2>3. Submission requirements</h2><ul><li>Completed technical response and compliance schedule.</li><li>Commercial response using the prescribed pricing schedule.</li><li>Current company, tax, banking and beneficial-ownership documents.</li><li>Signed declarations, conflict disclosure and authorised eSignature.</li></ul><h2>4. Evaluation</h2><p>Bids will be evaluated against mandatory compliance, technical merit, commercial value, delivery readiness, warranty and risk. The authorised user retains the final award decision, subject to approval authority.</p>`
+      content:`<h1>Invitation to Tender</h1><p class="doc-lead-v11">${escV11(tender.title)}</p><table><tbody><tr><th>Tender reference</th><td>${escV11(tender.id)}</td><th>Entity</th><td>${escV11(tender.entity)}</td></tr><tr><th>Procurement method</th><td>${escV11(tender.method)}</td><th>Estimated value</th><td>${money(tender.value,tender.currency)}</td></tr><tr><th>Closing date</th><td>${escV11(tender.close)}</td><th>Category</th><td>${escV11(tender.category)}</td></tr></tbody></table><h2>1. Invitation</h2><p>Eligible suppliers are invited to submit a complete, compliant and competitively priced bid through the secure Matanho vendor portal before the stated closing date.</p><h2>2. Scope of requirement</h2><p>The successful bidder shall provide the goods, implementation, documentation, training, warranty and support specified in the controlled technical schedules.</p><h2>3. Submission requirements</h2><ul><li>Completed technical response and compliance schedule.</li><li>Commercial response using the prescribed pricing schedule.</li><li>Current company, tax, banking and beneficial-ownership documents.</li><li>Signed declarations, conflict disclosure and authorised eSignature.</li></ul><h2>4. Evaluation</h2><p>Bids will be evaluated against mandatory compliance, technical merit, commercial value, delivery readiness, warranty and risk. The authorised user retains the final award decision, subject to approval authority.</p>`
     };
 
     const order = state.orders.find(o => o.id === ref);
     if (order) return {
       id:order.id,name:`Purchase Order ${order.id}`,type:'Purchase order',version:'Current',owner:'Group Procurement',status:order.status,date:order.delivery,
-      content:`<h1>Purchase Order</h1><table><tbody><tr><th>Purchase order</th><td>${escV11(order.id)}</td><th>Supplier</th><td>${escV11(order.vendor)}</td></tr><tr><th>Entity</th><td>${escV11(order.entity)}</td><th>Order value</th><td>${money(order.amount)}</td></tr><tr><th>Delivery date</th><td>${escV11(order.delivery)}</td><th>Classification</th><td>${order.asset ? 'Fixed asset' : 'Goods / services'}</td></tr></tbody></table><h2>Order description</h2><p>The supplier is authorised to provide the approved goods and services in accordance with the sourcing record, accepted quotation, delivery schedule and controlled purchase terms.</p><h2>Tax and compliance</h2><p>Payment is subject to valid tax documentation, invoice validation, receipt or acceptance, applicable withholding tax and all statutory deductions.</p><h2>Commercial terms</h2><p>No variation is binding unless approved in writing by an authorised representative. The supplier must quote this purchase-order number on all delivery notes and invoices.</p>`
+      content:`<h1>Purchase Order</h1><table><tbody><tr><th>Purchase order</th><td>${escV11(order.id)}</td><th>Supplier</th><td>${escV11(order.vendor)}</td></tr><tr><th>Entity</th><td>${escV11(order.entity)}</td><th>Order value</th><td>${money(order.amount,order.currency)}</td></tr><tr><th>Delivery date</th><td>${escV11(order.delivery)}</td><th>Classification</th><td>${order.asset ? 'Fixed asset' : 'Goods / services'}</td></tr></tbody></table><h2>Order description</h2><p>The supplier is authorised to provide the approved goods and services in accordance with the sourcing record, accepted quotation, delivery schedule and controlled purchase terms.</p><h2>Tax and compliance</h2><p>Payment is subject to valid tax documentation, invoice validation, receipt or acceptance, applicable withholding tax and all statutory deductions.</p><h2>Commercial terms</h2><p>No variation is binding unless approved in writing by an authorised representative. The supplier must quote this purchase-order number on all delivery notes and invoices.</p>`
     };
 
     const contract = (state.contractsV6 || []).find(c => c.id === ref);
@@ -5141,7 +8038,7 @@ window.MatanhoProcurement=Object.freeze({version:'8.0.0',navigate,render,getStat
       const updated = d.date || d.period || '01 Aug 2026';
       const st = d.status || 'Published';
       const search = `${d.id} ${d.name} ${type} ${owner} ${st}`.toLowerCase();
-      return `<tr data-doc-row-v11 data-doc-type="${escV11(type)}" data-doc-status="${escV11(st)}" data-doc-owner="${escV11(owner)}" data-doc-search="${escV11(search)}"><td><button class="document-link-v11" data-action="preview-doc-v11" data-id="${escV11(d.id)}">${escV11(d.id)}</button></td><td><strong>${escV11(d.name)}</strong><br><span class="muted">Actual controlled preview available</span></td><td>${escV11(type)}</td><td>${escV11(d.version || 'Current')}</td><td>${escV11(owner)}</td><td>${escV11(updated)}</td><td>${status(st)}</td><td class="document-menu-cell-v11"><button class="document-kebab-v11" data-action="doc-menu-v11" data-id="${escV11(d.id)}" aria-label="Document actions" title="Document actions">${icon('more')}</button></td></tr>`;
+      return `<tr data-doc-row-v11 data-doc-type="${escV11(type)}" data-doc-status="${escV11(st)}" data-doc-owner="${escV11(owner)}" data-doc-search="${escV11(search)}"><td><button class="document-link-v11" data-action="preview-doc-v11" data-id="${escV11(d.id)}">${escV11(d.id)}</button></td><td><strong>${escV11(d.name)}</strong><br><span class="muted">${__pr23Live()&&d.stored?__pr23DocSubline(d):'Actual controlled preview available'}</span></td><td>${escV11(type)}</td><td>${escV11(d.version || 'Current')}</td><td>${escV11(owner)}</td><td>${escV11(updated)}</td><td>${status(st)}</td><td class="document-menu-cell-v11"><button class="document-kebab-v11" data-action="doc-menu-v11" data-id="${escV11(d.id)}" aria-label="Document actions" title="Document actions">${icon('more')}</button></td></tr>`;
     }).join('');
   }
 
@@ -5179,23 +8076,23 @@ window.MatanhoProcurement=Object.freeze({version:'8.0.0',navigate,render,getStat
     const approver = state.prViewV11 === 'approver';
     const rowsSource = approver ? state.requisitions.filter(r => r.rawStatus ? r.awaitingMe !== false && r.rawStatus === 'PENDING_APPROVAL' : !/Approved|Rejected/i.test(r.status)) : state.requisitions.filter(r => { const me = __pr23Live()?.access?.userId; return !me || !r.requestedById || r.requestedById === me; });
     const rows = rowsSource.map(r => {
-      const canEdit = __pr23Live() ? ['DRAFT','REJECTED'].includes(String(r.rawStatus||'').toUpperCase()) : /Draft|Returned|Information requested|revision/i.test(r.status);
+      const canEdit = __pr23Live() ? ['DRAFT','REJECTED','RETURNED'].includes(String(r.rawStatus||'').toUpperCase()) : /Draft|Returned|Information requested|revision/i.test(r.status);
       const action = approver ? smallV11('Review','review-pr-v11',r.id,'eye') : canEdit ? smallV11('Edit request','edit-pr-v11',r.id,'document') : smallV11('View','view-pr-v11',r.id,'eye');
-      return `<tr><td><strong class="link">${escV11(r.id)}</strong></td><td><strong>${escV11(r.title)}</strong><br><span class="muted">${escV11(r.owner)}</span></td><td>${escV11(r.type)}</td><td>${escV11(r.entity)}</td><td>${escV11(r.category)}</td><td class="money">${money(r.amount)}</td>${__pr23Live()?'':`<td>${/Warning/.test(r.budget)?status(r.budget):`<span style="color:var(--green)">${escV11(r.budget)}</span>`}</td>`}<td>${status(r.status)}</td><td>${action}</td></tr>`;
+      return `<tr><td><strong class="link">${escV11(r.id)}</strong></td><td><strong>${escV11(r.title)}</strong><br><span class="muted">${escV11(r.owner)}</span></td><td>${escV11(r.type)}</td><td>${escV11(r.entity)}</td><td>${escV11(r.category)}</td><td class="money">${money(r.amount,r.currency)}</td>${__pr23Live()?'':`<td>${/Warning/.test(r.budget)?status(r.budget):`<span style="color:var(--green)">${escV11(r.budget)}</span>`}</td>`}<td>${status(r.status)}</td><td>${action}</td></tr>`;
     });
     const actions = approver ? actionV11('Open Approval Centre','go-approval-centre-v11','','primary','approve') : actionV11('New requisition','create-requisition','','primary','plus')+actionV11('Import CSV lines','import-pr');
-    return `<div class="page">${pageHead(approver?'Assigned decisions':'Demand intake',approver?'Purchase Requisition Approval Queue':'My Purchase Requisitions',approver?'Review assigned requisitions. Approval and rejection controls are shown only in this approver workspace.':'Create and maintain requests. Edit controls are shown only for requestors and only while the request remains editable.',actions)}${requisitionTabsV11()}${filterBar()}<div class="grid kpis">${approver?kpi('Awaiting my decision',rowsSource.length,'Assigned through approval rules','approve'):kpi('My open requests',(__pr23Live()?rowsSource.filter(r=>['DRAFT','PENDING_APPROVAL','REJECTED'].includes(String(r.rawStatus||'').toUpperCase())):rowsSource).length,'Draft, submitted and returned','requisition')}${kpi('Budget warnings','3','Requirements exceed remaining budget','account')}${kpi('Approved for sourcing','5','One-click PR to RFQ','tender')}${kpi('Returned drafts','2','Requester correction required','document')}${kpi('Median approval time','1.8 days','Current service level','report')}${kpi('Department isolation','Active','Cost-centre visibility enforced','settings')}</div>${card(approver?'Assigned requisitions':'My requisition register',approver?'Select Review to inspect the supporting motivation and make an approval decision.':'Select Edit request only where the current workflow status permits requester changes.',table(['PR number','Requirement','Source','Entity','Category','Estimate',...(__pr23Live()?[]:['Budget check']),'Status','Action'],rows))}</div>`;
+    return `<div class="page">${pageHead(approver?'Assigned decisions':'Demand intake',approver?'Purchase Requisition Approval Queue':'My Purchase Requisitions',approver?'Review assigned requisitions. Approval and rejection controls are shown only in this approver workspace.':'Create and maintain requests. Edit controls are shown only for requestors and only while the request remains editable.',actions)}${requisitionTabsV11()}${filterBar()}<div class="grid kpis">${approver?kpi('Awaiting my decision',rowsSource.length,'Assigned through approval rules','approve'):kpi('My open requests',(__pr23Live()?rowsSource.filter(r=>['DRAFT','PENDING_APPROVAL','REJECTED','RETURNED'].includes(String(r.rawStatus||'').toUpperCase())):rowsSource).length,'Draft, submitted and returned','requisition')}${kpi('Budget warnings','3','Requirements exceed remaining budget','account')}${kpi('Approved for sourcing','5','One-click PR to RFQ','tender')}${kpi('Returned drafts','2','Requester correction required','document')}${kpi('Median approval time','1.8 days','Current service level','report')}${kpi('Department isolation','Active','Cost-centre visibility enforced','settings')}</div>${card(approver?'Assigned requisitions':'My requisition register',approver?'Select Review to inspect the supporting motivation and make an approval decision.':'Select Edit request only where the current workflow status permits requester changes.',table(['PR number','Requirement','Source','Entity','Category','Estimate',...(__pr23Live()?[]:['Budget check']),'Status','Action'],rows))}</div>`;
   }
   pages.requisitions = requisitionsPageV11;
 
   function viewPrV11(id, mode='view') {
     const r = state.requisitions.find(x => x.id === id); if (!r) return;
     const editable = mode === 'edit';
-    const fields = editable ? `<form id="editPrFormV11" class="dense-form-grid"><div class="field span2"><label>Requirement title</label><input name="title" value="${escV11(r.title)}" required></div>${__pr23Live()?__pr23RequisitionProjectField(r.projectId,'span2'):''}${__pr23Live()?'':`<div class="field"><label>Category</label><select name="category"><option>${escV11(r.category)}</option><option>Technology</option><option>Medical</option><option>Agriculture</option><option>Facilities</option><option>Fleet</option></select></div><div class="field"><label>Estimated value</label><input name="amount" type="number" value="${Number(r.amount)}" required></div>`}<div class="field span2"><label>Business justification</label><textarea name="justification">${__pr23Live()?escV11(r.justification||''):'The requirement supports approved departmental operations and service-delivery objectives. Procurement should validate the specification and sourcing route before commitment.'}</textarea></div>${__pr23Live()?'':'<div class="field span2"><label>Supporting documents</label><input type="file" multiple accept=".pdf,.doc,.docx,.xlsx,.csv"></div>'}</form>` : `<div class="source-meta"><div><span>Entity</span><strong>${escV11(r.entity)}</strong></div><div><span>Source</span><strong>${escV11(r.type)}</strong></div><div><span>Category</span><strong>${escV11(r.category)}</strong></div>${__pr23Live()?`<div><span>Project</span><strong>${escV11(r.project||'None')}</strong></div>`:''}<div><span>Estimate</span><strong>${money(r.amount)}</strong></div><div><span>Budget check</span><strong>${escV11(r.budget)}</strong></div><div><span>Status</span><strong>${escV11(r.status)}</strong></div></div><div class="notice" style="margin-top:14px"><span class="kpi-icon">${icon('document')}</span><div><strong>${__pr23Live()?'Internal motivation':'Internal motivation and supporting evidence'}</strong><p>${__pr23Live()?'The lines, justification and approval route of this requisition, as one document.':'Open the actual controlled motivation document before making a decision.'}</p></div>${smallV11('Preview motivation','preview-doc-v11',`MOT-${r.id}`,'eye')}</div>${__pr23Live()?__pr23ApprovalRouteHtml(r.approvalRoute):''}`;
+    const fields = editable ? `${__pr23Live()?__pr23RequisitionDecisionHtml(r):''}<form id="editPrFormV11" class="dense-form-grid"><div class="field span2"><label>Requirement title</label><input name="title" value="${escV11(r.title)}" required></div>${__pr23Live()?__pr23RequisitionProjectField(r.projectId,'span2'):''}${__pr23Live()?__pr23RequisitionProjectField(r.projectId,'span2')+__pr23RequisitionPlanningFields(r):''}${__pr23Live()?'':`<div class="field"><label>Category</label><select name="category"><option>${escV11(r.category)}</option><option>Technology</option><option>Medical</option><option>Agriculture</option><option>Facilities</option><option>Fleet</option></select></div><div class="field"><label>Estimated value</label><input name="amount" type="number" value="${Number(r.amount)}" required></div>`}<div class="field span2"><label>Business justification</label><textarea name="justification">${__pr23Live()?escV11(r.justification||''):'The requirement supports approved departmental operations and service-delivery objectives. Procurement should validate the specification and sourcing route before commitment.'}</textarea></div>${__pr23Live()?'':'<div class="field span2"><label>Supporting documents</label><input type="file" multiple accept=".pdf,.doc,.docx,.xlsx,.csv"></div>'}${__pr23Live()?__pr23RequisitionLinesEditor(r)+'<div class="field full"><div class="notice"><div><strong>Budget and plan position</strong>'+__pr23BudgetNotice()+'</div></div></div>':''}</form>` : `<div class="source-meta"><div><span>Entity</span><strong>${escV11(r.entity)}</strong></div><div><span>Source</span><strong>${escV11(r.type)}</strong></div><div><span>Category</span><strong>${escV11(r.category)}</strong></div>${__pr23Live()?`<div><span>Project</span><strong>${escV11(r.project||'None')}</strong></div>${__pr23RequisitionPlanningMeta(r)}`:''}<div><span>Estimate</span><strong>${money(r.amount,r.currency)}</strong></div><div><span>Budget check</span><strong>${escV11(r.budget)}</strong></div><div><span>Status</span><strong>${escV11(r.status)}</strong></div></div><div class="notice" style="margin-top:14px"><span class="kpi-icon">${icon('document')}</span><div><strong>${__pr23Live()?'Internal motivation':'Internal motivation and supporting evidence'}</strong><p>${__pr23Live()?'The lines, justification and approval route of this requisition, as one document.':'Open the actual controlled motivation document before making a decision.'}</p></div>${smallV11('Preview motivation','preview-doc-v11',`MOT-${r.id}`,'eye')}</div>${__pr23Live()?__pr23ApprovalRouteHtml(r.approvalRoute)+__pr23RequisitionDecisionHtml(r):''}`;
     let foot = actionV11('Preview motivation','preview-doc-v11',`MOT-${r.id}`,'','eye');
     if (mode === 'edit') foot += actionV11(__pr23Live()?'Save draft':'Save changes','save-pr-v11',r.id,__pr23Live()?'':'primary','document') + (__pr23Live()?actionV11('Save and submit','submit-pr-v11',r.id,'primary','approve'):'');
-    if (mode === 'approve') foot += actionV11('Reject or return','reject-pr-v11',r.id,'danger') + actionV11('Approve requisition','approve-pr-v11',r.id,'primary','approve');
-    openLargeModalV11(mode==='approve'?`Review ${r.id}`:mode==='edit'?`Edit ${r.id}`:`${r.id} - ${r.title}`, `${r.entity} | ${r.status}`, fields, foot);
+    if (mode === 'approve') foot += actionV11(__pr23Live()?'Reject, return or comment':'Reject or return','reject-pr-v11',r.id,'danger') + (__pr23Live()&&r.delegate&&r.delegate.canDelegate?actionV11('Delegate','delegate-pr-v11',r.id):'') + actionV11('Approve requisition','approve-pr-v11',r.id,'primary','approve');
+    openLargeModalV11(mode==='approve'?`Review ${r.id}`:mode==='edit'?`Edit ${r.id}`:`${r.id} - ${r.title}`, `${r.entity} | ${r.status}`, fields, foot+(__pr23Live()?__pr23LifecycleButtons('requisition',r):''));if(__pr23Live()&&mode==='edit'){__pr23PrLinesRecalc();__pr23RefreshPosition()}
   }
 
   function rejectPrV11(id) {
@@ -5234,7 +8131,7 @@ window.MatanhoProcurement=Object.freeze({version:'8.0.0',navigate,render,getStat
       const show = (!query || row.dataset.docSearch.includes(query)) && (type==='All types'||row.dataset.docType===type) && (statusValue==='All statuses'||row.dataset.docStatus===statusValue) && (owner==='All owners'||row.dataset.docOwner===owner);
       row.hidden = !show; if(show) visible++;
     });
-    const count = document.querySelector('#docFilterCountV11'); if(count) count.textContent = `${visible} document${visible===1?'':'s'}`;
+    if(__pr23Live())visible=__pr23DocPaginate(); const count = document.querySelector('#docFilterCountV11'); if(count) count.textContent = `${visible} document${visible===1?'':'s'}`;
   }
 
   function enhanceV11() {
@@ -5249,6 +8146,7 @@ window.MatanhoProcurement=Object.freeze({version:'8.0.0',navigate,render,getStat
       applyDocumentFiltersV11();
     }
     preparePoSelectionV11();
+    if(__pr23Live()){__pr23PaginateTables();setTimeout(__pr23PaginateTables,400)}
   }
 
   const renderBeforeV11 = render;
@@ -5378,15 +8276,15 @@ window.MatanhoProcurement=Object.freeze({version:'8.0.0',navigate,render,getStat
     const type=String(a.type||'').toLowerCase();
     if(type.includes('annual plan')){
       const lines=(state.planActualsV6||[]).slice(0,6).map((r,i)=>`<tr><td>${i+1}</td><td>${e13(r.department)}</td><td>${e13(r.item)}</td><td>${r.planQty} ${e13(r.unit)}</td><td>${money(r.planAmount)}</td><td>${e13(r.status)}</td></tr>`).join('');
-      return `<h1>FY 2026 Group Procurement Plan</h1><p class="doc-lead">Final consolidated plan submitted for budget, liquidity and executive approval.</p><table><tbody><tr><th>Plan reference</th><td>${e13(a.record)}</td><th>Financial year</th><td>FY 2026</td></tr><tr><th>Entity scope</th><td>${e13(a.entity)}</td><th>Approved ceiling requested</th><td>${money(a.amount)}</td></tr><tr><th>Plan owner</th><td>Nyasha Moyo, Group Procurement Lead</td><th>Current workflow</th><td>${e13(a.status)}</td></tr></tbody></table><h2>1. Executive summary</h2><p>The plan consolidates approved operational, capital and investee requirements across the group. It prioritises continuity of operations, value for money, competitive sourcing, current supplier compliance and delivery against approved departmental budgets.</p><h2>2. Procurement requirements</h2><table><thead><tr><th>Line</th><th>Department</th><th>Requirement</th><th>Planned quantity</th><th>Plan value</th><th>Execution status</th></tr></thead><tbody>${lines}</tbody></table><h2>3. Budget and liquidity assessment</h2><p>The submitted ceiling is <strong>${money(a.amount)}</strong>. Commitments are released only after source-budget validation, delegated approval and cash-flow confirmation. Foreign-currency procurements remain subject to approved exchange-rate assumptions and payment scheduling.</p><h2>4. Governance and risk</h2><ul><li>Competitive sourcing is the default unless a documented exception is approved.</li><li>Material changes to quantity, scope, quarter or budget require a controlled plan amendment.</li><li>Vendor compliance and tax status are checked before purchase orders, contracts and payment.</li><li>Investee and subsidiary requirements remain isolated by entity while visible in the group consolidation.</li></ul><h2>5. Approval requested</h2><p>Approve the FY 2026 consolidated procurement plan and budget ceiling, subject to the controls and amendment process described above.</p><table><thead><tr><th>Role</th><th>Name</th><th>Decision</th><th>eSignature</th><th>Date</th></tr></thead><tbody><tr><td>Group Procurement Lead</td><td>Nyasha Moyo</td><td>Submitted</td><td>Signed</td><td>31 Jul 2026</td></tr><tr><td>CFO</td><td>Tinashe Chaka</td><td>Pending</td><td>Required</td><td>-</td></tr><tr><td>CEO</td><td>Tendai Moyo</td><td>Queued</td><td>Required</td><td>-</td></tr></tbody></table>`;
+      return `<h1>FY 2026 Group Procurement Plan</h1><p class="doc-lead">Final consolidated plan submitted for budget, liquidity and executive approval.</p><table><tbody><tr><th>Plan reference</th><td>${e13(a.record)}</td><th>Financial year</th><td>FY 2026</td></tr><tr><th>Entity scope</th><td>${e13(a.entity)}</td><th>Approved ceiling requested</th><td>${money(a.amount,a.currency)}</td></tr><tr><th>Plan owner</th><td>Nyasha Moyo, Group Procurement Lead</td><th>Current workflow</th><td>${e13(a.status)}</td></tr></tbody></table><h2>1. Executive summary</h2><p>The plan consolidates approved operational, capital and investee requirements across the group. It prioritises continuity of operations, value for money, competitive sourcing, current supplier compliance and delivery against approved departmental budgets.</p><h2>2. Procurement requirements</h2><table><thead><tr><th>Line</th><th>Department</th><th>Requirement</th><th>Planned quantity</th><th>Plan value</th><th>Execution status</th></tr></thead><tbody>${lines}</tbody></table><h2>3. Budget and liquidity assessment</h2><p>The submitted ceiling is <strong>${money(a.amount,a.currency)}</strong>. Commitments are released only after source-budget validation, delegated approval and cash-flow confirmation. Foreign-currency procurements remain subject to approved exchange-rate assumptions and payment scheduling.</p><h2>4. Governance and risk</h2><ul><li>Competitive sourcing is the default unless a documented exception is approved.</li><li>Material changes to quantity, scope, quarter or budget require a controlled plan amendment.</li><li>Vendor compliance and tax status are checked before purchase orders, contracts and payment.</li><li>Investee and subsidiary requirements remain isolated by entity while visible in the group consolidation.</li></ul><h2>5. Approval requested</h2><p>Approve the FY 2026 consolidated procurement plan and budget ceiling, subject to the controls and amendment process described above.</p><table><thead><tr><th>Role</th><th>Name</th><th>Decision</th><th>eSignature</th><th>Date</th></tr></thead><tbody><tr><td>Group Procurement Lead</td><td>Nyasha Moyo</td><td>Submitted</td><td>Signed</td><td>31 Jul 2026</td></tr><tr><td>CFO</td><td>Tinashe Chaka</td><td>Pending</td><td>Required</td><td>-</td></tr><tr><td>CEO</td><td>Tendai Moyo</td><td>Queued</td><td>Required</td><td>-</td></tr></tbody></table>`;
     }
     if(type.includes('tender award')){if(__pr23Live())return __pr23AwardMemo(a,tenderByRecordV13(a.record));
       const t=tenderByRecordV13(a.record);const winner=state.bidAwardsV6?.[t.id]||'TechNova Solutions';
-      return `<h1>Tender Award Approval Memorandum</h1><p class="doc-lead">Final user-selected award decision for ${e13(t.title)}.</p><table><tbody><tr><th>Tender reference</th><td>${e13(t.id)}</td><th>Entity</th><td>${e13(t.entity)}</td></tr><tr><th>Method</th><td>${e13(t.method)}</td><th>Closing date</th><td>${e13(t.close)}</td></tr><tr><th>Internal estimate</th><td>${money(t.value)}</td><th>Selected bidder</th><td>${e13(winner)}</td></tr><tr><th>Proposed award value</th><td>${money(a.amount)}</td><th>Approval role</th><td>${e13(a.role)}</td></tr></tbody></table><h2>1. Process summary</h2><p>The tender was issued through the controlled Matanho sourcing workflow. Eligible vendors received secure system-generated bid forms. Submissions were sealed at the closing time, opened under committee control and evaluated against the published criteria.</p><h2>2. Evaluation result</h2><table><thead><tr><th>Bidder</th><th>Technical</th><th>Commercial</th><th>Delivery / support</th><th>Weighted total</th><th>Position</th></tr></thead><tbody><tr><td>TechNova Solutions</td><td>91%</td><td>94%</td><td>88%</td><td>90%</td><td>1</td></tr><tr><td>NetShield Africa</td><td>86%</td><td>91%</td><td>84%</td><td>87%</td><td>2</td></tr><tr><td>CloudAxis Systems</td><td>83%</td><td>88%</td><td>82%</td><td>84%</td><td>3</td></tr></tbody></table><h2>3. Final user decision</h2><p>The authorised user selects <strong>${e13(winner)}</strong> for an award of <strong>${money(a.amount)}</strong>. The evaluation score is advisory; the final selection is made by the authorised user and is subject to the approval, conflict, due-diligence and contract controls recorded in this document.</p><h2>4. Conditions of award</h2><ul><li>Current company, tax, banking and beneficial-ownership documents.</li><li>Final negotiated service levels, delivery programme and warranty.</li><li>Execution of the purchase contract and eSignature certificate.</li><li>No material adverse change before contract signature.</li></ul><h2>5. Approval requested</h2><p>Approve the selected bidder and authorise contract finalisation and purchase-order preparation.</p><table><thead><tr><th>Role</th><th>Name</th><th>Decision</th><th>Signature</th><th>Date</th></tr></thead><tbody><tr><td>Evaluation Committee</td><td>Committee record</td><td>Recommendation submitted</td><td>Completed</td><td>31 Jul 2026</td></tr><tr><td>CFO</td><td>Tinashe Chaka</td><td>Reviewed</td><td>Signed</td><td>01 Aug 2026</td></tr><tr><td>CEO</td><td>${e13(a.approver)}</td><td>Pending</td><td>Required</td><td>-</td></tr></tbody></table>`;
+      return `<h1>Tender Award Approval Memorandum</h1><p class="doc-lead">Final user-selected award decision for ${e13(t.title)}.</p><table><tbody><tr><th>Tender reference</th><td>${e13(t.id)}</td><th>Entity</th><td>${e13(t.entity)}</td></tr><tr><th>Method</th><td>${e13(t.method)}</td><th>Closing date</th><td>${e13(t.close)}</td></tr><tr><th>Internal estimate</th><td>${money(t.value,t.currency)}</td><th>Selected bidder</th><td>${e13(winner)}</td></tr><tr><th>Proposed award value</th><td>${money(a.amount,a.currency)}</td><th>Approval role</th><td>${e13(a.role)}</td></tr></tbody></table><h2>1. Process summary</h2><p>The tender was issued through the controlled Matanho sourcing workflow. Eligible vendors received secure system-generated bid forms. Submissions were sealed at the closing time, opened under committee control and evaluated against the published criteria.</p><h2>2. Evaluation result</h2><table><thead><tr><th>Bidder</th><th>Technical</th><th>Commercial</th><th>Delivery / support</th><th>Weighted total</th><th>Position</th></tr></thead><tbody><tr><td>TechNova Solutions</td><td>91%</td><td>94%</td><td>88%</td><td>90%</td><td>1</td></tr><tr><td>NetShield Africa</td><td>86%</td><td>91%</td><td>84%</td><td>87%</td><td>2</td></tr><tr><td>CloudAxis Systems</td><td>83%</td><td>88%</td><td>82%</td><td>84%</td><td>3</td></tr></tbody></table><h2>3. Final user decision</h2><p>The authorised user selects <strong>${e13(winner)}</strong> for an award of <strong>${money(a.amount,a.currency)}</strong>. The evaluation score is advisory; the final selection is made by the authorised user and is subject to the approval, conflict, due-diligence and contract controls recorded in this document.</p><h2>4. Conditions of award</h2><ul><li>Current company, tax, banking and beneficial-ownership documents.</li><li>Final negotiated service levels, delivery programme and warranty.</li><li>Execution of the purchase contract and eSignature certificate.</li><li>No material adverse change before contract signature.</li></ul><h2>5. Approval requested</h2><p>Approve the selected bidder and authorise contract finalisation and purchase-order preparation.</p><table><thead><tr><th>Role</th><th>Name</th><th>Decision</th><th>Signature</th><th>Date</th></tr></thead><tbody><tr><td>Evaluation Committee</td><td>Committee record</td><td>Recommendation submitted</td><td>Completed</td><td>31 Jul 2026</td></tr><tr><td>CFO</td><td>Tinashe Chaka</td><td>Reviewed</td><td>Signed</td><td>01 Aug 2026</td></tr><tr><td>CEO</td><td>${e13(a.approver)}</td><td>Pending</td><td>Required</td><td>-</td></tr></tbody></table>`;
     }
     if(type.includes('purchase order')){
       const o=orderForApprovalV13(a);const supplier=o?.vendor||'MedEquip Africa';
-      return `<h1>Purchase Order</h1><p class="doc-lead">Approval copy generated from the awarded procurement record.</p><table><tbody><tr><th>PO number</th><td>${e13(a.record)}</td><th>Supplier</th><td>${e13(supplier)}</td></tr><tr><th>Purchasing entity</th><td>${e13(a.entity)}</td><th>Currency / value</th><td>USD ${Number(a.amount||0).toLocaleString()}</td></tr><tr><th>Delivery location</th><td>Lumina Health Group - Main Hospital</td><th>Required delivery</th><td>${e13(o?.delivery||'30 Sep 2026')}</td></tr><tr><th>Classification</th><td>Fixed asset</td><th>Approval authority</th><td>${e13(a.role)}</td></tr></tbody></table><h2>1. Order lines</h2><table><thead><tr><th>Line</th><th>Description</th><th>UOM</th><th>Quantity</th><th>Unit price</th><th>Total</th></tr></thead><tbody><tr><td>1</td><td>Diagnostic imaging equipment, installation and commissioning</td><td>Lot</td><td>1</td><td>${money(a.amount)}</td><td>${money(a.amount)}</td></tr></tbody></table><h2>2. Delivery and acceptance</h2><p>The supplier shall deliver, install, test and commission the equipment and provide user training, manuals, warranties and acceptance evidence. Payment is conditional on an accepted GRN and successful invoice controls.</p><h2>3. Tax and compliance</h2><p>The supplier must maintain valid compliance and tax-clearance records. Applicable VAT and withholding treatment are determined from the approved vendor record at invoice and payment stages.</p><h2>4. Fixed-asset transfer</h2><p>After accepted receipt, the system will prepare the accounting journal and fixed-asset registry record for Finance review and capitalisation.</p><h2>5. Approval requested</h2><p>Approve the purchase order above the delegated operational threshold and apply the authenticated eSignature.</p>`;
+      return `<h1>Purchase Order</h1><p class="doc-lead">Approval copy generated from the awarded procurement record.</p><table><tbody><tr><th>PO number</th><td>${e13(a.record)}</td><th>Supplier</th><td>${e13(supplier)}</td></tr><tr><th>Purchasing entity</th><td>${e13(a.entity)}</td><th>Currency / value</th><td>USD ${Number(a.amount||0).toLocaleString()}</td></tr><tr><th>Delivery location</th><td>Lumina Health Group - Main Hospital</td><th>Required delivery</th><td>${e13(o?.delivery||'30 Sep 2026')}</td></tr><tr><th>Classification</th><td>Fixed asset</td><th>Approval authority</th><td>${e13(a.role)}</td></tr></tbody></table><h2>1. Order lines</h2><table><thead><tr><th>Line</th><th>Description</th><th>UOM</th><th>Quantity</th><th>Unit price</th><th>Total</th></tr></thead><tbody><tr><td>1</td><td>Diagnostic imaging equipment, installation and commissioning</td><td>Lot</td><td>1</td><td>${money(a.amount,a.currency)}</td><td>${money(a.amount,a.currency)}</td></tr></tbody></table><h2>2. Delivery and acceptance</h2><p>The supplier shall deliver, install, test and commission the equipment and provide user training, manuals, warranties and acceptance evidence. Payment is conditional on an accepted GRN and successful invoice controls.</p><h2>3. Tax and compliance</h2><p>The supplier must maintain valid compliance and tax-clearance records. Applicable VAT and withholding treatment are determined from the approved vendor record at invoice and payment stages.</p><h2>4. Fixed-asset transfer</h2><p>After accepted receipt, the system will prepare the accounting journal and fixed-asset registry record for Finance review and capitalisation.</p><h2>5. Approval requested</h2><p>Approve the purchase order above the delegated operational threshold and apply the authenticated eSignature.</p>`;
     }
     if(type.includes('vendor compliance')){
       const v=vendorForApprovalV13(a);const docs=(v.complianceDocs||[]).map(d=>`<tr><td>${e13(d.type)}</td><td>${e13(d.version)}</td><td>${e13(d.updated)}</td><td>${e13(d.status)}</td></tr>`).join('');
@@ -5394,9 +8292,9 @@ window.MatanhoProcurement=Object.freeze({version:'8.0.0',navigate,render,getStat
     }
     if(type.includes('contract')){
       const c=contractForApprovalV13(a);const t=tenderByRecordV13(c?.tender||'TN-2026-014');
-      return `<h1>Cybersecurity Managed Services Contract</h1><p class="doc-lead">Execution copy submitted for final approval and eSignature.</p><table><tbody><tr><th>Contract reference</th><td>${e13(a.record)}</td><th>Related tender</th><td>${e13(c?.tender||t.id)}</td></tr><tr><th>Purchaser</th><td>${e13(a.entity)}</td><th>Supplier</th><td>${e13(c?.vendor||'TechNova Solutions')}</td></tr><tr><th>Contract value</th><td>${money(a.amount)}</td><th>Term</th><td>${e13(c?.start||'01 Sep 2026')} to ${e13(c?.end||'31 Aug 2029')}</td></tr></tbody></table><h2>1. Scope</h2><p>The Supplier shall provide managed cybersecurity monitoring, incident response, vulnerability management, quarterly testing, reporting, training and support in accordance with the service schedule.</p><h2>2. Service levels and acceptance</h2><p>Service availability, response times, remediation deadlines and reporting obligations are measured monthly. Repeated service failure may result in credits, remediation plans or termination.</p><h2>3. Fees, taxes and payment</h2><p>Fees are paid against accepted milestones and valid invoices. Tax, VAT and withholding treatment follow the approved vendor and statutory rules at the time of payment.</p><h2>4. Security, confidentiality and audit</h2><p>The Supplier shall protect confidential information, comply with applicable security policies, notify incidents promptly and retain complete records for audit.</p><h2>5. Execution</h2><p>The contract becomes binding only after the configured internal and external signatories complete authenticated electronic signatures.</p>`;
+      return `<h1>Cybersecurity Managed Services Contract</h1><p class="doc-lead">Execution copy submitted for final approval and eSignature.</p><table><tbody><tr><th>Contract reference</th><td>${e13(a.record)}</td><th>Related tender</th><td>${e13(c?.tender||t.id)}</td></tr><tr><th>Purchaser</th><td>${e13(a.entity)}</td><th>Supplier</th><td>${e13(c?.vendor||'TechNova Solutions')}</td></tr><tr><th>Contract value</th><td>${money(a.amount,a.currency)}</td><th>Term</th><td>${e13(c?.start||'01 Sep 2026')} to ${e13(c?.end||'31 Aug 2029')}</td></tr></tbody></table><h2>1. Scope</h2><p>The Supplier shall provide managed cybersecurity monitoring, incident response, vulnerability management, quarterly testing, reporting, training and support in accordance with the service schedule.</p><h2>2. Service levels and acceptance</h2><p>Service availability, response times, remediation deadlines and reporting obligations are measured monthly. Repeated service failure may result in credits, remediation plans or termination.</p><h2>3. Fees, taxes and payment</h2><p>Fees are paid against accepted milestones and valid invoices. Tax, VAT and withholding treatment follow the approved vendor and statutory rules at the time of payment.</p><h2>4. Security, confidentiality and audit</h2><p>The Supplier shall protect confidential information, comply with applicable security policies, notify incidents promptly and retain complete records for audit.</p><h2>5. Execution</h2><p>The contract becomes binding only after the configured internal and external signatories complete authenticated electronic signatures.</p>`;
     }
-    return `<h1>Procurement Approval Decision Paper</h1><p class="doc-lead">Actual decision record for ${e13(a.title)}.</p><table><tbody><tr><th>Approval reference</th><td>${e13(a.id)}</td><th>Related record</th><td>${e13(a.record)}</td></tr><tr><th>Entity</th><td>${e13(a.entity)}</td><th>Value</th><td>${a.amount?money(a.amount):'Non-financial'}</td></tr><tr><th>Required role</th><td>${e13(a.role)}</td><th>Due</th><td>${e13(a.due)}</td></tr></tbody></table><h2>Decision requested</h2><p>${e13(a.reason)}</p><h2>Management assessment</h2><p>The approver should review the complete transaction document, budget evidence, process compliance, commercial conclusion, conflicts and delegated authority before recording a decision.</p><h2>Approver declaration</h2><p>I confirm that I hold the required authority and have reviewed the actual document and supporting evidence.</p>`;
+    return `<h1>Procurement Approval Decision Paper</h1><p class="doc-lead">Actual decision record for ${e13(a.title)}.</p><table><tbody><tr><th>Approval reference</th><td>${e13(a.id)}</td><th>Related record</th><td>${e13(a.record)}</td></tr><tr><th>Entity</th><td>${e13(a.entity)}</td><th>Value</th><td>${a.amount?money(a.amount,a.currency):'Non-financial'}</td></tr><tr><th>Required role</th><td>${e13(a.role)}</td><th>Due</th><td>${e13(a.due)}</td></tr></tbody></table><h2>Decision requested</h2><p>${e13(a.reason)}</p><h2>Management assessment</h2><p>The approver should review the complete transaction document, budget evidence, process compliance, commercial conclusion, conflicts and delegated authority before recording a decision.</p><h2>Approver declaration</h2><p>I confirm that I hold the required authority and have reviewed the actual document and supporting evidence.</p>`;
   }
 
   function approvalDocumentV13(id){
@@ -5406,7 +8304,7 @@ window.MatanhoProcurement=Object.freeze({version:'8.0.0',navigate,render,getStat
   function supportDocumentV13(approvalId,kind){if(__pr23Live()){const __a=approvalBaseV13(approvalId),__d=__pr23SupportDocument(__a,kind),__k=`${approvalId}:${kind}`,__o=state.approvalDocumentOverridesV13[__k];if(__a&&__d)return {id:`${__a.record}-${String(kind).toUpperCase()}`,name:__d.name,type:'Supporting approval document',version:__o?.version||'v1.0',status:__a.status,owner:__a.approver,approvalId:__a.id,storageKey:__k,content:__o?.content||__d.content};}
     const a=approvalBaseV13(approvalId);const key=`${approvalId}:${kind}`;const override=state.approvalDocumentOverridesV13[key];let name='',content='';
     if(kind==='budget'){
-      name='Budget Availability and Funding Confirmation';content=`<h1>${name}</h1><p class="doc-lead">Finance control evidence supporting ${e13(a.record)}.</p><table><tbody><tr><th>Entity</th><td>${e13(a.entity)}</td><th>Record</th><td>${e13(a.record)}</td></tr><tr><th>Requested commitment</th><td>${a.amount?money(a.amount):'Non-financial'}</td><th>Budget owner</th><td>Tinashe Chaka, CFO</td></tr><tr><th>Funding source</th><td>Approved operating / capital budget</td><th>Control result</th><td>Within approved ceiling, subject to cash schedule</td></tr></tbody></table><h2>Assessment</h2><p>The requested commitment has been checked against the approved annual plan, department budget and current commitments. Release remains subject to the final delegated approval and payment scheduling.</p><h2>Finance confirmation</h2><p>[Editable finance conclusion, conditions and signature.]</p>`;
+      name='Budget Availability and Funding Confirmation';content=`<h1>${name}</h1><p class="doc-lead">Finance control evidence supporting ${e13(a.record)}.</p><table><tbody><tr><th>Entity</th><td>${e13(a.entity)}</td><th>Record</th><td>${e13(a.record)}</td></tr><tr><th>Requested commitment</th><td>${a.amount?money(a.amount,a.currency):'Non-financial'}</td><th>Budget owner</th><td>Tinashe Chaka, CFO</td></tr><tr><th>Funding source</th><td>Approved operating / capital budget</td><th>Control result</th><td>Within approved ceiling, subject to cash schedule</td></tr></tbody></table><h2>Assessment</h2><p>The requested commitment has been checked against the approved annual plan, department budget and current commitments. Release remains subject to the final delegated approval and payment scheduling.</p><h2>Finance confirmation</h2><p>[Editable finance conclusion, conditions and signature.]</p>`;
     }else if(kind==='evaluation'){
       const t=tenderByRecordV13(a.record);name='Bid Evaluation and Recommendation Report';content=`<h1>${name}</h1><p class="doc-lead">Committee report for ${e13(t.id)} - ${e13(t.title)}.</p><table><thead><tr><th>Bidder</th><th>Mandatory compliance</th><th>Technical</th><th>Commercial</th><th>Total</th></tr></thead><tbody><tr><td>TechNova Solutions</td><td>Pass</td><td>91%</td><td>94%</td><td>90%</td></tr><tr><td>NetShield Africa</td><td>Pass</td><td>86%</td><td>91%</td><td>87%</td></tr><tr><td>CloudAxis Systems</td><td>Pass</td><td>83%</td><td>88%</td><td>84%</td></tr></tbody></table><h2>Committee recommendation</h2><p>TechNova Solutions is recommended as the highest-ranked responsive bidder, subject to the authorised user's final selection, due diligence, approval and contract finalisation.</p><h2>Evaluation declarations</h2><p>All evaluators completed confidentiality and conflict-of-interest declarations before accessing bid content.</p>`;
     }else if(kind==='conflict'){
@@ -5426,7 +8324,7 @@ window.MatanhoProcurement=Object.freeze({version:'8.0.0',navigate,render,getStat
   function openApprovalV13(id){
     const a=approvalBaseV13(id),doc=approvalDocumentV13(id);
     const chain=a.type==='Annual plan'?['Group Procurement Lead','CFO','CEO']:a.type==='Tender award'?['Evaluation Committee','CFO','CEO']:['Business Owner','Finance Control',a.role];
-    openModal(`Approval - ${a.record}`,`${a.type} | ${a.entity}`,`<div class="approval-review-layout-v13"><div class="approval-document-stage-v13">${paperV13(doc,false)}</div><aside class="approval-side-v13"><section class="approval-side-card-v13"><h3>Decision context</h3><div class="approval-meta-v13"><div><span>Approval role</span><strong>${e13(a.role)}</strong></div><div><span>Approver</span><strong>${e13(a.approver)}</strong></div><div><span>Value</span><strong>${a.amount?money(a.amount):'N/A'}</strong></div><div><span>Due</span><strong>${e13(a.due)}</strong></div></div><p>${e13(a.reason)}</p></section><section class="approval-side-card-v13"><div class="approval-control-note-v13">${icon('approve')}<div><strong>Authority and SoD validation passed</strong><p>Required role, entity scope, amount limit, delegation and creator conflict were checked before this prompt opened.</p></div></div></section><section class="approval-side-card-v13"><h3>Approval sequence</h3><div class="esign-timeline-v6">${chain.map((x,i)=>`<div class="esign-step-v6 ${i===chain.length-1?'current':'done'}"><div class="esign-dot-v6">${i+1}</div><div><strong>${e13(x)}</strong><span>${i===chain.length-1?`Awaiting ${e13(a.approver)}`:'Completed and audit-stamped'}</span></div></div>`).join('')}</div></section><section class="approval-side-card-v13"><h3>Supporting documents</h3><div class="approval-support-v13"><button type="button" data-action="preview-approval-support-v13" data-id="${e13(id)}|budget">${icon('document')}<span>${__pr23Live()?__PR23_SUPPORT_LABELS.budget:'Budget availability and funding confirmation'}</span></button><button type="button" data-action="preview-approval-support-v13" data-id="${e13(id)}|evaluation">${icon('document')}<span>${__pr23Live()?__PR23_SUPPORT_LABELS.evaluation:'Evaluation or technical recommendation'}</span></button><button type="button" data-action="preview-approval-support-v13" data-id="${e13(id)}|conflict">${icon('document')}<span>${__pr23Live()?__PR23_SUPPORT_LABELS.conflict:'Conflict and independence declaration'}</span></button></div></section><section class="approval-side-card-v13"><h3>Approver statement</h3><textarea class="approval-comment-v13" id="approvalCommentV13">I have reviewed the actual document, supporting evidence, budget position, procurement process, conflicts and delegated authority.</textarea></section></aside></div>`,action13('Send document','send-approval-doc-v13',`${id}|main`,'','mail')+action13('Edit document','edit-approval-doc-v13',`${id}|main`,'','document')+action13('Delegate','delegate-approval-v6',id)+action13('Reject / return','reject-approval-v6',id)+action13(a.esign?'Approve & eSign':'Approve','approve-prompt-v6',id,'primary',a.esign?'signature':'approve'));
+    openModal(`Approval - ${a.record}`,`${a.type} | ${a.entity}`,`<div class="approval-review-layout-v13"><div class="approval-document-stage-v13">${paperV13(doc,false)}</div><aside class="approval-side-v13"><section class="approval-side-card-v13"><h3>Decision context</h3><div class="approval-meta-v13"><div><span>Approval role</span><strong>${e13(a.role)}</strong></div><div><span>Approver</span><strong>${e13(a.approver)}</strong></div><div><span>Value</span><strong>${a.amount?money(a.amount,a.currency):'N/A'}</strong></div><div><span>Due</span><strong>${e13(a.due)}</strong></div></div><p>${e13(a.reason)}</p></section><section class="approval-side-card-v13"><div class="approval-control-note-v13">${icon('approve')}<div><strong>Authority and SoD validation passed</strong><p>Required role, entity scope, amount limit, delegation and creator conflict were checked before this prompt opened.</p></div></div></section><section class="approval-side-card-v13"><h3>Approval sequence</h3><div class="esign-timeline-v6">${chain.map((x,i)=>`<div class="esign-step-v6 ${i===chain.length-1?'current':'done'}"><div class="esign-dot-v6">${i+1}</div><div><strong>${e13(x)}</strong><span>${i===chain.length-1?`Awaiting ${e13(a.approver)}`:'Completed and audit-stamped'}</span></div></div>`).join('')}</div></section><section class="approval-side-card-v13"><h3>Supporting documents</h3><div class="approval-support-v13"><button type="button" data-action="preview-approval-support-v13" data-id="${e13(id)}|budget">${icon('document')}<span>${__pr23Live()?__PR23_SUPPORT_LABELS.budget:'Budget availability and funding confirmation'}</span></button><button type="button" data-action="preview-approval-support-v13" data-id="${e13(id)}|evaluation">${icon('document')}<span>${__pr23Live()?__PR23_SUPPORT_LABELS.evaluation:'Evaluation or technical recommendation'}</span></button><button type="button" data-action="preview-approval-support-v13" data-id="${e13(id)}|conflict">${icon('document')}<span>${__pr23Live()?__PR23_SUPPORT_LABELS.conflict:'Conflict and independence declaration'}</span></button></div></section><section class="approval-side-card-v13"><h3>Approver statement</h3><textarea class="approval-comment-v13" id="approvalCommentV13">I have reviewed the actual document, supporting evidence, budget position, procurement process, conflicts and delegated authority.</textarea></section></aside></div>`,action13('Send document','send-approval-doc-v13',`${id}|main`,'','mail')+action13('Edit document','edit-approval-doc-v13',`${id}|main`,'','document')+action13('Delegate','delegate-approval-v6',id)+action13('Reject / return','reject-approval-v6',id)+action13(a.esign?'Approve & eSign':'Approve','approve-prompt-v6',id,'primary',a.esign?'signature':'approve'));
     setModalClassV13('modal-v13-approval');
   }
 
@@ -5800,7 +8698,7 @@ window.MatanhoProcurement=Object.freeze({version:'8.0.0',navigate,render,getStat
 
   function isVendorProvidedDocumentV19(doc) {
     if (!doc) return false;
-    if (__pr23Live() && /template/i.test(String(doc.type || '') + ' ' + String(doc.folder || ''))) return false; const text = [doc.name,doc.type,doc.folder,doc.owner,doc.source,doc.provenance].filter(Boolean).join(' ');
+    if (__pr23Live() && doc.stored) return false; if (__pr23Live() && /template/i.test(String(doc.type || '') + ' ' + String(doc.folder || ''))) return false; const text = [doc.name,doc.type,doc.folder,doc.owner,doc.source,doc.provenance].filter(Boolean).join(' ');
     return doc.vendorProvided === true || doc.immutable === true || /Vendor Portal|Supplier Portal/i.test(String(doc.owner || doc.source || '')) || /Vendor Submissions/i.test(String(doc.folder || '')) || vendorDocumentPatternV19.test(text) && /vendor|supplier|bid|quotation/i.test(text);
   }
 
@@ -6138,7 +9036,7 @@ window.MatanhoProcurement=Object.freeze({version:'8.0.0',navigate,render,getStat
 
   function hydrate(payload={}){
     if(typeof state==='undefined') throw new Error('The procurement state store is not available.');
-    const allowed=['entities','plans','requisitions','tenders','vendors','orders','invoices','documents','reports','approvals','notifications','roles','accessRequests','planItems','grns','journals','assets','approvalPromptsV6','contractsV6','signatureEnvelopesV6','vendorMessagesV6','vendorRequestsV6','planActualsV6','departmentBudgetsV6','rbacUsersV6','vendorAuditTrailV19','quotationNormalisationsV19','complianceReminderLogV7','complianceReminderSettingsV7','auditEventsLive','prViewV11','quotationsLive','evaluationLive','letterhead','approvalGroupV23','approvalMatrixV23','analyticsV23','requisitionProjectsV23','vendorRegistrationsV23'];
+    const allowed=['entities','plans','requisitions','tenders','vendors','orders','invoices','documents','reports','approvals','notifications','roles','accessRequests','planItems','grns','journals','assets','approvalPromptsV6','contractsV6','signatureEnvelopesV6','vendorMessagesV6','vendorRequestsV6','planActualsV6','departmentBudgetsV6','rbacUsersV6','vendorAuditTrailV19','quotationNormalisationsV19','complianceReminderLogV7','complianceReminderSettingsV7','auditEventsLive','prViewV11','quotationsLive','evaluationLive','letterhead','approvalGroupV23','approvalMatrixV23','analyticsV23','requisitionProjectsV23','vendorRegistrationsV23','vendorOptionsV23','requisitionOptionsV23','budgetsV23','planLinesV23','sourcingV23','awardMatrixV23','declarationOptionsV23','p2pConfigV23','poMatrixV23','aiStatusV23','aiUsageV23','aiExtractionsV23','aiOpenV23'];
     for(const key of allowed){
       if(Object.prototype.hasOwnProperty.call(payload,key)) state[key]=structuredClone(payload[key]);
     }

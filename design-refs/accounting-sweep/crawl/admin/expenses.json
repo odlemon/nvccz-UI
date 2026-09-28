@@ -1,0 +1,31 @@
+{
+  "url": "/accounting/expenses",
+  "title": "Expenses & Claims",
+  "headings": [
+    "Expenses & Claims",
+    "Claim evidence centre",
+    "Evidence controls",
+    "Expense control trajectory",
+    "Policy attention",
+    "Expense SLA"
+  ],
+  "tabs": [],
+  "buttons": [
+    "New expense claim",
+    "Import card feed",
+    "Filters ▴",
+    "Command",
+    "Claims",
+    "Corporate cards",
+    "Recurring",
+    "Policy studio",
+    "Attach evidence",
+    "Evidence register"
+  ],
+  "text": "EXPENSE CONTROL Expenses & Claims Employee claims, corporate cards, recurring expenses and policy governance with source evidence and reimbursement controls. New expense claim Import card feed Submitted $1,820 Open claims Ready to approve $0 Awaiting reviewer Policy exceptions 2 Need rationale Evidence coverage 0% 2 receipts missing Corporate card $3,166 Unposted feed Next reimbursement — Not yet tracked Filters ▴ From To Employee All employees Audit Tester Policy All policies Clear Exception Missing receipt Project All projects None Growth Fund I MFI Portfolio Expense-control operating health Policy, evidence and reimbursement readiness with exception-first review. Evidence coverage 0% Receipts & documents Policy compliance 0% Within policy Approval readiness 100% Claims approved Command Claims Corporate cards Recurring Policy studio Claim evidence centre Attach receipts, invoices, photographs, PDFs or supporting spreadsheets directly to an employee claim before finance approval. + No uploaded evidence yet Attach a receipt, photo, PDF or spreadsheet to a claim. Ready Evidence controls Files are linked to a claim ID, submitter and timestamp. Finance reviewers can preview image evidence before approving or returning the claim. Attach evidence Evidence register Expense control trajectory Submitted, approved and reimbursed expense value. Expense submissions 46k 34k 23k 11k 0k Aug Sep Oct Nov Dec Jan Feb Mar Apr May Jun Jul Policy attention Claims with missing evidence, duplicate risk or policy exceptions. Audit Tester cmtr2wiu30025ung0h5304bo6 · Audit verification test expense 2 - Conference registration · 0 evidence file(s) $640 Audit Tester cmtr0sam20010ung00yta3rdx · Audit verification test expense - Harare to Bulawayo travel claim · 0 evidence file(s) $1,180 Expense SLA Processing and evidence quality. Evidence complete 0%",
+  "ms": 10346,
+  "console": [
+    "Failed to fetch RSC payload for http://localhost:3120/accounting/receivables. Falling back to browser navigation. TypeError: Failed to fetch\n    at fetchServerResponse (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client"
+  ],
+  "failed": []
+}

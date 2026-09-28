@@ -1,0 +1,46 @@
+{
+  "url": "/accounting/close",
+  "title": "Month-End Close Control Centre",
+  "headings": [
+    "Month-End Close Control Centre",
+    "Are the books balanced?",
+    "Is cash fully proven?",
+    "Are taxes ready?",
+    "Can we lock July?",
+    "Workstream control map",
+    "Cash & bank",
+    "Receivables",
+    "Payables",
+    "Tax",
+    "Close task register",
+    "Review ageing and expected credit losses",
+    "Close duration trend",
+    "Immediate control attention",
+    "Recent activity"
+  ],
+  "tabs": [],
+  "buttons": [
+    "Close calendar",
+    "CFO brief",
+    "Run control scan",
+    "Submit close",
+    "Top 10",
+    "Bottom 10",
+    "All",
+    "cmtrbgjbv0001unksb1lvrx7n Complete all bank reconc {noop}",
+    "cmtrbgjc20003unks6sgt1p6a Review ageing and expect {noop}",
+    "cmtrbgjc60005unksunv76q39 Accrue unmatched supplie {noop}",
+    "cmtrbgjca0007unksn3d7nj49 Complete VAT reconciliat {noop}",
+    "Open task",
+    "Explain priority",
+    "Analytics",
+    "All exceptions"
+  ],
+  "text": "GOVERNED FINANCIAL CLOSE Month-End Close Control Centre A decision-oriented workspace that answers what is complete, what is blocking publication, who owns the next action and whether July 2026 can be safely locked. Close calendar CFO brief Run control scan Submit close ✓ Prepare 100% complete 2 Reconcile 83% complete ✓ Adjust 100% complete 4 Review 48% complete ✓ Report 100% complete 6 Lock 18% complete Close completion 75% 3 of 4 tasks Critical blockers 0 0 open exceptions Evidence coverage 0% 6 governed files Control readiness 53% Last scan 01 Aug 2026, 14:42 Review chain 1/4 2 pending Period lock Unavailable 0 critical tasks remain Are the books balanced? Trial balance and journal integrity. Exception USD 322209.92 difference 2 GL actions remain Is cash fully proven? External statements and ledger balances. Review 2 of 3 accounts signed USD 185 adjustment required Are taxes ready? VAT, WHT and source evidence. Review 96% VAT readiness One supplier document blocks filing Can we lock July? Mandatory gates and approvals. Blocked No · not yet Open exact lock gates Workstream control map Open a secondary workspace for task status, dependencies, evidence and reviewer conclusion. Cash & bank Real close workstream, grouped from live task data. 1/1 done Progress 100% Evidence 0% Owner Audit Receivables Real close workstream, grouped from live task data. 0/1 done Progress 0% Evidence 0% Owner Audit Payables Real close workstream, grouped from live task data. 1/1 done Progress 100% Evidence 0% Owner Audit Tax Real close workstream, grouped from live task data. 1/1 done Progress 100% Evidence 0% Owner Audit Close task register Filters persist. Every row opens a unique third-level task workspace. Search Workstream All workstreams Cash & bank Receivables Payables Tax Status All statuses Complete In review In progress Blocked Not started Owner All owners Audit Tester Priority All priorities Critical High Medium Top 10 Bottom 10 All TASK WORKSTREAM OWNER DUE DEPENDENCY EVIDENCE PROGRESS PRIORITY STATUS cmtrbgjbv0001unksb1lvrx7n Complete all bank reconciliations Cash & bank Audit Tester Finance team Not set None 0/1 100% Medium Complete cmtrbgjc20003unks6sgt1p6a Review ageing and expected credit losses Receivables Audit Tester Finance team Not set None 0/1 0% Medium In progress cmtrbgjc60005unksunv76q39 Accrue unmatched supplier invoices Payables Audit Tester Finance team Not set None 0/1 100% Medium Complete cmtrbgjca0007unksn3d7nj49 Complete VAT reconciliation working paper Tax Audit Tester Finance team Not set None 0/1 100% Medium Complete RECOMMENDED NEXT ACTION Review ageing and expected credit losses cmtrbgjc20003unks6sgt1p6a · Receivables · Audit Tester. Open task Explain priority Close duration trend Elapsed business days from cut-off to lock. Analytics Feb Mar Apr May Jun Jul Immediate control attention Risk-ranked items that prevent a clean close. All exceptions Recent activity Tasks, documents, controls and approvals. 1 Close control scan completed 01 Aug 14:42 · 37 assertions passed; 3 critical blockers remain. 2 Management accounts version 7 created 01 Aug 14:05 · Five comments complete; three remain. 3 Preparer sign-off recorded 01 Aug 13:42 · General ledger and checklist signed.",
+  "ms": 33918,
+  "console": [
+    "API request failed: TypeError: Failed to fetch\n    at ApiClient.makeRequest (webpack-internal:///(app-pages-browser)/./lib/api/api-client.ts:153:36)\n    at ApiClient.get (webpack-internal:///(app-pages-browser)/./lib/api/api-client.ts:165:2",
+    "Failed to fetch RSC payload for http://localhost:3120/accounting/approvals. Falling back to browser navigation. TypeError: Failed to fetch\n    at fetchServerResponse (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/c"
+  ],
+  "failed": []
+}

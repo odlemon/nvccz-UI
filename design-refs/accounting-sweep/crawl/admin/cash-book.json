@@ -1,0 +1,26 @@
+{
+  "url": "/accounting/cash-book",
+  "title": "Cashbook & Daily Liquidity",
+  "headings": [
+    "Cashbook & Daily Liquidity",
+    "Cashbook register",
+    "Batch processing model",
+    "Bank reconciliation"
+  ],
+  "tabs": [],
+  "buttons": [
+    "Import batch",
+    "New receipt",
+    "New payment",
+    "New transfer",
+    "Filters",
+    "No cashbook records. {noop}",
+    "Open workbench"
+  ],
+  "text": "CASH OPERATIONS Cashbook & Daily Liquidity Spreadsheet-style batch processing with editable rows, bank and currency context, tax, project dimensions and balanced-journal validation. Import batch New receipt New payment New transfer Cash at bank $3,784,579.34 CR All configured cashbooks Receipt batches 0 User-created batches Payment batches 0 User-created batches Unreconciled lines 4 Bank workbench Bank feeds 0/1 API, SFTP and uploads Ledger integrity Balanced Cash journals validated Filters Cashbook register Posted cashbook batches and their source-to-ledger relationship. DATE BATCH / REFERENCE CASHBOOK COUNTERPARTY PROJECT / FUND CURRENCY RECEIPTS PAYMENTS JOURNAL STATUS No cashbook records. Batch processing model Industry-style cashbook workflow. 1 Batch header Bank, period, currency and owner 2 Grid entry Edit rows, accounts, tax and dimensions 3 Validate Duplicates, period and account controls 4 Post Balanced journal per accepted row 5 Reconcile Match to external statement Bank reconciliation Compare bank evidence with cashbook and GL lines. Open workbench 4 statement lines 0 matched · 4 require action.",
+  "ms": 12516,
+  "console": [
+    "Failed to fetch RSC payload for http://localhost:3120/accounting/chart-governance. Falling back to browser navigation. TypeError: Failed to fetch\n    at fetchServerResponse (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/c"
+  ],
+  "failed": []
+}

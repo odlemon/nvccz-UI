@@ -1,0 +1,30 @@
+{
+  "url": "/accounting/receivables",
+  "title": "Receivables · Billing to Cash",
+  "headings": [
+    "Receivables · Billing to Cash",
+    "Cash collection trajectory",
+    "Debtors ageing",
+    "Billing pipeline"
+  ],
+  "tabs": [],
+  "buttons": [
+    "New invoice",
+    "New quotation",
+    "⋯",
+    "Filters ▴",
+    "Command",
+    "Invoices",
+    "Quotations",
+    "Customers",
+    "Ageing & ECL",
+    "Collections",
+    "Open collections"
+  ],
+  "text": "ACCOUNTS RECEIVABLE Receivables · Billing to Cash A layered invoice-to-cash workspace for quotations, invoices, customer accounts, collections, ageing, credit risk and source-to-ledger evidence. New invoice New quotation ⋯ Outstanding $7,800 Open customer balances Past due $0 0% of receivables 90+ days $0 Highest-risk exposure DSO 0 days Not yet tracked Weighted quote pipeline $448,620 Probability-adjusted Unallocated receipts $0 Not yet tracked Filters ▴ From To Customer All customers Audit Verification Client Ltd Status All statuses Current Part paid Overdue Disputed Currency All currencies USD ZWG ZAR Command Invoices Quotations Customers Ageing & ECL Collections Cash collection trajectory Expected receipts, overdue migration and collection performance. Open collections $7,800 Current, not yet due $0 Overdue $448,620 Weighted quote pipeline 30-day collection trend is not yet tracked — no historical AR snapshot exists to chart. Due within 7 days $0 Ready Overdue balance $0 · 0% of receivables Ready Unallocated bank receipts Not yet tracked Ready Credit limits exceeded Not yet tracked Ready Debtors ageing Exposure by ageing band. $7,800 Current $0 1–30 $0 31–60 $0 61–90 $0 90+ Billing pipeline Quotes converting into contracted revenue. Accepted $112k Negotiation $186k Sent $245k Expired $92k",
+  "ms": 14424,
+  "console": [
+    "Failed to fetch RSC payload for http://localhost:3120/accounting/vendors. Falling back to browser navigation. TypeError: Failed to fetch\n    at fetchServerResponse (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/com"
+  ],
+  "failed": []
+}

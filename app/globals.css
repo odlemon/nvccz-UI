@@ -1,5 +1,14 @@
-@import "tailwindcss";
+/* source(none): prevent Tailwind oxide from scanning .cursor/.claude/etc.
+   On Windows those paths often contain `\ + hex` (UUIDs/hashes) which v4.1
+   misreads as CSS escapes and crashes with RangeError: Invalid code point —
+   leaving layout.css without utilities so login UI sits under the bg image. */
+@import "tailwindcss" source(none);
 @import "tw-animate-css";
+
+@source "./**/*.{js,ts,jsx,tsx,mdx}";
+@source "../components/**/*.{js,ts,jsx,tsx,mdx}";
+@source "../lib/**/*.{js,ts,jsx,tsx,mdx}";
+@source "../hooks/**/*.{js,ts,jsx,tsx,mdx}";
 
 @custom-variant dark (&:is(.dark *));
 

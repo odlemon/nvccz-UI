@@ -1,0 +1,26 @@
+{
+  "url": "/accounting/recurring",
+  "title": "Recurring Schedules & Automation",
+  "headings": [
+    "Recurring Schedules & Automation",
+    "Recurring schedule register"
+  ],
+  "tabs": [],
+  "buttons": [
+    "Filters ▴",
+    "Simulate 90 days",
+    "⋮",
+    "New schedule",
+    "Schedules",
+    "Run queue",
+    "Calendar",
+    "Exceptions",
+    "Controls"
+  ],
+  "text": "ACCOUNTING AUTOMATION Recurring Schedules & Automation Enterprise scheduler for recurring supplier bills, invoices, expenses, accruals, cash transfers and controlled journals. Every occurrence is independently validated, approved, posted and auditable. Filters ▴ Simulate 90 days ⋮ New schedule ACTIVE SCHEDULES 2 0 paused or in review DUE NEXT 7 DAYS 2 Operational queue requires review 90-DAY FORECAST $1,500.00 Gross scheduled business value OPEN EXCEPTIONS 0 Validation, evidence and expiry controls AUTO-POST ELIGIBLE 2 After maker-checker validation AUTOMATION HEALTH 100% Successful occurrence generation Schedules Run queue Calendar Exceptions Controls Next scheduler cycle · 12 Aug 2026 06:00 CAT From date Up to date Schedule type All Expense Supplier bill Revenue Status All Active Paused Review Entity / fund All Matanho Capital Partners Search Recurring schedule register Reusable business rules with occurrence generation, accounting mappings, approvals, evidence and exception management. 2 visible SCHEDULE TYPE DESCRIPTION / COUNTERPARTY ENTITY FREQUENCY NEXT RUN AMOUNT AMOUNT RULE APPROVAL STATUS cmtr3wlp40003unocem7nkx4t Journal Audit verification - Monthly software subscription accrual Not applicable Matanho Capital Partners Monthly 01 Oct,2026 $250.00 Fixed amount Auto-post on run (no approval gate configured) Active cmtr3vxel0001unoc4do81vqa Journal Audit verification test - Monthly software subscription accrual Not applicable Matanho Capital Partners Monthly 01 Oct,2026 $250.00 Fixed amount Auto-post on run (no approval gate configured) Active",
+  "ms": 19668,
+  "console": [
+    "Failed to fetch RSC payload for http://localhost:3120/accounting/journals. Falling back to browser navigation. TypeError: Failed to fetch\n    at fetchServerResponse (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/co"
+  ],
+  "failed": []
+}

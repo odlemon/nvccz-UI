@@ -1,5 +1,7 @@
 "use client"
 
+import { UserMasterDetails } from "./user-master-details"
+import { STATUS_BADGE_CLASS, statusLabel } from "./user-master-shared"
 import { useState, useEffect } from "react"
 import { motion } from "framer-motion"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
@@ -137,7 +139,9 @@ export function UserDrawer({ isOpen, onClose, user, onEdit, onDelete }: UserDraw
   }
 
   const handleDelete = () => {
-    if (window.confirm(`Are you sure you want to delete ${user.firstName} ${user.lastName}?`)) {
+    if (window.confirm(`Remove ${user.firstName} ${user.lastName}?
+
+A user with transaction history is deactivated and kept on record; only a user with no history is deleted.`)) {
       onDelete(user)
       onClose()
     }
@@ -296,6 +300,9 @@ export function UserDrawer({ isOpen, onClose, user, onEdit, onDelete }: UserDraw
                     <Badge variant="outline" className="bg-blue-50 text-blue-700">
                       {user.role.name}
                     </Badge>
+                    <Badge variant="outline" className={STATUS_BADGE_CLASS[String(userDetails.status || 'ACTIVE').toUpperCase() as keyof typeof STATUS_BADGE_CLASS]}>
+                      {statusLabel(userDetails.status)}
+                    </Badge>
                     {user.userDepartment && (
                       <Badge variant="outline">
                         {user.userDepartment}
@@ -349,61 +356,7 @@ export function UserDrawer({ isOpen, onClose, user, onEdit, onDelete }: UserDraw
           {/* Tab Content */}
           <div className="mt-6">
             {/* Overview Tab */}
-            {activeTab === "overview" && (
-              <div className="space-y-4">
-                <div className="border border-gray-200 rounded-lg p-4">
-                  <h3 className="text-lg font-normal text-gray-900 flex items-center gap-2 mb-4">
-                    <User className="w-5 h-5" />
-                    Personal Information
-                  </h3>
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-3">
-                      <Mail className="w-4 h-4 text-gray-400" />
-                      <div>
-                        <p className="text-sm text-gray-900">Email</p>
-                        <CopyText 
-                          text={user.email}
-                          successMessage="Email copied to clipboard!"
-                          className="mt-1"
-                        />
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <User className="w-4 h-4 text-gray-400" />
-                      <div>
-                        <p className="text-sm text-gray-900">Full Name</p>
-                        <p className="text-sm text-gray-600 mt-1">
-                          {user.firstName} {user.lastName}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="border border-gray-200 rounded-lg p-4">
-                  <h3 className="text-lg font-normal text-gray-900 flex items-center gap-2 mb-4">
-                    <Calendar className="w-5 h-5" />
-                    Timeline
-                  </h3>
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-3">
-                      <Calendar className="w-4 h-4 text-gray-400" />
-                      <div>
-                        <p className="text-sm font-normal text-gray-900">Created</p>
-                        <p className="text-sm text-gray-600">{formatDateTime(user.createdAt)}</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <Calendar className="w-4 h-4 text-gray-400" />
-                      <div>
-                        <p className="text-sm font-normal text-gray-900">Last Updated</p>
-                        <p className="text-sm text-gray-600">{formatDateTime(user.updatedAt)}</p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
+            {activeTab === "overview" && <UserMasterDetails user={userDetails} />}
 
             {/* Role Tab */}
             {activeTab === "role" && (

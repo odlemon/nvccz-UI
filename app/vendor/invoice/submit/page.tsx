@@ -138,6 +138,7 @@ export default function VendorInvoiceSubmissionPage() {
 
   const [lines, setLines] = useState<InvoiceLine[]>([blankLine()])
   const [dueDate, setDueDate] = useState<Date | undefined>(daysFromToday(30))
+  const [supplierInvoiceNumber, setSupplierInvoiceNumber] = useState('')
   const [documentFile, setDocumentFile] = useState<File | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState<SubmittedInvoice | null>(null)
@@ -220,6 +221,10 @@ export default function VendorInvoiceSubmissionPage() {
       toast.error(`Line ${badLine + 1} needs an item name, a quantity above zero and a unit price`)
       return
     }
+    if (!supplierInvoiceNumber.trim()) {
+      toast.error("Enter your invoice number, as printed on your invoice")
+      return
+    }
     if (dueDate && dueDate.getTime() < startOfToday().getTime()) {
       toast.error('The due date cannot be earlier than today')
       return
@@ -238,6 +243,7 @@ export default function VendorInvoiceSubmissionPage() {
 
       const res = await procurementApiV2.createInvoice({
         vendorPortalToken: token,
+        supplierInvoiceNumber: supplierInvoiceNumber.trim(),
         dueDate: dueDate?.toISOString(),
         currencyId: po.currency?.id,
         documentPath,
@@ -550,6 +556,18 @@ export default function VendorInvoiceSubmissionPage() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="supplier-invoice-number">Your invoice number</Label>
+                  <Input
+                    id="supplier-invoice-number"
+                    value={supplierInvoiceNumber}
+                    onChange={(e) => setSupplierInvoiceNumber(e.target.value)}
+                    maxLength={128}
+                    required
+                    placeholder="The number printed on your invoice"
+                    className="rounded-full h-11"
+                  />
+                </div>
                 <div className="space-y-2">
                   <Label>Due date</Label>
                   <DatePicker value={dueDate} onChange={setDueDate} allowFutureDates={true} className="rounded-full h-11" />

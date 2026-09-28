@@ -152,6 +152,23 @@
         "NEXT_PUBLIC_INVESTEE_PORTAL_URL": "http://localhost:3120",
         "NEXT_PUBLIC_APPLY_PORTAL_URL": "http://localhost:3140"
       }
+    },
+    {
+      "name": "vendor-portal-review",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": [
+        "next",
+        "dev",
+        "-p",
+        "3140"
+      ],
+      "port": 3140,
+      "env": {
+        "NEXT_PUBLIC_PORTAL": "vendor",
+        "NEXT_DIST_DIR": ".next-vendor-review",
+        "NEXT_PUBLIC_AUTH_TOKEN_KEY": "token_vendor",
+        "NEXT_PUBLIC_AUTH_PROFILE_KEY": "userProfile_vendor"
+      }
     }
   ]
 }

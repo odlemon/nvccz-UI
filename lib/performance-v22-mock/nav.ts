@@ -29,9 +29,10 @@ export const PM22_PATH_TO_PAGE: Record<string, string> = Object.fromEntries(
 )
 
 export function pathToPm22Page(pathname: string): string {
-  if (pathname in PM22_PATH_TO_PAGE) return PM22_PATH_TO_PAGE[pathname]
-  if (pathname.startsWith('/performance/')) {
-    const seg = pathname.replace('/performance/', '').split('/')[0]
+  const clean = String(pathname || '').split('?')[0].replace(/\/+$/, '') || '/performance'
+  if (clean in PM22_PATH_TO_PAGE) return PM22_PATH_TO_PAGE[clean]
+  if (clean.startsWith('/performance/')) {
+    const seg = clean.replace('/performance/', '').split('/')[0]
     if (seg === 'kpi-analytics') return 'kpiAnalytics'
     const directMatch = Object.entries(PM22_PAGE_TO_PATH).find(([, path]) => path === `/performance/${seg}`)
     if (directMatch) return directMatch[0]

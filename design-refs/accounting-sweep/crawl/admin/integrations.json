@@ -1,0 +1,19 @@
+{
+  "url": "/accounting/integrations",
+  "title": "Integrations and Data Exchange",
+  "headings": [
+    "Integrations and Data Exchange"
+  ],
+  "tabs": [],
+  "buttons": [
+    "Integration logs {integration-logs}",
+    "Add connector {add-connector}",
+    "Open connector {connector-detail}"
+  ],
+  "text": "PLATFORM Integrations and Data Exchange Connect banking, procurement, payroll, inventory, identity and reporting services through governed interfaces. Integration logs Add connector Core banking · CBZ Bank statements + payment files Open connector Status Connected Connected Last sync 2 min ago Recorded Authentication Certificate / OAuth Enforced Error handling Quarantine + retry Configured Core banking · Stanbic Bank statements + confirmations Open connector Status Connected Connected Last sync 4 min ago Recorded Authentication Certificate / OAuth Enforced Error handling Quarantine + retry Configured Matanho Procurement PO, GRN, vendor master Open connector Status Connected Connected Last sync 1 min ago Recorded Authentication Certificate / OAuth Enforced Error handling Quarantine + retry Configured Matanho Payroll Payroll journals + payment batches Open connector Status Connected Connected Last sync 12 min ago Recorded Authentication Certificate / OAuth Enforced Error handling Quarantine + retry Configured Matanho Workshop OS Inventory, sales and customer receipts Open connector Status Connected Connected Last sync 8 min ago Recorded Authentication Certificate / OAuth Enforced Error handling Quarantine + retry Configured ZIMRA gateway Submission package handoff Open connector Status Sandbox Sandbox Last sync Yesterday Recorded Authentication Certificate / OAuth Enforced Error handling Quarantine + retry Configured Microsoft Entra ID SSO, MFA and lifecycle Open connector Status Connected Connected Last sync Live Recorded Authentication Certificate / OAuth Enforced Error handling Quarantine + retry Configured Document rendering service PDF and spreadsheet outputs Open connector Status Connected Connected Last sync Live Recorded Authentication Certificate / OAuth Enforced Error handling Quarantine + retry Configured Data exchange health Volume, latency and quarantined records Bank statement imports184 lines processed 100% Procurement invoices2 records quarantined 98% Payroll journalsJuly batch posted 100% Inventory movements2 mapping exceptions 99% Integration governance Controls for every interface Schema validation Before import Enforced Duplicate detection Idempotency keys Enforced Source-to-ledger traceability Record-level lineage Enforced Service accounts Least privilege + rotation Enforced Retry and dead-letter queue Operational monitoring Enabled",
+  "ms": 9490,
+  "console": [
+    "Failed to fetch RSC payload for http://localhost:3120/accounting/timesheets. Falling back to browser navigation. TypeError: Failed to fetch\n    at fetchServerResponse (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/"
+  ],
+  "failed": []
+}

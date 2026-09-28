@@ -158,6 +158,21 @@ function currencyLabel(e: any): string {
 // Adapters
 // ---------------------------------------------------------------------------
 
+/**
+ * Stored picture URLs are absolute and carry whichever host the API was configured with when the file was
+ * uploaded. Re-root the `/api/public-media/...` part on the API this app actually talks to, so a photo loads
+ * from the same backend the rest of the page does (dev, staging and prod all serve it).
+ */
+function mediaUrl(raw: unknown): string | null {
+  if (typeof raw !== "string" || !raw.trim()) return null
+  const url = raw.trim()
+  const marker = "/public-media/"
+  const at = url.indexOf(marker)
+  if (at === -1) return url
+  const base = (process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:3009/api").replace(/\/+$/, "")
+  return `${base}${marker}${url.slice(at + marker.length)}`
+}
+
 function adaptEmployees(
   rows: any[],
   leaveByEmployee: Map<string, number>,
@@ -206,6 +221,9 @@ function adaptEmployees(
       documents: DASH, // no document store wired for employees yet
       terminated: e.terminated === true,
       isActive: e.isActive === true,
+      // The employee's own uploaded photo, or null: the runtime then draws their initials. It used to draw one
+      // stock portrait for everyone without a hardcoded one.
+      photo: mediaUrl(e.pictureUrl ?? e.picture),
     }
   })
 }
@@ -255,7 +273,13 @@ function adaptRuns(rows: any[]): any[] {
     // Variance is a real month-on-month change, not a fixture constant.
     const variance =
       prev && prev !== 0 ? Number((((gross - prev) / prev) * 100).toFixed(2)) : null
-    const employeeCount = Array.isArray(r.employeePayrolls) ? r.employeePayrolls.length : null
+    // The run-register list endpoint doesn't hydrate the `employeePayrolls` relation (too expensive for a list) —
+    // it sends a Prisma `_count` instead. Only the single-run detail endpoint carries the real array. Checking
+    // just the array left every row in the register reading `employees: null`, rendered as the literal text
+    // "null" (found live: every run on Payroll Runs showed "Employees: null", not just an empty draft).
+    const employeeCount = Array.isArray(r.employeePayrolls)
+      ? r.employeePayrolls.length
+      : (r._count?.employeePayrolls ?? null)
 
     return {
       id: r.id,

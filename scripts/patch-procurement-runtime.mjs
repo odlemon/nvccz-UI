@@ -145,7 +145,7 @@ s = replaceOnce(
   "const money=n=>new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',maximumFractionDigits:0}).format(n);",
   "const money=n=>(n===null||n===undefined||n===''||!Number.isFinite(Number(n)))?'\\u2014':new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',maximumFractionDigits:0}).format(n);",
   "money() -> em dash for no value",
-  "const money=n=>(n===null||n===undefined",
+  ["const money=n=>(n===null||n===undefined", "const money=(n,cur)=>"],
 )
 
 // ---------------------------------------------------------------------------
@@ -943,9 +943,9 @@ for (const [kind, find] of [
 s = replaceUnique(
   s,
   "const rows=state.tenders.filter(t=>t.bids>0).map(t=>`<tr data-action=\"open-evaluation\"",
-  "const rows=state.tenders.filter(t=>t.bids>0&&(!__pr23Live()||t.stage==='Evaluation')).map(t=>`<tr data-action=\"open-evaluation\"",
-  "bid evaluation: only tenders with bids and no award",
-  "t.bids>0&&(!__pr23Live()||t.stage==='Evaluation')",
+  "const rows=state.tenders.filter(t=>t.bids>0&&(!__pr23Live()||['OPEN','CLOSED','UNDER_EVALUATION','AWAITING_APPROVAL'].includes(String(t.rawStatus||'').toUpperCase()))).map(t=>`<tr data-action=\"open-evaluation\"",
+  "bid evaluation: only tenders with bids that are open, closed or under evaluation, by their status (SRD 40)",
+  "['OPEN','CLOSED','UNDER_EVALUATION','AWAITING_APPROVAL'].includes(String(t.rawStatus||'').toUpperCase())",
 )
 
 // Vendor tax: the record holds no country, and "not Zimbabwe" made every vendor a non-resident for specialist review.
@@ -985,7 +985,7 @@ s = replaceUnique(
   "kpi('My open requests',rowsSource.length,",
   "kpi('My open requests',(__pr23Live()?rowsSource.filter(r=>['DRAFT','PENDING_APPROVAL','REJECTED'].includes(String(r.rawStatus||'').toUpperCase())):rowsSource).length,",
   "requisitions: \"My open requests\" counts drafts, pending and returned only",
-  "['DRAFT','PENDING_APPROVAL','REJECTED'].includes(String(r.rawStatus||'').toUpperCase())",
+  ["['DRAFT','PENDING_APPROVAL','REJECTED'].includes(String(r.rawStatus||'').toUpperCase())", "['DRAFT','PENDING_APPROVAL','REJECTED','RETURNED'].includes(String(r.rawStatus||'').toUpperCase())"],
 )
 
 // Command Centre: "Pending approvals" counted every pending requisition; "My approval queue" listed the latest requisitions.
@@ -1037,7 +1037,7 @@ s = replaceUnique(
   "const canEdit = /Draft|Returned|Information requested|revision/i.test(r.status);",
   "const canEdit = __pr23Live() ? ['DRAFT','REJECTED'].includes(String(r.rawStatus||'').toUpperCase()) : /Draft|Returned|Information requested|revision/i.test(r.status);",
   "requisitions: drafts and rejected requests offer Edit request",
-  "['DRAFT','REJECTED'].includes(String(r.rawStatus||'').toUpperCase()) :",
+  ["['DRAFT','REJECTED'].includes(String(r.rawStatus||'').toUpperCase()) :", "['DRAFT','REJECTED','RETURNED'].includes(String(r.rawStatus||'').toUpperCase()) :"],
 )
 s = replaceUnique(
   s,
@@ -1402,6 +1402,21 @@ s = replaceUnique(
   "approval centre -> live page",
   "function approvalsPageV6(){if(__pr23Live())return __pr23ApprovalsPageHtml();",
 )
+// SRD §8 Vendor Master: the live Vendor Registry and vendor profile (statuses, compliance, documents, banking) replace the prototype pages.
+s = replaceUnique(
+  s,
+  "function vendorRegisterPageV6(){",
+  "function vendorRegisterPageV6(){if(__pr23Live())return __pr23VendorRegistryLive();",
+  "vendor registry -> live vendor master",
+  "function vendorRegisterPageV6(){if(__pr23Live())return __pr23VendorRegistryLive();",
+)
+s = replaceUnique(
+  s,
+  "function vendorDetailPageV6(v){",
+  "function vendorDetailPageV6(v){if(__pr23Live())return __pr23VendorDetailLive(v);",
+  "vendor profile -> live vendor master",
+  "function vendorDetailPageV6(v){if(__pr23Live())return __pr23VendorDetailLive(v);",
+)
 // Configuration's Approval matrix tab reads the requisition route the loaders fetch (GET /procurement/approval-matrix).
 s = replaceUnique(
   s,
@@ -1435,7 +1450,15 @@ s = replaceUnique(
   "'approvalMatrixV23','analyticsV23','requisitionProjectsV23'];",
   "'approvalMatrixV23','analyticsV23','requisitionProjectsV23','vendorRegistrationsV23'];",
   "hydrate() -> vendor self-registrations",
+  "'requisitionProjectsV23','vendorRegistrationsV23'",
+)
+// hydrate() takes the vendor option lists (statuses, lifecycle moves, document types).
+s = replaceUnique(
+  s,
   "'requisitionProjectsV23','vendorRegistrationsV23'];",
+  "'requisitionProjectsV23','vendorRegistrationsV23','vendorOptionsV23'];",
+  "hydrate() -> vendor options",
+  "'vendorRegistrationsV23','vendorOptionsV23'",
 )
 
 // ---------------------------------------------------------------------------
@@ -1809,7 +1832,7 @@ s = replaceUnique(
   "${smallV11('Preview motivation','preview-doc-v11',`MOT-${r.id}`,'eye')}</div>`;",
   "${smallV11('Preview motivation','preview-doc-v11',`MOT-${r.id}`,'eye')}</div>${__pr23Live()?__pr23ApprovalRouteHtml(r.approvalRoute):''}`;",
   "requisition modal -> approval route",
-  "${__pr23Live()?__pr23ApprovalRouteHtml(r.approvalRoute):''}",
+  ["${__pr23Live()?__pr23ApprovalRouteHtml(r.approvalRoute):''}", "__pr23ApprovalRouteHtml(r.approvalRoute)+__pr23RequisitionDecisionHtml(r)"],
 )
 
 // ---------------------------------------------------------------------------
@@ -1898,7 +1921,7 @@ s = replaceUnique(
   "${smallAction('Send','send-po-v6',o.id,'mail')}${smallAction('eSign','esign-new-v6',o.id,'signature')}",
   "${smallAction('Send','send-po-v6',o.id,'mail')}${__pr23Live()?'':smallAction('eSign','esign-new-v6',o.id,'signature')}",
   "purchase orders -> no eSignature row action",
-  "${__pr23Live()?'':smallAction('eSign','esign-new-v6',o.id,'signature')}",
+  ["${__pr23Live()?'':smallAction('eSign','esign-new-v6',o.id,'signature')}", "__pr23Live()?__pr23PoRowActions(o)"],
 )
 s = replaceUnique(
   s,
@@ -2309,6 +2332,34 @@ s = replaceUnique(
 )
 
 // ---------------------------------------------------------------------------
+// Quotation Comparison: shared filter bar must filter state.tenders by stage /
+// category / year at render — DOM text matching could never map "Rejected"
+// (other modules) onto RFQ stages like "Awarded".
+// ---------------------------------------------------------------------------
+{
+  const findLf = "function quotationSelectionPageV7(){\n    const candidates=state.tenders.filter(t=>t.bids>0);"
+  const findCrlf = "function quotationSelectionPageV7(){\r\n    const candidates=state.tenders.filter(t=>t.bids>0);"
+  const replLf = "function quotationSelectionPageV7(){\n    const candidates=(typeof __pr23QuotationCandidates==='function'?__pr23QuotationCandidates():state.tenders.filter(t=>t.bids>0));"
+  const replCrlf = "function quotationSelectionPageV7(){\r\n    const candidates=(typeof __pr23QuotationCandidates==='function'?__pr23QuotationCandidates():state.tenders.filter(t=>t.bids>0));"
+  const marker = "typeof __pr23QuotationCandidates==='function'?__pr23QuotationCandidates()"
+  if (s.includes(marker)) {
+    console.log("  skip (already)  quotationSelectionPageV7 uses __pr23QuotationCandidates")
+    skipped += 1
+  } else if (s.includes(findCrlf)) {
+    s = s.replace(findCrlf, replCrlf)
+    console.log("  patch           quotationSelectionPageV7 uses __pr23QuotationCandidates")
+    applied += 1
+  } else if (s.includes(findLf)) {
+    s = s.replace(findLf, replLf)
+    console.log("  patch           quotationSelectionPageV7 uses __pr23QuotationCandidates")
+    applied += 1
+  } else {
+    console.warn("  MISS            quotationSelectionPageV7 uses __pr23QuotationCandidates")
+    missed += 1
+  }
+}
+
+// ---------------------------------------------------------------------------
 // P2P chain toolbar: don't offer Capture invoice / Record payment to roles the
 // backend will refuse anyway (INV-2) -- same __pr23Can(...) gate the invoice
 // register's own per-row Record payment button already uses.
@@ -2319,6 +2370,273 @@ s = replaceUnique(
   "(__pr23Can('intake.manage')?actionButton('Capture invoice','capture-invoice-v5',t.id,'','invoice'):'')+(__pr23Can('invoices.pay')?actionButton('Record payment','record-payment-v23',t.id,'','account'):'')",
   "P2P chain toolbar: hide Capture invoice / Record payment without the grant",
   "__pr23Can('intake.manage')?actionButton('Capture invoice'",
+)
+
+// ---------------------------------------------------------------------------
+// SRD 10-12 planning, requisitions and approval routing
+// ---------------------------------------------------------------------------
+// Requisition header fields (currency, required date, method, risk, exception, budget code, plan line, suggested vendor),
+// the live budget/plan position, a returned requisition that can be amended, the decision history and the return / comment /
+// delegate controls. Bridge functions: __pr23RequisitionPlanningFields and the rest of the planning block.
+s = replaceUnique(
+  s,
+  "'requisitionProjectsV23','vendorRegistrationsV23','vendorOptionsV23'];",
+  "'requisitionProjectsV23','vendorRegistrationsV23','vendorOptionsV23','requisitionOptionsV23','budgetsV23','planLinesV23'];",
+  "hydrate() -> requisition options, budgets, plan lines",
+  "'vendorOptionsV23','requisitionOptionsV23'",
+)
+s = replaceUnique(
+  s,
+  "'requisitionOptionsV23','budgetsV23','planLinesV23'];",
+  "'requisitionOptionsV23','budgetsV23','planLinesV23','sourcingV23','awardMatrixV23','declarationOptionsV23'];",
+  "hydrate() -> sourcing events, award route, declaration wording",
+  "'sourcingV23','awardMatrixV23','declarationOptionsV23'",
+)
+s = replaceUnique(
+  s,
+  "__pr23RequisitionDepartmentField()+__pr23RequisitionProjectField():formField('Entity'",
+  "__pr23RequisitionDepartmentField()+__pr23RequisitionProjectField()+__pr23RequisitionPlanningFields():formField('Entity'",
+  "new requisition -> currency, dates, method, risk, exception, budget, plan line",
+  "__pr23RequisitionProjectField()+__pr23RequisitionPlanningFields()",
+)
+s = replaceUnique(
+  s,
+  "btn('Save draft','save-pr')+btn('Submit for approval','submit-pr','primary'))}",
+  "btn('Save draft','save-pr')+btn('Submit for approval','submit-pr','primary'));if(__pr23Live()){__pr23PrLinesRecalc();__pr23RefreshPosition()}}",
+  "new requisition -> live budget and plan position on open",
+  "btn('Submit for approval','submit-pr','primary'));if(__pr23Live()){__pr23PrLinesRecalc()",
+)
+s = replaceUnique(
+  s,
+  "${__pr23Live()?__pr23RequisitionProjectField(r.projectId,'span2'):''}",
+  "${__pr23Live()?__pr23RequisitionProjectField(r.projectId,'span2')+__pr23RequisitionPlanningFields(r):''}",
+  "edit requisition -> planning fields",
+  "__pr23RequisitionProjectField(r.projectId,'span2')+__pr23RequisitionPlanningFields(r)",
+)
+s = replaceUnique(
+  s,
+  "<input type=\"file\" multiple accept=\".pdf,.doc,.docx,.xlsx,.csv\"></div>'}</form>` : `<div class=\"source-meta\">",
+  "<input type=\"file\" multiple accept=\".pdf,.doc,.docx,.xlsx,.csv\"></div>'}${__pr23Live()?__pr23RequisitionLinesEditor(r)+'<div class=\"field full\"><div class=\"notice\"><div><strong>Budget and plan position</strong>'+__pr23BudgetNotice()+'</div></div></div>':''}</form>` : `<div class=\"source-meta\">",
+  "edit requisition -> lines and position",
+  "__pr23RequisitionLinesEditor(r)+'<div class=\"field full\">",
+)
+s = replaceUnique(
+  s,
+  "const fields = editable ? `<form id=\"editPrFormV11\"",
+  "const fields = editable ? `${__pr23Live()?__pr23RequisitionDecisionHtml(r):''}<form id=\"editPrFormV11\"",
+  "edit requisition -> amendment banner and history",
+  "${__pr23Live()?__pr23RequisitionDecisionHtml(r):''}<form id=\"editPrFormV11\"",
+)
+s = replaceUnique(
+  s,
+  "['DRAFT','REJECTED'].includes(String(r.rawStatus||'').toUpperCase())",
+  "['DRAFT','REJECTED','RETURNED'].includes(String(r.rawStatus||'').toUpperCase())",
+  "requisition register -> a returned requisition is editable",
+  "['DRAFT','REJECTED','RETURNED'].includes(String(r.rawStatus||'').toUpperCase())",
+)
+s = replaceUnique(
+  s,
+  "['DRAFT','PENDING_APPROVAL','REJECTED']",
+  "['DRAFT','PENDING_APPROVAL','REJECTED','RETURNED']",
+  "requisition register -> a returned requisition counts as open",
+  "['DRAFT','PENDING_APPROVAL','REJECTED','RETURNED']",
+)
+s = replaceUnique(
+  s,
+  "<div><span>Project</span><strong>${escV11(r.project||'None')}</strong></div>`:''}",
+  "<div><span>Project</span><strong>${escV11(r.project||'None')}</strong></div>${__pr23RequisitionPlanningMeta(r)}`:''}",
+  "requisition view -> planning summary",
+  "${__pr23RequisitionPlanningMeta(r)}",
+)
+s = replaceUnique(
+  s,
+  "${__pr23Live()?__pr23ApprovalRouteHtml(r.approvalRoute):''}",
+  "${__pr23Live()?__pr23ApprovalRouteHtml(r.approvalRoute)+__pr23RequisitionDecisionHtml(r):''}",
+  "requisition view -> decision history",
+  "__pr23ApprovalRouteHtml(r.approvalRoute)+__pr23RequisitionDecisionHtml(r)",
+)
+s = replaceUnique(
+  s,
+  "foot += actionV11('Reject or return','reject-pr-v11',r.id,'danger') + actionV11('Approve requisition','approve-pr-v11',r.id,'primary','approve');",
+  "foot += actionV11(__pr23Live()?'Reject, return or comment':'Reject or return','reject-pr-v11',r.id,'danger') + (__pr23Live()&&r.delegate&&r.delegate.canDelegate?actionV11('Delegate','delegate-pr-v11',r.id):'') + actionV11('Approve requisition','approve-pr-v11',r.id,'primary','approve');",
+  "requisition review -> return, comment and delegate controls",
+  "actionV11(__pr23Live()?'Reject, return or comment'",
+)
+s = replaceUnique(
+  s,
+  "actionV6('Delegate','delegate-approval-v6',a.id)+",
+  "(__pr23Live()&&a.kind!=='requisition'?'':actionV6('Delegate','delegate-approval-v6',a.id))+",
+  "Approval Centre -> delegation only where the record supports it",
+  "(__pr23Live()&&a.kind!=='requisition'?'':actionV6('Delegate','delegate-approval-v6',a.id))+",
+)
+s = replaceUnique(
+  s,
+  "openLargeModalV11(mode==='approve'?`Review ${r.id}`:mode==='edit'?`Edit ${r.id}`:`${r.id} - ${r.title}`, `${r.entity} | ${r.status}`, fields, foot);",
+  "openLargeModalV11(mode==='approve'?`Review ${r.id}`:mode==='edit'?`Edit ${r.id}`:`${r.id} - ${r.title}`, `${r.entity} | ${r.status}`, fields, foot);if(__pr23Live()&&mode==='edit'){__pr23PrLinesRecalc();__pr23RefreshPosition()}",
+  "edit requisition -> prime line total and position on open",
+  "if(__pr23Live()&&mode==='edit'){__pr23PrLinesRecalc()",
+)
+
+
+s = replaceUnique(
+  s,
+  "<td>${esc(i.method)}</td><td class=\"money\">${money(i.budget)}</td><td>${status(i.status)}</td></tr>`);",
+  "<td>${esc(i.method)}</td><td class=\"money\">${money(i.budget)}</td>${__pr23Live()?__pr23PlanItemExtraCells(i):''}<td>${status(i.status)}</td></tr>`);",
+  "plan requirement register -> section 10 columns and drawing",
+  "${__pr23Live()?__pr23PlanItemExtraCells(i):''}<td>${status(i.status)}</td></tr>`);",
+)
+s = replaceUnique(
+  s,
+  "card('Plan requirement register','Approved requirements can be converted to requisitions, RFQs or tenders.',table(['Item','Requirement','Entity','Category','Quarter','Method','Budget','Status'],itemRows))",
+  "card('Plan requirement register','Approved requirements can be converted to requisitions, RFQs or tenders.',table(['Item','Requirement','Entity','Category','Quarter','Method','Budget',...(__pr23Live()?__PR23_PLAN_LINE_HEADS:[]),'Status'],itemRows))",
+  "plan requirement register -> header",
+  "...(__pr23Live()?__PR23_PLAN_LINE_HEADS:[]),'Status'],itemRows)",
+)
+s = replaceUnique(
+  s,
+  "<td>${esc(i.method)}</td><td>${money(i.budget)}</td><td>${status(i.status)}</td><td>${smallAction('Edit','edit-plan-item-v23',i.id)}</td></tr>`);",
+  "<td>${esc(i.method)}</td><td>${money(i.budget)}</td>${__pr23Live()?__pr23PlanItemExtraCells(i):''}<td>${status(i.status)}</td><td>${smallAction('Edit','edit-plan-item-v23',i.id)}</td></tr>`);",
+  "plan workspace lines -> section 10 columns and drawing",
+  "${__pr23Live()?__pr23PlanItemExtraCells(i):''}<td>${status(i.status)}</td><td>${smallAction('Edit'",
+)
+s = replaceUnique(
+  s,
+  "table(['Item','Requirement','Category','Quarter','Sourcing method','Budget','Status',''],rows)",
+  "table(['Item','Requirement','Category','Quarter','Sourcing method','Budget',...(__pr23Live()?__PR23_PLAN_LINE_HEADS:[]),'Status',''],rows)",
+  "plan workspace lines -> header",
+  "...(__pr23Live()?__PR23_PLAN_LINE_HEADS:[]),'Status',''],rows)",
+)
+
+s = replaceUnique(
+  s,
+  "'sourcingV23','awardMatrixV23','declarationOptionsV23'];",
+  "'sourcingV23','awardMatrixV23','declarationOptionsV23','p2pConfigV23','poMatrixV23','aiStatusV23','aiUsageV23','aiExtractionsV23','aiOpenV23'];",
+  "hydrate() -> P2P configuration, PO approval route and the AI layer",
+  "'p2pConfigV23','poMatrixV23'",
+)
+
+// ---------------------------------------------------------------------------
+// §21-§25 purchase orders, receipts, invoices, matching and handoff (bridge: __pr23PoRowActions, __pr23MatchInsightsHtml)
+// ---------------------------------------------------------------------------
+s = replaceUnique(
+  s,
+  "${__pr23Live()?'':smallAction('eSign','esign-new-v6',o.id,'signature')}</div></td></tr>`});",
+  "${__pr23Live()?__pr23PoRowActions(o):smallAction('eSign','esign-new-v6',o.id,'signature')}</div></td></tr>`});",
+  "purchase order register: details, submit for approval and approval status",
+  "__pr23Live()?__pr23PoRowActions(o)",
+)
+s = replaceUnique(
+  s,
+  "if (__pr23Live() && /template/i.test(String(doc.type || '') + ' ' + String(doc.folder || ''))) return false;",
+  "if (__pr23Live() && doc.stored) return false; if (__pr23Live() && /template/i.test(String(doc.type || '') + ' ' + String(doc.folder || ''))) return false;",
+  "vault: a document staff filed in the vault is a stored vault document (preview, download, versions), not a sealed vendor original",
+  "if (__pr23Live() && doc.stored) return false;",
+)
+s = replaceUnique(
+  s,
+  "const count = document.querySelector('#docFilterCountV11'); if(count) count.textContent = `${visible} document${visible===1?'':'s'}`;",
+  "if(__pr23Live())visible=__pr23DocPaginate(); const count = document.querySelector('#docFilterCountV11'); if(count) count.textContent = `${visible} document${visible===1?'':'s'}`;",
+  "vault: Recent controlled documents is paged (the filters pick the matching rows, the pager shows one page of them)",
+  "if(__pr23Live())visible=__pr23DocPaginate();",
+)
+s = replaceUnique(
+  s,
+  "    preparePoSelectionV11();",
+  "    preparePoSelectionV11();" + String.fromCharCode(10) + "    if(__pr23Live()){__pr23PaginateTables();setTimeout(__pr23PaginateTables,400)}",
+  "every data table in the workspace is paged (25 a page) alongside the page's own filters",
+  "__pr23PaginateTables();setTimeout(__pr23PaginateTables,400)",
+)
+s = replaceUnique(
+  s,
+  "function auditPage(){",
+  "function auditPage(){if(__pr23Live())return __pr23AuditPageLive();",
+  "audit page: the paged, filtered server-side trail with previous and new values (SRD 33)",
+  "if(__pr23Live())return __pr23AuditPageLive();",
+)
+s = replaceUnique(
+  s,
+  "<span class=\"muted\">Actual controlled preview available</span>",
+  "<span class=\"muted\">${__pr23Live()&&d.stored?__pr23DocSubline(d):'Actual controlled preview available'}</span>",
+  "vault rows: the file's format, size and related record instead of a caption (SRD 32)",
+  "${__pr23Live()&&d.stored?__pr23DocSubline(d):",
+)
+s = replaceUnique(
+  s,
+  "<td>${status(o.status)}</td><td><div class=\"actions\">${smallAction('Preview','preview-po-v6',o.id,'eye')}",
+  "<td>${status(o.status)}${__pr23Live()?__pr23PoStatusChip(o):''}</td><td><div class=\"actions\">${smallAction('Preview','preview-po-v6',o.id,'eye')}",
+  "purchase order register: the approval state is shown beside the status, not hidden in the action menu",
+  "${__pr23Live()?__pr23PoStatusChip(o):''}",
+)
+s = replaceUnique(
+  s,
+  "<div class=\"grid two\" style=\"margin-bottom:14px\">${card('Match outcome trend','Click a point for a month-specific match register.',`<div class=\"card-body\">${lineChart('invoice-match')}</div>`)}${card('Exception causes','Click a cause for the underlying invoice and variance records.',`<div class=\"card-body\">${bars([['Price variance',72],['Missing GRN',54],['Quantity variance',43],['Duplicate invoice',24],['Tax exception',18]],'invoice-exceptions')}</div>`)}</div>",
+  "${__pr23Live()?__pr23MatchInsightsHtml(__chain):`<div class=\"grid two\" style=\"margin-bottom:14px\">${card('Match outcome trend','Click a point for a month-specific match register.',`<div class=\"card-body\">${lineChart('invoice-match')}</div>`)}${card('Exception causes','Click a cause for the underlying invoice and variance records.',`<div class=\"card-body\">${bars([['Price variance',72],['Missing GRN',54],['Quantity variance',43],['Duplicate invoice',24],['Tax exception',18]],'invoice-exceptions')}</div>`)}</div>`}",
+  "match workspace: real exceptions instead of the fixture charts",
+  "__pr23MatchInsightsHtml(__chain)",
+)
+
+// ---------------------------------------------------------------------------
+// SRD §34-§40: dashboards, reports, currency, statuses, lists
+// ---------------------------------------------------------------------------
+s = replaceUnique(
+  s,
+  "function dashboardPage(){",
+  "function dashboardPage(){if(__pr23Live())return __pr23DashboardLive();",
+  "Command Centre: role-specific dashboards (executive, procurement, own work) live from the records, no fixture tiles (SRD 35)",
+  "if(__pr23Live())return __pr23DashboardLive();",
+)
+s = replaceUnique(
+  s,
+  "pages.reports=reportsPageV5;",
+  "pages.reports=function(){return __pr23Live()?__pr23ReportsPageLive():reportsPageV5()};",
+  "Reports: the fifteen procurement reports with filters and PDF / CSV / XLSX export (SRD 37)",
+  "return __pr23Live()?__pr23ReportsPageLive()",
+)
+s = replaceUnique(
+  s,
+  "const money=n=>(n===null||n===undefined||n===''||!Number.isFinite(Number(n)))?'\\u2014':new Intl.NumberFormat('en-US',{style:'currency',currency:'USD',maximumFractionDigits:0}).format(n);",
+  "const money=(n,cur)=>(n===null||n===undefined||n===''||!Number.isFinite(Number(n)))?'\\u2014':new Intl.NumberFormat('en-US',{style:'currency',currency:(typeof cur==='string'&&/^[A-Za-z]{3}$/.test(cur))?cur.toUpperCase():'USD',maximumFractionDigits:0}).format(n);",
+  "money(): a record's own currency when it has one (SRD 38: never assume the default)",
+  "const money=(n,cur)=>",
+)
+{
+  // each register row shows its record's own currency
+  const re = /money\((o|i|r|t|c|g|q|a|inv|po|order|pr|x|tender|grn)\.(amount|value)\)/g
+  const before = (s.match(re) || []).length
+  if (before) {
+    s = s.replace(re, (_m, v, f) => `money(${v}.${f},${v}.currency)`)
+    applied += 1
+    console.log(`  applied         ${before} register amounts now carry their record's currency`)
+  } else {
+    skipped += 1
+    console.log("  skip (already)  register amounts carry their record's currency")
+  }
+}
+s = replaceUnique(
+  s,
+  "const status=s=>{let c=/approved|matched|ready|accepted|posted|published|prequalified|active|in use/i.test(s)?'green':/blocked|blacklisted|expired|rejected|held|variance/i.test(s)?'red':/pending|review|conditional|clarification|opening|warning|revision/i.test(s)?'amber':'blue';",
+  "const status=s=>{let c=/approved|matched|ready|accepted|posted|published|prequalified|active|in use|issued|awarded|^open$|delivered/i.test(s)?'green':/blocked|blacklisted|expired|rejected|held|variance|cancelled/i.test(s)?'red':/pending|review|conditional|clarification|opening|warning|revision|awaiting|under evaluation|returned/i.test(s)?'amber':/^closed$|^draft$/i.test(s)?'gray':'blue';",
+  "status colours cover the SRD statuses (Issued, Awarded, Open green; Cancelled red; Under Review, Awaiting Approval, Returned amber; Closed, Draft grey)",
+  "issued|awarded|^open$|delivered",
+)
+{
+  // the requisition drawer offers Cancel / Close only where the status map allows them
+  const find = "openLargeModalV11(mode==='approve'?`Review ${r.id}`:mode==='edit'?`Edit ${r.id}`:`${r.id} - ${r.title}`, `${r.entity} | ${r.status}`, fields, foot)"
+  s = replaceUnique(
+    s,
+    find,
+    "openLargeModalV11(mode==='approve'?`Review ${r.id}`:mode==='edit'?`Edit ${r.id}`:`${r.id} - ${r.title}`, `${r.entity} | ${r.status}`, fields, foot+(__pr23Live()?__pr23LifecycleButtons('requisition',r):''))",
+    "requisition drawer: Cancel and Close where the status map allows them (SRD 40)",
+    "__pr23LifecycleButtons('requisition',r)",
+  )
+}
+
+s = replaceUnique(
+  s,
+  "__pr23Live()?'Every purchase order your role can see. The filters narrow this register; the cards above cover every order.':",
+  "__pr23Live()?'Every purchase order your role can see.':",
+  "purchase order register caption: what the register holds, not how its filters work",
+  "__pr23Live()?'Every purchase order your role can see.':",
 )
 
 // ---------------------------------------------------------------------------

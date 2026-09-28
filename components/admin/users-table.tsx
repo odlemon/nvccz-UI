@@ -23,6 +23,7 @@ import { User, CreateUserRequest } from "@/lib/api/admin-api"
 import { toast } from "sonner"
 import { Users, Search, X, Plus, RefreshCw, ArrowUpDown, ArrowUp, ArrowDown, Edit, Trash2 } from "lucide-react"
 import { UsersTableSkeleton } from "./users-table-skeleton"
+import { STATUS_BADGE_CLASS, STATUS_LABELS, formatDateTime, formatMoney, humanize, statusLabel } from "./user-master-shared"
 import {
   Pagination,
   PaginationContent,
@@ -233,6 +234,7 @@ export function UsersTable() {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false)
   const [editingUser, setEditingUser] = useState<User | null>(null)
   const [viewingUser, setViewingUser] = useState<User | null>(null)
+  const [statusFilter, setStatusFilter] = useState<string>('all')
 
   // Fetch data on mount
   useEffect(() => {
@@ -249,7 +251,7 @@ export function UsersTable() {
     setEditingUser({
       ...user,
       department: user.userDepartment || '',
-    })
+    } as User)
     setIsFormOpen(true)
   }
 
@@ -259,12 +261,14 @@ export function UsersTable() {
   }
 
   const handleDelete = async (user: User) => {
-    if (window.confirm(`Are you sure you want to delete ${user.firstName} ${user.lastName}?`)) {
+    if (window.confirm(`Remove ${user.firstName} ${user.lastName}?\n\nA user with transaction history is deactivated and kept on record; only a user with no history is deleted.`)) {
       try {
-        await dispatch(deleteUser(user.id)).unwrap()
-        toast.success('User deleted successfully')
+        const result = await dispatch(deleteUser(user.id)).unwrap()
+        const message = result?.message || 'User removed'
+        if (result?.deactivated) toast.info(message)
+        else toast.success(message)
       } catch (error: any) {
-        toast.error(error || 'Failed to delete user')
+        toast.error(error || 'Failed to remove user')
       }
     }
   }
@@ -300,6 +304,7 @@ export function UsersTable() {
 
   const handleResetFilters = () => {
     dispatch(resetFilters())
+    setStatusFilter('all')
   }
 
   // Get unique roles with names from department roles
@@ -319,22 +324,27 @@ export function UsersTable() {
       const matchesSearch = searchTerm === '' || 
         user.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
         user.lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        user.email.toLowerCase().includes(searchTerm.toLowerCase())
+        user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (user.employeeCode || '').toLowerCase().includes(searchTerm.toLowerCase())
       
       const matchesDepartment = selectedDepartmentFilter === 'all' || 
         user.userDepartment === selectedDepartmentFilter
       
       const matchesRole = selectedRoleFilter === 'all' || 
         user.roleCode === selectedRoleFilter
+
+      const matchesStatus = statusFilter === 'all' ||
+        String(user.status || 'ACTIVE').toUpperCase() === statusFilter
       
-      return matchesSearch && matchesDepartment && matchesRole
+      return matchesSearch && matchesDepartment && matchesRole && matchesStatus
     })
-  }, [users, searchTerm, selectedDepartmentFilter, selectedRoleFilter])
+  }, [users, searchTerm, selectedDepartmentFilter, selectedRoleFilter, statusFilter])
 
   const getFilterCount = () => {
     let count = 0
     if (selectedDepartmentFilter !== "all") count++
     if (selectedRoleFilter !== "all") count++
+    if (statusFilter !== "all") count++
     if (searchTerm) count++
     return count
   }
@@ -348,6 +358,7 @@ export function UsersTable() {
         <div>
           <div className="font-medium text-gray-900">{row.firstName} {row.lastName}</div>
           <div className="text-sm text-gray-500">{row.email}</div>
+          {row.employeeCode && <div className="text-xs text-gray-400">{row.employeeCode}</div>}
         </div>
       ),
     },
@@ -368,11 +379,19 @@ export function UsersTable() {
       ),
     },
     {
-      key: 'roleCode' as keyof User,
-      label: 'Role Code',
+      key: 'procurementFunction' as keyof User,
+      label: 'Procurement Function',
       sortable: true,
       render: (value: string | null) => (
-        value ? <Badge variant="outline" className="bg-purple-50 text-purple-700">{value}</Badge> : <span className="text-sm text-gray-500">N/A</span>
+        value ? <Badge variant="outline" className="bg-purple-50 text-purple-700">{humanize(value)}</Badge> : <span className="text-sm text-gray-500">N/A</span>
+      ),
+    },
+    {
+      key: 'approvalLimitAmount' as keyof User,
+      label: 'Approval Limit',
+      sortable: true,
+      render: (value: number | null) => (
+        value != null ? <span className="text-sm text-gray-900">{formatMoney(value)}</span> : <span className="text-sm text-gray-500">No limit</span>
       ),
     },
     {
@@ -381,6 +400,23 @@ export function UsersTable() {
       sortable: true,
       render: (value: any) => (
         <Badge variant="outline" className="bg-blue-50 text-blue-700">{value.name}</Badge>
+      ),
+    },
+    {
+      key: 'status' as keyof User,
+      label: 'Status',
+      sortable: true,
+      render: (value: string | undefined) => {
+        const key = String(value || 'ACTIVE').toUpperCase() as keyof typeof STATUS_BADGE_CLASS
+        return <Badge variant="outline" className={STATUS_BADGE_CLASS[key]}>{statusLabel(value)}</Badge>
+      },
+    },
+    {
+      key: 'lastLoginAt' as keyof User,
+      label: 'Last Login',
+      sortable: true,
+      render: (value: string | null) => (
+        <span className="text-sm text-gray-600">{formatDateTime(value) || 'Never'}</span>
       ),
     },
   ]
@@ -435,7 +471,7 @@ export function UsersTable() {
           )}
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           {/* Search */}
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
@@ -465,6 +501,19 @@ export function UsersTable() {
             </SelectContent>
           </Select>
 
+          {/* Status Filter */}
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger>
+              <SelectValue placeholder="All Statuses" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Statuses</SelectItem>
+              {Object.entries(STATUS_LABELS).map(([code, label]) => (
+                <SelectItem key={code} value={code}>{label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
           {/* Role Filter */}
           <Select 
             value={selectedRoleFilter} 
@@ -485,7 +534,7 @@ export function UsersTable() {
         </div>
 
         {/* Active Filters */}
-        {(searchTerm || selectedDepartmentFilter !== 'all' || selectedRoleFilter !== 'all') && (
+        {(searchTerm || selectedDepartmentFilter !== 'all' || selectedRoleFilter !== 'all' || statusFilter !== 'all') && (
           <div className="flex items-center gap-2 flex-wrap">
             {searchTerm && (
               <Badge variant="secondary" className="flex items-center gap-1">
@@ -499,6 +548,14 @@ export function UsersTable() {
               <Badge variant="secondary" className="flex items-center gap-1">
                 Department: {selectedDepartmentFilter}
                 <button onClick={() => dispatch(setSelectedDepartmentFilter('all'))} className="ml-1 hover:bg-gray-200 rounded-full p-0.5">
+                  <X className="w-3 h-3" />
+                </button>
+              </Badge>
+            )}
+            {statusFilter !== 'all' && (
+              <Badge variant="secondary" className="flex items-center gap-1">
+                Status: {STATUS_LABELS[statusFilter as keyof typeof STATUS_LABELS] || statusFilter}
+                <button onClick={() => setStatusFilter('all')} className="ml-1 hover:bg-gray-200 rounded-full p-0.5">
                   <X className="w-3 h-3" />
                 </button>
               </Badge>

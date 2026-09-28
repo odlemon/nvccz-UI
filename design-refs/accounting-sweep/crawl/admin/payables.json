@@ -1,0 +1,28 @@
+{
+  "url": "/accounting/payables",
+  "title": "Payables · Procurement to Payment",
+  "headings": [
+    "Payables · Procurement to Payment",
+    "Payment obligations",
+    "Creditors ageing",
+    "Procure-to-pay"
+  ],
+  "tabs": [],
+  "buttons": [
+    "Capture a supplier invoice",
+    "Purchase orders in procurement",
+    "Overview",
+    "Supplier bills",
+    "Payment queue",
+    "Purchase orders",
+    "Quotations & sourcing",
+    "Vendors",
+    "Ageing"
+  ],
+  "text": "ACCOUNTS PAYABLE Payables · Procurement to Payment Supplier invoices approved in procurement and Accounting's own bills, queued for payment by due date. Capture a supplier invoice Purchase orders in procurement Outstanding $1,004,380 377 open bills Approved to pay $146,246 93 in the payment queue Due next 7 days $0 From the payment queue Overdue $0 0 bills Awaiting approval 284 Not yet approved to pay Open commitments $441,220 Ordered, not yet invoiced Overview Supplier bills Payment queue Purchase orders Quotations & sourcing Vendors Ageing Payment obligations Approved supplier liabilities, by when they fall due. $146,246 Approved to pay $0 Due in 7 days $0 Overdue $441,220 Ordered, not yet invoiced Awaiting approval 284 bills · $858,134 Review Three-way match exceptions 236 bills Exception Overdue for payment 0 bills Ready Awaiting goods receipt 30 procurement invoices Review Creditors ageing Open supplier liabilities by days past due. $1,000,130 Not yet due $4,250 1–30 days overdue $0 31–60 days $0 61–90 days $0 Over 90 days Procure-to-pay Procurement invoices in Payables, counted from the records. Against a purchase order 405 of 422 procurement invoices Approved, awaiting payment 93 invoices Waiting for approval in procurement 283 invoices Paid 46 invoices",
+  "ms": 15670,
+  "console": [
+    "Failed to fetch RSC payload for http://localhost:3120/accounting/short-term-investments. Falling back to browser navigation. TypeError: Failed to fetch\n    at fetchServerResponse (webpack-internal:///(app-pages-browser)/./node_modules/next/"
+  ],
+  "failed": []
+}

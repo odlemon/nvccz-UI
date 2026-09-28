@@ -1,0 +1,27 @@
+{
+  "url": "/accounting/short-term-investments",
+  "title": "Short-Term Investments",
+  "headings": [
+    "Short-Term Investments",
+    "Portfolio value and accrued income",
+    "Liquidity forecast",
+    "Portfolio yield heat map",
+    "Yield and risk watch",
+    "Investment register",
+    "Accrual position"
+  ],
+  "tabs": [],
+  "buttons": [
+    "New investment instrument",
+    "Run daily accrual",
+    "Update instrument",
+    "Cash movement",
+    "Filters"
+  ],
+  "text": "TREASURY AND LIQUIDITY Short-Term Investments CFO-grade portfolio valuation, yield, concentration, daily accruals, maturities and multi-currency liquidity management. New investment instrument Run daily accrual Update instrument Cash movement Portfolio value $0.00 Principal plus accrued interest Weighted yield 0% Annualised portfolio yield Accrued income $0.00 Current carrying vs principal 30-day maturities $0.00 Available liquidity Issuer concentration 0% Largest issuer exposure FX exposure $0.00 Foreign currency carrying value Filters Portfolio value and accrued income Time-series growth for the selected period. Select the chart to enlarge it. Aug Sep Oct Nov Dec Jan Feb Mar Apr May Jun Jul USD m 4.3 3.2 Liquidity forecast Upcoming principal and interest inflows. HORIZON ↕ PRINCIPAL ↕ INTEREST ↕ EXPECTED CASH ↕ INSTRUMENTS ↕ 0–30 days $0.00 $0.00 $0.00 0 31–60 days $0.00 $0.00 $0.00 0 61–90 days $0.00 $0.00 $0.00 0 91+ days $0.00 $0.00 $0.00 0 Portfolio yield heat map Treemap size is proportional to investment value. Colour shows yield quality and concentration risk. Yield and risk watch Expected yield, realised yield and policy observations. Investment register Full-width instrument register with dimensional, yield, valuation and settlement information. INSTRUMENT ↕ ISSUER ↕ TYPE ↕ CURRENCY ↕ PRINCIPAL ↕ APY ↕ CARRYING VALUE ↕ MATURITY ↕ DAYS ↕ LIMIT ↕ STATUS ↕ Accrual position Current carrying value versus principal, by instrument. Per-day accrual history is not tracked — only the latest posted position. No investments held — nothing to accrue.",
+  "ms": 12834,
+  "console": [
+    "Failed to fetch RSC payload for http://localhost:3120/accounting/bank-reconciliation. Falling back to browser navigation. TypeError: Failed to fetch\n    at fetchServerResponse (webpack-internal:///(app-pages-browser)/./node_modules/next/dis"
+  ],
+  "failed": []
+}

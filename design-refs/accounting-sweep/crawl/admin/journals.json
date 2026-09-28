@@ -1,0 +1,48 @@
+{
+  "url": "/accounting/journals",
+  "title": "Journal Entry Maker–Checker",
+  "headings": [
+    "Journal Entry Maker–Checker",
+    "Journal header",
+    "Journal lines",
+    "Live validation",
+    "Approval route",
+    "Journal register"
+  ],
+  "tabs": [],
+  "buttons": [
+    "Import journal {v8-import-journal}",
+    "Open approvals {v8-go-page}",
+    "Filters",
+    "Save draft {v8-journal-save-draft}",
+    "Review & submit {v8-journal-review}",
+    "× {v8-journal-remove-line}",
+    "+ Add line {v8-journal-add-line}",
+    "Clear amounts {v8-journal-clear}",
+    "Export register {v8-export}",
+    "PERF-GOAL-cmuk4oxph00wpun1c6o416dl1-cmuk4rogb010ju {v8-journal-detail}",
+    "PERF-GOAL-cmuk4oxph00wpun1c6o416dl1-cmuk4qgf800ylu {v8-journal-detail}",
+    "PERF-GOAL-cmuk4oxph00wpun1c6o416dl1-cmuk4qd2a00yau {v8-journal-detail}",
+    "PERF-GOAL-cmuk4oxph00wpun1c6o416dl1-cmuk4qbpx00y1u {v8-journal-detail}",
+    "PERF-GOAL-cmuk4oxph00wpun1c6o416dl1-cmuk4qbl400xqu {v8-journal-detail}",
+    "PERF-GOAL-cmuk4oxph00wpun1c6o416dl1-cmuk4qbg700xfu {v8-journal-detail}",
+    "PERF-GOAL-cmuk4oxph00wpun1c6o416dl1-cmuk4qb5200x4u {v8-journal-detail}",
+    "PERF-GOAL-cmuk4oxph00wpun1c6o416dl1-cmuk4pig500wru {v8-journal-detail}",
+    "PERF-GOAL-cmuk4eh4000sfun1c8piwejr0-cmuk4f97w00v6u {v8-journal-detail}",
+    "PERF-GOAL-cmuk4eh4000sfun1c8piwejr0-cmuk4f5cq00udu {v8-journal-detail}",
+    "PERF-GOAL-cmuk4cs8f00rtun1conb19irj-cmuk4dfoq00rvu {v8-journal-detail}",
+    "PERF-GOAL-cmuju52ku015oun48ho84in92-cmuju5p980187u {v8-journal-detail}",
+    "PERF-GOAL-cmuju52ku015oun48ho84in92-cmuju5lk6017eu {v8-journal-detail}",
+    "PERF-GOAL-cmuju3z7s00n5un48jnqlphyh-cmuju4yb60156u {v8-journal-detail}",
+    "PERF-GOAL-cmuju3z7s00n5un48jnqlphyh-cmuju4l2500ozu {v8-journal-detail}",
+    "PERF-GOAL-cmuju3z7s00n5un48jnqlphyh-cmuju4kxm00oou {v8-journal-detail}",
+    "PERF-GOAL-cmuju3z7s00n5un48jnqlphyh-cmuju4krz00ofu {v8-journal-detail}",
+    "PERF-GOAL-cmuju3z7s00n5un48jnqlphyh-cmuju4kn400o4u {v8-journal-detail}"
+  ],
+  "text": "DOUBLE-ENTRY ENGINE Journal Entry Maker–Checker Build a multi-line journal, validate account rules and currency translation, then route it to an independent checker. Posted journals are immutable and corrected only through reversals. Import journal Open approvals Journal header Reference, date, currency and business narration Filters Journal lines Control accounts are blocked from direct manual posting Save draft Review & submit ACCOUNT NARRATION DIMENSION DEBIT CREDIT 1125 · Accounts Receivable — LP Commitments 1502 · Investment Asset — Portfolio 1000 · Cash and Cash Equivalents 1010 · Petty Cash 1030 · Petty Cash / Cash Clearing 1100 · Bank - Operating Account 1101 · VAT Input Recoverable 1200 · Accounts Receivable 1210 · Capital Contributions Receivable 1220 · Management Fee Receivable 1300 · Prepayments 1400 · Inventory 2000 · Accounts Payable 2100 · VAT Output Payable 2110 · VAT Input (clearing) / VAT Payable 2150 · PAYE Payable 2160 · NSSA / Pension Payable 2170 · SDL Payable 2250 · Net Wages Payable 2400 · Distributions Payable to LPs 3000 · Share Capital 3010 · Partners Capital - Uncalled 3020 · Partners Capital - Contributed 3050 · Share Premium — Capital in Excess of Par 3100 · Retained Earnings 5010 · Payroll Expense (Gross Pay) 5030 · Salaries and Wages 5060 · Marketing Expense 5070 · Travel and Accommodation 5090 · Other Operating Expenses 5130 · Depreciation Expense 5200 · General Operating Expense 5500 · Corporate Tax Expense 6000 · Foreign Exchange Gain/Loss 6050 · Foreign Exchange Loss 6095 · Rounding Variance 1501 · Portfolio Investments 1510 · Office Equipment 1550 · Accumulated Depreciation 2210 · Corporate Tax Liabilities — ZIMRA 4000 · Sales Revenue 4010 · Management Fee Revenue 4020 · Performance Fee Revenue 4050 · Unrealized Foreign Exchange Gain/Loss 4100 · Dividend Income 4110 · Interest Income 4120 · Realised Gain on Investments 4130 · Other Investment Income Corporate Growth Fund I MFI Portfolio Pension Liquidity Technology × 1125 · Accounts Receivable — LP Commitments 1502 · Investment Asset — Portfolio 1000 · Cash and Cash Equivalents 1010 · Petty Cash 1030 · Petty Cash / Cash Clearing 1100 · Bank - Operating Account 1101 · VAT Input Recoverable 1200 · Accounts Receivable 1210 · Capital Contributions Receivable 1220 · Management Fee Receivable 1300 · Prepayments 1400 · Inventory 2000 · Accounts Payable 2100 · VAT Output Payable 2110 · VAT Input (clearing) / VAT Payable 2150 · PAYE Payable 2160 · NSSA / Pension Payable 2170 · SDL Payable 2250 · Net Wages Payable 2400 · Distributions Payable to LPs 3000 · Share Capital 3010 · Partners Capital - Uncalled 3020 · Partners Capital - Contributed 3050 · Share Premium — Capital in Excess of Par 3100 · Retained Earnings 5010 · Payroll Expense (Gross Pay) 5030 · Salaries and Wages 5060 · Marketing Expense 5070 · Travel and Accommodation 5090 · Other Operating Expenses 5130 · Depreciation Expense 5200 · General Operating Expense 5500 · Corporate Tax Expense 6000 · Foreign Exchange Gain/Loss 6050 · Foreign Exchange Loss 6095 · Rounding Variance 1501 · Portfolio Investments 1510 · Office Equipment 1550 · Accumulated Depreciation 2210 · Corporate Tax Liabilities — ZIMRA 4000 · Sales Revenue 4010 · Management Fee Revenue 4020 · Performance Fee Revenue 4050 · Unrealized Foreign Exchange Gain/Loss 4100 · Dividend Income 4110 · Interest Income 4120 · Realised Gain on Investments 4130 · Other Investment Income Corporate Growth Fund I MFI Portfolio Pension Liquidity Technology × + Add line Clear amounts ACCOUNT DESCRIPTION DEBIT CREDIT 5010 Payroll Expense (Gross Pay) — — 1101 VAT Input Recoverable — — Validation required $0.00 $0.00 Live validation All conditions must pass before maker-checker submission Line 1: enter a debit or credit amount. Journal description is required. Transaction and base-currency values will be retained. Posting period Jul 2026 is open. Maker cannot approve the same journal. Approval route Dynamic role and value-based routing Maker Tariro Moyo · Finance Director Prepared Checker Financial Controller / Finance Director / CEO Pending Evidence Attachment or source reference recommended Review Journal register Posted, submitted and reversed journals with immutable source links Export register JOURNAL DATE REFERENCE DESCRIPTION CURRENCY BASE TOTAL MAKER STATUS PERF-GOAL-cmuk4oxph00wpun1c6o416dl1-cmuk4rogb010jun1cyyjv60x4 27 Sept,2026 PERF-GOAL-cmuk4oxph00wpun1c6o416dl1-cmuk4rogb010jun1cyyjv60x4 Performance correction (reversal): UAT Int 76758 Fee revenue — UAT Int 76758 Revenue — -460 USD Live ledger · PERF-GOAL-cmuk4oxph00wpun1c6o416dl1-cmuk4rogb010jun1cyyjv60x4 USD $460.00 Admin NTS Posted PERF-GOAL-cmuk4oxph00wpun1c6o416dl1-cmuk4qgf800ylun1cvwc4s2jp 27 Sept,2026 PERF-GOAL-cmuk4oxph00wpun1c6o416dl1-cmuk4qgf800ylun1cvwc4s2jp Performance: UAT Int 76758 Fee revenue — UAT Int 76758 Revenue — 50 USD Live ledger · PERF-GOAL-cmuk4oxph00wpun1c6o416dl1-cmuk4qgf800ylun1cvwc4s2jp USD $50.00 Admin NTS Posted PERF-GOAL-cmuk4oxph00wpun1c6o416dl1-cmuk4qd2a00yaun1cgjzi22sd 27 Sept,2026 PERF-GOAL-cmuk4oxph00wpun1c6o416dl1-cmuk4qd2a00yaun1cgjzi22sd Performance: UAT Int 76758 Fee revenue — UAT Int 76758 Revenue — 10 USD Live ledger · PERF-GOAL-cmuk4oxph00wpun1c6o416dl1-cmuk4qd2a00yaun1cgjzi22sd USD $10.00 Admin NTS Posted PERF-GOAL-cmuk4oxph00wpun1c6o416dl1-cmuk4qbpx00y1un1c4zkqgvse 27 Sept,2026 PERF-GOAL-cmuk4oxph00wpun1c6o416dl1-cmuk4qbpx00y1un1c4zkqgvse Performance: UAT Int 76758 Fee revenue — UAT Int 76758 Revenue — 350 USD Live ledger · PERF-GOAL-cmuk4oxph00wpun1c6o416dl1-cmuk4qbpx00y1un1c4zkqgvse USD $350.00 Admin NTS Posted PERF-GOAL-cmuk4oxph00wpun1c6o416dl1-cmuk4qbl400xqun1ct2rz3x2j 27 Sept,2026 PERF-GOAL-cmuk4oxph00wpun1c6o416dl1-cmuk4qbl400xqun1ct2rz3x2j Performance: UAT Int 76758 Fee revenue — UAT Int 76758 Revenue — 50 USD Live ledger · PERF-GOAL-cmuk4oxph00wpun1c6o416dl1-cmuk4qbl400xqun1ct2rz3x2j USD $50.00 Admin NTS Posted PERF-GOAL-cmuk4oxph00wpun1c6o416dl1-cmuk4qbg700xfun1c676njpkx 27 Sept,2026 PERF-GOAL-cm",
+  "ms": 42827,
+  "console": [
+    "Failed to fetch RSC payload for http://localhost:3120/accounting/general-ledger. Falling back to browser navigation. TypeError: Failed to fetch\n    at fetchServerResponse (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/cli"
+  ],
+  "failed": []
+}

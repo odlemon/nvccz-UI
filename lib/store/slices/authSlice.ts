@@ -324,7 +324,11 @@ const authSlice = createSlice({
       })
       // Check auth status
       .addCase(checkAuthStatus.pending, (state) => {
-        state.isLoading = true
+        // Keep already-authenticated shells painted during revalidation.
+        // Flipping isLoading here blanked client-design modules (home remount flash).
+        if (!state.isAuthenticated && !state.user) {
+          state.isLoading = true
+        }
       })
       .addCase(checkAuthStatus.fulfilled, (state, action) => {
         state.isAuthenticated = true

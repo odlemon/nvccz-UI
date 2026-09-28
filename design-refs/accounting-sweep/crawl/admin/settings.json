@@ -1,0 +1,32 @@
+{
+  "url": "/accounting/settings",
+  "title": "Accounting Settings",
+  "headings": [
+    "Accounting Settings",
+    "Finance configuration",
+    "Configured banks",
+    "Custom exchange rates & reporting overrides"
+  ],
+  "tabs": [],
+  "buttons": [
+    "Save configuration",
+    "General & banks",
+    "Periods & lock",
+    "Letterheads",
+    "Security & RBAC",
+    "Audit trail",
+    "Integrations",
+    "New change request",
+    "Review pending changes",
+    "Filters ▴",
+    "Filters",
+    "Add bank",
+    "Add custom exchange rate {v8-add-rate}"
+  ],
+  "text": "PLATFORM CONFIGURATION Accounting Settings Banks, periods, letterheads, RBAC, audit and integrations are managed in one governed settings workspace. Save configuration Configured banks 1 Reporting currencies 1 Open periods 1 Active integrations — Access requests — General & banks Periods & lock Letterheads Security & RBAC Audit trail Integrations Configuration health — Not measured Legal entities 1 1 currency Bank accounts 1 Mapped to control accounts Open periods 1 Current fiscal period Access requests — Not tracked Integrations — Not tracked Configuration change control Material changes are versioned, impact-checked and independently approved before becoming effective. 0 Enterprise control plane Govern the accounting architecture independently from day-to-day transaction processing. New change request Review pending changes Save configuration CONFIGURATION DOMAIN OWNER LAST CHANGE APPROVAL POLICY ENVIRONMENT STATUS Ledger & posting — — — — — Banks & currency — — — — — Document controls — — — — — Identity & access — — — — — Integrations — — — — — Finance configuration Entity, fiscal calendar, base currency and posting policy. Filters ▴ Filters Configured banks Add banks and map each cashbook to its control account. Add bank BANK / CASHBOOK ↕ CURRENCY ↕ GL ACCOUNT ↕ FEED ↕ STATUS ↕ Matanho Capital - USD Operating Account USD 1100 Bank feed Active Custom exchange rates & reporting overrides Create effective-dated rates for presentation reporting, transactions and controlled month-end revaluation. Existing posted journals are never rewritten. Add custom exchange rate USD/ZWG · Verified 26.877600 2026-07-27 · Reserve Bank of Zimbabwe snapshot ZAR/USD · Verified 0.055200 2026-07-31 · Treasury rate table",
+  "ms": 13940,
+  "console": [
+    "Failed to fetch RSC payload for http://localhost:3120/accounting/access. Falling back to browser navigation. TypeError: Failed to fetch\n    at fetchServerResponse (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/comp"
+  ],
+  "failed": []
+}

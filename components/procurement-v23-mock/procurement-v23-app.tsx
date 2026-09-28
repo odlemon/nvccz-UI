@@ -23,7 +23,51 @@ import {
   NOT_YET_LIVE_ACTIONS,
 } from "@/lib/procurement-v23/actions"
 import { getAuthToken } from "@/lib/utils/cookies"
-import { requisitionLineSuggestions } from "@/lib/api/procurement-v23-api"
+import {
+  downloadPurchaseOrderPdf,
+  downloadProcurementAuditCsv,
+  fetchProcurementDocumentFile,
+  getProcurementAuditEvent,
+  getProcurementAuditFacets,
+  getProcurementDocument,
+  getProcurementDocumentPreview,
+  queryProcurementAudit,
+  getInvoiceHandoff,
+  getPoApprovals,
+  listAiExtractions,
+  type AiExtraction,
+  getMyScorecard,
+  getRfqComparison,
+  getRfqConsolidation,
+  getRfqSourcing,
+  requisitionLineSuggestions,
+  getMyDashboard,
+  getProcurementDashboardLive,
+  getExecutiveDashboardLive,
+  listProcurementReports,
+  runProcurementReport,
+  downloadProcurementReport,
+  getNotificationRules,
+  saveNotificationRules,
+  getNotificationLog,
+  runNotificationJobs,
+  getNumberingFormats,
+  saveNumberingFormats,
+  getFxConfig,
+  saveFxConfig,
+  listFxRates,
+  saveFxRate,
+  deleteFxRate,
+  getStatusVocabulary,
+  cancelRequisitionRecord,
+  closeRequisitionRecord,
+  approveRfqDraft,
+  publishRfqEvent,
+  closeRfqEvent,
+  cancelRfqEvent,
+  cancelPurchaseOrderRecord,
+  closePurchaseOrderRecord,
+} from "@/lib/api/procurement-v23-api"
 import { VENDOR_PORTAL_EXTERNAL_URL } from "@/lib/portal/config"
 import "@/components/procurement-v23-mock/procurement-v23.css"
 import "@/components/procurement-v23-mock/procurement-v23-live.css"
@@ -125,6 +169,132 @@ export function ProcurementV23App() {
       )
     }
 
+    // The sourcing event the person has open (SRD 15-20). The server decides what each role may see of it, so what is
+    // fetched here is only ever what they are released; the runtime asks for an event when it draws its page.
+    const sourcingCache: Record<string, unknown> = {}
+    const sourcingInflight = new Set<string>()
+    const loadSourcing = async (rfqId: string, force = false) => {
+      if (!rfqId || (!force && (sourcingCache[rfqId] || sourcingInflight.has(rfqId)))) return
+      sourcingInflight.add(rfqId)
+      try {
+        const state = await getRfqSourcing(rfqId)
+        const released = state.phase === "OPENED" && state.level !== "COUNT"
+        const [comparison, consolidation, scorecard] = await Promise.all([
+          getRfqComparison(rfqId).catch(() => null),
+          released ? getRfqConsolidation(rfqId).catch(() => null) : Promise.resolve(null),
+          state.me && !state.me.recused && state.phase === "OPENED" ? getMyScorecard(rfqId).catch(() => null) : Promise.resolve(null),
+        ])
+        sourcingCache[rfqId] = { state, comparison, consolidation, scorecard }
+      } catch (err) {
+        sourcingCache[rfqId] = { error: readableLoadError((err as { message?: string })?.message) }
+      } finally {
+        sourcingInflight.delete(rfqId)
+      }
+      if (!disposed) runtimeUi()?.hydrate?.({ sourcingV23: { ...sourcingCache } })
+    }
+    const refreshSourcing = () => {
+      for (const id of Object.keys(sourcingCache)) void loadSourcing(id, true)
+    }
+    ;(window as unknown as { __pr23Sourcing?: unknown }).__pr23Sourcing = { load: loadSourcing }
+
+    // §21-§25, §29: what the screens ask the host for that is not part of the registers: the purchase order as the server renders it,
+    // its approvals, an invoice's finance handoff, and the person's AI readings (kept here, so a decision shows at once).
+    let aiList: AiExtraction[] = []
+    const aiHydrate = (open?: string) => {
+      if (!disposed) runtimeUi()?.hydrate?.({ aiExtractionsV23: [...aiList], ...(open ? { aiOpenV23: open } : {}) })
+    }
+    const pdfUrls = new Map<string, string>()
+    ;(window as unknown as { __pr23P2p?: unknown }).__pr23P2p = {
+      poPdfUrl: async (id: string) => {
+        const blob = await downloadPurchaseOrderPdf(id)
+        const old = pdfUrls.get(id)
+        if (old) URL.revokeObjectURL(old)
+        const url = URL.createObjectURL(blob)
+        pdfUrls.set(id, url)
+        return url
+      },
+      poApprovals: (id: string) => getPoApprovals(id),
+      handoff: (id: string) => getInvoiceHandoff(id),
+      aiPut: (ex: AiExtraction, select: boolean) => {
+        aiList = [ex, ...aiList.filter((x) => x.id !== ex.id)]
+        aiHydrate(select ? ex.id : undefined)
+      },
+    }
+    void listAiExtractions().then((list) => { aiList = list; aiHydrate() }).catch(() => undefined)
+
+    // SRD §32 / §33: the vault's real files and the paged audit trail, read with the signed-in user's credentials.
+    const docUrls = new Set<string>()
+    const saveBlob = (blob: Blob, filename: string) => {
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement("a")
+      a.href = url
+      a.download = filename
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      setTimeout(() => URL.revokeObjectURL(url), 10000)
+    }
+    ;(window as unknown as { __pr23Docs?: unknown }).__pr23Docs = {
+      detail: (id: string) => getProcurementDocument(id),
+      preview: (id: string, versionNo?: number) => getProcurementDocumentPreview(id, versionNo),
+      fileUrl: async (id: string, versionNo?: number) => {
+        const { blob } = await fetchProcurementDocumentFile(id, { versionNo, disposition: "inline" })
+        const url = URL.createObjectURL(blob)
+        docUrls.add(url)
+        return url
+      },
+      download: async (id: string, versionNo?: number) => {
+        const { blob, filename } = await fetchProcurementDocumentFile(id, { versionNo, disposition: "attachment" })
+        saveBlob(blob, filename)
+      },
+      revoke: (url: string) => { URL.revokeObjectURL(url); docUrls.delete(url) },
+    }
+    ;(window as unknown as { __pr23Audit?: unknown }).__pr23Audit = {
+      query: (p: Record<string, unknown>) => queryProcurementAudit(p),
+      facets: (p: Record<string, unknown>) => getProcurementAuditFacets(p),
+      detail: (id: string) => getProcurementAuditEvent(id),
+      exportCsv: async (p: Record<string, unknown>) => saveBlob(await downloadProcurementAuditCsv(p), "procurement-audit-trail.csv"),
+    }
+
+    // SRD §34-§40: dashboards, reports and their exports, the notification rules, numbering formats, exchange rates and the status vocabulary.
+    ;(window as unknown as { __pr23Insights?: unknown }).__pr23Insights = {
+      me: () => getMyDashboard(),
+      dashboard: (kind: "procurement" | "executive", q: Record<string, string>) => (kind === "executive" ? getExecutiveDashboardLive(q) : getProcurementDashboardLive(q)),
+      reports: () => listProcurementReports(),
+      report: (key: string, filters: Record<string, string>, page: number, pageSize: number, convertTo?: string) => runProcurementReport(key, filters, page, pageSize, convertTo),
+      exportReport: async (key: string, format: "csv" | "xlsx" | "pdf", filters: Record<string, string>, convertTo?: string) => {
+        const { blob, filename } = await downloadProcurementReport(key, format, filters, convertTo)
+        saveBlob(blob, filename)
+        return filename
+      },
+      rules: () => getNotificationRules(),
+      saveRules: (r: Record<string, unknown>) => saveNotificationRules(r),
+      log: (p: Record<string, string | number | undefined>) => getNotificationLog(p),
+      runJobs: () => runNotificationJobs(),
+      numbering: () => getNumberingFormats(),
+      saveNumbering: (f: Record<string, string>) => saveNumberingFormats(f),
+      fx: () => getFxConfig(),
+      saveFx: (b: Record<string, unknown>) => saveFxConfig(b),
+      rates: () => listFxRates(),
+      saveRate: (b: { from: string; to: string; rate: number; date: string }) => saveFxRate(b),
+      deleteRate: (id: string) => deleteFxRate(id),
+      statuses: () => getStatusVocabulary(),
+      lifecycle: async (action: string, id: string, reason?: string) => {
+        switch (action) {
+          case "cancel-requisition": return cancelRequisitionRecord(id, reason || "")
+          case "close-requisition": return closeRequisitionRecord(id, reason)
+          case "approve-rfq": return approveRfqDraft(id)
+          case "publish-rfq": return publishRfqEvent(id)
+          case "close-rfq": return closeRfqEvent(id)
+          case "cancel-rfq": return cancelRfqEvent(id, reason || "")
+          case "cancel-po": return cancelPurchaseOrderRecord(id, reason || "")
+          case "close-po": return closePurchaseOrderRecord(id, reason)
+          default: throw new Error("Unknown action")
+        }
+      },
+      reload: () => loadLive(),
+    }
+
     const loadLive = () => {
       void loadProcurementV23LiveData()
         .then((payload) => {
@@ -194,7 +364,10 @@ export function ProcurementV23App() {
           if (!result.handled) return
           if (result.error) toast.error(result.error)
           if (result.message) toast.success(result.message)
-          if (result.reload) loadLive()
+          if (result.reload) {
+            loadLive()
+            refreshSourcing()
+          }
         })
         .catch((err) => toast.error(err?.message ?? "Procurement action failed"))
         .finally(() => {
@@ -246,6 +419,12 @@ export function ProcurementV23App() {
       window.removeEventListener("click", onClick, true)
       window.removeEventListener("procurement-v23:reload-request", onReload)
       delete (window as unknown as { __pr23Live?: unknown }).__pr23Live
+      delete (window as unknown as { __pr23Sourcing?: unknown }).__pr23Sourcing
+      delete (window as unknown as { __pr23P2p?: unknown }).__pr23P2p
+      delete (window as unknown as { __pr23Docs?: unknown }).__pr23Docs
+      delete (window as unknown as { __pr23Audit?: unknown }).__pr23Audit
+      pdfUrls.forEach((u) => URL.revokeObjectURL(u))
+      docUrls.forEach((u) => URL.revokeObjectURL(u))
       apiRef.current?.destroy()
       apiRef.current = null
     }

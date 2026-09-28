@@ -1,0 +1,1950 @@
+
+
+===== PAGE 1 =====
+SYSTEM REQUIREMENTS DOCUMENT (SRD) 
+Procurement Management System 
+​
+Implementation Partner: Niakazi​
+Document Type: System Requirements Document​
+Version: 1.1​
+Date: 16 September 2026​
+Process Mapping: 18 September 2026​
+Infrastructure Deployment: 22 September 2026​
+User Onboarding: 23 September 2026​
+Phase 1 UAT: 24 September 2026​
+Phase 1 Production Deployment: 25 September 2026​
+Phase 2 SmartStream Mapping Start: 25 September 2026​
+Internal Integration UAT: 27 September 2026​
+External UAT: 29 September 2026 
+ 
+ 
+1. Document Purpose 
+This System Requirements Document defines what the development and implementation team 
+must deliver for the Client’s Procurement Management System. 
+This is an internal implementation and development document. The dates contained in this 
+SRD are the technical team’s delivery milestones and should be used to organise development, 
+configuration, deployment, testing, remediation and integration work. 
+The system must provide a complete controlled procurement workflow from internal requisition 
+through sourcing, evaluation, purchase order, goods/service receipt and invoice hand-off. 
+The implementation will be delivered in two phases. 
+Phase 1 – Standalone Procurement System 
+The Procurement Management System must first operate as a complete standalone application 
+on the Client’s infrastructure. 
+The development team must have the application technically deployed onto the Client’s 
+infrastructure by 22 September 2026. 
+
+
+===== PAGE 2 =====
+The standalone system must be capable of operating independently using its own: 
+●​ users; 
+●​ permissions; 
+●​ vendor records; 
+●​ approval workflows; 
+●​ procurement records; 
+●​ documents; 
+●​ notifications; 
+●​ reporting; 
+●​ audit trail; and 
+●​ administrative configuration. 
+User onboarding will take place on 23 September 2026, followed by Phase 1 UAT on 24 
+September 2026. 
+Following successful remediation of any critical Phase 1 issues, the Phase 1 production/go-live 
+deployment will take place on 25 September 2026. 
+Phase 2 – Systems Integration 
+Phase 2 begins on 25 September 2026, immediately following the Phase 1 production 
+deployment. 
+The first Phase 2 activity will be detailed SmartStream process and data mapping. 
+Integrations may subsequently include: 
+●​ SmartStream Accounting; 
+●​ approved RPA processes; 
+●​ authentication/identity systems where applicable; 
+●​ email infrastructure; and 
+●​ other systems agreed through the Integration Design Matrix. 
+Internal integration UAT must be conducted on 27 September 2026. 
+External UAT with the Client is scheduled for 29 September 2026. 
+The core implementation principle is: 
+The procurement platform must work correctly on its own before integration 
+complexity is introduced. 
+ 
+2. Requirements Hierarchy 
+
+
+===== PAGE 3 =====
+Development must be guided by the following documents in this order: 
+1.​ Client-approved BRD; 
+2.​ this SRD; 
+3.​ signed process maps; 
+4.​ signed UAT script; 
+5.​ signed Integration Design Matrix; 
+6.​ approved change requests. 
+The Client already has a BRD, but it has not yet been supplied to the Implementation Partner. 
+The development team must therefore avoid making irreversible assumptions where the BRD 
+could materially change functionality. 
+Once received, the BRD must be reviewed and gaps recorded in a formal Requirements 
+Traceability Matrix. 
+ 
+3. System Objectives 
+The system must: 
+1.​ digitise the Client’s procurement workflow; 
+2.​ reduce manual procurement administration; 
+3.​ provide controlled approval routing; 
+4.​ centralise vendor information; 
+5.​ maintain procurement documentation; 
+6.​ provide transparent quotation comparison; 
+7.​ maintain complete audit histories; 
+8.​ enforce user permissions and segregation of duties; 
+9.​ provide management reporting; 
+10.​support procurement policy controls; 
+11.​operate independently during Phase 1; 
+12.​integrate with SmartStream and other agreed systems during Phase 2; 
+13.​support an optional AI-assisted procurement review layer; and 
+14.​remain easy for Client users to operate without technical knowledge. 
+ 
+4. High-Level Workflow 
+The principal workflow is: 
+Procurement Plan / Requirement 
+
+
+===== PAGE 4 =====
+↓ 
+Purchase Requisition 
+↓ 
+Approval 
+↓ 
+RFQ / Tender / Sourcing Event 
+↓ 
+Supplier Invitation 
+↓ 
+Supplier Quotation / Submission 
+↓ 
+Compliance Review 
+↓ 
+Quotation Comparison / Evaluation 
+↓ 
+Recommendation 
+↓ 
+Approval / Award 
+↓ 
+Purchase Order 
+↓ 
+Goods / Service Receipt 
+↓ 
+Invoice Capture 
+
+
+===== PAGE 5 =====
+↓ 
+Three-Way / Relevant Control Checks 
+↓ 
+Accounting / Payment Handoff 
+↓ 
+Close 
+Every major stage must be recorded in the audit trail. 
+ 
+5. System Users 
+The final user structure will be confirmed during process mapping and user/stakeholder 
+mapping. 
+At minimum, the system must support the following roles. For simplicity, roles can be made 
+dynamic 
+Role 
+Main Responsibilities 
+System Administrator 
+System configuration, accounts, permissions and technical 
+administration 
+Procurement 
+Administrator 
+Procurement configuration, categories, vendors and 
+workflow administration 
+Requestor 
+Creates and monitors requisitions 
+Line Manager 
+Reviews and approves subordinate requisitions 
+
+
+===== PAGE 6 =====
+Budget Owner 
+Reviews budget-related requests 
+Procurement Officer 
+Manages sourcing events, RFQs and procurement 
+processes 
+Procurement Manager 
+Supervises procurement activity and approvals 
+Evaluation Committee 
+Member 
+Reviews and scores supplier submissions 
+Finance User 
+Reviews financial information, coding and invoice-related 
+information 
+Finance Approver 
+Approves relevant financial stages 
+Executive Approver 
+Approves items according to delegated limits 
+Project Sponsor 
+Executive oversight and reporting 
+Auditor 
+Read-only access to transactions, documents and audit 
+histories 
+Compliance/Risk User 
+Reviews supplier and procurement compliance information 
+Vendor/Supplier 
+Submits authorised quotation/tender information 
+
+
+===== PAGE 7 =====
+Reporting User 
+Accesses approved reports and dashboards 
+Technical Support 
+Technical administration subject to restricted business-data 
+permissions 
+Roles must not be hard-coded. 
+Administrators must be able to create additional roles and permission sets. 
+ 
+6. Role-Based Access Control 
+The system must use granular role-based access control. 
+Permissions must be available for: 
+●​ view; 
+●​ create; 
+●​ edit; 
+●​ submit; 
+●​ approve; 
+●​ reject; 
+●​ return; 
+●​ cancel; 
+●​ reopen; 
+●​ export; 
+●​ upload; 
+●​ download; 
+●​ administer; 
+●​ view sensitive financial information. 
+Permission control must operate by: 
+●​ role; 
+●​ department; 
+●​ branch; 
+●​ business unit; 
+●​ procurement category where required; 
+●​ transaction ownership; 
+●​ approval authority. 
+
+
+===== PAGE 8 =====
+A user must not be able to approve a transaction where the approved segregation-of-duties 
+matrix prohibits it. 
+The system must support configurable approval limits. 
+Example: 
+●​ Approver A: up to US$5,000; 
+●​ Approver B: US$5,001–US$25,000; 
+●​ Approver C: US$25,001–US$100,000; 
+●​ Executive Committee: above configured threshold. 
+Actual approval limits must come from Client configuration. 
+ 
+7. User Master 
+The system must maintain a user master containing, where applicable: 
+●​ Employee/User ID; 
+●​ First Name; 
+●​ Surname; 
+●​ Full Name; 
+●​ Work Email; 
+●​ Mobile Number; 
+●​ Department; 
+●​ Business Unit; 
+●​ Branch; 
+●​ Location; 
+●​ Cost Centre; 
+●​ Job Title; 
+●​ Reporting Manager; 
+●​ Procurement Function; 
+●​ System Role; 
+●​ Access Profile; 
+●​ Approval Level; 
+●​ Approval Limit; 
+●​ Delegated Approver; 
+●​ Network/SSO Username; 
+●​ UAT Role; 
+●​ User Status; 
+●​ Effective Date; 
+●​ End Date; 
+●​ Segregation-of-Duties Restrictions; 
+
+
+===== PAGE 9 =====
+●​ Last Login; 
+●​ Created Date; 
+●​ Created By; 
+●​ Modified Date; 
+●​ Modified By. 
+Users must be capable of being: 
+●​ Active; 
+●​ Suspended; 
+●​ Locked; 
+●​ Deactivated. 
+Records should not be permanently deleted where they have historical transactions. 
+ 
+8. Vendor Management 
+A central vendor master must be provided. 
+8.1 Vendor Record 
+The vendor record must support: 
+●​ Vendor Code; 
+●​ Legal Entity Name; 
+●​ Trading Name; 
+●​ Registration Number; 
+●​ Tax Identification Number; 
+●​ VAT Number; 
+●​ Vendor Category; 
+●​ Commodity/Service Categories; 
+●​ Registered Address; 
+●​ Country; 
+●​ Primary Contact; 
+●​ Contact Email; 
+●​ Telephone Number; 
+●​ Payment Terms; 
+●​ Currency; 
+●​ Vendor Status; 
+●​ Approval Status; 
+●​ Onboarding Date; 
+●​ Tax Clearance Status; 
+●​ Tax Clearance Expiry; 
+
+
+===== PAGE 10 =====
+●​ Compliance Status; 
+●​ Risk Classification; 
+●​ Account Name; 
+●​ Financial Institution Name; 
+●​ Account Number; 
+●​ Branch; 
+●​ SWIFT/BIC where applicable; 
+●​ Supporting Documents; 
+●​ Notes. 
+8.2 Vendor Statuses 
+Minimum statuses: 
+●​ Draft; 
+●​ Pending Review; 
+●​ Pending Approval; 
+●​ Approved; 
+●​ Suspended; 
+●​ Blocked; 
+●​ Expired; 
+●​ Inactive. 
+8.3 Vendor Documents 
+The system must support documents including: 
+●​ certificate of incorporation; 
+●​ tax clearance certificate; 
+●​ VAT registration; 
+●​ account confirmation; 
+●​ company profile; 
+●​ licences; 
+●​ insurance documents; 
+●​ compliance documentation; 
+●​ quotations; 
+●​ technical submissions; 
+●​ contracts where applicable; 
+●​ other supporting documents. 
+Document expiry dates must be configurable. 
+Notifications should be capable of alerting authorised users before expiry. 
+ 
+
+
+===== PAGE 11 =====
+9. Vendor Portal / Supplier Submission 
+Where suppliers submit information electronically, a controlled supplier interface must be 
+provided. 
+Suppliers must only see: 
+●​ procurement opportunities specifically available to them; 
+●​ RFQ/tender documents; 
+●​ clarification requests intended for them; 
+●​ their own submissions; 
+●​ submission status information approved for supplier visibility. 
+Suppliers must never see: 
+●​ competing supplier submissions; 
+●​ internal Client evaluation notes; 
+●​ competitor prices; 
+●​ internal approval discussions; 
+●​ confidential evaluation scores; 
+●​ internal audit information. 
+The supplier interface must support: 
+●​ secure login or secure invitation; 
+●​ quotation upload; 
+●​ PDF/document attachments; 
+●​ structured pricing entry where required; 
+●​ currency; 
+●​ delivery period; 
+●​ quotation validity; 
+●​ payment terms; 
+●​ comments; 
+●​ final submission; 
+●​ acknowledgement receipt. 
+Once a sourcing deadline has passed, suppliers must not be allowed to alter their submission 
+unless procurement formally reopens the event. 
+All reopen actions must be audited. 
+ 
+10. Procurement Planning 
+
+
+===== PAGE 12 =====
+Where required by the BRD, the system must provide an annual procurement plan. 
+Fields should include: 
+●​ Financial Year; 
+●​ Department; 
+●​ Business Unit; 
+●​ Requirement; 
+●​ Description; 
+●​ Category; 
+●​ Estimated Value; 
+●​ Currency; 
+●​ Planned Procurement Method; 
+●​ Planned Start Date; 
+●​ Required Delivery Date; 
+●​ Budget Code; 
+●​ Cost Centre; 
+●​ Responsible Officer; 
+●​ Status. 
+Actual procurement activity should be capable of being linked back to the approved 
+procurement plan. 
+ 
+11. Purchase Requisitions 
+Users must be able to create purchase requisitions. 
+Minimum fields: 
+●​ Requisition Number; 
+●​ Requestor; 
+●​ Department; 
+●​ Branch; 
+●​ Business Unit; 
+●​ Cost Centre; 
+●​ Procurement Category; 
+●​ Description; 
+●​ Business Justification; 
+●​ Quantity; 
+●​ Unit; 
+●​ Estimated Unit Price; 
+●​ Estimated Total; 
+●​ Currency; 
+
+
+===== PAGE 13 =====
+●​ Required Date; 
+●​ Budget Code; 
+●​ Delivery Location; 
+●​ Suggested Vendor, where permitted; 
+●​ Attachments; 
+●​ Date Created; 
+●​ Status. 
+Requisition numbering must be automatic. 
+Example: 
+PR-2026-000154 
+The exact numbering format must be configurable. 
+ 
+12. Requisition Approval 
+Approval routing must be configurable. 
+The workflow engine must be capable of routing based on: 
+●​ amount; 
+●​ department; 
+●​ business unit; 
+●​ cost centre; 
+●​ procurement category; 
+●​ branch; 
+●​ procurement method; 
+●​ risk level; 
+●​ exception type. 
+An approver must be able to: 
+●​ approve; 
+●​ reject; 
+●​ return for amendment; 
+●​ add comments; 
+●​ delegate where authorised. 
+Every decision must capture: 
+●​ user; 
+●​ action; 
+
+
+===== PAGE 14 =====
+●​ date; 
+●​ time; 
+●​ comments; 
+●​ previous status; 
+●​ resulting status. 
+ 
+13. RFQ and Tender Management 
+Procurement users must be able to create sourcing events from approved requisitions. 
+The system must support at minimum: 
+●​ Request for Quotation; 
+●​ Request for Proposal, where required; 
+●​ Tender / competitive sourcing event; 
+●​ Direct procurement / single-source event where authorised. 
+Each event must contain: 
+●​ Event Number; 
+●​ Title; 
+●​ Description; 
+●​ Category; 
+●​ Procurement Method; 
+●​ Linked Requisition(s); 
+●​ Issue Date; 
+●​ Closing Date; 
+●​ Closing Time; 
+●​ Currency; 
+●​ Submission Instructions; 
+●​ Terms and Conditions; 
+●​ Evaluation Criteria; 
+●​ Invited Suppliers; 
+●​ Attachments; 
+●​ Responsible Procurement Officer; 
+●​ Status. 
+ 
+14. Supplier Invitation 
+Procurement officers must be able to: 
+
+
+===== PAGE 15 =====
+●​ select approved suppliers; 
+●​ invite multiple vendors; 
+●​ issue an invitation; 
+●​ attach RFQ/tender documents; 
+●​ set closing date/time; 
+●​ record invitation delivery. 
+The system must record: 
+●​ invitation sent; 
+●​ date; 
+●​ time; 
+●​ recipient; 
+●​ delivery status where available. 
+ 
+15. Quotation Management 
+Supplier quotations may be: 
+1.​ submitted through the vendor portal; or 
+2.​ captured/uploaded by an authorised procurement user where the Client receives them 
+through an approved alternative channel. 
+Every quotation must record: 
+●​ Supplier; 
+●​ Event; 
+●​ Quotation Reference; 
+●​ Quotation Date; 
+●​ Currency; 
+●​ Subtotal; 
+●​ VAT; 
+●​ Total; 
+●​ Payment Terms; 
+●​ Delivery Period; 
+●​ Quotation Validity; 
+●​ Attachments; 
+●​ Submission Date; 
+●​ Submission Time; 
+●​ Submission Method. 
+Original submitted documents must be retained. 
+
+
+===== PAGE 16 =====
+ 
+16. Bid Opening Controls 
+Where the Client requires sealed procurement submissions, the system should support 
+controlled opening. 
+Before the closing deadline: 
+●​ evaluation users must not be able to view restricted supplier pricing; 
+●​ submissions must remain inaccessible except to specifically authorised administrative 
+processes. 
+After closing: 
+●​ authorised procurement users may initiate bid opening; 
+●​ opening must be time stamped; 
+●​ attendees/users must be recorded; 
+●​ submissions must become available according to role. 
+The exact sealed-bid requirements must be confirmed against the BRD. 
+ 
+17. Supplier Comparison 
+The system must generate a comparison view. 
+The comparison must support: 
+Requirement 
+Supplier A 
+Supplier 
+B 
+Supplier C 
+Quoted 
+Amount 
+ 
+ 
+ 
+Currency 
+ 
+ 
+ 
+
+
+===== PAGE 17 =====
+VAT 
+ 
+ 
+ 
+Delivery 
+Period 
+ 
+ 
+ 
+Payment 
+Terms 
+ 
+ 
+ 
+Quotation 
+Validity 
+ 
+ 
+ 
+Compliance 
+Status 
+ 
+ 
+ 
+Technical 
+Score 
+ 
+ 
+ 
+Commercial 
+Score 
+ 
+ 
+ 
+Total Score 
+ 
+ 
+ 
+Users must be able to drill into original supporting documents. 
+The system must not automatically select a supplier unless the Client expressly defines an 
+approved rule. 
+Final recommendations and awards remain human-controlled. 
+ 
+18. Evaluation 
+
+
+===== PAGE 18 =====
+The system must support configurable evaluation criteria. 
+Example categories: 
+●​ mandatory compliance; 
+●​ technical capability; 
+●​ price; 
+●​ delivery; 
+●​ experience; 
+●​ methodology; 
+●​ support; 
+●​ local requirements where applicable. 
+The system must support: 
+●​ weighted scores; 
+●​ pass/fail requirements; 
+●​ individual evaluator scores; 
+●​ committee score consolidation; 
+●​ evaluator comments; 
+●​ attachments; 
+●​ final recommendation. 
+Evaluation records must remain auditable. 
+ 
+19. Conflict / Evaluation Controls 
+Where required by Client policy, evaluation committee members should be required to confirm 
+participation before scoring. 
+The system should support configurable declarations such as: 
+●​ no known conflict; 
+●​ conflict disclosed; 
+●​ recusal required. 
+Specific declaration wording must come from the Client. 
+ 
+20. Award Recommendation 
+
+
+===== PAGE 19 =====
+After evaluation, an authorised procurement officer must be able to prepare an award 
+recommendation containing: 
+●​ sourcing event; 
+●​ recommended supplier; 
+●​ recommended amount; 
+●​ currency; 
+●​ evaluation summary; 
+●​ procurement justification; 
+●​ deviations/exceptions; 
+●​ supporting documents; 
+●​ evaluation results; 
+●​ approval route. 
+The recommendation must pass through configured approval authorities before an award is 
+finalised. 
+ 
+21. Purchase Orders 
+Approved awards must be capable of generating a Purchase Order. 
+Minimum fields: 
+●​ PO Number; 
+●​ Vendor; 
+●​ Vendor Code; 
+●​ Date; 
+●​ Currency; 
+●​ Items; 
+●​ Quantity; 
+●​ Unit Price; 
+●​ VAT; 
+●​ Total; 
+●​ Delivery Address; 
+●​ Delivery Date; 
+●​ Cost Centre; 
+●​ GL Code where applicable; 
+●​ Budget Code; 
+●​ Payment Terms; 
+●​ Purchase Conditions; 
+●​ Linked Requisition; 
+●​ Linked RFQ/Tender; 
+●​ Linked Award; 
+
+
+===== PAGE 20 =====
+●​ Approvals. 
+POs must support PDF generation. 
+PDFs must display Client-approved branding and layout. 
+ 
+22. Goods Receipt / Service Receipt 
+The system must support receipt confirmation. 
+For goods: 
+●​ PO; 
+●​ supplier; 
+●​ item; 
+●​ ordered quantity; 
+●​ received quantity; 
+●​ outstanding quantity; 
+●​ delivery note; 
+●​ date; 
+●​ receiver; 
+●​ location; 
+●​ attachments; 
+●​ comments. 
+For services: 
+●​ PO; 
+●​ service description; 
+●​ completion period; 
+●​ amount; 
+●​ confirmation; 
+●​ approving user; 
+●​ service evidence; 
+●​ comments. 
+Partial receipts must be supported. 
+ 
+23. Invoice Management 
+Invoices must be capable of being linked to: 
+
+
+===== PAGE 21 =====
+●​ vendor; 
+●​ purchase order; 
+●​ receipt; 
+●​ procurement event. 
+Minimum invoice information: 
+●​ Invoice Number; 
+●​ Vendor; 
+●​ Invoice Date; 
+●​ Currency; 
+●​ Subtotal; 
+●​ VAT; 
+●​ Total; 
+●​ PO Number; 
+●​ Receipt Reference; 
+●​ Payment Terms; 
+●​ Due Date; 
+●​ Attachments; 
+●​ Status. 
+The system must detect duplicate invoice numbers for the same vendor. 
+ 
+24. Matching Controls 
+Where applicable, the system must support: 
+Purchase Order ↔ Receipt ↔ Invoice 
+Comparison must highlight: 
+●​ quantity mismatch; 
+●​ value mismatch; 
+●​ tax mismatch; 
+●​ missing receipt; 
+●​ missing PO; 
+●​ excess invoice; 
+●​ duplicate invoice. 
+Tolerance rules must be configurable. 
+ 
+
+
+===== PAGE 22 =====
+25. Accounting Handoff 
+During Phase 1, accounting handoff may remain a controlled standalone process. 
+The system must record that an approved invoice is: 
+●​ Ready for Finance; 
+●​ Submitted to Finance; 
+●​ Accepted; 
+●​ Rejected/Returned; 
+●​ Paid; 
+●​ Closed. 
+During Phase 2, relevant information will integrate with SmartStream. 
+ 
+26. SmartStream Integration – Phase 2 
+Detailed SmartStream mapping begins on 25 September 2026. 
+Exact SmartStream integration specifications will be established through the Phase 2 mapping 
+exercise and documented in the Integration Design Matrix. 
+The integration architecture must nevertheless be capable of supporting the following. 
+Potential Outbound Information 
+Procurement System → SmartStream: 
+●​ vendor information; 
+●​ purchase orders; 
+●​ approved invoices; 
+●​ cost centre; 
+●​ GL code; 
+●​ currency; 
+●​ tax values; 
+●​ transaction totals; 
+●​ supporting references; 
+●​ approval status. 
+Potential Inbound Information 
+SmartStream → Procurement System: 
+
+
+===== PAGE 23 =====
+●​ valid GL codes; 
+●​ cost centres; 
+●​ budget information where available; 
+●​ vendor/accounting identifiers; 
+●​ invoice posting reference; 
+●​ payment status; 
+●​ payment date; 
+●​ accounting document number. 
+The exact source of truth for each field must be documented in the Integration Design Matrix. 
+ 
+27. Integration Technical Requirements 
+Integrations may use: 
+●​ REST APIs; 
+●​ SOAP where required; 
+●​ secure file exchange; 
+●​ approved database interfaces; 
+●​ middleware; 
+●​ RPA. 
+All integrations must support, where technically applicable: 
+●​ authentication; 
+●​ encryption; 
+●​ retry; 
+●​ timeout handling; 
+●​ idempotency; 
+●​ duplicate prevention; 
+●​ logging; 
+●​ reconciliation; 
+●​ exception queues; 
+●​ manual retry; 
+●​ technical alerts. 
+An integration transaction must have a unique correlation ID. 
+ 
+28. RPA Requirements 
+
+
+===== PAGE 24 =====
+Where another system cannot support a direct API, approved RPA may be used. 
+RPA processing must not operate as an invisible black box. 
+The procurement system or associated integration service must record: 
+●​ item submitted; 
+●​ timestamp; 
+●​ destination; 
+●​ RPA job reference; 
+●​ status; 
+●​ success/failure; 
+●​ error message; 
+●​ retry count; 
+●​ final result. 
+Statuses: 
+●​ Queued; 
+●​ Processing; 
+●​ Successful; 
+●​ Failed; 
+●​ Retrying; 
+●​ Requires Attention. 
+ 
+29. Optional AI-Assisted Procurement Layer 
+The AI functionality belongs to the AI Assisted Procurement and Tendering System option. 
+The standard system must remain fully operational without AI. 
+29.1 Purpose 
+AI will assist authorised users in reading procurement documentation. 
+AI must not replace: 
+●​ procurement officers; 
+●​ procurement committees; 
+●​ finance officers; 
+●​ approvers; 
+●​ internal control functions; 
+●​ final decision makers. 
+
+
+===== PAGE 25 =====
+29.2 Supported Documents 
+The AI layer should be capable of reading documents including: 
+●​ quotations; 
+●​ invoices; 
+●​ company profiles; 
+●​ tax clearance certificates; 
+●​ supplier registration documents; 
+●​ technical submissions; 
+●​ delivery notes; 
+●​ price schedules; 
+●​ relevant PDF supporting documents. 
+29.3 AI Extraction 
+Where possible, AI should extract: 
+●​ supplier name; 
+●​ quoted amount; 
+●​ currency; 
+●​ VAT treatment; 
+●​ payment terms; 
+●​ delivery period; 
+●​ document date; 
+●​ quotation validity; 
+●​ document reference; 
+●​ key line items; 
+●​ missing expected information; 
+●​ unusual inconsistencies. 
+29.4 AI Review Interface 
+AI-extracted information must be displayed as: 
+AI Extracted Value → Original Source → User Confirmation 
+Users must be able to: 
+●​ accept; 
+●​ correct; 
+●​ reject; 
+●​ manually enter; 
+●​ view the source document. 
+
+
+===== PAGE 26 =====
+AI values must not silently overwrite official data. 
+ 
+30. AI Safety and Human Control 
+The AI system must never: 
+●​ automatically award tenders; 
+●​ automatically reject vendors without an authorised rule; 
+●​ approve expenditure; 
+●​ create final procurement decisions; 
+●​ change supplier payment details; 
+●​ bypass approval workflows. 
+The interface must clearly distinguish: 
+●​ original supplier information; 
+●​ AI-extracted information; 
+●​ human-confirmed information. 
+AI output should be labelled as assistance and not as an authorised decision. 
+ 
+31. AI Usage Controls 
+Administrators must be able to monitor: 
+●​ number of AI documents processed; 
+●​ approximate usage; 
+●​ model calls; 
+●​ failures; 
+●​ processing date; 
+●​ requesting user. 
+Where technically possible, administrators should be able to configure: 
+●​ monthly document limits; 
+●​ monthly usage limits; 
+●​ approved user groups; 
+●​ permitted document types. 
+ 
+
+
+===== PAGE 27 =====
+32. Document Management 
+The system must provide central document storage. 
+Supported formats should include at minimum: 
+●​ PDF; 
+●​ DOCX; 
+●​ XLSX; 
+●​ XLS; 
+●​ CSV; 
+●​ JPG; 
+●​ JPEG; 
+●​ PNG. 
+Documents must support: 
+●​ upload; 
+●​ preview; 
+●​ download; 
+●​ metadata; 
+●​ version information where required; 
+●​ uploader; 
+●​ upload date; 
+●​ related transaction. 
+Users must be able to preview common file types without downloading them where technically 
+practical. 
+ 
+33. Audit Trail 
+Audit logging is mandatory. 
+The system must capture: 
+●​ Login; 
+●​ Logout; 
+●​ Record Creation; 
+●​ Record Edit; 
+●​ Submission; 
+●​ Approval; 
+●​ Rejection; 
+●​ Return; 
+
+
+===== PAGE 28 =====
+●​ Assignment; 
+●​ File Upload; 
+●​ File Download; 
+●​ Permission Change; 
+●​ User Change; 
+●​ Vendor Change; 
+●​ Workflow Change; 
+●​ Integration Transaction; 
+●​ AI Processing Event where applicable; 
+●​ Record Closure. 
+Each audit event must record: 
+●​ timestamp; 
+●​ user; 
+●​ action; 
+●​ record; 
+●​ record ID; 
+●​ previous value where applicable; 
+●​ new value where applicable; 
+●​ IP/device information where available. 
+Business users must not be able to delete or modify audit history. 
+ 
+34. Notifications 
+The system must provide in-application notifications. 
+Email notifications must be supported where SMTP/email integration is available. 
+Notifications may include: 
+●​ requisition submitted; 
+●​ approval required; 
+●​ requisition returned; 
+●​ requisition rejected; 
+●​ RFQ invitation; 
+●​ sourcing deadline; 
+●​ evaluation assigned; 
+●​ evaluation overdue; 
+●​ approval assigned; 
+●​ PO issued; 
+●​ vendor document expiring; 
+
+
+===== PAGE 29 =====
+●​ invoice exception; 
+●​ integration failure; 
+●​ task escalation. 
+Notification rules should be configurable. 
+ 
+35. Dashboard 
+The application must provide role-specific dashboards. 
+Procurement Dashboard 
+Recommended information: 
+●​ Open Requisitions; 
+●​ Pending Approvals; 
+●​ RFQs in Progress; 
+●​ Tenders Closing Soon; 
+●​ Evaluations Pending; 
+●​ Purchase Orders Issued; 
+●​ Vendor Compliance Exceptions; 
+●​ Procurement Spend; 
+●​ Cycle Time; 
+●​ Savings / Variance where data supports it; 
+●​ Overdue Activities. 
+Executive Dashboard 
+Recommended information: 
+●​ total procurement value; 
+●​ procurement volume; 
+●​ spend by category; 
+●​ spend by department; 
+●​ spend by supplier; 
+●​ procurement cycle time; 
+●​ pending approvals; 
+●​ exception transactions; 
+●​ vendor concentration; 
+●​ sourcing method split. 
+Charts must have: 
+
+
+===== PAGE 30 =====
+●​ labels; 
+●​ legends; 
+●​ date filters; 
+●​ readable axes; 
+●​ drill-down where practical. 
+ 
+36. Search and Filtering 
+All major record lists must support search. 
+Search should support relevant fields such as: 
+●​ reference number; 
+●​ supplier; 
+●​ requestor; 
+●​ department; 
+●​ category; 
+●​ status; 
+●​ date; 
+●​ amount. 
+Filters must support combinations. 
+Example: 
+Status + Department + Date Range + Value Range 
+Tables should support: 
+●​ sorting; 
+●​ pagination; 
+●​ configurable page size; 
+●​ export where permitted. 
+ 
+37. Reports 
+Minimum reports should include: 
+●​ Requisition Register; 
+●​ RFQ/Tender Register; 
+●​ Purchase Order Register; 
+
+
+===== PAGE 31 =====
+●​ Supplier Register; 
+●​ Vendor Compliance Report; 
+●​ Procurement Spend Report; 
+●​ Spend by Department; 
+●​ Spend by Category; 
+●​ Spend by Supplier; 
+●​ Approval Turnaround Report; 
+●​ Procurement Cycle-Time Report; 
+●​ Pending Approval Report; 
+●​ Invoice Exception Report; 
+●​ Vendor Document Expiry Report; 
+●​ Audit Trail Report. 
+Reports must support appropriate: 
+●​ date filters; 
+●​ department filters; 
+●​ supplier filters; 
+●​ category filters; 
+●​ currency filters. 
+Export formats: 
+●​ PDF; 
+●​ CSV; 
+●​ XLSX. 
+ 
+38. Currency 
+The system must support multiple currencies. 
+Currency must be stored against each financial transaction. 
+The system must not silently combine values from different currencies. 
+Any consolidated reporting involving currency conversion must use an explicitly defined 
+exchange-rate mechanism. 
+The exact exchange-rate source will be confirmed during implementation. 
+ 
+39. Numbering 
+
+
+===== PAGE 32 =====
+System-generated references must be unique. 
+Examples: 
+●​ REQ-2026-000001 
+●​ RFQ-2026-000001 
+●​ TND-2026-000001 
+●​ PO-2026-000001 
+●​ GRN-2026-000001 
+Numbering formats must be configurable rather than permanently hard-coded. 
+ 
+40. Status Management 
+Records must use controlled statuses. 
+Requisition 
+●​ Draft 
+●​ Submitted 
+●​ Under Review 
+●​ Approved 
+●​ Rejected 
+●​ Returned 
+●​ Converted to Sourcing 
+●​ Cancelled 
+●​ Closed 
+Sourcing Event 
+●​ Draft 
+●​ Approved 
+●​ Published 
+●​ Open 
+●​ Closed 
+●​ Under Evaluation 
+●​ Awaiting Approval 
+●​ Awarded 
+●​ Cancelled 
+Purchase Order 
+●​ Draft 
+
+
+===== PAGE 33 =====
+●​ Pending Approval 
+●​ Approved 
+●​ Issued 
+●​ Partially Received 
+●​ Fully Received 
+●​ Cancelled 
+●​ Closed 
+Statuses must not be changed manually outside permitted workflow actions. 
+ 
+41. Data Validation 
+The application must implement both client-side and server-side validation. 
+Examples: 
+●​ mandatory fields; 
+●​ valid email; 
+●​ numeric value restrictions; 
+●​ date validation; 
+●​ positive quantity; 
+●​ valid currency; 
+●​ duplicate vendor detection; 
+●​ duplicate invoice checks; 
+●​ approval limit checks; 
+●​ closing date restrictions. 
+Server-side validation is mandatory even where frontend validation exists. 
+ 
+42. Error Handling 
+Users must never receive unhelpful raw technical errors. 
+Instead of: 
+500 Internal Server Error 
+show: 
+“The request could not be completed. No data has been lost. Please try again or contact 
+support using reference ERR-XXXXXX.” 
+
+
+===== PAGE 34 =====
+Errors must be logged server-side. 
+Sensitive infrastructure information must not be exposed in user-facing errors. 
+ 
+43. Security Requirements 
+The application must be designed for deployment within the Client’s controlled enterprise 
+environment. 
+Minimum requirements: 
+●​ HTTPS only; 
+●​ encryption in transit; 
+●​ secure password hashing where local passwords are used; 
+●​ role-based access; 
+●​ least privilege; 
+●​ protected secrets; 
+●​ server-side permission enforcement; 
+●​ configurable session timeout; 
+●​ login attempt controls; 
+●​ secure cookies; 
+●​ CSRF protection where applicable; 
+●​ protection against common injection attacks; 
+●​ file-upload restrictions; 
+●​ file-type verification; 
+●​ secure API authentication; 
+●​ logging of privileged actions. 
+No API keys, database passwords or secrets may be stored directly in source code. 
+ 
+44. Authentication 
+Phase 1 
+The system must support secure local authentication if Client SSO is not yet available. 
+Phase 2 
+Where approved, the system should integrate with Client identity services such as: 
+●​ Active Directory; 
+
+
+===== PAGE 35 =====
+●​ SAML; 
+●​ OAuth/OIDC; 
+●​ other approved identity provider. 
+Authentication architecture must not require major rework to move from local login to SSO. 
+ 
+45. MFA 
+The architecture must support multifactor authentication either: 
+●​ directly within the application; or 
+●​ through the Client's identity provider. 
+The final approach will depend on Client infrastructure. 
+ 
+46. Session Management 
+Sessions must support: 
+●​ secure login; 
+●​ timeout after configured inactivity; 
+●​ logout; 
+●​ forced logout after account deactivation; 
+●​ session revocation. 
+Privileged users should have shorter configurable session rules if required by Client policy. 
+ 
+47. Database 
+The production solution must use a proper server-side relational database. 
+Suitable technologies include: 
+●​ PostgreSQL; 
+●​ Microsoft SQL Server; 
+●​ another Client-approved enterprise database. 
+Do not build the production system around browser storage, static JSON or local files. 
+
+
+===== PAGE 36 =====
+ 
+48. Core Data Entities 
+Minimum core entities include: 
+●​ User; 
+●​ Role; 
+●​ Permission; 
+●​ Department; 
+●​ Branch; 
+●​ Business Unit; 
+●​ Cost Centre; 
+●​ Vendor; 
+●​ Vendor Contact; 
+●​ Vendor Payment Account; 
+●​ Vendor Document; 
+●​ Procurement Category; 
+●​ Procurement Plan; 
+●​ Requisition; 
+●​ Requisition Item; 
+●​ Approval; 
+●​ Sourcing Event; 
+●​ Event Supplier; 
+●​ Supplier Submission; 
+●​ Submission Item; 
+●​ Evaluation; 
+●​ Evaluation Criterion; 
+●​ Award Recommendation; 
+●​ Purchase Order; 
+●​ PO Item; 
+●​ Receipt; 
+●​ Receipt Item; 
+●​ Invoice; 
+●​ Document; 
+●​ Notification; 
+●​ Integration Transaction; 
+●​ Audit Event; 
+●​ AI Processing Record where applicable. 
+ 
+49. Soft Delete and Historical Integrity 
+
+
+===== PAGE 37 =====
+Transactional records must generally not be physically deleted. 
+Where deletion is allowed for draft administrative records, the system should use controlled 
+soft-delete or archival logic where appropriate. 
+Historical approved procurement records must remain retrievable for authorised users. 
+ 
+50. User Interface 
+The interface must be: 
+●​ professional; 
+●​ responsive; 
+●​ clean; 
+●​ suitable for a large enterprise environment; 
+●​ easy to navigate; 
+●​ desktop-first but usable on tablet and mobile. 
+The system should use: 
+●​ clear navigation; 
+●​ consistent status badges; 
+●​ readable tables; 
+●​ meaningful empty states; 
+●​ confirmation prompts for important actions; 
+●​ document previews; 
+●​ contextual actions. 
+Avoid unnecessary animations or visual effects that reduce efficiency. 
+ 
+51. Accessibility and Readability 
+Text and input fields must remain readable. 
+Do not use excessively small text. 
+Forms must: 
+●​ have visible labels; 
+●​ provide useful validation messages; 
+●​ maintain logical keyboard navigation; 
+
+
+===== PAGE 38 =====
+●​ avoid hidden critical actions. 
+ 
+52. Performance 
+Under normal agreed Client workloads: 
+●​ standard pages should load promptly; 
+●​ filters should not require full-page refreshes where unnecessary; 
+●​ search results should paginate; 
+●​ large data sets should be processed server-side; 
+●​ reports should run asynchronously if necessary; 
+●​ document processing must not block normal UI operations. 
+Exact load targets may be refined after infrastructure details are received. 
+ 
+53. Availability and Recovery 
+The deployment must be compatible with the Client’s required: 
+●​ backup policy; 
+●​ recovery approach; 
+●​ monitoring; 
+●​ server redundancy, where available. 
+Database backups must form part of the deployment design. 
+Recovery procedures must be documented. 
+ 
+54. Environment Separation 
+Where Client infrastructure permits, the following environments should exist: 
+1.​ Development; 
+2.​ UAT/Test; 
+3.​ Production. 
+Configuration and secrets must be environment-specific. 
+Production data must not be copied into developer environments without Client approval. 
+
+
+===== PAGE 39 =====
+ 
+55. Logging and Monitoring 
+The application must provide: 
+●​ application logs; 
+●​ error logs; 
+●​ authentication logs; 
+●​ integration logs; 
+●​ audit events. 
+Logs must not contain plain-text passwords or sensitive secret credentials. 
+ 
+56. Deployment Requirements 
+The development team must ensure that all required deployment dependencies are identified 
+during process mapping and technical discovery. 
+Required items may include: 
+●​ server access; 
+●​ database access; 
+●​ VPN; 
+●​ firewall approval; 
+●​ DNS; 
+●​ SSL certificates; 
+●​ SMTP; 
+●​ environment details; 
+●​ secure service credentials; 
+●​ repository/deployment access; 
+●​ infrastructure approvals; 
+●​ user data; 
+●​ vendor data; 
+●​ relevant master data. 
+The team must escalate any missing dependency immediately because the standalone 
+application is required to be technically deployed onto the Client’s infrastructure by 22 
+September 2026. 
+The system must be deployable within the Client's approved infrastructure. 
+Deployment must not depend on an individual developer's laptop. 
+
+
+===== PAGE 40 =====
+ 
+57. Deployment Documentation 
+The developer must provide: 
+●​ README; 
+●​ installation guide; 
+●​ environment-variable guide; 
+●​ database setup instructions; 
+●​ migration procedure; 
+●​ backup procedure; 
+●​ restore procedure; 
+●​ deployment procedure; 
+●​ rollback procedure; 
+●​ integration configuration instructions; 
+●​ admin guide; 
+●​ troubleshooting guide. 
+ 
+58. Phase 1 Technical Deployment Gate – 22 September 2026 
+By 22 September 2026, the development team must have the standalone application deployed 
+onto the Client’s infrastructure. 
+At this stage: 
+●​ application services must run on Client infrastructure; 
+●​ database must be operational; 
+●​ required application configuration must be loaded; 
+●​ authorised test users must be able to log in; 
+●​ core roles must exist; 
+●​ master-data import mechanisms must work; 
+●​ document storage must work; 
+●​ major procurement workflows must be technically functional; 
+●​ audit logging must operate; 
+●​ deployment logs must be available; 
+●​ no infrastructure-level blocker should prevent onboarding. 
+This milestone is a technical infrastructure deployment, not the final Phase 1 
+production/go-live release. 
+ 
+
+
+===== PAGE 41 =====
+59. User Onboarding – 23 September 2026 
+User onboarding is scheduled for 23 September 2026. 
+The system must be sufficiently stable for Client users to: 
+●​ log in; 
+●​ understand navigation; 
+●​ understand their assigned role; 
+●​ create or review sample transactions relevant to their role; 
+●​ access documents; 
+●​ understand notifications and task queues; 
+●​ understand approval actions; 
+●​ identify obvious configuration issues. 
+The development team must treat onboarding feedback as immediate configuration and 
+usability input ahead of Phase 1 UAT. 
+ 
+60. Phase 1 UAT – 24 September 2026 
+Formal Phase 1 UAT is scheduled for: 
+24 September 2026 
+UAT must test complete business journeys rather than isolated buttons. 
+Example test: 
+1.​ User creates requisition. 
+2.​ Manager approves. 
+3.​ Procurement converts requisition to RFQ. 
+4.​ Three suppliers are invited. 
+5.​ Quotations are received. 
+6.​ Supplier submissions are compared. 
+7.​ Committee evaluates. 
+8.​ Recommendation is prepared. 
+9.​ Approver approves. 
+10.​PO is generated. 
+11.​Goods are received. 
+12.​Invoice is captured. 
+13.​Matching controls operate. 
+14.​Invoice is marked Ready for Finance. 
+15.​Audit trail confirms every step. 
+
+
+===== PAGE 42 =====
+Any Critical defects identified during UAT must be addressed immediately. 
+ 
+61. Phase 1 Production Deployment – 25 September 2026 
+Phase 1 production/go-live deployment is scheduled for 25 September 2026. 
+Phase 1 is ready for this deployment when: 
+●​ application is running on Client-approved infrastructure; 
+●​ database is operational; 
+●​ authorised users can log in; 
+●​ users and roles are configured; 
+●​ vendor master is loaded; 
+●​ relevant master data is loaded; 
+●​ requisitions can be created; 
+●​ approval workflow operates; 
+●​ RFQs/tenders can be created; 
+●​ suppliers can submit or submissions can be captured; 
+●​ supplier submissions can be compared; 
+●​ evaluation operates; 
+●​ award workflow operates; 
+●​ purchase orders can be generated; 
+●​ receipts can be recorded; 
+●​ invoices can be captured; 
+●​ documents can be previewed; 
+●​ reports operate; 
+●​ audit history operates; 
+●​ notifications operate where infrastructure is available; 
+●​ Phase 1 UAT Critical defects have been resolved; 
+●​ no unresolved Critical defect prevents core procurement processing. 
+Phase 1 production deployment and Phase 2 commencement occur on the same date. 
+ 
+62. Phase 2 Start – SmartStream Mapping – 25 September 2026 
+Phase 2 begins on 25 September 2026. 
+The first activity must be detailed SmartStream mapping. 
+The technical team must establish: 
+
+
+===== PAGE 43 =====
+●​ relevant SmartStream modules; 
+●​ source and destination transactions; 
+●​ master-data ownership; 
+●​ field mappings; 
+●​ mandatory fields; 
+●​ reference numbers; 
+●​ GL structures; 
+●​ cost-centre structures; 
+●​ tax handling; 
+●​ currency handling; 
+●​ transaction direction; 
+●​ posting triggers; 
+●​ response messages; 
+●​ error messages; 
+●​ reconciliation requirements; 
+●​ available APIs/interfaces; 
+●​ RPA requirements where direct integration is unavailable; 
+●​ authentication requirements; 
+●​ integration environment; 
+●​ test data; 
+●​ retry requirements; 
+●​ duplicate prevention; 
+●​ source-of-truth rules. 
+The mapping output must become the working Integration Design Matrix. 
+ 
+63. Internal Integration UAT – 27 September 2026 
+Internal UAT is scheduled for 27 September 2026. 
+This test is performed by the implementation and development team before external Client UAT. 
+Internal UAT must verify: 
+●​ field mapping; 
+●​ transaction submission; 
+●​ authentication; 
+●​ SmartStream connectivity; 
+●​ RPA flows where applicable; 
+●​ successful transaction posting; 
+●​ unsuccessful transaction handling; 
+●​ duplicate prevention; 
+●​ retry logic; 
+
+
+===== PAGE 44 =====
+●​ integration queue; 
+●​ reconciliation; 
+●​ reference matching; 
+●​ audit logging; 
+●​ error visibility; 
+●​ recovery from failed transactions. 
+The development team must not knowingly send an integration flow into external UAT where a 
+Critical integration defect remains unresolved. 
+ 
+64. External UAT – 29 September 2026 
+External UAT with the Client is scheduled for 29 September 2026. 
+External UAT must test the complete integrated business journey, including applicable 
+SmartStream and RPA components. 
+The test should cover: 
+1.​ procurement transaction created; 
+2.​ approval workflow completed; 
+3.​ downstream transaction prepared; 
+4.​ integration trigger initiated; 
+5.​ payload generated; 
+6.​ transaction received by target system; 
+7.​ target-system reference returned where applicable; 
+8.​ status reflected in procurement system; 
+9.​ exceptions handled; 
+10.​reconciliation completed; 
+11.​audit history verified. 
+The principal objective is to prove that the standalone procurement application and agreed 
+Phase 2 integration operate as one controlled end-to-end process. 
+ 
+65. Defect Classification 
+Critical 
+Core system cannot operate, major security failure, loss/corruption of data, or essential 
+procurement/integration process cannot be completed. 
+
+
+===== PAGE 45 =====
+High 
+Major feature fails but a controlled workaround exists. 
+Medium 
+Feature has limited impact or manageable workaround. 
+Low 
+Cosmetic or minor usability issue. 
+Critical defects must be resolved before the relevant deployment or UAT gate proceeds. 
+ 
+66. Internal Development Timeline 
+Date 
+Internal 
+Delivery 
+Mileston
+e 
+Required Outcome 
+18 Sep 
+2026 
+Process 
+Mapping 
+& 
+Technical 
+Discovery 
+Confirm end-to-end process, users, roles, system 
+dependencies, BRD gaps and implementation 
+decisions 
+18–21 
+Sep 
+2026 
+Configuration 
+& 
+Deployme
+nt 
+Preparati
+on 
+BRD review, workflow configuration, master-data 
+preparation, environment setup, permissions and 
+standalone system stabilisation 
+
+
+===== PAGE 46 =====
+22 Sep 
+2026 
+Infrastructure 
+Deployme
+nt 
+Standalone procurement application deployed and 
+running on Client infrastructure 
+23 Sep 
+2026 
+User 
+Onboardi
+ng 
+Users onboarded; access, roles, navigation and core 
+workflow validated 
+24 Sep 
+2026 
+Phase 1 UAT 
+Standalone end-to-end procurement process tested 
+25 Sep 
+2026 
+Phase 1 
+Productio
+n 
+Deployme
+nt 
+Phase 1 released into agreed production/go-live state 
+25 Sep 
+2026 
+Phase 2 Start 
+SmartStream process, data, field and transaction 
+mapping begins 
+25–26 
+Sep 
+2026 
+Integration 
+Build & 
+Configura
+tion 
+SmartStream/RPA interfaces configured or developed 
+against agreed mappings 
+27 Sep 
+2026 
+Internal UAT 
+Technical team completes end-to-end integration 
+testing 
+28 Sep 
+2026 
+Remediation 
+& 
+Regressio
+n 
+Internal UAT issues corrected and regression tested 
+ahead of external UAT 
+
+
+===== PAGE 47 =====
+29 Sep 
+2026 
+External UAT 
+Client performs integrated end-to-end UAT 
+These dates are the development and implementation team’s internal delivery gates. 
+The development team must organise tasks, branches, testing and deployments backwards 
+from these dates. 
+ 
+67. Requirements Traceability 
+Every major requirement must be tracked using a Requirements Traceability Matrix. 
+Minimum columns: 
+ID 
+Requir
+em
+ent 
+S
+Prio
+ri
+t
+y 
+Pha
+s
+e 
+Develo
+pm
+ent 
+Stat
+us 
+Test 
+Ca
+se 
+UAT 
+Res
+ult 
+No
+t
+e
+s
+Suggested priorities: 
+●​ P0 – Mandatory for Go-Live 
+●​ P1 – High Priority 
+●​ P2 – Enhancement 
+●​ P3 – Future 
+No P0 item may be silently removed from scope. 
+ 
+68. Minimum Development Standards 
+Developers must: 
+●​ use source control; 
+●​ use feature branches or agreed equivalent; 
+
+
+===== PAGE 48 =====
+●​ perform peer review for material changes; 
+●​ avoid hard-coded production credentials; 
+●​ avoid direct production database edits; 
+●​ implement database migrations; 
+●​ validate all server inputs; 
+●​ handle errors gracefully; 
+●​ write reusable components; 
+●​ document significant business logic; 
+●​ keep configuration separate from code; 
+●​ provide test data separately from production data. 
+ 
+69. Testing Requirements 
+Testing must include: 
+●​ unit testing where appropriate; 
+●​ API testing; 
+●​ workflow testing; 
+●​ permission testing; 
+●​ negative testing; 
+●​ validation testing; 
+●​ document testing; 
+●​ reporting testing; 
+●​ integration testing; 
+●​ browser testing; 
+●​ responsive testing; 
+●​ internal UAT; 
+●​ external UAT. 
+Permission tests are particularly important. 
+A developer must test not only whether a permitted user can perform an action, but also 
+whether an unauthorised user is correctly prevented from performing it. 
+ 
+70. Critical Security Test Cases 
+Before production: 
+●​ normal users cannot access administrator APIs; 
+
+
+===== PAGE 49 =====
+●​ one department cannot access restricted records of another department unless 
+authorised; 
+●​ suppliers cannot see competitor submissions; 
+●​ requestors cannot self-approve where prohibited; 
+●​ suspended users cannot log in; 
+●​ files cannot execute on upload; 
+●​ sensitive API endpoints enforce authentication; 
+●​ approval limits are enforced server-side; 
+●​ audit logs cannot be altered by ordinary users; 
+●​ supplier payment-detail changes are controlled; 
+●​ direct URL manipulation does not bypass access controls. 
+ 
+71. Change Control 
+Anything materially outside: 
+●​ the approved BRD; 
+●​ this SRD; 
+●​ signed process maps; 
+●​ signed UAT script; 
+●​ signed Integration Design Matrix; 
+must be recorded as a change request. 
+The developer must not quietly expand system behaviour based on informal verbal requests 
+where the request could materially affect scope, architecture, security or timeline. 
+ 
+72. Current Known Scope Boundaries 
+Unless subsequently included by the BRD or approved through change control, the following 
+should not automatically be assumed to be part of the initial implementation: 
+●​ replacing SmartStream accounting; 
+●​ executing payments directly; 
+●​ full inventory management; 
+●​ payroll; 
+●​ general ledger accounting; 
+●​ full contract lifecycle management beyond agreed procurement needs; 
+●​ public e-procurement marketplace; 
+●​ reverse auctions; 
+
+
+===== PAGE 50 =====
+●​ advanced supplier financing; 
+●​ unrelated ERP functionality. 
+The Procurement Management System must integrate with existing systems rather than 
+unnecessarily duplicate them. 
+ 
+73. Developer Implementation Priority 
+The development team should work in the following order: 
+Priority 1 — Platform Foundation 
+●​ authentication; 
+●​ database; 
+●​ user master; 
+●​ roles; 
+●​ permissions; 
+●​ audit framework; 
+●​ document storage; 
+●​ notifications. 
+Priority 2 — Core Procurement 
+●​ vendor master; 
+●​ requisitions; 
+●​ approvals; 
+●​ RFQ/tender; 
+●​ supplier submissions; 
+●​ quotation comparison; 
+●​ evaluation; 
+●​ award; 
+●​ PO. 
+Priority 3 — Procure-to-Pay Control 
+●​ receipts; 
+●​ invoices; 
+●​ matching; 
+●​ finance handoff. 
+Priority 4 — Reporting and Administration 
+●​ dashboards; 
+
+
+===== PAGE 51 =====
+●​ reports; 
+●​ configuration; 
+●​ master data; 
+●​ exports. 
+Priority 5 — AI Layer 
+Where purchased: 
+●​ document extraction; 
+●​ AI review interface; 
+●​ usage tracking; 
+●​ human confirmation. 
+Priority 6 — Integrations 
+After standalone validation: 
+●​ SmartStream; 
+●​ RPA; 
+●​ SSO; 
+●​ agreed third-party interfaces. 
+ 
+74. Architectural Principle 
+The application should be built as a modular system. 
+Recommended logical structure: 
+Web Frontend 
+↓ 
+Backend/API Layer 
+↓ 
+Business Logic / Workflow Engine 
+↓ 
+Relational Database 
+↓ 
+
+
+===== PAGE 52 =====
+Document/Object Storage 
+↓ 
+Audit / Logging Services 
+↓ 
+Integration Layer 
+↙ SmartStream​
+↙ RPA​
+↙ Identity Provider​
+↙ Email​
+↙ AI Provider where applicable 
+External integrations must not be allowed to make the core procurement application unstable. 
+If SmartStream is unavailable, authorised users must still be able to operate procurement 
+functions that do not depend on SmartStream. 
+ 
+75. Integration Resilience Principle 
+Integration failure must not mean data loss. 
+Example: 
+An invoice is approved for SmartStream submission. 
+SmartStream is unavailable. 
+The system must: 
+1.​ retain the approved invoice; 
+2.​ create an integration queue item; 
+3.​ display the failure; 
+4.​ log the reason; 
+5.​ retry automatically where appropriate; 
+6.​ allow authorised manual retry; 
+7.​ prevent duplicate posting; 
+8.​ record eventual success. 
+ 
+
+
+===== PAGE 53 =====
+76. Final Delivery Package 
+The technical team must maintain and ultimately hand over: 
+●​ production application; 
+●​ source code as contractually applicable; 
+●​ database schema; 
+●​ migration scripts; 
+●​ deployment scripts/configuration; 
+●​ environment-variable template; 
+●​ integration documentation; 
+●​ API documentation; 
+●​ role/permission matrix; 
+●​ architecture diagram; 
+●​ master-data templates; 
+●​ test results; 
+●​ UAT evidence; 
+●​ known-issues list; 
+●​ admin guide; 
+●​ deployment guide; 
+●​ backup and restore guide; 
+●​ support/escalation information. 
+ 
+77. Final Developer Instruction 
+This project should not be treated as the development of a collection of attractive procurement 
+screens. 
+It must operate as a transactional procurement control system. 
+For every important output, the developer must identify: 
+1.​ Who creates the input? 
+2.​ Where is the input stored? 
+3.​ Who is authorised to change it? 
+4.​ What approval is required? 
+5.​ What happens after approval? 
+6.​ What system receives the next transaction? 
+7.​ What happens if that action fails? 
+8.​ How is the action audited? 
+9.​ How does a user find the record later? 
+10.​How is the result reported? 
+
+
+===== PAGE 54 =====
+A feature is not considered complete simply because a button works or a screen displays. 
+A feature is complete when the entire business transaction, permissions, audit history, data 
+persistence, error handling and downstream consequences operate correctly. 
+ 
+78. Overall Acceptance Principle 
+The final solution must demonstrate that: 
+An authorised Client employee can initiate a procurement requirement, route 
+it through the appropriate controls, source and evaluate suppliers, obtain 
+approval, issue a purchase order, record delivery, capture the supplier invoice 
+and hand the approved financial transaction into the Client’s accounting 
+process with a complete and searchable audit history. 
+That end-to-end journey is the central requirement of the system. 
+●​ 
+ 

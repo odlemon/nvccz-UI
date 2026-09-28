@@ -166,7 +166,7 @@ export async function createEmployee(body: Record<string, any>) {
  * driven from a form that has no user id. This provisions both in one
  * transaction; no password is sent or returned.
  */
-export async function createEmployeeWithUser(body: {
+export async function createEmployeeWithUser(body: FormData | {
   firstName: string
   lastName: string
   email: string
@@ -180,15 +180,19 @@ export async function createEmployeeWithUser(body: {
   idNumber?: string | null
   zimraBpNumber?: string | null
 }) {
-  const res = await apiClient.post<ApiResponse<PayrollEmployee>>(
-    `${BASE}/employees/with-user`,
-    body,
-  )
+  // A FormData body carries the optional `picture` file; the route parses multipart and JSON alike.
+  const res =
+    body instanceof FormData
+      ? await apiClient.postFormData<ApiResponse<PayrollEmployee>>(`${BASE}/employees/with-user`, body)
+      : await apiClient.post<ApiResponse<PayrollEmployee>>(`${BASE}/employees/with-user`, body)
   return unwrapData(res)
 }
 
-export async function updateEmployee(id: string, body: Record<string, any>) {
-  const res = await apiClient.put<ApiResponse<PayrollEmployee>>(`${BASE}/employees/${id}`, body)
+export async function updateEmployee(id: string, body: Record<string, any> | FormData) {
+  const res =
+    body instanceof FormData
+      ? await apiClient.putFormData<ApiResponse<PayrollEmployee>>(`${BASE}/employees/${id}`, body)
+      : await apiClient.put<ApiResponse<PayrollEmployee>>(`${BASE}/employees/${id}`, body)
   return unwrapData(res)
 }
 

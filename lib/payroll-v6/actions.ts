@@ -103,6 +103,18 @@ function runIdFrom(detail: PayrollActionDetail): string | null {
   return d.id || d.runId || d.run || null
 }
 
+const PICTURE_TYPES = ["image/png", "image/jpeg", "image/webp"]
+const PICTURE_MAX_BYTES = 10 * 1024 * 1024
+
+/** The photo chosen in a form's file input, or an error string if it can't be uploaded. */
+function pickedPicture(inputId: string): { file?: File; error?: string } {
+  const file = document.querySelector<HTMLInputElement>(`#${inputId}`)?.files?.[0]
+  if (!file) return {}
+  if (!PICTURE_TYPES.includes(file.type)) return { error: "The photo must be a PNG, JPEG or WebP image." }
+  if (file.size > PICTURE_MAX_BYTES) return { error: "The photo must be 10 MB or smaller." }
+  return { file }
+}
+
 export async function handlePayrollV6Action(
   detail: PayrollActionDetail,
   context?: { currentRunId?: string | null; currencyId?: string | null },
@@ -166,8 +178,10 @@ export async function handlePayrollV6Action(
         const denied = await requirePermission("payroll.runs.approve")
         if (denied) return denied
         if (!runId) return { handled: true, error: "No payroll run selected." }
+        // The Maker-Checker card's box is #approvalComment. This read #decisionBasis, which is not on that page,
+        // so a reviewer's reason for returning a run was silently dropped ("Rejected by checker" was stored).
         const reason =
-          document.querySelector<HTMLTextAreaElement>("#decisionBasis")?.value || undefined
+          document.querySelector<HTMLTextAreaElement>("#approvalComment, #decisionBasis")?.value.trim() || undefined
         await rejectRun(runId, reason)
         return { handled: true, reload: true, message: "Payroll run returned for correction." }
       }
@@ -246,14 +260,25 @@ export async function handlePayrollV6Action(
           }
         }
 
-        const created = await createEmployeeWithUser({
+        const photo = pickedPicture("newPicture")
+        if (photo.error) return { handled: true, error: photo.error }
+
+        const fields = {
           firstName,
           lastName,
           email,
           employeeNumber,
-          departmentCode: departmentCode || null,
+          departmentCode: departmentCode || "",
           basicSalary,
-        })
+        }
+        let payload: FormData | Record<string, any> = { ...fields, departmentCode: departmentCode || null }
+        if (photo.file) {
+          const form = new FormData()
+          Object.entries(fields).forEach(([k, v]) => v && form.append(k, v))
+          form.append("picture", photo.file)
+          payload = form
+        }
+        const created = await createEmployeeWithUser(payload as any)
         return {
           handled: true,
           reload: true,
@@ -340,11 +365,23 @@ export async function handlePayrollV6Action(
           const v = val(field)
           if (v) body[key] = v
         }
-        if (!Object.keys(body).length) {
+        const photo = pickedPicture("editPicture")
+        if (photo.error) return { handled: true, error: photo.error }
+        const removePhoto = !!document.querySelector<HTMLInputElement>("#editRemovePicture")?.checked
+        if (!Object.keys(body).length && !photo.file && !removePhoto) {
           return { handled: true, error: "Nothing to update — change a field first." }
         }
 
-        await updateEmployee(id, body)
+        if (photo.file || removePhoto) {
+          const form = new FormData()
+          Object.entries(body).forEach(([k, v]) => form.append(k, v))
+          // An empty `pictureUrl` in the form body is how the backend is told to clear the photo.
+          if (photo.file) form.append("picture", photo.file)
+          else form.append("pictureUrl", "")
+          await updateEmployee(id, form)
+        } else {
+          await updateEmployee(id, body)
+        }
         return { handled: true, reload: true, message: "Employee updated." }
       }
 

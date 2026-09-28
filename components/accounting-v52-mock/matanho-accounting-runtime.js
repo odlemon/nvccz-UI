@@ -2394,7 +2394,7 @@ function createReversal8(id){const original=S.journals.find(x=>x.id===id);if(!or
 function postImportedBatch8(){const samples=[{kind:'receipt',bankId:S.ui.cashBank,currency:'USD',rate:1,counterparty:'Growth Fund I',account:'4120',vatRate:.15,date:'2026-08-01',reference:'RCPT-IMP-001',amount:18400,project:'Growth Fund I',description:'Imported fund administration fee'},{kind:'payment',bankId:S.ui.cashBank,currency:'USD',rate:1,counterparty:'Cloud Africa',account:'5140',vatRate:.15,date:'2026-08-01',reference:'PAY-IMP-002',amount:2400,project:'Corporate',description:'Imported data subscription'}];return samples.map(createCash8)}
 function reviewImpactJournal8(lines,currency='USD'){const v=validateJournal8(lines,'Cashbook');return `${journalPreview8(lines,currency)}<div class="v8-callout ${v.valid?'':'bad'}" style="margin-top:10px"><strong>${v.valid?'Balanced journal':'Validation exception'}</strong>${v.valid?`Debit and credit both equal ${money8(v.debit)}.`:esc8(v.errors.join(' '))}</div>`}
 
-const AC52_LIVE_ACTION_KEYS=new Set(['coa-save']);
+const AC52_LIVE_ACTION_KEYS=new Set(['coa-save','invoice-create','cash-post','receipt-post','expense-create','stock-adjust','asset-create','recurring-run','recurring-run-due','recon-signoff']);
 function ac52DispatchBeforeCommit(key,payload){return window.dispatchEvent(new CustomEvent('matanho:before-action',{detail:{action:key,payload,dataset:{},state:{}},cancelable:true}))}
 function executePending8(){const pending=S.ui.pending||{},key=pending.key,p=pending.payload||{};S.ui.pending=null;save8();if(AC52_LIVE_ACTION_KEYS.has(key)){const proceed=ac52DispatchBeforeCommit(key,p);if(!proceed){closeModal();return}}try{
  switch(key){
@@ -2460,7 +2460,7 @@ function clickV8(e){const el=e.target.closest('[data-action]');if(!el)return;con
  case 'v8-close-drawer':closeDrawer();clearDrawer8();break;
  case 'v8-confirm-no':S.ui.pending=null;save8();closeModal();notify8('Action cancelled','No accounting or workflow record was changed.');break;
  case 'v8-confirm-yes':executePending8();break;
- case 'v8-open-cash':cashEntryModal8(id||'receipt');break;
+ case 'v8-open-cash':if(window.__AC52_LIVE__&&window.MatanhoAccountingV8?.openCashModal){window.MatanhoAccountingV8.openCashModal(id||'receipt');break}cashEntryModal8(id||'receipt');break;
  case 'v8-import-batch':importBatchModal8();break;
  case 'v8-choose-batch-file':q('#v8BatchFile')?.click();break;
  case 'v8-validate-import':notify8('Batch validated','2 rows are ready to post; 1 row remains quarantined for tax-code review.');break;
@@ -2685,14 +2685,15 @@ installPageNav8();
 const baseRender8=render;
 render=function(){baseRender8();setTimeout(enhance8,180)};
 normaliseState8();S.ui.sidebarExpanded=true;save8();render();setTimeout(enhance8,280);
-window.MatanhoAccountingV8=Object.freeze({version:VERSION,navigate:p=>rerender8(p),getState:()=>structuredClone(S),postJournal:postJournal8,validateJournal:validateJournal8,runInvestmentAccruals:runAccrualBatch8,previewReport:previewReport8});
-rootEl.__ac52Hydrate=function(source){if(!document.contains(rootEl))return;if(!source)return;if(Array.isArray(source.accounts))S.accounts.splice(0,S.accounts.length,...source.accounts);if(Array.isArray(source.journals))S.journals.splice(0,S.journals.length,...source.journals);if(Array.isArray(source.banks)){S.banks.splice(0,S.banks.length,...source.banks);const validIds=new Set(S.banks.map(b=>b.id));const firstId=S.banks[0]?S.banks[0].id:'all';if(S.ui.cashBank!=='all'&&!validIds.has(S.ui.cashBank))S.ui.cashBank=firstId;if(S.ui.reconBank!=='all'&&!validIds.has(S.ui.reconBank))S.ui.reconBank=firstId}if(source.reconciliation){if(Array.isArray(source.reconciliation.statement))S.reconciliation.statement.splice(0,S.reconciliation.statement.length,...source.reconciliation.statement);if(Array.isArray(source.reconciliation.ledger))S.reconciliation.ledger.splice(0,S.reconciliation.ledger.length,...source.reconciliation.ledger);const recGroup=navGroups.find(g=>g[1].some(x=>x[0]==='reconciliation'));if(recGroup){const item=recGroup[1].find(x=>x[0]==='reconciliation');if(item){const unmatchedCount=S.reconciliation.statement.filter(x=>x.status!=='Matched').length;item[3]=unmatchedCount?String(unmatchedCount):''}}}
+window.MatanhoAccountingV8=Object.freeze({version:VERSION,navigate:p=>rerender8(p),getState:()=>structuredClone(S),postJournal:postJournal8,validateJournal:validateJournal8,runInvestmentAccruals:runAccrualBatch8,previewReport:previewReport8,openInvoiceModal:(customerId)=>{if(!S.customers.length){if(typeof toast==='function')toast('No customers yet','Create a customer before recording an invoice.');else if(typeof notify8==='function')notify8('No customers yet','Create a customer before recording an invoice.','warn');return}try{invoiceModal8(customerId||'')}catch(err){if(typeof toast==='function')toast('Could not open invoice',err?.message||'Unknown error');}},openReceiptModal:(invoiceId)=>{if(!S.invoices.some(x=>x.outstanding>0)&&!invoiceId){if(typeof toast==='function')toast('No open invoices','There is nothing to allocate a receipt against.');return}try{receiptAllocationModal8();if(invoiceId)setTimeout(()=>{const s=q('#v8ReceiptInvoice');if(s)s.value=invoiceId},0)}catch(err){if(typeof toast==='function')toast('Could not open receipt',err?.message||'Unknown error');}},openCashModal:(kind)=>{const k=kind||'receipt';if(!S.banks.length){if(typeof toast==='function')toast('No cashbooks yet','Configure a bank account before posting cash.');return}if(k==='transfer'&&S.banks.length<2){if(typeof toast==='function')toast('Need two cashbooks','Transfers require a second bank account.');return}try{cashEntryModal8(k)}catch(err){if(typeof toast==='function')toast('Could not open cash entry',err?.message||'Unknown error');}},syncCustomers:(rows)=>{if(!Array.isArray(rows))return;S.customers.splice(0,S.customers.length,...rows.map(x=>({id:x.id,name:x.name,email:x.email||'',phone:x.phone||'',currency:x.currency||'USD',terms:Number(x.terms)||30,limit:Number(x.limit)||0,owner:x.owner||'Finance team',risk:x.risk||'Stage 1',status:x.status||'Active'})));save8()}});
+rootEl.__ac52Hydrate=function(source){if(!document.contains(rootEl))return;if(!source)return;if(Array.isArray(source.accounts)){S.accounts.splice(0,S.accounts.length,...source.accounts);/* patched:reset-journal-draft-to-live-coa */try{const posting=S.accounts.filter(a=>a&&a.posting&&a.active!==false);const codes=new Set(posting.map(a=>a.code));if(S.manualDraft&&Array.isArray(S.manualDraft.lines)&&posting.length){const expense=posting.find(a=>/Expense/i.test(String(a.type||'')))||posting[0];const contra=posting.find(a=>a.code!==expense.code&&(/Asset|Liability|Equity/i.test(String(a.type||''))))||posting.find(a=>a.code!==expense.code)||posting[0];S.manualDraft.lines.forEach((line,i)=>{if(!codes.has(line.account))line.account=(i===0?expense:contra).code});if(S.manualDraft.lines.length>=2&&S.manualDraft.lines[0].account===S.manualDraft.lines[1].account&&contra)S.manualDraft.lines[1].account=contra.code}}catch(_ac52Draft){}}if(Array.isArray(source.journals))S.journals.splice(0,S.journals.length,...source.journals);if(Array.isArray(source.banks)){S.banks.splice(0,S.banks.length,...source.banks);const validIds=new Set(S.banks.map(b=>b.id));const firstId=S.banks[0]?S.banks[0].id:'all';if(S.ui.cashBank!=='all'&&!validIds.has(S.ui.cashBank))S.ui.cashBank=firstId;if(S.ui.reconBank!=='all'&&!validIds.has(S.ui.reconBank))S.ui.reconBank=firstId}if(source.reconciliation){if(Array.isArray(source.reconciliation.statement))S.reconciliation.statement.splice(0,S.reconciliation.statement.length,...source.reconciliation.statement);if(Array.isArray(source.reconciliation.ledger))S.reconciliation.ledger.splice(0,S.reconciliation.ledger.length,...source.reconciliation.ledger);const recGroup=navGroups.find(g=>g[1].some(x=>x[0]==='reconciliation'));if(recGroup){const item=recGroup[1].find(x=>x[0]==='reconciliation');if(item){const unmatchedCount=S.reconciliation.statement.filter(x=>x.status!=='Matched').length;item[3]=unmatchedCount?String(unmatchedCount):''}}}
  // Command Centre / CEO View read S.bills/S.invoices via outstandingAP8()/outstandingAR8() — a
  // separate v8-scoped array from the apBills/arInvoices the visible v28 Payables/Receivables pages
  // read (see __ac52HydrateApAr below). Both need the real numbers so the dashboards agree with the
  // sub-ledger pages instead of showing a stale/mock total.
  if(Array.isArray(source.apBills))S.bills.splice(0,S.bills.length,...source.apBills.map(b=>({id:b.id,vendorId:b.id,invoice:b.invoice,date:b.date,due:b.due,currency:'USD',net:b.gross,vat:0,total:b.gross,outstanding:b.open,project:b.project,status:b.status,journal:b.journal,match:b.match})));
- if(Array.isArray(source.arInvoices))S.invoices.splice(0,S.invoices.length,...source.arInvoices.map(x=>({id:x.id,customerId:x.id,date:x.date,due:x.due,currency:'USD',net:x.gross,vat:0,total:x.gross,outstanding:x.open,project:x.project,status:x.status,journal:x.journal})));
+ if(Array.isArray(source.arInvoices))S.invoices.splice(0,S.invoices.length,...source.arInvoices.map(x=>({id:x.id,customerId:x.customerId||x.id,date:x.date,due:x.due,currency:'USD',net:x.gross,vat:0,total:x.gross,outstanding:x.open,project:x.project,status:x.status,journal:x.journal})));
+ if(Array.isArray(source.arCustomers))S.customers.splice(0,S.customers.length,...source.arCustomers.map(x=>({id:x.id,name:x.name,email:'',phone:'',currency:'USD',terms:30,limit:Number(x.limit)||0,owner:x.owner||'Finance team',risk:x.risk||'Stage 1',status:'Active'})));
  // Approval Centre reads S.approvals — real PENDING journals awaiting posting, the one
  // maker-checker queue genuinely backed by live data (see adaptAc52Approvals).
  if(Array.isArray(source.approvals)){S.approvals.splice(0,S.approvals.length,...source.approvals);S.ac52RealApprovalsLoaded=true}
@@ -3056,7 +3057,7 @@ window.MatanhoAccountingV12=Object.freeze({version:'12.0.0',navigate:rerender12,
  function formatDate(v){if(!v)return new Date().toISOString().slice(0,10);if(typeof v==='number'&&window.XLSX){const d=window.XLSX.SSF.parse_date_code(v);return `${d.y}-${String(d.m).padStart(2,'0')}-${String(d.d).padStart(2,'0')}`}const s=String(v).trim();const m=s.match(/^(\d{1,2})[\/-](\d{1,2})[\/-](\d{2,4})$/);if(m)return `${m[3].length===2?'20'+m[3]:m[3]}-${m[2].padStart(2,'0')}-${m[1].padStart(2,'0')}`;return s.slice(0,10)}
  async function handleFile(file){if(!file)return;let matrix;if(/\.csv$/i.test(file.name)){matrix=csv(await file.text())}else{await loadXlsx();const wb=XLSX.read(await file.arrayBuffer(),{type:'array',cellDates:false});matrix=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1,defval:''})}imported=mapRows(matrix);const tbody=q('#v14Rows');if(q('#v14ImportMode')?.value.startsWith('Replace'))tbody.innerHTML='';imported.forEach(r=>tbody.insertAdjacentHTML('beforeend',rowHtml(r.payment?'payment':'receipt',r)));refreshLines();q('#v14ImportSummary').innerHTML=`<span class="v14-chip good">${imported.length} rows loaded</span><span class="v14-chip good">Headers mapped</span><span class="v14-chip ${imported.some(x=>!x.reference||!x.description)?'warn':'good'}">${imported.filter(x=>!x.reference||!x.description).length} rows need review</span><span class="v14-chip">${esc(file.name)}</span>`}
  function template(){const h=['Date','Source','Counterparty','GL Account','Reference','Description','Receipt Amount','Payment Amount','Tax','Project / Fund'];const sample=['2026-08-01','CR','Mukuru Microfinance','4100','RCPT-001','Advisory services','1000','','No VAT','Corporate'];const blob=new Blob([h.join(',')+'\n'+sample.join(',')+'\n'],{type:'text/csv'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='Matanho_Cashbook_Import_Template.csv';a.click();URL.revokeObjectURL(a.href)}
- document.addEventListener('click',e=>{const legacy=e.target.closest('[data-v12="cash-new"],[data-v12="cash-import"]');if(legacy){e.preventDefault();e.stopImmediatePropagation();openBatch(legacy.dataset.id||'receipt',legacy.dataset.v12==='cash-import');return}const el=e.target.closest('[data-v14]');if(!el)return;const a=el.dataset.v14,id=el.dataset.id;e.preventDefault();if(a==='toggle-import')q('#v14ImportPanel')?.classList.toggle('open');if(a==='template')template();if(a==='add-row'){q('#v14Rows').insertAdjacentHTML('beforeend',rowHtml(id||'receipt',{receipt:0,payment:0}));refreshLines()}if(a==='remove-row'){el.closest('tr')?.remove();refreshLines()}if(a==='new-counterpart')openCounterpart(el.closest('tr')?.querySelector('.v14-cp'));if(a==='cp-cancel')el.closest('.v14-person-modal')?.remove();if(a==='cp-save'){const name=q('#v14CpName')?.value.trim();if(!name)return alert('Enter the counterpart name.');let list=[];try{list=JSON.parse(localStorage.getItem(storeKey)||'[]')}catch{}list.push({name,type:q('#v14CpType').value,tax:q('#v14CpTax').value,currency:q('#v14CpCurrency').value,email:q('#v14CpEmail').value,terms:q('#v14CpTerms').value});localStorage.setItem(storeKey,JSON.stringify(list));qa('.v14-cp').forEach(sel=>{if(![...sel.options].some(o=>o.value===name))sel.add(new Option(name,name))});if(counterpartTarget){counterpartTarget.value=name}el.closest('.v14-person-modal')?.remove();window.toast?.('Counterpart created',`${name} is now available in this batch.`)}if(a==='close'){window.closeModal?.()}if(a==='save-draft'){window.toast?.('Batch draft saved','The editable batch was retained without posting to the ledger.');window.closeModal?.()}if(a==='post'){const rs=readRows().filter(x=>x.receipt||x.payment);const bad=rs.filter(x=>(x.receipt>0)===(x.payment>0)||!x.reference||!x.account);if(!rs.length||bad.length)return window.toast?.('Review the batch',`${bad.length||'No'} row(s) require a valid amount, reference and GL account.`,'bad');window.toast?.('Batch ready for review',`${rs.length} row(s) passed front-end validation and are ready for maker-checker posting.`);window.closeModal?.()}},true);
+ document.addEventListener('click',e=>{const legacy=e.target.closest('[data-v12="cash-new"],[data-v12="cash-import"]');if(legacy){e.preventDefault();e.stopImmediatePropagation();if(window.__AC52_LIVE__&&window.MatanhoAccountingV8?.openCashModal){if(legacy.dataset.v12==='cash-import'){if(typeof toast==='function')toast('Import stays local','Cash batch import is not wired to the live cashbook yet.');return}window.MatanhoAccountingV8.openCashModal(legacy.dataset.id||'receipt');return}openBatch(legacy.dataset.id||'receipt',legacy.dataset.v12==='cash-import');return}const el=e.target.closest('[data-v14]');if(!el)return;const a=el.dataset.v14,id=el.dataset.id;e.preventDefault();if(a==='toggle-import')q('#v14ImportPanel')?.classList.toggle('open');if(a==='template')template();if(a==='add-row'){q('#v14Rows').insertAdjacentHTML('beforeend',rowHtml(id||'receipt',{receipt:0,payment:0}));refreshLines()}if(a==='remove-row'){el.closest('tr')?.remove();refreshLines()}if(a==='new-counterpart')openCounterpart(el.closest('tr')?.querySelector('.v14-cp'));if(a==='cp-cancel')el.closest('.v14-person-modal')?.remove();if(a==='cp-save'){const name=q('#v14CpName')?.value.trim();if(!name)return alert('Enter the counterpart name.');let list=[];try{list=JSON.parse(localStorage.getItem(storeKey)||'[]')}catch{}list.push({name,type:q('#v14CpType').value,tax:q('#v14CpTax').value,currency:q('#v14CpCurrency').value,email:q('#v14CpEmail').value,terms:q('#v14CpTerms').value});localStorage.setItem(storeKey,JSON.stringify(list));qa('.v14-cp').forEach(sel=>{if(![...sel.options].some(o=>o.value===name))sel.add(new Option(name,name))});if(counterpartTarget){counterpartTarget.value=name}el.closest('.v14-person-modal')?.remove();window.toast?.('Counterpart created',`${name} is now available in this batch.`)}if(a==='close'){window.closeModal?.()}if(a==='save-draft'){window.toast?.('Batch draft saved','The editable batch was retained without posting to the ledger.');window.closeModal?.()}if(a==='post'){const rs=readRows().filter(x=>x.receipt||x.payment);const bad=rs.filter(x=>(x.receipt>0)===(x.payment>0)||!x.reference||!x.account);if(!rs.length||bad.length)return window.toast?.('Review the batch',`${bad.length||'No'} row(s) require a valid amount, reference and GL account.`,'bad');window.toast?.('Batch ready for review',`${rs.length} row(s) passed front-end validation and are ready for maker-checker posting.`);window.closeModal?.()}},true);
  document.addEventListener('change',e=>{if(e.target.id==='v14File')handleFile(e.target.files[0]).catch(err=>window.toast?.('Import failed',err.message,'bad'));if(e.target.closest('.v14-batch'))calc()},true);
  document.addEventListener('input',e=>{if(e.target.closest('.v14-batch'))calc()},true);
  window.MatanhoCashbookV14={openBatch,handleFile,getRows:readRows};
@@ -3814,10 +3815,11 @@ function click(ev){const el=ev.target.closest('[data-v34]');if(!el)return;const 
  if(a==='more'){document.querySelectorAll('.v34-more-menu').forEach(x=>x.remove());const t=document.querySelector(`#${CSS.escape(el.dataset.menu)}`);if(!t)return;const m=document.createElement('div');m.className='v34-more-menu';m.innerHTML=t.innerHTML;document.body.appendChild(m);const r=el.getBoundingClientRect(),w=205,h=Math.min(300,m.scrollHeight);let left=Math.min(innerWidth-w-8,Math.max(8,r.right-w)),top=r.bottom+5;if(top+h>innerHeight-8)top=Math.max(8,r.top-h-5);m.style.left=left+'px';m.style.top=top+'px';return}
  if(a==='timesheet-approve'){modal('Approve timesheet',id,panel('Confirm approval','This marks the timesheet Approved and makes the hours available for cost allocation and billing.',`<div class="v34-list">${row('Timesheet',id,st('Submitted'))}</div>`),`${btn('Cancel','close')}${btn('Approve','timesheet-approve-confirm','primary',id)}`);return}
  if(a==='timesheet-return'){modal('Return timesheet',id,panel('Confirm return','This marks the timesheet Returned so the employee can correct and resubmit it.',`<div class="v34-list">${row('Timesheet',id,st('Submitted'))}</div>`),`${btn('Cancel','close')}${btn('Return','timesheet-return-confirm','danger',id)}`);return}
+ if(a==='ac52-expense-create'){const vendorId=document.querySelector('#ac52ExpVendor')?.value;const catEl=document.querySelector('#ac52ExpCategory');const categoryId=catEl?.value||undefined;const category=catEl?.selectedOptions?.[0]?.dataset?.name||catEl?.selectedOptions?.[0]?.textContent||undefined;const amount=Number(document.querySelector('#ac52ExpAmount')?.value||0);const transactionDate=document.querySelector('#ac52ExpDate')?.value||new Date().toISOString().slice(0,10);const currency=document.querySelector('#ac52ExpCurrency')?.value||'USD';const description=(document.querySelector('#ac52ExpDesc')?.value||'').trim();if(!vendorId||!(amount>0)||!description){if(typeof toast==='function')toast('Incomplete claim','Vendor, amount and description are required.');return}document.querySelector('#v34Overlay')?.remove();window.dispatchEvent(new CustomEvent('matanho:before-action',{detail:{action:'expense-create',payload:{vendorId,categoryId,category,amount,currency,transactionDate,description},dataset:{},state:{}},cancelable:true}));return}
  if(a==='timesheet-approve-confirm'||a==='timesheet-return-confirm'){document.querySelector('#v34Overlay')?.remove();window.dispatchEvent(new CustomEvent('matanho:before-action',{detail:{action:a==='timesheet-approve-confirm'?'timesheet-approve':'timesheet-return',payload:{id},dataset:{},state:{}},cancelable:true}));return}
  if(a==='vendor'||a==='customer'||a==='project'||a==='ap-record'||a==='ar-record'||a==='claim'||a==='timesheet'||a==='inv-record'){detail(a,id);return} if(a==='evidence'){evidence(id);return} if(a==='document'){modal('Document preview',id,panel('Controlled document','Clicking the document row opens the full source evidence.',`<div style="height:420px;border:1px solid #dfe7ef;border-radius:10px;background:#fafcff;display:grid;place-items:center;color:#74859a">Document preview · ${e(id)}</div>`));return}
  if(a==='vendor-kyc'){detail('vendor',id);return} if(a==='vendor-edit'){modal('Edit vendor profile',id,`<div class="v34-filter-panel open" style="grid-template-columns:repeat(2,minmax(0,1fr))">${field('Primary contact','<input value="Finance Contact">')}${field('Email','<input value="finance@vendor.co.zw">')}${field('Payment terms',select(['15 days','30 days','45 days','60 days']))}${field('Default currency',select(['USD','ZWG','ZAR']))}</div><p style="font-size:10px;color:#6b7c91">Bank-account and tax-identity changes remain maker-checker controlled and cannot be edited here.</p>`,`${btn('Cancel','close')}${btn('Save changes','action-modal','primary',id)}`);return}
- if(a==='action-modal'){modal('Finance action',id||'Controlled update',`<div class="v34-grid equal">${panel('What will change','The selected record will be updated using effective-dated, auditable information.',`<div class="v34-list">${row('Source record',id||'Selected record',st('Selected'))}${row('Approval','Role-based maker-checker',st('Ready'))}${row('Evidence','Required where material',st('Ready'))}</div>`)}${panel('Confirmation','Review the impact before committing.',`<textarea style="width:100%;min-height:90px;border:1px solid #c9d6e4;border-radius:9px;padding:9px;font:650 8.4px inherit">Enter rationale or supporting note.</textarea>`)}</div>`,`${btn('No','close')}${btn('Yes, continue','close','primary')}`);return}
+ if(a==='action-modal'){if(window.__AC52_LIVE__&&id==='Expense claim'){const lookups=window.__ac52ExpenseLookups||{vendors:[],categories:[]};const vendors=lookups.vendors||[];const cats=lookups.categories||[];if(!vendors.length){if(typeof toast==='function')toast('No vendors','Create a vendor in Payables before recording an expense.');return}const today=new Date().toISOString().slice(0,10);const catOpts=cats.length?cats.map(c=>`<option value="${c.id}" data-name="${String(c.name).replace(/"/g,'&quot;')}">${c.name}</option>`).join(''):['Travel and Accommodation','Operations','Office Equipment','Salaries and Wages','Branding and Marketing'].map(n=>`<option value="" data-name="${n}">${n}</option>`).join('');modal('New expense claim','Posts to live accounting expenses (vendor + category required)',`<div class="v34-filter-panel open" style="grid-template-columns:repeat(2,minmax(0,1fr))">${field('Vendor',`<select id="ac52ExpVendor">${vendors.map(v=>`<option value="${v.id}">${v.name}</option>`).join('')}</select>`)}${field('Category',`<select id="ac52ExpCategory">${catOpts}</select>`)}${field('Date',`<input id="ac52ExpDate" type="date" value="${today}">`)}${field('Amount',`<input id="ac52ExpAmount" type="number" step="0.01" min="0">`)}${field('Currency',`<select id="ac52ExpCurrency"><option>USD</option><option>ZWG</option><option>ZAR</option></select>`)}<div style="grid-column:1/-1">${field('Description / purpose',`<textarea id="ac52ExpDesc" style="width:100%;min-height:70px;border:1px solid #c9d6e4;border-radius:9px;padding:9px"></textarea>`)}</div></div>`,`${btn('Cancel','close')}${btn('Save expense','ac52-expense-create','primary')}`);return}if(window.__AC52_LIVE__&&id==='Corporate card import'){if(typeof toast==='function')toast('Not available','Corporate card import has no live backend endpoint yet.');return}modal('Finance action',id||'Controlled update',`<div class="v34-grid equal">${panel('What will change','The selected record will be updated using effective-dated, auditable information.',`<div class="v34-list">${row('Source record',id||'Selected record',st('Selected'))}${row('Approval','Role-based maker-checker',st('Ready'))}${row('Evidence','Required where material',st('Ready'))}</div>`)}${panel('Confirmation','Review the impact before committing.',`<textarea style="width:100%;min-height:90px;border:1px solid #c9d6e4;border-radius:9px;padding:9px;font:650 8.4px inherit">Enter rationale or supporting note.</textarea>`)}</div>`,`${btn('No','close')}${btn('Yes, continue','close','primary')}`);return}
 }
 function install(){try{navGroups.forEach(g=>g[1]=g[1].filter(x=>x[0]!=='vendors'));const daily=navGroups.find(g=>/Daily accounting/i.test(g[0]));if(daily){const tsItem=daily[1].find(x=>x[0]==='timesheets');if(tsItem)tsItem[1]='Timesheets & Projects'}renderNav()}catch(_){}
  pages.payables=apPage34;pages.receivables=arPage34;pages.expenses=expensesPage34;pages.timesheets=timesheetsPage34;pages.inventory=inventoryPage34;
@@ -4356,13 +4358,13 @@ document.addEventListener('click',e=>{const t=e.target.closest('[data-v27]');if(
  if(a==='counterparty-new'){newCounterparty27();return}
  if(a==='counterparty-save'){const n=formVal27('v27CpName')||'New counterparty';closeOverlay27();if(typeof toast==='function')toast('Draft counterparty created',`${n} is available for schedule configuration subject to KYC and approval.`);return}
  if(a==='schedule-run'||a==='run-review'){const s=ST27.schedules.find(x=>x.id===id);if(s)reviewRun27(s);return}
- if(a==='schedule-run-confirm'){const s=ST27.schedules.find(x=>x.id===id);if(s)runSchedule27(s);return}
+ if(a==='schedule-run-confirm'){if(window.__AC52_LIVE__){const live=ac52LiveSchedules27().find(x=>x.id===id)||ST27.schedules.find(x=>x.id===id);closeOverlay27?.();window.dispatchEvent(new CustomEvent('matanho:before-action',{detail:{action:'recurring-run',payload:{id:live?.id||id},dataset:{},state:{}},cancelable:true}));return}const s=ST27.schedules.find(x=>x.id===id);if(s)runSchedule27(s);return}
  if(a==='schedule-pause'||a==='schedule-resume'){const s=ST27.schedules.find(x=>x.id===id);if(s){s.status=a==='schedule-pause'?'Paused':'Active';ST27.audit.unshift({schedule:s.id,time:new Date().toLocaleString(),actor:'Current user',event:s.status==='Paused'?'Schedule paused':'Schedule resumed',result:s.status});save27();closeOverlay27();render?.();if(typeof toast==='function')toast(`Schedule ${s.status.toLowerCase()}`,`${s.id} is now ${s.status.toLowerCase()}.`) }return}
  if(a==='schedule-skip'){const s=ST27.schedules.find(x=>x.id===id||x.id===ST27.selected);if(s){const old=s.nextRun;s.nextRun=nextDate27(s.nextRun,s.frequency);ST27.audit.unshift({schedule:s.id,time:new Date().toLocaleString(),actor:'Current user',event:'Occurrence skipped',result:`${old} → ${s.nextRun}`});save27();closeOverlay27();render?.();if(typeof toast==='function')toast('Occurrence skipped',`${d27(old)} was skipped; next run is ${d27(s.nextRun)}.`)}return}
  if(a==='schedule-copy'){const s=ST27.schedules.find(x=>x.id===id);if(s){const c={...s,id:`REC-${String(++ST27.seq).padStart(3,'0')}`,description:s.description+' · Copy',status:'Review',version:1,lastRun:'—',lastResult:'Not run'};ST27.schedules.unshift(c);save27();render?.();if(typeof toast==='function')toast('Schedule duplicated',`${c.id} created in review status.`)}return}
  if(a==='schedule-audit'){const s=ST27.schedules.find(x=>x.id===id);if(s)drawer27(s,'audit');return}
  if(a==='schedule-run-due'){const due=ST27.schedules.filter(s=>s.status==='Active'&&s.nextRun<='2026-08-18');modal27('Run due schedules',`${due.length} active schedules fall inside the next seven-day operational window.`,`<div class="v27-table-wrap"><table class="v27-table" style="min-width:680px"><thead><tr><th>Schedule</th><th>Counterparty</th><th>Run date</th><th>Amount</th><th>Approval</th></tr></thead><tbody>${due.map(s=>`<tr><td>${s.id}</td><td>${s.counterparty}</td><td>${d27(s.nextRun)}</td><td>${fmt27(s.amount,s.currency)}</td><td>${s.approval}</td></tr>`).join('')}</tbody></table></div>`,`<button class="v27-btn" data-v27="overlay-close">Cancel</button><button class="v27-btn primary" data-v27="run-due-confirm">Validate & generate</button>`);return}
- if(a==='run-due-confirm'){ST27.schedules.filter(s=>s.status==='Active'&&s.nextRun<='2026-08-18').forEach(runSchedule27);closeOverlay27();render?.();return}
+ if(a==='run-due-confirm'){if(window.__AC52_LIVE__){closeOverlay27?.();window.dispatchEvent(new CustomEvent('matanho:before-action',{detail:{action:'recurring-run-due',payload:{asOf:new Date().toISOString().slice(0,10)},dataset:{},state:{}},cancelable:true}));return}ST27.schedules.filter(s=>s.status==='Active'&&s.nextRun<='2026-08-18').forEach(runSchedule27);closeOverlay27();render?.();return}
  if(a==='schedule-simulate'){const total=ST27.schedules.filter(s=>s.status==='Active').reduce((sum,s)=>sum+s.amount*3,0);modal27('90-day automation simulation','Forecast business documents, cash requirements and approval workload without creating ledger records.',`<div class="v27-run-status"><div><span>Forecast value</span><strong>${fmt27(total)}</strong></div><div><span>Expected occurrences</span><strong>${ST27.schedules.filter(s=>s.status==='Active').length*3}</strong></div><div><span>Approval events</span><strong>${ST27.schedules.filter(s=>s.status==='Active').length*3}</strong></div><div><span>Exceptions forecast</span><strong>2</strong></div></div><div class="v27-panel" style="margin-top:10px"><div class="v27-panel-body v27-info-list">${[['Highest cash requirement','01 Sep 2026 · $112.4k'],['Largest recurring revenue','Growth Fund administration fee'],['FX-dependent schedules','1 schedule'],['Evidence expiries before run','2 counterparties']].map(x=>`<div class="v27-info-row"><div><strong>${x[0]}</strong></div><b>${x[1]}</b></div>`).join('')}</div></div>`);return}
  if(a==='schedule-bulk-review'){ST27.view='queue';save27();closeMenu27();render?.();return}
  if(a==='schedule-import'){modal27('Import recurring schedules','Upload an approved CSV/XLSX register, map fields, validate counterparties and review before creating schedules.',`<div class="v27-form-section"><h4>Import source</h4><div class="v27-form-section-body"><div class="v27-field span2"><label>Schedule register</label><input type="file" accept=".csv,.xlsx,.xls"></div><div class="v27-field"><label>Duplicate policy</label><select><option>Quarantine duplicates</option><option>Update matching schedule</option></select></div><div class="v27-field"><label>Initial status</label><select><option>Review</option><option>Draft</option></select></div></div></div><div class="v27-control-strip"><div class="v27-control"><span>Counterparty mapping</span><strong>Validate</strong></div><div class="v27-control"><span>GL mapping</span><strong>Validate</strong></div><div class="v27-control"><span>Calendar rules</span><strong>Validate</strong></div><div class="v27-control"><span>Approval policy</span><strong>Assign</strong></div><div class="v27-control"><span>Duplicates</span><strong>Quarantine</strong></div></div>`,`<button class="v27-btn" data-v27="overlay-close">Cancel</button><button class="v27-btn primary" data-v27="import-validate">Validate file</button>`);return}
@@ -4642,7 +4644,7 @@ function ac52LiveApPage() {
     body = `<div class="v28-grid equal">${panel('Creditors ageing', 'Open liabilities by days past due.', ac52AgeHtml(ac52Age(apBills)))}${panel('Owed by vendor', 'Open bills per vendor, and how much of it is overdue.', table(['Vendor', 'Open bills', 'Outstanding', 'Overdue'], vendorRows.length ? vendorRows.join('') : '<tr><td colspan="4" class="v28-sub">Nothing is owed.</td></tr>', '600px'))}</div>`;
   }
 
-  return `<div class="v28-page">${head('Accounts payable', 'Payables · Procurement to Payment', 'Supplier invoices approved in procurement and Accounting\'s own bills, queued for payment by due date.', `${ac52Btn('Capture a supplier invoice', 'aplive-go', 'intake', 'primary')}${ac52Btn('Purchase orders in procurement', 'aplive-go', 'orders')}`)}<div class="v28-kpis">${kpi('Outstanding', money(total), ac52Plural(open.length, 'open bill'))}${kpi('Approved to pay', money(ready), `${queue.length} in the payment queue`, '#009d68')}${kpi('Due next 7 days', money(dueSoon), 'From the payment queue', '#ef9800')}${kpi('Overdue', money(overdueAmt), ac52Plural(overdue.length, 'bill'), '#df3654')}${kpi('Awaiting approval', String(awaiting.length), 'Not yet approved to pay', '#6c4cff')}${kpi('Open commitments', money(commitments), 'Ordered, not yet invoiced', '#00a8d6')}</div><div class="v28-toolbar">${tabs([['command', 'Overview'], ['bills', 'Supplier bills'], ['queue', 'Payment queue'], ['pos', 'Purchase orders'], ['sourcing', 'Quotations & sourcing'], ['vendors', 'Vendors'], ['aging', 'Ageing']], t, 'ap')}</div>${body}</div>`;
+  return `<div class="v28-page">${head('Accounts payable', 'Payables · Procurement to Payment', 'Supplier invoices approved in procurement and Accounting\'s own bills, queued for payment by due date.', `<button class="v28-btn" data-al="pr-runs">Payment runs</button>${ac52Btn('Capture a supplier invoice', 'aplive-go', 'intake', 'primary')}${ac52Btn('Purchase orders in procurement', 'aplive-go', 'orders')}`)}<div class="v28-kpis">${kpi('Outstanding', money(total), ac52Plural(open.length, 'open bill'))}${kpi('Approved to pay', money(ready), `${queue.length} in the payment queue`, '#009d68')}${kpi('Due next 7 days', money(dueSoon), 'From the payment queue', '#ef9800')}${kpi('Overdue', money(overdueAmt), ac52Plural(overdue.length, 'bill'), '#df3654')}${kpi('Awaiting approval', String(awaiting.length), 'Not yet approved to pay', '#6c4cff')}${kpi('Open commitments', money(commitments), 'Ordered, not yet invoiced', '#00a8d6')}</div><div class="v28-toolbar">${tabs([['command', 'Overview'], ['bills', 'Supplier bills'], ['queue', 'Payment queue'], ['pos', 'Purchase orders'], ['sourcing', 'Quotations & sourcing'], ['vendors', 'Vendors'], ['aging', 'Ageing']], t, 'ap')}</div>${body}</div>`;
 }
 
 function ac52LiveApDetail(type, id) {
@@ -4663,7 +4665,7 @@ function ac52LiveApDetail(type, id) {
       : x.payable && x.open > 0
         ? ac52Row('In the payment queue', `Due ${e(x.due || '—')} · ${ac52Cents(x.open)} to pay`)
         : ac52Row('Not payable yet', 'It joins the payment queue once approved');
-    return `<div class="v28-page">${head('Supplier bill', e(x.id), `${e(x.vendor)} · ${e(x.invoice || '')}`, actions, true)}<div class="v28-detail-hero"><div class="top"><div><h2>${ac52Cents(x.gross)} · ${status(x.status)}</h2><p>Invoice dated ${e(x.date)} · due ${e(x.due || '—')} · captured in ${ac52ApSource(x)}</p></div><b>${e(x.journal || '')}</b></div><div class="v28-detail-grid"><div><span>Vendor</span><b>${e(x.vendor)}</b></div><div><span>Purchase order</span><b>${e(x.po)}</b></div><div><span>Goods receipt</span><b>${e(x.grn)}</b></div><div><span>Three-way match</span><b>${e(x.match || '—')}</b></div><div><span>Outstanding</span><b>${ac52Cents(x.open)}</b></div></div></div><div class="v28-grid two"><div class="v28-grid">${linesPanel}</div><aside class="v28-grid">${panel('Amounts', '', `${ac52Row('Subtotal', x.subtotal != null ? ac52Cents(x.subtotal) : '—')}${ac52Row('VAT', x.tax != null ? ac52Cents(x.tax) : '—')}${ac52Row('Total', ac52Cents(x.gross))}${ac52Row('Outstanding', ac52Cents(x.open))}`)}${panel('Approval', '', ac52Row(e(x.approval || x.status), ''))}${panel('Payment', '', payment)}</aside></div></div>`;
+    return `<div class="v28-page">${head('Supplier bill', e(x.invoice || x.id), e(x.vendor), actions, true)}<div class="v28-detail-hero"><div class="top"><div><h2>${ac52Cents(x.gross)} · ${status(x.status)}</h2><p>Invoice dated ${e(x.date)} · due ${e(x.due || '—')} · captured in ${ac52ApSource(x)}</p></div><b>${e(x.journal || '')}</b></div><div class="v28-detail-grid"><div><span>Vendor</span><b>${e(x.vendor)}</b></div><div><span>Purchase order</span><b>${e(x.po)}</b></div><div><span>Goods receipt</span><b>${e(x.grn)}</b></div><div><span>Three-way match</span><b>${e(x.match || '—')}</b></div><div><span>Outstanding</span><b>${ac52Cents(x.open)}</b></div></div></div><div class="v28-grid two"><div class="v28-grid">${linesPanel}</div><aside class="v28-grid">${panel('Amounts', '', `${ac52Row('Subtotal', x.subtotal != null ? ac52Cents(x.subtotal) : '—')}${ac52Row('VAT', x.tax != null ? ac52Cents(x.tax) : '—')}${ac52Row('Total', ac52Cents(x.gross))}${ac52Row('Outstanding', ac52Cents(x.open))}`)}${panel('Approval', '', ac52Row(e(x.approval || x.status), ''))}${panel('Payment', '', payment)}</aside></div></div>`;
   }
   if (type === 'appo') {
     const x = apPOs.find(v => v.id === id);
@@ -4726,7 +4728,8 @@ function ac52LiveApPayConfirm(id) {
 function ac52LiveApClick(a, id) {
   if (a === 'aplive-pay') return ac52LiveApPayModal(id);
   if (a === 'aplive-pay-confirm') return ac52LiveApPayConfirm(id);
-  if (a === 'aplive-go') return window.location.assign(AC52_PROC_PATHS[id] || '/procurement');
+  // Procurement is another module: it opens in a new tab (CLAUDE.md cross-module links), Accounting stays where it was
+  if (a === 'aplive-go') return void window.open(AC52_PROC_PATHS[id] || '/procurement', '_blank', 'noopener,noreferrer');
 }
 /* END_AC52_PAYABLES_LIVE */
 function apPage(){if(window.__AC52_LIVE__)return ac52LiveApPage();const t=V28.apTab,total=apBills.reduce((s,x)=>s+x.open,0);const apNow=new Date();const apAge={cur:0,b30:0,b60:0,b90:0,b90p:0};apBills.forEach(x=>{if(!(x.open>0))return;const d=new Date(x.due),days=isNaN(d.getTime())?0:Math.floor((apNow-d)/86400000);if(days<=0)apAge.cur+=x.open;else if(days<=30)apAge.b30+=x.open;else if(days<=60)apAge.b60+=x.open;else if(days<=90)apAge.b90+=x.open;else apAge.b90p+=x.open});const apCum30=apAge.cur+apAge.b30,apCum60=apCum30+apAge.b60,apCum90=apCum60+apAge.b90+apAge.b90p,apLiqMax=Math.max(apCum90,1);const apDueSoon=apBills.filter(x=>{const d=new Date(x.due),days=isNaN(d.getTime())?999:Math.floor((d-apNow)/86400000);return x.open>0&&days>=0&&days<=7}).reduce((s,x)=>s+x.open,0);const apReadyToPay=apBills.filter(x=>x.open>0&&(x.status==='Due'||x.status==='Approved')).reduce((s,x)=>s+x.open,0);const apMatchExceptions=apBills.filter(x=>x.match&&x.match!=='—'&&/Exception|Mismatch/i.test(x.match)).length;const apCommitments=apPOs.reduce((s,x)=>s+Math.max(0,Number(x.commitment||0)-Number(x.invoiced||0)),0);const apSourcing=rfqs.reduce((s,x)=>s+(Number(x.value)||0),0);window.__ac52HealthMetrics=Object.assign(window.__ac52HealthMetrics||{},{ap:{paymentReadiness:total>0?Math.round(apReadyToPay/total*100):0,vendorControls:apVendors.length?Math.round(apVendors.filter(x=>x.kyc==='Current').length/apVendors.length*100):100}});let body='';
@@ -4795,9 +4798,12 @@ function click(ev){const el=ev.target.closest('[data-v28]');if(!el)return;const 
  if(a==='more'){document.querySelectorAll('.v28-more-menu').forEach(x=>x.remove());const t=document.querySelector(`#${CSS.escape(el.dataset.menu)}`);if(!t)return;const m=document.createElement('div');m.className='v28-more-menu open';m.innerHTML=t.innerHTML;document.body.appendChild(m);const r=el.getBoundingClientRect(),w=210,h=Math.min(280,m.scrollHeight);let left=Math.min(innerWidth-w-10,Math.max(10,r.right-w)),top=r.bottom+6;if(top+h>innerHeight-10)top=Math.max(10,r.top-h-6);m.style.left=left+'px';m.style.top=top+'px';return}
  if(a==='zoom-chart'){zoomChart(el);return} if(a==='zoom-close'){document.querySelector('#v28Zoom')?.remove();return} if(a==='modal-close'){document.querySelector('#v28Overlay')?.remove();return}
  if(a==='ar-invoice'){go('v28detail',{type:'arinvoice',id});return} if(a==='ar-quote'){go('v28detail',{type:'arquote',id});return} if(a==='ar-customer'){go('v28detail',{type:'arcustomer',id});return} if(a==='ap-bill'){go('v28detail',{type:'apbill',id});return} if(a==='ap-po'){go('v28detail',{type:'appo',id});return} if(a==='ap-rfq'){go('v28detail',{type:'aprfq',id});return} if(a==='recon-line'){go('v28detail',{type:'recon',id});return} if(a==='asset'){go('v28detail',{type:'asset',id});return}
- if(a==='new-ar-invoice'){formDoc('invoice');return} if(a==='new-ar-quote'){formDoc('quotation');return} if(a==='new-ap-bill'){formDoc('supplier bill');return} if(a==='new-po'){formDoc('purchase order');return} if(a==='asset-new'){assetForm();return}
+ if(a==='new-ar-invoice'){if(window.__AC52_LIVE__&&window.MatanhoAccountingV8?.openInvoiceModal){window.MatanhoAccountingV8.openInvoiceModal();return}formDoc('invoice');return} if(a==='new-ar-quote'){if(window.__AC52_LIVE__){if(typeof toast==='function')toast('Not available','Customer quotations are not persisted by the live accounting API yet.');return}formDoc('quotation');return} if(a==='new-ap-bill'){formDoc('supplier bill');return} if(a==='new-po'){formDoc('purchase order');return} if(a==='asset-new'){assetForm();return}
+ if(a==='new-customer'){if(window.__AC52_LIVE__){modal('Create customer','Customer master used for invoices and receipts',`<div class="v28-form-grid">${field('Legal / display name','<input class="v28-input" id="ac52CustName" placeholder="e.g. Horizon Mining Ltd">')}${field('Email','<input class="v28-input" id="ac52CustEmail" type="email" placeholder="accounts@example.com">')}${field('Phone','<input class="v28-input" id="ac52CustPhone" placeholder="Optional">')}${field('Tax / registration','<input class="v28-input" id="ac52CustTax" placeholder="Optional">')}</div>`,'ac52-customer-create');return}}
+ if(a==='ac52-customer-create'){const name=(document.querySelector('#ac52CustName')?.value||'').trim();if(!name){if(typeof toast==='function')toast('Name required','Enter the customer name.');return}window.dispatchEvent(new CustomEvent('matanho:before-action',{detail:{action:'customer-create',payload:{name,email:(document.querySelector('#ac52CustEmail')?.value||'').trim()||undefined,phone:(document.querySelector('#ac52CustPhone')?.value||'').trim()||undefined,taxNumber:(document.querySelector('#ac52CustTax')?.value||'').trim()||undefined},dataset:{},state:{}},cancelable:true}));document.querySelector('#v28Overlay')?.remove();return}
+ if(a==='ar-receipt'){if(window.__AC52_LIVE__&&window.MatanhoAccountingV8?.openReceiptModal){window.MatanhoAccountingV8.openReceiptModal(id);return}}
  if(a==='recon-max'){V28.reconMax=!V28.reconMax;render();requestAnimationFrame(enhancement);return}
- if(a==='recon-auto'){reconLines.forEach(x=>{if(x.status==='Suggested')x.status='Matched'});saveToast('Suggested matches were accepted into the reconciliation workbench.');return}
+ if(a==='recon-auto'||a==='recon-submit'){if(window.__AC52_LIVE__){const bank=reconBanks.find(x=>x.id===V28.reconBank)||reconBanks[0];if(!bank){if(typeof toast==='function')toast('No bank','Select a cashbook bank first.');return}window.dispatchEvent(new CustomEvent('matanho:before-action',{detail:{action:'recon-signoff',payload:{bankId:bank.id,statementEndBalance:Number(bank.statement)||0,statementDate:new Date().toISOString().slice(0,10),reference:`REC-${bank.id}`},dataset:{},state:{}},cancelable:true}));return}reconLines.forEach(x=>{if(x.status==='Suggested')x.status='Matched'});saveToast('Suggested matches were accepted into the reconciliation workbench.');return}
  if(a==='recon-bank'){V28.reconBank=id;render();requestAnimationFrame(enhancement);return}
  if(a==='recon-accept'){const x=reconLines.find(v=>v.id===id);if(x){x.status='Matched';x.confidence=Math.max(Number(x.confidence||0),90);saveToast(`${x.ref} was accepted as a controlled reconciliation match.`)}return}
  if(a==='recon-reject'){const x=reconLines.find(v=>v.id===id);if(x){x.status='Exception';saveToast(`${x.ref} was moved to the exception queue for investigation.`)}return}
@@ -4808,13 +4814,13 @@ function click(ev){const el=ev.target.closest('[data-v28]');if(!el)return;const 
  if(a==='save-purchase order'){const n=apPOs.length+1173;apPOs.unshift({id:`PO-2026-${n}`,vendor:apVendors[0].name,date:'2026-08-11',commitment:0,received:0,invoiced:0,status:'Draft',owner:'Chipo Ndlovu'});V28.apTab='pos';saveToast('A purchase-order draft was added to the commitments register.');return}
  if(a==='save-asset'){assets28.unshift({id:`FA-${String(assets28.length+101).padStart(4,'0')}`,desc:'New fixed asset',category:'Technology',location:'Harare HQ',custodian:'Tariro Moyo',cost:0,accum:0,nbv:0,status:'Draft',serial:'Pending',acquired:'2026-08-11',life:4,method:'Straight line',residual:0,condition:'New',lastVerify:'Not yet verified',nextService:'Not scheduled',project:'None'});V28.assetTab='portfolio';saveToast('A fixed-asset draft was created with accounting, depreciation and custody controls.');return}
  if(a==='ap-vendor'){goPage('vendors');return} if(a==='vendor-kyc'){goPage('vendors');setTimeout(()=>typeof toast==='function'&&toast('Vendor KYC','Open the selected vendor and choose Digital KYC.'),80);return}
- if(['doc-email','doc-preview','doc-download','ar-receipt','ar-creditnote','ar-statement','ar-limit','ar-statements','ar-recurring','new-customer','quote-duplicate','quote-version','quote-accept','ap-schedule','ap-hold','ap-approve','ap-return','ap-adjust','po-receipt','po-amend','rfq-invite','rfq-recommend','new-rfq','ap-intake','ap-payment-run','new-vendor','recon-import','recon-adjust','recon-escalate','recon-confirm','recon-rule','recon-submit','asset-dep-preview','asset-dep-run','asset-transfer','asset-verify','asset-impair','asset-disposal','asset-edit','form-add-line'].includes(a)){modal('Finance action',`Context: ${e(id||a)}`,`<div class="v28-side-note"><strong>${e(a.replaceAll('-',' '))}</strong><br>This workflow is linked to the selected source record and will update its status, evidence, audit trail and—where applicable—the balanced accounting journal.</div><div class="v28-form-grid" style="margin-top:12px">${field('Effective date',input('date','2026-08-11'))}${field('Owner / approver',select(['Tariro Moyo','Farai Mapfumo','Nyasha Dube','Rudo Chivero']))}${field('Reference',input('text',id||''))}<div class="full">${field('Rationale / note','<textarea class="v28-textarea">Record the business reason and evidence for this action.</textarea>')}</div></div>`,'generic-save');return}
+ if(['doc-email','doc-preview','doc-download','ar-receipt','ar-creditnote','ar-statement','ar-limit','ar-statements','ar-recurring','quote-duplicate','quote-version','quote-accept','ap-schedule','ap-hold','ap-approve','ap-return','ap-adjust','po-receipt','po-amend','rfq-invite','rfq-recommend','new-rfq','ap-intake','ap-payment-run','new-vendor','recon-import','recon-adjust','recon-escalate','recon-confirm','recon-rule','recon-submit','asset-dep-preview','asset-dep-run','asset-transfer','asset-verify','asset-impair','asset-disposal','asset-edit','form-add-line'].includes(a)){modal('Finance action',`Context: ${e(id||a)}`,`<div class="v28-side-note"><strong>${e(a.replaceAll('-',' '))}</strong><br>This workflow is linked to the selected source record and will update its status, evidence, audit trail and—where applicable—the balanced accounting journal.</div><div class="v28-form-grid" style="margin-top:12px">${field('Effective date',input('date','2026-08-11'))}${field('Owner / approver',select(['Tariro Moyo','Farai Mapfumo','Nyasha Dube','Rudo Chivero']))}${field('Reference',input('text',id||''))}<div class="full">${field('Rationale / note','<textarea class="v28-textarea">Record the business reason and evidence for this action.</textarea>')}</div></div>`,'generic-save');return}
  if(a==='generic-save'){saveToast('The finance action was recorded and the source record was refreshed.');return}
 }
 function closeMenus(ev){if(!ev.target.closest('[data-v28="more"]')&&!ev.target.closest('.v28-more-menu'))document.querySelectorAll('.v28-more-menu').forEach(x=>x.remove())}
 installNav();installPages();const baseRender28=render;render=function(){baseRender28();requestAnimationFrame(enhancement)};document.addEventListener('click',click,true);document.addEventListener('click',closeMenus,false);document.addEventListener('keydown',ev=>{if(ev.key==='Escape'){document.querySelector('#v28Overlay')?.remove();document.querySelector('#v28Zoom')?.remove();document.querySelectorAll('.v28-more-menu').forEach(x=>x.remove());if(V28.reconMax){V28.reconMax=false;render()}}}, __ac52Sig);if(['receivables','payables','reconciliation','assets','quotations','billing'].includes(state.page))render();window.MatanhoAccountingV28={version:V,state:V28};
 rootEl.__ac52HydrateReconBanks=function(banks,lines){if(!document.contains(rootEl))return;if(Array.isArray(banks)&&banks.length){reconBanks.splice(0,reconBanks.length,...banks);if(!banks.some(b=>b.id===V28.reconBank))V28.reconBank=banks[0].id}if(Array.isArray(lines))reconLines.splice(0,reconLines.length,...lines);if(typeof render==='function')render()};
-rootEl.__ac52HydrateApAr=function(bills,vendors,invoices,customers){if(!document.contains(rootEl))return;if(Array.isArray(bills)){apBills.splice(0,apBills.length,...bills);try{const g=navGroups.find(g=>g[1].some(x=>x[0]==='payables'));const item=g&&g[1].find(x=>x[0]==='payables');if(item){const openCount=apBills.filter(x=>x.open>0).length;item[3]=openCount?String(openCount):''}}catch(_){}}if(Array.isArray(vendors))apVendors.splice(0,apVendors.length,...vendors);if(Array.isArray(invoices)){arInvoices.splice(0,arInvoices.length,...invoices);try{const g=navGroups.find(g=>g[1].some(x=>x[0]==='receivables'));const item=g&&g[1].find(x=>x[0]==='receivables');if(item){const openCount=arInvoices.filter(x=>x.open>0).length;item[3]=openCount?String(openCount):''}}catch(_){}}if(Array.isArray(customers))arCustomers.splice(0,arCustomers.length,...customers);if(typeof render==='function')render()};
+rootEl.__ac52HydrateApAr=function(bills,vendors,invoices,customers){if(!document.contains(rootEl))return;if(Array.isArray(bills)){apBills.splice(0,apBills.length,...bills);try{const g=navGroups.find(g=>g[1].some(x=>x[0]==='payables'));const item=g&&g[1].find(x=>x[0]==='payables');if(item){const openCount=apBills.filter(x=>x.open>0).length;item[3]=openCount?String(openCount):''}}catch(_){}}if(Array.isArray(vendors))apVendors.splice(0,apVendors.length,...vendors);if(Array.isArray(invoices)){arInvoices.splice(0,arInvoices.length,...invoices);try{const g=navGroups.find(g=>g[1].some(x=>x[0]==='receivables'));const item=g&&g[1].find(x=>x[0]==='receivables');if(item){const openCount=arInvoices.filter(x=>x.open>0).length;item[3]=openCount?String(openCount):''}}catch(_){}}if(Array.isArray(customers)){arCustomers.splice(0,arCustomers.length,...customers);try{window.MatanhoAccountingV8?.syncCustomers?.(customers)}catch(_){}}if(typeof render==='function')render()};
 rootEl.__ac52HydrateApSourcing=function(pos,rfqRows){if(!document.contains(rootEl))return;if(Array.isArray(pos))apPOs.splice(0,apPOs.length,...pos);if(Array.isArray(rfqRows))rfqs.splice(0,rfqs.length,...rfqRows);if(typeof render==='function')render()};
 rootEl.__ac52HydrateClaims=function(items){if(!document.contains(rootEl))return;if(Array.isArray(items)){claims.splice(0,claims.length,...items);try{const g=navGroups.find(g=>g[1].some(x=>x[0]==='expenses'));const item=g&&g[1].find(x=>x[0]==='expenses');if(item){const reviewCount=claims.filter(x=>x.status==='Review').length;item[3]=reviewCount?String(reviewCount):''}}catch(_){}}if(typeof render==='function')render()};
 rootEl.__ac52HydrateRegisters=function(inv,fixedAssets,stiInvestments){if(!document.contains(rootEl))return;if(Array.isArray(inv))inventory.splice(0,inventory.length,...inv);if(Array.isArray(fixedAssets))assets.splice(0,assets.length,...fixedAssets);if(Array.isArray(stiInvestments))investments.splice(0,investments.length,...stiInvestments);if(typeof render==='function')render()};
@@ -5373,7 +5379,7 @@ function assetPage(){let body='';if(V.assetTab==='overview')body=assetOverview()
 
 function modal(title,desc,body,footer){q('#v51Layer')?.remove();const d=document.createElement('div');d.id='v51Layer';d.className='v51-backdrop';d.innerHTML=`<section class="v51-modal"><header><div><h2>${e(title)}</h2><p>${e(desc)}</p></div><button class="v51-btn" data-v51="close">Close</button></header><div class="v51-modal-body">${body}</div><footer>${footer}</footer></section>`;document.body.appendChild(d)}
 function drawer(title,desc,body){q('#v51Layer')?.remove();const d=document.createElement('div');d.id='v51Layer';d.className='v51-backdrop';d.innerHTML=`<aside class="v51-drawer"><header><div><h2>${e(title)}</h2><p>${e(desc)}</p></div><button class="v51-btn" data-v51="close">Close</button></header><div class="v51-drawer-body">${body}</div></aside>`;document.body.appendChild(d)}
-function invModal(kind){const names={receipt:'Receive stock',issue:'Issue stock',transfer:'Transfer stock',adjust:'Adjust stock',count:'Capture physical count'};const isTransfer=kind==='transfer';modal(names[kind]||'Inventory action','Update the inventory sub-ledger with source reference, dimensions and an auditable quantity movement.',`<div class="v51-form">${field('SKU',select('v51InvSku',inventory.map(x=>x.sku),inventory[0].sku))}${field('Date',input('v51InvDate','2026-08-14','date'))}${field('Quantity',input('v51InvQty','1','number'))}${field('Reference',input('v51InvRef',`${kind.toUpperCase().slice(0,3)}-${Date.now().toString().slice(-5)}`))}${field('Project / mandate',select('v51InvProject',['None','Corporate','Workshop Service Mandate','Technology Refresh','Growth Fund I'],'None'))}${field(isTransfer?'Destination warehouse':'Counterparty / custodian',input('v51InvCounterparty',''))}${field('Narrative',input('v51InvNote','', 'text','Reason or source document'), 'wide')}</div>`,`${btn('Cancel','close')}${btn('Save movement','save-inv','primary',kind)}`)}
+function invModal(kind){const names={receipt:'Receive stock',issue:'Issue stock',transfer:'Transfer stock',adjust:'Adjust stock',count:'Capture physical count'};const isTransfer=kind==='transfer';const invOpts=inventory.map(x=>({value:x.backendId||x.sku,label:`${x.sku} · ${x.item}`}));modal(names[kind]||'Inventory action','Update the inventory sub-ledger with source reference, dimensions and an auditable quantity movement.',`<div class="v51-form">${field('SKU',`<select id="v51InvSku" class="v51-input">${invOpts.map(o=>`<option value="${e(o.value)}">${e(o.label)}</option>`).join('')}</select>`)}${field('Date',input('v51InvDate','2026-08-14','date'))}${field('Quantity',input('v51InvQty','1','number'))}${field('Reference',input('v51InvRef',`${kind.toUpperCase().slice(0,3)}-${Date.now().toString().slice(-5)}`))}${field('Project / mandate',select('v51InvProject',['None','Corporate','Workshop Service Mandate','Technology Refresh','Growth Fund I'],'None'))}${field(isTransfer?'Destination warehouse':'Counterparty / custodian',input('v51InvCounterparty',''))}${field('Narrative',input('v51InvNote','', 'text','Reason or source document'), 'wide')}</div>`,`${btn('Cancel','close')}${btn('Save movement','save-inv','primary',kind)}`)}
 function saveInv(kind){const sku=q('#v51InvSku')?.value,item=inventory.find(x=>x.sku===sku),qty=Math.abs(Number(q('#v51InvQty')?.value||0));if(!item||!qty)return;let delta=qty,type='Receipt';if(kind==='issue'){delta=-qty;type='Issue'}else if(kind==='transfer'){delta=0;type='Transfer'}else if(kind==='adjust'){delta=Number(q('#v51InvQty')?.value||0);type='Adjustment'}else if(kind==='count'){const counted=qty;delta=counted-item.qty;type='Count adjustment'}if(item.qty+delta<0){alert('Quantity cannot become negative.');return}item.qty+=delta;item.value=item.qty*item.unitCost;if(kind==='count')item.countVar=0;V.movements.unshift({id:'MOV-'+Date.now(),date:q('#v51InvDate')?.value||'2026-08-14',sku,type,qty:delta,project:q('#v51InvProject')?.value||'None',counterparty:q('#v51InvCounterparty')?.value||'Internal',ref:q('#v51InvRef')?.value||'Manual',owner:'Current user'});save();q('#v51Layer')?.remove();render()}
 function invDrawer(id){const x=inventory.find(v=>v.sku===id);if(!x)return;const mov=V.movements.filter(m=>m.sku===id).slice(0,8);drawer(`${x.sku} · ${x.item}`,'Inventory item · quantity, valuation, usage and movement evidence',`<div class="v51-facts"><div class="v51-fact"><span>Warehouse</span><strong>${e(x.warehouse)}</strong></div><div class="v51-fact"><span>On hand</span><strong>${x.qty}</strong></div><div class="v51-fact"><span>Unit cost</span><strong>${money(x.unitCost)}</strong></div><div class="v51-fact"><span>Carrying value</span><strong>${money(x.qty*x.unitCost)}</strong></div><div class="v51-fact"><span>Count variance</span><strong>${x.countVar}</strong></div><div class="v51-fact"><span>Control status</span><strong>${e(x.status)}</strong></div></div><div class="v51-mini-chart"><svg viewBox="0 0 500 130"><path d="M18 96 C80 82 102 88 150 65 S240 48 285 58 S370 32 480 24" fill="none" stroke="#6d35f2" stroke-width="3"/><path d="M18 108H480" stroke="#dbe3ec"/><text x="18" y="124" font-size="10" fill="#667085">30 days ago</text><text x="430" y="124" font-size="10" fill="#667085">Today</text></svg></div><div style="margin-top:10px">${panel('Recent movements','Source-linked quantity history.',mov.length?movementTable(mov):'<div class="v51-muted">No recent movements.</div>')}</div><div class="v51-actions" style="margin-top:10px">${btn('Issue','inv-action','blue','issue')}${btn('Receive','inv-action','green','receipt')}${btn('Count','inv-action','','count')}</div>`)}
 function assetModal(kind){if(kind==='add'){modal('Add fixed asset','Capture acquisition, accounting, tax, custody and evidence before the asset is capitalised.',`<div class="v51-form">${field('Asset description',input('v51AssetDesc','','text','Description'))}${field('Asset class',select('v51AssetCat',['Computer Equipment','Motor Vehicles','Office Equipment','Equipment','Technology'],'Computer Equipment'))}${field('Acquisition date',input('v51AssetDate','2026-08-14','date'))}${field('Supplier',input('v51AssetSupplier','','text','Vendor'))}${field('Cost',input('v51AssetCost','0','number'))}${field('Currency',select('v51AssetCurrency',['USD','ZWG','ZAR'],'USD'))}${field('Location',input('v51AssetLocation','Harare HQ'))}${field('Custodian',input('v51AssetCustodian',''))}${field('Useful life',select('v51AssetLife',['3 years','4 years','5 years','7 years','10 years'],'5 years'))}${field('Depreciation method',select('v51AssetMethod',['Straight line','Reducing balance','Units of production'],'Straight line'))}${field('Residual value',input('v51AssetResidual','0','number'))}${field('Project / funding source',select('v51AssetProject',['Corporate','Growth Fund I','Technology Refresh','Fleet Replacement'],'Corporate'))}${field('Asset GL account',select('v51AssetGL',['1600 · Fixed Assets','1610 · Motor Vehicles','1620 · Computer Equipment'],'1600 · Fixed Assets'))}${field('Depreciation expense GL',select('v51AssetDepGL',['5130 · Depreciation Expense','5131 · Vehicle Depreciation'],'5130 · Depreciation Expense'))}${field('Serial / registration',input('v51AssetSerial',''))}${field('Evidence reference',input('v51AssetEvidence','','text','Invoice / GRN / title / certificate'))}</div>`,`${btn('Cancel','close')}${btn('Create asset','save-asset','primary')}`);return}modal('Fixed asset action','This action will be effective-dated and retained in the asset lifecycle and audit history.',`<div class="v51-form">${field('Asset',select('v51AssetActionId',assets.map(x=>x.id),assets[0].id))}${field('Effective date',input('v51AssetActionDate','2026-08-14','date'))}${field('Reason / evidence',input('v51AssetActionReason','','text','Reason and evidence reference'),'wide')}</div>`,`${btn('Cancel','close')}${btn('Confirm','close','primary')}`)}
@@ -5384,7 +5390,7 @@ function fxPanel(){const root=q('#main');if(!root||!q('#main h1')?.textContent.i
 function enhance(){q('.v45-fund-reporting')?.remove();fxPanel();document.title='Matanho Accounting'}
 const oldInv=pages.inventory,oldAssets=pages.assets;pages.inventory=invPage;pages.assets=assetPage;
 const prior=typeof render==='function'?render:null;if(prior){render=function(){const out=prior.apply(this,arguments);requestAnimationFrame(enhance);return out}}
-document.addEventListener('click',ev=>{const el=ev.target.closest('[data-v51]');if(!el)return;const a=el.dataset.v51,id=el.dataset.id||'';if(a==='inv-tab'){V.invTab=id;save();render();return}if(a==='asset-tab'){V.assetTab=id;save();render();return}if(a==='inv-action'){invModal(id);return}if(a==='save-inv'){saveInv(id);return}if(a==='inv-item'){invDrawer(id);return}if(a==='asset-action'){assetModal(id);return}if(a==='save-asset'){saveAsset();return}if(a==='asset-item'){assetDrawer(id);return}if(a==='close'){q('#v51Layer')?.remove();return}if(a==='fx-add'){const b=document.createElement('button');b.dataset.action='v8-add-rate';b.style.display='none';document.body.appendChild(b);b.click();b.remove();return}if(a==='fx-apply'){const b=document.createElement('button');b.dataset.v44='apply-currency';b.style.display='none';document.body.appendChild(b);b.click();b.remove();return}},true);
+document.addEventListener('click',ev=>{const el=ev.target.closest('[data-v51]');if(!el)return;const a=el.dataset.v51,id=el.dataset.id||'';if(a==='inv-tab'){V.invTab=id;save();render();return}if(a==='asset-tab'){V.assetTab=id;save();render();return}if(a==='inv-action'){invModal(id);return}if(a==='save-inv'){if(window.__AC52_LIVE__){const sku=q('#v51InvSku')?.value;const item=inventory.find(x=>x.sku===sku||x.backendId===sku);const itemId=item?.backendId||item?.sku||sku;const rawQty=Number(q('#v51InvQty')?.value||0);if(!itemId||!rawQty){if(typeof toast==='function')toast('Incomplete','Select an item and enter a quantity.');return}const kind=id||'adjust';const quantity=kind==='issue'?-Math.abs(rawQty):kind==='adjust'||kind==='count'?rawQty:Math.abs(rawQty);q('#v51Layer')?.remove();window.dispatchEvent(new CustomEvent('matanho:before-action',{detail:{action:'stock-adjust',payload:{kind,itemId,quantity,reason:q('#v51InvNote')?.value||kind,reference:q('#v51InvRef')?.value,notes:q('#v51InvNote')?.value,unitCost:item?.unitCost},dataset:{},state:{}},cancelable:true}));return}saveInv(id);return}if(a==='inv-item'){invDrawer(id);return}if(a==='asset-action'){assetModal(id);return}if(a==='save-asset'){if(window.__AC52_LIVE__){const assetName=(q('#v51AssetDesc')?.value||'').trim();const cost=Number(q('#v51AssetCost')?.value||0);if(!assetName||!(cost>0)){if(typeof toast==='function')toast('Incomplete','Asset description and cost are required.');return}const lifeRaw=q('#v51AssetLife')?.value||'5 years';q('#v51Layer')?.remove();window.dispatchEvent(new CustomEvent('matanho:before-action',{detail:{action:'asset-create',payload:{assetName,cost,usefulLifeYears:lifeRaw,depreciationMethod:q('#v51AssetMethod')?.value,purchaseDate:q('#v51AssetDate')?.value,location:q('#v51AssetLocation')?.value,vendor:q('#v51AssetSupplier')?.value,description:assetName,assetAccountCode:q('#v51AssetGL')?.value,expenseAccountCode:q('#v51AssetDepGL')?.value},dataset:{},state:{}},cancelable:true}));return}saveAsset();return}if(a==='asset-item'){assetDrawer(id);return}if(a==='close'){q('#v51Layer')?.remove();return}if(a==='fx-add'){const b=document.createElement('button');b.dataset.action='v8-add-rate';b.style.display='none';document.body.appendChild(b);b.click();b.remove();return}if(a==='fx-apply'){const b=document.createElement('button');b.dataset.v44='apply-currency';b.style.display='none';document.body.appendChild(b);b.click();b.remove();return}},true);
 document.addEventListener('change',ev=>{const id=ev.target.id;if(id==='v51InvWarehouse'){V.invWarehouse=ev.target.value;save();render()}if(id==='v51InvCategory'){V.invCategory=ev.target.value;save();render()}if(id==='v51AssetClass'){V.assetClass=ev.target.value;save();render()}},true);
 document.addEventListener('input',ev=>{if(ev.target.id==='v51InvSearch'){V.invSearch=ev.target.value;save()}if(ev.target.id==='v51AssetSearch'){V.assetSearch=ev.target.value;save()}},true);
 document.addEventListener('keydown',ev=>{if(ev.key==='Enter'&&['v51InvSearch','v51AssetSearch'].includes(ev.target.id))render();if(ev.key==='Escape')q('#v51Layer')?.remove()}, __ac52Sig);
@@ -5451,6 +5457,7 @@ document.title='Matanho Accounting';
     if (Array.isArray(source.claims) && typeof rootEl.__ac52HydrateClaims === 'function') {
       rootEl.__ac52HydrateClaims(source.claims);
     }
+    if (source.expenseLookups) window.__ac52ExpenseLookups = source.expenseLookups;
     // Financial Reports' Statement Builder (v17 layer) reads the module-level reportRows object
     // (pnl/bs/cf), shared with the original v1 report page — same situation as the hooks above.
     if (source.reportRows && typeof rootEl.__ac52HydrateReportRows === 'function') {
@@ -5507,6 +5514,3569 @@ document.title='Matanho Accounting';
     }
   }
 
+/* BEGIN_AC52_ACC_LIVE */
+try {
+/* ---- accounting-live/00-core.js ---- */
+/* =====================================================================================================================
+ * AccLive core (Accounting sweep). Inlined into the runtime, inside startAccountingV52Runtime, just before its API object,
+ * by scripts/accounting-live-sync.mjs — so it sees the runtime's `pages`, `state`, `render`, `navGroups`, `notify8`.
+ *
+ * Pages registered here render from the API (never fixtures): every data surface has loading, empty and error states;
+ * every write shows it is working, reports the server's answer and re-reads what the server now holds. Markup uses the
+ * runtime's own v28 classes so the pages look like the rest of the module.
+ * ===================================================================================================================== */
+const AL = (window.AccLive = window.AccLive || {});
+AL.pages = {}; AL.cache = {}; AL.ui = {}; AL.actions = {}; AL.wire = {};
+
+AL.e = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const ae = AL.e;
+AL.http = () => window.__AC52_HTTP__;
+AL.unwrap = (r) => (r && typeof r === 'object' && 'success' in r && 'data' in r ? r.data : r);
+AL.msg = (e) => String((e && (e.message || e.error)) || e || 'Something went wrong').replace(/\s+/g, ' ').slice(0, 300);
+AL.get = async (p) => AL.unwrap(await AL.http().get(p));
+/** The whole answer, envelope included (a paginated list's `pagination` sits beside its `data`). */
+AL.getRaw = async (p) => AL.http().get(p);
+AL.getText = async (p) => AL.http().text(p);
+/** Save text the server produced (e.g. a CSV export) as a file. */
+AL.saveText = (text, filename, type = 'text/csv;charset=utf-8') => { const url = URL.createObjectURL(new Blob([text], { type })); const a = document.createElement('a'); a.href = url; a.download = filename; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000); };
+AL.post = async (p, b) => AL.unwrap(await AL.http().post(p, b));
+AL.put = async (p, b) => AL.unwrap(await AL.http().put(p, b));
+AL.patch = async (p, b) => AL.unwrap(await AL.http().patch(p, b));
+AL.del = async (p) => AL.unwrap(await AL.http().del(p));
+AL.me = () => (window.__AC52_ME__ ? window.__AC52_ME__() : { id: null, name: '' });
+AL.toast = (title, message, kind) => { try { notify8(title, message || '', kind || ''); } catch (_) { /* no runtime toast */ } };
+
+AL.money = (v, cur) => { if (v == null || v === '' || !Number.isFinite(Number(v))) return '—'; const n = Number(v); return `${n < 0 ? '-' : ''}${cur ? `${cur} ` : '$'}${Math.abs(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`; };
+AL.num = (v, d = 0) => (v == null || v === '' || !Number.isFinite(Number(v)) ? '—' : Number(v).toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d }));
+AL.date = (v) => { if (!v) return '—'; const d = new Date(v); return Number.isNaN(d.getTime()) ? '—' : d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }); };
+AL.dateTime = (v) => { if (!v) return '—'; const d = new Date(v); return Number.isNaN(d.getTime()) ? '—' : d.toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }); };
+AL.plural = (n, w) => `${n} ${n === 1 ? w : /[^aeiou]y$/.test(w) ? `${w.slice(0, -1)}ies` : `${w}s`}`;
+
+// ------------------------------------------------------------------------------------------------ data with states
+/** A cached load: returns { state: 'loading'|'ok'|'error', data, error }. Loads once; AL.run(key) reloads. */
+AL.res = (key, fetcher) => {
+  let e = AL.cache[key];
+  if (!e) { e = AL.cache[key] = { state: 'loading', data: null, error: null, fetcher }; AL.run(key); }
+  if (fetcher) e.fetcher = fetcher;
+  return e;
+};
+AL.run = (key) => {
+  const e = AL.cache[key];
+  if (!e || !e.fetcher) return Promise.resolve();
+  e.state = 'loading'; e.error = null;
+  return (e.pending = Promise.resolve()
+    .then(async () => {
+      for (let i = 0; i < 100 && !AL.http(); i++) await new Promise((r) => setTimeout(r, 100));
+      // a load cut off in transit (the first page after signing in, a dev-server rebuild) is tried once more
+      try { return await e.fetcher(); } catch (err) {
+        if (!(err && (err.status === 0 || /network|failed to fetch|load failed/i.test(String(err.message || err))))) throw err;
+        await new Promise((r) => setTimeout(r, 1500));
+        return e.fetcher();
+      }
+    })
+    .then((d) => { e.data = d; e.state = 'ok'; })
+    .catch((err) => { e.error = AL.msg(err); e.state = 'error'; })
+    .finally(() => AL.redraw()));
+};
+AL.invalidate = (...keys) => keys.forEach((k) => { delete AL.cache[k]; });
+AL.redraw = () => { if (AL.pages[state.page] && typeof render === 'function') render(); };
+AL.gate = (entry, opts = {}) => {
+  if (!entry || entry.state === 'loading') return `<div class="al-state" role="status">${ae(opts.loading || 'Loading…')}</div>`;
+  if (entry.state === 'error' && /not include|forbidden|insufficient|not authori|access denied|403/i.test(entry.error || '')) return `<div class="al-state al-denied" role="alert"><strong>You do not have access to this</strong><p>Your role does not include it. Ask an administrator if you need it.</p></div>`;
+  if (entry.state === 'error') return `<div class="al-state al-error" role="alert"><strong>${ae(opts.errorTitle || 'This could not be loaded')}</strong><p>${ae(entry.error)}</p><button class="v28-btn" data-al="retry" data-key="${ae(opts.key || '')}">Try again</button></div>`;
+  return '';
+};
+AL.actions.retry = (el) => AL.run(el.dataset.key);
+/** The signed-in user's Accounting permissions (GET /accounting/me): screens offer only what the server will accept. */
+AL.meLoad = () => AL.res('me', () => AL.get('/accounting/me'));
+AL.can = (...keys) => { const e = AL.meLoad(); const held = (e.state === 'ok' && e.data && e.data.keys) || []; return keys.some((k) => held.includes(k)); };
+
+/** Real per-page view access (design-refs/accounting-sweep/RBAC.md), replacing the vendored runtime's own nav
+ *  permission check: it filtered by a demo "role simulator" (`state.role`, read from localStorage, defaulting to a
+ *  permissive persona) that was never wired to the signed-in user, so every real user — including someone with no
+ *  Accounting access at all — saw and could open every page in the sidebar, landing on a page that only then said
+ *  "you do not have access to this" once its own data load failed. Pages the live layer added later (CEO, Timesheets,
+ *  Payment Runs, Scheduled Jobs, Employee Claims, Trial Balance, Recurring) had no entry in that map at all, so they
+ *  were shown to literally everyone regardless of role — a second copy of the same gap. */
+AL.READ_ANY = ['view_accounting', 'manage_accounting', 'view_ledger', 'manage_ledger', 'view_financial_reports'];
+AL.PAGE_VIEW_KEYS = {
+  timesheets: ['accounting.timesheets.view', 'accounting.timesheets.manage', 'manage_accounting'],
+};
+AL.pageAllowed = (id) => {
+  if (id === 'claims') return true; // every staff member's own claims; no accounting key needed (route is exempt from the guard)
+  return AL.can(...(AL.PAGE_VIEW_KEYS[id] || AL.READ_ANY));
+};
+(() => {
+  const e = AL.meLoad(); // kick off now, not on first page render, so the sidebar is right before anyone clicks anything
+  const fix = () => { try { if (typeof permittedPage === 'function') permittedPage = (id) => AL.pageAllowed(id); if (typeof render === 'function') render(); } catch (_) { /* runtime not ready yet */ } };
+  if (e.state === 'ok' || e.state === 'error') fix(); else if (e.pending) e.pending.then(fix);
+})();
+
+// ------------------------------------------------------------------------------------------------ markup (v28 look)
+AL.btn = (label, act, kind = '', attrs = '') => `<button class="v28-btn ${kind}" data-al="${ae(act)}" ${attrs}>${ae(label)}</button>`;
+AL.head = (eye, title, sub, actions = '') => `<div class="v28-hero"><div><div class="v28-eyebrow">${ae(eye)}</div><h1>${ae(title)}</h1>${sub ? `<p>${ae(sub)}</p>` : ''}</div><div class="v28-hero-actions">${actions}</div></div>`;
+AL.panel = (title, sub, body, actions = '') => `<section class="v28-panel"><header class="v28-panel-head"><div><h3>${ae(title)}</h3>${sub ? `<p>${ae(sub)}</p>` : ''}</div>${actions ? `<div class="v28-actions">${actions}</div>` : ''}</header><div class="v28-panel-body">${body}</div></section>`;
+AL.kpi = (label, value, sub, accent = '#0878f6') => `<div class="v28-kpi" style="--accent:${accent}"><span>${ae(label)}</span><strong>${ae(value)}</strong><small>${ae(sub || '')}</small></div>`;
+AL.kpis = (list) => `<div class="v28-kpis">${list.map((k) => AL.kpi(k[0], k[1], k[2], k[3])).join('')}</div>`;
+AL.status = (s, tone) => { const t = tone || (/fail|error|overdue|exception|void|blocked|rejected|off/i.test(s) ? 'bad' : /running|pending|draft|due|warn|review|paused|never/i.test(s) ? 'warn' : /succeed|ok|posted|active|approved|complete|on|recorded|settled/i.test(s) ? 'ok' : 'info'); return `<span class="v28-status ${t}"><i class="v28-dot"></i>${ae(s)}</span>`; };
+AL.table = (headers, rows, min = '900px') => `<div class="v28-tablewrap"><table class="v28-table" style="min-width:${min}"><thead><tr>${headers.map((h) => `<th${/amount|value|total|rate|balance|principal|interest/i.test(h) ? ' class="num"' : ''}>${ae(h)}</th>`).join('')}</tr></thead><tbody>${rows || `<tr><td colspan="${headers.length}" class="al-empty-cell">Nothing here yet.</td></tr>`}</tbody></table></div>`;
+AL.empty = (msg) => `<div class="al-empty">${ae(msg)}</div>`;
+
+// ------------------------------------------------------------------------------------------------ forms and dialogs
+/** AL.form({ title, sub, fields:[{k,label,type,options,required,hint,min,max,step}], submitLabel, initial, onSubmit(values) }) */
+AL.field = (f, v) => {
+  const val = v == null ? '' : v;
+  const req = f.required ? ' required' : '';
+  let ctl;
+  if (f.type === 'select') ctl = `<select class="v28-select" name="${ae(f.k)}"${req}>${f.blank !== false ? `<option value="">${ae(f.blankLabel || (f.required ? 'Choose…' : '— none —'))}</option>` : ''}${(f.options || []).map((o) => { const ov = typeof o === 'object' ? o.value : o, ol = typeof o === 'object' ? o.label : o; return `<option value="${ae(ov)}"${String(ov) === String(val) ? ' selected' : ''}>${ae(ol)}</option>`; }).join('')}</select>`;
+  else if (f.type === 'textarea') ctl = `<textarea class="v28-input" name="${ae(f.k)}" rows="${f.rows || 3}"${req}>${ae(val)}</textarea>`;
+  else if (f.type === 'checkbox') return `<label class="v28-field al-check"><input type="checkbox" name="${ae(f.k)}"${val ? ' checked' : ''}> ${ae(f.label)}</label>`;
+  else ctl = `<input class="v28-input" name="${ae(f.k)}" type="${ae(f.type || 'text')}" value="${ae(val)}"${req}${f.min != null ? ` min="${f.min}"` : ''}${f.max != null ? ` max="${f.max}"` : ''}${f.step != null ? ` step="${f.step}"` : ''}${f.placeholder ? ` placeholder="${ae(f.placeholder)}"` : ''}>`;
+  return `<label class="v28-field${f.wide ? ' al-wide' : ''}"><span>${ae(f.label)}${f.required ? ' *' : ''}</span>${ctl}${f.hint ? `<small class="v28-sub">${ae(f.hint)}</small>` : ''}</label>`;
+};
+AL.close = () => { document.querySelectorAll('#alOverlay').forEach((n) => n.remove()); };
+AL.form = (o) => {
+  AL.close();
+  const init = o.initial || {};
+  const body = `<form id="alForm" class="v28-form-grid" novalidate>${(o.fields || []).map((f) => AL.field(f, init[f.k])).join('')}${o.extra || ''}</form><div id="alFormError" class="al-form-error" role="alert" hidden></div>`;
+  const root = document.querySelector('.accounting-v52-root') || document.body;
+  root.insertAdjacentHTML('beforeend', `<div class="v28-modal-backdrop" id="alOverlay"><section class="v28-modal${o.wide ? ' al-modal-wide' : ''}" role="dialog" aria-modal="true"><header><div><h2>${ae(o.title)}</h2>${o.sub ? `<p>${ae(o.sub)}</p>` : ''}</div><button class="v28-btn icon" data-al="close" aria-label="Close">×</button></header><div class="v28-modal-body">${body}</div><footer class="v28-modal-foot">${o.viewOnly ? '' : '<button class="v28-btn" data-al="close">Cancel</button>'}<button class="v28-btn ${o.danger ? 'danger' : 'primary'}" data-al="form-submit">${ae(o.submitLabel || 'Save')}</button></footer></section></div>`);
+  AL.formSpec = o;
+  const first = root.querySelector('#alForm input, #alForm select, #alForm textarea'); if (first) first.focus();
+};
+AL.values = (form, fields) => {
+  const out = {};
+  for (const f of fields) { const el = form.elements[f.k]; if (!el) continue; out[f.k] = f.type === 'checkbox' ? el.checked : (typeof el.value === 'string' ? el.value.trim() : el.value); }
+  return out;
+};
+AL.formError = (m) => { const el = document.getElementById('alFormError'); if (!el) { AL.toast('Not saved', m, 'bad'); return; } el.hidden = false; el.textContent = m; };
+AL.actions.close = () => AL.close();
+AL.actions['form-submit'] = async (el) => {
+  const o = AL.formSpec; const form = document.getElementById('alForm');
+  if (!o || !form || el.disabled) return;
+  for (const f of o.fields || []) { const c = form.elements[f.k]; if (f.required && c && f.type !== 'checkbox' && !String(c.value || '').trim()) { AL.formError(`${f.label} is required.`); try { c.focus(); } catch (_) { /* n/a */ } return; } }
+  const values = AL.values(form, o.fields || []);
+  const bad = o.validate && o.validate(values);
+  if (bad) { AL.formError(bad); return; }
+  el.disabled = true; el.classList.add('al-busy');
+  try {
+    const r = await o.onSubmit(values);
+    AL.close();
+    // a dialog that only shows something (history, details) closes without announcing a save
+    if (r !== false) { AL.toast(o.doneTitle || 'Saved', (typeof r === 'string' && r) || o.doneMessage || '', ''); AL.loadNavCounts(); }
+    if (o.after) await o.after(r);
+  } catch (e) { AL.formError(AL.msg(e)); }
+  finally { el.disabled = false; el.classList.remove('al-busy'); }
+};
+/** A confirmation, with an optional reason. */
+AL.confirm = (o) => AL.form({ title: o.title, sub: o.sub, danger: o.danger, submitLabel: o.confirmLabel || 'Confirm', doneTitle: o.doneTitle, doneMessage: o.doneMessage, after: o.after,
+  fields: o.reason ? [{ k: 'reason', label: o.reason === true ? 'Reason' : o.reason, type: 'textarea', required: o.reasonRequired !== false, wide: true }] : [],
+  extra: o.body ? `<p class="v28-sub al-wide">${ae(o.body)}</p>` : '', onSubmit: o.onConfirm });
+/** A button that calls the server: shows it is working until the answer, then says what happened. */
+AL.busy = async (el, fn, ok) => {
+  if (el.disabled) return;
+  el.disabled = true; el.classList.add('al-busy');
+  try { const r = await fn(); if (ok) { AL.toast(ok[0], typeof ok[1] === 'function' ? ok[1](r) : ok[1] || '', ''); AL.loadNavCounts(); } return r; }
+  catch (e) { AL.toast('Not done', AL.msg(e), 'bad'); }
+  finally { el.disabled = false; el.classList.remove('al-busy'); }
+};
+
+// ------------------------------------------------------------------------------------------------ events
+window.addEventListener('click', (ev) => {
+  const t = ev.target && ev.target.closest && ev.target.closest('[data-al]');
+  if (!t || !t.closest('.accounting-v52-root')) return;
+  const fn = AL.actions[t.dataset.al];
+  if (!fn) return;
+  ev.preventDefault(); ev.stopPropagation();
+  Promise.resolve(fn(t, ev)).catch((e) => AL.toast('Something went wrong', AL.msg(e), 'bad'));
+}, true);
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && document.getElementById('alOverlay')) AL.close(); }, true);
+
+// ------------------------------------------------------------------------------------------------ pages
+/** Register a live page: the runtime's page table calls it; the page's own wire step runs after it is drawn. */
+AL.page = (id, fn) => {
+  AL.pages[id] = fn;
+  const draw = () => {
+    let html;
+    try { html = fn(); } catch (e) { html = `<div class="v28-page"><div class="al-state al-error"><strong>This page could not be drawn</strong><p>${ae(AL.msg(e))}</p></div></div>`; if (window.console) console.error('[acc-live]', id, e); }
+    // after the runtime has inserted the markup (a timer, not an animation frame: frames never fire in a hidden tab)
+    if (AL.wire[id]) setTimeout(() => { try { AL.wire[id](); } catch (e) { if (window.console) console.error('[acc-live wire]', id, e); } }, 0);
+    // an older layer injects a decorative "spotlight" (fixed figures and charts) into pages that have none; a live page
+    // carries an empty one so nothing is injected
+    return `${html}<section class="v35-spotlight" hidden aria-hidden="true"></section>`;
+  };
+  // later layers of the runtime re-install their own page on a timer (e.g. recurring, 600 ms after load); a live page
+  // keeps its place: assignments to it are ignored
+  try { Object.defineProperty(pages, id, { get: () => draw, set: () => {}, configurable: true, enumerable: true }); } catch (_) { pages[id] = draw; }
+};
+/** Sidebar counts: what is waiting for this user, from /accounting/me/counts (the runtime counted its own hydrated
+ *  copies, which went stale, and its reconciliation count came from demo statement lines). Refreshed every minute and
+ *  after each save. */
+AL.navCounts = null;
+AL.loadNavCounts = async () => {
+  try { AL.navCounts = await AL.get('/accounting/me/counts'); if (typeof renderNav === 'function') renderNav(); } catch (_) { /* keep the last counts */ }
+};
+try {
+  const baseNavCount = navCount;
+  navCount = (id) => {
+    const c = AL.navCounts;
+    if (c && Object.prototype.hasOwnProperty.call(c, id)) { const v = c[id]; return typeof v === 'number' && v > 0 ? String(v) : ''; }
+    return baseNavCount(id);
+  };
+  setTimeout(AL.loadNavCounts, 1200);
+  setInterval(AL.loadNavCounts, 60000);
+} catch (e) { if (window.console) console.warn('[acc-live] sidebar counts not taken over', e); }
+
+/** Add a sidebar entry to a group (after `after`, or at the end). */
+AL.navAdd = (group, item, after) => {
+  const g = navGroups.find((x) => x[0] === group); if (!g || g[1].some((x) => x[0] === item[0])) return;
+  const i = after ? g[1].findIndex((x) => x[0] === after) : -1;
+  if (i >= 0) g[1].splice(i + 1, 0, item); else g[1].push(item);
+};
+AL.go = (page) => { const nav = window.__ACCOUNTING_V52_NAV__; state.page = page; if (typeof nav === 'function') { try { nav(page); } catch (_) { /* host */ } } render(); };
+
+/* ---- accounting-live/02-overview.js ---- */
+try {
+/* Command Centre: /accounting — the position today from the ledger: cash per currency and bank, receivables and
+ * payables (their control accounts and the documents behind them), revenue and net income for the year against last
+ * year, results by month, what is waiting and where, the month being closed, the last integrity check and the latest
+ * postings. Data: /accounting/overview. */
+AL.page('overview', () => {
+  AL.meLoad();
+  const e = AL.res('ov', () => AL.get('/accounting/overview'));
+  const head = AL.head('Control centre', 'Command Centre', '', [AL.btn('New journal', 'ov-go', '', 'data-page="journals"'), AL.btn('Cash book', 'ov-go', '', 'data-page="cash"'), AL.btn('Financial statements', 'ov-go', 'primary', 'data-page="reports"')].join(''));
+  const g = AL.gate(e, { key: 'ov', errorTitle: 'The overview could not be loaded' });
+  if (g) return `<div class="v28-page">${head}${g}</div>`;
+  const d = e.data, c = d.baseCurrency;
+  const pct = (a, b) => (b ? `${a >= b ? '+' : ''}${Math.round(((a - b) / Math.abs(b)) * 100)}% on last year` : 'No figures last year');
+  const cashCur = Object.entries(d.cash.byCurrency || {});
+  const ar = d.receivables.control, ap = d.payables.control;
+  const apCredit = ap ? -ap.debitBalance : 0;
+  const ytd = d.results.ytd, ly = d.results.lastYear;
+  const kpis = AL.kpis([
+    ['Cash and bank', cashCur.length ? cashCur.map(([k, v]) => AL.money(v, k)).join(' · ') : '—', `${d.cash.banks.length} bank account${d.cash.banks.length === 1 ? '' : 's'}`, cashCur.some(([, v]) => v < 0) ? '#d92d20' : undefined],
+    ['Receivables', ar ? AL.money(ar.debitBalance, c) : '—', `${d.receivables.openInvoices} open invoice${d.receivables.openInvoices === 1 ? '' : 's'}${d.receivables.overdue ? `, ${d.receivables.overdue} overdue` : ''}`, d.receivables.overdue ? '#f79009' : undefined],
+    ['Payables', ap ? AL.money(apCredit, c) : '—', `${d.payables.openBills} approved bill${d.payables.openBills === 1 ? '' : 's'} unpaid${d.payables.dueWithin7Days ? `, ${d.payables.dueWithin7Days} due within 7 days` : ''}`, apCredit < 0 ? '#d92d20' : undefined],
+    ['Revenue, year to date', AL.money(ytd.revenue, c), pct(ytd.revenue, ly.revenue), ytd.revenue < 0 ? '#d92d20' : undefined],
+    ['Net income, year to date', AL.money(ytd.netIncome, c), pct(ytd.netIncome, ly.netIncome), ytd.netIncome < 0 ? '#d92d20' : '#12b76a'],
+  ]);
+  const w = d.waiting;
+  const waitRows = [
+    ['Journals waiting to be posted', w.draftJournals, 'approvals'],
+    ['Approval requests (payments, placements, account changes)', w.approvalRequests, 'approvals'],
+    ['Bank lines not reconciled', w.unreconciledBankLines, 'reconciliation'],
+    ['Invoices overdue', w.overdueInvoices, 'receivables'],
+    ['Supplier bills due within 7 days', w.billsDue, 'payables'],
+  ].map(([label, count, page]) => `<tr><td>${ae(label)}</td><td class="num">${count ? `<strong>${count}</strong>` : '<span class="v28-sub">0</span>'}</td><td class="al-actions">${count ? AL.btn('Open', 'ov-go', 'small', `data-page="${page}"`) : ''}</td></tr>`).join('');
+  const months = d.results.months || [];
+  const peak = Math.max(1, ...months.map((m) => Math.max(Math.abs(m.revenue), Math.abs(m.expenses))));
+  const bar = (v, cls) => `<span class="al-bar ${cls}" style="width:${Math.round((Math.abs(v) / peak) * 100)}%"></span>`;
+  const monthRows = months.map((m) => `<tr><td>${ae(new Date(`${m.month}-01T00:00:00Z`).toLocaleDateString('en-GB', { month: 'short', year: 'numeric', timeZone: 'UTC' }))}</td><td class="num">${ae(AL.money(m.revenue, c))}${bar(m.revenue, m.revenue < 0 ? 'bad' : 'ok')}</td><td class="num">${ae(AL.money(m.expenses, c))}${bar(m.expenses, 'warn')}</td><td class="num"><strong>${ae(AL.money(m.netIncome, c))}</strong></td></tr>`).join('');
+  const bankRows = d.cash.banks.map((b) => `<tr><td>${ae(b.bank)}</td><td>${ae(b.currency)}</td><td class="num">${ae(AL.money(b.balance, b.currency))}</td><td>${b.unreconciled ? `${b.unreconciled} not reconciled` : 'Reconciled'}</td></tr>`).join('');
+  const recentRows = (d.recent || []).map((j) => `<tr><td><strong>${ae(j.reference.length > 26 ? `${j.reference.slice(0, 26)}…` : j.reference)}</strong></td><td>${ae(AL.date(j.date))}</td><td class="al-wrap">${ae(j.description || '')}</td><td class="num">${ae(AL.money(j.amount, j.currency))}</td><td>${ae(j.by || '')}</td></tr>`).join('');
+  const cl = d.close, ig = d.integrity;
+  const control = `<tr><td>Month being closed</td><td>${cl ? `${ae(cl.period)} · ${cl.locked ? 'locked' : 'open'}${cl.tasks ? ` · ${cl.complete} of ${cl.tasks} close tasks done` : ' · no close checklist yet'}` : '—'}</td><td class="al-actions">${AL.btn('Period close', 'ov-go', 'small', 'data-page="close"')}</td></tr>
+    <tr><td>Ledger integrity</td><td>${ig ? `${ig.status === 'succeeded' ? '<span class="al-ok">Passed</span>' : `<span class="al-bad">${ae(ig.status)}</span>`} · ${ae(AL.dateTime(ig.at))}` : 'Not run yet'}</td><td class="al-actions">${AL.btn('Scheduled jobs', 'ov-go', 'small', 'data-page="jobs"')}</td></tr>`;
+  return `<div class="v28-page">${head}${kpis}
+    <div class="al-split">${AL.panel('Waiting', '', AL.table(['', 'Count', ''], waitRows, '520px'))}${AL.panel('Close and control', '', AL.table(['', '', ''], control, '520px'))}</div>
+    ${AL.panel('Results by month', `${c}, posted journals`, monthRows ? AL.table(['Month', 'Revenue', 'Expenses', 'Net income'], monthRows, '760px') : AL.empty('Nothing posted in the last twelve months.'))}
+    <div class="al-split">${AL.panel('Cash by bank', 'Ledger balance of each bank account', bankRows ? AL.table(['Bank account', 'Currency', 'Balance', 'Reconciliation'], bankRows, '560px') : AL.empty('No bank accounts.'))}${AL.panel('Latest postings', '', recentRows ? AL.table(['Journal', 'Date', 'Description', 'Amount', 'By'], recentRows, '640px') : AL.empty('Nothing posted yet.'))}</div>
+  </div>`;
+});
+AL.actions['ov-go'] = (el) => AL.go(el.dataset.page);
+
+} catch (e) { if (window.console) console.error("[acc-live] 02-overview.js failed to load", e); }
+/* ---- accounting-live/03-ceo.js ---- */
+try {
+/* CEO View: /accounting/ceo — the executive summary of the same ledger figures as the Command Centre: liquidity (bank
+ * balances per currency plus short-term investments at carrying value), results for the year against last year, what
+ * is owed each way, each entity's contribution, results by month and what is waiting on a decision. Read-only; each
+ * figure opens the page that holds it. Data: /accounting/overview, /accounting/consolidation/summary,
+ * /accounting/short-term-investments/dashboard. */
+AL.page('ceo', () => {
+  AL.meLoad();
+  const ov = AL.res('ov', () => AL.get('/accounting/overview'));
+  const sti = AL.res('ceo-sti', () => AL.get(`/accounting/short-term-investments/dashboard?asOfIso=${AL.stiToday()}`).catch(() => null));
+  const today = AL.stiToday();
+  const cons = AL.res('ceo-cons', () => AL.get(`/accounting/consolidation/summary?asOfDate=${today}&periodStart=${today.slice(0, 4)}-01-01&periodEnd=${today}`).catch(() => null));
+  const head = AL.head('Control centre', 'CEO View', '', AL.btn('Financial statements', 'ov-go', 'primary', 'data-page="reports"'));
+  const g = AL.gate(ov, { key: 'ov', errorTitle: 'The figures could not be loaded' });
+  if (g) return `<div class="v28-page">${head}${g}</div>`;
+  const d = ov.data, c = d.baseCurrency, ytd = d.results.ytd, ly = d.results.lastYear;
+  const cash = d.cash.byCurrency || {};
+  const invest = sti.state === 'ok' && sti.data ? sti.data.portfolio || {} : null;
+  const baseCash = cash[c] || 0;
+  const liquidity = baseCash + (invest ? Number(invest.carryingTotal || 0) : 0);
+  const margin = ytd.revenue > 0 ? `${Math.round((ytd.netIncome / ytd.revenue) * 1000) / 10}% of revenue` : ytd.revenue < 0 ? 'Revenue is negative' : 'No revenue';
+  const vs = (a, b) => (b ? `${a >= b ? 'Up' : 'Down'} ${AL.money(Math.abs(a - b), c)} on last year` : 'Nothing to compare last year');
+  const ar = d.receivables.control, ap = d.payables.control;
+  const decisions = d.waiting.draftJournals + d.waiting.approvalRequests;
+  const kpis = AL.kpis([
+    ['Liquidity', AL.money(liquidity, c), `Bank ${AL.money(baseCash, c)}${invest ? ` + investments ${AL.money(invest.carryingTotal, c)}` : ''}${Object.keys(cash).filter((k) => k !== c).map((k) => ` · ${AL.money(cash[k], k)} apart`).join('')}`, liquidity < 0 ? '#d92d20' : '#12b76a'],
+    [ytd.netIncome >= 0 ? 'Profit, year to date' : 'Loss, year to date', AL.money(Math.abs(ytd.netIncome), c), margin, ytd.netIncome < 0 ? '#d92d20' : '#12b76a'],
+    ['Revenue, year to date', AL.money(ytd.revenue, c), vs(ytd.revenue, ly.revenue), ytd.revenue < 0 ? '#d92d20' : undefined],
+    ['Owed to us / by us', `${ar ? AL.money(ar.debitBalance, c) : '—'} / ${ap ? AL.money(-ap.debitBalance, c) : '—'}`, `${d.receivables.overdue} invoices overdue · ${d.payables.dueWithin7Days} bills due in 7 days`],
+    ['Waiting on a decision', String(decisions), `${d.waiting.draftJournals} journals, ${d.waiting.approvalRequests} approval requests`, decisions ? '#f79009' : '#12b76a'],
+  ]);
+  const ents = cons.state === 'ok' && cons.data ? cons.data.entities || [] : [];
+  const entRows = ents.map((e) => { const i = e.incomeStatement || {}, b = e.balanceSheet || {}; return `<tr><td><strong>${ae(e.entityName)}</strong></td><td class="num">${ae(AL.money(i.revenue, c))}</td><td class="num">${ae(AL.money(i.netIncome, c))}</td><td class="num">${i.revenue > 0 ? `${Math.round((i.netIncome / i.revenue) * 1000) / 10}%` : '—'}</td><td class="num">${ae(AL.money(b.totalAssets, c))}</td><td class="num">${ae(AL.money(b.totalEquity, c))}</td></tr>`; }).join('');
+  const months = (d.results.months || []).map((m) => `<tr><td>${ae(new Date(`${m.month}-01T00:00:00Z`).toLocaleDateString('en-GB', { month: 'short', year: 'numeric', timeZone: 'UTC' }))}</td><td class="num">${ae(AL.money(m.revenue, c))}</td><td class="num">${ae(AL.money(m.expenses, c))}</td><td class="num"><strong>${ae(AL.money(m.netIncome, c))}</strong></td></tr>`).join('');
+  const invRows = invest && sti.data.instruments && sti.data.instruments.length ? sti.data.instruments.slice(0, 8).map((i) => `<tr><td>${ae(i.name || i.reference || '')}</td><td class="num">${ae(AL.money(i.principal, i.currency))}</td><td class="num">${ae(AL.money(i.accruedInterest ?? i.accruedToDate ?? 0, i.currency))}</td><td>${ae(AL.date(i.maturityDate))}</td></tr>`).join('') : '';
+  return `<div class="v28-page">${head}${kpis}
+    ${AL.panel('Entities', `Year to date, ${c}`, entRows ? AL.table(['Entity', 'Revenue', 'Net income', 'Margin', 'Assets', 'Equity'], entRows, '860px') : AL.gate(cons, { key: 'ceo-cons' }) || AL.empty('No entities.'))}
+    <div class="al-split">${AL.panel('Results by month', c, months ? AL.table(['Month', 'Revenue', 'Expenses', 'Net income'], months, '560px') : AL.empty('Nothing posted in the last twelve months.'))}${AL.panel('Short-term investments', invest ? `${AL.money(invest.principalTotal, c)} placed · ${AL.money(invest.accruedInterestTotal, c)} interest accrued` : '', invRows ? AL.table(['Investment', 'Principal', 'Interest accrued', 'Matures'], invRows, '560px') : AL.empty('No active investments.'), AL.btn('Investments', 'ov-go', 'small', 'data-page="investments"'))}</div>
+  </div>`;
+});
+
+} catch (e) { if (window.console) console.error("[acc-live] 03-ceo.js failed to load", e); }
+/* ---- accounting-live/05-approvals.js ---- */
+try {
+/* Approval Queue: /accounting/approvals — everything waiting on the signed-in user: approval requests assigned to them
+ * and, for someone who may post, journals prepared by others (labelled with what they were raised for). Accounting items
+ * are approved or rejected here; a procurement approval opens in Procurement (new tab); an invoice or credit note is
+ * posted by sending it on Receivables. Data: /accounting/me/queue, /approvals/:id/approve|reject,
+ * /accounting/journal-entries/:id/post|void. */
+AL.ui.apq = AL.ui.apq || { filter: 'ALL' };
+AL.apqLoad = () => AL.res('apq', () => AL.get('/accounting/me/queue'));
+AL.apqReload = () => { delete AL.cache.apq; AL.redraw(); };
+
+AL.page('approvals', () => {
+  AL.meLoad();
+  const e = AL.apqLoad();
+  const head = AL.head('Control centre', 'Approval Queue', 'What is waiting on you. Nobody approves or posts their own work.');
+  const g = AL.gate(e, { key: 'apq', errorTitle: 'The queue could not be loaded' });
+  if (g) return `<div class="v28-page">${head}${g}</div>`;
+  const items = e.data || [];
+  const today = AL.stiToday();
+  const age = (d) => Math.max(0, Math.round((Date.parse(today) - Date.parse(String(d).slice(0, 10))) / 86400000));
+  const groups = {};
+  items.forEach((x) => { groups[x.label] = (groups[x.label] || 0) + 1; });
+  const kpis = AL.kpis([
+    ['Waiting on you', String(items.length), items.length ? `Oldest ${Math.max(...items.map((x) => age(x.requestedAt)))} days` : 'Nothing waiting', items.length ? '#f79009' : '#12b76a'],
+    ['Approval requests', String(items.filter((x) => x.kind === 'approval').length), 'Payments, placements, changes'],
+    ['Journals to post', String(items.filter((x) => x.kind === 'journal').length), 'Prepared by others'],
+    ['Over 7 days', String(items.filter((x) => age(x.requestedAt) > 7).length), 'Waiting more than a week', items.some((x) => age(x.requestedAt) > 7) ? '#d92d20' : '#12b76a'],
+  ]);
+  const f = AL.ui.apq.filter;
+  const chips = `<div class="v28-tabbar">${[['ALL', `All (${items.length})`], ...Object.entries(groups).map(([k, n]) => [k, `${k} (${n})`])].map(([id, label]) => `<button class="v28-tab ${f === id ? 'active' : ''}" data-al="apq-filter" data-f="${ae(id)}">${ae(label)}</button>`).join('')}</div>`;
+  const shown = items.filter((x) => f === 'ALL' || x.label === f);
+  const rows = shown.map((x) => {
+    const acts = [];
+    if (x.where === 'procurement') acts.push(AL.btn('Open in Procurement', 'apq-proc', 'small', `data-type="${ae(x.stageType)}"`));
+    else if (x.where === 'receivables') acts.push(AL.btn('Open in Receivables', 'apq-ar', 'small'));
+    else if (x.kind === 'approval') acts.push(AL.btn('Approve', 'apq-approve', 'small primary', `data-id="${ae(x.id)}"`), AL.btn('Reject', 'apq-reject', 'small danger', `data-id="${ae(x.id)}"`));
+    else acts.push(AL.btn('Open', 'apq-open', 'small', `data-id="${ae(x.id)}"`), AL.btn('Post', 'apq-post', 'small primary', `data-id="${ae(x.id)}"`), AL.btn('Reject', 'apq-jreject', 'small danger', `data-id="${ae(x.id)}"`));
+    const a = age(x.requestedAt);
+    return `<tr>
+      <td>${AL.status(x.label, x.kind === 'approval' ? 'info' : 'warn')}${x.step ? `<span class="v28-sub">${ae(x.step)}</span>` : ''}</td>
+      <td class="al-wrap"><strong>${ae(x.title || '')}</strong><span class="v28-sub">${ae(x.reference || '')}</span></td>
+      <td>${x.amount != null ? ae(AL.money(x.amount, x.currency || '')) : '—'}</td>
+      <td>${ae(x.requestedBy || '—')}</td>
+      <td>${ae(AL.date(x.requestedAt))}<span class="v28-sub${a > 7 ? ' al-bad' : ''}">${a === 0 ? 'Today' : `${a} day${a === 1 ? '' : 's'}`}</span></td>
+      <td class="al-actions">${acts.join('')}</td>
+    </tr>`;
+  }).join('');
+  return `<div class="v28-page">${head}${kpis}${AL.panel('Waiting on you', '', `${chips}${rows ? AL.table(['What', 'Detail', 'Amount', 'From', 'Waiting', ''], rows, '1080px') : AL.empty('Nothing is waiting on you.')}`)}</div>`;
+});
+AL.actions['apq-filter'] = (el) => { AL.ui.apq.filter = el.dataset.f; AL.redraw(); };
+AL.apqItem = (id) => ((AL.cache.apq && AL.cache.apq.data) || []).find((x) => x.id === id);
+AL.actions['apq-approve'] = (el) => { const x = AL.apqItem(el.dataset.id); if (!x) return; AL.confirm({ title: `Approve: ${x.label}`, confirmLabel: 'Approve', doneTitle: 'Approved', reason: 'Comment', reasonRequired: false, body: `${x.title}${x.amount != null ? ` · ${AL.money(x.amount, x.currency || '')}` : ''} — requested by ${x.requestedBy || 'someone'}.`, onConfirm: async (v) => { await AL.post(`/approvals/${encodeURIComponent(x.id)}/approve`, { comments: v.reason || 'Approved' }); return ''; }, after: () => AL.apqReload() }); };
+AL.actions['apq-reject'] = (el) => { const x = AL.apqItem(el.dataset.id); if (!x) return; AL.confirm({ title: `Reject: ${x.label}`, danger: true, confirmLabel: 'Reject', doneTitle: 'Rejected', reason: 'Why it is rejected', body: x.title, onConfirm: async (v) => { await AL.post(`/approvals/${encodeURIComponent(x.id)}/reject`, { comments: v.reason }); return ''; }, after: () => AL.apqReload() }); };
+AL.actions['apq-post'] = (el) => AL.busy(el, async () => { await AL.patch(`/accounting/journal-entries/${encodeURIComponent(el.dataset.id)}/post`, {}); AL.apqReload(); }, ['Posted', 'It is in the ledger.']);
+AL.actions['apq-jreject'] = (el) => { const x = AL.apqItem(el.dataset.id); if (!x) return; AL.confirm({ title: `Reject ${x.reference || 'journal'}`, danger: true, confirmLabel: 'Reject', doneTitle: 'Rejected', reason: 'Why it is rejected', body: `${x.label}: ${x.title}. It is withdrawn and never reaches the ledger.`, onConfirm: async (v) => { await AL.patch(`/accounting/journal-entries/${encodeURIComponent(x.id)}/void`, { reason: v.reason }); return ''; }, after: () => AL.apqReload() }); };
+AL.actions['apq-open'] = (el) => AL.actions['je-open'](el);
+AL.actions['apq-ar'] = () => AL.go('receivables');
+AL.actions['apq-proc'] = (el) => { const path = { PURCHASE_REQUISITION: '/procurement/requisitions', PURCHASE_ORDER: '/procurement/purchase-orders', INVOICE: '/procurement/invoices', GRN: '/procurement/receiving', AWARD_RECOMMENDATION: '/procurement/evaluation' }[el.dataset.type] || '/procurement'; window.open(path, '_blank', 'noopener,noreferrer'); };
+
+} catch (e) { if (window.console) console.error("[acc-live] 05-approvals.js failed to load", e); }
+/* ---- accounting-live/10-close.js ---- */
+try {
+/* Period Close: /accounting/close — one month's close: readiness (checklist, draft journals, bank lines, investment
+ * interest, depreciation), the checklist by workstream with owners and dependencies, and the lock. Locking the month
+ * locks the ledger and its sub-ledgers (GL, AR, AP, BANK) and is refused while checklist tasks are open (ACC-PER-07).
+ * Data: /accounting/fiscal-calendar, /accounting/close-tasks/*. */
+AL.CLOSE_MODULES = ['GL', 'AR', 'AP', 'BANK'];
+AL.MODULE_NAMES = { GL: 'General ledger', AR: 'Receivables', AP: 'Payables', BANK: 'Bank', IC: 'Inventory', OE: 'Orders', PO: 'Purchase orders' };
+AL.ui.close = AL.ui.close || { period: '' };
+AL.calLoad = () => AL.res('calendar', () => AL.get('/accounting/fiscal-calendar'));
+AL.closePeriods = (cal) => {
+  const out = [];
+  ((cal && cal.fiscalYears) || []).forEach((y) => (y.periods || []).forEach((p) => out.push(p)));
+  return out.sort((a, b) => String(a.startDate).localeCompare(String(b.startDate)));
+};
+AL.glLock = (p) => { const l = (p.moduleLocks || []).find((m) => m.moduleCode === 'GL'); return l ? l.lockStatus : 'OPEN'; };
+/** The month to close: last month while it is still open, otherwise this month. */
+AL.closeDefault = (periods) => {
+  const today = AL.stiToday();
+  const i = periods.findIndex((p) => String(p.startDate).slice(0, 10) <= today && String(p.endDate).slice(0, 10) >= today);
+  if (i < 0) return periods.length ? periods[periods.length - 1].id : '';
+  const prev = periods[i - 1];
+  return prev && AL.glLock(prev) === 'OPEN' ? prev.id : periods[i].id;
+};
+AL.closeLoad = (pid) => AL.res(`close:${pid}`, async () => {
+  const [tasks, ready, audit] = await Promise.all([
+    AL.get(`/accounting/close-tasks/periods/${encodeURIComponent(pid)}/tasks`),
+    AL.get(`/accounting/close-tasks/periods/${encodeURIComponent(pid)}/readiness`),
+    AL.get('/accounting/fiscal-calendar/period-lock/audit').catch(() => []),
+  ]);
+  return { tasks: tasks || [], ready: ready || {}, audit: (audit || []).filter((a) => a.fiscalPeriodId === pid).slice(0, 12) };
+});
+AL.closeReload = () => { Object.keys(AL.cache).filter((k) => k === 'calendar' || k.startsWith('close:')).forEach((k) => delete AL.cache[k]); AL.redraw(); };
+AL.taskStatus = { OPEN: ['Open', 'warn'], IN_PROGRESS: ['In progress', 'info'], COMPLETE: ['Complete', 'ok'] };
+
+AL.page('close', () => {
+  AL.meLoad();
+  const canManage = AL.can('accounting.period_lock.manage');
+  const cal = AL.calLoad();
+  const g0 = AL.gate(cal, { key: 'calendar', errorTitle: 'The fiscal calendar could not be loaded' });
+  if (g0) return `<div class="v28-page">${AL.head('Control centre', 'Period Close', '')}${g0}</div>`;
+  const periods = AL.closePeriods(cal.data);
+  if (!AL.ui.close.period || !periods.some((p) => p.id === AL.ui.close.period)) AL.ui.close.period = AL.closeDefault(periods);
+  const period = periods.find((p) => p.id === AL.ui.close.period);
+  if (!period) return `<div class="v28-page">${AL.head('Control centre', 'Period Close', '')}${AL.empty('No fiscal periods are set up.')}</div>`;
+  const today = AL.stiToday();
+  const nearby = periods.filter((p) => String(p.startDate).slice(0, 10) <= today).slice(-15).concat(periods.filter((p) => String(p.startDate).slice(0, 10) > today).slice(0, 1));
+  const picker = `<label class="v28-field al-inline"><span>Month</span><select class="v28-select" data-close-period>${nearby.map((p) => `<option value="${ae(p.id)}"${p.id === period.id ? ' selected' : ''}>${ae(p.name)}${AL.glLock(p) !== 'OPEN' ? ' (locked)' : ''}</option>`).join('')}</select></label>`;
+  const locked = AL.glLock(period) !== 'OPEN';
+  const e = AL.closeLoad(period.id);
+  const g = AL.gate(e, { key: `close:${period.id}`, errorTitle: 'The close for this month could not be loaded' });
+  const actions = [picker];
+  if (canManage && !g) {
+    if (!e.data.tasks.length) actions.push(AL.btn('Add standard checklist', 'close-standard'));
+    actions.push(AL.btn('Add task', 'close-add'));
+    actions.push(locked ? AL.btn('Reopen month', 'close-unlock', 'danger') : AL.btn('Lock month', 'close-lock', 'primary'));
+  }
+  const head = AL.head('Control centre', 'Period Close', `${period.name}: ${locked ? 'locked; nothing can be posted into it' : 'open for posting'}.`, actions.join(''));
+  if (g) return `<div class="v28-page">${head}${g}</div>`;
+  const { tasks, ready, audit } = e.data;
+  const t = ready.tasks || { total: 0, complete: 0 };
+  const pct = t.total ? Math.round((t.complete / t.total) * 100) : 0;
+  const inv = ready.investments || {}, dep = ready.depreciation || {};
+  const kpis = AL.kpis([
+    ['Checklist', t.total ? `${t.complete} of ${t.total}` : 'None', t.total ? `${pct}% complete` : 'No tasks yet', t.total && t.complete === t.total ? '#12b76a' : '#f79009'],
+    ['Draft journals', String(ready.draftJournals ?? '—'), 'Dated in the month, not posted', ready.draftJournals ? '#f79009' : '#12b76a'],
+    ['Bank lines not reconciled', ready.unreconciledBankLines == null ? '—' : String(ready.unreconciledBankLines), 'Cashbook lines in the month', ready.unreconciledBankLines ? '#f79009' : '#12b76a'],
+    ['Investment interest', inv.active ? (inv.notAccruedThrough ? `${inv.notAccruedThrough} behind` : 'Up to date') : 'No investments', inv.active ? `Accrued through ${AL.date(inv.dueThrough)}` : '', inv.notAccruedThrough ? '#f79009' : '#12b76a'],
+    ['Depreciation', dep.posted ? `${AL.plural(dep.posted, 'asset')} posted` : dep.pending ? `${dep.pending} not posted` : dep.lastRun && dep.lastRun.status === 'succeeded' ? 'Nothing to depreciate' : 'Not run', dep.lastRun ? `Run ${AL.dateTime(dep.lastRun.finishedAt)}` : 'For this month', (dep.posted && !dep.pending) || (dep.lastRun && dep.lastRun.status === 'succeeded' && !dep.pending) ? '#12b76a' : '#f79009'],
+    ['Ledger', locked ? 'Locked' : 'Open', locked ? 'Posting into the month is refused' : 'Posting allowed', locked ? '#0878f6' : '#12b76a'],
+  ]);
+
+  // the checklist, by workstream
+  const me = AL.me().id;
+  const byWs = new Map();
+  tasks.forEach((k) => { if (!byWs.has(k.workstream)) byWs.set(k.workstream, []); byWs.get(k.workstream).push(k); });
+  const rows = [];
+  byWs.forEach((list, ws) => {
+    rows.push(`<tr class="al-group"><td colspan="6"><strong>${ae(ws)}</strong> <span class="v28-sub" style="display:inline">${list.filter((k) => k.status === 'COMPLETE').length} of ${list.length} complete</span></td></tr>`);
+    list.forEach((k) => {
+      const st = AL.taskStatus[k.status] || [k.status, 'info'];
+      const mine = k.ownerId && k.ownerId === me;
+      const may = canManage || (mine && k.status !== 'COMPLETE');
+      const blocked = k.dependsOn && k.dependsOn.status !== 'COMPLETE';
+      const acts = [];
+      if (!locked && may && k.status === 'OPEN') acts.push(AL.btn('Start', 'close-task', 'small', `data-id="${ae(k.id)}" data-s="IN_PROGRESS"`));
+      if (!locked && may && k.status !== 'COMPLETE') acts.push(AL.btn('Complete', 'close-task', 'small primary', `data-id="${ae(k.id)}" data-s="COMPLETE"${blocked ? ' disabled title="Waiting on its dependency"' : ''}`));
+      if (!locked && canManage && k.status === 'COMPLETE') acts.push(AL.btn('Reopen', 'close-task', 'small', `data-id="${ae(k.id)}" data-s="OPEN"`));
+      const overdue = k.status !== 'COMPLETE' && k.dueAt && String(k.dueAt).slice(0, 10) < today;
+      rows.push(`<tr>
+        <td class="al-wrap"><strong>${ae(k.task)}</strong>${k.dependsOn ? `<span class="v28-sub">After: ${ae(k.dependsOn.task)}${blocked ? ' (not done yet)' : ''}</span>` : ''}</td>
+        <td>${ae(AL.jeWho(k.owner))}${mine ? '<span class="v28-sub">You</span>' : ''}</td>
+        <td>${k.dueAt ? `${ae(AL.date(k.dueAt))}${overdue ? '<span class="v28-sub al-bad">Overdue</span>' : ''}` : '—'}</td>
+        <td>${AL.status(st[0], st[1])}</td>
+        <td>${k.completedAt ? `${ae(AL.jeWho(k.completedBy))}<span class="v28-sub">${ae(AL.dateTime(k.completedAt))}</span>` : '—'}</td>
+        <td class="al-actions">${acts.join('')}</td>
+      </tr>`);
+    });
+  });
+  const checklist = AL.panel('Close checklist', locked ? 'The month is locked; reopen it to change the checklist.' : '', tasks.length ? AL.table(['Task', 'Owner', 'Due', 'Status', 'Completed', ''], rows.join(''), '980px') : AL.empty(canManage ? 'No checklist for this month yet.' : 'No checklist for this month yet; the period manager sets it up.'));
+
+  // lock state by module, and what happened to it
+  const mods = Object.keys(AL.MODULE_NAMES).map((m) => { const l = (period.moduleLocks || []).find((x) => x.moduleCode === m); const s = l ? l.lockStatus : 'OPEN'; return `<div class="v28-list-item"><div><strong>${ae(AL.MODULE_NAMES[m])}</strong><span>${ae(l && l.reason ? l.reason : '')}</span></div>${AL.status(s === 'OPEN' ? 'Open' : s === 'CLOSED' ? 'Closed' : 'Locked', s === 'OPEN' ? 'ok' : 'info')}</div>`; }).join('');
+  const hist = audit.length ? AL.table(['When', 'What', 'By', 'Reason'], audit.map((a) => `<tr><td>${ae(AL.dateTime(a.createdAt))}</td><td>${ae(a.actionType === 'ATTEMPT_REJECTED' ? `Posting refused (${(a.newValue && a.newValue.action) || a.moduleCode})` : `${AL.MODULE_NAMES[a.moduleCode] || a.moduleCode}: ${(a.oldValue && a.oldValue.lockStatus) || 'Open'} → ${(a.newValue && a.newValue.lockStatus) || ''}`)}</td><td>${ae(AL.jeWho(a.performedBy))}</td><td class="al-wrap">${ae(a.reason || '')}</td></tr>`).join(''), '640px') : AL.empty('No lock changes for this month.');
+  const side = `<div class="v28-grid two"><div>${AL.panel('Locks for the month', '', `<div class="al-listcol">${mods}</div>`)}</div><div>${AL.panel('Lock history', '', hist)}</div></div>`;
+  return `<div class="v28-page">${head}${kpis}${checklist}${side}</div>`;
+});
+AL.wire.close = () => {
+  const sel = document.querySelector('[data-close-period]');
+  if (sel && !sel.dataset.wired) { sel.dataset.wired = '1'; sel.addEventListener('change', () => { AL.ui.close.period = sel.value; AL.redraw(); }); }
+};
+
+AL.actions['close-task'] = (el) => AL.busy(el, async () => {
+  await AL.patch(`/accounting/close-tasks/tasks/${encodeURIComponent(el.dataset.id)}`, { status: el.dataset.s });
+  AL.closeReload();
+}, [el.dataset.s === 'COMPLETE' ? 'Task complete' : el.dataset.s === 'OPEN' ? 'Task reopened' : 'Task started', '']);
+AL.actions['close-standard'] = (el) => AL.busy(el, async () => {
+  const r = await AL.post(`/accounting/close-tasks/periods/${encodeURIComponent(AL.ui.close.period)}/tasks/standard`, {});
+  AL.closeReload();
+  return r;
+}, ['Checklist added', (r) => `${AL.plural((r && r.added) || 0, 'task')} added, due on the fifth working day after month end.`]);
+AL.actions['close-add'] = (el) => AL.busy(el, async () => {
+  const [users, tasks] = await Promise.all([AL.get('/users?limit=500').catch(() => []), Promise.resolve((AL.cache[`close:${AL.ui.close.period}`] || {}).data)]);
+  // owners come from finance: the department, or a finance role
+  const staff = (Array.isArray(users) ? users : (users && (users.users || users.items)) || []).filter((u) => (u.status || 'ACTIVE') === 'ACTIVE' && (u.userDepartment === 'Finance' || /^(CFO|FIN_|ACCOUNTANT|PAYROLL|INT_AUDIT)/.test(u.roleCode || '')));
+  const list = (tasks && tasks.tasks) || [];
+  const ws = [...new Set(['Cash & bank', 'Payables', 'Receivables', 'Payroll', 'Fixed assets', 'Short-term investments', 'Tax', 'Financial statements', ...list.map((k) => k.workstream)])];
+  AL.form({
+    title: 'Add a close task', submitLabel: 'Add task', doneTitle: 'Task added',
+    fields: [
+      { k: 'workstream', label: 'Workstream', type: 'select', options: ws, required: true },
+      { k: 'task', label: 'Task', required: true, wide: true },
+      { k: 'ownerId', label: 'Owner', type: 'select', options: staff.map((u) => ({ value: u.id, label: `${[u.firstName, u.lastName].filter(Boolean).join(' ') || u.email}` })) },
+      { k: 'dueAt', label: 'Due', type: 'date' },
+      { k: 'dependsOnId', label: 'After (dependency)', type: 'select', options: list.map((k) => ({ value: k.id, label: k.task })), wide: true },
+    ],
+    onSubmit: async (v) => { await AL.post(`/accounting/close-tasks/periods/${encodeURIComponent(AL.ui.close.period)}/tasks`, { workstream: v.workstream, task: v.task, ownerId: v.ownerId || null, dueAt: v.dueAt || null, dependsOnId: v.dependsOnId || null }); return v.task; },
+    after: () => AL.closeReload(),
+  });
+});
+AL.closeCommit = async (status, reason) => {
+  const pid = AL.ui.close.period;
+  await AL.put('/accounting/fiscal-calendar/locks/draft', { draft: { moduleLocks: AL.CLOSE_MODULES.map((m) => ({ fiscalPeriodId: pid, moduleCode: m, lockStatus: status, reason })) } });
+  return AL.post('/accounting/fiscal-calendar/locks/commit', { reason });
+};
+AL.actions['close-lock'] = () => {
+  const d = (AL.cache[`close:${AL.ui.close.period}`] || {}).data || {};
+  const r = d.ready || {}; const t = r.tasks || {};
+  const notes = [];
+  if (t.total && t.complete < t.total) notes.push(`${t.total - t.complete} checklist task(s) are still open: the lock is refused until they are complete.`);
+  if (r.draftJournals) notes.push(`${AL.plural(r.draftJournals, 'draft journal')} dated in the month can no longer be posted once it is locked.`);
+  if (r.unreconciledBankLines) notes.push(`${AL.plural(r.unreconciledBankLines, 'bank line')} in the month are not reconciled.`);
+  AL.confirm({
+    title: `Lock ${r.period ? r.period.name : 'the month'}`, confirmLabel: 'Lock month', doneTitle: 'Month locked', reason: 'Reason',
+    body: `The general ledger, receivables, payables and bank are locked for the month: nothing can be posted, voided or reversed into it until it is reopened.${notes.length ? ' ' + notes.join(' ') : ''}`,
+    onConfirm: async (v) => { const res = await AL.closeCommit('LOCKED', v.reason); return res && res.warnings && res.warnings.length ? res.warnings.join(' ') : 'Posting into the month is now refused.'; },
+    after: () => AL.closeReload(),
+  });
+};
+AL.actions['close-unlock'] = () => AL.confirm({
+  title: 'Reopen the month', danger: true, confirmLabel: 'Reopen month', doneTitle: 'Month reopened', reason: 'Why it is reopened',
+  body: 'Posting into the month is allowed again; the reopening and its reason are kept in the lock history.',
+  onConfirm: async (v) => { await AL.closeCommit('OPEN', v.reason); return 'Posting into the month is allowed.'; },
+  after: () => AL.closeReload(),
+});
+
+} catch (e) { if (window.console) console.error("[acc-live] 10-close.js failed to load", e); }
+/* ---- accounting-live/20-journals.js ---- */
+try {
+/* Journal Entries: /accounting/journals — the journal register (drafts, posted, voided) with maker-checker: preparers
+ * raise and correct drafts, approvers post or reject them, nobody posts their own; a posted journal is voided by a
+ * reversing entry, and only while its period is open. Data: /accounting/journal-entries. */
+AL.ui.je = AL.ui.je || { tab: 'PENDING', from: '', to: '', q: '', page: 0 };
+AL.jeYearStart = () => `${AL.stiToday().slice(0, 4)}-01-01`;
+AL.jeLoad = () => {
+  const u = AL.ui.je;
+  const from = u.from || AL.jeYearStart(), to = u.to || AL.stiToday();
+  const key = `je:${u.tab}:${from}:${to}:${u.page}`;
+  return AL.res(key, async () => {
+    const r = await AL.getRaw(`/accounting/journal-entries?status=${u.tab}&startDate=${from}&endDate=${to}&limit=50&offset=${u.page * 50}`);
+    return { rows: (r && r.data) || [], pagination: (r && r.pagination) || null, key };
+  });
+};
+AL.jeCounts = () => AL.res('je-counts', async () => {
+  const from = AL.jeYearStart(), to = AL.stiToday(), m = `${to.slice(0, 7)}-01`;
+  const [drafts, posted] = await Promise.all([
+    AL.getRaw(`/accounting/journal-entries?status=PENDING&startDate=${from}&endDate=${to}&limit=500`),
+    AL.getRaw(`/accounting/journal-entries?status=POSTED&startDate=${m}&endDate=${to}&limit=1`),
+  ]);
+  const d = (drafts && drafts.data) || [];
+  return { drafts: d.length, draftTotal: (drafts && drafts.pagination && drafts.pagination.total) || d.length, mine: d.filter((x) => x.createdById === AL.me().id).length, postedThisMonth: (posted && posted.pagination && posted.pagination.total) || 0 };
+});
+AL.jeStatus = { PENDING: ['Draft', 'warn'], POSTED: ['Posted', 'ok'], VOID: ['Voided', 'bad'] };
+AL.jeWho = (u) => (u ? [u.firstName, u.lastName].filter(Boolean).join(' ') || u.email : '—');
+AL.jeTotals = (lines) => (lines || []).reduce((t, l) => ({ dr: t.dr + Number(l.debitAmount || 0), cr: t.cr + Number(l.creditAmount || 0) }), { dr: 0, cr: 0 });
+AL.jeReload = () => { Object.keys(AL.cache).filter((k) => k.startsWith('je')).forEach((k) => delete AL.cache[k]); AL.redraw(); };
+
+AL.page('journals', () => {
+  AL.meLoad();
+  const canPrepare = AL.can('manage_accounting'), canPost = AL.can('manage_ledger');
+  const e = AL.jeLoad(), c = AL.jeCounts();
+  const u = AL.ui.je;
+  const head = AL.head('Daily accounting', 'Journal Entries', 'Nobody posts a journal they prepared; a posted journal is corrected by a reversing entry.',
+    canPrepare ? AL.btn('New journal', 'je-new', 'primary') : '');
+  const cd = c.state === 'ok' ? c.data : null;
+  const kpis = AL.kpis([
+    ['Drafts awaiting approval', cd ? String(cd.draftTotal) : '…', 'This year', cd && cd.draftTotal ? '#f79009' : '#12b76a'],
+    ['My drafts', cd ? String(cd.mine) : '…', 'Prepared by you, not yet posted'],
+    ['Posted this month', cd ? String(cd.postedThisMonth) : '…', `Since 1 ${new Date(AL.stiToday()).toLocaleDateString('en-GB', { month: 'short' })}`],
+  ]);
+  const tabs = `<div class="v28-tabbar">${[['PENDING', 'Drafts'], ['POSTED', 'Posted'], ['VOID', 'Voided'], ['ALL', 'All']].map(([id, label]) => `<button class="v28-tab ${u.tab === id ? 'active' : ''}" data-al="je-tab" data-tab="${id}">${ae(label)}</button>`).join('')}</div>`;
+  const filters = `<div class="al-filters"><label class="v28-field"><span>From</span><input class="v28-input" type="date" data-je-filter="from" value="${ae(u.from || AL.jeYearStart())}"></label><label class="v28-field"><span>To</span><input class="v28-input" type="date" data-je-filter="to" value="${ae(u.to || AL.stiToday())}"></label><label class="v28-field al-grow"><span>Search this page</span><input class="v28-input" type="search" data-je-filter="q" value="${ae(u.q)}" placeholder="Reference, description or account"></label></div>`;
+  const g = AL.gate(e, { key: e.data && e.data.key, errorTitle: 'Journal entries could not be loaded' });
+  let body = g;
+  if (!g) {
+    const q = u.q.trim().toLowerCase();
+    const rows = e.data.rows.filter((j) => !q || `${j.referenceNumber} ${j.description} ${(j.journalEntryLines || []).map((l) => l.chartOfAccount ? `${l.chartOfAccount.accountNo} ${l.chartOfAccount.accountName}` : '').join(' ')}`.toLowerCase().includes(q));
+    const me = AL.me().id;
+    const tr = rows.map((j) => {
+      const st = AL.jeStatus[j.status] || [j.status, 'info'];
+      const code = (j.currency && j.currency.code) || '';
+      const own = j.createdById === me;
+      const acts = [AL.btn('Open', 'je-open', 'small', `data-id="${ae(j.id)}"`)];
+      if (j.status === 'PENDING' && canPost && !own) acts.push(AL.btn('Post', 'je-post', 'small primary', `data-id="${ae(j.id)}"`));
+      const accts = (j.journalEntryLines || []).map((l) => l.chartOfAccount && l.chartOfAccount.accountNo).filter(Boolean);
+      return `<tr>
+        <td>${ae(AL.date(j.transactionDate))}</td>
+        <td><strong>${ae(j.referenceNumber)}</strong><span class="v28-sub">#${ae(j.auditTrailSequenceNumber || '—')}</span></td>
+        <td class="al-wrap">${ae(j.description)}<span class="v28-sub">${ae([...new Set(accts)].slice(0, 4).join(', '))}</span></td>
+        <td>${ae(AL.jeWho(j.createdBy))}${own ? '<span class="v28-sub">You</span>' : ''}</td>
+        <td>${ae(AL.money(j.totalAmount, code))}</td>
+        <td>${AL.status(st[0], st[1])}</td>
+        <td class="al-actions">${acts.join('')}</td>
+      </tr>`;
+    }).join('');
+    const pg = e.data.pagination;
+    const pager = pg && pg.totalPages > 1 ? `<div class="al-pager"><span class="v28-sub">Page ${pg.page} of ${pg.totalPages} · ${AL.plural(pg.total, 'journal')}</span>${pg.hasPrevPage ? AL.btn('Previous', 'je-page', 'small', 'data-d="-1"') : ''}${pg.hasNextPage ? AL.btn('Next', 'je-page', 'small', 'data-d="1"') : ''}</div>` : '';
+    body = rows.length ? `${AL.table(['Date', 'Reference', 'Description', 'Prepared by', 'Amount', 'Status', ''], tr, '1080px')}${pager}` : AL.empty(q ? 'No journal on this page matches the search.' : u.tab === 'PENDING' ? 'No drafts waiting.' : 'No journals in this range.');
+  }
+  return `<div class="v28-page">${head}${kpis}${AL.panel('Journal register', '', `${tabs}${filters}${body}`)}</div>`;
+});
+AL.wire.journals = () => {
+  document.querySelectorAll('[data-je-filter]').forEach((el) => {
+    if (el.dataset.wired) return; el.dataset.wired = '1';
+    const k = el.dataset.jeFilter;
+    if (k === 'q') el.addEventListener('input', () => { AL.ui.je.q = el.value; clearTimeout(AL.jeT); AL.jeT = setTimeout(() => { AL.redraw(); const n = document.querySelector('[data-je-filter="q"]'); if (n) { n.focus(); n.setSelectionRange(n.value.length, n.value.length); } }, 250); });
+    else el.addEventListener('change', () => { AL.ui.je[k] = el.value; AL.ui.je.page = 0; AL.redraw(); });
+  });
+};
+AL.actions['je-tab'] = (el) => { AL.ui.je.tab = el.dataset.tab; AL.ui.je.page = 0; AL.redraw(); };
+AL.actions['je-page'] = (el) => { AL.ui.je.page = Math.max(0, AL.ui.je.page + Number(el.dataset.d)); AL.redraw(); };
+
+// ------------------------------------------------------------------------------------------------ one journal
+AL.jeLinesTable = (j) => {
+  const code = (j.currency && j.currency.code) || '';
+  const t = AL.jeTotals(j.journalEntryLines);
+  const rows = (j.journalEntryLines || []).map((l) => `<tr><td><strong>${ae(l.chartOfAccount ? l.chartOfAccount.accountNo : '')}</strong> ${ae(l.chartOfAccount ? l.chartOfAccount.accountName : '')}</td><td class="al-wrap">${ae(l.description || '')}</td><td>${Number(l.debitAmount) ? ae(AL.money(l.debitAmount, code)) : ''}</td><td>${Number(l.creditAmount) ? ae(AL.money(l.creditAmount, code)) : ''}</td></tr>`).join('');
+  return AL.table(['Account', 'Line description', 'Debit', 'Credit'], `${rows}<tr class="al-total"><td colspan="2"><strong>Total</strong></td><td><strong>${ae(AL.money(t.dr, code))}</strong></td><td><strong>${ae(AL.money(t.cr, code))}</strong></td></tr>`, '720px');
+};
+AL.actions['je-open'] = (el) => AL.busy(el, async () => {
+  const r = await AL.get(`/accounting/journal-entries/${encodeURIComponent(el.dataset.id)}`);
+  // the single-journal read answers { journalEntry, journalEntryLines, source }
+  const j = r && r.journalEntry ? { ...r.journalEntry, journalEntryLines: r.journalEntry.journalEntryLines || r.journalEntryLines || [], source: r.source || null } : r;
+  if (!j.currency) { const lk = AL.jeLookups(); if (lk.pending) await lk.pending; const c = lk.data && lk.data.currencies.find((x) => x.id === j.currencyId); if (c) j.currency = { code: c.code }; }
+  const canPrepare = AL.can('manage_accounting'), canPost = AL.can('manage_ledger');
+  const own = j.createdById === AL.me().id;
+  const st = AL.jeStatus[j.status] || [j.status, 'info'];
+  const facts = [['Date', AL.date(j.transactionDate)], ['Prepared by', `${AL.jeWho(j.createdBy)}${own ? ' (you)' : ''}`], ['Status', st[0]], ['Raised for', j.source ? j.source.replace(/^an? /, '') : 'Manual journal'], ['Audit sequence', `#${j.auditTrailSequenceNumber || '—'}`], ['Currency', (j.currency && j.currency.code) || '—']]
+    .map((f) => `<div class="v28-list-item"><div><strong>${ae(f[0])}</strong><span>${ae(f[1])}</span></div></div>`).join('');
+  const buttons = [];
+  if (j.status === 'PENDING' && canPost && !own) buttons.push(AL.btn('Post to ledger', 'je-post', 'primary', `data-id="${ae(j.id)}"`), AL.btn('Reject', 'je-reject', 'danger', `data-id="${ae(j.id)}"`));
+  if (j.status === 'PENDING' && canPost && own) buttons.push(`<span class="v28-sub">You prepared this draft, so another approver posts it.</span>`);
+  if (j.status === 'PENDING' && own && canPrepare && !j.source) buttons.push(AL.btn('Edit draft', 'je-edit', '', `data-id="${ae(j.id)}"`), AL.btn('Discard draft', 'je-discard', 'danger', `data-id="${ae(j.id)}"`));
+  if (j.status === 'POSTED' && canPost) buttons.push(AL.btn('Void (reverse)', 'je-void', 'danger', `data-id="${ae(j.id)}"`));
+  AL.jeCurrent = j;
+  AL.form({
+    title: j.referenceNumber, sub: j.description, wide: true, viewOnly: true, submitLabel: 'Close', fields: [],
+    extra: `<div class="al-wide"><div class="v28-grid equal">${facts}</div><h4 style="margin:16px 0 8px">Lines</h4>${AL.jeLinesTable(j)}${buttons.length ? `<div class="al-actions" style="margin-top:14px">${buttons.join('')}</div>` : ''}</div>`,
+    onSubmit: async () => false,
+  });
+});
+AL.actions['je-post'] = (el) => AL.busy(el, async () => {
+  await AL.patch(`/accounting/journal-entries/${encodeURIComponent(el.dataset.id)}/post`, {});
+  AL.close(); AL.jeReload();
+}, ['Journal posted', 'It is in the ledger.']);
+AL.actions['je-reject'] = (el) => AL.confirm({
+  title: 'Reject this draft', danger: true, confirmLabel: 'Reject draft', doneTitle: 'Draft rejected', reason: 'Why it is rejected',
+  body: 'The draft is withdrawn and never reaches the ledger; the preparer raises a corrected one.',
+  onConfirm: async (v) => { await AL.patch(`/accounting/journal-entries/${encodeURIComponent(el.dataset.id)}/void`, { reason: v.reason }); return 'The preparer can raise a corrected journal.'; },
+  after: () => AL.jeReload(),
+});
+AL.actions['je-discard'] = (el) => AL.confirm({
+  title: 'Discard this draft', danger: true, confirmLabel: 'Discard draft', doneTitle: 'Draft discarded', reason: 'Why it is discarded', reasonRequired: false,
+  body: 'It never reached the ledger, so nothing is reversed.',
+  onConfirm: async (v) => { await AL.post(`/accounting/journal-entries/${encodeURIComponent(el.dataset.id)}/discard`, { reason: v.reason || null }); return ''; },
+  after: () => AL.jeReload(),
+});
+AL.actions['je-void'] = (el) => AL.confirm({
+  title: 'Void this journal', danger: true, confirmLabel: 'Void and reverse', doneTitle: 'Journal voided', reason: 'Why it is voided',
+  body: 'A reversing entry is posted and the journal is marked void; reports then leave both out. Its period must still be open.',
+  onConfirm: async (v) => { await AL.patch(`/accounting/journal-entries/${encodeURIComponent(el.dataset.id)}/void`, { reason: v.reason }); return 'A reversing entry is posted.'; },
+  after: () => AL.jeReload(),
+});
+
+// ------------------------------------------------------------------------------------------------ raise or edit a journal
+AL.jeLookups = () => AL.res('je-lookups', async () => {
+  const [coa, currencies] = await Promise.all([AL.get('/accounting/chart-of-accounts'), AL.get('/accounting/currencies')]);
+  const accounts = (Array.isArray(coa) ? coa : (coa && coa.accounts) || []).filter((a) => a.isActive !== false).sort((a, b) => String(a.accountNo).localeCompare(String(b.accountNo)));
+  return { accounts, currencies: (currencies || []).filter((c) => c.isActive !== false) };
+});
+AL.jeLineRow = (accounts, l = {}) => `<tr class="al-je-line">
+  <td><select class="v28-select" data-k="chartOfAccountId"><option value="">Choose account…</option>${accounts.map((a) => `<option value="${ae(a.id)}"${a.id === l.chartOfAccountId ? ' selected' : ''}>${ae(`${a.accountNo} ${a.accountName}`)}</option>`).join('')}</select></td>
+  <td><input class="v28-input" data-k="description" value="${ae(l.description || '')}"></td>
+  <td><input class="v28-input" type="number" min="0" step="0.01" data-k="debitAmount" value="${Number(l.debitAmount) ? ae(Number(l.debitAmount)) : ''}"></td>
+  <td><input class="v28-input" type="number" min="0" step="0.01" data-k="creditAmount" value="${Number(l.creditAmount) ? ae(Number(l.creditAmount)) : ''}"></td>
+  <td><button class="v28-btn icon" data-al="je-line-del" aria-label="Remove line" type="button">×</button></td>
+</tr>`;
+AL.jeReadLines = () => [...document.querySelectorAll('#alOverlay .al-je-line')].map((tr) => {
+  const v = (k) => { const n = tr.querySelector(`[data-k="${k}"]`); return n ? n.value.trim() : ''; };
+  return { chartOfAccountId: v('chartOfAccountId'), description: v('description'), debitAmount: Number(v('debitAmount')) || 0, creditAmount: Number(v('creditAmount')) || 0 };
+}).filter((l) => l.chartOfAccountId || l.debitAmount || l.creditAmount);
+AL.jeBalanceNote = () => {
+  const t = AL.jeTotals(AL.jeReadLines()), n = document.getElementById('alJeBalance'); if (!n) return;
+  const diff = Math.round((t.dr - t.cr) * 100) / 100;
+  n.innerHTML = `Debits <strong>${ae(AL.num(t.dr, 2))}</strong> · Credits <strong>${ae(AL.num(t.cr, 2))}</strong> · ${diff === 0 && t.dr > 0 ? '<span class="al-ok">Balanced</span>' : `<span class="al-bad">Difference ${ae(AL.num(Math.abs(diff), 2))}</span>`}`;
+};
+AL.actions['je-line-add'] = () => { const tb = document.querySelector('#alOverlay .al-je-lines tbody'); if (tb) { tb.insertAdjacentHTML('beforeend', AL.jeLineRow(AL.cache['je-lookups'].data.accounts)); AL.jeBalanceNote(); } };
+AL.actions['je-line-del'] = (el) => { const rows = document.querySelectorAll('#alOverlay .al-je-line'); if (rows.length > 2) el.closest('tr').remove(); AL.jeBalanceNote(); };
+AL.jeForm = async (existing) => {
+  const lk = AL.jeLookups();
+  if (lk.pending) await lk.pending;
+  if (lk.state !== 'ok') throw new Error(lk.error || 'The chart of accounts could not be loaded.');
+  const { accounts, currencies } = lk.data;
+  const base = currencies.find((c) => c.isDefault) || currencies[0] || {};
+  const lines = existing ? existing.journalEntryLines : [{}, {}];
+  const today = AL.stiToday();
+  AL.form({
+    title: existing ? `Edit draft ${existing.referenceNumber}` : 'New journal', sub: 'Saved as a draft; an approver other than you posts it.', wide: true, submitLabel: existing ? 'Save draft' : 'Save as draft', doneTitle: existing ? 'Draft saved' : 'Journal saved as a draft',
+    fields: [
+      { k: 'transactionDate', label: 'Date', type: 'date', required: true, max: today },
+      { k: 'referenceNumber', label: 'Reference', required: true },
+      { k: 'currencyId', label: 'Currency', type: 'select', blank: false, required: true, options: currencies.map((c) => ({ value: c.id, label: c.code })) },
+      { k: 'description', label: 'Description', required: true, wide: true },
+    ],
+    initial: existing
+      ? { transactionDate: String(existing.transactionDate).slice(0, 10), referenceNumber: existing.referenceNumber, currencyId: existing.currencyId, description: existing.description }
+      : { transactionDate: today, referenceNumber: `MJ-${today.replace(/-/g, '')}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`, currencyId: base.id },
+    extra: `<div class="al-wide"><div class="v28-tablewrap"><table class="v28-table al-je-lines" style="min-width:760px"><thead><tr><th>Account</th><th>Line description</th><th>Debit</th><th>Credit</th><th></th></tr></thead><tbody>${lines.map((l) => AL.jeLineRow(accounts, l)).join('')}</tbody></table></div><div class="al-je-foot">${AL.btn('Add line', 'je-line-add', 'small', 'type="button"')}<span id="alJeBalance" class="v28-sub"></span></div></div>`,
+    validate: (v) => {
+      const ls = AL.jeReadLines();
+      if (ls.length < 2) return 'A journal needs at least two lines.';
+      if (ls.some((l) => !l.chartOfAccountId)) return 'Choose an account on every line.';
+      if (ls.some((l) => l.debitAmount && l.creditAmount)) return 'A line is either a debit or a credit, not both.';
+      if (ls.some((l) => !l.debitAmount && !l.creditAmount)) return 'Every line needs an amount.';
+      if (ls.some((l) => l.debitAmount < 0 || l.creditAmount < 0)) return 'Amounts cannot be negative; use the other column.';
+      const t = AL.jeTotals(ls);
+      if (Math.round((t.dr - t.cr) * 100) !== 0) return `Debits and credits differ by ${AL.num(Math.abs(t.dr - t.cr), 2)}.`;
+      if (v.transactionDate > today) return 'The date cannot be in the future.';
+      return '';
+    },
+    onSubmit: async (v) => {
+      const body = { ...v, journalEntryLines: AL.jeReadLines() };
+      if (existing) await AL.patch(`/accounting/journal-entries/${encodeURIComponent(existing.id)}`, body);
+      else await AL.post('/accounting/journal-entries', body);
+      return `${v.referenceNumber} is waiting for an approver.`;
+    },
+    after: () => { AL.ui.je.tab = 'PENDING'; AL.jeReload(); },
+  });
+  const ov = document.getElementById('alOverlay');
+  if (ov) ov.addEventListener('input', (ev) => { if (ev.target.closest('.al-je-line')) AL.jeBalanceNote(); });
+  AL.jeBalanceNote();
+};
+AL.actions['je-new'] = (el) => AL.busy(el, () => AL.jeForm(null));
+AL.actions['je-edit'] = (el) => AL.busy(el, () => AL.jeForm(AL.jeCurrent));
+
+} catch (e) { if (window.console) console.error("[acc-live] 20-journals.js failed to load", e); }
+/* ---- accounting-live/30-investments.js ---- */
+try {
+/* Short-Term Investments: /accounting/short-term-investments — the treasury register, valued in the reporting currency,
+ * with daily interest, placements, rate changes, liquidation, void, the posting mode and approval of interest journals.
+ * Everything here comes from /accounting/short-term-investments/* (SRD: Accounting Short-Term Investment Tracking). */
+AL.stiToday = () => { try { return new Date().toLocaleDateString('en-CA', { timeZone: 'Africa/Harare' }); } catch (_) { return new Date().toISOString().slice(0, 10); } };
+AL.stiLoad = () => AL.res('sti', async () => {
+  const today = AL.stiToday();
+  const [dash, list, settings] = await Promise.all([
+    AL.get(`/accounting/short-term-investments/dashboard?asOfIso=${today}`),
+    AL.get('/accounting/short-term-investments/instruments'),
+    AL.get('/accounting/short-term-investments/settings'),
+  ]);
+  return { dash: dash || {}, list: Array.isArray(list) ? list : [], settings: settings || {}, today };
+});
+AL.ui.sti = AL.ui.sti || { tab: 'ACTIVE' };
+AL.stiCompounding = { SIMPLE: 'Simple', COMPOUND_DAILY: 'Compound daily', COMPOUND_MONTHLY: 'Compound monthly' };
+AL.stiDayCount = { ACTUAL_365: 'Actual/365', ACTUAL_360: 'Actual/360', THIRTY_360: '30/360' };
+AL.stiStatus = { ACTIVE: ['Active', 'ok'], SETTLED: ['Settled', 'info'], VOIDED: ['Voided', 'bad'] };
+AL.stiPct = (dec) => (dec == null || !Number.isFinite(Number(dec)) ? '—' : `${(Number(dec) * 100).toLocaleString('en-US', { maximumFractionDigits: 4 })}%`);
+AL.stiDays = (iso, today) => { if (!iso) return null; return Math.round((Date.parse(iso.slice(0, 10)) - Date.parse(today)) / 86400000); };
+AL.stiFind = (id) => (((AL.cache.sti && AL.cache.sti.data) || {}).list || []).find((x) => x.id === id);
+AL.stiReload = () => { AL.invalidate('sti-detail'); return AL.run('sti'); };
+
+AL.page('investments', () => {
+  const e = AL.stiLoad();
+  AL.meLoad();
+  const canPlace = AL.can('accounting.treasury.manage');
+  const canApprove = AL.can('accounting.treasury.approve');
+  const g = AL.gate(e, { key: 'sti', errorTitle: 'Short-term investments could not be loaded' });
+  if (g) return `<div class="v28-page">${AL.head('Treasury and liquidity', 'Short-Term Investments', '')}${g}</div>`;
+  const { dash, list, settings, today } = e.data;
+  const cur = dash.reportingCurrency || 'USD';
+  const pf = dash.portfolio || {};
+  const alerts = dash.alerts || [];
+  const pendingAccruals = alerts.filter((a) => a.type === 'PENDING_APPROVAL');
+  const placements = dash.pendingPlacements || [];
+  const settlements = alerts.filter((a) => a.type === 'PENDING_SETTLEMENT');
+  const active = list.filter((x) => x.status === 'ACTIVE');
+  const byId = new Map((dash.instruments || []).map((x) => [x.instrumentId, x]));
+  const draftMode = settings.postingMode !== 'APPROVED';
+
+  const actions = [
+    canPlace ? AL.btn('New investment', 'sti-new', 'primary') : '',
+    canPlace && active.length ? AL.btn('Accrue to today', 'sti-accrue') : '',
+    canApprove && pendingAccruals.length ? AL.btn(`Approve ${AL.plural(pendingAccruals.length, 'interest journal')}`, 'sti-approve-all') : '',
+    canApprove ? AL.btn('Posting mode', 'sti-settings') : '',
+  ].join('');
+  const head = AL.head('Treasury and liquidity', 'Short-Term Investments',
+    `Valued in ${cur} as of ${AL.date(today)}. ${draftMode ? 'Daily interest journals are drafts until an approver posts them.' : 'Daily interest journals post straight to the ledger.'}`, actions);
+
+  const mb = dash.maturityBuckets || {};
+  const kpis = AL.kpis([
+    ['Portfolio value', AL.money(pf.carryingTotal, cur), `${AL.plural(active.length, 'active investment')}`],
+    ['Principal', AL.money(pf.principalTotal, cur), 'Cash placed'],
+    ['Accrued interest', AL.money(pf.accruedInterestTotal, cur), 'Earned, not yet received', Number(pf.accruedInterestTotal) < 0 ? '#d92d20' : '#12b76a'],
+    ['Interest this month', AL.money((dash.netYield || {}).monthToDate, cur), `Since 1 ${new Date(today).toLocaleDateString('en-GB', { month: 'short' })}`],
+    ['Maturing in 30 days', AL.money(mb.within30Days, cur), 'Principal and interest due back'],
+    ['Awaiting approval', String(pendingAccruals.length + placements.length + settlements.length), placements.length ? `${AL.plural(placements.length, 'placement')} with the CFO` : settlements.length ? `${AL.plural(settlements.length, 'settlement')} in draft` : pendingAccruals.length ? 'Interest journals in draft' : 'Nothing waiting', pendingAccruals.length + placements.length + settlements.length ? '#f79009' : '#12b76a'],
+  ]);
+
+  // what needs someone: missing rates, capital erosion, recent rate changes, drafts, placements with the CFO
+  const attention = [];
+  alerts.filter((a) => a.type === 'FX_RATE_MISSING').forEach((a) => attention.push([AL.status('Rate missing', 'bad'), 'Exchange rate', a.message]));
+  alerts.filter((a) => a.type === 'CAPITAL_EROSION').forEach((a) => attention.push([AL.status('Negative yield', 'bad'), a.instrumentName, 'The current rate is below zero: the investment is losing value each day.']));
+  const pendingBy = new Map();
+  pendingAccruals.forEach((a) => pendingBy.set(a.instrumentId, { name: a.instrumentName, n: (pendingBy.get(a.instrumentId) || { n: 0 }).n + 1 }));
+  pendingBy.forEach((v, id) => attention.push([AL.status('Draft interest', 'warn'), v.name, `${AL.plural(v.n, 'daily interest journal')} waiting to be posted.${canApprove ? '' : ' An approver posts them.'}`, canApprove ? AL.btn('Approve', 'sti-approve', 'small', `data-id="${ae(id)}"`) : '']));
+  settlements.forEach((a) => attention.push([AL.status('Draft settlement', 'warn'), a.instrumentName, `Settled ${AL.date(a.triggeredAt)}. The settlement journal is a draft, so the cash is not in the bank ledger until an approver posts it.`, AL.btn('Journal entries', 'sti-journals', 'small')]));
+  placements.forEach((p) => attention.push([AL.status('With the CFO', 'warn'), p.name, `${AL.money(p.principal, p.currencyCode || '')} placement requested by ${p.requestedBy || 'a preparer'} on ${AL.date(p.requestedAt)}; it is booked when the CFO approves it.`, AL.btn('Approval queue', 'sti-queue', 'small')]));
+  alerts.filter((a) => a.type === 'RATE_CHANGE').forEach((a) => attention.push([AL.status('Rate changed', 'info'), a.instrumentName, a.message.replace('APY schedule updated', 'New rate')]));
+  const attentionPanel = attention.length
+    ? AL.panel('Needs attention', '', AL.table(['', 'Investment', 'Detail', ''], attention.map((r) => `<tr><td>${r[0]}</td><td><strong>${ae(r[1] || '')}</strong></td><td class="al-wrap">${ae(r[2])}</td><td class="al-actions">${r[3] || ''}</td></tr>`).join(''), '760px'))
+    : '';
+
+  // interest earned per day this month, in the reporting currency
+  const days = dash.dailyYieldInMonth || [];
+  const peak = Math.max(0, ...days.map((d) => Math.abs(Number(d.amountSum) || 0)));
+  const bars = peak > 0
+    ? `<div class="al-bars" role="img" aria-label="Interest earned per day this month">${days.map((d) => { const v = Number(d.amountSum) || 0; const h = Math.max(2, Math.round((Math.abs(v) / peak) * 100)); return `<div class="al-bar${v < 0 ? ' neg' : ''}${v === 0 ? ' zero' : ''}" style="--h:${v === 0 ? 0 : h}%" title="${ae(AL.date(d.accrualDate))}: ${ae(AL.money(v, cur))}"></div>`; }).join('')}</div><div class="al-bars-axis"><span>${ae(AL.date(days[0] && days[0].accrualDate))}</span><span>${ae(AL.date(days[days.length - 1] && days[days.length - 1].accrualDate))}</span></div>`
+    : AL.empty('No interest accrued yet this month.');
+  const yieldPanel = AL.panel('Interest earned this month', `Per day, in ${cur}. Peak day ${AL.money(peak, cur)}.`, bars);
+
+  // cash coming back, by when the investment matures
+  const openEnded = (dash.instruments || []).filter((x) => !x.maturityDate).reduce((s, x) => s + (Number(x.carryingValueReporting) || 0), 0);
+  const ladder = [['Within 30 days', mb.within30Days], ['31 to 60 days', mb.days31to60], ['61 to 90 days', mb.days61to90], ['Over 90 days', mb.over90Days], ['No maturity date', openEnded]];
+  const ladderPanel = AL.panel('Liquidity forecast', `Expected value at maturity, in ${cur}.`, AL.table(['When it comes back', 'Expected cash'], ladder.map((r) => `<tr><td>${ae(r[0])}</td><td>${ae(AL.money(r[1], cur))}</td></tr>`).join(''), '360px'));
+
+  // the register
+  const tab = AL.ui.sti.tab;
+  const counts = { ACTIVE: 0, SETTLED: 0, VOIDED: 0 };
+  list.forEach((x) => { counts[x.status] = (counts[x.status] || 0) + 1; });
+  const tabs = `<div class="v28-tabbar">${[['ACTIVE', 'Active'], ['SETTLED', 'Settled'], ['VOIDED', 'Voided'], ['ALL', 'All']].map(([id, label]) => `<button class="v28-tab ${tab === id ? 'active' : ''}" data-al="sti-tab" data-tab="${id}">${ae(label)} <span class="v28-sub" style="display:inline">${id === 'ALL' ? list.length : counts[id] || 0}</span></button>`).join('')}</div>`;
+  const shown = list.filter((x) => tab === 'ALL' || x.status === tab);
+  const rows = shown.map((x) => {
+    const d = byId.get(x.id) || {};
+    const accrued = x.latestAccrual && x.status === 'ACTIVE' ? Number(x.latestAccrual.runningAccruedBalance) : d.accruedInterest;
+    const code = (x.currency && x.currency.code) || '';
+    const dleft = AL.stiDays(x.maturityDate, today);
+    const st = AL.stiStatus[x.status] || [x.status, 'info'];
+    const acts = [AL.btn('Open', 'sti-open', 'small', `data-id="${ae(x.id)}"`)];
+    if (x.status === 'ACTIVE' && canPlace) acts.push(AL.btn('Change rate', 'sti-rate', 'small', `data-id="${ae(x.id)}"`), AL.btn('Liquidate', 'sti-liquidate', 'small', `data-id="${ae(x.id)}"`));
+    if (x.status !== 'VOIDED' && canApprove) acts.push(AL.btn('Void', 'sti-void', 'small danger', `data-id="${ae(x.id)}"`));
+    const maturity = x.status === 'SETTLED'
+      ? `Settled ${ae(AL.date(x.liquidationDate))}<span class="v28-sub">${ae(AL.money(x.liquidationCashReceived, code))} received</span>`
+      : x.maturityDate ? `${ae(AL.date(x.maturityDate))}<span class="v28-sub">${dleft < 0 ? `${-dleft} days past maturity` : dleft === 0 ? 'Matures today' : `in ${dleft} days`}</span>` : 'Open-ended';
+    return `<tr>
+      <td><strong>${ae(x.name)}</strong><span class="v28-sub">${ae([x.category, AL.stiCompounding[x.compoundingMethod], AL.stiDayCount[x.dayCountConvention]].filter(Boolean).join(' · '))}</span></td>
+      <td>${ae(x.broker || '—')}</td>
+      <td>${ae(code)}</td>
+      <td>${ae(AL.money(x.principal, code))}</td>
+      <td>${x.status === 'ACTIVE' ? ae(AL.stiPct(d.apyAsOf)) : '—'}</td>
+      <td>${x.status === 'ACTIVE' ? ae(AL.money(accrued, code)) : '—'}</td>
+      <td>${x.status === 'ACTIVE' ? `${ae(AL.money(d.carryingValue, code))}${code !== cur && d.carryingValueReporting != null ? `<span class="v28-sub">${ae(AL.money(d.carryingValueReporting, cur))}</span>` : ''}` : '—'}</td>
+      <td>${maturity}</td>
+      <td>${AL.status(st[0], st[1])}${x.capitalErosion ? `<span class="v28-sub">Negative yield</span>` : ''}</td>
+      <td class="al-actions">${acts.join('')}</td>
+    </tr>`;
+  }).join('');
+  const register = AL.panel('Investment register', '', `${tabs}${shown.length ? AL.table(['Investment', 'Broker', 'Currency', 'Principal', 'Rate (APY)', 'Accrued interest', 'Carrying value', 'Maturity', 'Status', ''], rows, '1280px') : AL.empty(tab === 'ACTIVE' ? 'No active investments.' : 'None here.')}`);
+
+  // settled: what came back against what the books expected
+  const variance = (dash.settlementVariance || []).filter((v) => v.varianceInstrumentCcy != null && Math.abs(v.varianceInstrumentCcy) >= 0.01);
+  const variancePanel = variance.length
+    ? AL.panel('Settlement differences', 'Cash received against principal plus accrued interest; the difference was posted to interest income.', AL.table(['Investment', 'Settled', 'Expected', 'Received', 'Difference'], variance.map((v) => `<tr><td><strong>${ae(v.instrumentName)}</strong></td><td>${ae(AL.date(v.settlementDate))}</td><td>${ae(AL.money(v.expectedSettledAmountInstrumentCcy))}</td><td>${ae(AL.money(v.actualSettledAmountInstrumentCcy))}</td><td>${ae(AL.money(v.varianceInstrumentCcy))}</td></tr>`).join(''), '720px'))
+    : '';
+
+  return `<div class="v28-page">${head}${kpis}${attentionPanel}<div class="v28-grid two"><div>${yieldPanel}</div><div>${ladderPanel}</div></div>${register}${variancePanel}</div>`;
+});
+
+AL.actions['sti-tab'] = (el) => { AL.ui.sti.tab = el.dataset.tab; AL.redraw(); };
+AL.actions['sti-queue'] = () => AL.go('approvals');
+AL.actions['sti-journals'] = () => AL.go('journals');
+
+// ------------------------------------------------------------------------------------------------ place an investment
+AL.stiLookups = async () => {
+  const [currencies, banks, coa] = await Promise.all([AL.get('/accounting/currencies'), AL.get('/cashbook/banks'), AL.get('/accounting/chart-of-accounts')]);
+  const accounts = (Array.isArray(coa) ? coa : (coa && coa.accounts) || []).filter((a) => a.isActive !== false);
+  return { currencies: (currencies || []).filter((c) => c.isActive !== false), banks: (banks || []).filter((b) => b.isActive !== false && b.glAccountId), accounts };
+};
+AL.stiAccountPick = (accounts, no, re) => { const a = accounts.find((x) => x.accountNo === no) || accounts.find((x) => re.test(x.accountName || '')); return a ? a.id : ''; };
+AL.actions['sti-new'] = (el) => AL.busy(el, async () => {
+  const lk = await AL.stiLookups();
+  const base = lk.currencies.find((c) => c.isDefault) || lk.currencies[0] || {};
+  const acct = (types) => lk.accounts.filter((a) => types.test(`${a.accountType} ${a.accountNo}`)).map((a) => ({ value: a.id, label: `${a.accountNo} ${a.accountName}` }));
+  const assets = acct(/asset|^1/i), income = acct(/income|revenue|\b4\d{3}\b/i), expense = acct(/expense|\b5\d{3}\b/i), all = lk.accounts.map((a) => ({ value: a.id, label: `${a.accountNo} ${a.accountName}` }));
+  const fields = [
+    { k: 'name', label: 'Investment name', required: true, wide: true },
+    { k: 'category', label: 'Type', type: 'select', options: ['Money Market', 'Treasury Bill', 'Commercial Paper', 'Fixed Deposit', 'Bond', 'Other'], required: true },
+    { k: 'broker', label: 'Broker or issuer', required: true },
+    { k: 'currencyId', label: 'Currency', type: 'select', options: lk.currencies.map((c) => ({ value: c.id, label: c.code })), required: true, blank: false },
+    { k: 'principal', label: 'Principal', type: 'number', min: 0.01, step: '0.01', required: true },
+    { k: 'initialApyPercent', label: 'Rate (APY %)', type: 'number', step: '0.0001', required: true, hint: 'Annual yield in percent; a negative rate is allowed.' },
+    { k: 'compoundingMethod', label: 'Interest method', type: 'select', options: Object.entries(AL.stiCompounding).map(([value, label]) => ({ value, label })), required: true, blank: false },
+    { k: 'dayCountConvention', label: 'Day count', type: 'select', options: Object.entries(AL.stiDayCount).map(([value, label]) => ({ value, label })), required: true, blank: false },
+    { k: 'startDateIso', label: 'Start date', type: 'date', required: true, max: AL.stiToday() },
+    { k: 'maturityDateIso', label: 'Maturity date', type: 'date' },
+    { k: 'settlementBankId', label: 'Funded from (bank)', type: 'select', options: lk.banks.map((b) => ({ value: b.id, label: `${b.name}${b.currency && b.currency.code ? ` (${b.currency.code})` : ''}` })), required: true, wide: true },
+    { k: 'principalGlAccountId', label: 'Investment asset account', type: 'select', options: assets, required: true },
+    { k: 'accruedInterestGlAccountId', label: 'Accrued interest account', type: 'select', options: assets, required: true },
+    { k: 'interestIncomeGlAccountId', label: 'Interest income account', type: 'select', options: income, required: true },
+    { k: 'negativeYieldExpenseGlAccountId', label: 'Negative yield expense account', type: 'select', options: expense, required: true },
+    { k: 'unrealizedFxGlAccountId', label: 'Unrealised FX account (foreign currency)', type: 'select', options: all },
+    { k: 'realizedFxGlAccountId', label: 'Realised FX account (foreign currency)', type: 'select', options: all },
+  ];
+  AL.form({
+    title: 'New investment', sub: 'Placements of USD 50,000 or more by a preparer go to the CFO for approval first.', wide: true, submitLabel: 'Place investment', fields,
+    initial: {
+      currencyId: base.id, compoundingMethod: 'SIMPLE', dayCountConvention: 'ACTUAL_365', startDateIso: AL.stiToday(),
+      settlementBankId: (lk.banks.find((b) => b.currencyId === base.id) || lk.banks[0] || {}).id,
+      principalGlAccountId: AL.stiAccountPick(lk.accounts, '1150', /short.?term invest/i),
+      accruedInterestGlAccountId: AL.stiAccountPick(lk.accounts, '1160', /accrued interest/i),
+      interestIncomeGlAccountId: AL.stiAccountPick(lk.accounts, '4110', /interest income/i),
+      negativeYieldExpenseGlAccountId: AL.stiAccountPick(lk.accounts, '5150', /negative yield|investment loss/i),
+    },
+    validate: (v) => {
+      if (!(Number(v.principal) > 0)) return 'Principal must be more than zero.';
+      if (!Number.isFinite(Number(v.initialApyPercent))) return 'Enter the rate as a percentage, for example 9.12.';
+      if (v.startDateIso > AL.stiToday()) return 'The start date cannot be in the future.';
+      if (v.maturityDateIso && v.maturityDateIso <= v.startDateIso) return 'The maturity date must be after the start date.';
+      const bank = lk.banks.find((b) => b.id === v.settlementBankId);
+      if (bank && bank.currencyId && bank.currencyId !== v.currencyId) return 'The funding bank account must be in the investment currency.';
+      if (v.accruedInterestGlAccountId === v.principalGlAccountId) return 'Principal and accrued interest need separate accounts.';
+      if (v.currencyId !== base.id && (!v.unrealizedFxGlAccountId || !v.realizedFxGlAccountId)) return 'A foreign-currency investment needs its unrealised and realised FX accounts.';
+      return '';
+    },
+    onSubmit: async (v) => {
+      const body = { ...v, principal: Number(v.principal), initialApyPercent: Number(v.initialApyPercent), maturityDateIso: v.maturityDateIso || null, functionalCurrencyId: v.currencyId !== base.id ? base.id : null, unrealizedFxGlAccountId: v.unrealizedFxGlAccountId || null, realizedFxGlAccountId: v.realizedFxGlAccountId || null };
+      const r = await AL.post('/accounting/short-term-investments/instruments', body);
+      if (r && r.status === 'pending_approval') { AL.formSpec.doneTitle = 'Sent for CFO approval'; return `${v.name} is booked once the CFO approves it.`; }
+      AL.formSpec.doneTitle = 'Investment placed';
+      return r && r.initialAccrualCatchUpWarning ? `Placed. Interest could not be accrued yet: ${r.initialAccrualCatchUpWarning}` : `${v.name} is placed and interest is accrued to today.`;
+    },
+    after: () => { AL.ui.sti.tab = 'ACTIVE'; return AL.stiReload(); },
+  });
+});
+
+// ------------------------------------------------------------------------------------------------ rate, liquidation, void
+AL.actions['sti-rate'] = (el) => {
+  const x = AL.stiFind(el.dataset.id); if (!x) return;
+  const d = ((AL.cache.sti.data.dash.instruments || []).find((i) => i.instrumentId === x.id)) || {};
+  AL.form({
+    title: `Change rate: ${x.name}`, sub: `Current rate ${AL.stiPct(d.apyAsOf)}`, submitLabel: 'Save rate', doneTitle: 'Rate changed',
+    fields: [
+      { k: 'apyPercent', label: 'New rate (APY %)', type: 'number', step: '0.0001', required: true },
+      { k: 'effectiveFromIso', label: 'Effective from', type: 'date', required: true, min: x.startDate.slice(0, 10) },
+    ],
+    initial: { effectiveFromIso: AL.stiToday() },
+    validate: (v) => (Number.isFinite(Number(v.apyPercent)) ? '' : 'Enter the rate as a percentage, for example 8.5.'),
+    onSubmit: async (v) => {
+      const r = await AL.post(`/accounting/short-term-investments/instruments/${encodeURIComponent(x.id)}/apy-rates`, { apyPercent: Number(v.apyPercent), effectiveFromIso: v.effectiveFromIso });
+      return r && r.restatedDays ? `${AL.plural(r.restatedDays, 'draft day')} recalculated at the new rate.` : `The new rate applies from ${AL.date(v.effectiveFromIso)}.`;
+    },
+    after: () => AL.stiReload(),
+  });
+};
+AL.actions['sti-liquidate'] = (el) => {
+  const x = AL.stiFind(el.dataset.id); if (!x) return;
+  const code = (x.currency && x.currency.code) || '';
+  const d = ((AL.cache.sti.data.dash.instruments || []).find((i) => i.instrumentId === x.id)) || {};
+  AL.form({
+    title: `Liquidate: ${x.name}`, sub: `Carrying value ${AL.money(d.carryingValue, code)} (principal plus accrued interest)`, submitLabel: 'Settle investment', doneTitle: 'Investment settled',
+    fields: [
+      { k: 'settlementIso', label: 'Settlement date', type: 'date', required: true, max: AL.stiToday(), min: x.startDate.slice(0, 10) },
+      { k: 'cashReceived', label: `Cash received (${code})`, type: 'number', step: '0.01', min: 0, required: true, hint: 'Interest is accrued to the settlement date first; any difference from the books is posted to interest income.' },
+    ],
+    initial: { settlementIso: AL.stiToday(), cashReceived: d.carryingValue != null ? Math.round(Number(d.carryingValue) * 100) / 100 : '' },
+    validate: (v) => (Number(v.cashReceived) >= 0 ? '' : 'Enter the cash received.'),
+    onSubmit: async (v) => {
+      await AL.post(`/accounting/short-term-investments/instruments/${encodeURIComponent(x.id)}/liquidate`, { settlementIso: v.settlementIso, cashReceived: Number(v.cashReceived) });
+      return AL.cache.sti.data.settings.postingMode === 'APPROVED' ? 'The settlement is posted to the bank.' : 'The settlement journal is a draft until an approver posts it.';
+    },
+    after: () => AL.stiReload(),
+  });
+};
+AL.actions['sti-void'] = (el) => {
+  const x = AL.stiFind(el.dataset.id); if (!x) return;
+  AL.confirm({
+    title: `Void ${x.name}`, danger: true, confirmLabel: 'Void investment', doneTitle: 'Investment voided', reason: 'Why it is being voided',
+    body: 'For an investment booked in error. Its placement, interest and any settlement are reversed in the ledger; it stays on record as voided.',
+    onConfirm: async (v) => { await AL.post(`/accounting/short-term-investments/instruments/${encodeURIComponent(x.id)}/void`, { reason: v.reason }); return 'Its journals are reversed.'; },
+    after: () => AL.stiReload(),
+  });
+};
+
+// ------------------------------------------------------------------------------------------------ accruals and approval
+AL.actions['sti-accrue'] = (el) => AL.busy(el, async () => {
+  const today = AL.stiToday(); let days = 0; const failed = [];
+  for (const x of (AL.cache.sti.data.list || []).filter((i) => i.status === 'ACTIVE')) {
+    try { const r = await AL.post(`/accounting/short-term-investments/instruments/${encodeURIComponent(x.id)}/catch-up`, { throughIso: today }); days += Array.isArray(r) ? r.filter((c) => c.outcome === 'created').length : Number((r && r.created) || 0); }
+    catch (err) { failed.push(`${x.name}: ${AL.msg(err)}`); }
+  }
+  await AL.stiReload();
+  if (failed.length) throw new Error(failed.join(' · '));
+  return days;
+}, ['Interest accrued', (days) => (days ? `${AL.plural(days, 'day')} of interest booked.` : 'Every investment was already accrued to today.')]);
+AL.actions['sti-approve'] = (el) => AL.busy(el, async () => {
+  await AL.post(`/accounting/short-term-investments/instruments/${encodeURIComponent(el.dataset.id)}/accruals/approve-all`, {});
+  await AL.stiReload();
+}, ['Interest posted', 'The draft interest journals are posted to the ledger.']);
+AL.actions['sti-approve-all'] = (el) => AL.busy(el, async () => {
+  const ids = [...new Set((AL.cache.sti.data.dash.alerts || []).filter((a) => a.type === 'PENDING_APPROVAL').map((a) => a.instrumentId))];
+  const failed = [];
+  for (const id of ids) { try { await AL.post(`/accounting/short-term-investments/instruments/${encodeURIComponent(id)}/accruals/approve-all`, {}); } catch (err) { failed.push(AL.msg(err)); } }
+  await AL.stiReload();
+  if (failed.length) throw new Error(failed[0]);
+}, ['Interest posted', 'Every draft interest journal is posted to the ledger.']);
+AL.actions['sti-settings'] = () => {
+  const s = AL.cache.sti.data.settings || {};
+  AL.form({
+    title: 'Posting mode', sub: 'How the daily interest journals reach the ledger.', submitLabel: 'Save', doneTitle: 'Posting mode saved',
+    fields: [{ k: 'postingMode', label: 'Daily interest journals', type: 'select', blank: false, required: true, options: [{ value: 'DRAFT', label: 'Draft: an approver posts them' }, { value: 'APPROVED', label: 'Posted automatically' }] }],
+    initial: { postingMode: s.postingMode || 'DRAFT' },
+    onSubmit: async (v) => { await AL.patch('/accounting/short-term-investments/settings', { postingMode: v.postingMode }); return v.postingMode === 'APPROVED' ? 'New interest journals post straight to the ledger.' : 'New interest journals wait for an approver.'; },
+    after: () => AL.stiReload(),
+  });
+};
+
+// ------------------------------------------------------------------------------------------------ one investment
+AL.actions['sti-open'] = (el) => AL.busy(el, async () => {
+  const x = await AL.get(`/accounting/short-term-investments/instruments/${encodeURIComponent(el.dataset.id)}`);
+  const code = (x.currency && x.currency.code) || '';
+  const canApprove = AL.can('accounting.treasury.approve');
+  const drafts = (x.accruals || []).filter((a) => a.status === 'PENDING_POST').length;
+  const foreign = !!x.functionalCurrencyId && x.functionalCurrencyId !== x.currencyId;
+  const facts = [
+    ['Principal', AL.money(x.principal, code)], ['Start', AL.date(x.startDate)], ['Maturity', x.maturityDate ? AL.date(x.maturityDate) : 'Open-ended'],
+    ['Interest method', `${AL.stiCompounding[x.compoundingMethod] || x.compoundingMethod} · ${AL.stiDayCount[x.dayCountConvention] || x.dayCountConvention}`],
+    ['Broker', x.broker || '—'], ['Funded from', (x.settlementBank && x.settlementBank.name) || '—'],
+  ].map((f) => `<div class="v28-list-item"><div><strong>${ae(f[0])}</strong><span>${ae(f[1])}</span></div></div>`).join('');
+  const rates = (x.apyRates || []).map((r) => `<tr><td>${ae(AL.date(r.effectiveFrom))}</td><td>${ae(AL.stiPct(r.apy))}</td><td>${ae(AL.dateTime(r.createdAt))}</td></tr>`).join('');
+  const accStatus = { PENDING_POST: ['Draft', 'warn'], POSTED: ['Posted', 'ok'], REVERSED: ['Reversed', 'bad'] };
+  const acc = (x.accruals || []).map((a) => { const st = accStatus[a.status] || [a.status, 'info']; return `<tr><td>${ae(AL.date(a.accrualDate))}</td><td>${ae(AL.money(a.amountInstrumentCcy, code))}</td><td>${ae(AL.money(a.runningAccruedBalance, code))}</td>${foreign ? `<td>${a.reportingAmountFunctional != null ? ae(AL.money(a.reportingAmountFunctional)) : 'No rate that day'}</td>` : ''}<td>${ae(AL.stiPct(a.apyRate && a.apyRate.apy))}</td><td>${AL.status(st[0], st[1])}</td></tr>`; }).join('');
+  AL.form({
+    title: x.name, sub: `${x.category || 'Investment'} · ${code} · ${(AL.stiStatus[x.status] || [x.status])[0]}`, wide: true, submitLabel: drafts && canApprove && x.status === 'ACTIVE' ? `Approve ${AL.plural(drafts, 'draft')}` : 'Close', viewOnly: !(drafts && canApprove && x.status === 'ACTIVE'), fields: [],
+    extra: `<div class="al-wide"><div class="v28-grid equal">${facts}</div>
+      <h4 style="margin:16px 0 8px">Rate history</h4>${rates ? AL.table(['Effective from', 'Rate (APY)', 'Entered'], rates, '480px') : AL.empty('No rates.')}
+      <h4 style="margin:16px 0 8px">Daily interest (latest ${(x.accruals || []).length} of ${(x._count && x._count.accruals) || 0} days)</h4>${acc ? AL.table(['Day', 'Interest', 'Accrued to date', ...(foreign ? ['In reporting currency'] : []), 'Rate', 'Journal'], acc, '720px') : AL.empty('No interest accrued yet.')}</div>`,
+    onSubmit: async () => {
+      if (!(drafts && canApprove && x.status === 'ACTIVE')) return false;
+      AL.formSpec.doneTitle = 'Interest posted';
+      await AL.post(`/accounting/short-term-investments/instruments/${encodeURIComponent(x.id)}/accruals/approve-all`, {});
+      return 'The draft interest journals are posted to the ledger.';
+    },
+    after: () => AL.stiReload(),
+  });
+});
+
+} catch (e) { if (window.console) console.error("[acc-live] 30-investments.js failed to load", e); }
+/* ---- accounting-live/35-recurring.js ---- */
+try {
+/* Recurring Schedules: /accounting/recurring — journals that post themselves each month (accruals, subscriptions,
+ * allocations). A preparer sets one up (balanced lines, day of the month); an approver who did not set it up switches it
+ * on; the scheduled job then posts it on its day each month (never twice for a month), and an approver can run one or all
+ * due now. Data: /accounting/recurring-journal-templates. */
+AL.recLoad = () => AL.res('rec', () => AL.get('/accounting/recurring-journal-templates'));
+AL.recReload = () => { delete AL.cache.rec; AL.redraw(); };
+AL.recNext = (t) => {
+  const today = AL.stiToday(); const [y, m] = today.split('-').map(Number);
+  const dim = (yy, mm) => new Date(Date.UTC(yy, mm, 0)).getUTCDate();
+  const d = Math.min(t.dayOfMonth || 1, dim(y, m));
+  const thisMonth = `${today.slice(0, 7)}-${String(d).padStart(2, '0')}`;
+  if (thisMonth >= today) return thisMonth;
+  const ny = m === 12 ? y + 1 : y, nm = m === 12 ? 1 : m + 1;
+  return `${ny}-${String(nm).padStart(2, '0')}-${String(Math.min(t.dayOfMonth || 1, dim(ny, nm))).padStart(2, '0')}`;
+};
+
+AL.page('recurring', () => {
+  AL.meLoad();
+  const canPrepare = AL.can('manage_accounting'), canPost = AL.can('manage_ledger');
+  const e = AL.recLoad();
+  const head = AL.head('Daily accounting', 'Recurring Schedules', 'Each posts on its day every month once an approver has switched it on.',
+    [canPrepare ? AL.btn('New schedule', 'rec-new', 'primary') : '', canPost ? AL.btn('Run what is due', 'rec-due') : ''].join(''));
+  const g = AL.gate(e, { key: 'rec', errorTitle: 'Recurring schedules could not be loaded' });
+  if (g) return `<div class="v28-page">${head}${g}</div>`;
+  const list = e.data || [];
+  const me = AL.me().id;
+  const active = list.filter((t) => t.isActive), waiting = list.filter((t) => !t.isActive && !(t._count && t._count.runs));
+  const monthly = active.reduce((s, t) => s + (t.linesJson || []).reduce((a, l) => a + Number(l.debitAmount || 0), 0), 0);
+  const kpis = AL.kpis([
+    ['On', String(active.length), `${AL.money(monthly)} a month`],
+    ['Waiting to be switched on', String(waiting.length), 'Set up, not approved yet', waiting.length ? '#f79009' : '#12b76a'],
+    ['Paused', String(list.length - active.length - waiting.length), 'Switched off after running'],
+    ['Next to post', active.length ? AL.date(active.map(AL.recNext).sort()[0]) : '—', active.length ? active.sort((a, b) => AL.recNext(a).localeCompare(AL.recNext(b)))[0].name : ''],
+  ]);
+  const rows = list.map((t) => {
+    const amount = (t.linesJson || []).reduce((a, l) => a + Number(l.debitAmount || 0), 0);
+    const runs = (t._count && t._count.runs) || 0;
+    const own = t.createdById === me;
+    const status = t.isActive ? AL.status('On', 'ok') : runs ? AL.status('Paused', 'info') : AL.status('Waiting to be switched on', 'warn');
+    const acts = [AL.btn('Lines', 'rec-lines', 'small', `data-id="${ae(t.id)}"`)];
+    if (canPost && !t.isActive && !own) acts.push(AL.btn('Switch on', 'rec-toggle', 'small primary', `data-id="${ae(t.id)}" data-on="1"`));
+    if (canPost && t.isActive) acts.push(AL.btn('Run now', 'rec-run', 'small', `data-id="${ae(t.id)}"`), AL.btn('Pause', 'rec-toggle', 'small', `data-id="${ae(t.id)}" data-on="0"`));
+    return `<tr>
+      <td><strong>${ae(t.name)}</strong><span class="v28-sub">${ae(t.description || '')}</span></td>
+      <td>Day ${ae(String(t.dayOfMonth || 1))}<span class="v28-sub">${t.isActive ? `Next ${ae(AL.date(AL.recNext(t)))}` : ''}</span></td>
+      <td>${ae(AL.money(amount, t.currency && t.currency.code))}</td>
+      <td>${ae(String(runs))}</td>
+      <td>${status}${own && !t.isActive && !runs ? '<span class="v28-sub">Set up by you</span>' : ''}</td>
+      <td class="al-actions">${acts.join('')}</td>
+    </tr>`;
+  }).join('');
+  return `<div class="v28-page">${head}${kpis}${AL.panel('Schedules', '', rows ? AL.table(['Schedule', 'Posts on', 'Amount', 'Months posted', 'Status', ''], rows, '980px') : AL.empty('No recurring schedules yet.'))}</div>`;
+});
+AL.recFind = (id) => ((AL.cache.rec && AL.cache.rec.data) || []).find((t) => t.id === id);
+AL.actions['rec-lines'] = (el) => AL.busy(el, async () => {
+  const t = AL.recFind(el.dataset.id); if (!t) return;
+  const lk = AL.jeLookups(); if (lk.pending) await lk.pending;
+  const name = (id) => { const a = ((lk.data && lk.data.accounts) || []).find((x) => x.id === id); return a ? `${a.accountNo} ${a.accountName}` : id; };
+  const rows = (t.linesJson || []).map((l) => `<tr><td>${ae(name(l.chartOfAccountId))}</td><td class="al-wrap">${ae(l.description || '')}</td><td>${Number(l.debitAmount) ? ae(AL.money(l.debitAmount)) : ''}</td><td>${Number(l.creditAmount) ? ae(AL.money(l.creditAmount)) : ''}</td></tr>`).join('');
+  AL.form({ title: t.name, sub: `Day ${t.dayOfMonth || 1} · reference ${t.referencePrefix || ''}`, wide: true, viewOnly: true, submitLabel: 'Close', fields: [], extra: `<div class="al-wide">${AL.table(['Account', 'Line', 'Debit', 'Credit'], rows, '640px')}</div>`, onSubmit: async () => false });
+});
+AL.actions['rec-toggle'] = (el) => {
+  const t = AL.recFind(el.dataset.id); if (!t) return;
+  const on = el.dataset.on === '1';
+  AL.confirm({ title: `${on ? 'Switch on' : 'Pause'} ${t.name}`, confirmLabel: on ? 'Switch on' : 'Pause', doneTitle: on ? 'Switched on' : 'Paused',
+    body: on ? `From now on it posts ${AL.money((t.linesJson || []).reduce((a, l) => a + Number(l.debitAmount || 0), 0), t.currency && t.currency.code)} on day ${t.dayOfMonth || 1} of every month without further review.` : 'It stops posting until switched on again.',
+    onConfirm: async () => { await AL.patch(`/accounting/recurring-journal-templates/${encodeURIComponent(t.id)}/active`, { isActive: on }); return ''; }, after: () => AL.recReload() });
+};
+AL.actions['rec-run'] = (el) => AL.busy(el, async () => { const r = await AL.post(`/accounting/recurring-journal-templates/${encodeURIComponent(el.dataset.id)}/run`, {}); AL.recReload(); return r; }, ['Run', (r) => (r && (r.skipped || r.alreadyRun) ? 'Already posted for this month.' : 'Posted for this month.')]);
+AL.actions['rec-due'] = (el) => AL.busy(el, async () => { const r = await AL.post('/accounting/recurring-journal-templates/run-due', {}); AL.recReload(); return r; }, ['Due schedules run', (r) => `${(r && (r.created ?? r.posted ?? r.processed)) || 0} posted.`]);
+AL.actions['rec-new'] = (el) => AL.busy(el, async () => {
+  const lk = AL.jeLookups(); if (lk.pending) await lk.pending;
+  const { accounts, currencies } = lk.data; const base = currencies.find((c) => c.isDefault) || currencies[0] || {};
+  AL.form({
+    title: 'New recurring schedule', sub: 'Saved switched off; an approver other than you switches it on.', wide: true, submitLabel: 'Save', doneTitle: 'Schedule saved',
+    fields: [
+      { k: 'name', label: 'Name', required: true, wide: true },
+      { k: 'description', label: 'Description', wide: true },
+      { k: 'dayOfMonth', label: 'Posts on day of month', type: 'number', min: 1, max: 31, step: '1', required: true },
+      { k: 'currencyId', label: 'Currency', type: 'select', blank: false, required: true, options: currencies.map((c) => ({ value: c.id, label: c.code })) },
+      { k: 'referencePrefix', label: 'Reference prefix' },
+    ],
+    initial: { dayOfMonth: 1, currencyId: base.id, referencePrefix: 'REC' },
+    extra: `<div class="al-wide"><div class="v28-tablewrap"><table class="v28-table al-je-lines" style="min-width:760px"><thead><tr><th>Account</th><th>Line description</th><th>Debit</th><th>Credit</th><th></th></tr></thead><tbody>${AL.jeLineRow(accounts)}${AL.jeLineRow(accounts)}</tbody></table></div><div class="al-je-foot">${AL.btn('Add line', 'je-line-add', 'small', 'type="button"')}<span id="alJeBalance" class="v28-sub"></span></div></div>`,
+    validate: () => { const ls = AL.jeReadLines(); if (ls.length < 2) return 'At least two lines.'; if (ls.some((l) => !l.chartOfAccountId)) return 'Choose an account on every line.'; const t = AL.jeTotals(ls); return Math.round((t.dr - t.cr) * 100) !== 0 ? 'Debits and credits must be equal.' : ''; },
+    onSubmit: async (v) => { await AL.post('/accounting/recurring-journal-templates', { ...v, dayOfMonth: Number(v.dayOfMonth), lines: AL.jeReadLines() }); return 'An approver switches it on.'; },
+    after: () => AL.recReload(),
+  });
+  const ov = document.getElementById('alOverlay'); if (ov) ov.addEventListener('input', (ev) => { if (ev.target.closest('.al-je-line')) AL.jeBalanceNote(); });
+});
+
+} catch (e) { if (window.console) console.error("[acc-live] 35-recurring.js failed to load", e); }
+/* ---- accounting-live/40-reconciliation.js ---- */
+try {
+/* Bank Reconciliation: /accounting/bank-reconciliation — per account: where it is reconciled to and what is outstanding;
+ * the workbench: statement lines beside cashbook entries (SRD ACC-CB-33), import, auto-match, match by hand, book a bank
+ * line the books do not have (charges, interest), tick, and finish only when every line is matched and the cleared
+ * balance equals the statement (ACC-CB-25). Data: /cashbook/reconciliation/*. */
+AL.ui.rec = AL.ui.rec || { session: '' };
+AL.recStatus = () => AL.res('rec-status', () => AL.get('/cashbook/reconciliation/status'));
+AL.recBench = (id) => AL.res(`rec:${id}`, () => AL.get(`/cashbook/reconciliation/sessions/${encodeURIComponent(id)}/workbench`));
+AL.recReload = () => { Object.keys(AL.cache).filter((k) => k === 'rec-status' || k.startsWith('rec:')).forEach((k) => delete AL.cache[k]); AL.redraw(); };
+AL.recDay = (v) => String(v || '').slice(0, 10);
+
+AL.page('reconciliation', () => {
+  AL.meLoad();
+  const canRec = AL.can('bank_reconciliation');
+  if (AL.ui.rec.session) return AL.recWorkbench(AL.ui.rec.session, canRec);
+  const e = AL.recStatus();
+  const head = AL.head('Daily accounting', 'Bank Reconciliation', 'Each account is reconciled statement by statement; nothing can be booked on or before a reconciled date.');
+  const g = AL.gate(e, { key: 'rec-status', errorTitle: 'Bank accounts could not be loaded' });
+  if (g) return `<div class="v28-page">${head}${g}</div>`;
+  const rows = e.data;
+  const totalOpen = rows.reduce((t, r) => t + r.unreconciled.count, 0);
+  const stale = rows.filter((r) => r.unreconciled.count && (!r.lastReconciled || (Date.now() - Date.parse(r.lastReconciled.statementDate)) > 35 * 86400000)).length;
+  const kpis = AL.kpis([
+    ['Bank accounts', String(rows.length), `${rows.filter((r) => r.lastReconciled).length} reconciled at least once`],
+    ['Entries not reconciled', String(totalOpen), 'Posted cashbook lines', totalOpen ? '#f79009' : '#12b76a'],
+    ['Behind', String(stale), 'Not reconciled in the last month', stale ? '#d92d20' : '#12b76a'],
+    ['In progress', String(rows.filter((r) => r.draft).length), 'Reconciliations started'],
+  ]);
+  const tr = rows.map((r) => {
+    const cur = (r.bank.currency && r.bank.currency.code) || '';
+    const acts = r.draft ? AL.btn('Continue', 'rec-open', 'small primary', `data-id="${ae(r.draft.sessionId)}"`) : canRec ? AL.btn('Start reconciliation', 'rec-start', 'small', `data-bank="${ae(r.bank.id)}"`) : '';
+    const last = r.lastReconciled ? AL.btn('Last reconciliation', 'rec-open', 'small', `data-id="${ae(r.lastReconciled.sessionId)}"`) : '';
+    return `<tr>
+      <td><strong>${ae(r.bank.name)}</strong><span class="v28-sub">${ae(r.bank.accountNumber || '')} · ${ae(cur)}</span></td>
+      <td>${r.lastReconciled ? `${ae(AL.date(r.lastReconciled.statementDate))}<span class="v28-sub">Closing ${ae(AL.money(r.lastReconciled.closingBalance, cur))}</span>` : AL.status('Never', 'warn')}</td>
+      <td>${ae(String(r.unreconciled.count))}${r.unreconciled.oldest ? `<span class="v28-sub">Oldest ${ae(AL.date(r.unreconciled.oldest))}</span>` : ''}</td>
+      <td>${ae(AL.money(r.unreconciled.receipts, cur))}</td>
+      <td>${ae(AL.money(r.unreconciled.payments, cur))}</td>
+      <td>${r.draft ? `${AL.status('In progress', 'info')}<span class="v28-sub">Statement to ${ae(AL.date(r.draft.statementDate))}</span>` : '—'}</td>
+      <td class="al-actions">${acts}${last}</td>
+    </tr>`;
+  }).join('');
+  return `<div class="v28-page">${head}${kpis}${AL.panel('Accounts', '', rows.length ? AL.table(['Account', 'Reconciled to', 'Not reconciled', 'Receipts outstanding', 'Payments outstanding', 'Current', ''], tr, '1080px') : AL.empty('No bank accounts are set up.'))}</div>`;
+});
+
+AL.recWorkbench = (id, canRec) => {
+  const e = AL.recBench(id);
+  const back = AL.btn('All accounts', 'rec-back');
+  const g = AL.gate(e, { key: `rec:${id}`, errorTitle: 'This reconciliation could not be loaded' });
+  if (g) return `<div class="v28-page">${AL.head('Bank reconciliation', 'Reconciliation', '', back)}${g}</div>`;
+  const { session, bank, statement, items, entries, summary } = e.data;
+  const cur = (bank && bank.currency && bank.currency.code) || '';
+  const draft = session.status === 'DRAFT';
+  const acts = [back];
+  if (draft && canRec) {
+    acts.push(AL.btn(statement ? 'Replace statement' : 'Import statement', 'rec-import'));
+    if (statement) acts.push(AL.btn('Auto-match', 'rec-auto'));
+    acts.push(AL.btn('Discard', 'rec-discard', 'danger'));
+    acts.push(AL.btn('Finish reconciliation', 'rec-finish', 'primary', summary.canFinish ? '' : `disabled title="${ae(summary.blockers.join(' '))}"`));
+  }
+  if (!draft && AL.can('manage_ledger')) acts.push(AL.btn('Reopen', 'rec-reopen', 'danger'));
+  const head = AL.head('Bank reconciliation', `${bank ? bank.name : ''}: statement to ${AL.date(session.statementDate)}`, draft ? `Opening ${AL.money(summary.openingBalance, cur)} · closing ${AL.money(summary.statementEndBalance, cur)}${statement && statement.lastAutoMatchAt ? ` · last auto-match ${AL.dateTime(statement.lastAutoMatchAt)}` : ''}` : `Finished ${AL.dateTime(session.finishedAt)}`, acts.join(''));
+  const diff = summary.difference;
+  const kpis = AL.kpis([
+    ['Statement closing', AL.money(summary.statementEndBalance, cur), statement ? `${statement.fileName || 'Imported statement'}` : 'Entered'],
+    ['Cleared balance', summary.clearedBalance == null ? '—' : AL.money(summary.clearedBalance, cur), 'Opening + ticked receipts − ticked payments'],
+    ['Difference', diff == null ? '—' : AL.money(diff, cur), diff === 0 ? 'Balanced' : 'Statement − cleared', diff === 0 ? '#12b76a' : '#d92d20'],
+    ['Statement lines matched', statement ? `${summary.matchedLines} of ${summary.statementLines}` : 'No statement', statement ? `${summary.statementLines ? Math.round((summary.matchedLines / summary.statementLines) * 100) : 0}%` : 'Tick entries by hand, or import', statement && summary.matchedLines === summary.statementLines ? '#12b76a' : '#f79009'],
+    ['Outstanding receipts', AL.money(summary.outstandingReceipts, cur), 'In the books, not on the statement'],
+    ['Outstanding payments', AL.money(summary.outstandingPayments, cur), 'In the books, not on the statement'],
+  ]);
+  const blockers = draft && summary.blockers.length ? `<div class="al-state al-note" role="status"><strong>Before it can be finished</strong><ul>${summary.blockers.map((b) => `<li>${ae(b)}</li>`).join('')}</ul></div>` : '';
+  // statement side
+  const stRows = items.map((i) => {
+    const acts2 = [];
+    if (draft && canRec) {
+      if (i.matched) acts2.push(AL.btn('Unmatch', 'rec-unmatch', 'small', `data-item="${ae(i.id)}"`));
+      else acts2.push(AL.btn('Match', 'rec-match', 'small', `data-item="${ae(i.id)}"`), AL.btn('Book to cashbook', 'rec-book', 'small', `data-item="${ae(i.id)}"`));
+    }
+    return `<tr class="${i.matched ? '' : 'al-exception'}">
+      <td>${ae(AL.date(i.date))}</td>
+      <td class="al-wrap">${ae(i.description)}<span class="v28-sub">${ae(i.reference || '')}</span></td>
+      <td>${i.credit ? ae(AL.money(i.credit, cur)) : ''}</td>
+      <td>${i.debit ? ae(AL.money(i.debit, cur)) : ''}</td>
+      <td>${i.matched ? `${AL.status('Matched', 'ok')}<span class="v28-sub">${ae(i.entry ? i.entry.reference || i.entry.description : '')}</span>` : AL.status('Not in the books', 'warn')}</td>
+      <td class="al-actions">${acts2.join('')}</td>
+    </tr>`;
+  }).join('');
+  const stPanel = AL.panel('Bank statement', statement ? `${AL.plural(items.length, 'line')} · money in ${AL.money(statement.totalCredits, cur)} · money out ${AL.money(statement.totalDebits, cur)}` : '', statement ? AL.table(['Date', 'Description', 'Money in', 'Money out', 'Match', ''], stRows, '760px') : AL.empty(draft ? 'No statement imported. Import the bank\'s CSV statement to match it line by line, or tick the cashbook entries that appear on the paper statement.' : 'Reconciled by ticking entries (no statement imported).'));
+  // book side
+  const matchedIds = new Set(items.filter((i) => i.entry).map((i) => i.entry.id));
+  const bkRows = entries.map((x) => `<tr class="${x.ticked ? 'al-ticked' : ''}">
+      <td>${draft && canRec ? `<input type="checkbox" data-rec-tick="${ae(x.id)}"${x.ticked ? ' checked' : ''}${matchedIds.has(x.id) ? ' disabled title="Matched to a statement line; unmatch it there"' : ''} aria-label="Cleared">` : x.ticked ? '✓' : ''}</td>
+      <td>${ae(AL.date(x.transactionDate))}</td>
+      <td class="al-wrap"><strong>${ae(x.reference || '—')}</strong><span class="v28-sub">${ae(x.description || '')}${x.counterparty && x.counterparty !== 'N/A' ? ` · ${ae(x.counterparty)}` : ''}</span></td>
+      <td>${x.received ? ae(AL.money(x.received, cur)) : ''}</td>
+      <td>${x.paid ? ae(AL.money(x.paid, cur)) : ''}</td>
+    </tr>`).join('');
+  const bkPanel = AL.panel('Cashbook', draft ? `${AL.plural(entries.filter((x) => x.ticked).length, 'entry')} ticked of ${entries.length} not yet reconciled to ${AL.date(session.statementDate)}` : `${AL.plural(entries.length, 'entry')} cleared`, entries.length ? AL.table(['Cleared', 'Date', 'Reference', 'Received', 'Paid'], bkRows, '520px') : AL.empty('No cashbook entries to reconcile up to this date.'));
+  return `<div class="v28-page">${head}${kpis}${blockers}<div class="al-split"><div>${stPanel}</div><div>${bkPanel}</div></div></div>`;
+};
+AL.wire.reconciliation = () => {
+  document.querySelectorAll('[data-rec-tick]').forEach((cb) => {
+    if (cb.dataset.wired) return; cb.dataset.wired = '1';
+    cb.addEventListener('change', async () => {
+      cb.disabled = true;
+      try { await AL.post(`/cashbook/reconciliation/sessions/${encodeURIComponent(AL.ui.rec.session)}/tick`, { cashbookEntryId: cb.dataset.recTick, selected: cb.checked }); AL.run(`rec:${AL.ui.rec.session}`); }
+      catch (err) { cb.checked = !cb.checked; AL.toast('Not changed', AL.msg(err), 'bad'); }
+      finally { cb.disabled = false; }
+    });
+  });
+};
+
+AL.actions['rec-back'] = () => { AL.ui.rec.session = ''; AL.recReload(); };
+AL.actions['rec-open'] = (el) => { AL.ui.rec.session = el.dataset.id; AL.redraw(); };
+AL.actions['rec-start'] = (el) => {
+  const r = (AL.cache['rec-status'].data || []).find((x) => x.bank.id === el.dataset.bank); if (!r) return;
+  const cur = (r.bank.currency && r.bank.currency.code) || '';
+  const prior = r.lastReconciled;
+  AL.form({
+    title: `Reconcile ${r.bank.name}`, sub: prior ? `Reconciled to ${AL.date(prior.statementDate)}, closing ${AL.money(prior.closingBalance, cur)}` : 'First reconciliation of this account', submitLabel: 'Start', doneTitle: 'Reconciliation started',
+    fields: [
+      { k: 'statementDate', label: 'Statement date (last day)', type: 'date', required: true, max: AL.stiToday(), min: prior ? AL.recDay(prior.statementDate) : undefined },
+      { k: 'statementEndBalance', label: `Statement closing balance (${cur})`, type: 'number', step: '0.01', required: true },
+      ...(prior ? [] : [{ k: 'openingBalance', label: `Statement opening balance (${cur})`, type: 'number', step: '0.01', required: true, hint: 'The balance the first statement starts from.' }]),
+    ],
+    initial: { statementDate: AL.stiToday() },
+    validate: (v) => (prior && v.statementDate <= AL.recDay(prior.statementDate) ? 'The statement must end after the last reconciled date.' : ''),
+    onSubmit: async (v) => {
+      const s = await AL.post(`/cashbook/reconciliation/banks/${encodeURIComponent(r.bank.id)}/sessions`, { statementDate: v.statementDate, statementEndBalance: Number(v.statementEndBalance), ...(prior ? {} : { openingBalance: Number(v.openingBalance) }), reference: `REC-${v.statementDate}` });
+      AL.ui.rec.session = s.id;
+      return 'Import the statement or tick the entries on it.';
+    },
+    after: () => AL.recReload(),
+  });
+};
+AL.actions['rec-import'] = () => {
+  AL.form({
+    title: 'Import bank statement', sub: 'CSV in the bank statement template: Transaction Date, Value Date, Reference, Description, Debit, Credit, Balance (with Opening and Closing Balance rows).', submitLabel: 'Import', doneTitle: 'Statement imported',
+    fields: [{ k: 'file', label: 'Statement file (CSV)', type: 'file', required: true, wide: true }],
+    extra: `<div class="al-wide">${AL.btn('Download the template', 'rec-template', 'small', 'type="button"')}</div>`,
+    onSubmit: async () => {
+      const inp = document.querySelector('#alForm input[name="file"]');
+      const f = inp && inp.files && inp.files[0];
+      if (!f) throw new Error('Choose the statement file.');
+      const fd = new FormData(); fd.append('file', f);
+      const r = await AL.post(`/cashbook/reconciliation/sessions/${encodeURIComponent(AL.ui.rec.session)}/statement`, fd);
+      const m = await AL.post(`/cashbook/reconciliation/sessions/${encodeURIComponent(AL.ui.rec.session)}/auto-match`, {});
+      return `${AL.plural(r.lines, 'line')} imported; ${m.matched} matched automatically, ${m.stillUnmatched} to resolve.`;
+    },
+    after: () => AL.recReload(),
+  });
+};
+AL.actions['rec-template'] = () => {
+  const csv = 'Account Number,\nAccount Currency,\nOpening Balance,0.00\nClosing Balance,0.00\n\nTransaction Date,Value Date,Reference,Description,Debit,Credit,Balance\n';
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' })); a.download = 'bank-statement-template.csv'; document.body.appendChild(a); a.click(); a.remove();
+};
+AL.actions['rec-auto'] = (el) => AL.busy(el, async () => {
+  const m = await AL.post(`/cashbook/reconciliation/sessions/${encodeURIComponent(AL.ui.rec.session)}/auto-match`, {});
+  AL.recReload(); return m;
+}, ['Auto-match done', (m) => `${m.matched} matched; ${m.stillUnmatched} still to resolve (no entry, or more than one equally likely).`]);
+AL.actions['rec-unmatch'] = (el) => AL.busy(el, async () => { await AL.post(`/cashbook/reconciliation/sessions/${encodeURIComponent(AL.ui.rec.session)}/lines/${encodeURIComponent(el.dataset.item)}/unmatch`, {}); AL.recReload(); }, ['Unmatched', '']);
+AL.actions['rec-match'] = (el) => {
+  const d = AL.cache[`rec:${AL.ui.rec.session}`].data;
+  const it = d.items.find((i) => i.id === el.dataset.item); if (!it) return;
+  const cur = (d.bank && d.bank.currency && d.bank.currency.code) || '';
+  const inflow = it.credit > 0, amount = inflow ? it.credit : it.debit;
+  const used = new Set(d.items.filter((i) => i.entry).map((i) => i.entry.id));
+  const cands = d.entries.filter((x) => !used.has(x.id) && x.type === (inflow ? 'RECEIPT' : 'PAYMENT')).sort((a, b) => Math.abs(a.amount - amount) - Math.abs(b.amount - amount));
+  AL.form({
+    title: 'Match statement line', sub: `${AL.date(it.date)} · ${it.description} · ${inflow ? 'in' : 'out'} ${AL.money(amount, cur)}`, submitLabel: 'Match', doneTitle: 'Matched',
+    fields: [{ k: 'entry', label: `Cashbook ${inflow ? 'receipt' : 'payment'}`, type: 'select', required: true, wide: true, options: cands.map((x) => ({ value: x.id, label: `${AL.date(x.transactionDate)} · ${x.reference || x.description} · ${AL.money(x.amount, cur)}${Math.abs(x.amount - amount) > 0.005 ? ' (amount differs)' : ''}` })) }],
+    onSubmit: async (v) => { await AL.post(`/cashbook/reconciliation/sessions/${encodeURIComponent(AL.ui.rec.session)}/lines/${encodeURIComponent(it.id)}/match`, { cashbookEntryId: v.entry }); return ''; },
+    after: () => AL.recReload(),
+  });
+};
+AL.actions['rec-book'] = (el) => AL.busy(el, async () => {
+  const d = AL.cache[`rec:${AL.ui.rec.session}`].data;
+  const it = d.items.find((i) => i.id === el.dataset.item); if (!it) return;
+  const lk = AL.jeLookups(); if (lk.pending) await lk.pending;
+  const inflow = it.credit > 0;
+  const accts = ((lk.data && lk.data.accounts) || []).filter((a) => (inflow ? /^[48]/ : /^[56]/).test(String(a.accountNo)));
+  const cur = (d.bank && d.bank.currency && d.bank.currency.code) || '';
+  AL.form({
+    title: 'Book to cashbook', sub: `${AL.date(it.date)} · ${it.description} · ${inflow ? 'in' : 'out'} ${AL.money(inflow ? it.credit : it.debit, cur)}`, submitLabel: `Book ${inflow ? 'receipt' : 'payment'}`, doneTitle: 'Booked and matched',
+    fields: [
+      { k: 'glAccountId', label: inflow ? 'Income account (e.g. interest received)' : 'Expense account (e.g. bank charges)', type: 'select', required: true, wide: true, options: accts.map((a) => ({ value: a.id, label: `${a.accountNo} ${a.accountName}` })) },
+      { k: 'description', label: 'Description', required: true, wide: true },
+    ],
+    initial: { description: it.description, glAccountId: (accts.find((a) => (inflow ? /interest/i : /bank charge|bank fee/i).test(a.accountName)) || {}).id },
+    onSubmit: async (v) => { await AL.post(`/cashbook/reconciliation/sessions/${encodeURIComponent(AL.ui.rec.session)}/lines/${encodeURIComponent(it.id)}/book`, v); return `A cashbook ${inflow ? 'receipt' : 'payment'} is posted for it.`; },
+    after: () => AL.recReload(),
+  });
+});
+AL.actions['rec-finish'] = () => {
+  const d = AL.cache[`rec:${AL.ui.rec.session}`].data; const cur = (d.bank && d.bank.currency && d.bank.currency.code) || '';
+  AL.confirm({
+    title: 'Finish this reconciliation', confirmLabel: 'Finish', doneTitle: 'Reconciliation finished',
+    body: `${AL.plural(d.entries.filter((x) => x.ticked).length, 'entry')} are marked reconciled, closing at ${AL.money(d.summary.statementEndBalance, cur)}. Nothing can be booked to this account on or before ${AL.date(d.session.statementDate)} afterwards.`,
+    onConfirm: async () => { await AL.post(`/cashbook/reconciliation/sessions/${encodeURIComponent(AL.ui.rec.session)}/finish`, {}); return ''; },
+    after: () => AL.recReload(),
+  });
+};
+AL.actions['rec-discard'] = () => AL.confirm({
+  title: 'Discard this reconciliation', danger: true, confirmLabel: 'Discard', doneTitle: 'Reconciliation discarded',
+  body: 'Its ticks and imported statement are removed; the cashbook is not changed.',
+  onConfirm: async () => { await AL.post(`/cashbook/reconciliation/sessions/${encodeURIComponent(AL.ui.rec.session)}/discard`, {}); AL.ui.rec.session = ''; return ''; },
+  after: () => AL.recReload(),
+});
+AL.actions['rec-reopen'] = () => AL.confirm({
+  title: 'Reopen this reconciliation', danger: true, confirmLabel: 'Reopen', doneTitle: 'Reconciliation reopened', reason: 'Why it is reopened',
+  body: 'Its entries become unreconciled and it returns to draft; only the latest reconciliation of an account can be reopened.',
+  onConfirm: async (v) => { await AL.post(`/cashbook/reconciliation/sessions/${encodeURIComponent(AL.ui.rec.session)}/reopen`, { reason: v.reason }); return ''; },
+  after: () => AL.recReload(),
+});
+
+} catch (e) { if (window.console) console.error("[acc-live] 40-reconciliation.js failed to load", e); }
+/* ---- accounting-live/45-cash.js ---- */
+try {
+/* Cashbook: /accounting/cash-book — each bank account's cashbook and ledger balance (and any gap between them), the
+ * cashbook register (receipts, payments, transfers) with filters, and receipts, payments, transfers and voids.
+ * Data: /cashbook/position, /cashbook/entries, /cashbook/receipts|payments, /cashbook/transfers. */
+AL.ui.cash = AL.ui.cash || { bank: '', type: '', status: 'POSTED', from: '', to: '', q: '', page: 1 };
+AL.cashPos = () => AL.res('cash-pos', () => AL.get('/cashbook/position'));
+AL.cashList = () => {
+  const u = AL.ui.cash;
+  const from = u.from || `${AL.stiToday().slice(0, 7)}-01`, to = u.to || AL.stiToday();
+  const qs = [`page=${u.page}`, 'limit=50', `startDate=${from}`, `endDate=${to}`, u.bank && `bankId=${u.bank}`, u.type && `type=${u.type}`, u.status && `status=${u.status}`, u.q && `search=${encodeURIComponent(u.q)}`].filter(Boolean).join('&');
+  return AL.res(`cash:${qs}`, () => AL.get(`/cashbook/entries?${qs}`));
+};
+AL.cashReload = () => { Object.keys(AL.cache).filter((k) => k === 'cash-pos' || k.startsWith('cash:')).forEach((k) => delete AL.cache[k]); AL.redraw(); };
+AL.cashStatus = { POSTED: ['Posted', 'ok'], PENDING: ['Awaiting allocation', 'warn'], VOIDED: ['Voided', 'bad'] };
+
+AL.page('cash', () => {
+  AL.meLoad();
+  const canPrepare = AL.can('manage_accounting'), canVoid = AL.can('manage_ledger');
+  const pos = AL.cashPos();
+  const head = AL.head('Daily accounting', 'Cashbook', 'Receipts and payments post to the ledger as they are entered; customer and supplier amounts wait for allocation to invoices.',
+    canPrepare ? `${AL.btn('New receipt', 'cash-new', 'primary', 'data-t="R"')}${AL.btn('New payment', 'cash-new', '', 'data-t="P"')}${AL.btn('Transfer', 'cash-transfer')}` : '');
+  const g = AL.gate(pos, { key: 'cash-pos', errorTitle: 'Bank accounts could not be loaded' });
+  if (g) return `<div class="v28-page">${head}${g}</div>`;
+  const banks = pos.data;
+  const byCur = {};
+  banks.forEach((b) => { const c = b.bank.currency || ''; byCur[c] = (byCur[c] || 0) + b.cashbookBalance; });
+  const gaps = banks.filter((b) => b.difference != null && Math.abs(b.difference) >= 0.01);
+  const one = Object.keys(byCur).length === 1 ? Object.keys(byCur)[0] : '';
+  const kpis = AL.kpis([
+    ...Object.entries(byCur).map(([c, v]) => [`Cash at bank (${c})`, AL.money(v, c), `${AL.plural(banks.filter((b) => (b.bank.currency || '') === c).length, 'account')}`, v < 0 ? '#d92d20' : '#0878f6']),
+    ['In this month', AL.money(banks.reduce((t, b) => t + b.thisMonth.receipts, 0), one), 'Posted receipts'],
+    ['Out this month', AL.money(banks.reduce((t, b) => t + b.thisMonth.payments, 0), one), 'Posted payments'],
+    ['Awaiting allocation', String(banks.reduce((t, b) => t + b.pendingEntries, 0)), 'Customer / supplier amounts'],
+    ['Not reconciled', String(banks.reduce((t, b) => t + b.unreconciledEntries, 0)), 'Posted entries', banks.some((b) => b.unreconciledEntries) ? '#f79009' : '#12b76a'],
+  ]);
+  const bankRows = banks.map((b) => `<tr>
+    <td><strong>${ae(b.bank.name)}</strong><span class="v28-sub">${ae(b.bank.accountNumber || '')} · ${ae(b.bank.glAccount || 'no ledger account')}</span></td>
+    <td>${ae(AL.money(b.cashbookBalance, b.bank.currency))}</td>
+    <td>${b.ledgerBalance == null ? '—' : ae(AL.money(b.ledgerBalance, b.bank.currency))}${b.difference ? `<span class="v28-sub al-bad">Ledger differs by ${ae(AL.money(b.difference, b.bank.currency))}</span>` : ''}</td>
+    <td>${ae(AL.money(b.thisMonth.receipts, b.bank.currency))}</td>
+    <td>${ae(AL.money(b.thisMonth.payments, b.bank.currency))}</td>
+    <td>${b.unreconciledEntries ? `${ae(String(b.unreconciledEntries))} ${AL.btn('Reconcile', 'cash-rec', 'small')}` : AL.status('Reconciled', 'ok')}</td>
+  </tr>`).join('');
+  const gapNote = gaps.length ? `<div class="al-state al-note" role="status"><strong>Ledger and cashbook differ</strong><p>${gaps.map((b) => `${ae(b.bank.name)}: ${ae(AL.money(b.difference, b.bank.currency))}`).join(' · ')} — postings to the bank account made without a cashbook line (for example an investment placed or settled). They cannot be reconciled until they are in the cashbook.</p></div>` : '';
+  const banksPanel = AL.panel('Bank accounts', '', AL.table(['Account', 'Cashbook balance', 'Ledger balance', 'In this month', 'Out this month', 'Not reconciled'], bankRows, '980px'));
+
+  // register
+  const u = AL.ui.cash;
+  const filters = `<div class="al-filters">
+    <label class="v28-field"><span>Account</span><select class="v28-select" data-cash-f="bank"><option value="">All accounts</option>${banks.map((b) => `<option value="${ae(b.bank.id)}"${u.bank === b.bank.id ? ' selected' : ''}>${ae(b.bank.name)}</option>`).join('')}</select></label>
+    <label class="v28-field"><span>Type</span><select class="v28-select" data-cash-f="type"><option value="">Receipts and payments</option><option value="RECEIPT"${u.type === 'RECEIPT' ? ' selected' : ''}>Receipts</option><option value="PAYMENT"${u.type === 'PAYMENT' ? ' selected' : ''}>Payments</option></select></label>
+    <label class="v28-field"><span>Status</span><select class="v28-select" data-cash-f="status"><option value="POSTED"${u.status === 'POSTED' ? ' selected' : ''}>Posted</option><option value="PENDING"${u.status === 'PENDING' ? ' selected' : ''}>Awaiting allocation</option><option value="VOIDED"${u.status === 'VOIDED' ? ' selected' : ''}>Voided</option><option value=""${!u.status ? ' selected' : ''}>All</option></select></label>
+    <label class="v28-field"><span>From</span><input class="v28-input" type="date" data-cash-f="from" value="${ae(u.from || `${AL.stiToday().slice(0, 7)}-01`)}"></label>
+    <label class="v28-field"><span>To</span><input class="v28-input" type="date" data-cash-f="to" value="${ae(u.to || AL.stiToday())}"></label>
+    <label class="v28-field al-grow"><span>Search</span><input class="v28-input" type="search" data-cash-f="q" value="${ae(u.q)}" placeholder="Reference or description"></label>
+  </div>`;
+  const e = AL.cashList();
+  const g2 = AL.gate(e, { errorTitle: 'The cashbook could not be loaded' });
+  let reg = g2;
+  if (!g2) {
+    const entries = (e.data && e.data.entries) || [];
+    const pg = (e.data && e.data.pagination) || {};
+    const tr = entries.map((x) => {
+      const st = AL.cashStatus[x.status] || [x.status, 'info'];
+      const cp = x.counterpartyType === 'CUSTOMER' ? x.customer && x.customer.name : x.counterpartyType === 'SUPPLIER' ? x.vendor && x.vendor.name : x.glAccount && `${x.glAccount.accountNo} ${x.glAccount.accountName}`;
+      const cur = ((banks.find((b) => b.bank.id === x.bankId) || {}).bank || {}).currency || '';
+      const acts = [];
+      if (x.status === 'POSTED' && canVoid && !x.isReconciled) acts.push(AL.btn('Void', 'cash-void', 'small danger', `data-id="${ae(x.id)}" data-ref="${ae(x.reference || x.description)}"`));
+      return `<tr>
+        <td>${ae(AL.date(x.transactionDate))}</td>
+        <td><strong>${ae(x.reference || '—')}</strong><span class="v28-sub">${ae(x.journalEntry ? x.journalEntry.referenceNumber || '' : '')}</span></td>
+        <td class="al-wrap">${ae(x.description)}<span class="v28-sub">${ae(cp || '')}</span></td>
+        <td>${ae(x.bank ? x.bank.name : '')}</td>
+        <td>${x.type === 'RECEIPT' ? ae(AL.money(x.amount, cur)) : ''}</td>
+        <td>${x.type === 'PAYMENT' ? ae(AL.money(x.amount, cur)) : ''}</td>
+        <td>${AL.status(st[0], st[1])}${x.isReconciled ? '<span class="v28-sub">Reconciled</span>' : ''}${x.transferId ? '<span class="v28-sub">Transfer</span>' : ''}</td>
+        <td class="al-actions">${acts.join('')}</td>
+      </tr>`;
+    }).join('');
+    const pager = pg.pages > 1 ? `<div class="al-pager"><span class="v28-sub">Page ${pg.page} of ${pg.pages} · ${AL.plural(pg.total, 'entry')}</span>${pg.page > 1 ? AL.btn('Previous', 'cash-page', 'small', 'data-d="-1"') : ''}${pg.page < pg.pages ? AL.btn('Next', 'cash-page', 'small', 'data-d="1"') : ''}</div>` : '';
+    reg = entries.length ? `${AL.table(['Date', 'Reference', 'Description', 'Account', 'Received', 'Paid', 'Status', ''], tr, '1100px')}${pager}` : AL.empty('No cashbook entries match.');
+  }
+  return `<div class="v28-page">${head}${kpis}${gapNote}${banksPanel}${AL.panel('Cashbook register', '', `${filters}${reg}`)}</div>`;
+});
+AL.wire.cash = () => {
+  document.querySelectorAll('[data-cash-f]').forEach((el) => {
+    if (el.dataset.wired) return; el.dataset.wired = '1';
+    const k = el.dataset.cashF;
+    const apply = () => { AL.ui.cash[k] = el.value; AL.ui.cash.page = 1; AL.redraw(); };
+    if (k === 'q') el.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') apply(); }); else el.addEventListener('change', apply);
+  });
+};
+AL.actions['cash-page'] = (el) => { AL.ui.cash.page = Math.max(1, AL.ui.cash.page + Number(el.dataset.d)); AL.redraw(); };
+AL.actions['cash-rec'] = () => AL.go('reconciliation');
+AL.actions['cash-void'] = (el) => AL.confirm({
+  title: `Void ${el.dataset.ref}`, danger: true, confirmLabel: 'Void entry', doneTitle: 'Entry voided', reason: 'Why it is voided',
+  body: 'A reversing journal is posted and the entry is marked void; it drops out of reconciliation.',
+  onConfirm: async (v) => { await AL.put(`/cashbook/entries/${encodeURIComponent(el.dataset.id)}/void`, { reason: v.reason }); return 'The reversal is posted.'; },
+  after: () => AL.cashReload(),
+});
+AL.actions['cash-new'] = (el) => AL.busy(el, async () => {
+  const receipt = el.dataset.t === 'R';
+  const [lk, custs, vends] = await Promise.all([(async () => { const r = AL.jeLookups(); if (r.pending) await r.pending; return r.data; })(), AL.get('/cashbook/customers').catch(() => []), AL.get('/cashbook/vendors').catch(() => [])]);
+  const banks = (AL.cache['cash-pos'].data || []).map((b) => b.bank);
+  const accounts = ((lk && lk.accounts) || []).filter((a) => !/^1[01]\d\d$/.test(String(a.accountNo)) || a.accountNo === '1160');
+  const list = (x) => (Array.isArray(x) ? x : (x && (x.customers || x.vendors || x.items || x.data)) || []);
+  AL.form({
+    title: receipt ? 'New receipt' : 'New payment', wide: true, submitLabel: receipt ? 'Post receipt' : 'Post payment', doneTitle: receipt ? 'Receipt recorded' : 'Payment recorded',
+    fields: [
+      { k: 'bankId', label: 'Bank account', type: 'select', required: true, blank: false, options: banks.map((b) => ({ value: b.id, label: `${b.name} (${b.currency || ''})` })) },
+      { k: 'transactionDate', label: 'Date', type: 'date', required: true, max: AL.stiToday() },
+      { k: 'amount', label: 'Amount', type: 'number', min: 0.01, step: '0.01', required: true },
+      { k: 'reference', label: receipt ? 'Reference (deposit slip, transfer ref)' : 'Reference (cheque no., transfer ref, ZIMRA code)' },
+      { k: 'description', label: 'Description', required: true, wide: true },
+      { k: 'counterpartyType', label: receipt ? 'Received from' : 'Paid to', type: 'select', required: true, blank: false, options: [{ value: 'GL', label: 'An account (income, expense, other)' }, { value: 'CUSTOMER', label: 'A customer' }, { value: 'SUPPLIER', label: 'A supplier' }] },
+      { k: 'glAccountId', label: 'Account', type: 'select', options: accounts.map((a) => ({ value: a.id, label: `${a.accountNo} ${a.accountName}` })) },
+      { k: 'customerId', label: 'Customer', type: 'select', options: list(custs).map((c) => ({ value: c.id, label: c.name })) },
+      { k: 'vendorId', label: 'Supplier', type: 'select', options: list(vends).map((v) => ({ value: v.id, label: v.name || v.companyName })) },
+      { k: 'vatCode', label: 'VAT', type: 'select', blank: false, options: [{ value: 'EXEMPT', label: 'Exempt / no VAT' }, { value: '0%', label: 'Zero-rated' }, { value: '15.5%', label: 'Standard 15.5%' }] },
+    ],
+    initial: { bankId: (banks[0] || {}).id, transactionDate: AL.stiToday(), counterpartyType: 'GL', vatCode: 'EXEMPT' },
+    validate: (v) => {
+      if (!(Number(v.amount) > 0)) return 'The amount must be more than zero.';
+      if (v.transactionDate > AL.stiToday()) return 'The date cannot be in the future.';
+      if (v.counterpartyType === 'GL' && !v.glAccountId) return 'Choose the account.';
+      if (v.counterpartyType === 'CUSTOMER' && !v.customerId) return 'Choose the customer.';
+      if (v.counterpartyType === 'SUPPLIER' && !v.vendorId) return 'Choose the supplier.';
+      return '';
+    },
+    onSubmit: async (v) => {
+      const body = { bankId: v.bankId, transactionDate: v.transactionDate, amount: Number(v.amount), reference: v.reference || undefined, description: v.description, counterpartyType: v.counterpartyType, vatCode: v.vatCode, ...(v.counterpartyType === 'GL' ? { glAccountId: v.glAccountId } : v.counterpartyType === 'CUSTOMER' ? { customerId: v.customerId } : { vendorId: v.vendorId }) };
+      const r = await AL.post(`/cashbook/${receipt ? 'receipts' : 'payments'}`, body);
+      const t = r && (r.transaction || r);
+      return t && t.status === 'PENDING' ? 'Saved; allocate it to the invoices it settles to post it.' : 'Posted to the ledger.';
+    },
+    after: () => AL.cashReload(),
+  });
+});
+AL.actions['cash-transfer'] = () => {
+  const banks = (AL.cache['cash-pos'].data || []).map((b) => b.bank);
+  AL.form({
+    title: 'Transfer between accounts', submitLabel: 'Post transfer', doneTitle: 'Transfer posted',
+    fields: [
+      { k: 'fromBankId', label: 'From', type: 'select', required: true, options: banks.map((b) => ({ value: b.id, label: `${b.name} (${b.currency || ''})` })) },
+      { k: 'toBankId', label: 'To', type: 'select', required: true, options: banks.map((b) => ({ value: b.id, label: `${b.name} (${b.currency || ''})` })) },
+      { k: 'transferDate', label: 'Date', type: 'date', required: true, max: AL.stiToday() },
+      { k: 'amount', label: 'Amount', type: 'number', min: 0.01, step: '0.01', required: true },
+      { k: 'reference', label: 'Reference' },
+      { k: 'description', label: 'Description', required: true, wide: true },
+    ],
+    initial: { transferDate: AL.stiToday() },
+    validate: (v) => {
+      if (v.fromBankId === v.toBankId) return 'Choose two different accounts.';
+      const a = banks.find((b) => b.id === v.fromBankId), b = banks.find((x) => x.id === v.toBankId);
+      if (a && b && a.currency !== b.currency) return 'Both accounts must be in the same currency; a currency exchange is booked as a payment and a receipt at the day\'s rate.';
+      return Number(v.amount) > 0 ? '' : 'The amount must be more than zero.';
+    },
+    onSubmit: async (v) => { await AL.post('/cashbook/transfers', { ...v, amount: Number(v.amount) }); return 'Both accounts are updated.'; },
+    after: () => AL.cashReload(),
+  });
+};
+
+} catch (e) { if (window.console) console.error("[acc-live] 45-cash.js failed to load", e); }
+/* ---- accounting-live/50-fx.js ---- */
+try {
+/* FX: /accounting/fx-revaluation — the rate table the ledger converts with (the daily official rate, and rates entered
+ * or corrected by finance, with who and why), what is held in each foreign currency translated at the latest rate, and
+ * the month-end revaluation: each foreign-currency balance at the closing rate against what it is carried at, prepared
+ * as a draft journal for an approver (only the movement since the last revaluation is booked).
+ * Data: /accounting/multi-currency/rates, /exposure, /revaluation, /accounting/jobs (the daily rate job). */
+AL.fxLoad = () => AL.res('fx', async () => {
+  const [rates, exposure, jobs] = await Promise.all([
+    AL.get('/accounting/multi-currency/rates?limit=60'),
+    AL.get('/accounting/multi-currency/exposure'),
+    AL.get('/accounting/jobs').catch(() => null),
+  ]);
+  return { rates, exposure, rateJob: jobs && (jobs.jobs || []).find((j) => j.key === 'rates.daily') };
+});
+AL.fxSource = { URL: 'Official daily rate', MANUAL: 'Entered by finance', TABLE: 'Rate table' };
+AL.fxRate = (v) => (v == null ? '—' : Number(v).toLocaleString('en-US', { maximumFractionDigits: 6 }));
+
+AL.page('fx', () => {
+  AL.meLoad();
+  const canEnter = AL.can('manage_accounting'), canRun = AL.can('manage_ledger');
+  const e = AL.fxLoad();
+  const acts = [canEnter ? AL.btn('Enter a rate', 'fx-add', 'primary') : '', canRun ? AL.btn("Fetch today's official rate", 'fx-fetch') : ''].join('');
+  const head = AL.head('Treasury and reporting', 'FX Rates and Revaluation', 'The rates postings are converted with, what is held in each foreign currency, and its month-end revaluation.', acts);
+  const g = AL.gate(e, { key: 'fx', errorTitle: 'Exchange rates could not be loaded' });
+  if (g) return `<div class="v28-page">${head}${g}</div>`;
+  const { rates, exposure, rateJob } = e.data;
+  const base = rates.baseCurrency || exposure.baseCurrency || '';
+  const today = AL.stiToday();
+  const latest = rates.latest || [];
+  const stale = latest.filter((r) => String(r.date).slice(0, 10) < today);
+  const missing = (exposure.currencies || []).filter((c) => c.missingRate);
+  const kpis = AL.kpis([
+    ...latest.slice(0, 3).map((r) => [r.pair, AL.fxRate(r.rate), `${AL.date(r.date)} · ${AL.fxSource[r.source] || r.source}${r.previous ? ` · ${r.rate >= r.previous.rate ? '+' : ''}${(((r.rate - r.previous.rate) / r.previous.rate) * 100).toFixed(2)}% on ${AL.date(r.previous.date)}` : ''}`, String(r.date).slice(0, 10) < today ? '#f79009' : '#0878f6']),
+    ['Missing rates', String(missing.length), missing.length ? `No rate for ${missing.map((c) => c.currency).join(', ')}` : 'Every currency held has a rate', missing.length ? '#d92d20' : '#12b76a'],
+    ['Daily official rate', rateJob && rateJob.lastRun ? (rateJob.lastRun.status === 'succeeded' ? 'Fetched' : 'Failed') : 'Not run', rateJob && rateJob.lastRun ? AL.dateTime(rateJob.lastRun.startedAt) : 'Scheduled 09:00', rateJob && rateJob.lastRun && rateJob.lastRun.status !== 'succeeded' ? '#d92d20' : '#12b76a'],
+  ]);
+  const staleNote = stale.length ? `<div class="al-state al-note" role="status"><strong>Not rated today</strong><p>${stale.map((r) => `${ae(r.pair)} was last rated on ${ae(AL.date(r.date))}`).join(' · ')}; postings today use that rate until today's is recorded.</p></div>` : '';
+
+  // exposure by currency
+  const expo = (exposure.currencies || []).map((c) => {
+    const rows = c.items.map((i) => `<tr><td>${ae(i.kind)}<span class="v28-sub">${AL.plural(i.count, 'item')}</span></td><td>${ae(AL.money(i.amount, c.currency))}</td><td>${i.inBase == null ? '—' : ae(AL.money(i.inBase, base))}</td></tr>`).join('');
+    return AL.panel(`${c.currency} exposure`, c.ratePerBase ? `At ${AL.fxRate(c.ratePerBase)} ${c.currency} per ${base}` : `No ${base}/${c.currency} rate yet: enter one to translate`, AL.table([`Held in ${c.currency}`, c.currency, base], `${rows}<tr class="al-total"><td><strong>Net</strong></td><td><strong>${ae(AL.money(c.net, c.currency))}</strong></td><td><strong>${c.netInBase == null ? '—' : ae(AL.money(c.netInBase, base))}</strong></td></tr>`, '560px'));
+  }).join('');
+
+  // the rate table
+  const tr = (rates.rates || []).map((r) => `<tr><td>${ae(AL.date(r.date))}</td><td><strong>${ae(r.pair)}</strong></td><td>${ae(AL.fxRate(r.rate))}</td><td>${ae(AL.fxSource[r.source] || r.source)}</td><td>${ae(r.createdBy || '—')}<span class="v28-sub">${ae(AL.dateTime(r.createdAt))}</span></td><td class="al-actions">${canEnter ? AL.btn('Correct', 'fx-correct', 'small', `data-id="${ae(r.id)}"`) : ''}</td></tr>`).join('');
+  const table = AL.panel('Rate table', `The latest ${AL.plural((rates.rates || []).length, 'rate')}`, tr ? AL.table(['Date', 'Pair', 'Rate', 'Source', 'Recorded by', ''], tr, '820px') : AL.empty('No rates recorded yet.'));
+  return `<div class="v28-page">${head}${kpis}${staleNote}<div class="al-grid-auto">${expo}</div>${AL.fxRevalPanel(canEnter)}${table}</div>`;
+});
+/** Month-end revaluation: the last month end by default. */
+AL.ui.fxr = AL.ui.fxr || { asOf: '' };
+AL.fxMonthEnd = () => { const [y, m] = AL.stiToday().split('-').map(Number); return new Date(Date.UTC(y, m - 1, 0)).toISOString().slice(0, 10); };
+AL.fxRevalPanel = (canPrepare) => {
+  const asOf = AL.ui.fxr.asOf || AL.fxMonthEnd();
+  const key = `fxr:${asOf}`;
+  const e = AL.res(key, () => AL.get(`/accounting/multi-currency/revaluation?asOf=${asOf}`));
+  const bookable = e.state === 'ok' && ((e.data && e.data.rows) || []).some((r) => r.difference != null && Math.abs(r.difference) >= 0.01);
+  const pick = `<div class="al-filters"><label class="v28-field"><span>Revalue at</span><input class="v28-input" type="date" data-fxr-f="asOf" value="${ae(asOf)}" max="${ae(AL.stiToday())}"></label><span class="al-grow"></span>${canPrepare && bookable ? AL.btn('Prepare revaluation journal', 'fxr-prepare', 'primary', `data-asof="${ae(asOf)}"`) : ''}</div>`;
+  const g = AL.gate(e, { key, errorTitle: 'The revaluation could not be worked out' });
+  if (g) return AL.panel('Month-end revaluation', '', `${pick}${g}`);
+  const d = e.data || {}, base = d.baseCurrency || '';
+  const rows = (d.rows || []).map((r) => `<tr><td>${ae(r.account)}</td><td>${ae(r.currency)}</td><td class="num">${ae(AL.money(r.native, r.currency))}</td><td class="num">${r.closingRate == null ? '<span class="al-bad">No rate</span>' : ae(AL.fxRate(1 / r.closingRate))}</td><td class="num">${r.revalued == null ? '—' : ae(AL.money(r.revalued, base))}</td><td class="num">${ae(AL.money(r.carrying, base))}</td><td class="num">${r.difference == null ? '—' : `<strong class="${r.difference < 0 ? 'al-bad' : r.difference > 0 ? 'al-ok' : ''}">${ae(AL.money(r.difference, base))}</strong>`}</td></tr>`).join('');
+  return AL.panel('Month-end revaluation', `Foreign-currency balances at ${AL.date(asOf)}, closing rate per ${base}`, `${pick}${rows ? AL.table(['Account', 'Currency', 'Balance', 'Closing rate', `At closing rate (${base})`, `Carried at (${base})`, 'Gain / loss'], rows + `<tr class="al-total"><td colspan="6"><strong>Net unrealised ${d.total >= 0 ? 'gain' : 'loss'}</strong></td><td class="num"><strong>${ae(AL.money(d.total, base))}</strong></td></tr>`, '980px') : AL.empty('No foreign-currency balances to revalue at this date.')}`);
+};
+AL.wire.fx = () => { document.querySelectorAll('[data-fxr-f]').forEach((el) => { if (el.dataset.wired) return; el.dataset.wired = '1'; el.addEventListener('change', () => { AL.ui.fxr.asOf = el.value; AL.redraw(); }); }); };
+AL.actions['fxr-prepare'] = (el) => AL.busy(el, async () => { const r = await AL.post('/accounting/multi-currency/revaluation', { asOf: el.dataset.asof }); Object.keys(AL.cache).filter((k) => k.startsWith('fxr:')).forEach((k) => delete AL.cache[k]); AL.redraw(); return r; },
+  ['Revaluation prepared', (r) => (r && r.journal ? `${r.journal.referenceNumber}: ${r.lines} balance${r.lines === 1 ? '' : 's'}, net ${AL.money(r.net)}. An approver posts it from the Approval Queue.` : '')]);
+
+AL.fxForm = (init = {}) => {
+  const d = (AL.cache.fx && AL.cache.fx.data) || {};
+  const codes = [...new Set(((d.rates && d.rates.latest) || []).flatMap((r) => [r.from, r.to]).concat([d.rates && d.rates.baseCurrency, ...((d.exposure && d.exposure.currencies) || []).map((c) => c.currency)]).filter(Boolean))];
+  AL.form({
+    title: init.id ? `Correct ${init.pair} for ${AL.date(init.date)}` : 'Enter a rate', submitLabel: init.id ? 'Save correction' : 'Save rate', doneTitle: init.id ? 'Rate corrected' : 'Rate saved',
+    fields: [
+      { k: 'from', label: 'From (1 unit of)', type: 'select', required: true, blank: false, options: codes },
+      { k: 'to', label: 'To', type: 'select', required: true, blank: false, options: codes },
+      { k: 'date', label: 'Date', type: 'date', required: true, max: AL.stiToday() },
+      { k: 'rate', label: 'Rate', type: 'number', step: 'any', min: 0, required: true },
+      { k: 'reason', label: init.id ? 'Why it is corrected' : 'Source or note', type: 'textarea', wide: true, required: !!init.id },
+    ],
+    initial: { from: init.from || (d.rates && d.rates.baseCurrency) || 'USD', to: init.to || codes.find((c) => c !== ((d.rates && d.rates.baseCurrency) || 'USD')), date: init.date ? String(init.date).slice(0, 10) : AL.stiToday(), rate: init.rate || '' },
+    validate: (v) => (v.from === v.to ? 'Choose two different currencies.' : Number(v.rate) > 0 ? '' : 'The rate must be more than zero.'),
+    onSubmit: async (v) => { const r = await AL.post('/accounting/multi-currency/rates', { ...v, rate: Number(v.rate) }); return r && r.corrected ? `${v.from}/${v.to} for ${AL.date(v.date)} corrected; the old value is kept in the audit trail.` : `${v.from}/${v.to} ${v.rate} recorded for ${AL.date(v.date)}.`; },
+    after: () => { delete AL.cache.fx; AL.redraw(); AL.fxTopbar(); },
+  });
+};
+AL.actions['fx-add'] = () => AL.fxForm();
+AL.actions['fx-correct'] = (el) => { const r = ((AL.cache.fx.data.rates || {}).rates || []).find((x) => x.id === el.dataset.id); if (r) AL.fxForm(r); };
+AL.actions['fx-fetch'] = (el) => AL.busy(el, async () => {
+  const r = await AL.post('/accounting/jobs/rates.daily/run', {});
+  if (r && r.status === 'failed') throw new Error(r.error || 'The official rate could not be fetched.');
+  delete AL.cache.fx; AL.redraw(); AL.fxTopbar();
+  return r;
+}, ['Official rate', (r) => (r && r.summary && r.summary.outcome === 'already_recorded' ? "Today's rate was already recorded." : r && r.summary && r.summary.rate ? `Recorded ${r.summary.rate}.` : 'Done.')]);
+
+/* The topbar rate pill used to scrape the Reserve Bank's website from the browser through a public CORS proxy (it failed
+ * on every load). That code lives in an inner scope of the runtime, so it is switched off from here: its six-hourly
+ * trigger is marked as done, its "Refresh official rate" button is taken over, and the pill and the rate the browser keeps
+ * are filled from the stored rate the ledger uses. */
+AL.fxTopbar = async () => {
+  try {
+    const d = await AL.get('/accounting/multi-currency/rates?limit=1');
+    const r = (d.latest || []).find((x) => x.from === 'USD' && /^(ZIG|ZWG|ZWL)$/.test(x.to)) || (d.latest || [])[0];
+    if (!r) return null;
+    const snap = { pair: `${r.from}/${r.to}`, bid: r.rate, ask: r.rate, avg: r.rate, date: AL.date(r.date), source: AL.fxSource[r.source] || r.source, updated: new Date().toISOString() };
+    try { localStorage.setItem('matanho-v5-rates', JSON.stringify(snap)); } catch (_) { /* storage off */ }
+    const v = document.querySelector('#v5RateValue'); if (v) v.textContent = Number(r.rate).toFixed(4);
+    const dt = document.querySelector('#v5RateDate'); if (dt) dt.textContent = `${snap.source} · ${snap.date}`;
+    return r;
+  } catch (_) { return null; }
+};
+try { localStorage.setItem('matanho-v5-rate-check', String(Date.now())); } catch (_) { /* storage off */ }
+setTimeout(() => AL.fxTopbar(), 1500);
+window.addEventListener('click', (ev) => {
+  const t = ev.target && ev.target.closest && ev.target.closest('[data-action="v5-refresh-rates"]');
+  if (!t || !t.closest('.accounting-v52-root')) return;
+  ev.preventDefault(); ev.stopPropagation();
+  AL.busy(t, () => AL.fxTopbar(), ['Exchange rate', (r) => (r ? `${r.pair} ${AL.fxRate(r.rate)} (${AL.fxSource[r.source] || r.source}, ${AL.date(r.date)}).` : 'No stored rate yet.')]);
+}, true);
+// the sidebar names what the page does
+try { for (const g of navGroups) for (const it of g[1]) if (it[0] === 'fx') it[1] = 'FX Rates & Revaluation'; } catch (_) { /* nav shape changed */ }
+
+} catch (e) { if (window.console) console.error("[acc-live] 50-fx.js failed to load", e); }
+/* ---- accounting-live/55-assets.js ---- */
+try {
+/* Fixed Assets: /accounting/assets — the register (cost, accumulated depreciation, book value, reconciled to the GL
+ * accounts), the monthly depreciation run with its preview (SRD ACC-FA-05…09), each asset's depreciation history, adding
+ * an asset (paid from a bank, bought on a posted supplier bill, or credited to a named account), moving it (location), and disposal with gain or loss.
+ * Data: /accounting/assets, /accounting/assets/depreciation/preview, /accounting/assets/:id/depreciation-schedule. */
+AL.ui.assets = AL.ui.assets || { tab: 'IN_USE' };
+AL.assetPrevMonth = () => { const t = AL.stiToday(); const d = new Date(`${t.slice(0, 7)}-01T12:00:00Z`); d.setUTCMonth(d.getUTCMonth() - 1); return d.toISOString().slice(0, 7); };
+AL.assetsLoad = () => AL.res('assets', async () => {
+  // the list is of active assets unless asked; disposed assets are inactive
+  const [live, gone, preview] = await Promise.all([AL.get('/accounting/assets?limit=500'), AL.get('/accounting/assets?limit=500&status=DISPOSED&isActive=false').catch(() => null), AL.get(`/accounting/assets/depreciation/preview?period=${AL.assetPrevMonth()}`).catch(() => null)]);
+  const rows = (x) => (x && (x.assets || (Array.isArray(x) ? x : []))) || [];
+  return { assets: [...rows(live), ...rows(gone).filter((a) => !rows(live).some((b) => b.id === a.id))], preview };
+});
+AL.assetsReload = () => { delete AL.cache.assets; AL.redraw(); };
+AL.assetMethod = { STRAIGHT_LINE: 'Straight line', DECLINING_BALANCE: 'Reducing balance', REDUCING_BALANCE: 'Reducing balance' };
+
+AL.page('assets', () => {
+  AL.meLoad();
+  const canPrepare = AL.can('manage_accounting'), canPost = AL.can('manage_ledger');
+  const e = AL.assetsLoad();
+  const head = AL.head('Registers and valuation', 'Fixed Assets', 'Depreciation posts monthly for the month just ended; disposals clear cost and depreciation and post the gain or loss.',
+    [canPrepare ? AL.btn('Add asset', 'asset-new', 'primary') : '', canPost ? AL.btn('Depreciation run', 'asset-run') : ''].join(''));
+  const g = AL.gate(e, { key: 'assets', errorTitle: 'The asset register could not be loaded' });
+  if (g) return `<div class="v28-page">${head}${g}</div>`;
+  const { assets, preview } = e.data;
+  const inUse = assets.filter((a) => a.status === 'IN_USE' && a.isActive !== false);
+  const sum = (arr, f) => arr.reduce((t, a) => t + Number(f(a) || 0), 0);
+  const cost = sum(inUse, (a) => a.cost), nbv = sum(inUse, (a) => a.currentBookValue);
+  const kpis = AL.kpis([
+    ['Assets in use', String(inUse.length), `${assets.filter((a) => a.status === 'DISPOSED').length} disposed`],
+    ['Cost', AL.money(cost), 'Assets in use'],
+    ['Accumulated depreciation', AL.money(cost - nbv), 'To date'],
+    ['Net book value', AL.money(nbv), 'Cost less depreciation', '#0878f6'],
+    ...(preview ? [[`Depreciation ${preview.period}`, preview.toPost ? `${AL.money(preview.total)} to post` : preview.alreadyPosted ? 'Posted' : 'Nothing due', preview.toPost ? `${AL.plural(preview.toPost, 'asset')} not yet depreciated` : `${AL.plural(preview.alreadyPosted, 'asset')} posted`, preview.toPost ? '#f79009' : '#12b76a']] : []),
+  ]);
+  const tab = AL.ui.assets.tab;
+  const tabs = `<div class="v28-tabbar">${[['IN_USE', 'In use'], ['DISPOSED', 'Disposed'], ['ALL', 'All']].map(([id, label]) => `<button class="v28-tab ${tab === id ? 'active' : ''}" data-al="asset-tab" data-tab="${id}">${ae(label)}</button>`).join('')}</div>`;
+  const shown = assets.filter((a) => tab === 'ALL' || a.status === tab);
+  const rows = shown.map((a) => {
+    const acts = [AL.btn('Open', 'asset-open', 'small', `data-id="${ae(a.id)}"`)];
+    if (a.status === 'IN_USE' && canPrepare) acts.push(AL.btn('Move', 'asset-move', 'small', `data-id="${ae(a.id)}"`));
+    if (a.status === 'IN_USE' && canPost) acts.push(AL.btn('Dispose', 'asset-dispose', 'small danger', `data-id="${ae(a.id)}"`));
+    const dep = Number(a.cost) - Number(a.currentBookValue);
+    return `<tr>
+      <td><strong>${ae(a.assetName)}</strong><span class="v28-sub">${ae(a.assetCode)}${a.serialNumber ? ` · ${ae(a.serialNumber)}` : ''}</span></td>
+      <td>${ae(AL.date(a.purchaseDate))}</td>
+      <td>${ae(a.location || '—')}</td>
+      <td>${ae(AL.money(a.cost))}</td>
+      <td>${ae(AL.money(dep))}</td>
+      <td>${ae(AL.money(a.currentBookValue))}</td>
+      <td>${ae(AL.assetMethod[a.depreciationMethod] || a.depreciationMethod)}<span class="v28-sub">${ae(String(a.usefulLifeYears))} years</span></td>
+      <td>${a.status === 'IN_USE' ? AL.status('In use', 'ok') : `${AL.status('Disposed', 'info')}<span class="v28-sub">${ae(AL.date(a.disposalDate))} · ${Number(a.disposalGainLoss) >= 0 ? 'gain' : 'loss'} ${ae(AL.money(Math.abs(Number(a.disposalGainLoss || 0))))}</span>`}</td>
+      <td class="al-actions">${acts.join('')}</td>
+    </tr>`;
+  }).join('');
+  const reg = AL.panel('Asset register', '', `${tabs}${shown.length ? AL.table(['Asset', 'Bought', 'Location', 'Cost', 'Depreciation', 'Book value', 'Method', 'Status', ''], rows, '1180px') : AL.empty(tab === 'IN_USE' ? 'No assets in use.' : 'None here.')}`);
+  return `<div class="v28-page">${head}${kpis}${reg}</div>`;
+});
+AL.actions['asset-tab'] = (el) => { AL.ui.assets.tab = el.dataset.tab; AL.redraw(); };
+AL.assetFind = (id) => ((AL.cache.assets && AL.cache.assets.data && AL.cache.assets.data.assets) || []).find((a) => a.id === id);
+
+AL.actions['asset-open'] = (el) => AL.busy(el, async () => {
+  const a = AL.assetFind(el.dataset.id); if (!a) return;
+  const sched = await AL.get(`/accounting/assets/${encodeURIComponent(a.id)}/depreciation-schedule`).catch(() => null);
+  const recs = Array.isArray(sched) ? sched : (sched && (sched.records || sched.depreciationRecords || sched.schedule)) || a.depreciationRecords || [];
+  const facts = [['Code', a.assetCode], ['Bought', AL.date(a.purchaseDate)], ['Cost', AL.money(a.cost)], ['Residual value', AL.money(a.salvageValue)], ['Useful life', `${a.usefulLifeYears} years · ${AL.assetMethod[a.depreciationMethod] || a.depreciationMethod}`], ['Location', a.location || '—'], ['Serial number', a.serialNumber || '—'], ['Asset account', a.assetAccount ? `${a.assetAccount.accountNo} ${a.assetAccount.accountName}` : '—'], ['Depreciation expense', a.depreciationExpenseAccount ? `${a.depreciationExpenseAccount.accountNo} ${a.depreciationExpenseAccount.accountName}` : '—']]
+    .map((f) => `<div class="v28-list-item"><div><strong>${ae(f[0])}</strong><span>${ae(f[1])}</span></div></div>`).join('');
+  const rows = recs.map((r) => `<tr><td>${ae(r.period)}</td><td>${ae(AL.money(r.depreciationAmount))}</td><td>${ae(AL.money(r.accumulatedDepreciation))}</td><td>${ae(AL.money(r.bookValue))}</td><td>${AL.status(r.isPosted === false ? 'Calculated' : 'Posted', r.isPosted === false ? 'warn' : 'ok')}</td></tr>`).join('');
+  AL.form({ title: a.assetName, sub: `${a.assetCode} · ${a.status === 'IN_USE' ? 'In use' : 'Disposed'}`, wide: true, viewOnly: true, submitLabel: 'Close', fields: [],
+    extra: `<div class="al-wide"><div class="v28-grid equal">${facts}</div><h4 style="margin:16px 0 8px">Depreciation</h4>${rows ? AL.table(['Month', 'Charge', 'Accumulated', 'Book value', ''], rows, '560px') : AL.empty('No depreciation posted yet.')}</div>`,
+    onSubmit: async () => false });
+});
+
+AL.assetAccounts = async () => { const lk = AL.jeLookups(); if (lk.pending) await lk.pending; return (lk.data && lk.data.accounts) || []; };
+AL.actions['asset-new'] = (el) => AL.busy(el, async () => {
+  const accts = await AL.assetAccounts();
+  const banks = await AL.get('/cashbook/banks').catch(() => []);
+  const bills = await AL.get('/accounting/assets/bills').catch(() => []);
+  const opt = (re) => accts.filter((a) => re.test(`${a.accountNo} ${a.accountName}`)).map((a) => ({ value: a.id, label: `${a.accountNo} ${a.accountName}` }));
+  const all = accts.map((a) => ({ value: a.id, label: `${a.accountNo} ${a.accountName}` }));
+  const pick = (re) => (accts.find((a) => re.test(a.accountName)) || {}).id;
+  AL.form({
+    title: 'Add a fixed asset', wide: true, submitLabel: 'Add asset', doneTitle: 'Asset added',
+    fields: [
+      { k: 'assetName', label: 'Asset', required: true, wide: true },
+      { k: 'assetCode', label: 'Asset code / tag', required: true },
+      { k: 'serialNumber', label: 'Serial number' },
+      { k: 'purchaseDate', label: 'Bought on', type: 'date', required: true, max: AL.stiToday() },
+      { k: 'cost', label: 'Cost', type: 'number', min: 0.01, step: '0.01', required: true },
+      { k: 'salvageValue', label: 'Residual value', type: 'number', min: 0, step: '0.01' },
+      { k: 'usefulLifeYears', label: 'Useful life (years)', type: 'number', min: 1, step: '1', required: true },
+      { k: 'depreciationMethod', label: 'Method', type: 'select', blank: false, required: true, options: [{ value: 'STRAIGHT_LINE', label: 'Straight line' }, { value: 'DECLINING_BALANCE', label: 'Reducing balance' }] },
+      { k: 'location', label: 'Location' },
+      { k: 'assetAccountId', label: 'Asset account', type: 'select', required: true, options: opt(/^1\d{3}\b/) },
+      { k: 'accumulatedDepreciationAccountId', label: 'Accumulated depreciation account', type: 'select', required: true, options: opt(/^1\d{3}\b/) },
+      { k: 'depreciationExpenseAccountId', label: 'Depreciation expense account', type: 'select', required: true, options: opt(/^[56]\d{3}\b/) },
+      { k: 'fundedBy', label: 'Paid for', type: 'select', blank: false, required: true, options: [{ value: 'BANK', label: 'From a bank account' }, { value: 'BILL', label: 'On a supplier bill already posted' }, { value: 'ACCOUNT', label: 'Credited to an account (supplier, clearing)' }] },
+      { k: 'invoiceId', label: 'Supplier bill', type: 'select', options: (Array.isArray(bills) ? bills : []).map((b) => ({ value: b.id, label: `${b.invoiceNumber} · ${b.supplier || ''} · ${AL.money(b.netAmount)} before VAT` })) },
+      { k: 'paymentBankId', label: 'Bank account', type: 'select', options: (Array.isArray(banks) ? banks : []).filter((b) => b.isActive !== false).map((b) => ({ value: b.id, label: b.name })) },
+      { k: 'creditChartOfAccountId', label: 'Account credited', type: 'select', options: all },
+    ],
+    initial: { purchaseDate: AL.stiToday(), depreciationMethod: 'STRAIGHT_LINE', usefulLifeYears: 4, salvageValue: 0, fundedBy: 'BANK', assetAccountId: pick(/equipment|furniture|vehicle|computer/i), accumulatedDepreciationAccountId: pick(/accumulated depreciation/i), depreciationExpenseAccountId: pick(/depreciation expense/i) },
+    validate: (v) => {
+      if (!(Number(v.cost) > 0)) return 'The cost must be more than zero.';
+      if (Number(v.salvageValue || 0) >= Number(v.cost)) return 'The residual value must be below the cost.';
+      if (v.assetAccountId === v.accumulatedDepreciationAccountId) return 'Cost and accumulated depreciation need separate accounts.';
+      if (v.fundedBy === 'BANK' && !v.paymentBankId) return 'Choose the bank account it was paid from.';
+      if (v.fundedBy === 'ACCOUNT' && !v.creditChartOfAccountId) return 'Choose the account to credit.';
+      if (v.fundedBy === 'BILL' && !v.invoiceId) return 'Choose the supplier bill.';
+      return '';
+    },
+    onSubmit: async (v) => {
+      const body = { assetName: v.assetName, assetCode: v.assetCode, serialNumber: v.serialNumber || undefined, purchaseDate: v.purchaseDate, cost: Number(v.cost), salvageValue: Number(v.salvageValue || 0), usefulLifeYears: Number(v.usefulLifeYears), depreciationMethod: v.depreciationMethod, location: v.location || undefined, assetAccountId: v.assetAccountId, accumulatedDepreciationAccountId: v.accumulatedDepreciationAccountId, depreciationExpenseAccountId: v.depreciationExpenseAccountId, ...(v.fundedBy === 'BANK' ? { paymentBankId: v.paymentBankId } : v.fundedBy === 'BILL' ? { invoiceId: v.invoiceId } : { creditChartOfAccountId: v.creditChartOfAccountId }) };
+      await AL.post('/accounting/assets', body);
+      return v.fundedBy === 'BANK' ? 'The purchase is posted and appears in the cashbook.' : v.fundedBy === 'BILL' ? 'The cost is moved from the bill expense to the asset; the bill stays the one amount owed.' : 'The purchase is posted.';
+    },
+    after: () => AL.assetsReload(),
+  });
+});
+AL.actions['asset-move'] = (el) => {
+  const a = AL.assetFind(el.dataset.id); if (!a) return;
+  AL.form({ title: `Move ${a.assetName}`, sub: `Now at ${a.location || 'no location'}`, submitLabel: 'Save', doneTitle: 'Asset moved',
+    fields: [{ k: 'location', label: 'New location', required: true, wide: true }],
+    onSubmit: async (v) => { await AL.put(`/accounting/assets/${encodeURIComponent(a.id)}`, { location: v.location }); return `Now at ${v.location}; the move is in the audit trail.`; },
+    after: () => AL.assetsReload() });
+};
+AL.actions['asset-dispose'] = (el) => AL.busy(el, async () => {
+  const a = AL.assetFind(el.dataset.id); if (!a) return;
+  const banks = await AL.get('/cashbook/banks').catch(() => []);
+  AL.form({
+    title: `Dispose of ${a.assetName}`, sub: `Book value ${AL.money(a.currentBookValue)}`, submitLabel: 'Dispose', doneTitle: 'Asset disposed', danger: true,
+    fields: [
+      { k: 'disposalDate', label: 'Date', type: 'date', required: true, max: AL.stiToday() },
+      // the server accepts exactly SALE / SCRAP / DONATION / TRADE_IN (AssetController.ts); "Written off" used to send
+      // WRITE_OFF, which is none of those — every write-off failed with "Invalid disposalMethod" (found live, full sweep
+      // audit). A write-off has no proceeds and nothing changes hands, which SCRAP already models; kept the familiar label.
+      { k: 'disposalMethod', label: 'How', type: 'select', blank: false, options: [{ value: 'SALE', label: 'Sold' }, { value: 'SCRAP', label: 'Scrapped / written off' }, { value: 'DONATION', label: 'Donated' }, { value: 'TRADE_IN', label: 'Traded in' }] },
+      { k: 'disposalValue', label: 'Proceeds', type: 'number', min: 0, step: '0.01', required: true },
+      { k: 'paymentBankId', label: 'Proceeds received into', type: 'select', options: (Array.isArray(banks) ? banks : []).filter((b) => b.isActive !== false).map((b) => ({ value: b.id, label: b.name })) },
+      { k: 'description', label: 'Note', type: 'textarea', wide: true },
+    ],
+    initial: { disposalDate: AL.stiToday(), disposalMethod: 'SALE', disposalValue: 0 },
+    validate: (v) => (Number(v.disposalValue) > 0 && !v.paymentBankId ? 'Choose the bank account the proceeds were received into.' : ''),
+    onSubmit: async (v) => {
+      const gain = Number(v.disposalValue) - Number(a.currentBookValue);
+      await AL.post(`/accounting/assets/${encodeURIComponent(a.id)}/dispose`, { disposalDate: v.disposalDate, disposalMethod: v.disposalMethod, disposalValue: Number(v.disposalValue), description: v.description || undefined, ...(Number(v.disposalValue) > 0 ? { paymentBankId: v.paymentBankId } : {}) });
+      return `${gain >= 0 ? 'Gain' : 'Loss'} of ${AL.money(Math.abs(gain))} posted.`;
+    },
+    after: () => AL.assetsReload(),
+  });
+});
+AL.actions['asset-run'] = (el) => AL.busy(el, async () => {
+  const period = AL.assetPrevMonth();
+  const pv = await AL.get(`/accounting/assets/depreciation/preview?period=${period}`);
+  const label = { to_post: 'To post', already_posted: 'Posted', not_due: 'Not due (bought later)', fully_depreciated: 'Fully depreciated', calculated_not_posted: 'Calculated, not posted' };
+  const rows = pv.assets.map((r) => `<tr><td><strong>${ae(r.assetName)}</strong><span class="v28-sub">${ae(r.assetCode)}</span></td><td>${ae(AL.money(r.amount))}</td><td>${ae(r.expenseAccount || '—')}</td><td>${AL.status(label[r.outcome] || r.outcome, r.outcome === 'to_post' ? 'warn' : r.outcome === 'already_posted' ? 'ok' : 'info')}</td></tr>`).join('');
+  AL.form({
+    title: `Depreciation for ${period}`, sub: pv.toPost ? `${AL.plural(pv.toPost, 'asset')}, ${AL.money(pv.total)}` : 'Nothing to post for this month', wide: true,
+    submitLabel: pv.toPost ? `Post ${AL.money(pv.total)}` : 'Close', viewOnly: !pv.toPost, doneTitle: 'Depreciation posted', fields: [],
+    extra: `<div class="al-wide">${rows ? AL.table(['Asset', 'Charge', 'Expense account', ''], rows, '640px') : AL.empty('No assets in use.')}</div>`,
+    onSubmit: async () => {
+      if (!pv.toPost) return false;
+      const r = await AL.post('/accounting/assets/depreciation/monthly', { period });
+      return `${AL.plural(r.processedAssets || 0, 'asset')} depreciated, ${AL.money(r.totalDepreciation)}.${r.skippedErrors ? ` ${r.skippedErrors} could not be posted.` : ''}`;
+    },
+    after: () => AL.assetsReload(),
+  });
+});
+
+} catch (e) { if (window.console) console.error("[acc-live] 55-assets.js failed to load", e); }
+/* ---- accounting-live/57-payment-runs.js ---- */
+try {
+/* Payment Runs: /accounting/payment-runs — supplier bills paid together (SRD ACC-AP-11). A preparer picks approved,
+ * unpaid bills payable from one bank account (the others show why they cannot be paid yet) and submits the run; someone
+ * else approves it; the bank file goes to the bank; once paid, the run is settled with the bank's confirmation and each
+ * bill is paid (journal, cashbook line, procurement shows it paid). A bill that fails keeps its reason and can be tried
+ * again. Data: /accounting/payment-runs. */
+AL.ui.pr = AL.ui.pr || { open: '' };
+AL.prLoad = () => AL.res('pr', () => AL.get('/accounting/payment-runs'));
+AL.prReload = () => { Object.keys(AL.cache).filter((k) => k === 'pr' || k.startsWith('pr:')).forEach((k) => delete AL.cache[k]); AL.redraw(); };
+AL.PR_STATUS = { DRAFT: ['Draft', 'info'], SUBMITTED: ['Waiting for approval', 'warn'], APPROVED: ['Approved: pay at the bank', 'warn'], SETTLING: ['Settling', 'warn'], SETTLED: ['Paid', 'ok'], PARTLY_SETTLED: ['Partly paid', 'bad'], CANCELLED: ['Cancelled', 'info'] };
+
+AL.page('paymentruns', () => {
+  AL.meLoad();
+  const canPrep = AL.can('manage_accounting'), canApprove = AL.can('manage_ledger');
+  const e = AL.prLoad();
+  const head = AL.head('Daily accounting', 'Payment Runs', '', [AL.btn('Payables', 'pr-payables'), canPrep ? AL.btn('New payment run', 'pr-new', 'primary') : ''].join(''));
+  const g = AL.gate(e, { key: 'pr', errorTitle: 'Payment runs could not be loaded' });
+  if (g) return `<div class="v28-page">${head}${g}</div>`;
+  const runs = e.data || [], me = AL.me().id;
+  const kpis = AL.kpis([
+    ['Waiting for approval', String(runs.filter((r) => r.status === 'SUBMITTED').length), AL.money(runs.filter((r) => r.status === 'SUBMITTED').reduce((s, r) => s + r.total, 0)), runs.some((r) => r.status === 'SUBMITTED') ? '#f79009' : undefined],
+    ['Approved, to pay at the bank', String(runs.filter((r) => r.status === 'APPROVED').length), AL.money(runs.filter((r) => r.status === 'APPROVED').reduce((s, r) => s + r.total, 0))],
+    ['With failed bills', String(runs.filter((r) => r.status === 'PARTLY_SETTLED').length), 'Settle again once corrected', runs.some((r) => r.status === 'PARTLY_SETTLED') ? '#d92d20' : undefined],
+    ['Paid this month', AL.money(runs.filter((r) => r.status === 'SETTLED' && String(r.settledAt || '').slice(0, 7) === AL.stiToday().slice(0, 7)).reduce((s, r) => s + r.total, 0)), `${AL.plural(runs.filter((r) => r.status === 'SETTLED').length, 'run')} paid in all`],
+  ]);
+  const rows = runs.map((r) => {
+    const st = AL.PR_STATUS[r.status] || [r.status, 'info'];
+    const acts = [AL.btn('Bills', 'pr-open', 'small', `data-id="${ae(r.id)}"`)];
+    if (canPrep && r.status === 'DRAFT' && r.preparedById === me) acts.push(AL.btn('Submit', 'pr-submit', 'small primary', `data-id="${ae(r.id)}"`));
+    if (canApprove && r.status === 'SUBMITTED' && r.preparedById !== me) acts.push(AL.btn('Approve', 'pr-approve', 'small primary', `data-id="${ae(r.id)}"`));
+    if (['APPROVED', 'SETTLED', 'PARTLY_SETTLED'].includes(r.status)) acts.push(AL.btn('Bank file', 'pr-file', 'small', `data-id="${ae(r.id)}" data-ref="${ae(r.reference)}"`));
+    if (canApprove && ['APPROVED', 'PARTLY_SETTLED'].includes(r.status)) acts.push(AL.btn(r.status === 'PARTLY_SETTLED' ? 'Settle again' : 'Settle', 'pr-settle', 'small primary', `data-id="${ae(r.id)}"`));
+    if (canPrep && ['DRAFT', 'SUBMITTED', 'APPROVED'].includes(r.status)) acts.push(AL.btn('Cancel', 'pr-cancel', 'small danger', `data-id="${ae(r.id)}"`));
+    return `<tr>
+      <td><strong>${ae(r.reference)}</strong><span class="v28-sub">${ae(r.bank)} · pay on ${ae(AL.date(r.paymentDate))}</span></td>
+      <td class="num">${ae(AL.money(r.total, r.currency))}<span class="v28-sub">${r.bills} bill${r.bills === 1 ? '' : 's'}${r.paid ? `, ${r.paid} paid` : ''}</span></td>
+      <td>${ae(r.preparedBy || '—')}${r.approvedBy ? `<span class="v28-sub">approved by ${ae(r.approvedBy)}</span>` : ''}</td>
+      <td>${AL.status(st[0], st[1])}${r.cancelReason ? `<span class="v28-sub">${ae(r.cancelReason)}</span>` : ''}${r.bankReference ? `<span class="v28-sub">Bank ref ${ae(r.bankReference)}</span>` : ''}</td>
+      <td class="al-actions">${acts.join('')}</td>
+    </tr>`;
+  }).join('');
+  return `<div class="v28-page">${head}${kpis}${AL.panel('Runs', '', rows ? AL.table(['Run', 'Amount', 'Prepared by', 'Status', ''], rows, '1060px') : AL.empty('No payment runs yet.'))}</div>`;
+});
+AL.actions['pr-payables'] = () => AL.go('payables');
+AL.prFind = (id) => ((AL.cache.pr && AL.cache.pr.data) || []).find((r) => r.id === id);
+AL.actions['pr-new'] = (el) => AL.busy(el, async () => {
+  const banks = (await AL.get('/cashbook/banks').catch(() => [])).filter((b) => b.isActive !== false);
+  if (!banks.length) throw new Error('No bank account to pay from.');
+  const bankId = AL.ui.pr.bank || banks[0].id;
+  const c = await AL.get(`/accounting/payment-runs/candidates?bankId=${encodeURIComponent(bankId)}`);
+  const bills = (c.bills || []).slice().sort((x, y) => (y.payable ? 1 : 0) - (x.payable ? 1 : 0));
+  const row = (b) => `<tr class="${b.payable ? '' : 'al-muted'}"><td>${b.payable ? `<input type="checkbox" data-pr-bill="${ae(b.id)}" data-amount="${b.amount}">` : ''}</td><td><strong>${ae(b.invoiceNumber)}</strong><span class="v28-sub">${ae(b.vendor || '')}</span></td><td>${ae(AL.date(b.dueDate))}</td><td class="num">${ae(AL.money(b.amount, b.currency || c.bank.currency))}</td><td class="al-wrap">${b.payable ? '' : `<span class="v28-sub">${ae(b.reason)}</span>`}</td></tr>`;
+  AL.form({ title: 'New payment run', sub: `${bills.filter((b) => b.payable).length} of ${bills.length} approved bills can be paid from ${c.bank.name} now`, wide: true, submitLabel: 'Create run', doneTitle: 'Payment run created', fields: [
+    { k: 'bankId', label: 'Pay from', type: 'select', required: true, blank: false, options: banks.map((b) => ({ value: b.id, label: `${b.name}${b.currency ? ` (${b.currency.code})` : ''}` })) },
+    { k: 'paymentDate', label: 'Payment date', type: 'date', required: true },
+    { k: 'notes', label: 'Note', wide: true },
+  ], initial: { bankId, paymentDate: AL.stiToday() },
+  extra: `<div class="al-wide"><div class="v28-tablewrap" style="max-height:360px;overflow:auto">${AL.table(['', 'Bill', 'Due', 'Amount', ''], bills.map(row).join(''), '760px')}</div><p class="v28-sub" id="alPrTotal">Nothing chosen yet.</p></div>`,
+  validate: () => (document.querySelectorAll('[data-pr-bill]:checked').length ? '' : 'Choose at least one bill.'),
+  onSubmit: async (v) => { const ids = [...document.querySelectorAll('[data-pr-bill]:checked')].map((x) => x.dataset.prBill); const r = await AL.post('/accounting/payment-runs', { bankId: v.bankId, paymentDate: v.paymentDate, notes: v.notes || undefined, invoiceIds: ids }); return `${r.reference}: ${r.lines.length} bill${r.lines.length === 1 ? '' : 's'}, ${AL.money(r.total, r.currency)}. Submit it for approval.`; },
+  after: () => AL.prReload() });
+  const ov = document.getElementById('alOverlay');
+  if (ov) {
+    ov.addEventListener('change', (ev) => {
+      if (ev.target.name === 'bankId' && ev.target.value !== bankId) { AL.ui.pr.bank = ev.target.value; AL.actions['pr-new'](el); return; }
+      if (!ev.target.dataset || !ev.target.dataset.prBill) return;
+      const chosen = [...ov.querySelectorAll('[data-pr-bill]:checked')];
+      const t = document.getElementById('alPrTotal'); if (t) t.textContent = chosen.length ? `${chosen.length} bill${chosen.length === 1 ? '' : 's'} · ${AL.money(chosen.reduce((s, x) => s + Number(x.dataset.amount), 0), c.bank.currency)}` : 'Nothing chosen yet.';
+    });
+  }
+});
+AL.actions['pr-open'] = (el) => AL.busy(el, async () => {
+  const r = await AL.get(`/accounting/payment-runs/${encodeURIComponent(el.dataset.id)}`);
+  const LS = { INCLUDED: ['To pay', 'info'], PAID: ['Paid', 'ok'], FAILED: ['Failed', 'bad'] };
+  const rows = r.lines.map((l) => `<tr><td><strong>${ae(l.invoiceNumber || '')}</strong><span class="v28-sub">${ae(l.vendor || '')}</span></td><td>${ae(AL.date(l.dueDate))}</td><td class="num">${ae(AL.money(l.amount, r.currency))}</td><td>${AL.status((LS[l.status] || [l.status])[0], (LS[l.status] || [0, 'info'])[1])}${l.error ? `<span class="v28-sub al-bad">${ae(l.error)}</span>` : ''}${l.journal ? `<span class="v28-sub">${ae(l.journal)}</span>` : ''}</td></tr>`).join('');
+  AL.form({ title: `${r.reference} · ${AL.money(r.total, r.currency)}`, sub: `${r.bank} · pay on ${AL.date(r.paymentDate)}${r.notes ? ` · ${r.notes}` : ''}`, wide: true, viewOnly: true, submitLabel: 'Close', fields: [], extra: `<div class="al-wide">${AL.table(['Bill', 'Due', 'Amount', 'Status'], rows, '720px')}</div>`, onSubmit: async () => false });
+});
+AL.actions['pr-submit'] = (el) => AL.busy(el, async () => { await AL.post(`/accounting/payment-runs/${encodeURIComponent(el.dataset.id)}/submit`, {}); AL.prReload(); }, ['Submitted', 'An approver other than you approves it.']);
+AL.actions['pr-approve'] = (el) => { const r = AL.prFind(el.dataset.id); if (!r) return; AL.confirm({ title: `Approve ${r.reference}`, confirmLabel: 'Approve', doneTitle: 'Approved', body: `${r.bills} bill${r.bills === 1 ? '' : 's'}, ${AL.money(r.total, r.currency)} from ${r.bank} on ${AL.date(r.paymentDate)}. The bills are checked again now.`, onConfirm: async () => { await AL.post(`/accounting/payment-runs/${encodeURIComponent(r.id)}/approve`, {}); return 'Download the bank file and pay at the bank, then settle the run.'; }, after: () => AL.prReload() }); };
+AL.actions['pr-cancel'] = (el) => { const r = AL.prFind(el.dataset.id); if (!r) return; AL.confirm({ title: `Cancel ${r.reference}`, danger: true, confirmLabel: 'Cancel run', doneTitle: 'Cancelled', reason: 'Why it is cancelled', body: 'Its bills go back to the payment queue.', onConfirm: async (v) => { await AL.post(`/accounting/payment-runs/${encodeURIComponent(r.id)}/cancel`, { reason: v.reason }); return ''; }, after: () => AL.prReload() }); };
+AL.actions['pr-file'] = (el) => AL.busy(el, async () => { const t = await AL.getText(`/accounting/payment-runs/${encodeURIComponent(el.dataset.id)}/bank-file`); AL.saveText(`﻿${t}`, `${el.dataset.ref}.csv`); }, ['Bank file saved', 'One line per bill, to each supplier’s bank account on record.']);
+AL.actions['pr-settle'] = (el) => {
+  const r = AL.prFind(el.dataset.id); if (!r) return;
+  AL.form({ title: `Settle ${r.reference}`, sub: `${AL.money(r.total, r.currency)} paid from ${r.bank}`, submitLabel: 'Settle', doneTitle: 'Run settled', fields: [{ k: 'bankReference', label: 'Bank reference', required: true }],
+    extra: '<label class="v28-field al-wide"><span>Bank confirmation (PDF or image) *</span><input class="v28-input" type="file" id="alPrProof" accept=".pdf,.png,.jpg,.jpeg,.webp"></label>',
+    validate: () => { const f = document.getElementById('alPrProof'); return f && f.files && f.files[0] ? '' : 'Attach the bank’s confirmation of the payments.'; },
+    onSubmit: async (v) => { const fd = new FormData(); fd.append('proofOfPayment', document.getElementById('alPrProof').files[0]); fd.append('bankReference', v.bankReference); const out = AL.unwrap(await AL.http().form(`/accounting/payment-runs/${encodeURIComponent(r.id)}/settle`, fd)); const failed = (out.lines || []).filter((l) => l.status === 'FAILED'); return failed.length ? `${out.lines.length - failed.length} paid; ${failed.length} failed and can be settled again once corrected.` : `All ${out.lines.length} bills paid; each is in the ledger and the cashbook.`; },
+    after: () => AL.prReload() });
+};
+// the Payables page (scripts/accounting-v52-payables-live.inc.js) links here
+AL.actions['pr-runs'] = () => AL.go('paymentruns');
+
+} catch (e) { if (window.console) console.error("[acc-live] 57-payment-runs.js failed to load", e); }
+/* ---- accounting-live/60-receivables.js ---- */
+try {
+/* Receivables: /accounting/receivables — customer invoices (draft → sent → paid), receipts and their allocation to
+ * invoices, credit notes, customers with their balances, and the ageing. Posting (sending an invoice or credit note,
+ * voiding a sent invoice) is for approvers; preparers raise invoices, credit notes and receipts and allocate them.
+ * Data: /accounting/invoices, /accounting/customers, /accounting/credit-notes, /accounting/receivables/unallocated,
+ * /cashbook/receipts, /cashbook/open-items/*. */
+AL.ui.ar = AL.ui.ar || { tab: 'invoices', status: 'OPEN', q: '' };
+AL.arLoad = () => AL.res('ar', async () => {
+  const [inv, cust, cn, un, age] = await Promise.all([
+    AL.get('/accounting/invoices?limit=500'),
+    AL.get('/accounting/customers?limit=500'),
+    AL.get('/accounting/credit-notes?limit=200').catch(() => null),
+    AL.get('/accounting/receivables/unallocated').catch(() => []),
+    AL.get('/accounting/invoices/debtors-age-analysis').catch(() => null),
+  ]);
+  return { invoices: (inv && inv.invoices) || [], customers: (cust && cust.customers) || [], creditNotes: (cn && cn.creditNotes) || [], unallocated: un || [], ageing: age };
+});
+AL.arReload = () => { delete AL.cache.ar; AL.redraw(); };
+AL.arStatus = { DRAFT: ['Draft', 'warn'], SENT: ['Sent', 'info'], PARTIALLY_PAID: ['Part paid', 'warn'], PAID: ['Paid', 'ok'], VOID: ['Voided', 'bad'] };
+AL.cnStatus = { DRAFT: ['Draft', 'warn'], SENT: ['Issued', 'info'], PARTIALLY_APPLIED: ['Part applied', 'warn'], APPLIED: ['Applied', 'ok'] };
+AL.arCode = (x) => (x && x.currency && x.currency.code) || '';
+
+AL.page('receivables', () => {
+  AL.meLoad();
+  const canPrepare = AL.can('manage_accounting'), canPost = AL.can('manage_ledger');
+  const e = AL.arLoad();
+  const head = AL.head('Accounts receivable', 'Receivables', 'Invoices are posted when sent; money received is a cashbook receipt allocated to the invoices it settles.',
+    canPrepare ? `${AL.btn('New invoice', 'ar-new', 'primary')}${AL.btn('Record receipt', 'ar-receipt')}${AL.btn('New customer', 'ar-customer')}` : '');
+  const g = AL.gate(e, { key: 'ar', errorTitle: 'Receivables could not be loaded' });
+  if (g) return `<div class="v28-page">${head}${g}</div>`;
+  const { invoices, customers, creditNotes, unallocated, ageing } = e.data;
+  const today = AL.stiToday();
+  const open = invoices.filter((x) => x.status === 'SENT' || x.status === 'PARTIALLY_PAID');
+  const byCur = {};
+  open.forEach((x) => { const c = AL.arCode(x); byCur[c] = (byCur[c] || 0) + Number(x.outstandingAmount || 0); });
+  const overdue = open.filter((x) => x.dueDate && String(x.dueDate).slice(0, 10) < today);
+  const over90 = ageing && ageing.totalsByCurrency ? Object.entries(ageing.totalsByCurrency).map(([c, t]) => [c, Number(t.over90 || 0)]).filter(([, v]) => v > 0) : [];
+  const since = new Date(Date.now() - 90 * 86400000).toISOString().slice(0, 10);
+  const sales90 = invoices.filter((x) => x.status !== 'DRAFT' && x.status !== 'VOID' && String(x.transactionDate).slice(0, 10) >= since).reduce((t, x) => t + Number(x.totalAmount || 0), 0);
+  const outAll = Object.values(byCur).reduce((t, v) => t + v, 0);
+  const kpis = AL.kpis([
+    ...Object.entries(byCur).map(([c, v]) => [`Owed to us (${c})`, AL.money(v, c), AL.plural(open.filter((x) => AL.arCode(x) === c).length, 'open invoice')]),
+    ...(Object.keys(byCur).length ? [] : [['Owed to us', AL.money(0), 'No open invoices']]),
+    ['Overdue', String(overdue.length), overdue.length ? AL.money(overdue.reduce((t, x) => t + Number(x.outstandingAmount || 0), 0)) : 'Nothing overdue', overdue.length ? '#d92d20' : '#12b76a'],
+    ['Over 90 days', over90.length ? over90.map(([c, v]) => AL.money(v, c)).join(' · ') : AL.money(0), 'Past due by more than 90 days', over90.length ? '#d92d20' : '#12b76a'],
+    ['Days sales outstanding', sales90 > 0 ? `${Math.round((outAll / sales90) * 90)} days` : '—', 'Owed ÷ last 90 days\' sales × 90'],
+    ['Receipts to allocate', String(unallocated.length), unallocated.length ? AL.money(unallocated.reduce((t, r) => t + r.unallocated, 0)) : 'All allocated', unallocated.length ? '#f79009' : '#12b76a'],
+    ['Drafts', String(invoices.filter((x) => x.status === 'DRAFT').length), 'Not sent yet'],
+  ]);
+  const t = AL.ui.ar.tab;
+  const tabs = `<div class="v28-tabbar">${[['invoices', 'Invoices'], ['receipts', `Receipts to allocate${unallocated.length ? ` (${unallocated.length})` : ''}`], ['credit', 'Credit notes'], ['customers', 'Customers'], ['ageing', 'Ageing']].map(([id, label]) => `<button class="v28-tab ${t === id ? 'active' : ''}" data-al="ar-tab" data-tab="${id}">${ae(label)}</button>`).join('')}</div>`;
+  let body = '';
+  if (t === 'invoices') {
+    const st = AL.ui.ar.status, q = AL.ui.ar.q.trim().toLowerCase();
+    const shown = invoices.filter((x) => (st === 'ALL' || (st === 'OPEN' ? (x.status === 'SENT' || x.status === 'PARTIALLY_PAID') : x.status === st)) && (!q || `${x.invoiceNumber} ${x.customer && x.customer.name} ${x.description}`.toLowerCase().includes(q)));
+    const filt = `<div class="al-filters"><label class="v28-field"><span>Show</span><select class="v28-select" data-ar-f="status">${[['OPEN', 'Open (sent, unpaid)'], ['DRAFT', 'Drafts'], ['PAID', 'Paid'], ['VOID', 'Voided'], ['ALL', 'All']].map(([v, l]) => `<option value="${v}"${st === v ? ' selected' : ''}>${l}</option>`).join('')}</select></label><label class="v28-field al-grow"><span>Search</span><input class="v28-input" type="search" data-ar-f="q" value="${ae(AL.ui.ar.q)}" placeholder="Invoice, customer or description"></label></div>`;
+    const rows = shown.map((x) => {
+      const s = AL.arStatus[x.status] || [x.status, 'info'];
+      const c = AL.arCode(x);
+      const late = (x.status === 'SENT' || x.status === 'PARTIALLY_PAID') && x.dueDate && String(x.dueDate).slice(0, 10) < today;
+      const acts = [];
+      if (x.status === 'DRAFT' && canPost) acts.push(AL.btn('Send', 'ar-send', 'small primary', `data-id="${ae(x.id)}"`));
+      if ((x.status === 'SENT' || x.status === 'PARTIALLY_PAID') && canPrepare) acts.push(AL.btn('Record receipt', 'ar-receipt', 'small', `data-id="${ae(x.id)}"`), AL.btn('Credit note', 'ar-cn', 'small', `data-id="${ae(x.id)}"`));
+      if ((x.status === 'DRAFT' || x.status === 'SENT') && Number(x.paidAmount || 0) === 0 && canPost) acts.push(AL.btn('Void', 'ar-void', 'small danger', `data-id="${ae(x.id)}"`));
+      return `<tr>
+        <td><strong>${ae(x.invoiceNumber)}</strong><span class="v28-sub">${ae(AL.date(x.transactionDate))}</span></td>
+        <td>${ae((x.customer && x.customer.name) || '—')}</td>
+        <td class="al-wrap">${ae(x.description || '')}</td>
+        <td>${x.dueDate ? `${ae(AL.date(x.dueDate))}${late ? '<span class="v28-sub al-bad">Overdue</span>' : ''}` : '—'}</td>
+        <td>${ae(AL.money(x.totalAmount, c))}</td>
+        <td>${ae(AL.money(x.outstandingAmount, c))}</td>
+        <td>${AL.status(s[0], s[1])}</td>
+        <td class="al-actions">${acts.join('')}</td>
+      </tr>`;
+    }).join('');
+    body = `${filt}${rows ? AL.table(['Invoice', 'Customer', 'Description', 'Due', 'Total', 'Outstanding', 'Status', ''], rows, '1150px') : AL.empty('No invoices here.')}`;
+  } else if (t === 'receipts') {
+    const rows = unallocated.map((r) => `<tr><td>${ae(AL.date(r.date))}</td><td><strong>${ae(r.customer ? r.customer.name : '')}</strong><span class="v28-sub">${ae(r.reference || r.description || '')}</span></td><td>${ae(r.bank ? r.bank.name : '')}</td><td>${ae(AL.money(r.amount, r.bank && r.bank.currency))}</td><td>${ae(AL.money(r.unallocated, r.bank && r.bank.currency))}</td><td class="al-actions">${canPrepare ? AL.btn('Allocate', 'ar-allocate', 'small primary', `data-id="${ae(r.id)}"`) : ''}</td></tr>`).join('');
+    body = rows ? AL.table(['Received', 'Customer', 'Bank', 'Amount', 'Not allocated', ''], rows, '900px') : AL.empty('Every customer receipt is allocated to invoices.');
+  } else if (t === 'credit') {
+    const rows = creditNotes.map((n) => {
+      const s = AL.cnStatus[n.status] || [n.status, 'info'];
+      const c = (n.currency && n.currency.code) || '';
+      const acts = [];
+      if (n.status === 'DRAFT' && canPost) acts.push(AL.btn('Issue', 'cn-send', 'small primary', `data-id="${ae(n.id)}"`));
+      if (n.status === 'DRAFT' && canPrepare) acts.push(AL.btn('Delete', 'cn-delete', 'small danger', `data-id="${ae(n.id)}"`));
+      if ((n.status === 'SENT' || n.status === 'PARTIALLY_APPLIED') && Number(n.remainingAmount) > 0 && canPrepare) acts.push(AL.btn('Apply to invoice', 'cn-apply', 'small', `data-id="${ae(n.id)}"`));
+      return `<tr><td><strong>${ae(n.creditNoteNumber)}</strong><span class="v28-sub">${ae(AL.date(n.createdAt))}</span></td><td>${ae(n.customer ? n.customer.name : '')}</td><td>${ae(n.originalInvoice ? n.originalInvoice.invoiceNumber : '—')}</td><td class="al-wrap">${ae(n.reason || '')}</td><td>${ae(AL.money(n.totalAmount, c))}</td><td>${ae(AL.money(n.remainingAmount, c))}</td><td>${AL.status(s[0], s[1])}</td><td class="al-actions">${acts.join('')}</td></tr>`;
+    }).join('');
+    body = rows ? AL.table(['Credit note', 'Customer', 'Against', 'Reason', 'Total', 'Not yet applied', 'Status', ''], rows, '1100px') : AL.empty('No credit notes.');
+  } else if (t === 'customers') {
+    const owed = {};
+    open.forEach((x) => { const k = x.customerId; owed[k] = owed[k] || {}; const c = AL.arCode(x); owed[k][c] = (owed[k][c] || 0) + Number(x.outstandingAmount || 0); });
+    const rows = customers.map((c) => `<tr><td><strong>${ae(c.name)}</strong><span class="v28-sub">${ae([c.contactPerson, c.email].filter(Boolean).join(' · '))}</span></td><td>${ae(c.taxNumber || '—')}</td><td>${ae(c.paymentTerms ? `${c.paymentTerms} days` : '30 days')}</td><td>${owed[c.id] ? Object.entries(owed[c.id]).map(([k, v]) => ae(AL.money(v, k))).join('<br>') : AL.money(0)}</td></tr>`).join('');
+    body = rows ? AL.table(['Customer', 'Tax number', 'Terms', 'Owed'], rows, '760px') : AL.empty('No customers yet.');
+  } else {
+    const lines = (ageing && ageing.lines) || [];
+    const byCust = {};
+    lines.forEach((l) => { const k = `${l.customerName}|${l.currencyCode}`; byCust[k] = byCust[k] || { name: l.customerName, cur: l.currencyCode, current: 0, days1To30: 0, days31To60: 0, days61To90: 0, over90: 0 }; byCust[k][l.bucket] = (byCust[k][l.bucket] || 0) + Number(l.outstandingAmount || 0); });
+    const rows = Object.values(byCust).map((r) => `<tr><td><strong>${ae(r.name)}</strong></td>${['current', 'days1To30', 'days31To60', 'days61To90', 'over90'].map((b) => `<td>${r[b] ? ae(AL.money(r[b], r.cur)) : ''}</td>`).join('')}<td><strong>${ae(AL.money(['current', 'days1To30', 'days31To60', 'days61To90', 'over90'].reduce((t2, b) => t2 + r[b], 0), r.cur))}</strong></td></tr>`).join('');
+    body = rows ? AL.table(['Customer', 'Not yet due', '1–30 days', '31–60 days', '61–90 days', 'Over 90 days', 'Total'], rows, '980px') : AL.empty('Nothing is owed.');
+  }
+  return `<div class="v28-page">${head}${kpis}${AL.panel('Receivables', '', `${tabs}${body}`)}</div>`;
+});
+AL.wire.receivables = () => {
+  document.querySelectorAll('[data-ar-f]').forEach((el) => {
+    if (el.dataset.wired) return; el.dataset.wired = '1';
+    const k = el.dataset.arF;
+    if (k === 'q') el.addEventListener('input', () => { AL.ui.ar.q = el.value; clearTimeout(AL.arT); AL.arT = setTimeout(() => { AL.redraw(); const n = document.querySelector('[data-ar-f="q"]'); if (n) { n.focus(); n.setSelectionRange(n.value.length, n.value.length); } }, 250); });
+    else el.addEventListener('change', () => { AL.ui.ar[k] = el.value; AL.redraw(); });
+  });
+};
+AL.actions['ar-tab'] = (el) => { AL.ui.ar.tab = el.dataset.tab; AL.redraw(); };
+AL.arInv = (id) => ((AL.cache.ar && AL.cache.ar.data && AL.cache.ar.data.invoices) || []).find((x) => x.id === id);
+
+// ------------------------------------------------------------------------------------------------ invoices
+AL.arLineRow = (l = {}) => `<tr class="al-ar-line"><td><input class="v28-input" data-k="description" value="${ae(l.description || '')}"></td><td><input class="v28-input" type="number" min="0" step="any" data-k="quantity" value="${ae(l.quantity || 1)}"></td><td><input class="v28-input" type="number" min="0" step="0.01" data-k="unitPrice" value="${ae(l.unitPrice || '')}"></td><td><button class="v28-btn icon" data-al="ar-line-del" type="button" aria-label="Remove line">×</button></td></tr>`;
+AL.arReadLines = () => [...document.querySelectorAll('#alOverlay .al-ar-line')].map((tr) => ({ description: tr.querySelector('[data-k="description"]').value.trim(), quantity: Number(tr.querySelector('[data-k="quantity"]').value) || 0, unitPrice: Number(tr.querySelector('[data-k="unitPrice"]').value) || 0 })).filter((l) => l.description || l.unitPrice);
+AL.actions['ar-line-add'] = () => { const tb = document.querySelector('#alOverlay .al-ar-lines tbody'); if (tb) tb.insertAdjacentHTML('beforeend', AL.arLineRow()); };
+AL.actions['ar-line-del'] = (el) => { if (document.querySelectorAll('#alOverlay .al-ar-line').length > 1) el.closest('tr').remove(); };
+AL.actions['ar-new'] = (el) => AL.busy(el, async () => {
+  const { customers } = AL.cache.ar.data;
+  const cur = await AL.get('/accounting/currencies');
+  const base = (cur || []).find((c) => c.isDefault) || (cur || [])[0] || {};
+  AL.form({
+    title: 'New invoice', sub: 'Saved as a draft; it is posted to the ledger when sent.', wide: true, submitLabel: 'Save draft', doneTitle: 'Invoice saved',
+    fields: [
+      { k: 'customerId', label: 'Customer', type: 'select', required: true, options: customers.map((c) => ({ value: c.id, label: c.name })) },
+      { k: 'currencyId', label: 'Currency', type: 'select', required: true, blank: false, options: (cur || []).filter((c) => c.isActive !== false).map((c) => ({ value: c.id, label: c.code })) },
+      { k: 'invoiceDate', label: 'Invoice date', type: 'date', required: true, max: AL.stiToday() },
+      { k: 'dueDate', label: 'Due date', type: 'date', hint: "Empty: the customer's payment terms." },
+      { k: 'description', label: 'Description', required: true, wide: true },
+      { k: 'isTaxable', label: 'Charge VAT', type: 'checkbox' },
+    ],
+    initial: { currencyId: base.id, invoiceDate: AL.stiToday() },
+    extra: `<div class="al-wide"><div class="v28-tablewrap"><table class="v28-table al-ar-lines" style="min-width:640px"><thead><tr><th>Item</th><th>Quantity</th><th>Unit price</th><th></th></tr></thead><tbody>${AL.arLineRow()}</tbody></table></div>${AL.btn('Add line', 'ar-line-add', 'small', 'type="button"')}</div>`,
+    validate: (v) => {
+      const ls = AL.arReadLines();
+      if (!ls.length) return 'Add at least one line.';
+      if (ls.some((l) => !l.description || !(l.quantity > 0) || !(l.unitPrice >= 0))) return 'Each line needs an item, a quantity and a price.';
+      if (!(ls.reduce((t, l) => t + l.quantity * l.unitPrice, 0) > 0)) return 'The invoice total must be more than zero.';
+      if (v.dueDate && v.dueDate < v.invoiceDate) return 'The due date cannot be before the invoice date.';
+      return '';
+    },
+    onSubmit: async (v) => { await AL.post('/accounting/invoices', { ...v, dueDate: v.dueDate || undefined, items: AL.arReadLines() }); return 'Send it to post it to the ledger.'; },
+    after: () => { AL.ui.ar.tab = 'invoices'; AL.ui.ar.status = 'DRAFT'; AL.arReload(); },
+  });
+});
+AL.actions['ar-send'] = (el) => {
+  const x = AL.arInv(el.dataset.id); if (!x) return;
+  AL.confirm({ title: `Send ${x.invoiceNumber}`, confirmLabel: 'Send and post', doneTitle: 'Invoice sent',
+    body: `${AL.money(x.totalAmount, AL.arCode(x))} to ${x.customer ? x.customer.name : 'the customer'}: the receivable and the income are posted, and the invoice is emailed to the customer where an address is on file.`,
+    onConfirm: async () => { await AL.patch(`/accounting/invoices/${encodeURIComponent(x.id)}/send`, {}); return ''; }, after: () => AL.arReload() });
+};
+AL.actions['ar-void'] = (el) => {
+  const x = AL.arInv(el.dataset.id); if (!x) return;
+  AL.confirm({ title: `Void ${x.invoiceNumber}`, danger: true, confirmLabel: 'Void invoice', doneTitle: 'Invoice voided', reason: 'Why it is voided',
+    body: x.status === 'DRAFT' ? 'The draft is withdrawn; nothing was posted.' : 'Its posting is reversed (its month must still be open).',
+    onConfirm: async (v) => { await AL.patch(`/accounting/invoices/${encodeURIComponent(x.id)}/void`, { reason: v.reason }); return ''; }, after: () => AL.arReload() });
+};
+
+// ------------------------------------------------------------------------------------------------ receipts
+AL.actions['ar-receipt'] = (el) => AL.busy(el, async () => {
+  const { invoices, customers } = AL.cache.ar.data;
+  const inv = el.dataset.id ? AL.arInv(el.dataset.id) : null;
+  const banks = ((await AL.get('/cashbook/banks')) || []).filter((b) => b.isActive !== false);
+  AL.form({
+    title: inv ? `Receipt for ${inv.invoiceNumber}` : 'Record a customer receipt', sub: inv ? `${inv.customer ? inv.customer.name : ''} · ${AL.money(inv.outstandingAmount, AL.arCode(inv))} outstanding` : 'Posted to the bank and allocated to the invoices it settles.', submitLabel: 'Post receipt', doneTitle: 'Receipt posted',
+    fields: [
+      ...(inv ? [] : [{ k: 'customerId', label: 'Customer', type: 'select', required: true, options: customers.map((c) => ({ value: c.id, label: c.name })) }]),
+      { k: 'bankId', label: 'Received into', type: 'select', required: true, options: banks.map((b) => ({ value: b.id, label: b.name })) },
+      { k: 'transactionDate', label: 'Date received', type: 'date', required: true, max: AL.stiToday() },
+      { k: 'amount', label: 'Amount', type: 'number', min: 0.01, step: '0.01', required: true },
+      { k: 'reference', label: 'Reference (deposit slip, transfer)' },
+    ],
+    initial: { transactionDate: AL.stiToday(), amount: inv ? Number(inv.outstandingAmount) : '', bankId: (banks.find((b) => inv && b.currencyId === inv.currencyId) || banks[0] || {}).id },
+    validate: (v) => {
+      if (!(Number(v.amount) > 0)) return 'The amount must be more than zero.';
+      const b = banks.find((x) => x.id === v.bankId);
+      if (inv && b && b.currencyId !== inv.currencyId) return 'Choose a bank account in the invoice currency.';
+      return '';
+    },
+    onSubmit: async (v) => {
+      const customerId = inv ? inv.customerId : v.customerId;
+      const r = await AL.post('/cashbook/receipts', { bankId: v.bankId, transactionDate: v.transactionDate, amount: Number(v.amount), reference: v.reference || undefined, description: inv ? `Receipt · ${inv.invoiceNumber}` : `Receipt · ${(customers.find((c) => c.id === customerId) || {}).name || 'customer'}`, counterpartyType: 'CUSTOMER', customerId, vatCode: 'EXEMPT' });
+      const entryId = r && ((r.transaction && r.transaction.id) || r.id);
+      if (inv && entryId) {
+        const amt = Math.min(Number(v.amount), Number(inv.outstandingAmount));
+        await AL.post(`/cashbook/open-items/match/${encodeURIComponent(entryId)}`, { allocations: [{ openItemId: inv.id, allocatedAmount: amt, description: v.reference || '' }] });
+        return Number(v.amount) > amt ? `${AL.money(amt, AL.arCode(inv))} allocated to ${inv.invoiceNumber}; ${AL.money(Number(v.amount) - amt, AL.arCode(inv))} is left to allocate.` : `Allocated to ${inv.invoiceNumber}.`;
+      }
+      return 'Allocate it to the invoices it settles under "Receipts to allocate".';
+    },
+    after: () => AL.arReload(),
+  });
+});
+AL.actions['ar-allocate'] = (el) => AL.busy(el, async () => {
+  const r = (AL.cache.ar.data.unallocated || []).find((x) => x.id === el.dataset.id); if (!r) return;
+  const items = await AL.get(`/cashbook/open-items/customers/${encodeURIComponent(r.customer.id)}`);
+  const open = Array.isArray(items) ? items : [];
+  let left = r.unallocated;
+  const rows = open.map((o) => { const take = Math.min(left, Number(o.outstandingAmount)); left = Math.round((left - take) * 100) / 100; return `<tr class="al-ar-alloc" data-id="${ae(o.id)}"><td><strong>${ae(o.invoiceNumber)}</strong><span class="v28-sub">${ae(o.dueDate ? `Due ${AL.date(o.dueDate)}` : '')}</span></td><td>${ae(AL.money(o.outstandingAmount, o.currency))}</td><td><input class="v28-input" type="number" min="0" step="0.01" max="${ae(Number(o.outstandingAmount))}" data-k="amt" value="${take > 0 ? take : ''}"></td></tr>`; }).join('');
+  AL.form({
+    title: `Allocate ${AL.money(r.unallocated, r.bank && r.bank.currency)} from ${r.customer.name}`, sub: `${AL.date(r.date)} · ${r.reference || r.description || ''}`, wide: true, submitLabel: 'Allocate', doneTitle: 'Receipt allocated', fields: [],
+    extra: `<div class="al-wide">${rows ? AL.table(['Invoice', 'Outstanding', 'Allocate'], rows, '560px') : AL.empty('This customer has no sent, unpaid invoice.')}</div>`,
+    validate: () => {
+      const a = [...document.querySelectorAll('#alOverlay .al-ar-alloc')].map((tr) => Number(tr.querySelector('[data-k="amt"]').value) || 0);
+      const total = a.reduce((t, x) => t + x, 0);
+      if (!(total > 0)) return 'Enter what to allocate to at least one invoice.';
+      if (total > r.unallocated + 0.005) return `That is ${AL.money(total)}; only ${AL.money(r.unallocated)} is left to allocate.`;
+      return '';
+    },
+    onSubmit: async () => {
+      if (!rows) return false;
+      const allocations = [...document.querySelectorAll('#alOverlay .al-ar-alloc')].map((tr) => ({ openItemId: tr.dataset.id, allocatedAmount: Number(tr.querySelector('[data-k="amt"]').value) || 0 })).filter((a) => a.allocatedAmount > 0);
+      await AL.post(`/cashbook/open-items/match/${encodeURIComponent(r.id)}`, { allocations });
+      return `${AL.plural(allocations.length, 'invoice')} settled from this receipt.`;
+    },
+    after: () => AL.arReload(),
+  });
+});
+
+// ------------------------------------------------------------------------------------------------ credit notes
+AL.actions['ar-cn'] = (el) => {
+  const x = AL.arInv(el.dataset.id); if (!x) return;
+  const c = AL.arCode(x);
+  const vatRate = Number(x.amount) > 0 ? Number(x.vatAmount || 0) / Number(x.amount) : 0;
+  AL.form({
+    title: `Credit note against ${x.invoiceNumber}`, sub: `${AL.money(x.outstandingAmount, c)} outstanding${vatRate ? ` · VAT is credited at the invoice's rate` : ''}`, submitLabel: 'Raise credit note', doneTitle: 'Credit note raised',
+    fields: [
+      { k: 'amount', label: `Amount before VAT (${c})`, type: 'number', min: 0.01, step: '0.01', required: true },
+      { k: 'reason', label: 'Reason', type: 'textarea', required: true, wide: true },
+    ],
+    validate: (v) => { const gross = Number(v.amount) * (1 + vatRate); return !(Number(v.amount) > 0) ? 'The amount must be more than zero.' : gross > Number(x.outstandingAmount) + 0.005 ? `With VAT that is ${AL.money(gross, c)}, more than the ${AL.money(x.outstandingAmount, c)} outstanding.` : ''; },
+    onSubmit: async (v) => {
+      const amount = Math.round(Number(v.amount) * 100) / 100, vat = Math.round(amount * vatRate * 100) / 100;
+      await AL.post('/accounting/credit-notes', { invoiceId: x.id, amount, vatAmount: vat, totalAmount: Math.round((amount + vat) * 100) / 100, reason: v.reason });
+      return 'An approver issues it (posting it); it is then applied to the invoice.';
+    },
+    after: () => { AL.ui.ar.tab = 'credit'; AL.arReload(); },
+  });
+};
+AL.cnFind = (id) => ((AL.cache.ar && AL.cache.ar.data && AL.cache.ar.data.creditNotes) || []).find((n) => n.id === id);
+AL.actions['cn-send'] = (el) => { const n = AL.cnFind(el.dataset.id); if (!n) return; AL.confirm({ title: `Issue ${n.creditNoteNumber}`, confirmLabel: 'Issue and post', doneTitle: 'Credit note issued', body: `${AL.money(n.totalAmount, n.currency && n.currency.code)} is credited to ${n.customer ? n.customer.name : 'the customer'}: income and VAT are reduced and the receivable with them.`, onConfirm: async () => { await AL.post(`/accounting/credit-notes/${encodeURIComponent(n.id)}/send`, {}); return ''; }, after: () => AL.arReload() }); };
+AL.actions['cn-delete'] = (el) => { const n = AL.cnFind(el.dataset.id); if (!n) return; AL.confirm({ title: `Delete ${n.creditNoteNumber}`, danger: true, confirmLabel: 'Delete draft', doneTitle: 'Credit note deleted', body: 'The draft and its unposted journal are withdrawn.', onConfirm: async () => { await AL.del(`/accounting/credit-notes/${encodeURIComponent(n.id)}`); return ''; }, after: () => AL.arReload() }); };
+AL.actions['cn-apply'] = (el) => {
+  const n = AL.cnFind(el.dataset.id); if (!n) return;
+  const c = (n.currency && n.currency.code) || '';
+  const inv = (AL.cache.ar.data.invoices || []).filter((x) => x.customerId === n.customerId && (x.status === 'SENT' || x.status === 'PARTIALLY_PAID') && x.currencyId === n.currencyId);
+  AL.form({
+    title: `Apply ${n.creditNoteNumber}`, sub: `${AL.money(n.remainingAmount, c)} to apply`, submitLabel: 'Apply', doneTitle: 'Credit applied',
+    fields: [{ k: 'invoiceId', label: 'Invoice', type: 'select', required: true, wide: true, options: inv.map((x) => ({ value: x.id, label: `${x.invoiceNumber} · ${AL.money(x.outstandingAmount, c)} outstanding` })) }, { k: 'amount', label: 'Amount', type: 'number', min: 0.01, step: '0.01', required: true }],
+    initial: { invoiceId: n.invoiceId && inv.some((x) => x.id === n.invoiceId) ? n.invoiceId : (inv[0] || {}).id, amount: Number(n.remainingAmount) },
+    validate: (v) => { const x = inv.find((i) => i.id === v.invoiceId); return !(Number(v.amount) > 0) ? 'Enter the amount.' : Number(v.amount) > Number(n.remainingAmount) + 0.005 ? 'More than the credit left.' : x && Number(v.amount) > Number(x.outstandingAmount) + 0.005 ? 'More than the invoice has outstanding.' : ''; },
+    onSubmit: async (v) => { await AL.post(`/accounting/credit-notes/${encodeURIComponent(n.id)}/apply`, { invoiceId: v.invoiceId, amount: Number(v.amount) }); return ''; },
+    after: () => AL.arReload(),
+  });
+};
+AL.actions['ar-customer'] = () => AL.form({
+  title: 'New customer', submitLabel: 'Add customer', doneTitle: 'Customer added',
+  fields: [{ k: 'name', label: 'Name', required: true, wide: true }, { k: 'contactPerson', label: 'Contact person' }, { k: 'email', label: 'Email', type: 'email' }, { k: 'phone', label: 'Phone' }, { k: 'taxNumber', label: 'Tax number (BP / VAT)' }, { k: 'paymentTerms', label: 'Payment terms (days)', type: 'number', min: 0, step: '1' }, { k: 'address', label: 'Address', type: 'textarea', wide: true }],
+  initial: { paymentTerms: 30 },
+  onSubmit: async (v) => { await AL.post('/accounting/customers', { ...v, paymentTerms: v.paymentTerms ? Number(v.paymentTerms) : undefined }); return v.name; },
+  after: () => AL.arReload(),
+});
+
+} catch (e) { if (window.console) console.error("[acc-live] 60-receivables.js failed to load", e); }
+/* ---- accounting-live/65-expenses.js ---- */
+try {
+/* Expenses: /accounting/expenses — expenses recorded against a supplier and category, paid from a named bank, in cash or
+ * on credit; each is submitted with a draft journal and approved (posted) or returned (rejected) by an approver who did
+ * not record it. Data: /accounting/expenses, /accounting/expense-categories, /cashbook/vendors, /cashbook/banks,
+ * /accounting/journal-entries/:id/post|void. */
+AL.ui.exp = AL.ui.exp || { tab: 'SUBMITTED' };
+AL.expLoad = () => AL.res('exp', async () => {
+  const [list, cats] = await Promise.all([AL.get('/accounting/expenses?limit=500'), AL.get('/accounting/expense-categories').catch(() => [])]);
+  return { expenses: Array.isArray(list) ? list : (list && (list.expenses || list.items)) || [], categories: Array.isArray(cats) ? cats : [] };
+});
+AL.expReload = () => { delete AL.cache.exp; AL.redraw(); };
+AL.expStatus = { SUBMITTED: ['Awaiting approval', 'warn'], POSTED: ['Awaiting approval', 'warn'], DRAFT: ['Draft', 'warn'], APPROVED: ['Approved', 'ok'], REJECTED: ['Returned', 'bad'], VOIDED: ['Voided', 'bad'] };
+AL.expPay = { BANK: 'Bank', CASH: 'Petty cash', CREDIT: 'On credit (supplier)' };
+
+AL.actions['clm-go'] = () => AL.go('claims');
+AL.page('expenses', () => {
+  AL.meLoad();
+  const canPrepare = AL.can('manage_accounting'), canPost = AL.can('manage_ledger');
+  const e = AL.expLoad();
+  const head = AL.head('Spend', 'Expenses', 'An expense is approved by someone other than the person who recorded it; approval posts it to the ledger.', [AL.btn('Employee claims', 'clm-go'), canPrepare ? AL.btn('Record expense', 'exp-new', 'primary') : ''].join(''));
+  const g = AL.gate(e, { key: 'exp', errorTitle: 'Expenses could not be loaded' });
+  if (g) return `<div class="v28-page">${head}${g}</div>`;
+  const { expenses } = e.data;
+  const me = AL.me().id;
+  const waiting = expenses.filter((x) => x.status === 'SUBMITTED' || x.status === 'POSTED');
+  const month = AL.stiToday().slice(0, 7);
+  const approvedMonth = expenses.filter((x) => x.status === 'APPROVED' && String(x.transactionDate).slice(0, 7) === month);
+  const kpis = AL.kpis([
+    ['Awaiting approval', String(waiting.length), AL.money(waiting.reduce((t, x) => t + Number(x.totalAmount || 0), 0)), waiting.length ? '#f79009' : '#12b76a'],
+    ['Waiting on me', String(canPost ? waiting.filter((x) => x.createdById !== me).length : 0), canPost ? 'Recorded by others' : 'Approvers approve'],
+    ['Approved this month', AL.money(approvedMonth.reduce((t, x) => t + Number(x.totalAmount || 0), 0)), AL.plural(approvedMonth.length, 'expense')],
+    ['Returned', String(expenses.filter((x) => x.status === 'REJECTED').length), 'Not approved'],
+  ]);
+  const tab = AL.ui.exp.tab;
+  const tabs = `<div class="v28-tabbar">${[['SUBMITTED', 'Awaiting approval'], ['APPROVED', 'Approved'], ['REJECTED', 'Returned'], ['ALL', 'All']].map(([id, label]) => `<button class="v28-tab ${tab === id ? 'active' : ''}" data-al="exp-tab" data-tab="${id}">${ae(label)}</button>`).join('')}</div>`;
+  const shown = expenses.filter((x) => tab === 'ALL' || (tab === 'SUBMITTED' ? (x.status === 'SUBMITTED' || x.status === 'POSTED') : tab === 'REJECTED' ? (x.status === 'REJECTED' || x.status === 'VOIDED') : x.status === tab));
+  const rows = shown.map((x) => {
+    const st = AL.expStatus[x.status] || [x.status, 'info'];
+    const c = (x.currency && x.currency.code) || '';
+    const own = x.createdById === me;
+    const acts = [];
+    if ((x.status === 'SUBMITTED' || x.status === 'POSTED') && canPost && !own && x.journalEntryId) acts.push(AL.btn('Approve', 'exp-approve', 'small primary', `data-id="${ae(x.id)}"`), AL.btn('Return', 'exp-return', 'small danger', `data-id="${ae(x.id)}"`));
+    return `<tr>
+      <td>${ae(AL.date(x.transactionDate))}</td>
+      <td class="al-wrap"><strong>${ae(x.description)}</strong><span class="v28-sub">${ae([x.category && x.category.name, x.receiptNumber].filter(Boolean).join(' · '))}</span></td>
+      <td>${ae((x.vendor && x.vendor.name) || '—')}</td>
+      <td>${ae(AL.expPay[x.paymentMethod] || x.paymentMethod)}</td>
+      <td>${ae(AL.money(x.totalAmount, c))}${Number(x.vatAmount) ? `<span class="v28-sub">VAT ${ae(AL.money(x.vatAmount, c))}</span>` : ''}</td>
+      <td>${ae(AL.jeWho(x.createdBy))}${own ? '<span class="v28-sub">You</span>' : ''}</td>
+      <td>${AL.status(st[0], st[1])}</td>
+      <td class="al-actions">${acts.join('')}</td>
+    </tr>`;
+  }).join('');
+  return `<div class="v28-page">${head}${kpis}${AL.panel('Expenses', '', `${tabs}${rows ? AL.table(['Date', 'Expense', 'Supplier', 'Paid', 'Amount', 'Recorded by', 'Status', ''], rows, '1150px') : AL.empty(tab === 'SUBMITTED' ? 'Nothing is waiting for approval.' : 'None here.')}`)}</div>`;
+});
+AL.actions['exp-tab'] = (el) => { AL.ui.exp.tab = el.dataset.tab; AL.redraw(); };
+AL.expFind = (id) => ((AL.cache.exp && AL.cache.exp.data && AL.cache.exp.data.expenses) || []).find((x) => x.id === id);
+AL.actions['exp-approve'] = (el) => {
+  const x = AL.expFind(el.dataset.id); if (!x) return;
+  AL.confirm({ title: 'Approve this expense', confirmLabel: 'Approve and post', doneTitle: 'Expense approved', body: `${x.description}: ${AL.money(x.totalAmount, x.currency && x.currency.code)} is posted to the ledger${x.paymentMethod === 'BANK' ? ' and the payment to the cashbook' : ''}.`,
+    onConfirm: async () => { await AL.patch(`/accounting/journal-entries/${encodeURIComponent(x.journalEntryId)}/post`, {}); return ''; }, after: () => AL.expReload() });
+};
+AL.actions['exp-return'] = (el) => {
+  const x = AL.expFind(el.dataset.id); if (!x) return;
+  AL.confirm({ title: 'Return this expense', danger: true, confirmLabel: 'Return', doneTitle: 'Expense returned', reason: 'What needs correcting',
+    body: 'It is not posted; the person who recorded it records a corrected one.',
+    onConfirm: async (v) => { await AL.patch(`/accounting/journal-entries/${encodeURIComponent(x.journalEntryId)}/void`, { reason: v.reason }); return ''; }, after: () => AL.expReload() });
+};
+AL.actions['exp-new'] = (el) => AL.busy(el, async () => {
+  const [vend, cur, banks] = await Promise.all([AL.get('/cashbook/vendors').catch(() => []), AL.get('/accounting/currencies'), AL.get('/cashbook/banks').catch(() => [])]);
+  const cats = (AL.cache.exp.data.categories || []).filter((c) => c.isActive !== false);
+  const catOpts = cats.length ? cats.map((c) => c.name) : ['Salaries and Wages', 'Travel and Accommodation', 'Operations', 'Branding and Marketing', 'Office Equipment'];
+  const base = (cur || []).find((c) => c.isDefault) || (cur || [])[0] || {};
+  AL.form({
+    title: 'Record an expense', sub: 'It waits for an approver, who posts it.', wide: true, submitLabel: 'Submit for approval', doneTitle: 'Expense submitted',
+    fields: [
+      { k: 'description', label: 'What for', required: true, wide: true },
+      { k: 'vendorId', label: 'Supplier', type: 'select', required: true, options: (Array.isArray(vend) ? vend : []).map((v) => ({ value: v.id, label: v.name })) },
+      { k: 'category', label: 'Category', type: 'select', required: true, options: catOpts },
+      { k: 'transactionDate', label: 'Date', type: 'date', required: true, max: AL.stiToday() },
+      { k: 'currencyId', label: 'Currency', type: 'select', blank: false, required: true, options: (cur || []).filter((c) => c.isActive !== false).map((c) => ({ value: c.id, label: c.code })) },
+      { k: 'amount', label: 'Amount before VAT', type: 'number', min: 0.01, step: '0.01', required: true },
+      { k: 'isTaxable', label: 'Includes claimable VAT', type: 'checkbox' },
+      { k: 'receiptNumber', label: 'Receipt / invoice number' },
+      { k: 'paymentMethod', label: 'Paid', type: 'select', blank: false, required: true, options: Object.entries(AL.expPay).map(([value, label]) => ({ value, label })) },
+      { k: 'bankId', label: 'Bank account', type: 'select', options: (Array.isArray(banks) ? banks : []).filter((b) => b.isActive !== false).map((b) => ({ value: b.id, label: b.name })) },
+    ],
+    initial: { transactionDate: AL.stiToday(), currencyId: base.id, paymentMethod: 'BANK' },
+    validate: (v) => (!(Number(v.amount) > 0) ? 'The amount must be more than zero.' : v.paymentMethod === 'BANK' && !v.bankId ? 'Choose the bank account it was paid from.' : ''),
+    onSubmit: async (v) => { await AL.post('/accounting/expenses', { ...v, amount: Number(v.amount), ...(v.paymentMethod === 'BANK' ? {} : { bankId: undefined }) }); return 'An approver posts it.'; },
+    after: () => { AL.ui.exp.tab = 'SUBMITTED'; AL.expReload(); },
+  });
+});
+
+} catch (e) { if (window.console) console.error("[acc-live] 65-expenses.js failed to load", e); }
+/* ---- accounting-live/66-claims.js ---- */
+try {
+/* Employee Claims: /accounting/claims — what staff spent for the business and are owed back (SRD ACC-EXP-03…07).
+ * Everyone: their own claims — itemised with receipts, submitted, corrected when returned, withdrawn. Then, never by the
+ * claimant: the line manager approves; a finance reviewer checks the receipts and assigns the expense accounts; a
+ * finance manager (not the reviewer) approves it — which posts it to the ledger as owed to the employee (with a note
+ * when it breaks the policy) — or rejects it, and pays it from a bank account. Each step can return it with what to
+ * correct. Roles come from the claims API (staff without Accounting rights use this page too). Data: /accounting/claims. */
+AL.ui.clm = AL.ui.clm || { tab: '', status: '' };
+AL.clmOpts = () => AL.res('clm-opts', () => AL.get('/accounting/claims/options'));
+// the lists; the options (the viewer's roles, categories, banks) stay
+AL.clmReload = () => { Object.keys(AL.cache).filter((k) => k.startsWith('clm-') && k !== 'clm-opts').forEach((k) => delete AL.cache[k]); AL.redraw(); };
+AL.CLM_STATUS = {
+  DRAFT: ['Draft', 'info'], RETURNED: ['Returned for correction', 'bad'], SUBMITTED: ['With the line manager', 'warn'], MANAGER_APPROVED: ['With finance review', 'warn'],
+  REVIEWED: ['Waiting for finance approval', 'warn'], APPROVED: ['Approved: to be paid', 'ok'], REIMBURSED: ['Paid', 'ok'], REJECTED: ['Rejected', 'bad'], WITHDRAWN: ['Withdrawn', 'info'],
+};
+
+AL.page('claims', () => {
+  const o = AL.clmOpts();
+  const head = AL.head('Spend', 'Employee Claims', '', [AL.can('view_accounting', 'manage_accounting', 'manage_ledger') ? AL.btn('Expenses', 'clm-expenses') : '', AL.btn('New claim', 'clm-new', 'primary')].join(''));
+  const g = AL.gate(o, { key: 'clm-opts', errorTitle: 'Claims could not be loaded' });
+  if (g) return `<div class="v28-page">${head}${g}</div>`;
+  const roles = o.data.roles || {}, approver = roles.lineManager || roles.reviewer || roles.approver;
+  const u = AL.ui.clm;
+  if (!u.tab || (u.tab === 'waiting' && !approver) || (u.tab === 'all' && !roles.register)) u.tab = approver ? 'waiting' : 'mine';
+  const mine = AL.res('clm-mine', () => AL.get('/accounting/claims?scope=mine'));
+  const waiting = approver ? AL.res('clm-waiting', () => AL.get('/accounting/claims?scope=waiting')) : null;
+  const all = u.tab === 'all' ? AL.res('clm-all', () => AL.get('/accounting/claims?scope=all')) : null;
+  const g2 = AL.gate(mine, { key: 'clm-mine' }) || (waiting && AL.gate(waiting, { key: 'clm-waiting' })) || (all && AL.gate(all, { key: 'clm-all' }));
+  if (g2) return `<div class="v28-page">${head}${g2}</div>`;
+  const my = mine.data || [], wait = waiting ? waiting.data || [] : [];
+  const sum = (xs) => xs.reduce((s, c) => s + c.total, 0);
+  const cur = (xs) => (xs[0] && xs[0].currency) || 'USD';
+  const open = my.filter((c) => ['SUBMITTED', 'MANAGER_APPROVED', 'REVIEWED'].includes(c.status)), owed = my.filter((c) => c.status === 'APPROVED'), back = my.filter((c) => ['DRAFT', 'RETURNED'].includes(c.status));
+  const toPay = wait.filter((c) => c.status === 'APPROVED');
+  const kpis = AL.kpis([
+    ['Your claims in progress', String(open.length), AL.money(sum(open), cur(open))],
+    ['Approved, to be paid to you', String(owed.length), AL.money(sum(owed), cur(owed)), owed.length ? '#12b76a' : undefined],
+    ['With you to finish', String(back.length), back.some((c) => c.status === 'RETURNED') ? 'Returned for correction' : 'Drafts', back.some((c) => c.status === 'RETURNED') ? '#d92d20' : undefined],
+    ...(approver ? [['Waiting for you', String(wait.length - toPay.length), toPay.length ? `${AL.plural(toPay.length, 'claim')} to pay` : AL.money(sum(wait), cur(wait)), wait.length ? '#f79009' : '#12b76a']] : []),
+  ]);
+  const tabs = `<div class="v28-tabbar">${[...(approver ? [['waiting', `Waiting for you (${wait.length})`]] : []), ['mine', 'My claims'], ...(roles.register ? [['all', 'All claims']] : [])].map(([id, l]) => `<button class="v28-tab ${u.tab === id ? 'active' : ''}" data-al="clm-tab" data-t="${id}">${ae(l)}</button>`).join('')}</div>`;
+  const rows = (list, showWho) => list.map((c) => {
+    const st = AL.CLM_STATUS[c.status] || [c.status, 'info'];
+    const note = c.status === 'RETURNED' || c.status === 'REJECTED' ? c.returnReason : c.exceptions && c.exceptions.length && !['REIMBURSED', 'WITHDRAWN', 'REJECTED'].includes(c.status) ? `${AL.plural(c.exceptions.length, 'policy exception')}` : '';
+    return `<tr>
+      <td><strong>${ae(c.reference)}</strong><span class="v28-sub">${ae(c.title)}</span></td>
+      ${showWho ? `<td>${ae(c.claimant || '—')}</td>` : ''}
+      <td class="num">${ae(AL.money(c.total, c.currency))}</td>
+      <td>${ae(c.submittedAt ? AL.date(c.submittedAt) : '—')}</td>
+      <td>${AL.status(st[0], st[1])}${note ? `<span class="v28-sub al-wrap">${ae(note)}</span>` : ''}</td>
+      <td class="al-actions">${AL.btn('Open', 'clm-open', 'small primary', `data-id="${ae(c.id)}"`)}</td>
+    </tr>`;
+  }).join('');
+  let body;
+  if (u.tab === 'waiting') body = wait.length ? AL.table(['Claim', 'Employee', 'Amount', 'Submitted', 'Status', ''], rows(wait, true), '980px') : AL.empty('No claims are waiting for you.');
+  else if (u.tab === 'all') {
+    const list = (all.data || []).filter((c) => !u.status || c.status === u.status);
+    body = `<div class="al-filters"><label class="v28-field"><span>Status</span><select class="v28-select" data-clm-f="status"><option value="">All</option>${Object.entries(AL.CLM_STATUS).filter(([k]) => k !== 'DRAFT').map(([k, v]) => `<option value="${k}"${u.status === k ? ' selected' : ''}>${ae(v[0])}</option>`).join('')}</select></label></div>${list.length ? AL.table(['Claim', 'Employee', 'Amount', 'Submitted', 'Status', ''], rows(list, true), '980px') : AL.empty('No claims.')}`;
+  } else body = my.length ? AL.table(['Claim', 'Amount', 'Submitted', 'Status', ''], rows(my, false), '860px') : AL.empty('You have no claims yet.');
+  return `<div class="v28-page">${head}${kpis}${AL.panel('Claims', '', `${tabs}${body}`)}</div>`;
+});
+AL.wire.claims = () => { document.querySelectorAll('[data-clm-f]').forEach((el) => { if (el.dataset.wired) return; el.dataset.wired = '1'; el.addEventListener('change', () => { AL.ui.clm[el.dataset.clmF] = el.value; AL.redraw(); }); }); };
+AL.actions['clm-tab'] = (el) => { AL.ui.clm.tab = el.dataset.t; AL.redraw(); };
+AL.actions['clm-expenses'] = () => AL.go('expenses');
+AL.clmData = () => (AL.cache['clm-opts'] && AL.cache['clm-opts'].data) || { categories: [], currencies: [], projects: [], accounts: [], banks: [], roles: {}, policy: {} };
+AL.clmFields = () => {
+  const d = AL.clmData();
+  return [
+    { k: 'title', label: 'What was it for', required: true, wide: true },
+    { k: 'purpose', label: 'Business purpose', type: 'textarea', wide: true },
+    { k: 'tripFrom', label: 'From', type: 'date' }, { k: 'tripTo', label: 'To', type: 'date' },
+    { k: 'currency', label: 'Currency', type: 'select', blank: false, options: (d.currencies || []).map((c) => ({ value: c.code, label: `${c.code} · ${c.name}` })) },
+    { k: 'projectId', label: 'Project', type: 'select', options: (d.projects || []).map((p) => ({ value: p.id, label: p.name })) },
+  ];
+};
+AL.clmBody = (v) => ({ title: v.title, purpose: v.purpose || null, tripFrom: v.tripFrom || null, tripTo: v.tripTo || null, currency: v.currency, projectId: v.projectId || null });
+AL.actions['clm-new'] = () => AL.form({ title: 'New claim', submitLabel: 'Create', doneTitle: 'Claim created', fields: AL.clmFields(), initial: { currency: 'USD' },
+  onSubmit: async (v) => { const c = await AL.post('/accounting/claims', AL.clmBody(v)); AL.ui.clm.tab = 'mine'; AL.ui.clm.reopen = c.id; return `${c.reference}: add what you spent, with receipts, then submit it.`; },
+  after: () => { AL.clmReload(); const id = AL.ui.clm.reopen; AL.ui.clm.reopen = ''; if (id) AL.clmShow(id); } });
+
+/** The claim, with what the viewer can do at its current step. */
+AL.clmShow = async (id) => {
+  const c = await AL.get(`/accounting/claims/${encodeURIComponent(id)}`);
+  if (!(AL.cache['clm-opts'] && AL.cache['clm-opts'].data)) AL.cache['clm-opts'] = { state: 'ok', data: await AL.get('/accounting/claims/options') };
+  const d = AL.clmData(), roles = d.roles || {}, me = d.me || '';
+  const mineEditable = c.claimantId === me && ['DRAFT', 'RETURNED'].includes(c.status);
+  const reviewing = c.status === 'MANAGER_APPROVED' && roles.reviewer && c.claimantId !== me;
+  const accOpts = (sel) => `<option value="">Category's account</option>${(d.accounts || []).map((a) => `<option value="${ae(a.id)}"${sel === a.id ? ' selected' : ''}>${ae(`${a.accountNo} ${a.accountName}`)}</option>`).join('')}`;
+  const lineRows = c.lines.map((l) => `<tr>
+    <td>${ae(AL.date(l.date))}</td>
+    <td><strong>${ae(l.description)}</strong><span class="v28-sub">${ae(l.category || 'No category')}</span></td>
+    <td class="num">${ae(AL.money(l.amount, c.currency))}${l.vat ? `<span class="v28-sub">VAT ${ae(AL.money(l.vat, c.currency))}</span>` : ''}</td>
+    <td>${l.receiptUrl ? `<a href="${ae(l.receiptUrl)}" target="_blank" rel="noopener">${ae(l.receiptName || 'Receipt')}</a>` : '<span class="v28-sub">None</span>'}</td>
+    <td>${reviewing ? `<select class="v28-select" data-clm-acc="${ae(l.id)}">${accOpts(l.accountId)}</select>` : ae(l.account || '—')}</td>
+    <td class="al-actions">${mineEditable ? [l.receiptUrl ? '' : AL.btn('Receipt', 'clm-receipt', 'small', `data-id="${ae(c.id)}" data-line="${ae(l.id)}"`), AL.btn('Remove', 'clm-rm', 'small danger', `data-id="${ae(c.id)}" data-line="${ae(l.id)}"`)].join('') : ''}</td>
+  </tr>`).join('');
+  const steps = [
+    c.submittedAt ? `Submitted ${AL.date(c.submittedAt)}` : '',
+    c.manager ? `Line manager: ${c.manager}, ${AL.date(c.managerAt)}` : '',
+    c.reviewer ? `Finance review: ${c.reviewer}, ${AL.date(c.reviewerAt)}` : '',
+    c.approver ? `Approved: ${c.approver}, ${AL.date(c.approverAt)}${c.journal ? ` (journal ${c.journal.referenceNumber})` : ''}` : '',
+    c.reimbursedAt ? `Paid: ${c.reimbursedBy}, ${AL.date(c.reimbursedAt)}${c.reimbursementJournal ? ` (journal ${c.reimbursementJournal.referenceNumber})` : ''}` : '',
+  ].filter(Boolean);
+  const acts = [];
+  const b = (label, action, cls) => AL.btn(label, action, cls, `data-id="${ae(c.id)}"`);
+  if (mineEditable) acts.push(b('Add item', 'clm-add', 'primary'), b('Details', 'clm-edit', ''), b('Submit', 'clm-submit', 'primary'));
+  if (c.claimantId === me && ['DRAFT', 'RETURNED', 'SUBMITTED', 'MANAGER_APPROVED', 'REVIEWED'].includes(c.status)) acts.push(b('Withdraw', 'clm-withdraw', 'danger'));
+  if (c.claimantId !== me) {
+    if (c.status === 'SUBMITTED' && roles.lineManager) acts.push(b('Approve', 'clm-mgr', 'primary'), b('Return', 'clm-return', 'danger'));
+    if (reviewing) acts.push(b('Reviewed', 'clm-review', 'primary'), b('Return', 'clm-return', 'danger'));
+    if (c.status === 'REVIEWED' && roles.approver) acts.push(b('Approve for payment', 'clm-approve', 'primary'), b('Return', 'clm-return', 'danger'), b('Reject', 'clm-reject', 'danger'));
+    if (c.status === 'APPROVED' && roles.approver) acts.push(b('Pay', 'clm-pay', 'primary'));
+  }
+  const st = AL.CLM_STATUS[c.status] || [c.status, 'info'];
+  const exc = c.exceptions && c.exceptions.length ? `<div class="al-wide"><p><strong>Policy exceptions</strong></p><ul class="al-list">${c.exceptions.map((x) => `<li>${ae(x)}</li>`).join('')}</ul>${c.exceptionNote ? `<p class="v28-sub">Approved with the note: ${ae(c.exceptionNote)}</p>` : ''}</div>` : '';
+  AL.clmOpen = c;
+  AL.form({ title: `${c.reference} · ${AL.money(c.total, c.currency)}`, sub: [c.title, c.claimant].filter(Boolean).join(' · '), wide: true, viewOnly: true, submitLabel: 'Close', fields: [],
+    extra: `<div class="al-wide">${AL.status(st[0], st[1])}${(c.status === 'RETURNED' || c.status === 'REJECTED') && c.returnReason ? `<p class="v28-sub al-bad">${ae(c.returnReason)}</p>` : ''}${c.purpose ? `<p class="v28-sub">${ae(c.purpose)}</p>` : ''}${c.tripFrom ? `<p class="v28-sub">${ae(AL.date(c.tripFrom))}${c.tripTo ? ` to ${ae(AL.date(c.tripTo))}` : ''}</p>` : ''}</div>
+      <div class="al-wide">${c.lines.length ? AL.table(['Date', 'Item', 'Amount', 'Receipt', 'Expense account', ''], lineRows, '860px') : AL.empty('No items yet.')}</div>${exc}
+      ${steps.length ? `<div class="al-wide"><ul class="al-list">${steps.map((s) => `<li>${ae(s)}</li>`).join('')}</ul></div>` : ''}
+      ${acts.length ? `<div class="al-wide al-actions">${acts.join('')}</div>` : ''}`,
+    onSubmit: async () => false });
+};
+AL.actions['clm-open'] = (el) => AL.busy(el, () => AL.clmShow(el.dataset.id));
+/** After a step: refresh the lists and show the claim again (or close it when it has left the viewer's hands). */
+AL.clmAfter = (id, reopen = true) => { AL.clmReload(); if (reopen) AL.clmShow(id).catch(() => null); };
+AL.clmStep = (el, path, body, done, reopen = true) => AL.busy(el, async () => { await AL.post(`/accounting/claims/${encodeURIComponent(el.dataset.id)}/${path}`, body || {}); AL.close(); AL.clmAfter(el.dataset.id, reopen); }, done);
+AL.actions['clm-edit'] = (el) => { const c = AL.clmOpen; if (!c) return; AL.form({ title: `Change ${c.reference}`, submitLabel: 'Save', doneTitle: 'Claim changed', fields: AL.clmFields(), initial: { title: c.title, purpose: c.purpose || '', tripFrom: c.tripFrom || '', tripTo: c.tripTo || '', currency: c.currency, projectId: c.projectId || '' }, onSubmit: async (v) => { await AL.patch(`/accounting/claims/${encodeURIComponent(c.id)}`, AL.clmBody(v)); return ''; }, after: () => AL.clmAfter(c.id) }); };
+AL.clmReceiptField = (req) => `<label class="v28-field al-wide"><span>Receipt (PDF or image)${req ? ' *' : ''}</span><input class="v28-input" type="file" id="alClmReceipt" accept=".pdf,.png,.jpg,.jpeg,.webp,.heic"></label>`;
+AL.actions['clm-add'] = (el) => {
+  const c = AL.clmOpen; if (!c) return;
+  const d = AL.clmData(), limit = Number((d.policy || {}).receiptRequiredAbove || 0);
+  AL.form({ title: `Add an item to ${c.reference}`, sub: limit ? `A receipt is needed for anything above ${AL.money(limit, c.currency)}.` : '', submitLabel: 'Add', doneTitle: 'Item added',
+    fields: [
+      { k: 'date', label: 'Date', type: 'date', required: true }, { k: 'categoryId', label: 'Category', type: 'select', options: (d.categories || []).map((x) => ({ value: x.id, label: x.name })) },
+      { k: 'description', label: 'What it was', required: true, wide: true },
+      { k: 'amount', label: `Amount (${c.currency})`, type: 'number', min: 0, step: '0.01', required: true }, { k: 'vat', label: 'VAT included', type: 'number', min: 0, step: '0.01' },
+    ], initial: { date: AL.stiToday() }, extra: AL.clmReceiptField(false),
+    validate: (v) => { const f = document.getElementById('alClmReceipt'); return Number(v.amount) > limit && limit > 0 && !(f && f.files && f.files[0]) ? `Attach the receipt: it is needed above ${AL.money(limit, c.currency)}.` : ''; },
+    onSubmit: async (v) => { const fd = new FormData(); Object.entries(v).forEach(([k, x]) => { if (x !== '' && x != null) fd.append(k, x); }); const f = document.getElementById('alClmReceipt'); if (f && f.files && f.files[0]) fd.append('receipt', f.files[0]); AL.unwrap(await AL.http().form(`/accounting/claims/${encodeURIComponent(c.id)}/lines`, fd)); return ''; },
+    after: () => AL.clmAfter(c.id) });
+};
+AL.actions['clm-receipt'] = (el) => AL.form({ title: 'Attach the receipt', submitLabel: 'Attach', doneTitle: 'Receipt attached', fields: [], extra: AL.clmReceiptField(true),
+  validate: () => { const f = document.getElementById('alClmReceipt'); return f && f.files && f.files[0] ? '' : 'Choose the receipt.'; },
+  onSubmit: async () => { const fd = new FormData(); fd.append('receipt', document.getElementById('alClmReceipt').files[0]); AL.unwrap(await AL.http().form(`/accounting/claims/${encodeURIComponent(el.dataset.id)}/lines/${encodeURIComponent(el.dataset.line)}/receipt`, fd)); return ''; },
+  after: () => AL.clmAfter(el.dataset.id) });
+AL.actions['clm-rm'] = (el) => AL.busy(el, async () => { await AL.del(`/accounting/claims/${encodeURIComponent(el.dataset.id)}/lines/${encodeURIComponent(el.dataset.line)}`); AL.close(); AL.clmAfter(el.dataset.id); }, ['Item removed', '']);
+AL.actions['clm-submit'] = (el) => AL.clmStep(el, 'submit', {}, ['Submitted', 'It goes to your line manager first.']);
+AL.actions['clm-withdraw'] = (el) => { const c = AL.clmOpen; if (!c) return; AL.confirm({ title: `Withdraw ${c.reference}`, danger: true, confirmLabel: 'Withdraw', doneTitle: 'Withdrawn', body: 'It will not be paid; start a new claim if you need to claim again.', onConfirm: async () => { await AL.post(`/accounting/claims/${encodeURIComponent(c.id)}/withdraw`, {}); return ''; }, after: () => AL.clmReload() }); };
+AL.actions['clm-mgr'] = (el) => AL.clmStep(el, 'manager-approve', {}, ['Approved', 'It goes to finance for review.'], false);
+AL.actions['clm-review'] = (el) => { const accounts = {}; document.querySelectorAll('[data-clm-acc]').forEach((s) => { if (s.value) accounts[s.dataset.clmAcc] = s.value; }); return AL.clmStep(el, 'review', { accounts }, ['Reviewed', 'A finance manager approves it for payment.'], false); };
+AL.actions['clm-return'] = (el) => { const c = AL.clmOpen; if (!c) return; AL.confirm({ title: `Return ${c.reference}`, danger: true, confirmLabel: 'Return', doneTitle: 'Returned', reason: 'What needs correcting', body: `It goes back to ${c.claimant || 'the employee'} to correct and submit again.`, onConfirm: async (v) => { await AL.post(`/accounting/claims/${encodeURIComponent(c.id)}/return`, { reason: v.reason }); return ''; }, after: () => AL.clmReload() }); };
+AL.actions['clm-reject'] = (el) => { const c = AL.clmOpen; if (!c) return; AL.confirm({ title: `Reject ${c.reference}`, danger: true, confirmLabel: 'Reject', doneTitle: 'Rejected', reason: 'Why it is rejected', body: 'It will not be paid.', onConfirm: async (v) => { await AL.post(`/accounting/claims/${encodeURIComponent(c.id)}/reject`, { reason: v.reason }); return ''; }, after: () => AL.clmReload() }); };
+AL.actions['clm-approve'] = (el) => {
+  const c = AL.clmOpen; if (!c) return;
+  const exc = c.exceptions || [];
+  AL.form({ title: `Approve ${c.reference} for payment`, sub: `${AL.money(c.total, c.currency)} owed to ${c.claimant || 'the employee'}; posted to the ledger now.`, submitLabel: exc.length ? 'Approve with exception' : 'Approve', doneTitle: 'Approved',
+    fields: exc.length ? [{ k: 'exceptionNote', label: 'Why it is approved despite the policy', type: 'textarea', required: true, wide: true }] : [],
+    extra: exc.length ? `<div class="al-wide"><ul class="al-list">${exc.map((x) => `<li>${ae(x)}</li>`).join('')}</ul></div>` : '',
+    onSubmit: async (v) => { const r = await AL.post(`/accounting/claims/${encodeURIComponent(c.id)}/approve`, { exceptionNote: v.exceptionNote || undefined }); return r.journal ? `Journal ${r.journal.referenceNumber} posted.` : ''; },
+    after: () => AL.clmReload() });
+};
+AL.actions['clm-pay'] = (el) => {
+  const c = AL.clmOpen; if (!c) return;
+  const banks = (AL.clmData().banks || []).filter((x) => x.currency === c.currency);
+  if (!banks.length) { AL.toast('Not done', `No active ${c.currency} bank account to pay from.`, 'bad'); return; }
+  AL.form({ title: `Pay ${c.reference}`, sub: `${AL.money(c.total, c.currency)} to ${c.claimant || 'the employee'}`, submitLabel: 'Pay', doneTitle: 'Claim paid',
+    fields: [
+      { k: 'bankId', label: 'Pay from', type: 'select', required: true, blank: false, options: banks.map((x) => ({ value: x.id, label: `${x.name} · ${x.accountNumber}` })) },
+      { k: 'date', label: 'Payment date', type: 'date', required: true }, { k: 'bankReference', label: 'Bank reference' },
+    ], initial: { date: AL.stiToday() },
+    onSubmit: async (v) => { const r = await AL.post(`/accounting/claims/${encodeURIComponent(c.id)}/reimburse`, v); return r.reimbursementJournal ? `Journal ${r.reimbursementJournal.referenceNumber} posted; the payment is in the cashbook.` : ''; },
+    after: () => AL.clmReload() });
+};
+AL.navAdd('Daily accounting', ['claims', 'Employee Claims', 'expense'], 'expenses');
+
+} catch (e) { if (window.console) console.error("[acc-live] 66-claims.js failed to load", e); }
+/* ---- accounting-live/70-reports.js ---- */
+try {
+/* Trial Balance, Financial Statements (the Financial Reports item; titled so an older layer's fixed 'multi-currency
+ * reporting' panel, keyed on the title 'Financial Reports', is not injected) and General Ledger — from the server's statements (/accounting/trial-balance,
+ * /income-statement, /balance-sheet, /cash-flow, /gl-ledger-detail), not recomputed in the browser from the first
+ * 1,000 journals as before. Reports are per currency (FINDINGS FX-01): the base currency by default. */
+AL.ui.rep = AL.ui.rep || { tab: 'is', from: '', to: '', asOf: '', cur: '' };
+AL.ui.tb = AL.ui.tb || { asOf: '', cur: '' };
+AL.ui.gl = AL.ui.gl || { acct: '', from: '', to: '' };
+AL.repCur = () => AL.res('rep-cur', async () => { const c = await AL.get('/accounting/currencies'); return (c || []).filter((x) => x.isActive !== false); });
+AL.repBase = () => { const c = AL.repCur(); return (c.data || []).find((x) => x.isDefault) || (c.data || [])[0] || null; };
+AL.yearStart = () => `${AL.stiToday().slice(0, 4)}-01-01`;
+AL.curPicker = (key, sel) => { const c = AL.repCur().data || []; return `<label class="v28-field"><span>Currency</span><select class="v28-select" data-rep-f="${key}">${c.map((x) => `<option value="${ae(x.id)}"${x.id === sel ? ' selected' : ''}>${ae(x.code)}</option>`).join('')}</select></label>`; };
+AL.csv = (name, rows) => { const esc = (v) => `"${String(v == null ? '' : v).replace(/"/g, '""')}"`; const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([rows.map((r) => r.map(esc).join(',')).join('\n')], { type: 'text/csv' })); a.download = name; document.body.appendChild(a); a.click(); a.remove(); };
+
+// ------------------------------------------------------------------------------------------------ trial balance
+AL.page('trialbalance', () => {
+  AL.meLoad();
+  const cur = AL.repCur();
+  if (cur.state !== 'ok') return `<div class="v28-page">${AL.head('Reporting', 'Trial Balance', '')}${AL.gate(cur, { key: 'rep-cur' }) || ''}</div>`;
+  const u = AL.ui.tb; const base = AL.repBase();
+  const asOf = u.asOf || AL.stiToday(), curId = u.cur || (base && base.id);
+  const code = ((cur.data || []).find((x) => x.id === curId) || {}).code || '';
+  const e = AL.res(`tb:${asOf}:${curId}`, () => AL.get(`/accounting/trial-balance?asOfDate=${asOf}&currencyId=${curId}`));
+  const head = AL.head('Reporting', 'Trial Balance', `Posted journals in ${code} to ${AL.date(asOf)}.`, AL.btn('Export CSV', 'tb-csv'));
+  const filters = `<div class="al-filters"><label class="v28-field"><span>As of</span><input class="v28-input" type="date" data-rep-f="tb-asOf" value="${ae(asOf)}" max="${ae(AL.stiToday())}"></label>${AL.curPicker('tb-cur', curId)}</div>`;
+  const g = AL.gate(e, { errorTitle: 'The trial balance could not be produced' });
+  if (g) return `<div class="v28-page">${head}${filters}${g}</div>`;
+  const rows = (e.data.accounts || []).map((a) => ({ ...a, net: Math.round((Number(a.debitBalance || 0) - Number(a.creditBalance || 0)) * 100) / 100 })).filter((a) => Math.abs(a.net) >= 0.005).sort((a, b) => String(a.accountNo).localeCompare(String(b.accountNo)));
+  const dr = rows.reduce((t, a) => t + Math.max(a.net, 0), 0), cr = rows.reduce((t, a) => t + Math.max(-a.net, 0), 0);
+  const diff = Math.round((dr - cr) * 100) / 100;
+  AL.tbRows = rows.map((a) => [a.accountNo, a.accountName, a.accountType, a.net > 0 ? a.net : '', a.net < 0 ? -a.net : '']);
+  const kpis = AL.kpis([
+    ['Debits', AL.money(dr, code), `${rows.filter((a) => a.net > 0).length} accounts`],
+    ['Credits', AL.money(cr, code), `${rows.filter((a) => a.net < 0).length} accounts`],
+    ['Difference', AL.money(diff, code), diff === 0 ? 'The ledger balances' : 'Posted journals do not balance: see Scheduled Jobs → Ledger integrity check', diff === 0 ? '#12b76a' : '#d92d20'],
+  ]);
+  const tr = rows.map((a) => `<tr data-al="tb-drill" data-no="${ae(a.accountNo)}" class="al-click"><td><strong>${ae(a.accountNo)}</strong></td><td>${ae(a.accountName)}</td><td>${ae(a.accountType)}</td><td>${a.net > 0 ? ae(AL.money(a.net, code)) : ''}</td><td>${a.net < 0 ? ae(AL.money(-a.net, code)) : ''}</td></tr>`).join('');
+  const table = tr ? AL.table(['Account', 'Name', 'Type', 'Debit', 'Credit'], `${tr}<tr class="al-total"><td colspan="3"><strong>Total</strong></td><td><strong>${ae(AL.money(dr, code))}</strong></td><td><strong>${ae(AL.money(cr, code))}</strong></td></tr>`, '820px') : AL.empty('Nothing posted yet.');
+  return `<div class="v28-page">${head}${filters}${kpis}${AL.panel('Balances', '', table)}</div>`;
+});
+AL.actions['tb-csv'] = () => AL.csv(`trial-balance-${AL.ui.tb.asOf || AL.stiToday()}.csv`, [['Account', 'Name', 'Type', 'Debit', 'Credit'], ...(AL.tbRows || [])]);
+AL.actions['tb-drill'] = (el) => { AL.ui.gl.acct = el.dataset.no; AL.ui.gl.from = AL.yearStart(); AL.ui.gl.to = AL.ui.tb.asOf || AL.stiToday(); AL.go('ledger'); };
+
+// ------------------------------------------------------------------------------------------------ general ledger
+AL.page('ledger', () => {
+  AL.meLoad();
+  const lk = AL.jeLookups();
+  const u = AL.ui.gl;
+  const from = u.from || `${AL.stiToday().slice(0, 7)}-01`, to = u.to || AL.stiToday();
+  const accts = (lk.data && lk.data.accounts) || [];
+  const acct = u.acct || (accts.find((a) => a.accountNo === '1100') || accts[0] || {}).accountNo || '';
+  const head = AL.head('Daily accounting', 'General Ledger', 'Every posted line on an account, with its running balance.', AL.btn('Export CSV', 'gl-csv'));
+  const filters = `<div class="al-filters"><label class="v28-field al-grow"><span>Account</span><select class="v28-select" data-rep-f="gl-acct">${accts.map((a) => `<option value="${ae(a.accountNo)}"${a.accountNo === acct ? ' selected' : ''}>${ae(`${a.accountNo} ${a.accountName}`)}</option>`).join('')}</select></label><label class="v28-field"><span>From</span><input class="v28-input" type="date" data-rep-f="gl-from" value="${ae(from)}"></label><label class="v28-field"><span>To</span><input class="v28-input" type="date" data-rep-f="gl-to" value="${ae(to)}"></label></div>`;
+  if (lk.state !== 'ok') return `<div class="v28-page">${head}${AL.gate(lk, { key: 'je-lookups' }) || ''}</div>`;
+  if (!acct) return `<div class="v28-page">${head}${AL.empty('No accounts are set up.')}</div>`;
+  const e = AL.res(`gl:${acct}:${from}:${to}`, () => AL.get(`/accounting/gl-ledger-detail?accountNo=${encodeURIComponent(acct)}&startDate=${from}&endDate=${to}`));
+  const g = AL.gate(e, { errorTitle: 'The ledger could not be read' });
+  if (g) return `<div class="v28-page">${head}${filters}${g}</div>`;
+  const d = e.data; const a = d.account || {};
+  const txs = d.transactions || [];
+  AL.glRows = txs.map((t) => [String(t.date).slice(0, 10), t.reference, t.description, t.debitAmount || '', t.creditAmount || '', t.runningBalance]);
+  const kpis = AL.kpis([
+    ['Opening balance', AL.money(a.openingBalance), AL.date(from)],
+    ['Debits', AL.money(txs.reduce((s, t) => s + Number(t.debitAmount || 0), 0)), AL.plural(txs.filter((t) => Number(t.debitAmount) > 0).length, 'line')],
+    ['Credits', AL.money(txs.reduce((s, t) => s + Number(t.creditAmount || 0), 0)), AL.plural(txs.filter((t) => Number(t.creditAmount) > 0).length, 'line')],
+    ['Closing balance', AL.money(a.closingBalance), AL.date(to), '#0878f6'],
+  ]);
+  const tr = txs.map((t) => `<tr><td>${ae(AL.date(t.date))}</td><td><strong>${ae(t.reference || '')}</strong></td><td class="al-wrap">${ae(t.description || '')}</td><td>${Number(t.debitAmount) ? ae(AL.money(t.debitAmount)) : ''}</td><td>${Number(t.creditAmount) ? ae(AL.money(t.creditAmount)) : ''}</td><td>${ae(AL.money(t.runningBalance))}</td><td>${t.transactionCurrency && t.transactionCurrency !== 'USD' ? ae(t.transactionCurrency) : ''}</td></tr>`).join('');
+  return `<div class="v28-page">${head}${filters}${kpis}${AL.panel(`${a.accountNo || acct} ${a.accountName || ''}`, a.accountType || '', tr ? AL.table(['Date', 'Reference', 'Description', 'Debit', 'Credit', 'Balance', ''], tr, '1000px') : AL.empty('No posted lines in this period.'))}</div>`;
+});
+AL.actions['gl-csv'] = () => AL.csv(`ledger-${AL.ui.gl.acct || 'account'}.csv`, [['Date', 'Reference', 'Description', 'Debit', 'Credit', 'Balance'], ...(AL.glRows || [])]);
+
+// ------------------------------------------------------------------------------------------------ financial statements
+AL.page('reports', () => {
+  AL.meLoad();
+  const cur = AL.repCur();
+  if (cur.state !== 'ok') return `<div class="v28-page">${AL.head('Reporting', 'Financial Statements', '')}${AL.gate(cur, { key: 'rep-cur' }) || ''}</div>`;
+  const u = AL.ui.rep; const base = AL.repBase();
+  const curId = u.cur || (base && base.id), code = ((cur.data || []).find((x) => x.id === curId) || {}).code || '';
+  const from = u.from || AL.yearStart(), to = u.to || AL.stiToday(), asOf = u.asOf || AL.stiToday();
+  const t = u.tab;
+  const tabs = `<div class="v28-tabbar">${[['is', 'Income statement'], ['bs', 'Balance sheet'], ['cf', 'Cash flow']].map(([id, label]) => `<button class="v28-tab ${t === id ? 'active' : ''}" data-al="rep-tab" data-tab="${id}">${ae(label)}</button>`).join('')}</div>`;
+  const filters = `<div class="al-filters">${t === 'bs' ? `<label class="v28-field"><span>As of</span><input class="v28-input" type="date" data-rep-f="rep-asOf" value="${ae(asOf)}"></label>` : `<label class="v28-field"><span>From</span><input class="v28-input" type="date" data-rep-f="rep-from" value="${ae(from)}"></label><label class="v28-field"><span>To</span><input class="v28-input" type="date" data-rep-f="rep-to" value="${ae(to)}"></label>`}${AL.curPicker('rep-cur', curId)}</div>`;
+  const head = AL.head('Reporting', 'Financial Statements', `From posted journals in ${code}.`, AL.btn('Export CSV', 'rep-csv'));
+  const url = t === 'is' ? `/accounting/income-statement?startDate=${from}&endDate=${to}&currencyId=${curId}` : t === 'bs' ? `/accounting/balance-sheet?asOfDate=${asOf}&currencyId=${curId}` : `/accounting/cash-flow?startDate=${from}&endDate=${to}&currencyId=${curId}`;
+  const e = AL.res(`rep:${url}`, () => AL.get(url));
+  const g = AL.gate(e, { errorTitle: 'The statement could not be produced' });
+  if (g) return `<div class="v28-page">${head}${AL.panel('Statement', '', `${tabs}${filters}${g}`)}</div>`;
+  const d = e.data;
+  const out = []; // [label, amount, level]
+  const acctLines = (list, key = 'netAmount') => (list || []).filter((a) => Math.abs(Number(a[key] ?? a.balance ?? a.amount ?? 0)) >= 0.005).map((a) => [`${a.accountNo} ${a.accountName}`, Number(a[key] ?? a.balance ?? a.amount ?? 0), 2]);
+  if (t === 'is') {
+    for (const [k, s] of Object.entries(d.sections || {})) { if (!s || (!(s.accounts || []).length && !Number(s.total))) continue; out.push([s.label || k, null, 0], ...acctLines(s.accounts), [`Total ${String(s.label || k).toLowerCase()}`, Number(s.total || 0), 1]); }
+    out.push(['Net income before tax', d.totals.netIncomeBeforeTaxes, 1], ['Net income', d.totals.netIncome, 0]);
+  } else if (t === 'bs') {
+    const A = d.assets || {}, L = d.liabilities || {}, E = d.equity || {};
+    out.push(['Assets', null, 0]);
+    if (A.cashAndCashEquivalents) out.push(...(A.cashAndCashEquivalents.breakdown || []).filter((x) => Math.abs(Number(x.balance)) >= 0.005).map((x) => [`${x.accountNo} ${x.accountName}`, Number(x.balance), 2]), ['Cash and cash equivalents', A.cashAndCashEquivalents.total, 1]);
+    for (const [k, label] of [['currentAssets', 'Current assets'], ['fixedAssets', 'Non-current assets'], ['otherAssets', 'Other assets']]) if (A[k] && (A[k].accounts || []).length) out.push(...acctLines(A[k].accounts, 'balance'), [label, A[k].total, 1]);
+    out.push(['Total assets', A.totalAssets, 0], ['Liabilities', null, 0]);
+    for (const [k, label] of [['currentLiabilities', 'Current liabilities'], ['longTermLiabilities', 'Long-term liabilities']]) if (L[k] && (L[k].accounts || []).length) out.push(...acctLines(L[k].accounts, 'balance'), [label, L[k].total, 1]);
+    out.push(['Total liabilities', L.totalLiabilities, 0], ['Equity', null, 0], ...acctLines(E.accounts, 'balance'), ['Retained earnings', E.retainedEarnings, 2], ['Total equity', E.total, 1], ['Total liabilities and equity', d.totalLiabilitiesAndEquity, 0]);
+  } else {
+    for (const [k, label] of [['operatingActivities', 'Operating activities'], ['investingActivities', 'Investing activities'], ['financingActivities', 'Financing activities']]) { const s = d[k] || {}; out.push([label, null, 0], ...(s.lineItems || []).filter((x) => Math.abs(Number(x.netAmount ?? x.amount)) >= 0.005).map((x) => [`${x.accountNo} ${x.accountName}`, Number(x.netAmount ?? x.amount), 2]), [`Net cash from ${label.toLowerCase()}`, s.total, 1]); }
+    out.push(['Net change in cash', d.netCashFlow, 0], ['Cash at the start', d.beginningCashBalance, 1], ['Cash at the end', d.endingCashBalance, 0]);
+  }
+  AL.repRows = out.map((r) => [r[0], r[1] == null ? '' : r[1]]);
+  const check = t === 'bs' ? `<div class="al-state ${d.isBalanced ? '' : 'al-error'}" role="status"><strong>${d.isBalanced ? 'Assets equal liabilities plus equity' : `Out of balance by ${ae(AL.money(d.difference, code))}`}</strong></div>` : '';
+  const tr = out.map((r) => `<tr class="al-lvl${r[2]}"><td>${r[2] === 2 ? '<span class="al-indent"></span>' : ''}${r[2] < 2 ? `<strong>${ae(r[0])}</strong>` : ae(r[0])}</td><td>${r[1] == null ? '' : r[2] < 2 ? `<strong>${ae(AL.money(r[1], code))}</strong>` : ae(AL.money(r[1], code))}</td></tr>`).join('');
+  return `<div class="v28-page">${head}${AL.panel(t === 'is' ? `Income statement ${AL.date(from)} – ${AL.date(to)}` : t === 'bs' ? `Balance sheet at ${AL.date(asOf)}` : `Cash flow ${AL.date(from)} – ${AL.date(to)}`, '', `${tabs}${filters}${check}${AL.table(['', code], tr, '640px')}`)}</div>`;
+});
+AL.actions['rep-tab'] = (el) => { AL.ui.rep.tab = el.dataset.tab; AL.redraw(); };
+AL.actions['rep-csv'] = () => AL.csv(`${{ is: 'income-statement', bs: 'balance-sheet', cf: 'cash-flow' }[AL.ui.rep.tab]}.csv`, [['Line', 'Amount'], ...(AL.repRows || [])]);
+AL.wire.reports = AL.wire.trialbalance = AL.wire.ledger = () => {
+  document.querySelectorAll('[data-rep-f]').forEach((el) => {
+    if (el.dataset.wired) return; el.dataset.wired = '1';
+    el.addEventListener('change', () => {
+      const [scope, k] = el.dataset.repF.split('-');
+      const tgt = scope === 'tb' ? AL.ui.tb : scope === 'gl' ? AL.ui.gl : AL.ui.rep;
+      tgt[k] = el.value; AL.redraw();
+    });
+  });
+};
+
+} catch (e) { if (window.console) console.error("[acc-live] 70-reports.js failed to load", e); }
+/* ---- accounting-live/75-coa.js ---- */
+try {
+/* Chart of Accounts: /accounting/chart-of-accounts — the accounts, their type, statement and normal balance; add an
+ * account (number range checked against its type), change one (a change by anyone but the CFO or an administrator waits
+ * for approval), switch one off, delete one never posted to, and see its change history. Data: /accounting/
+ * chart-of-accounts, /audit-logs. */
+AL.ui.coa = AL.ui.coa || { type: '', q: '', inactive: false };
+AL.coaLoad = () => AL.res('coa', () => AL.get('/accounting/chart-of-accounts?includeInactive=true'));
+AL.coaReload = () => { delete AL.cache.coa; delete AL.cache['je-lookups']; AL.redraw(); };
+// [type, statement, number range] — the server's list; the normal balance follows from the type
+AL.COA_TYPES = [['Current Asset', 'Balance Sheet', '1'], ['Fixed Asset', 'Balance Sheet', '1'], ['Long-Term Asset', 'Balance Sheet', '1'], ['Contra-Asset', 'Balance Sheet', '1'], ['Current Liability', 'Balance Sheet', '2'], ['Long-Term Liability', 'Balance Sheet', '2'], ['Equity', 'Balance Sheet', '3'], ['Revenue', 'Income Statement', '4'], ['Income', 'Income Statement', '4'], ['Expense', 'Income Statement', '5']];
+AL.COA_GROUPS = [['1', 'Assets'], ['2', 'Liabilities'], ['3', 'Equity'], ['4', 'Income'], ['5', 'Expenses']];
+
+AL.page('coa', () => {
+  AL.meLoad();
+  const canPrepare = AL.can('manage_accounting');
+  const e = AL.coaLoad();
+  const head = AL.head('Reporting and compliance', 'Chart of Accounts', 'Account numbers follow the type: 1 assets, 2 liabilities, 3 equity, 4 income, 5 expenses.', canPrepare ? AL.btn('Add account', 'coa-new', 'primary') : '');
+  const g = AL.gate(e, { key: 'coa', errorTitle: 'The chart of accounts could not be loaded' });
+  if (g) return `<div class="v28-page">${head}${g}</div>`;
+  const all = Array.isArray(e.data) ? e.data : (e.data && e.data.accounts) || [];
+  const u = AL.ui.coa, q = u.q.trim().toLowerCase();
+  const types = [...new Set(all.map((a) => a.accountType))].sort();
+  const shown = all.filter((a) => (u.inactive || a.isActive !== false) && (!u.type || a.accountType === u.type) && (!q || `${a.accountNo} ${a.accountName} ${a.notes || ''}`.toLowerCase().includes(q))).sort((a, b) => String(a.accountNo).localeCompare(String(b.accountNo)));
+  const kpis = AL.kpis([
+    ['Accounts', String(all.filter((a) => a.isActive !== false).length), `${all.filter((a) => a.isActive === false).length} switched off`],
+    ...AL.COA_GROUPS.map(([d, label]) => [label, String(all.filter((a) => a.isActive !== false && String(a.accountNo).startsWith(d)).length), `${d}000s`]),
+  ]);
+  const filters = `<div class="al-filters"><label class="v28-field"><span>Type</span><select class="v28-select" data-coa-f="type"><option value="">All types</option>${types.map((t) => `<option${u.type === t ? ' selected' : ''}>${ae(t)}</option>`).join('')}</select></label><label class="v28-field al-grow"><span>Search</span><input class="v28-input" type="search" data-coa-f="q" value="${ae(u.q)}" placeholder="Number or name"></label><label class="v28-field al-check"><input type="checkbox" data-coa-f="inactive"${u.inactive ? ' checked' : ''}> Show switched-off accounts</label></div>`;
+  const rows = shown.map((a) => {
+    const acts = [AL.btn('History', 'coa-history', 'small', `data-id="${ae(a.id)}"`)];
+    const used = a._count ? a._count.journalEntryLines + a._count.children : 1;
+    if (canPrepare) acts.push(AL.btn('Change', 'coa-edit', 'small', `data-id="${ae(a.id)}"`));
+    if (canPrepare && !used) acts.push(AL.btn('Delete', 'coa-del', 'small danger', `data-id="${ae(a.id)}"`));
+    return `<tr class="${a.isActive === false ? 'al-muted' : ''}"><td><strong>${ae(a.accountNo)}</strong></td><td>${ae(a.accountName)}<span class="v28-sub">${ae([a.parentId && AL.coaFind(a.parentId) ? `Under ${AL.coaFind(a.parentId).accountNo}` : '', a._count && a._count.journalEntryLines ? `${a._count.journalEntryLines} journal line${a._count.journalEntryLines === 1 ? '' : 's'}` : 'Not used yet', a.notes || ''].filter(Boolean).join(' · '))}</span></td><td>${ae(a.accountType)}</td><td>${ae(a.financialStatement || '')}</td><td>${ae(a.naturalBalance === 'CREDIT' ? 'Credit' : a.naturalBalance === 'DEBIT' ? 'Debit' : '—')}</td><td>${a.isActive === false ? AL.status('Off', 'info') : AL.status('Active', 'ok')}</td><td class="al-actions">${acts.join('')}</td></tr>`;
+  }).join('');
+  return `<div class="v28-page">${head}${kpis}${AL.panel('Accounts', '', `${filters}${rows ? AL.table(['Number', 'Name', 'Type', 'Statement', 'Normal balance', 'Status', ''], rows, '1040px') : AL.empty('No account matches.')}`)}</div>`;
+});
+AL.wire.coa = () => {
+  document.querySelectorAll('[data-coa-f]').forEach((el) => {
+    if (el.dataset.wired) return; el.dataset.wired = '1';
+    const k = el.dataset.coaF;
+    if (k === 'q') el.addEventListener('input', () => { AL.ui.coa.q = el.value; clearTimeout(AL.coaT); AL.coaT = setTimeout(() => { AL.redraw(); const n = document.querySelector('[data-coa-f="q"]'); if (n) { n.focus(); n.setSelectionRange(n.value.length, n.value.length); } }, 250); });
+    else el.addEventListener('change', () => { AL.ui.coa[k] = k === 'inactive' ? el.checked : el.value; AL.redraw(); });
+  });
+};
+AL.coaFind = (id) => { const d = AL.cache.coa && AL.cache.coa.data; return (Array.isArray(d) ? d : (d && d.accounts) || []).find((a) => a.id === id); };
+AL.coaFields = (all, a) => [
+  { k: 'accountNo', label: 'Number', required: true },
+  { k: 'accountName', label: 'Name', required: true },
+  { k: 'accountType', label: 'Type', type: 'select', required: true, options: [...new Set([...AL.COA_TYPES.map((t) => t[0]), ...(a ? [a.accountType] : [])])] },
+  { k: 'parentId', label: 'Under (heading account)', type: 'select', options: all.filter((x) => (!a || x.id !== a.id) && x.isActive !== false).sort((x, y) => String(x.accountNo).localeCompare(String(y.accountNo))).map((x) => ({ value: x.id, label: `${x.accountNo} ${x.accountName}` })) },
+  { k: 'notes', label: 'Notes', type: 'textarea', wide: true },
+  ...(a ? [{ k: 'isActive', label: 'Active (can be posted to)', type: 'checkbox' }] : []),
+];
+/** New account: every field. A change: only what was changed (the statement follows a changed type). */
+AL.coaBody = (v, a) => {
+  const t = AL.COA_TYPES.find((x) => x[0] === v.accountType) || [];
+  const full = { accountNo: v.accountNo, accountName: v.accountName, accountType: v.accountType, financialStatement: t[1], parentId: v.parentId || null, notes: v.notes || null, isActive: v.isActive !== undefined ? !!v.isActive : true };
+  if (!a) return full;
+  const out = {};
+  ['accountNo', 'accountName', 'parentId', 'notes', 'isActive'].forEach((k) => { if ((full[k] ?? null) !== (k === 'isActive' ? a.isActive !== false : a[k] ?? null)) out[k] = full[k]; });
+  if (v.accountType !== a.accountType) { out.accountType = v.accountType; out.financialStatement = t[1]; }
+  return out;
+};
+AL.coaCheck = (v) => { const t = AL.COA_TYPES.find((x) => x[0] === v.accountType); return t && !String(v.accountNo).startsWith(t[2]) ? `${v.accountType} accounts are numbered in the ${t[2]}000s.` : ''; };
+AL.actions['coa-new'] = () => {
+  const d = AL.cache.coa.data; const all = Array.isArray(d) ? d : (d && d.accounts) || [];
+  AL.form({ title: 'Add an account', submitLabel: 'Add account', doneTitle: 'Account added', fields: AL.coaFields(all, null), validate: AL.coaCheck,
+    onSubmit: async (v) => { if (all.some((a) => a.accountNo === v.accountNo)) throw new Error(`${v.accountNo} is already used.`); await AL.post('/accounting/chart-of-accounts', AL.coaBody(v)); return `${v.accountNo} ${v.accountName}`; }, after: () => AL.coaReload() });
+};
+AL.actions['coa-edit'] = (el) => {
+  const a = AL.coaFind(el.dataset.id); if (!a) return;
+  const d = AL.cache.coa.data; const all = Array.isArray(d) ? d : (d && d.accounts) || [];
+  AL.form({ title: `Change ${a.accountNo} ${a.accountName}`, sub: a._count && a._count.journalEntryLines ? 'Posted to, so its type stays. Changes by anyone but the CFO or an administrator wait for approval.' : 'Changes by anyone but the CFO or an administrator wait for approval.', submitLabel: 'Submit change', doneTitle: 'Change submitted', fields: AL.coaFields(all, a),
+    initial: { accountNo: a.accountNo, accountName: a.accountName, accountType: a.accountType, parentId: a.parentId || '', notes: a.notes || '', isActive: a.isActive !== false }, validate: AL.coaCheck,
+    onSubmit: async (v) => { const body = AL.coaBody(v, a); if (!Object.keys(body).length) throw new Error('Nothing was changed.'); const r = await AL.put(`/accounting/chart-of-accounts/${encodeURIComponent(a.id)}`, body); return r && (r.status === 'pending_approval' || r.approvalRequestId) ? 'Sent for approval; the account changes once it is approved.' : 'The account is changed.'; },
+    after: () => AL.coaReload() });
+};
+AL.actions['coa-history'] = (el) => AL.busy(el, async () => {
+  const a = AL.coaFind(el.dataset.id); if (!a) return;
+  const r = await AL.get(`/audit-logs?entityId=${encodeURIComponent(a.id)}&limit=50`).catch(() => null);
+  const items = (r && (r.items || r.logs || r)) || [];
+  const WHAT = { CREATE: 'Added', UPDATE: 'Changed', CHANGE_REQUESTED: 'Change requested', CHANGE_APPROVED: 'Change approved and applied', DELETE: 'Deleted' };
+  const LABEL = { accountNo: 'Number', accountName: 'Name', accountType: 'Type', financialStatement: 'Statement', parentId: 'Under', notes: 'Notes', isActive: 'Active' };
+  const show = (k, v) => (k === 'isActive' ? (v === false ? 'No' : 'Yes') : k === 'parentId' ? (v && AL.coaFind(v) ? AL.coaFind(v).accountNo : v ? v : 'none') : v == null || v === '' ? '—' : String(v));
+  const detail = (x) => { const o = x.oldValues || {}, n = x.newValues || {}; if (x.action === 'CREATE') return `${n.accountNo} ${n.accountName} (${n.accountType})`; if (x.action === 'DELETE') return `${o.accountNo} ${o.accountName}`; return Object.keys(LABEL).filter((k) => k in n && (!(k in o) || String(o[k]) !== String(n[k]))).map((k) => `${LABEL[k]}: ${k in o ? `${show(k, o[k])} → ` : ''}${show(k, n[k])}`).join('; '); };
+  const rows = (Array.isArray(items) ? items : []).map((x) => `<tr><td>${ae(AL.dateTime(x.timestamp || x.createdAt))}</td><td>${ae(WHAT[x.action] || x.action)}</td><td>${ae(x.admin ? [x.admin.firstName, x.admin.lastName].filter(Boolean).join(' ') || x.admin.email : '—')}</td><td class="al-wrap">${ae(detail(x))}</td></tr>`).join('');
+  AL.form({ title: `${a.accountNo} ${a.accountName}: history`, wide: true, viewOnly: true, submitLabel: 'Close', fields: [], extra: `<div class="al-wide">${rows ? AL.table(['When', 'What', 'Who', 'Detail'], rows, '680px') : AL.empty('No recorded changes.')}</div>`, onSubmit: async () => false });
+});
+AL.actions['coa-del'] = (el) => {
+  const a = AL.coaFind(el.dataset.id); if (!a) return;
+  AL.confirm({ title: `Delete ${a.accountNo} ${a.accountName}`, danger: true, confirmLabel: 'Delete', doneTitle: 'Account deleted', body: 'Nothing has been posted to it. It is removed from the chart.',
+    onConfirm: async () => { await AL.del(`/accounting/chart-of-accounts/${encodeURIComponent(a.id)}`); return ''; }, after: () => AL.coaReload() });
+};
+
+} catch (e) { if (window.console) console.error("[acc-live] 75-coa.js failed to load", e); }
+/* ---- accounting-live/80-audit.js ---- */
+try {
+/* Audit Trail: /accounting/audit — every recorded change to an accounting record and every period-lock action, newest
+ * first: who, when, the record, what changed (before → after) and why. Filter by area, action, person, dates or a
+ * reference; export what is shown (the export is itself recorded); check that no journal has been removed from the
+ * numbered sequence and every posted journal balances. Data: /accounting/audit, /accounting/audit/export,
+ * /accounting/audit/integrity. */
+AL.ui.aud = AL.ui.aud || { area: '', action: '', userId: '', from: '', to: '', q: '', page: 1 };
+AL.audQuery = () => { const u = AL.ui.aud; return ['area', 'action', 'userId', 'from', 'to', 'q'].filter((k) => u[k]).map((k) => `${k}=${encodeURIComponent(u[k])}`).join('&'); };
+AL.audKey = () => `aud:${AL.audQuery()}:${AL.ui.aud.page}`;
+AL.audLoad = () => AL.res(AL.audKey(), () => AL.get(`/accounting/audit?${AL.audQuery()}&page=${AL.ui.aud.page}&limit=50`));
+AL.audReload = () => { Object.keys(AL.cache).filter((k) => k.startsWith('aud:')).forEach((k) => delete AL.cache[k]); AL.redraw(); };
+AL.AUD_ACTIONS = [['CREATE', 'Created'], ['UPDATE', 'Changed'], ['DELETE', 'Deleted'], ['POST', 'Posted'], ['VOID', 'Voided'], ['SUBMIT', 'Submitted'], ['APPROVE', 'Approved'], ['REJECT', 'Rejected'], ['SEND', 'Sent'], ['PAYMENT', 'Payment'], ['CHANGE_REQUESTED', 'Change requested'], ['CHANGE_APPROVED', 'Change approved'], ['RATE_SET', 'Rate set'], ['SET_FX_RATE', 'Rate set'], ['COMMIT_MODULE_LOCK', 'Period locked'], ['UNLOCK_MODULE', 'Period unlocked'], ['JOURNAL_POST', 'Posted']];
+AL.audActionLabel = (a) => { const hit = AL.AUD_ACTIONS.find((x) => x[0] === a); return hit ? hit[1] : String(a || '').toLowerCase().replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase()); };
+AL.audTypeLabel = { JournalEntry: 'Journal', ForexGainLoss: 'FX gain / loss', ChartOfAccounts: 'Account', CashbookEntry: 'Cashbook line', CASHBOOK_ENTRY: 'Cashbook line', CASHBOOK_TRANSFER: 'Bank transfer', CashbookBatch: 'Cashbook batch', CashbookAudit: 'Cashbook', CashbookReconciliationSession: 'Reconciliation', BankStatementImport: 'Bank statement', BankStatementItem: 'Statement line', BankReconciliationAutoMatch: 'Auto-match', Invoice: 'Invoice', CreditNote: 'Credit note', PurchaseInvoice: 'Supplier bill', Expense: 'Expense', Asset: 'Fixed asset', DepreciationRecord: 'Depreciation', ShortTermInvestmentInstrument: 'Investment', ShortTermInvestmentApyRate: 'Investment rate', ShortTermInvestmentAccrualCatchUp: 'Interest catch-up', ShortTermInvestmentSettings: 'Investment settings', ExchangeRate: 'Exchange rate', InventoryItem: 'Stock item', StockMovement: 'Stock movement', RecurringJournalTemplate: 'Recurring journal', PeriodLock: 'Period' };
+/** What changed, in words: "Name: old → new" for each field that differs; a creation or deletion by its main fields. */
+AL.audDetail = (e) => {
+  const o = e.oldValues && typeof e.oldValues === 'object' ? e.oldValues : {}, n = e.newValues && typeof e.newValues === 'object' ? e.newValues : {};
+  const skip = /^(id|createdAt|updatedAt|createdById|updatedById|userId|password|token|journalEntryLines|lines|currency|chartOfAccount)$/;
+  const words = (k) => k.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/_/g, ' ').toLowerCase().replace(/^./, (c) => c.toUpperCase());
+  const val = (v) => (v == null || v === '' ? '—' : typeof v === 'object' ? (Array.isArray(v) ? `${v.length} item${v.length === 1 ? '' : 's'}` : '…') : typeof v === 'boolean' ? (v ? 'Yes' : 'No') : /^\d{4}-\d{2}-\d{2}T/.test(String(v)) ? AL.date(v) : String(v).slice(0, 60));
+  const keys = [...new Set([...Object.keys(o), ...Object.keys(n)])].filter((k) => !skip.test(k) && k !== 'reason');
+  const changed = keys.filter((k) => JSON.stringify(o[k]) !== JSON.stringify(n[k]) && (k in n));
+  const parts = (Object.keys(o).length && Object.keys(n).length ? changed.map((k) => `${words(k)}: ${val(o[k])} → ${val(n[k])}`) : keys.filter((k) => typeof (Object.keys(n).length ? n : o)[k] !== 'object').slice(0, 5).map((k) => `${words(k)}: ${val((Object.keys(n).length ? n : o)[k])}`));
+  return parts.slice(0, 5).join(' · ') + (parts.length > 5 ? ` · +${parts.length - 5} more` : '');
+};
+
+AL.page('audit', () => {
+  AL.meLoad();
+  const e = AL.audLoad();
+  const head = AL.head('Reporting and compliance', 'Audit Trail', 'Every change to an accounting record, with who made it, when and what it was before.', [AL.btn('Check integrity', 'aud-check'), AL.btn('Export CSV', 'aud-export', 'primary')].join(''));
+  const g = AL.gate(e, { key: AL.audKey(), errorTitle: 'The audit trail could not be loaded' });
+  if (g) return `<div class="v28-page">${head}${g}</div>`;
+  const d = e.data || {}, items = d.items || [], u = AL.ui.aud;
+  const integ = AL.cache['aud-int'];
+  const iv = integ && integ.data;
+  const kpis = AL.kpis([
+    ['Events', (d.total || 0).toLocaleString('en-US'), AL.audQuery() ? 'Matching the filters' : 'All accounting records'],
+    ['Shown', items.length ? `${(u.page - 1) * 50 + 1}–${(u.page - 1) * 50 + items.length}` : '0', `Page ${u.page} of ${Math.max(1, Math.ceil((d.total || 0) / 50))}`],
+    ['Journal numbering', iv ? (iv.ok ? 'Intact' : 'Exceptions') : '—', iv ? (iv.ok ? `${iv.journals.toLocaleString('en-US')} journals, ${iv.first}–${iv.last}` : [iv.missingCount ? `${iv.missingCount} number${iv.missingCount === 1 ? '' : 's'} missing` : '', iv.duplicates ? `${iv.duplicates} repeated` : '', iv.unbalancedPosted.length ? `${iv.unbalancedPosted.length} unbalanced` : ''].filter(Boolean).join(', ')) : 'Not checked yet', iv ? (iv.ok ? '#12b76a' : '#d92d20') : undefined],
+  ]);
+  const opt = (list, cur, all) => `<option value="">${ae(all)}</option>${list.map(([v, l]) => `<option value="${ae(v)}"${cur === v ? ' selected' : ''}>${ae(l)}</option>`).join('')}`;
+  const seen = new Set(); const actions = AL.AUD_ACTIONS.filter(([, l]) => (seen.has(l) ? false : seen.add(l)));
+  const filters = `<div class="al-filters">
+    <label class="v28-field"><span>Area</span><select class="v28-select" data-aud-f="area">${opt((d.areas || []).map((a) => [a.id, a.label]), u.area, 'All areas')}</select></label>
+    <label class="v28-field"><span>Action</span><select class="v28-select" data-aud-f="action">${opt(actions, u.action, 'All actions')}</select></label>
+    <label class="v28-field"><span>Person</span><select class="v28-select" data-aud-f="userId">${opt((d.users || []).map((x) => [x.id, x.name]), u.userId, 'Everyone')}</select></label>
+    <label class="v28-field"><span>From</span><input class="v28-input" type="date" data-aud-f="from" value="${ae(u.from)}"></label>
+    <label class="v28-field"><span>To</span><input class="v28-input" type="date" data-aud-f="to" value="${ae(u.to)}"></label>
+    <label class="v28-field al-grow"><span>Reference</span><input class="v28-input" type="search" data-aud-f="q" value="${ae(u.q)}" placeholder="Journal, account, invoice or record id"></label>
+  </div>`;
+  const rows = items.map((x) => `<tr>
+    <td>${ae(AL.dateTime(x.at))}</td>
+    <td>${ae(AL.audTypeLabel[x.entityType] || x.entityType)}<span class="v28-sub">${ae(x.reference || String(x.entityId || '').slice(0, 12))}</span></td>
+    <td>${AL.status(AL.audActionLabel(x.action), /VOID|DELETE|REJECT/.test(x.action) ? 'bad' : /POST|APPROVE|LOCK/.test(x.action) ? 'ok' : 'info')}</td>
+    <td>${ae(x.user || 'System')}<span class="v28-sub">${ae(x.role || '')}</span></td>
+    <td class="al-wrap">${ae(AL.audDetail(x))}${x.reason ? `<span class="v28-sub">Reason: ${ae(String(x.reason).slice(0, 160))}</span>` : ''}</td>
+  </tr>`).join('');
+  const pages = Math.max(1, Math.ceil((d.total || 0) / 50));
+  const pager = pages > 1 ? `<div class="al-pager">${AL.btn('Newer', 'aud-page', 'small', `data-d="-1"${u.page <= 1 ? ' disabled' : ''}`)}<span class="v28-sub">Page ${u.page} of ${pages}</span>${AL.btn('Older', 'aud-page', 'small', `data-d="1"${u.page >= pages ? ' disabled' : ''}`)}</div>` : '';
+  const integPanel = iv && !iv.ok ? AL.panel('Integrity exceptions', `Checked ${AL.dateTime(iv.checkedAt)}`, `<ul class="al-list">${[
+    iv.missingCount ? `<li>${iv.missingCount} journal number${iv.missingCount === 1 ? ' is' : 's are'} missing from the sequence (a journal removed after it was numbered): ${ae(iv.missing.slice(0, 12).map((m) => (m.from === m.to ? m.from : `${m.from}–${m.to}`)).join(', '))}${iv.missing.length > 12 ? ' …' : ''}.</li>` : '',
+    iv.duplicates ? `<li>${iv.duplicates} journal number${iv.duplicates === 1 ? ' is' : 's are'} used twice.</li>` : '',
+    iv.unnumbered ? `<li>${iv.unnumbered} journal${iv.unnumbered === 1 ? ' has' : 's have'} no number.</li>` : '',
+    iv.counterBehind ? '<li>The numbering counter is behind the highest number issued.</li>' : '',
+    iv.unbalancedPosted.length ? `<li>Posted journals whose debits and credits differ: ${ae(iv.unbalancedPosted.slice(0, 10).join(', '))}.</li>` : '',
+  ].join('')}</ul>`) : '';
+  return `<div class="v28-page">${head}${kpis}${integPanel}${AL.panel('Events', '', `${filters}${rows ? AL.table(['When', 'Record', 'Action', 'Who', 'What changed'], rows, '1080px') : AL.empty('No events match.')}${pager}`)}</div>`;
+});
+AL.wire.audit = () => {
+  document.querySelectorAll('[data-aud-f]').forEach((el) => {
+    if (el.dataset.wired) return; el.dataset.wired = '1';
+    const k = el.dataset.audF;
+    const apply = () => { AL.ui.aud[k] = el.value; AL.ui.aud.page = 1; AL.redraw(); };
+    if (k === 'q') el.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') apply(); });
+    if (k === 'q') el.addEventListener('search', apply);
+    else el.addEventListener('change', apply);
+  });
+};
+AL.actions['aud-page'] = (el) => { AL.ui.aud.page = Math.max(1, AL.ui.aud.page + Number(el.dataset.d)); AL.redraw(); };
+AL.actions['aud-check'] = (el) => AL.busy(el, async () => { const r = await AL.get('/accounting/audit/integrity'); AL.cache['aud-int'] = { data: r }; AL.redraw(); return r; },
+  ['Integrity checked', (r) => (r && r.ok ? `All ${r.journals.toLocaleString('en-US')} journals are numbered in sequence and every posted journal balances.` : 'Exceptions found; they are listed on the page.')]);
+AL.actions['aud-export'] = (el) => AL.busy(el, async () => { const text = await AL.getText(`/accounting/audit/export?${AL.audQuery()}`); AL.saveText(`﻿${text}`, `accounting-audit-${AL.stiToday()}.csv`); return text; },
+  ['Exported', (t) => `${Math.max(0, String(t || '').split('\n').length - 1).toLocaleString('en-US')} events saved as CSV.`]);
+
+} catch (e) { if (window.console) console.error("[acc-live] 80-audit.js failed to load", e); }
+/* ---- accounting-live/85-access.js ---- */
+try {
+/* Access Control: /accounting/access — who can do what in Accounting, as the server decides it: the permissions, which
+ * roles grant them, every active user holding any (search, role, permission), and where one person holds both halves of
+ * a control. Roles and users are changed in Admin (opens in a new tab). Data: /accounting/access. */
+AL.ui.acx = AL.ui.acx || { tab: 'roles', q: '', role: '', key: '', scope: 'accounting', page: 0 };
+AL.acxLoad = () => AL.res('acx', () => AL.get('/accounting/access'));
+AL.ACX_TIMESHEETS = ['accounting.timesheets.view', 'accounting.timesheets.manage'];
+
+AL.page('access', () => {
+  AL.meLoad();
+  const e = AL.acxLoad();
+  const me = AL.me();
+  const admin = AL.can('accounting.access.manage') || /admin/i.test(me.role || '');
+  const head = AL.head('Reporting and compliance', 'Access Control', 'Who can do what in Accounting. Nobody posts or approves their own work, whatever their role.', admin ? '<a class="v28-btn primary" href="/admin" target="_blank" rel="noopener">Manage roles and users in Admin</a>' : '');
+  const g = AL.gate(e, { key: 'acx', errorTitle: 'Access could not be loaded' });
+  if (g) return `<div class="v28-page">${head}${g}</div>`;
+  const d = e.data || {}, u = AL.ui.acx;
+  const keys = d.keys || [], label = (k) => (keys.find((x) => x.key === k) || {}).label || k;
+  const acctOnly = (x) => x.keys.some((k) => !AL.ACX_TIMESHEETS.includes(k));
+  const users = d.users || [];
+  const kpis = AL.kpis([
+    ['People with accounting access', String(users.filter(acctOnly).length), `${users.length - users.filter(acctOnly).length} more with timesheets only`],
+    ['Can post journals', String(users.filter((x) => x.keys.includes('manage_ledger')).length), 'Hold "Post / approve"'],
+    ['Roles', String((d.roles || []).filter(acctOnly).length), 'Granting accounting access'],
+    ['Can lock periods', String(users.filter((x) => x.keys.includes('accounting.period_lock.manage')).length), `${users.filter((x) => x.keys.includes('accounting.period_lock.override')).length} may override a lock`],
+  ]);
+  const tabs = `<div class="v28-tabbar">${[['roles', 'Roles'], ['users', 'People'], ['pairs', 'Combined duties'], ['keys', 'Permissions']].map(([id, l]) => `<button class="v28-tab ${u.tab === id ? 'active' : ''}" data-al="acx-tab" data-t="${id}">${l}</button>`).join('')}</div>`;
+  let body = '';
+  if (u.tab === 'roles') {
+    const roles = (d.roles || []).filter((r) => u.scope !== 'accounting' || acctOnly(r));
+    const cols = keys.filter((k) => u.scope !== 'accounting' || !AL.ACX_TIMESHEETS.includes(k.key));
+    const rows = roles.map((r) => `<tr><td><strong>${ae(r.name)}</strong><span class="v28-sub">${r.users} ${r.users === 1 ? 'person' : 'people'}</span></td>${cols.map((k) => `<td class="al-center">${r.keys.includes(k.key) ? '<span class="al-ok" aria-label="yes">✓</span>' : '<span class="v28-sub" aria-label="no">·</span>'}</td>`).join('')}</tr>`).join('');
+    body = `<div class="al-filters"><label class="v28-field al-check"><input type="checkbox" data-acx-f="scope"${u.scope === 'accounting' ? ' checked' : ''}> Accounting roles only (hide timesheet-only roles)</label></div>${AL.table(['Role', ...cols.map((k) => k.label)], rows, `${260 + cols.length * 92}px`)}`;
+  } else if (u.tab === 'users') {
+    const q = u.q.trim().toLowerCase();
+    const list = users.filter((x) => (u.scope !== 'accounting' || acctOnly(x)) && (!u.role || x.role === u.role) && (!u.key || x.keys.includes(u.key)) && (!q || `${x.name} ${x.email}`.toLowerCase().includes(q)));
+    const pages = Math.max(1, Math.ceil(list.length / 50)); if (u.page >= pages) u.page = pages - 1;
+    const shown = list.slice(u.page * 50, u.page * 50 + 50);
+    const roleNames = [...new Set(users.map((x) => x.role))].sort();
+    const rows = shown.map((x) => `<tr><td><strong>${ae(x.name)}</strong><span class="v28-sub">${ae(x.email)}</span></td><td>${ae(x.role)}</td><td class="al-wrap">${ae(x.keys.map(label).join(', '))}</td><td>${x.lastLoginAt ? ae(AL.date(x.lastLoginAt)) : '<span class="v28-sub">Never</span>'}</td></tr>`).join('');
+    body = `<div class="al-filters">
+      <label class="v28-field al-grow"><span>Search</span><input class="v28-input" type="search" data-acx-f="q" value="${ae(u.q)}" placeholder="Name or email"></label>
+      <label class="v28-field"><span>Role</span><select class="v28-select" data-acx-f="role"><option value="">All roles</option>${roleNames.map((r) => `<option${u.role === r ? ' selected' : ''}>${ae(r)}</option>`).join('')}</select></label>
+      <label class="v28-field"><span>Holds</span><select class="v28-select" data-acx-f="key"><option value="">Any permission</option>${keys.map((k) => `<option value="${ae(k.key)}"${u.key === k.key ? ' selected' : ''}>${ae(k.label)}</option>`).join('')}</select></label>
+      <label class="v28-field al-check"><input type="checkbox" data-acx-f="scope"${u.scope === 'accounting' ? ' checked' : ''}> Accounting access only</label>
+    </div>${rows ? AL.table(['Person', 'Role', 'Can', 'Last signed in'], rows, '980px') : AL.empty('Nobody matches.')}${pages > 1 ? `<div class="al-pager">${AL.btn('Previous', 'acx-page', 'small', `data-d="-1"${u.page <= 0 ? ' disabled' : ''}`)}<span class="v28-sub">${list.length} people · page ${u.page + 1} of ${pages}</span>${AL.btn('Next', 'acx-page', 'small', `data-d="1"${u.page >= pages - 1 ? ' disabled' : ''}`)}</div>` : ''}`;
+  } else if (u.tab === 'pairs') {
+    const rows = (d.pairs || []).map((p) => `<tr><td><strong>${ae(p.label)}</strong><span class="v28-sub">${ae((d.pairKeys[p.id] || []).map(label).join(' + '))}</span></td><td>${p.users}</td><td>${AL.btn('Who', 'acx-pair', 'small', `data-id="${ae(p.id)}"`)}</td></tr>`).join('');
+    body = AL.table(['Both halves held by one person', 'People', ''], rows, '720px');
+  } else {
+    const rows = keys.map((k) => `<tr><td><strong>${ae(k.label)}</strong><span class="v28-sub">${ae(k.key)}</span></td><td class="al-wrap">${ae(k.allows)}</td><td>${users.filter((x) => x.keys.includes(k.key)).length}</td></tr>`).join('');
+    body = AL.table(['Permission', 'Allows', 'People'], rows, '860px');
+  }
+  return `<div class="v28-page">${head}${kpis}${AL.panel('Accounting access', '', `${tabs}${body}`)}</div>`;
+});
+AL.wire.access = () => {
+  document.querySelectorAll('[data-acx-f]').forEach((el) => {
+    if (el.dataset.wired) return; el.dataset.wired = '1';
+    const k = el.dataset.acxF;
+    const apply = () => { AL.ui.acx[k] = k === 'scope' ? (el.checked ? 'accounting' : 'all') : el.value; AL.ui.acx.page = 0; AL.redraw(); };
+    if (k === 'q') { el.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') apply(); }); el.addEventListener('search', apply); } else el.addEventListener('change', apply);
+  });
+};
+AL.actions['acx-tab'] = (el) => { AL.ui.acx.tab = el.dataset.t; AL.ui.acx.page = 0; AL.redraw(); };
+AL.actions['acx-page'] = (el) => { AL.ui.acx.page = Math.max(0, AL.ui.acx.page + Number(el.dataset.d)); AL.redraw(); };
+AL.actions['acx-pair'] = (el) => {
+  const d = AL.cache.acx && AL.cache.acx.data; if (!d) return;
+  const need = d.pairKeys[el.dataset.id] || []; const p = (d.pairs || []).find((x) => x.id === el.dataset.id) || {};
+  const list = d.users.filter((x) => need.every((k) => x.keys.includes(k)));
+  const rows = list.slice(0, 300).map((x) => `<tr><td>${ae(x.name)}<span class="v28-sub">${ae(x.email)}</span></td><td>${ae(x.role)}</td></tr>`).join('');
+  AL.form({ title: p.label || 'Combined duties', sub: `${list.length} ${list.length === 1 ? 'person' : 'people'}`, wide: true, viewOnly: true, submitLabel: 'Close', fields: [], extra: `<div class="al-wide">${AL.table(['Person', 'Role'], rows, '560px')}${list.length > 300 ? `<p class="v28-sub">First 300 of ${list.length}.</p>` : ''}</div>`, onSubmit: async () => false });
+};
+
+} catch (e) { if (window.console) console.error("[acc-live] 85-access.js failed to load", e); }
+/* ---- accounting-live/90-jobs.js ---- */
+try {
+/* Scheduled Jobs: /accounting/jobs — the jobs that run on their own (interest accrual, depreciation, recurring journals,
+ * the daily rate, reminders, the ledger check): when each runs, whether it is on, what its last runs did, and Run now. */
+AL.jobsLoad = () => AL.res('jobs', () => AL.get('/accounting/jobs'));
+AL.jobWhen = (s) => {
+  if (!s) return '—';
+  if (s.kind === 'daily') return `Every day at ${s.at}`;
+  if (s.kind === 'monthly') return `Monthly on day ${s.day} at ${s.at}`;
+  if (s.kind === 'month-end') return `Last day of the month at ${s.at}`;
+  if (s.kind === 'business-days') return `First ${s.days} working days of the month at ${s.at}`;
+  return '—';
+};
+AL.jobSummary = (run) => {
+  if (!run) return 'Not run yet';
+  if (run.status === 'failed') return run.error || 'Failed';
+  const s = run.summary || {};
+  const bits = [];
+  if (s.outcome === 'recorded') bits.push(`Rate ${s.rate}`);
+  if (s.outcome === 'already_recorded') bits.push('Already recorded');
+  if (s.processed != null) bits.push(`${s.processed} day-accrual(s) posted`);
+  if (s.processedAssets != null) bits.push(`${s.processedAssets} asset(s), ${AL.money(s.totalDepreciation)} for ${s.period}`);
+  if (s.created != null) bits.push(`${s.created} journal(s) created`);
+  if (s.overdue != null && s.outstanding != null) bits.push(`${s.overdue} overdue invoice(s), ${AL.money(s.outstanding)}`);
+  else if (s.overdue != null && s.due != null) bits.push(`${s.due} maturing, ${s.overdue} past maturity`);
+  else if (s.overdue === 0) bits.push('Nothing overdue');
+  if (s.open != null) bits.push(`${s.open} open close task(s)`);
+  if (s.ok != null) bits.push(s.ok ? 'Ledger balances' : `${s.unbalancedJournals} unbalanced journal(s), trial balance off by ${AL.money(s.trialBalanceDifference)}${s.overlappingPeriods ? `, ${s.overlappingPeriods} overlapping period(s)` : ''}`);
+  if (s.yearMonth) bits.push(`Revaluation for ${s.yearMonth}`);
+  return bits.join(' · ') || 'Done';
+};
+AL.page('jobs', () => {
+  AL.meLoad();
+  // running a job now or switching it is for people who may post to the ledger (the server's rule too)
+  const canRun = AL.can('manage_ledger');
+  const e = AL.jobsLoad();
+  const head = AL.head('Governance', 'Scheduled Jobs', 'Work Accounting does on its own, in Harare time.');
+  const g = AL.gate(e, { key: 'jobs', errorTitle: 'The scheduled jobs could not be loaded' });
+  if (g) return `<div class="v28-page">${head}${g}</div>`;
+  const d = e.data;
+  const jobs = d.jobs || [];
+  // a run that failed, or a check that ran and found something (the ledger integrity check)
+  const failed = jobs.filter((j) => j.lastRun && (j.lastRun.status === 'failed' || (j.lastRun.summary && j.lastRun.summary.ok === false))).length;
+  const off = jobs.filter((j) => !j.enabled).length;
+  const kpis = AL.kpis([
+    ['Jobs', String(jobs.length), `${jobs.filter((j) => j.postsToLedger).length} post to the ledger`],
+    ['Needs attention', String(failed), failed ? 'A run failed or found a problem' : 'Nothing to act on', failed ? '#d92d20' : '#12b76a'],
+    ['Switched off', String(off), off ? 'Not running on schedule' : 'All running', off ? '#f79009' : '#12b76a'],
+    ['Time zone', d.timezone, `Now ${d.now ? `${String(d.now.hh).padStart(2, '0')}:${String(d.now.mm).padStart(2, '0')} on ${AL.date(d.now.date)}` : ''}`],
+  ]);
+  const rows = jobs.map((j) => {
+    const last = j.lastRun;
+    return `<tr>
+      <td><strong>${ae(j.label)}</strong><span class="v28-sub">${ae(j.description)}</span></td>
+      <td>${ae(AL.jobWhen(j.schedule))}</td>
+      <td>${j.enabled ? AL.status('On', 'ok') : AL.status(j.disabledByEnvironment ? 'Off (server setting)' : 'Off', 'warn')}</td>
+      <td>${last ? `${AL.status(last.status === 'succeeded' ? 'Succeeded' : last.status === 'failed' ? 'Failed' : 'Running')}<span class="v28-sub">${ae(AL.dateTime(last.startedAt))}${last.trigger === 'manual' ? ' · run by hand' : ''}</span>` : AL.status('Never run', 'info')}</td>
+      <td class="al-wrap">${ae(AL.jobSummary(last))}</td>
+      <td class="al-actions">${canRun ? AL.btn('Run now', 'job-run', 'small', `data-key="${ae(j.key)}"`) : ''}${j.disabledByEnvironment || !canRun ? '' : AL.btn(j.enabled ? 'Switch off' : 'Switch on', 'job-toggle', 'small', `data-key="${ae(j.key)}" data-on="${j.enabled ? '0' : '1'}"`)}${AL.btn('History', 'job-history', 'small', `data-key="${ae(j.key)}"`)}</td>
+    </tr>`;
+  }).join('');
+  return `<div class="v28-page">${head}${kpis}${AL.panel('Jobs', '', AL.table(['Job', 'When', 'Schedule', 'Last run', 'Result', ''], rows, '1100px'))}</div>`;
+});
+AL.actions['job-run'] = (el) => {
+  const j = ((AL.cache.jobs && AL.cache.jobs.data && AL.cache.jobs.data.jobs) || []).find((x) => x.key === el.dataset.key);
+  if (!j) return;
+  AL.confirm({
+    title: `Run ${j.label} now`, sub: AL.jobWhen(j.schedule),
+    body: j.postsToLedger ? `${j.description} It posts to the ledger. Work already done (a day already accrued, a month already depreciated) is not posted again.` : j.description,
+    confirmLabel: 'Run now', doneTitle: `${j.label} ran`,
+    onConfirm: async () => {
+      const r = await AL.post(`/accounting/jobs/${encodeURIComponent(j.key)}/run`, {});
+      if (r && r.status === 'failed') throw new Error(r.error || 'The run failed.');
+      return AL.jobSummary(r && { status: r.status, summary: r.summary });
+    },
+    after: () => AL.run('jobs'),
+  });
+};
+AL.actions['job-toggle'] = (el) => AL.busy(el, async () => { await AL.patch(`/accounting/jobs/${encodeURIComponent(el.dataset.key)}`, { enabled: el.dataset.on === '1' }); await AL.run('jobs'); }, [el.dataset.on === '1' ? 'Switched on' : 'Switched off', 'The schedule is updated.']);
+AL.actions['job-history'] = (el) => {
+  const j = ((AL.cache.jobs && AL.cache.jobs.data && AL.cache.jobs.data.jobs) || []).find((x) => x.key === el.dataset.key);
+  if (!j) return;
+  const rows = (j.recent || []).map((r) => `<tr><td>${ae(AL.dateTime(r.startedAt))}</td><td>${ae(r.trigger === 'manual' ? 'By hand' : r.slot)}</td><td>${AL.status(r.status === 'succeeded' ? 'Succeeded' : r.status === 'failed' ? 'Failed' : 'Running')}</td><td class="al-wrap">${ae(AL.jobSummary(r))}</td></tr>`).join('');
+  AL.form({ title: `${j.label}: recent runs`, sub: AL.jobWhen(j.schedule), wide: true, submitLabel: 'Close', viewOnly: true, fields: [], extra: `<div class="al-wide">${AL.table(['Started', 'Slot', 'Result', 'Detail'], rows, '640px')}</div>`, onSubmit: async () => false });
+};
+AL.navAdd('Governance', ['jobs', 'Scheduled Jobs', 'settings'], 'settings');
+
+} catch (e) { if (window.console) console.error("[acc-live] 90-jobs.js failed to load", e); }
+/* ---- accounting-live/90-settings.js ---- */
+try {
+/* Settings: /accounting/settings — the organisation's accounting set-up as the server holds it. Company (letterhead,
+ * base currency, the tenant's clock), bank accounts (each with its own ledger account, balance and reconciliation state:
+ * add, change, switch off only when nothing is left in it) and currencies. Addresses and the logo are kept in Admin (new
+ * tab); the letterhead is edited here by an administrator. Data: /company-profile, /cashbook/banks, /cashbook/position, /accounting/currencies, /accounting/multi-currency/rates. */
+AL.ui.set = AL.ui.set || { tab: 'banks', inactive: false };
+AL.setLoad = () => ({
+  profile: AL.res('set-profile', () => AL.get('/company-profile').catch((e) => (e && e.status === 404 ? null : Promise.reject(e)))),
+  addresses: AL.res('set-addr', () => AL.get('/company-profile/addresses').catch(() => [])),
+  banks: AL.res('set-banks', () => AL.get('/cashbook/banks?includeInactive=true')),
+  position: AL.res('set-pos', () => AL.get('/cashbook/position').catch(() => [])),
+  currencies: AL.res('set-cur', () => AL.get('/accounting/currencies')),
+  rates: AL.res('set-rates', () => AL.get('/accounting/multi-currency/rates?limit=1').catch(() => null)),
+});
+AL.setReload = (...keys) => { keys.forEach((k) => delete AL.cache[k]); delete AL.cache['je-lookups']; AL.redraw(); };
+
+AL.page('settings', () => {
+  AL.meLoad();
+  const L = AL.setLoad(), u = AL.ui.set;
+  const me = AL.me();
+  const canBanks = AL.can('manage_ledger');
+  const admin = /admin/i.test(me.role || '');
+  const head = AL.head('Administration', 'Settings', '');
+  const g = AL.gate(L.banks, { key: 'set-banks', errorTitle: 'Settings could not be loaded' }) || AL.gate(L.currencies, { key: 'set-cur', errorTitle: 'Settings could not be loaded' });
+  if (g) return `<div class="v28-page">${head}${g}</div>`;
+  const banks = L.banks.data || [], currencies = L.currencies.data || [];
+  const base = currencies.find((c) => c.isDefault) || {};
+  const pos = new Map(((L.position.data) || []).map((p) => [p.bank.id, p]));
+  const active = banks.filter((b) => b.isActive);
+  const kpis = AL.kpis([
+    ['Bank accounts', String(active.length), `${banks.length - active.length} switched off`],
+    ['Base currency', base.code || '—', base.name || 'None set', base.code ? undefined : '#d92d20'],
+    ['Currencies', String(currencies.filter((c) => c.isActive).length), 'In use'],
+    ['Not reconciled', String(active.reduce((s, b) => s + ((pos.get(b.id) || {}).unreconciledEntries || 0), 0)), 'Bank entries, all accounts'],
+  ]);
+  const tabs = `<div class="v28-tabbar">${[['banks', 'Bank accounts'], ['company', 'Company'], ['currencies', 'Currencies']].map(([id, l]) => `<button class="v28-tab ${u.tab === id ? 'active' : ''}" data-al="set-tab" data-t="${id}">${l}</button>`).join('')}</div>`;
+  let body = '';
+  if (u.tab === 'banks') {
+    const list = banks.filter((b) => u.inactive || b.isActive);
+    const rows = list.map((b) => {
+      const p = pos.get(b.id);
+      const acts = [];
+      if (canBanks) acts.push(AL.btn('Change', 'set-bank-edit', 'small', `data-id="${ae(b.id)}"`), b.isActive ? AL.btn('Switch off', 'set-bank-off', 'small', `data-id="${ae(b.id)}"`) : AL.btn('Switch on', 'set-bank-on', 'small', `data-id="${ae(b.id)}"`));
+      return `<tr class="${b.isActive ? '' : 'al-muted'}">
+        <td><strong>${ae(b.name)}</strong><span class="v28-sub">${ae([b.accountNumber, b.branchCode && `branch ${b.branchCode}`, b.swiftCode].filter(Boolean).join(' · '))}</span></td>
+        <td>${ae((b.currency && b.currency.code) || '—')}</td>
+        <td>${b.glAccount ? `${ae(b.glAccount.accountNo)}<span class="v28-sub">${ae(b.glAccount.accountName)}</span>` : '<span class="al-bad">None</span>'}</td>
+        <td class="num">${p ? ae(AL.money(p.cashbookBalance, b.currency && b.currency.code)) : '—'}${p && p.difference ? `<span class="v28-sub al-bad">Ledger differs by ${ae(AL.money(p.difference, b.currency && b.currency.code))}</span>` : ''}</td>
+        <td>${p ? (p.unreconciledEntries ? `${p.unreconciledEntries} not reconciled` : 'All reconciled') : '—'}</td>
+        <td>${b.isActive ? AL.status('Active', 'ok') : AL.status('Off', 'info')}</td>
+        <td class="al-actions">${acts.join('')}</td>
+      </tr>`;
+    }).join('');
+    body = `<div class="al-filters"><label class="v28-field al-check"><input type="checkbox" data-set-f="inactive"${u.inactive ? ' checked' : ''}> Show switched-off accounts</label><span class="al-grow"></span>${canBanks ? AL.btn('Add bank account', 'set-bank-new', 'primary') : ''}</div>${rows ? AL.table(['Bank account', 'Currency', 'Ledger account', 'Cashbook balance', 'Reconciliation', 'Status', ''], rows, '1100px') : AL.empty('No bank accounts.')}`;
+  } else if (u.tab === 'company') {
+    const pr = L.profile.state === 'ok' ? L.profile.data : null;
+    const addr = ((L.addresses.data) || []).find((a) => a.isActive) || null;
+    const row = (k, v) => `<tr><td>${ae(k)}</td><td>${v ? ae(v) : '<span class="v28-sub">Not set</span>'}</td></tr>`;
+    body = L.profile.state === 'loading' ? AL.gate(L.profile) : AL.table(['', ''], [
+      row('Legal name', pr && pr.legalName),
+      row('Registration number', pr && pr.registrationNumber),
+      row('Tax number', pr && pr.taxNumber),
+      row('Email', pr && pr.email),
+      row('Phone', pr && pr.phone),
+      row('Website', pr && pr.website),
+      row('Address', addr && [addr.line1, addr.line2, addr.city, addr.country].filter(Boolean).join(', ')),
+      row('Base currency', base.code && `${base.code} · ${base.name}`),
+      row('Time zone', (pr && pr.fiscalTimezone) || 'Africa/Harare'),
+    ].join(''), '560px') + (admin ? `<div class="al-je-foot">${AL.btn('Edit company details', 'set-company', 'primary')}<a class="v28-btn" href="/admin/addresses" target="_blank" rel="noopener">Addresses and logo in Admin</a></div>` : '');
+  } else {
+    const latest = (L.rates.data && L.rates.data.latest) || [];
+    const rows = currencies.map((c) => {
+      const r = latest.find((x) => x.pair === `${base.code}/${c.code}`);
+      return `<tr class="${c.isActive ? '' : 'al-muted'}"><td><strong>${ae(c.code)}</strong><span class="v28-sub">${ae(c.name)}</span></td><td>${ae(c.symbol || '')}</td><td>${ae(String(c.decimalPlaces ?? 2))}</td><td>${c.isDefault ? AL.status('Base', 'ok') : r ? `${ae(Number(r.rate).toLocaleString('en-US', { maximumFractionDigits: 6 }))}<span class="v28-sub">${ae(AL.date(r.date))}</span>` : '<span class="v28-sub">No rate</span>'}</td><td>${c.isActive ? AL.status('Active', 'ok') : AL.status('Off', 'info')}</td></tr>`;
+    }).join('');
+    body = AL.table(['Currency', 'Symbol', 'Decimals', `Latest rate per ${base.code || 'base'}`, 'Status'], rows, '760px');
+  }
+  return `<div class="v28-page">${head}${kpis}${AL.panel('Accounting set-up', '', `${tabs}${body}`)}</div>`;
+});
+AL.wire.settings = () => {
+  document.querySelectorAll('[data-set-f]').forEach((el) => { if (el.dataset.wired) return; el.dataset.wired = '1'; el.addEventListener('change', () => { AL.ui.set.inactive = el.checked; AL.redraw(); }); });
+};
+AL.actions['set-tab'] = (el) => { AL.ui.set.tab = el.dataset.t; AL.redraw(); };
+AL.setBank = (id) => ((AL.cache['set-banks'] && AL.cache['set-banks'].data) || []).find((b) => b.id === id);
+/** Asset accounts a bank can post to: not the reporting bucket, not already another active bank's. */
+AL.setGlOptions = async (bank) => {
+  const lk = AL.jeLookups(); if (lk.pending) await lk.pending;
+  const used = new Set(((AL.cache['set-banks'] && AL.cache['set-banks'].data) || []).filter((b) => b.isActive && (!bank || b.id !== bank.id)).map((b) => b.glAccountId));
+  return ((lk.data && lk.data.accounts) || []).filter((a) => /^(Current Asset|Fixed Asset)$/.test(a.accountType) && a.accountNo !== '1000' && !used.has(a.id)).sort((a, b) => String(a.accountNo).localeCompare(String(b.accountNo))).map((a) => ({ value: a.id, label: `${a.accountNo} ${a.accountName}` }));
+};
+AL.actions['set-bank-new'] = (el) => AL.busy(el, async () => {
+  const currencies = (AL.cache['set-cur'] && AL.cache['set-cur'].data) || [];
+  const gl = await AL.setGlOptions(null);
+  AL.form({ title: 'Add a bank account', submitLabel: 'Add', doneTitle: 'Bank account added', fields: [
+    { k: 'name', label: 'Name', required: true, wide: true },
+    { k: 'accountNumber', label: 'Account number', required: true },
+    { k: 'currencyId', label: 'Currency', type: 'select', required: true, blank: false, options: currencies.filter((c) => c.isActive).map((c) => ({ value: c.id, label: c.code })) },
+    { k: 'glAccountId', label: 'Ledger account', type: 'select', blankLabel: 'Create a new one for this bank', options: gl },
+    { k: 'branchCode', label: 'Branch code' },
+    { k: 'swiftCode', label: 'SWIFT code' },
+  ], initial: { currencyId: (currencies.find((c) => c.isDefault) || {}).id },
+  onSubmit: async (v) => { const b = await AL.post('/cashbook/banks', { ...v, glAccountId: v.glAccountId || undefined }); return `${b.name}${b.glAccount ? ` posts to ${b.glAccount.accountNo}` : ''}.`; },
+  after: () => AL.setReload('set-banks', 'set-pos') });
+});
+AL.actions['set-bank-edit'] = (el) => AL.busy(el, async () => {
+  const b = AL.setBank(el.dataset.id); if (!b) return;
+  const used = (b._count && b._count.cashbookEntries) || 0;
+  const currencies = (AL.cache['set-cur'] && AL.cache['set-cur'].data) || [];
+  const gl = await AL.setGlOptions(b);
+  if (b.glAccount && !gl.some((o) => o.value === b.glAccountId)) gl.unshift({ value: b.glAccountId, label: `${b.glAccount.accountNo} ${b.glAccount.accountName}` });
+  AL.form({ title: `Change ${b.name}`, sub: used ? `${used} cashbook ${used === 1 ? 'entry uses' : 'entries use'} it, so its currency and ledger account stay.` : '', submitLabel: 'Save', doneTitle: 'Bank account changed', fields: [
+    { k: 'name', label: 'Name', required: true, wide: true },
+    { k: 'accountNumber', label: 'Account number', required: true },
+    ...(used ? [] : [{ k: 'currencyId', label: 'Currency', type: 'select', required: true, blank: false, options: currencies.filter((c) => c.isActive).map((c) => ({ value: c.id, label: c.code })) }, { k: 'glAccountId', label: 'Ledger account', type: 'select', required: true, options: gl }]),
+    { k: 'branchCode', label: 'Branch code' },
+    { k: 'swiftCode', label: 'SWIFT code' },
+  ], initial: { name: b.name, accountNumber: b.accountNumber, currencyId: b.currencyId, glAccountId: b.glAccountId || '', branchCode: b.branchCode || '', swiftCode: b.swiftCode || '' },
+  onSubmit: async (v) => { const body = {}; Object.keys(v).forEach((k) => { if ((v[k] || '') !== (b[k] || '')) body[k] = v[k]; }); if (!Object.keys(body).length) throw new Error('Nothing was changed.'); await AL.put(`/cashbook/banks/${encodeURIComponent(b.id)}`, body); return ''; },
+  after: () => AL.setReload('set-banks', 'set-pos') });
+});
+AL.actions['set-bank-off'] = (el) => { const b = AL.setBank(el.dataset.id); if (!b) return; AL.confirm({ title: `Switch off ${b.name}`, confirmLabel: 'Switch off', doneTitle: 'Switched off', body: 'Nothing can be received into or paid from it afterwards. Its history stays.', onConfirm: async () => { await AL.del(`/cashbook/banks/${encodeURIComponent(b.id)}`); return ''; }, after: () => AL.setReload('set-banks', 'set-pos') }); };
+AL.actions['set-bank-on'] = (el) => AL.busy(el, async () => { await AL.put(`/cashbook/banks/${encodeURIComponent(el.dataset.id)}`, { isActive: true }); AL.setReload('set-banks', 'set-pos'); }, ['Switched on', '']);
+AL.actions['set-company'] = () => {
+  const pr = (AL.cache['set-profile'] && AL.cache['set-profile'].data) || {};
+  const f = ['legalName', 'registrationNumber', 'taxNumber', 'email', 'phone', 'website'];
+  AL.form({ title: 'Company details', sub: 'Printed on invoices, statements and reports.', submitLabel: 'Save', doneTitle: 'Company details saved', fields: [
+    { k: 'legalName', label: 'Legal name', required: true, wide: true }, { k: 'registrationNumber', label: 'Registration number' }, { k: 'taxNumber', label: 'Tax number' },
+    { k: 'email', label: 'Email', type: 'email' }, { k: 'phone', label: 'Phone' }, { k: 'website', label: 'Website', wide: true },
+  ], initial: Object.fromEntries(f.map((k) => [k, pr[k] || ''])),
+  onSubmit: async (v) => { await AL.post('/company-profile/upsert', Object.fromEntries(f.map((k) => [k, v[k] || null]))); return ''; }, after: () => AL.setReload('set-profile') });
+};
+
+} catch (e) { if (window.console) console.error("[acc-live] 90-settings.js failed to load", e); }
+/* ---- accounting-live/94-vault.js ---- */
+try {
+/* Document Vault: /accounting/vault — the finance team's evidence kept in one place by category (close evidence,
+ * reports, tax, payment controls, policies, audit): search, open, upload (PDF, Office, spreadsheets, images, text,
+ * archives; each upload recorded in the audit trail). Data: /accounting/documents. */
+AL.ui.vault = AL.ui.vault || { cat: '', q: '' };
+AL.VAULT_CATS = ['Close evidence', 'Financial reports', 'Tax & compliance', 'Payment controls', 'Accounting policies', 'Audit room', 'General'];
+AL.page('vault', () => {
+  AL.meLoad();
+  const e = AL.res('vault', () => AL.get('/accounting/documents'));
+  const canUpload = AL.can('manage_accounting');
+  const head = AL.head('Reporting and compliance', 'Document Vault', '', canUpload ? AL.btn('Upload', 'vault-up', 'primary') : '');
+  const g = AL.gate(e, { key: 'vault', errorTitle: 'The vault could not be loaded' });
+  if (g) return `<div class="v28-page">${head}${g}</div>`;
+  const docs = e.data || [], u = AL.ui.vault, q = u.q.trim().toLowerCase();
+  const cats = [...new Set([...AL.VAULT_CATS, ...docs.map((d) => d.category)])];
+  const count = (c) => docs.filter((d) => d.category === c).length;
+  const tabs = `<div class="v28-tabbar">${[['', `All (${docs.length})`], ...cats.filter((c) => count(c) || AL.VAULT_CATS.includes(c)).map((c) => [c, `${c} (${count(c)})`])].map(([id, l]) => `<button class="v28-tab ${u.cat === id ? 'active' : ''}" data-al="vault-cat" data-c="${ae(id)}">${ae(l)}</button>`).join('')}</div>`;
+  const size = (b) => (b == null ? '—' : b < 1024 ? `${b} B` : b < 1048576 ? `${Math.round(b / 102.4) / 10} KB` : `${Math.round(b / 104857.6) / 10} MB`);
+  const rows = docs.filter((d) => (!u.cat || d.category === u.cat) && (!q || String(d.name).toLowerCase().includes(q))).map((d) => `<tr>
+    <td><strong>${ae(d.name)}</strong><span class="v28-sub">${ae(d.mimeType || '')}</span></td>
+    <td>${ae(d.category)}</td>
+    <td class="num">${ae(size(d.fileSizeBytes))}</td>
+    <td>${ae(d.uploadedBy ? [d.uploadedBy.firstName, d.uploadedBy.lastName].filter(Boolean).join(' ') : '—')}</td>
+    <td>${ae(AL.dateTime(d.createdAt))}</td>
+    <td class="al-actions">${d.fileUrl ? `<a class="v28-btn small" href="${ae(d.fileUrl)}" target="_blank" rel="noopener">Open</a>` : ''}</td>
+  </tr>`).join('');
+  return `<div class="v28-page">${head}${AL.panel('Documents', '', `${tabs}<div class="al-filters"><label class="v28-field al-grow"><span>Search</span><input class="v28-input" type="search" data-vault-f="q" value="${ae(u.q)}" placeholder="File name"></label></div>${rows ? AL.table(['Document', 'Category', 'Size', 'Uploaded by', 'When', ''], rows, '960px') : AL.empty('No documents here yet.')}`)}</div>`;
+});
+AL.wire.vault = () => { document.querySelectorAll('[data-vault-f]').forEach((el) => { if (el.dataset.wired) return; el.dataset.wired = '1'; const apply = () => { AL.ui.vault.q = el.value; AL.redraw(); }; el.addEventListener('search', apply); el.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') apply(); }); }); };
+AL.actions['vault-cat'] = (el) => { AL.ui.vault.cat = el.dataset.c; AL.redraw(); };
+AL.actions['vault-up'] = () => AL.form({ title: 'Upload to the vault', submitLabel: 'Upload', doneTitle: 'Uploaded', fields: [
+  { k: 'category', label: 'Category', type: 'select', required: true, blank: false, options: AL.VAULT_CATS },
+], initial: { category: AL.ui.vault.cat || 'Close evidence' },
+  extra: '<label class="v28-field al-wide"><span>File *</span><input class="v28-input" type="file" id="alVaultFile" accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.png,.jpg,.jpeg,.gif,.webp,.ppt,.pptx,.zip,.msg,.eml,.xml,.json"></label>',
+  validate: () => { const f = document.getElementById('alVaultFile'); return !f || !f.files || !f.files[0] ? 'Choose a file.' : f.files[0].size > 50 * 1024 * 1024 ? 'The file is over 50 MB.' : ''; },
+  onSubmit: async (v) => { const f = document.getElementById('alVaultFile').files[0]; const fd = new FormData(); fd.append('file', f); fd.append('category', v.category); AL.unwrap(await AL.http().form('/accounting/documents', fd)); return `${f.name} is in ${v.category}.`; },
+  after: () => { delete AL.cache.vault; AL.redraw(); } });
+
+} catch (e) { if (window.console) console.error("[acc-live] 94-vault.js failed to load", e); }
+/* ---- accounting-live/95-integrations.js ---- */
+try {
+/* Integrations: /accounting/integrations — how each connected module feeds the ledger, from the records: journals it
+ * raised (last 30 days, waiting to be posted, voided, the latest), the scheduled jobs that carry it and their last run,
+ * failures recorded for it. A module opens in a new tab; an accounting page opens here. Data: /accounting/integrations. */
+AL.intLoad = () => AL.res('int', () => AL.get('/accounting/integrations'));
+
+AL.page('integrations', () => {
+  AL.meLoad();
+  const e = AL.intLoad();
+  const head = AL.head('Administration', 'Integrations', 'What each module has posted to the ledger, and whether its scheduled jobs ran.', AL.btn('Refresh', 'int-refresh'));
+  const g = AL.gate(e, { key: 'int', errorTitle: 'Integrations could not be loaded' });
+  if (g) return `<div class="v28-page">${head}${g}</div>`;
+  const list = e.data || [];
+  const jobsFailed = list.reduce((s, x) => s + x.jobs.filter((j) => j.status === 'failed').length, 0);
+  const waiting = list.reduce((s, x) => s + ((x.journals && x.journals.pending) || 0), 0);
+  const kpis = AL.kpis([
+    ['Connected modules', String(list.filter((x) => (x.journals && x.journals.total) || x.jobs.some((j) => j.status)).length), `of ${list.length}`],
+    ['Journals, last 30 days', list.reduce((s, x) => s + ((x.journals && x.journals.last30) || 0), 0).toLocaleString('en-US'), 'Raised by other modules'],
+    ['Waiting to be posted', String(waiting), 'In the Approval Queue', waiting ? '#f79009' : '#12b76a'],
+    ['Job failures', String(jobsFailed), 'Last run of each job', jobsFailed ? '#d92d20' : '#12b76a'],
+  ]);
+  const rows = list.map((x) => {
+    const j = x.journals;
+    const health = x.jobs.some((y) => y.status === 'failed') ? AL.status('Job failed', 'bad') : x.failures30 ? AL.status(`${x.failures30} failure${x.failures30 === 1 ? '' : 's'} in 30 days`, 'warn') : (j && j.total) || x.jobs.some((y) => y.status) ? AL.status('Working', 'ok') : AL.status('Nothing yet', 'info');
+    const jobs = x.jobs.length ? x.jobs.map((y) => `${ae(y.label)}: ${y.status ? `${ae(y.status === 'succeeded' ? 'ran' : y.status)} ${ae(AL.dateTime(y.at))}` : 'never run'}${y.error ? ` <span class="al-bad">${ae(String(y.error).slice(0, 120))}</span>` : ''}`).join('<br>') : '<span class="v28-sub">—</span>';
+    const open = x.link ? `<a class="v28-btn small" href="${ae(x.link)}" target="_blank" rel="noopener">Open ${ae(x.label)}</a>` : x.page ? AL.btn('Open', 'int-go', 'small', `data-page="${ae(x.page)}"`) : '';
+    return `<tr>
+      <td><strong>${ae(x.label)}</strong><span class="v28-sub">${ae(x.feeds)}</span></td>
+      <td>${j ? `${j.last30.toLocaleString('en-US')}<span class="v28-sub">${j.total.toLocaleString('en-US')} in all</span>` : x.extra && x.extra.lastRateDate ? `Rate of ${ae(AL.date(x.extra.lastRateDate))}<span class="v28-sub">${ae(x.extra.source === 'MANUAL' ? 'Entered by hand' : 'From the official source')}</span>` : '—'}</td>
+      <td>${j ? (j.pending ? `<span class="al-bad">${j.pending}</span>` : '0') : '—'}${j && j.voided ? `<span class="v28-sub">${j.voided} voided</span>` : ''}</td>
+      <td>${j && j.latest ? `${ae(j.latest.referenceNumber.length > 28 ? `${j.latest.referenceNumber.slice(0, 28)}…` : j.latest.referenceNumber)}<span class="v28-sub">${ae(AL.dateTime(j.latest.createdAt))}</span>` : '—'}</td>
+      <td class="al-wrap">${jobs}</td>
+      <td>${health}</td>
+      <td class="al-actions">${open}</td>
+    </tr>`;
+  }).join('');
+  return `<div class="v28-page">${head}${kpis}${AL.panel('Modules feeding the ledger', '', AL.table(['Module', 'Journals, 30 days', 'Waiting', 'Latest', 'Scheduled jobs', 'State', ''], rows, '1180px'))}</div>`;
+});
+AL.actions['int-refresh'] = (el) => AL.busy(el, async () => { await AL.run('int'); });
+AL.actions['int-go'] = (el) => AL.go(el.dataset.page);
+
+} catch (e) { if (window.console) console.error("[acc-live] 95-integrations.js failed to load", e); }
+/* ---- accounting-live/96-consolidation.js ---- */
+try {
+/* Group Consolidation: /accounting/consolidation — each active entity's balance sheet and year-to-date results from its
+ * own posted journals, the journals flagged as eliminations netted at group level, and the consolidated position in the
+ * chosen currency (other currencies translated at the rate stored for the as-of date, shown per account). Data:
+ * /accounting/consolidation/summary, /accounting/balance-sheet/consolidated. */
+AL.ui.cons = AL.ui.cons || { asOf: '', cur: '' };
+AL.page('consolidation', () => {
+  AL.meLoad();
+  const u = AL.ui.cons;
+  const cur = AL.res('cons-cur', () => AL.get('/accounting/currencies'));
+  const head = AL.head('Reporting and compliance', 'Group Consolidation', '');
+  const g0 = AL.gate(cur, { key: 'cons-cur' });
+  if (g0) return `<div class="v28-page">${head}${g0}</div>`;
+  const currencies = (cur.data || []).filter((c) => c.isActive !== false);
+  const base = currencies.find((c) => c.isDefault) || currencies[0] || {};
+  const curId = u.cur || base.id, code = (currencies.find((c) => c.id === curId) || {}).code || '';
+  const asOf = u.asOf || AL.stiToday(), from = `${asOf.slice(0, 4)}-01-01`;
+  const sKey = `cons:${asOf}:${curId}`, bKey = `cons-bs:${asOf}:${curId}`;
+  const s = AL.res(sKey, () => AL.get(`/accounting/consolidation/summary?asOfDate=${asOf}&periodStart=${from}&periodEnd=${asOf}&consolidationCurrencyId=${encodeURIComponent(curId)}`));
+  const b = AL.res(bKey, () => AL.post('/accounting/balance-sheet/consolidated', { asOfDate: asOf, consolidationCurrencyId: curId }));
+  const filters = `<div class="al-filters"><label class="v28-field"><span>As of</span><input class="v28-input" type="date" data-cons-f="asOf" value="${ae(asOf)}"></label><label class="v28-field"><span>Currency</span><select class="v28-select" data-cons-f="cur">${currencies.map((c) => `<option value="${ae(c.id)}"${c.id === curId ? ' selected' : ''}>${ae(c.code)}</option>`).join('')}</select></label></div>`;
+  const g = AL.gate(s, { key: sKey, errorTitle: 'The consolidation could not be produced' });
+  if (g) return `<div class="v28-page">${head}${filters}${g}</div>`;
+  const d = s.data || {}, ents = d.entities || [], el = d.eliminations || {}, c = d.consolidated || {};
+  const bal = Math.round(((c.totalAssets || 0) - (c.totalLiabilities || 0) - (c.totalEquity || 0)) * 100) / 100;
+  const kpis = AL.kpis([
+    ['Entities', String(ents.length), ents.length === 1 ? 'One entity: the group is that entity' : 'Active entities'],
+    ['Consolidated assets', AL.money(c.totalAssets, code), `After ${AL.money(el.totalAssets || 0, code)} eliminated`],
+    ['Net income, year to date', AL.money(c.netIncome, code), `${AL.date(from)} – ${AL.date(asOf)}`, (c.netIncome || 0) < 0 ? '#d92d20' : '#12b76a'],
+    ['Balance check', Math.abs(bal) < 0.01 ? 'Balances' : AL.money(bal, code), 'Assets = liabilities + equity', Math.abs(bal) < 0.01 ? '#12b76a' : '#d92d20'],
+  ]);
+  const row = (name, x, cls = '') => `<tr class="${cls}"><td>${name}</td><td class="num">${ae(AL.money(x.totalAssets, code))}</td><td class="num">${ae(AL.money(x.totalLiabilities, code))}</td><td class="num">${ae(AL.money(x.totalEquity, code))}</td><td class="num">${ae(AL.money(x.revenue, code))}</td><td class="num">${ae(AL.money(x.expenses, code))}</td><td class="num">${ae(AL.money(x.netIncome, code))}</td></tr>`;
+  const rows = ents.map((e) => row(`<strong>${ae(e.entityName)}</strong>${e.balanceSheet && e.balanceSheet.isBalanced === false ? '<span class="v28-sub al-bad">Does not balance</span>' : ''}`, { ...e.balanceSheet, ...e.incomeStatement })).join('')
+    + row('Eliminations', el, 'al-muted') + row('<strong>Consolidated</strong>', c, 'al-total');
+  let detail = '';
+  if (b.state === 'ok' && b.data) {
+    const bs = b.data;
+    const lines = [];
+    const acc = (list) => (list || []).filter((a) => Math.abs(a.balance) >= 0.005).forEach((a) => lines.push(`<tr><td>${ae(`${a.accountNo} ${a.accountName}`.trim())}</td><td class="num">${ae(AL.money(a.balance, code))}</td><td class="al-wrap v28-sub">${ae((a.currencyBreakdown || []).filter((x) => x.sourceCurrency !== code).map((x) => `${x.sourceCurrency} ${Number(x.sourceAmount).toLocaleString('en-US', { minimumFractionDigits: 2 })} at ${x.conversionRate}`).join(' · '))}</td></tr>`));
+    const sec = (label, total) => lines.push(`<tr class="al-total"><td><strong>${ae(label)}</strong></td><td class="num"><strong>${ae(AL.money(total, code))}</strong></td><td></td></tr>`);
+    acc(bs.assets.cashAndCashEquivalents && bs.assets.cashAndCashEquivalents.breakdown); acc(bs.assets.currentAssets.accounts); acc(bs.assets.fixedAssets.accounts); acc(bs.assets.otherAssets.accounts); sec('Total assets', bs.assets.totalAssets);
+    acc(bs.liabilities.currentLiabilities.accounts); acc(bs.liabilities.longTermLiabilities.accounts); sec('Total liabilities', bs.liabilities.totalLiabilities);
+    acc(bs.equity.accounts); sec('Total equity', bs.equity.total);
+    const rates = (bs.exchangeRates || []).filter((r) => r.currencyCode !== code).map((r) => `${r.currencyCode} at ${r.rate}`).join(' · ');
+    detail = AL.panel('Consolidated balance sheet', rates ? `Translated to ${code}: ${rates}` : `In ${code}`, AL.table(['Account', 'Balance', 'From'], lines.join(''), '860px'));
+  } else detail = AL.gate(b, { key: bKey, errorTitle: 'The consolidated balance sheet could not be produced' }) || '';
+  return `<div class="v28-page">${head}${filters}${kpis}${AL.panel('Entities', `Balance sheet at ${AL.date(asOf)}; results ${AL.date(from)} – ${AL.date(asOf)}`, AL.table(['Entity', 'Assets', 'Liabilities', 'Equity', 'Revenue', 'Expenses', 'Net income'], rows, '1080px'))}${detail}</div>`;
+});
+AL.wire.consolidation = () => { document.querySelectorAll('[data-cons-f]').forEach((el) => { if (el.dataset.wired) return; el.dataset.wired = '1'; el.addEventListener('change', () => { AL.ui.cons[el.dataset.consF] = el.value; AL.redraw(); }); }); };
+
+} catch (e) { if (window.console) console.error("[acc-live] 96-consolidation.js failed to load", e); }
+/* ---- accounting-live/97-timesheets.js ---- */
+try {
+/* Timesheets & Projects: /accounting/timesheets — time booked to projects. For someone who approves time: the weeks
+ * waiting for them (approve, or return with what to correct; nobody approves their own), and their team's weeks. For
+ * everyone with access: projects with the hours approved (billable among them) and still waiting; those who manage
+ * projects add and change them. Employees enter their own time in Employee Hub. Data: /accounting/timesheets/*,
+ * /accounting/projects. */
+AL.ui.ts = AL.ui.ts || { tab: '', status: '' };
+AL.tsLoad = (canApprove) => ({
+  pending: canApprove ? AL.res('ts-pending', () => AL.get('/accounting/timesheets/pending-approval')) : null,
+  team: canApprove ? AL.res('ts-team', () => AL.get('/accounting/timesheets/team')) : null,
+  projects: AL.res('ts-projects', () => AL.get('/accounting/projects')),
+});
+AL.tsReload = () => { ['ts-pending', 'ts-team', 'ts-projects'].forEach((k) => delete AL.cache[k]); AL.redraw(); };
+AL.tsHours = (t) => (t.entries || []).reduce((s, e) => s + Number(e.hours || 0), 0);
+AL.tsName = (u) => (u ? [u.firstName, u.lastName].filter(Boolean).join(' ') || u.email : '—');
+AL.TS_STATUS = { DRAFT: ['Draft', 'info'], SUBMITTED: ['Waiting for approval', 'warn'], APPROVED: ['Approved', 'ok'], RETURNED: ['Returned', 'bad'] };
+
+AL.page('timesheets', () => {
+  AL.meLoad();
+  const canApprove = AL.can('accounting.timesheets.manage');
+  const L = AL.tsLoad(canApprove), u = { ...AL.ui.ts };
+  // the default tab follows the permissions, which may arrive after the first draw
+  if (!u.tab || (!canApprove && u.tab !== 'projects')) u.tab = canApprove ? 'waiting' : 'projects';
+  const head = AL.head('Daily accounting', 'Timesheets & Projects', '', canApprove ? AL.btn('Add project', 'ts-proj-new', 'primary') : '');
+  const g = AL.gate(L.projects, { key: 'ts-projects', errorTitle: 'Projects could not be loaded' }) || (canApprove && (AL.gate(L.pending, { key: 'ts-pending' }) || AL.gate(L.team, { key: 'ts-team' })));
+  if (g) return `<div class="v28-page">${head}${g}</div>`;
+  const projects = L.projects.data || [], pending = canApprove ? L.pending.data || [] : [], team = canApprove ? L.team.data || [] : [];
+  const monthStart = `${AL.stiToday().slice(0, 7)}-01`;
+  const approvedMonth = team.filter((t) => t.status === 'APPROVED' && String(t.weekEnding).slice(0, 10) >= monthStart).reduce((s, t) => s + AL.tsHours(t), 0);
+  const kpis = AL.kpis([
+    ...(canApprove ? [['Waiting for you', String(pending.length), `${pending.reduce((s, t) => s + AL.tsHours(t), 0).toLocaleString('en-US')} hours`, pending.length ? '#f79009' : '#12b76a'], ['Approved this month', `${approvedMonth.toLocaleString('en-US')} h`, 'Your team']] : []),
+    ['Active projects', String(projects.filter((p) => p.isActive !== false && p.status !== 'CLOSED').length), `${projects.length} in all`],
+    ['Hours approved', `${projects.reduce((s, p) => s + ((p.hours && p.hours.approved) || 0), 0).toLocaleString('en-US')} h`, `${projects.reduce((s, p) => s + ((p.hours && p.hours.billable) || 0), 0).toLocaleString('en-US')} h billable`],
+  ]);
+  const tabs = `<div class="v28-tabbar">${[...(canApprove ? [['waiting', `Waiting for you (${pending.length})`], ['team', 'Team']] : []), ['projects', 'Projects']].map(([id, l]) => `<button class="v28-tab ${u.tab === id ? 'active' : ''}" data-al="ts-tab" data-t="${id}">${ae(l)}</button>`).join('')}</div>`;
+  const weekRow = (t, acts) => {
+    const hrs = AL.tsHours(t), bill = (t.entries || []).filter((e) => e.billable).reduce((s, e) => s + Number(e.hours || 0), 0);
+    const st = AL.TS_STATUS[t.status] || [t.status, 'info'];
+    return `<tr>
+      <td><strong>${ae(AL.tsName(t.user))}</strong><span class="v28-sub">${ae((t.user && t.user.userDepartment && (t.user.userDepartment.name || t.user.userDepartment)) || (t.user && t.user.email) || '')}</span></td>
+      <td>Week to ${ae(AL.date(t.weekEnding))}</td>
+      <td class="num">${hrs.toLocaleString('en-US')} h<span class="v28-sub">${bill.toLocaleString('en-US')} h billable</span></td>
+      <td class="al-wrap">${ae([...new Set((t.entries || []).map((e) => e.project && e.project.name))].filter(Boolean).join(', '))}</td>
+      <td>${AL.status(st[0], st[1])}${t.status === 'RETURNED' && t.returnReason ? `<span class="v28-sub">${ae(t.returnReason)}</span>` : ''}${t.approvedBy && t.status === 'APPROVED' ? `<span class="v28-sub">by ${ae(AL.tsName(t.approvedBy))}</span>` : ''}</td>
+      <td class="al-actions">${acts}</td>
+    </tr>`;
+  };
+  let body = '';
+  if (u.tab === 'waiting') {
+    const me = AL.me().id;
+    const rows = pending.map((t) => weekRow(t, [AL.btn('Lines', 'ts-lines', 'small', `data-id="${ae(t.id)}" data-src="ts-pending"`), ...(t.userId !== me ? [AL.btn('Approve', 'ts-approve', 'small primary', `data-id="${ae(t.id)}"`), AL.btn('Return', 'ts-return', 'small danger', `data-id="${ae(t.id)}"`)] : [])].join(''))).join('');
+    body = rows ? AL.table(['Person', 'Week', 'Hours', 'Projects', 'Status', ''], rows, '1040px') : AL.empty('No timesheets are waiting for you.');
+  } else if (u.tab === 'team') {
+    const list = team.filter((t) => !u.status || t.status === u.status).sort((a, b) => String(b.weekEnding).localeCompare(String(a.weekEnding)));
+    const rows = list.map((t) => weekRow(t, AL.btn('Lines', 'ts-lines', 'small', `data-id="${ae(t.id)}" data-src="ts-team"`))).join('');
+    body = `<div class="al-filters"><label class="v28-field"><span>Status</span><select class="v28-select" data-ts-f="status"><option value="">All</option>${Object.entries(AL.TS_STATUS).map(([k, v]) => `<option value="${k}"${u.status === k ? ' selected' : ''}>${ae(v[0])}</option>`).join('')}</select></label></div>${rows ? AL.table(['Person', 'Week', 'Hours', 'Projects', 'Status', ''], rows, '1040px') : AL.empty('No timesheets.')}`;
+  } else {
+    const rows = projects.map((p) => `<tr class="${p.isActive === false ? 'al-muted' : ''}">
+      <td><strong>${ae(p.name)}</strong><span class="v28-sub">${ae([p.clientName, p.projectType].filter(Boolean).join(' · '))}</span></td>
+      <td class="num">${p.budget != null ? ae(AL.money(p.budget)) : '—'}</td>
+      <td class="num">${ae(((p.hours && p.hours.approved) || 0).toLocaleString('en-US'))} h<span class="v28-sub">${ae(((p.hours && p.hours.billable) || 0).toLocaleString('en-US'))} h billable</span></td>
+      <td class="num">${ae(((p.hours && p.hours.waiting) || 0).toLocaleString('en-US'))} h</td>
+      <td>${p.isActive === false || p.status === 'CLOSED' ? AL.status('Closed', 'info') : AL.status('Active', 'ok')}</td>
+      <td class="al-actions">${canApprove ? AL.btn('Change', 'ts-proj-edit', 'small', `data-id="${ae(p.id)}"`) : ''}</td>
+    </tr>`).join('');
+    body = rows ? AL.table(['Project', 'Budget', 'Approved', 'Waiting', 'Status', ''], rows, '900px') : AL.empty('No projects yet.');
+  }
+  return `<div class="v28-page">${head}${kpis}${AL.panel('Time', '', `${tabs}${body}`)}</div>`;
+});
+AL.wire.timesheets = () => { document.querySelectorAll('[data-ts-f]').forEach((el) => { if (el.dataset.wired) return; el.dataset.wired = '1'; el.addEventListener('change', () => { AL.ui.ts[el.dataset.tsF] = el.value; AL.redraw(); }); }); };
+AL.actions['ts-tab'] = (el) => { AL.ui.ts.tab = el.dataset.t; AL.redraw(); };
+AL.tsFind = (src, id) => ((AL.cache[src] && AL.cache[src].data) || []).find((t) => t.id === id);
+AL.actions['ts-lines'] = (el) => {
+  const t = AL.tsFind(el.dataset.src, el.dataset.id); if (!t) return;
+  const rows = (t.entries || []).map((e) => `<tr><td>${ae(AL.date(e.date))}</td><td>${ae((e.project && e.project.name) || '')}</td><td class="num">${ae(String(Number(e.hours)))}</td><td>${e.billable ? 'Yes' : 'No'}</td><td class="al-wrap">${ae(e.notes || '')}</td></tr>`).join('');
+  AL.form({ title: `${AL.tsName(t.user)} · week to ${AL.date(t.weekEnding)}`, sub: `${AL.tsHours(t)} hours`, wide: true, viewOnly: true, submitLabel: 'Close', fields: [], extra: `<div class="al-wide">${AL.table(['Day', 'Project', 'Hours', 'Billable', 'Notes'], rows, '640px')}</div>`, onSubmit: async () => false });
+};
+AL.actions['ts-approve'] = (el) => AL.busy(el, async () => { await AL.post(`/accounting/timesheets/${encodeURIComponent(el.dataset.id)}/approve`, {}); AL.tsReload(); }, ['Approved', '']);
+AL.actions['ts-return'] = (el) => { const t = AL.tsFind('ts-pending', el.dataset.id); if (!t) return; AL.confirm({ title: `Return ${AL.tsName(t.user)}'s week to ${AL.date(t.weekEnding)}`, danger: true, confirmLabel: 'Return', doneTitle: 'Returned', reason: 'What needs correcting', body: 'It goes back to them to correct and submit again.', onConfirm: async (v) => { await AL.post(`/accounting/timesheets/${encodeURIComponent(t.id)}/return`, { reason: v.reason }); return ''; }, after: () => AL.tsReload() }); };
+AL.tsProjectFields = [
+  { k: 'name', label: 'Name', required: true, wide: true }, { k: 'clientName', label: 'Client' }, { k: 'projectType', label: 'Type' },
+  { k: 'budget', label: 'Budget', type: 'number', min: 0, step: '0.01' }, { k: 'isActive', label: 'Active (time can be booked to it)', type: 'checkbox' },
+];
+AL.tsProjectBody = (v) => ({ name: v.name, clientName: v.clientName || null, projectType: v.projectType || null, budget: v.budget === '' ? null : Number(v.budget), isActive: !!v.isActive, status: v.isActive ? 'ACTIVE' : 'CLOSED' });
+AL.actions['ts-proj-new'] = () => AL.form({ title: 'Add a project', submitLabel: 'Add', doneTitle: 'Project added', fields: AL.tsProjectFields, initial: { isActive: true }, onSubmit: async (v) => { await AL.post('/accounting/projects', AL.tsProjectBody(v)); return v.name; }, after: () => AL.tsReload() });
+AL.actions['ts-proj-edit'] = (el) => { const p = AL.tsFind('ts-projects', el.dataset.id); if (!p) return; AL.form({ title: `Change ${p.name}`, submitLabel: 'Save', doneTitle: 'Project changed', fields: AL.tsProjectFields, initial: { name: p.name, clientName: p.clientName || '', projectType: p.projectType || '', budget: p.budget != null ? Number(p.budget) : '', isActive: p.isActive !== false && p.status !== 'CLOSED' }, onSubmit: async (v) => { await AL.put(`/accounting/projects/${encodeURIComponent(p.id)}`, AL.tsProjectBody(v)); return ''; }, after: () => AL.tsReload() }); };
+
+} catch (e) { if (window.console) console.error("[acc-live] 97-timesheets.js failed to load", e); }
+/* ---- accounting-live/98-inventory.js ---- */
+try {
+/* Inventory: /accounting/inventory — the stock sub-ledger. Items with quantity, moving weighted-average cost and value;
+ * receive (at a cost, from a payable, bank or opening balance), issue (to cost of sales or an expense) and count (an
+ * approver books the difference to a variance account). Each movement posts its journal with it, so the ledger and the
+ * stock agree; the ledger check shows it, and the roll-forward gives opening + receipts − issues ± adjustments = closing
+ * for a month. Data: /accounting/inventory/*. */
+AL.ui.inv = AL.ui.inv || { tab: 'items', q: '', month: '' };
+AL.invLoad = () => ({
+  items: AL.res('inv-items', () => AL.get('/accounting/inventory/items?limit=500')),
+  tie: AL.res('inv-tie', () => AL.get('/accounting/inventory/tie-out')),
+  moves: AL.res('inv-moves', () => AL.get('/accounting/inventory/movements?limit=200')),
+});
+AL.invReload = () => { Object.keys(AL.cache).filter((k) => k.startsWith('inv-')).forEach((k) => delete AL.cache[k]); AL.redraw(); };
+AL.invItems = () => { const d = AL.cache['inv-items'] && AL.cache['inv-items'].data; return (d && (d.items || d)) || []; };
+AL.invMonth = () => AL.ui.inv.month || AL.stiToday().slice(0, 7);
+
+AL.page('inventory', () => {
+  AL.meLoad();
+  const L = AL.invLoad(), u = AL.ui.inv;
+  const canPrep = AL.can('manage_accounting'), canCount = AL.can('manage_ledger');
+  const head = AL.head('Daily accounting', 'Inventory', '', canPrep ? AL.btn('Add item', 'inv-new', 'primary') : '');
+  const g = AL.gate(L.items, { key: 'inv-items', errorTitle: 'Inventory could not be loaded' });
+  if (g) return `<div class="v28-page">${head}${g}</div>`;
+  const items = AL.invItems();
+  const value = (i) => Number(i.quantityOnHand) * Number(i.costOfPurchase);
+  const tie = (L.tie.data || []);
+  const diff = tie.reduce((s, r) => s + Math.abs(r.difference || 0), 0);
+  const low = items.filter((i) => i.isActive !== false && Number(i.reorderLevel) > 0 && Number(i.quantityOnHand) <= Number(i.reorderLevel));
+  const kpis = AL.kpis([
+    ['Stock value', AL.money(items.reduce((s, i) => s + value(i), 0)), 'Quantity × average cost'],
+    ['Items', String(items.filter((i) => i.isActive !== false).length), `${items.filter((i) => i.isActive !== false && Number(i.quantityOnHand) > 0).length} in stock`],
+    ['At or below reorder level', String(low.length), low.length ? low.slice(0, 2).map((i) => i.skuNumber).join(', ') : 'None', low.length ? '#f79009' : '#12b76a'],
+    ['Ledger against stock', L.tie.state === 'ok' ? (diff < 0.005 ? 'Agrees' : AL.money(diff)) : '—', L.tie.state === 'ok' ? (diff < 0.005 ? 'Inventory accounts = stock value' : 'Difference') : 'Checking', L.tie.state === 'ok' ? (diff < 0.005 ? '#12b76a' : '#d92d20') : undefined],
+  ]);
+  const tabs = `<div class="v28-tabbar">${[['items', 'Items'], ['moves', 'Movements'], ['roll', 'Month roll-forward'], ['tie', 'Ledger check']].map(([id, l]) => `<button class="v28-tab ${u.tab === id ? 'active' : ''}" data-al="inv-tab" data-t="${id}">${l}</button>`).join('')}</div>`;
+  let body = '';
+  if (u.tab === 'items') {
+    const q = u.q.trim().toLowerCase();
+    const rows = items.filter((i) => !q || `${i.skuNumber} ${i.itemName}`.toLowerCase().includes(q)).map((i) => {
+      const acts = [AL.btn('Movements', 'inv-item-moves', 'small', `data-id="${ae(i.id)}"`)];
+      if (canPrep && i.isActive !== false) acts.push(AL.btn('Receive', 'inv-in', 'small', `data-id="${ae(i.id)}"`), AL.btn('Issue', 'inv-out', 'small', `data-id="${ae(i.id)}"`), AL.btn('Change', 'inv-edit', 'small', `data-id="${ae(i.id)}"`));
+      if (canCount && i.isActive !== false) acts.push(AL.btn('Count', 'inv-count', 'small', `data-id="${ae(i.id)}"`));
+      const lowFlag = Number(i.reorderLevel) > 0 && Number(i.quantityOnHand) <= Number(i.reorderLevel);
+      return `<tr class="${i.isActive === false ? 'al-muted' : ''}">
+        <td><strong>${ae(i.skuNumber)}</strong><span class="v28-sub">${ae(i.itemName)}</span></td>
+        <td class="num">${ae(Number(i.quantityOnHand).toLocaleString('en-US'))} ${ae(i.unitOfMeasure || '')}${lowFlag ? `<span class="v28-sub al-bad">Reorder at ${ae(String(Number(i.reorderLevel)))}</span>` : ''}</td>
+        <td class="num">${ae(AL.money(i.costOfPurchase))}</td>
+        <td class="num">${ae(AL.money(value(i)))}</td>
+        <td>${i.inventoryAssetAccount ? ae(`${i.inventoryAssetAccount.accountNo} ${i.inventoryAssetAccount.accountName}`) : '—'}</td>
+        <td>${i.isActive === false ? AL.status('Off', 'info') : AL.status('Active', 'ok')}</td>
+        <td class="al-actions">${acts.join('')}</td>
+      </tr>`;
+    }).join('');
+    body = `<div class="al-filters"><label class="v28-field al-grow"><span>Search</span><input class="v28-input" type="search" data-inv-f="q" value="${ae(u.q)}" placeholder="SKU or name"></label></div>${rows ? AL.table(['Item', 'On hand', 'Average cost', 'Value', 'Inventory account', 'Status', ''], rows, '1100px') : AL.empty('No inventory items yet.')}`;
+  } else if (u.tab === 'moves') {
+    body = AL.gate(L.moves, { key: 'inv-moves' }) || AL.invMovesTable(L.moves.data || []);
+  } else if (u.tab === 'roll') {
+    const m = AL.invMonth();
+    const [y, mo] = m.split('-').map(Number);
+    const to = `${m}-${String(new Date(Date.UTC(y, mo, 0)).getUTCDate()).padStart(2, '0')}`;
+    const e = AL.res(`inv-roll-${m}`, () => AL.get(`/accounting/inventory/roll-forward?from=${m}-01&to=${to}`));
+    const cell = (x) => `${ae(x.qty.toLocaleString('en-US'))}<span class="v28-sub">${ae(AL.money(x.value))}</span>`;
+    const rows = e.state === 'ok' ? (e.data.rows || []).map((r) => `<tr><td><strong>${ae(r.sku)}</strong><span class="v28-sub">${ae(r.name)}</span></td><td class="num">${cell(r.opening)}</td><td class="num">${cell(r.receipts)}</td><td class="num">${cell(r.issues)}</td><td class="num">${cell(r.adjustments)}</td><td class="num"><strong>${cell(r.closing)}</strong></td></tr>`).join('') : '';
+    const tot = (k) => (e.state === 'ok' ? e.data.rows.reduce((s, r) => s + r[k].value, 0) : 0);
+    body = `<div class="al-filters"><label class="v28-field"><span>Month</span><input class="v28-input" type="month" data-inv-f="month" value="${ae(m)}"></label></div>${AL.gate(e, { key: `inv-roll-${m}` }) || (rows ? AL.table(['Item', 'Opening', 'Received', 'Issued', 'Counted ±', 'Closing'], rows + `<tr class="al-total"><td><strong>Total</strong></td>${['opening', 'receipts', 'issues', 'adjustments', 'closing'].map((k) => `<td class="num"><strong>${ae(AL.money(tot(k)))}</strong></td>`).join('')}</tr>`, '960px') : AL.empty('No stock moved in this month.'))}`;
+  } else {
+    const rows = tie.map((r) => `<tr><td>${ae(r.account)}<span class="v28-sub">${r.items} item${r.items === 1 ? '' : 's'}</span></td><td class="num">${ae(AL.money(r.stockValue))}</td><td class="num">${ae(AL.money(r.ledgerBalance))}</td><td class="num">${Math.abs(r.difference) < 0.005 ? '<span class="al-ok">None</span>' : `<span class="al-bad">${ae(AL.money(r.difference))}</span>`}</td></tr>`).join('');
+    body = AL.gate(L.tie, { key: 'inv-tie' }) || (rows ? AL.table(['Inventory account', 'Stock value', 'Ledger balance', 'Difference'], rows, '760px') : AL.empty('No inventory accounts in use.'));
+  }
+  return `<div class="v28-page">${head}${kpis}${AL.panel('Stock', '', `${tabs}${body}`)}</div>`;
+});
+AL.invMovesTable = (list) => {
+  const TYPE = { IN: 'Received', OUT: 'Issued', ADJUSTMENT: 'Count difference' };
+  const rows = list.map((m) => {
+    const q = m.movementType === 'OUT' ? -Math.abs(Number(m.quantity)) : m.movementType === 'IN' ? Math.abs(Number(m.quantity)) : Number(m.quantity);
+    return `<tr><td>${ae(AL.dateTime(m.createdAt))}</td><td>${m.item ? `<strong>${ae(m.item.skuNumber)}</strong><span class="v28-sub">${ae(m.item.itemName)}</span>` : ''}</td><td>${ae(TYPE[m.movementType] || m.movementType)}</td><td class="num">${q > 0 ? '+' : ''}${ae(q.toLocaleString('en-US'))}</td><td class="num">${ae(AL.money(m.unitCost))}</td><td class="num">${ae(AL.money(Math.abs(Number(m.totalCost))))}</td><td class="al-wrap">${ae(m.description || m.reference || '')}<span class="v28-sub">${ae(m.createdBy ? AL.tsName ? AL.tsName(m.createdBy) : m.createdBy.email : '')}</span></td><td>${m.journal ? ae(m.journal.referenceNumber.slice(0, 16)) : '<span class="v28-sub">—</span>'}</td></tr>`;
+  }).join('');
+  return rows ? AL.table(['When', 'Item', 'Movement', 'Quantity', 'Unit cost', 'Value', 'Detail', 'Journal'], rows, '1180px') : AL.empty('No stock movements yet.');
+};
+AL.wire.inventory = () => {
+  document.querySelectorAll('[data-inv-f]').forEach((el) => {
+    if (el.dataset.wired) return; el.dataset.wired = '1';
+    const k = el.dataset.invF;
+    if (k === 'q') el.addEventListener('input', () => { AL.ui.inv.q = el.value; clearTimeout(AL.invT); AL.invT = setTimeout(() => { AL.redraw(); const n = document.querySelector('[data-inv-f="q"]'); if (n) { n.focus(); n.setSelectionRange(n.value.length, n.value.length); } }, 250); });
+    else el.addEventListener('change', () => { AL.ui.inv[k] = el.value; AL.redraw(); });
+  });
+};
+AL.actions['inv-tab'] = (el) => { AL.ui.inv.tab = el.dataset.t; AL.redraw(); };
+AL.invFind = (id) => AL.invItems().find((i) => i.id === id);
+/** Accounts for the other side of a movement, by kind; the preferred one first. */
+AL.invAccounts = async (kind) => {
+  const lk = AL.jeLookups(); if (lk.pending) await lk.pending;
+  const all = ((lk.data && lk.data.accounts) || []).filter((a) => a.isActive !== false && a.accountNo !== '1000');
+  const pick = { from: (a) => /^[23]/.test(a.accountNo) || /Current Asset/.test(a.accountType), to: (a) => /^5/.test(a.accountNo), variance: (a) => /^5/.test(a.accountNo), stock: (a) => /Current Asset/.test(a.accountType) }[kind];
+  return all.filter(pick).sort((a, b) => String(a.accountNo).localeCompare(String(b.accountNo))).map((a) => ({ value: a.id, label: `${a.accountNo} ${a.accountName}`, no: a.accountNo }));
+};
+AL.invDefault = (opts, no) => (opts.find((o) => o.no === no) || {}).value || '';
+AL.invAfter = () => AL.invReload();
+AL.invDone = (r) => (r && r.journalReference ? `On hand ${Number(r.onHandAfter).toLocaleString('en-US')}; journal ${r.journalReference.slice(0, 16)} posted.` : '');
+AL.actions['inv-new'] = (el) => AL.busy(el, async () => {
+  const [stock, from] = await Promise.all([AL.invAccounts('stock'), AL.invAccounts('from')]);
+  AL.form({ title: 'Add an inventory item', wide: true, submitLabel: 'Add', doneTitle: 'Item added', fields: [
+    { k: 'skuNumber', label: 'SKU', required: true }, { k: 'itemName', label: 'Name', required: true },
+    { k: 'unitOfMeasure', label: 'Unit' }, { k: 'reorderLevel', label: 'Reorder level', type: 'number', min: 0, step: 'any' },
+    { k: 'inventoryAssetAccountId', label: 'Inventory account', type: 'select', required: true, options: stock },
+    { k: 'costOfPurchase', label: 'Unit cost', type: 'number', min: 0.01, step: '0.01', required: true },
+    { k: 'quantityOnHand', label: 'Opening quantity', type: 'number', min: 0, step: 'any' },
+    { k: 'openingContraAccountId', label: 'Opening quantity came from', type: 'select', options: from },
+    { k: 'description', label: 'Description', type: 'textarea', wide: true },
+  ], initial: { unitOfMeasure: 'pieces', reorderLevel: 0, quantityOnHand: 0, inventoryAssetAccountId: AL.invDefault(stock, '1400'), openingContraAccountId: AL.invDefault(from, '3900') },
+  validate: (v) => (Number(v.quantityOnHand) > 0 && !v.openingContraAccountId ? 'Choose where the opening quantity came from.' : ''),
+  onSubmit: async (v) => { await AL.post('/accounting/inventory/items', { ...v, openingContraAccountId: Number(v.quantityOnHand) > 0 ? v.openingContraAccountId : undefined }); return `${v.skuNumber} ${v.itemName}`; }, after: AL.invAfter });
+});
+AL.actions['inv-edit'] = (el) => { const i = AL.invFind(el.dataset.id); if (!i) return; AL.form({ title: `Change ${i.skuNumber}`, submitLabel: 'Save', doneTitle: 'Item changed', fields: [
+  { k: 'itemName', label: 'Name', required: true, wide: true }, { k: 'unitOfMeasure', label: 'Unit' }, { k: 'reorderLevel', label: 'Reorder level', type: 'number', min: 0, step: 'any' }, { k: 'description', label: 'Description', type: 'textarea', wide: true }, { k: 'isActive', label: 'Active (can be received and issued)', type: 'checkbox' },
+], initial: { itemName: i.itemName, unitOfMeasure: i.unitOfMeasure || '', reorderLevel: Number(i.reorderLevel), description: i.description || '', isActive: i.isActive !== false },
+  onSubmit: async (v) => { await AL.put(`/accounting/inventory/items/${encodeURIComponent(i.id)}`, { ...v, reorderLevel: Number(v.reorderLevel) }); return ''; }, after: AL.invAfter }); };
+AL.actions['inv-in'] = (el) => AL.busy(el, async () => {
+  const i = AL.invFind(el.dataset.id); if (!i) return; const from = await AL.invAccounts('from');
+  AL.form({ title: `Receive ${i.skuNumber}`, sub: `${Number(i.quantityOnHand)} ${i.unitOfMeasure || ''} on hand at ${AL.money(i.costOfPurchase)}`, submitLabel: 'Receive', doneTitle: 'Stock received', fields: [
+    { k: 'quantity', label: 'Quantity', type: 'number', min: 0, step: 'any', required: true }, { k: 'unitCost', label: 'Unit cost', type: 'number', min: 0.01, step: '0.01', required: true },
+    { k: 'contraAccountId', label: 'Came from', type: 'select', required: true, options: from }, { k: 'reference', label: 'Reference (GRN, invoice)' },
+  ], initial: { unitCost: Number(i.costOfPurchase) || '' },
+  onSubmit: async (v) => AL.invDone(await AL.post('/accounting/inventory/movements', { itemId: i.id, movementType: 'IN', quantity: Number(v.quantity), unitCost: Number(v.unitCost), contraAccountId: v.contraAccountId, reference: v.reference || null, description: v.reference ? `Received · ${v.reference}` : 'Received' })), after: AL.invAfter });
+});
+AL.actions['inv-out'] = (el) => AL.busy(el, async () => {
+  const i = AL.invFind(el.dataset.id); if (!i) return; const to = await AL.invAccounts('to');
+  AL.form({ title: `Issue ${i.skuNumber}`, sub: `${Number(i.quantityOnHand)} ${i.unitOfMeasure || ''} on hand, issued at ${AL.money(i.costOfPurchase)} each`, submitLabel: 'Issue', doneTitle: 'Stock issued', fields: [
+    { k: 'quantity', label: 'Quantity', type: 'number', min: 0, step: 'any', required: true }, { k: 'contraAccountId', label: 'Charged to', type: 'select', required: true, options: to }, { k: 'description', label: 'Used for', required: true, wide: true },
+  ], initial: { contraAccountId: AL.invDefault(to, '5005') },
+  validate: (v) => (Number(v.quantity) > Number(i.quantityOnHand) ? `Only ${Number(i.quantityOnHand)} on hand.` : ''),
+  onSubmit: async (v) => AL.invDone(await AL.post('/accounting/inventory/movements', { itemId: i.id, movementType: 'OUT', quantity: Number(v.quantity), contraAccountId: v.contraAccountId, description: v.description })), after: AL.invAfter });
+});
+AL.actions['inv-count'] = (el) => AL.busy(el, async () => {
+  const i = AL.invFind(el.dataset.id); if (!i) return; const vr = await AL.invAccounts('variance');
+  AL.form({ title: `Count ${i.skuNumber}`, sub: `${Number(i.quantityOnHand)} ${i.unitOfMeasure || ''} on the books at ${AL.money(i.costOfPurchase)} each`, submitLabel: 'Book the difference', doneTitle: 'Count booked', fields: [
+    { k: 'counted', label: 'Counted quantity', type: 'number', min: 0, step: 'any', required: true }, { k: 'contraAccountId', label: 'Difference to', type: 'select', required: true, options: vr }, { k: 'reason', label: 'Reason', required: true, wide: true },
+  ], initial: { contraAccountId: AL.invDefault(vr, '5095') },
+  validate: (v) => (Number(v.counted) === Number(i.quantityOnHand) ? 'The count agrees with the books; nothing to book.' : ''),
+  onSubmit: async (v) => { const d = Math.round((Number(v.counted) - Number(i.quantityOnHand)) * 10000) / 10000; return AL.invDone(await AL.post('/accounting/inventory/adjustments', { itemId: i.id, quantity: d, reason: v.reason, contraAccountId: v.contraAccountId })); }, after: AL.invAfter });
+});
+AL.actions['inv-item-moves'] = (el) => AL.busy(el, async () => {
+  const i = AL.invFind(el.dataset.id); if (!i) return;
+  const list = await AL.get(`/accounting/inventory/movements?itemId=${encodeURIComponent(i.id)}&limit=200`);
+  AL.form({ title: `${i.skuNumber} · movements`, sub: i.itemName, wide: true, viewOnly: true, submitLabel: 'Close', fields: [], extra: `<div class="al-wide">${AL.invMovesTable(list || [])}</div>`, onSubmit: async () => false });
+});
+
+} catch (e) { if (window.console) console.error("[acc-live] 98-inventory.js failed to load", e); }
+/* ---- accounting-live/99-compliance.js ---- */
+try {
+/* Compliance & Tax: /accounting/tax — the VAT return from the ledger (output tax on 2100, input tax on 1101, posted
+ * journals only; drafts carrying VAT shown apart; one currency at a time) with every contributing line, and the tax
+ * return packs (CIT, VAT, withholding, audit file): prepare, compile from the ledger, submit for review, and sign off by
+ * a checker other than the preparer (a CIT sign-off raises the tax accrual journal). Data: /vat/report,
+ * /tax-return-packs/*. */
+AL.ui.tax = AL.ui.tax || { tab: 'vat', period: '', currencyId: '' };
+AL.taxQuarter = () => { const [y, m] = AL.stiToday().split('-').map(Number); const q = Math.floor((m - 1) / 3); return q === 0 ? `${y - 1}-Q4` : `${y}-Q${q}`; };
+AL.taxRange = (p) => {
+  const [y, part] = p.split('-');
+  if (/^Q\d$/.test(part)) { const q = Number(part[1]); const sm = (q - 1) * 3 + 1, em = q * 3; return [`${y}-${String(sm).padStart(2, '0')}-01`, `${y}-${String(em).padStart(2, '0')}-${String(new Date(Date.UTC(Number(y), em, 0)).getUTCDate()).padStart(2, '0')}`]; }
+  const mo = Number(part); return [`${y}-${part}-01`, `${y}-${part}-${String(new Date(Date.UTC(Number(y), mo, 0)).getUTCDate()).padStart(2, '0')}`];
+};
+AL.TRP_REGIME = { ZIMRA_CIT: 'Corporate income tax', ZIMRA_VAT: 'VAT', ZIMRA_WHT: 'Withholding tax', ZIMRA_SAFT: 'Audit support file' };
+AL.TRP_STATUS = { DRAFT: ['Draft', 'info'], COMPILING: ['Compiling', 'warn'], DRAFT_REVIEW: ['Compiled', 'warn'], SIGNED_OFF: ['Signed off', 'ok'], FAILED: ['Compile failed', 'bad'] };
+
+AL.page('compliance', () => {
+  AL.meLoad();
+  const u = AL.ui.tax; if (!u.period) u.period = AL.taxQuarter();
+  const canPrep = AL.can('manage_accounting');
+  const head = AL.head('Reporting and compliance', 'Compliance & Tax', '', u.tab === 'packs' && canPrep ? AL.btn('New tax return pack', 'trp-new', 'primary') : u.tab === 'vat' ? AL.btn('Export CSV', 'vat-csv') : '');
+  const tabs = `<div class="v28-tabbar">${[['vat', 'VAT return'], ['packs', 'Tax return packs']].map(([id, l]) => `<button class="v28-tab ${u.tab === id ? 'active' : ''}" data-al="tax-tab" data-t="${id}">${l}</button>`).join('')}</div>`;
+  return `<div class="v28-page">${head}${tabs}${u.tab === 'vat' ? AL.taxVat() : AL.taxPacks()}</div>`;
+});
+AL.taxVat = () => {
+  const u = AL.ui.tax;
+  const cur = AL.res('tax-cur', () => AL.get('/accounting/currencies'));
+  const [from, to] = AL.taxRange(u.period);
+  const key = `tax-vat:${from}:${to}:${u.currencyId}`;
+  const e = AL.res(key, () => AL.get(`/vat/report?startDate=${from}&endDate=${to}${u.currencyId ? `&currencyId=${encodeURIComponent(u.currencyId)}` : ''}`));
+  // the last eight quarters to the current one
+  const periods = []; { let [cy, cm] = AL.stiToday().split('-').map(Number); let cq = Math.ceil(cm / 3); for (let i = 0; i < 8; i++) { periods.push([`${cy}-Q${cq}`, `Q${cq} ${cy}`]); cq--; if (!cq) { cq = 4; cy--; } } }
+  const months = []; for (let i = 0; i < 18; i++) { const d = new Date(Date.UTC(Number(AL.stiToday().slice(0, 4)), Number(AL.stiToday().slice(5, 7)) - 1 - i, 1)); months.push([`${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`, d.toLocaleDateString('en-GB', { month: 'long', year: 'numeric', timeZone: 'UTC' })]); }
+  const filters = `<div class="al-filters">
+    <label class="v28-field"><span>Period</span><select class="v28-select" data-tax-f="period"><optgroup label="Quarters">${periods.map(([v, l]) => `<option value="${v}"${u.period === v ? ' selected' : ''}>${l}</option>`).join('')}</optgroup><optgroup label="Months">${months.map(([v, l]) => `<option value="${v}"${u.period === v ? ' selected' : ''}>${ae(l)}</option>`).join('')}</optgroup></select></label>
+    <label class="v28-field"><span>Currency</span><select class="v28-select" data-tax-f="currencyId"><option value="">Base currency</option>${((cur.data) || []).filter((c) => !c.isDefault).map((c) => `<option value="${ae(c.id)}"${u.currencyId === c.id ? ' selected' : ''}>${ae(c.code)}</option>`).join('')}</select></label>
+  </div>`;
+  const g = AL.gate(e, { key, errorTitle: 'The VAT return could not be built' });
+  if (g) return `${filters}${g}`;
+  const d = e.data || {}, c = d.currency || '';
+  const s = d.summary || {};
+  const kpis = AL.kpis([
+    ['Output tax', AL.money(s.totalOutputTax, c), `${(d.outputTax && d.outputTax.transactionCount) || 0} lines · ${d.accounts ? d.accounts.output : ''}`],
+    ['Input tax', AL.money(s.totalInputTax, c), `${(d.inputTax && d.inputTax.transactionCount) || 0} lines · ${d.accounts ? d.accounts.input : ''}`],
+    [s.netLiability >= 0 ? 'Payable to ZIMRA' : 'Refundable', AL.money(Math.abs(s.netLiability || 0), c), `${AL.date(from)} – ${AL.date(to)}`, s.netLiability > 0 ? '#f79009' : '#12b76a'],
+    ['Drafts carrying VAT', String((d.drafts && d.drafts.journals) || 0), d.drafts && d.drafts.journals ? `Output ${AL.money(d.drafts.outputTax, c)} · input ${AL.money(d.drafts.inputTax, c)}, not in the return until posted` : 'None', d.drafts && d.drafts.journals ? '#f79009' : undefined],
+  ]);
+  const others = (d.otherCurrencies || []).length ? `<div class="al-state al-note">${d.otherCurrencies.map((o) => `${ae(o.currency)}: output ${ae(AL.money(o.outputTax, o.currency))}, input ${ae(AL.money(o.inputTax, o.currency))}`).join(' · ')} — returned separately; choose the currency above.</div>` : '';
+  const lines = (list) => (list || []).map((t) => `<tr><td>${ae(AL.date(t.date))}</td><td>${ae(t.type)}</td><td><strong>${ae(t.reference || '')}</strong>${t.customerName ? `<span class="v28-sub">${ae(t.customerName)}</span>` : ''}</td><td class="al-wrap">${ae(t.description || '')}</td><td class="num">${ae(AL.money(t.amount, c))}</td><td class="num">${ae(AL.money(t.vatAmount, c))}</td></tr>`).join('');
+  const out = lines(d.outputTax && d.outputTax.transactions), inp = lines(d.inputTax && d.inputTax.transactions);
+  return `${filters}${kpis}${others}${AL.panel('Output tax', 'Every posted line on the VAT output account', out ? AL.table(['Date', 'Source', 'Reference', 'Description', 'Document', 'VAT'], out, '980px') : AL.empty('No output tax in this period.'))}${AL.panel('Input tax', 'Every posted line on the VAT input account', inp ? AL.table(['Date', 'Source', 'Reference', 'Description', 'Document', 'VAT'], inp, '980px') : AL.empty('No input tax in this period.'))}`;
+};
+AL.taxPacks = () => {
+  const e = AL.res('trp', () => AL.get('/tax-return-packs'));
+  const g = AL.gate(e, { key: 'trp', errorTitle: 'Tax return packs could not be loaded' });
+  if (g) return g;
+  const list = (e.data || []).slice().sort((a, b) => String(b.periodEnd).localeCompare(String(a.periodEnd)));
+  const me = AL.me();
+  const checker = /chief financial|cfo|admin/i.test(me.role || '');
+  const rows = list.map((p) => {
+    const st = AL.TRP_STATUS[p.status] || [p.status, 'info'];
+    const maker = p.compiledById || p.submittedById || p.createdById;
+    const acts = [AL.btn('Open', 'trp-open', 'small', `data-id="${ae(p.id)}"`)];
+    if (AL.can('manage_accounting') && ['DRAFT', 'DRAFT_REVIEW', 'FAILED'].includes(p.status) && !p.submittedById) acts.push(AL.btn(p.status === 'DRAFT' || p.status === 'FAILED' ? 'Compile' : 'Recompile', 'trp-compile', 'small', `data-id="${ae(p.id)}"`));
+    if (AL.can('manage_accounting') && p.status === 'DRAFT_REVIEW' && !p.submittedById) acts.push(AL.btn('Submit for review', 'trp-submit', 'small primary', `data-id="${ae(p.id)}"`));
+    if (checker && p.status === 'DRAFT_REVIEW' && p.submittedById && maker !== me.id) acts.push(AL.btn('Sign off', 'trp-sign', 'small primary', `data-id="${ae(p.id)}"`));
+    if (p.packPdfUrl) acts.push(`<a class="v28-btn small" href="${ae(p.packPdfUrl)}" target="_blank" rel="noopener">PDF</a>`);
+    const liab = p.taxRegime === 'ZIMRA_VAT' ? p.vatNetPayable : p.totalTaxLiability;
+    return `<tr>
+      <td><strong>${ae(AL.TRP_REGIME[p.taxRegime] || p.taxRegime)}</strong><span class="v28-sub">${ae(p.forecastEntity ? p.forecastEntity.name : '')}</span></td>
+      <td>${ae(p.taxPeriod === 'ANNUAL' ? `Year ${p.taxYear}` : `${p.taxPeriod} ${p.taxYear}`)}<span class="v28-sub">${ae(AL.date(p.periodStart))} – ${ae(AL.date(p.periodEnd))}</span></td>
+      <td class="num">${liab != null ? ae(AL.money(liab, p.baseCurrency)) : '—'}</td>
+      <td>${AL.status(p.submittedById && p.status === 'DRAFT_REVIEW' ? 'Waiting for sign-off' : st[0], p.submittedById && p.status === 'DRAFT_REVIEW' ? 'warn' : st[1])}${p.status === 'FAILED' && p.errorMessage ? `<span class="v28-sub al-bad">${ae(String(p.errorMessage).slice(0, 120))}</span>` : ''}</td>
+      <td class="al-actions">${acts.join('')}</td>
+    </tr>`;
+  }).join('');
+  return AL.panel('Tax return packs', '', rows ? AL.table(['Return', 'Period', 'Liability', 'Status', ''], rows, '1000px') : AL.empty('No tax return packs yet.'));
+};
+AL.wire.compliance = () => { document.querySelectorAll('[data-tax-f]').forEach((el) => { if (el.dataset.wired) return; el.dataset.wired = '1'; el.addEventListener('change', () => { AL.ui.tax[el.dataset.taxF] = el.value; AL.redraw(); }); }); };
+AL.actions['tax-tab'] = (el) => { AL.ui.tax.tab = el.dataset.t; AL.redraw(); };
+AL.trpReload = () => { delete AL.cache.trp; AL.redraw(); };
+AL.trpFind = (id) => ((AL.cache.trp && AL.cache.trp.data) || []).find((p) => p.id === id);
+AL.actions['vat-csv'] = () => {
+  const u = AL.ui.tax, [from, to] = AL.taxRange(u.period);
+  const e = AL.cache[`tax-vat:${from}:${to}:${u.currencyId}`]; if (!e || !e.data) return;
+  const d = e.data, rows = [];
+  for (const [kind, list] of [['Output', d.outputTax && d.outputTax.transactions], ['Input', d.inputTax && d.inputTax.transactions]]) for (const t of list || []) rows.push([kind, t.date, t.type, t.reference, t.description, t.amount, t.vatAmount, d.currency]);
+  AL.csv(`vat-return-${from}-to-${to}.csv`, [['Tax', 'Date', 'Source', 'Reference', 'Description', 'Document amount', 'VAT', 'Currency'], ...rows]);
+};
+AL.actions['trp-new'] = (el) => AL.busy(el, async () => {
+  const ents = await AL.get('/forecast-entities').catch(() => []);
+  const y = Number(AL.stiToday().slice(0, 4));
+  AL.form({ title: 'New tax return pack', submitLabel: 'Create', doneTitle: 'Pack created', fields: [
+    { k: 'taxRegime', label: 'Return', type: 'select', required: true, blank: false, options: Object.entries(AL.TRP_REGIME).map(([v, l]) => ({ value: v, label: l })) },
+    { k: 'forecastEntityId', label: 'Entity', type: 'select', required: true, blank: false, options: (ents || []).filter((x) => x.is_active !== false).map((x) => ({ value: x.id, label: x.name })) },
+    { k: 'taxYear', label: 'Tax year', type: 'number', min: 2000, max: 2100, step: '1', required: true },
+    { k: 'taxPeriod', label: 'Period', type: 'select', required: true, blank: false, options: [['Q1', 'Q1'], ['Q2', 'Q2'], ['Q3', 'Q3'], ['Q4', 'Q4'], ['ANNUAL', 'Full year']].map(([v, l]) => ({ value: v, label: l })) },
+  ], initial: { taxRegime: 'ZIMRA_VAT', taxYear: y, taxPeriod: `Q${Math.max(1, Math.ceil(Number(AL.stiToday().slice(5, 7)) / 3) - 1)}`, forecastEntityId: ((ents || []).find((x) => x.is_default) || (ents || [])[0] || {}).id },
+  onSubmit: async (v) => { await AL.post('/tax-return-packs', { ...v, taxYear: Number(v.taxYear), baseCurrency: 'USD' }); return 'Compile it to pull the figures from the ledger.'; }, after: () => AL.trpReload() });
+});
+AL.actions['trp-compile'] = (el) => AL.busy(el, async () => { const r = await AL.post(`/tax-return-packs/${encodeURIComponent(el.dataset.id)}/compile`, {}); AL.trpReload(); return r; }, ['Compiled', (r) => (r && r.status === 'FAILED' ? `Failed: ${r.errorMessage || ''}` : 'Figures pulled from the ledger.')]);
+AL.actions['trp-submit'] = (el) => AL.busy(el, async () => { await AL.post(`/tax-return-packs/${encodeURIComponent(el.dataset.id)}/submit-review`, {}); AL.trpReload(); }, ['Submitted', 'A checker other than you signs it off.']);
+AL.actions['trp-sign'] = (el) => { const p = AL.trpFind(el.dataset.id); if (!p) return; AL.confirm({ title: `Sign off ${AL.TRP_REGIME[p.taxRegime] || p.taxRegime} ${p.taxPeriod} ${p.taxYear}`, confirmLabel: 'Sign off', doneTitle: 'Signed off', body: `The pack is locked and its PDF sealed.${p.taxRegime === 'ZIMRA_CIT' ? ' The tax accrual journal is raised for posting.' : ''}`, onConfirm: async () => { await AL.post(`/tax-return-packs/${encodeURIComponent(p.id)}/sign-off`, {}); return ''; }, after: () => AL.trpReload() }); };
+AL.actions['trp-open'] = (el) => AL.busy(el, async () => {
+  const id = el.dataset.id; const p = AL.trpFind(id); if (!p) return;
+  const [rec, aud] = await Promise.all([AL.get(`/tax-return-packs/${encodeURIComponent(id)}/reconciliation`).catch(() => []), AL.get(`/tax-return-packs/${encodeURIComponent(id)}/audit`).catch(() => [])]);
+  const recRows = (rec || []).map((l) => `<tr><td>${ae(l.lineLabel || l.lineCode)}</td><td class="num">${ae(AL.money(l.glBalance, l.currencyCode))}</td><td class="num">${Number(l.taxAdjustment) ? ae(AL.money(l.taxAdjustment, l.currencyCode)) : '—'}</td><td>${ae(l.taxCategory || '')}</td></tr>`).join('');
+  const EV = { PACK_CREATED: 'Created', COMPILE_STARTED: 'Compiling', COMPILED: 'Compiled', COMPILE_FAILED: 'Compile failed', LINE_OVERRIDE: 'Line adjusted', SUBMITTED_REVIEW: 'Submitted for review', SIGNED_OFF: 'Signed off', GL_POSTED: 'Tax journal raised', PORTAL_PUBLISHED: 'Published' };
+  const audRows = (aud || []).map((a) => `<tr><td>${ae(AL.dateTime(a.createdAt))}</td><td>${ae(EV[a.eventType] || a.eventType)}</td><td class="al-wrap">${ae(a.details ? JSON.stringify(a.details).slice(0, 140) : '')}</td></tr>`).join('');
+  AL.form({ title: `${AL.TRP_REGIME[p.taxRegime] || p.taxRegime} · ${p.taxPeriod === 'ANNUAL' ? `Year ${p.taxYear}` : `${p.taxPeriod} ${p.taxYear}`}`, sub: `${AL.date(p.periodStart)} – ${AL.date(p.periodEnd)}${p.packPdfSha256 ? ` · PDF SHA-256 ${p.packPdfSha256.slice(0, 16)}…` : ''}`, wide: true, viewOnly: true, submitLabel: 'Close', fields: [],
+    extra: `<div class="al-wide"><h4>Ledger to return</h4>${recRows ? AL.table(['Line', 'Ledger', 'Tax adjustment', 'Category'], recRows, '640px') : AL.empty('Not compiled yet.')}<h4>History</h4>${audRows ? AL.table(['When', 'What', 'Detail'], audRows, '640px') : AL.empty('Nothing yet.')}</div>`, onSubmit: async () => false });
+});
+
+} catch (e) { if (window.console) console.error("[acc-live] 99-compliance.js failed to load", e); }
+} catch (e) { if (window.console) console.error("[acc-live] layer failed to load", e); }
+/* END_AC52_ACC_LIVE */
   api = {
     setPage(page) {
       if (typeof permittedPage === 'function' && !permittedPage(page)) return;

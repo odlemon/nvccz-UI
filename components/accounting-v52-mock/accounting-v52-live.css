@@ -1,0 +1,59 @@
+/* Accounting live layer (scripts/accounting-live): states, busy controls and a few layout helpers, on the runtime's v28 look. */
+.accounting-v52-root .al-state { border: 1px solid #e4e7ec; border-radius: 12px; background: #fff; padding: 16px 18px; margin: 12px 0; color: #344054; }
+.accounting-v52-root .al-state strong { display: block; margin-bottom: 4px; color: #101828; }
+.accounting-v52-root .al-state p { margin: 0 0 10px; }
+.accounting-v52-root .al-state.al-error { border-color: #fda29b; background: #fffbfa; }
+.accounting-v52-root .al-state.al-denied { border-color: #fec84b; background: #fffcf5; }
+.accounting-v52-root .al-empty, .accounting-v52-root .al-empty-cell { color: #667085; padding: 18px; text-align: center; }
+.accounting-v52-root .al-wrap { white-space: normal; max-width: 360px; }
+.accounting-v52-root .al-actions { white-space: nowrap; }
+.accounting-v52-root .al-actions .v28-btn + .v28-btn { margin-left: 6px; }
+.accounting-v52-root .v28-table td .v28-sub { display: block; margin-top: 2px; }
+.accounting-v52-root .al-wide { grid-column: 1 / -1; }
+.accounting-v52-root .al-check { display: flex; align-items: center; gap: 8px; }
+.accounting-v52-root .al-form-error { margin: 12px 0 0; padding: 10px 12px; border-radius: 10px; border: 1px solid #fda29b; background: #fef3f2; color: #b42318; font-size: 13px; }
+.accounting-v52-root .al-modal-wide { width: min(980px, 94vw); max-width: 980px; }
+.accounting-v52-root .al-busy { position: relative; opacity: 0.6; pointer-events: none; }
+.accounting-v52-root .al-busy::after { content: ""; position: absolute; top: 50%; left: 50%; width: 14px; height: 14px; margin: -7px 0 0 -7px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: al-spin 0.7s linear infinite; }
+@keyframes al-spin { to { transform: rotate(360deg); } }
+/* a small per-day bar chart (Short-Term Investments: interest earned this month) */
+.accounting-v52-root .al-bars { display: flex; align-items: flex-end; gap: 3px; height: 160px; padding: 8px 4px 0; border-bottom: 1px solid #e4e7ec; }
+.accounting-v52-root .al-bar { flex: 1 1 0; min-width: 3px; height: var(--h); background: #0878f6; border-radius: 3px 3px 0 0; opacity: 0.85; }
+.accounting-v52-root .al-bar:hover { opacity: 1; }
+.accounting-v52-root .al-bar.neg { background: #d92d20; }
+.accounting-v52-root .al-bar.zero { height: 2px; background: #d0d5dd; }
+.accounting-v52-root .al-bars-axis { display: flex; justify-content: space-between; margin-top: 6px; font-size: 12px; color: #667085; }
+/* registers: filter row, pager, totals, the journal line editor */
+.accounting-v52-root .al-filters { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; margin: 12px 0; }
+.accounting-v52-root .al-filters .v28-field { min-width: 160px; }
+.accounting-v52-root .al-filters .al-grow { flex: 1 1 240px; }
+.accounting-v52-root .al-pager { display: flex; gap: 8px; align-items: center; justify-content: flex-end; margin-top: 10px; }
+.accounting-v52-root .al-total td { border-top: 2px solid #d0d5dd; }
+.accounting-v52-root .al-je-lines td { vertical-align: middle; }
+.accounting-v52-root .al-je-lines .v28-select, .accounting-v52-root .al-je-lines .v28-input { width: 100%; min-width: 0; }
+.accounting-v52-root .al-je-foot { display: flex; gap: 14px; align-items: center; margin-top: 10px; }
+.accounting-v52-root .al-ok { color: #067647; font-weight: 600; }
+.accounting-v52-root .al-bad { color: #b42318; font-weight: 600; }
+/* period close */
+.accounting-v52-root .al-inline { display: inline-flex; flex-direction: column; min-width: 180px; margin-right: 8px; vertical-align: bottom; }
+.accounting-v52-root .al-group td { background: #f9fafb; }
+.accounting-v52-root .al-listcol { display: grid; gap: 8px; }
+/* bank reconciliation: statement beside the cashbook */
+.accounting-v52-root .al-split { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+@media (max-width: 1100px) { .accounting-v52-root .al-split { grid-template-columns: 1fr; } }
+.accounting-v52-root .al-exception td { background: #fffaeb; }
+.accounting-v52-root .al-ticked td { background: #f5faff; }
+.accounting-v52-root .al-state.al-note { border-color: #fec84b; background: #fffcf5; }
+.accounting-v52-root .al-state ul { margin: 6px 0 0 18px; padding: 0; }
+.accounting-v52-root .v28-btn[disabled] { opacity: 0.5; cursor: not-allowed; }
+.accounting-v52-root .al-split .v28-table td:nth-child(2) { white-space: nowrap; }
+.accounting-v52-root .al-grid-auto { display: grid; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); gap: 16px; }
+/* statements */
+.accounting-v52-root tr.al-click { cursor: pointer; }
+.accounting-v52-root tr.al-click:hover td { background: #f5faff; }
+.accounting-v52-root .al-lvl0 td { border-top: 2px solid #d0d5dd; }
+.accounting-v52-root .al-lvl1 td { background: #fcfcfd; }
+.accounting-v52-root .al-indent { display: inline-block; width: 18px; }
+.accounting-v52-root tr.al-muted td { color: #98a2b3; }
+.accounting-v52-root .al-list { margin: 0; padding-left: 18px; display: grid; gap: 6px; }
+.accounting-v52-root .al-center { text-align: center; }

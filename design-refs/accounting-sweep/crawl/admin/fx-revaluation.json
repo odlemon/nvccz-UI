@@ -1,0 +1,21 @@
+{
+  "url": "/accounting/fx-revaluation",
+  "title": "Foreign Exchange Revaluation",
+  "headings": [
+    "Foreign Exchange Revaluation"
+  ],
+  "tabs": [],
+  "buttons": [
+    "Rate sources",
+    "Preview journal",
+    "Run revaluation",
+    "Filters 2",
+    "Filters ▴"
+  ],
+  "text": "TREASURY & REPORTING Foreign Exchange Revaluation Monitor currency exposure, validate approved rates and post unrealised or realised revaluation journals with transparent source-rate lineage. Rate sources Preview journal Run revaluation Filters 2 Monetary exposure $3,490,740 USD equivalent Unrealised gain $12,180 Current revaluation Currencies 4 Active reporting currencies Missing rates 0 All required rates available Largest movement USD/ZWG +1.65% Since prior close Journal status Draft Independent review required Filters ▴ From To Entity Group consolidated Matanho Capital Partners Growth Fund I Pension Liquidity Currency All currencies USD ZWG ZAR EUR Rate type Closing rate Daily spot Average rate USD / ZWG rate trend Approved daily closing rates for the current revaluation horizon. 1 Aug 2 3 4 5 6 7 8 9 10 11 ZWG per USD Rate monitor Latest approved rates and period movement. USD/ZWG 27.18 +1.65% vs prior close · 11 Aug 2026 USD/ZAR 18.37 -0.76% vs prior close · 11 Aug 2026 EUR/USD 1.091 +0.74% vs prior close · 11 Aug 2026 GBP/USD 1.276 +0.55% vs prior close · 11 Aug 2026 Exposure and revaluation register Select an exposure to inspect source balance, rate lineage and proposed journal. ACCOUNT / INSTRUMENT CURRENCY FCY BALANCE BOOK RATE CLOSE RATE BASE CARRYING FX MOVEMENT STATUS CBZ USD Operating USD 2,037,244 1 1 $2,037,244 $0 Ready ZiG Operating ZWG 2,450,118 0.0372 0.03679 $90,174 $990 Review EUR Vendor Account EUR 42,800 1.083 1.091 $46,695 $342 Ready ZAR Operating ZAR 384,000 0.054 0.05444 $20,905 $169 Ready USD Receivables USD 618,400 1 1 $618,400 $0 Ready Revaluation journal Balanced preview before posting. DR / CR Monetary assets & liabilities Per-account carrying-value adjustment $12,180 Unrealised FX gain / loss 6060 · Period revaluation $12,180 Difference Debit must equal credit $0",
+  "ms": 10889,
+  "console": [
+    "Failed to fetch RSC payload for http://localhost:3120/accounting/tax. Falling back to browser navigation. TypeError: Failed to fetch\n    at fetchServerResponse (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/compone"
+  ],
+  "failed": []
+}

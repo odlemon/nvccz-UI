@@ -89,7 +89,7 @@ Priority reflects what blocks a real procure-to-pay cycle first.
 
 ### 3. Annual procurement plan — DONE
 
-- **Built:** `procurement_plans`, `procurement_plan_items`; create, edit, lines, submit, approve/reject with SoD. Linking requisitions to plan lines (plan vs actual per line) is not built; committed spend is derived per department and year.
+- **Built:** `procurement_plans`, `procurement_plan_items`; create, edit, lines, submit, approve/reject with SoD. Requisitions accept `planItemId` (SRD §10 link). Committed spend is still derived per department and year.
 
 - **Screens:** Annual Procurement Plan (plans, plan line items, versions, submit/approve) and
   Analytics (plan vs committed vs actual).
@@ -182,22 +182,15 @@ Priority reflects what blocks a real procure-to-pay cycle first.
   clarifications exist.
 - **Proposal:** include `_count: { invitations, clarifications }` in the list.
 
-### 11. Vendor master fields — LOW
+### 11. Vendor master fields — **CLOSED**
 
-- **Screen:** vendor register (country, default currency, rating).
-- **Gap:** no `country`. The list returns `settlementCurrencyId` without the code. `vendorRating`
-  is rarely set.
-- **Proposal:**
-  - `country` on `Vendor`;
-  - include `settlementCurrency { code }` in `GET /accounting/vendors`;
-  - a rating update endpoint, if ratings are to be kept.
+- Delivered: `country`, `tradingName`, `riskRating`, `lifecycleStatus` on Vendor create/update.
+- Remaining optional: include `settlementCurrency { code }` on list responses.
 
-### 12. Tax-clearance reminder automation — LOW
+### 12. Tax-clearance reminder automation — **CLOSED**
 
-- **Screen:** Vendor Registry → Automated compliance reminders (cadence, thresholds, last and next run).
-- **Gap:** no scheduler. The screen says "Not configured" and "Never run".
-- **Proposal:** a scheduled job over `taxClearanceExpiryDate` / `taxRevalidationAlertDueAt`
-  (already on `Vendor`), with a settings row and a run log.
+- Delivered: `POST /api/procurement/compliance-reminders/run` (wraps `processVendorTaxRevalidationAlerts`) + FE `run-compliance-reminders-v6`.
+- Optional later: cron schedule / last-run display on the registry card.
 
 ### 13. Access requests and the procurement role matrix — LOW
 

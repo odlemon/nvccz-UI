@@ -145,9 +145,11 @@ export function startMatanhoRuntime(rootEl, options = {}) {
     return {...heroScenes[index],index};
   }
   function heroAssetForViewport(scene){
+    // Prefer 1080p on desktop — 4k (~1.2MB) loads late and causes a visible
+    // hero “second paint” flash ~1–2s after the shell is already interactive.
     if(window.matchMedia('(max-width:760px)').matches) return scene.mobile;
     if(window.matchMedia('(max-width:1180px)').matches) return scene.tablet;
-    return scene.src;
+    return scene.tablet || scene.src;
   }
   function preloadHeroScene(scene){
     const primary=new Image();
@@ -248,15 +250,57 @@ export function startMatanhoRuntime(rootEl, options = {}) {
   }
   function applySessionUser(nextUser) {
     if (!nextUser) return;
+    const nextLocation = nextUser.location || state.profile.location || "";
+    const unchanged =
+      D.user.name === nextUser.name &&
+      D.user.role === nextUser.role &&
+      D.user.email === nextUser.email &&
+      D.user.initials === nextUser.initials &&
+      (D.user.image || "") === (nextUser.image || "") &&
+      state.profile.location === nextLocation;
+    if (unchanged) return;
     D.user = { ...D.user, ...nextUser };
     state.profile = {
       ...state.profile,
       name: D.user.name,
       role: D.user.role,
       email: D.user.email,
-      location: D.user.location || state.profile.location || "",
+      location: nextLocation,
     };
-    render();
+    patchSessionChrome();
+  }
+  function patchSessionChrome() {
+    const name = D.user.name || "";
+    const role = D.user.role || "";
+    const first = D.user.firstName || name.split(" ")[0] || "User";
+    const initials = D.user.initials || "";
+    const loc = state.profile.location || D.user.location || "";
+    app.querySelectorAll(".user-chip .meta strong, .user-button .user-copy strong").forEach((el) => {
+      el.textContent = name;
+    });
+    app.querySelectorAll(".user-chip .meta span, #userRoleCopy").forEach((el) => {
+      el.textContent = role;
+    });
+    app.querySelectorAll(".user-button .avatar").forEach((el) => {
+      if (!el.querySelector("img")) el.textContent = initials;
+    });
+    app.querySelectorAll(".user-chip .avatar").forEach((el) => {
+      if (D.user.image) {
+        el.classList.add("has-photo");
+        el.innerHTML = '<img src="' + esc(D.user.image) + '" alt="' + esc(name) + '" loading="lazy"/>';
+      } else if (!el.querySelector("img")) {
+        el.textContent = initials;
+      }
+    });
+    const greet = app.querySelector(".greeting");
+    if (greet) {
+      const iconNode = greet.querySelector("svg");
+      const iconHtml = iconNode ? iconNode.outerHTML : "";
+      const period = (typeof dayInfo === "function" && dayInfo().period) || "day";
+      greet.innerHTML = "Good " + period + ", " + esc(first) + " " + iconHtml;
+    }
+    const locEl = app.querySelector(".hero-location span");
+    if (locEl && loc) locEl.textContent = loc;
   }
   function navigate(route) {
     state.route = route;
@@ -267,7 +311,7 @@ export function startMatanhoRuntime(rootEl, options = {}) {
     if (route === 'newsletters') state.newsletterMode = 'library';
     else state.newsletterMode = 'library';
     syncUrl();
-    render();
+    render({ contentOnly: true });
     try { scrollTo(0,0); } catch (_) {}
   }
   /* hashchange disabled — Next.js owns routing */
@@ -435,7 +479,7 @@ export function startMatanhoRuntime(rootEl, options = {}) {
     const scene=currentHeroScene(); preloadHeroScene(scene);
     const assistant=`<section class="card assistant-bar home-assistant-priority"><div class="assistant-orb">${icon('sparkles')}</div><div class="assistant-copy"><strong>Matanho Assistant <span class="ai-badge">AI</span></strong><span>Ask for insights, prepare meetings or turn priorities into action.</span></div><div class="assistant-suggestions"><button data-ai-prompt="Summarise my priorities for today">Today’s priorities</button><button data-ai-prompt="Prepare me for my next meeting">Prepare next meeting</button><button data-ai-prompt="What needs my attention?">Attention needed</button></div><form class="assistant-input" id="homeAssistant"><input name="prompt" placeholder="Ask anything…"/><button aria-label="Send">${icon('arrow')}</button></form></section>`;
     return `${pageHead('', '')}
-      <section class="hero" style="--hero-image-desktop:url('${scene.src}');--hero-image-tablet:url('${scene.tablet}');--hero-image-mobile:url('${scene.mobile}')">
+      <section class="hero" style="--hero-image:url('${scene.tablet || scene.src}');--hero-image-desktop:url('${scene.tablet || scene.src}');--hero-image-tablet:url('${scene.tablet}');--hero-image-mobile:url('${scene.mobile}')">
         <div class="hero-content">
           <div class="greeting">Good ${d.period}, ${D.user.firstName} ${icon(d.icon,'day-icon')}</div>
           <div class="hero-time">${d.time.replace(/\s?(AM|PM)/,'')}<span>${d.ampm}</span></div>
@@ -887,14 +931,35 @@ export function startMatanhoRuntime(rootEl, options = {}) {
       case 'home': return homeView(); case 'daily-cover': return dailyCoverView(); case 'news': return newsView(); case 'newsletters': return newslettersView(); case 'forums': return forumsView(); case 'calendar': return calendarView(); case 'my-work': return myWorkView(); case 'performance': return performanceView(); case 'people': return peopleView(); case 'my-profile': return profileView(); case 'services': return servicesView(); case 'apps': return appsView(); case 'matanho-ai': return aiView(); default: return homeView();
     }
   }
-  function render() {
+  function render(opts) {
+    opts = opts || {};
     rootEl.style.setProperty('--user-saturation',String((state.settings.saturation||118)/100));
     rootEl.dataset.coverTheme=String(state.cover.theme||'Porcelain').toLowerCase();
-    const shellClasses=[state.sidebarCollapsed?'sidebar-collapsed':'',`density-${state.settings.density||'comfortable'}`,state.settings.glass?'glass-on':'glass-off',state.settings.motion?'motion-on':'motion-off'].filter(Boolean).join(' ');
-    app.innerHTML = `<div class="app-shell ${shellClasses}">${renderSidebar()}<div class="main">${renderTopbar()}<main class="content">${viewForRoute()}</main></div></div>`;
+    const shellClasses=[state.sidebarCollapsed?'sidebar-collapsed':'','density-'+(state.settings.density||'comfortable'),state.settings.glass?'glass-on':'glass-off',state.settings.motion?'motion-on':'motion-off'].filter(Boolean).join(' ');
+    const existing = app.querySelector('.app-shell');
+    // Once the shell is mounted, only rewrite main.content unless a full shell
+    // rebuild is required (sidebar collapse / density / glass / first paint).
+    // Full app.innerHTML rewrites were the visible ~2s reload flash on every page.
+    const contentOnly = existing && !opts.full;
+    if (contentOnly) {
+      existing.className = 'app-shell ' + shellClasses;
+      existing.querySelectorAll('button.nav-item[data-nav]').forEach((btn) => {
+        btn.classList.toggle('active', btn.getAttribute('data-nav') === state.route);
+      });
+      const sidebar = existing.querySelector('aside.sidebar');
+      if (sidebar) {
+        sidebar.classList.toggle('open', !!state.mobileNav);
+        sidebar.classList.toggle('collapsed', !!state.sidebarCollapsed);
+      }
+      const content = existing.querySelector('main.content');
+      if (content) content.innerHTML = viewForRoute();
+    } else {
+      app.innerHTML = '<div class="app-shell ' + shellClasses + '">' + renderSidebar() + '<div class="main">' + renderTopbar() + '<main class="content">' + viewForRoute() + '</main></div></div>';
+    }
     closePortal();
     syncControls(); syncSessionTimer();
   }
+
   function syncControls(){
     const p=document.getElementById('performancePeriod'); if(p) p.value=state.performancePeriod;
     const nr=document.getElementById('newsletterRole'); if(nr) nr.value=state.newsletterRole;
@@ -975,8 +1040,8 @@ export function startMatanhoRuntime(rootEl, options = {}) {
     const actionNode=e.target.closest('[data-action]');
     const action=(insideStop && actionNode?.classList.contains('overlay')) ? null : actionNode?.dataset.action;
     if(action){
-      if(action==='mobile-menu'){state.mobileNav=!state.mobileNav;render();return}
-      if(action==='collapse-sidebar'||action==='profile-sidebar-toggle'){state.sidebarCollapsed=!state.sidebarCollapsed;saveState();render();return}
+      if(action==='mobile-menu'){state.mobileNav=!state.mobileNav;render({ full: true });return}
+      if(action==='collapse-sidebar'||action==='profile-sidebar-toggle'){state.sidebarCollapsed=!state.sidebarCollapsed;saveState();render({ full: true });return}
       if(action==='calendar-source'){const b=e.target.closest('[data-action="calendar-source"]'),i=Number(b?.dataset.index);if(Number.isInteger(i)){state.calendarSources[i]=!state.calendarSources[i];saveState();render()}return}
       if(action==='toggle-calendar-details'){state.calendarDetailsOpen=!state.calendarDetailsOpen;saveState();render();return}
       if(action==='hero-prev'){if(state.cover.wallpaper==='auto')state.heroOffset-=1;else state.cover.wallpaper=String((Number(state.cover.wallpaper)-1+heroScenes.length)%heroScenes.length);saveState();render();return}
@@ -1101,7 +1166,7 @@ export function startMatanhoRuntime(rootEl, options = {}) {
   document.addEventListener('submit', e => {
     e.preventDefault();
     if(e.target.id==='startDayForm'){const f=new FormData(e.target);const duration=Number(f.get('duration')||50);state.daySession={active:true,paused:false,taskId:String(f.get('taskId')||'none'),status:String(f.get('status')||'Focus mode'),durationMinutes:duration,startedAt:Date.now(),pausedRemaining:null};state.profileAvailability=state.daySession.status;saveState();emitIntegrationEvent('workday.session.started',{...state.daySession,task:selectedSessionTask()});closePortal();render();toast('Your timer is running.','success');return}
-    if(e.target.id==='settingsForm'){const f=new FormData(e.target);state.settings={...state.settings,language:f.get('language'),timezone:f.get('timezone'),density:f.get('density'),profileVisibility:f.get('profileVisibility'),saturation:Number(f.get('saturation')||118),glass:f.has('glass'),motion:f.has('motion'),autoHero:f.has('autoHero'),usageAnalytics:f.has('usageAnalytics'),calendarAlerts:f.has('calendarAlerts'),newsDigest:f.has('newsDigest'),forumMentions:f.has('forumMentions'),performanceReminders:f.has('performanceReminders')};saveState();closePortal();render();toast('Preferences saved across your workspace.','success');return}
+    if(e.target.id==='settingsForm'){const f=new FormData(e.target);state.settings={...state.settings,language:f.get('language'),timezone:f.get('timezone'),density:f.get('density'),profileVisibility:f.get('profileVisibility'),saturation:Number(f.get('saturation')||118),glass:f.has('glass'),motion:f.has('motion'),autoHero:f.has('autoHero'),usageAnalytics:f.has('usageAnalytics'),calendarAlerts:f.has('calendarAlerts'),newsDigest:f.has('newsDigest'),forumMentions:f.has('forumMentions'),performanceReminders:f.has('performanceReminders')};saveState();closePortal();render({ full: true });toast('Preferences saved across your workspace.','success');return}
     if(e.target.id==='homeAssistant'||e.target.id==='serviceAi'){const p=new FormData(e.target).get('prompt');state.aiMessages=[];navigate('matanho-ai');setTimeout(()=>aiRespond(p),50);return}
     if(e.target.id==='aiTopForm'||e.target.id==='aiComposer'){const p=new FormData(e.target).get('prompt');e.target.reset();aiRespond(p);return}
     if(e.target.id==='aiSearchForm'){const q=String(new FormData(e.target).get('query')||'').trim();if(q)toast(`Showing permission-visible results for “${q}”.`,'success');return}
@@ -1135,6 +1200,27 @@ export function startMatanhoRuntime(rootEl, options = {}) {
 
   api = {
     setRoute(route, detail = {}) {
+      const nextNews = Object.prototype.hasOwnProperty.call(detail, 'selectedNews')
+        ? detail.selectedNews
+        : state.selectedNews;
+      const nextForum = Object.prototype.hasOwnProperty.call(detail, 'forumThread')
+        ? detail.forumThread
+        : state.forumThread;
+      const nextNewsletter = (Object.prototype.hasOwnProperty.call(detail, 'selectedNewsletter') && detail.selectedNewsletter != null)
+        ? detail.selectedNewsletter
+        : state.selectedNewsletter;
+      const nextMode = (Object.prototype.hasOwnProperty.call(detail, 'newsletterMode') && detail.newsletterMode)
+        ? detail.newsletterMode
+        : state.newsletterMode;
+      if (
+        state.route === route &&
+        state.selectedNews === nextNews &&
+        state.forumThread === nextForum &&
+        state.selectedNewsletter === nextNewsletter &&
+        state.newsletterMode === nextMode
+      ) {
+        return;
+      }
       state.route = route;
       state.mobileNav = false;
       if (Object.prototype.hasOwnProperty.call(detail, 'selectedNews')) state.selectedNews = detail.selectedNews;
@@ -1145,10 +1231,7 @@ export function startMatanhoRuntime(rootEl, options = {}) {
       if (Object.prototype.hasOwnProperty.call(detail, 'newsletterMode') && detail.newsletterMode) {
         state.newsletterMode = detail.newsletterMode;
       }
-      if (route === 'news' && detail.selectedNews == null && !Object.prototype.hasOwnProperty.call(detail, 'selectedNews')) {
-        /* keep existing */
-      }
-      render();
+      render({ contentOnly: true });
     },
     setSessionUser(user) {
       applySessionUser(user);

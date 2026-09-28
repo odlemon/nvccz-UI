@@ -1,0 +1,35 @@
+{
+  "url": "/accounting/assets",
+  "title": "Fixed Assets",
+  "headings": [
+    "Own the complete lifecycle.",
+    "Net book value trajectory",
+    "Asset age and control attention",
+    "Fixed Assets",
+    "Asset lifecycle",
+    "Fixed asset register",
+    "Finance control queue"
+  ],
+  "tabs": [],
+  "buttons": [
+    "Add fixed asset",
+    "Run depreciation",
+    "Overview",
+    "Asset register",
+    "Depreciation",
+    "Additions & CIP",
+    "Custody & verification",
+    "Impairment & valuation",
+    "Disposals",
+    "Preview",
+    "Open custody",
+    "Open additions",
+    "Review"
+  ],
+  "text": "ASSET INTELLIGENCE Own the complete lifecycle. Capitalisation, custody, depreciation, insurance, impairment and disposal are visible as one controlled asset story. 88% portfolio physical verification coverage 2 due 97% insured CARRYING VALUE Net book value trajectory Portfolio NBV 1254$k 627$k 0$k Aug Oct Dec Feb Apr Jun LIFECYCLE MIX Asset age and control attention 0–2 years 54% 3–5 years 28% 5+ years 18% Impairment review 2 assets FIXED ASSET SUB-LEDGER Fixed Assets Manage capitalisation, depreciation, custody, impairment and disposal through one controlled lifecycle rather than disconnected registers. Add fixed asset Run depreciation Overview Asset register Depreciation Additions & CIP Custody & verification Impairment & valuation Disposals Gross carrying cost $2,400.00 Asset register Net book value $2,400.00 After accumulated depreciation Accumulated depreciation $0.00 Current register CIP $274.4k 3 projects not yet in service Control attention 4 Verification, transfer and valuation Search Class All classes Office Equipment From To Status All statuses Active Transfer pending Disposed Asset lifecycle A controlled path from acquisition evidence to depreciation, physical verification and eventual disposal. 1 Acquire PO, invoice, funding 2 Capitalise Tag, class, GL mapping 3 Custody Location and owner 4 Depreciate Scheduled journal 5 Verify Physical evidence 6 Dispose Approval and gain/loss Fixed asset register Select an asset for depreciation schedule, custody, evidence, maintenance and lifecycle actions. ASSET CLASS LOCATION CUSTODIAN COST ACCUM. DEP. NBV USEFUL LIFE STATUS cmtr18ttx001pung0ltt08uik Audit verification test laptop Office Equipment Harare HQ Unassigned $2,400.00 $0.00 $2,400.00 4 years Active Finance control queue Only actions that affect stewardship, valuation or the accounting record. Depreciation run $31.9k July run ready for review and posting. Preview Physical verification 2 assets need current evidence before close. Open custody CIP commissioning $34.8k awaits in-service certificate. Open additions Valuation review 2 impairment indicators need assessment. Review",
+  "ms": 10428,
+  "console": [
+    "Failed to fetch RSC payload for http://localhost:3120/accounting/expenses. Falling back to browser navigation. TypeError: Failed to fetch\n    at fetchServerResponse (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/client/co"
+  ],
+  "failed": []
+}

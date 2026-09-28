@@ -22,6 +22,14 @@ const PUBLIC_ROUTE_PREFIXES = [
   '/applications/form',
   '/funding-application',
   '/vendor-quotations',
+  // Client-design ports that middleware allows without a session (STAFF_PUBLIC_PASS_THROUGH).
+  // Topbar notification polls can 401 here; must not hard-redirect to /login (looks like a reload flash).
+  '/home',
+  '/portfolio',
+  '/payroll',
+  '/accounting',
+  '/procurement',
+  '/fundraising-kyc',
 ]
 
 const isOnPublicRoute = (): boolean => {
@@ -131,8 +139,9 @@ class ApiClient {
         }
       }
 
+      // several routers answer { success:false, error:"…" } rather than { message } — surface either
       throw new ApiError(
-        errorData.message || `HTTP error! status: ${response.status}`,
+        errorData.message || (typeof errorData.error === 'string' ? errorData.error : '') || `HTTP error! status: ${response.status}`,
         response.status,
         errorData
       )

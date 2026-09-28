@@ -7,6 +7,8 @@ Faster than full `deploy-arcus-docker-vps.py` / `rebuild-arcus-ui.py`:
   - Rebuilds only the portal service(s) you ask for (default: detect or ui-staff)
   - Never touches demo/prod stacks
   - Skips API/MySQL/upload unless --api is passed
+  - When --api: after API image build (before recreate), runs idempotent
+    `db:migrate:nts-remaining` (vendor §8 + users §7 + other NTS gap DDL)
   - Snapshots the running image tag before rebuild for quick rollback
 
 Usage (from nvccz-new repo root):
@@ -14,7 +16,7 @@ Usage (from nvccz-new repo root):
   python scripts/deploy-arcus-dev-selective.py --portals staff
   python scripts/deploy-arcus-dev-selective.py --portals staff,lp
   python scripts/deploy-arcus-dev-selective.py --detect          # print detection only
-  python scripts/deploy-arcus-dev-selective.py --api             # also rebuild API
+  python scripts/deploy-arcus-dev-selective.py --api             # also rebuild API + NTS remaining DDL
   python scripts/deploy-arcus-dev-selective.py --rollback staff  # restore pre-deploy image
 
 Portal map (compose service → host):
@@ -325,6 +327,15 @@ export DOCKER_BUILDKIT=1
 export BUILDKIT_PROGRESS=plain
 # Build first (plain logs), then recreate — avoids flaky SSH PTY drown-outs
 $COMPOSE build $SERVICES
+# NTS remaining gap DDL (vendors.country, users approval fields, etc.) must run
+# before the new API serves traffic that selects those Prisma columns. Same
+# pattern as nvccz NTS prod api-only deploy (migrate via new image), scoped to
+# the fast idempotent script — not full db:migrate:all (entrypoint still skips
+# schema sync on every boot).
+if echo " $SERVICES " | grep -q " api "; then
+  echo '=== NTS remaining gap DDL (db:migrate:nts-remaining, idempotent) ==='
+  $COMPOSE run --rm --no-deps api npm run db:migrate:nts-remaining
+fi
 $COMPOSE up -d --no-deps --force-recreate $SERVICES
 echo '=== status ==='
 $COMPOSE ps

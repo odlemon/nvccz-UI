@@ -1,0 +1,31 @@
+{
+  "url": "/accounting/reports",
+  "title": "Financial Reports & Statement Builder",
+  "headings": [
+    "Financial Reports & Statement Builder",
+    "Multi-currency reporting",
+    "Income Statement"
+  ],
+  "tabs": [],
+  "buttons": [
+    "Consolidated view",
+    "Multi-currency",
+    "Preview report",
+    "Export Excel",
+    "Send for approval",
+    "Filters",
+    "Add exchange rate",
+    "Apply reporting currency",
+    "2026 actuals only",
+    "2026 · 2025 · 2024 comparison",
+    "Sign here Farai Mapfumo Prepared by · Financial Co",
+    "Sign here Tariro Moyo Reviewed by · Finance Direct",
+    "Sign here Tinashe Matanho Approved by · Authorised"
+  ],
+  "text": "FINANCIAL REPORTING Financial Reports & Statement Builder Build, investigate, preview, sign and distribute industry-standard financial statements from the controlled ledger. Consolidated view Multi-currency Preview report Export Excel Send for approval Reporting range 2026-07-01 → 2026-07-31 Calendar-controlled date range Actual revenue -$391,950.00 2026 current period Operating profit -$1,099,883.97 280.6% margin Report integrity Balanced Trial balance difference $0 Open commentary 4 Assigned to owners Signature status 0/3 Required management signatories Reporting currency USD ZWG ZAR Functional currency Income statement uses average rates; balance-sheet items use the closing rate for the selected end date. Filters Multi-currency reporting Presentation currency, effective-dated rate evidence and translation method are controlled independently from the underlying ledger currency. Add exchange rate Functional currency USD Presentation currency USD ZWG ZAR EUR GBP Rate date Display Presentation currency only Functional + presentation Translation policy IAS 21 policy Closing rate Period average Custom approved rate Apply reporting currency Approved rate register USD/ZWG · Verified 26.877600 2026-07-27 · Reserve Bank of Zimbabwe snapshot ZAR/USD · Verified 0.055200 2026-07-31 · Treasury rate table Income statement translation may use an average rate; balance-sheet monetary items use the selected closing/effective rate. Source and date remain visible in the controlled report. 2 rates 2026 actuals only 2026 · 2025 · 2024 comparison Actual calendar years and visible statement totals are used throughout. Income Statement Revenue, cost and profitability for the selected reporting scope. Approved Statement of Financial Position Assets, liabilities and equity with complete ledger drill-down. In review Cash Flow Statement Operating, investing and financing cash movement. Draft Trial Balance Account-level debit and credit integrity. Approved Budget versus Actual Actual results compared with approved budgets. In review Branch Performance Branch and business-unit operating performance. Draft Board Finance Pack Executive finance pack with statements, risk and commentary. Pending approval Fund NAV & Investor Capital Closing NAV, subscriptions, redemptions, fair-value movement and investor capital bridge. Draft Client Mandate Performance Opening market value, flows, income, realised/unrealised gains, fees and closing market value. Draft Portfolio Valuation & Fair Value Bridge Cost, additions, disposals, realised gains and unrealised fair-value movements. Draft PE Capital Calls & Distributions Called capital, funded capital, distributions, recallable amounts and unfunded commitments. Draft Management Fees & Carried Interest Management fees, offsets, fund expenses, carry accrual and carry paid. Draft Portfolio Company Monitoring Revenue, EBITDA, net debt, enterprise value, equity value and invested capital. Draft Liquidity & Commitment Coverage Cash, liquid investments, facilities, near-term obligations and unfunded commitments. Draft Fund FX Exposure & Translation Currency exposure, translation impacts and realised/unrealised FX movements. Draft Investor Capital Account Statement Opening capital, contributions, allocated results, fees, distributions and closing capital. Draft matanho. Finance and Investment Management Matanho Capital Partners Controlled financial report Generated 27 Sept,2026 Income Statement 01 Jul,2026 to 31 Jul,2026 · Matanho Capital Partners · USD Version 9 Draft controlled copy Prepared under IFRS basis LINE ITEM 2026 ACTUAL 2025 ACTUAL 2024 ACTUAL 2026 VS 2025 4000 · Sales RevenueShow contributing transactions $8,050.00 $0.00 $0.00 — 4100 · Dividend IncomeShow contributing transactions -$400,000.00 $0.00 $0.00 — Total revenueShow contributing transactions -$391,950.00 $0.00 $0.00 — 5010 · Payroll Expense (Gross Pay)Show contributing transactions $707,933.97 $0.00 $0.00 — Total expensesShow contributing transactions $707,933.97 $0.00 $0.00 — Profit before taxShow contributing transactions -$1,099,883.97 $0.00 $0.00 — Profit before tax -$1,099,883.97 2026 actual 2025 comparative $0.00 Prior actual year 2024 comparative $0.00 Two-year actual Movement 0.0% 2026 versus 2025 Sign here Farai Mapfumo Prepared by · Financial Controller Select your name to sign Sign here Tariro Moyo Reviewed by · Finance Director Select your name to sign Sign here Tinashe Matanho Approved by · Authorised executive Select your name to sign",
+  "ms": 11754,
+  "console": [
+    "Failed to fetch RSC payload for http://localhost:3120/accounting/consolidation. Falling back to browser navigation. TypeError: Failed to fetch\n    at fetchServerResponse (webpack-internal:///(app-pages-browser)/./node_modules/next/dist/clie"
+  ],
+  "failed": []
+}

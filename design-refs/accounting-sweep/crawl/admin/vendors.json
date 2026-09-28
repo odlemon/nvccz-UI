@@ -1,0 +1,17 @@
+{
+  "url": "/accounting/vendors",
+  "title": "404",
+  "headings": [
+    "404",
+    "This page could not be found."
+  ],
+  "tabs": [],
+  "buttons": [],
+  "text": "404 This page could not be found.",
+  "ms": 127344,
+  "console": [
+    "API request failed: TypeError: Failed to fetch\n    at ApiClient.makeRequest (webpack-internal:///(app-pages-browser)/./lib/api/api-client.ts:153:36)\n    at ApiClient.get (webpack-internal:///(app-pages-browser)/./lib/api/api-client.ts:165:2",
+    "Failed to load resource: the server responded with a status of 404 (Not Found)"
+  ],
+  "failed": []
+}

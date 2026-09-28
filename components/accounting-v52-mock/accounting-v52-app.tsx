@@ -13,6 +13,9 @@ import { handleAccountingV52Action } from "@/lib/accounting-v52/actions"
 import { toast } from "sonner"
 import type { Ac52Account } from "@/lib/accounting-v52/types"
 import "@/components/accounting-v52-mock/accounting-v52.css"
+import "@/components/accounting-v52-mock/accounting-v52-live.css"
+import { apiClient } from "@/lib/api/api-client"
+import { getAuthUser, getUserProfile } from "@/lib/utils/cookies"
 
 type RuntimeApi = {
   setPage: (page: string) => void
@@ -53,12 +56,32 @@ export function AccountingV52App() {
     // to the root route before the runtime ever shows the real page. Ignore nav
     // calls that don't match initialPage until we've seen one that does.
     let hasSettledOnInitialPage = initialPage === "overview"
+    // While the runtime starts it renders against pages that are not registered yet (the live layer adds Payment Runs
+    // and Scheduled Jobs last), so a deep link to one of those briefly reads as the Command Centre. Nothing it reports
+    // before it has finished starting is a navigation; the requested page is opened once it has.
+    let starting = true
     // Pages patched for live data (scripts/patch-accounting-v52-runtime.mjs) render the records instead of samples.
     ;(window as any).__AC52_LIVE__ = true
+    // The live layer (scripts/accounting-live, synced into the runtime) reads and writes through these: every call carries
+    // the signed-in user's token, and the server decides what that user may do.
+    ;(window as any).__AC52_HTTP__ = {
+      get: (p: string) => apiClient.get<any>(p),
+      post: (p: string, b?: unknown) => apiClient.post<any>(p, b ?? {}),
+      put: (p: string, b?: unknown) => apiClient.put<any>(p, b ?? {}),
+      patch: (p: string, b?: unknown) => apiClient.patch<any>(p, b ?? {}),
+      del: (p: string) => apiClient.delete<any>(p),
+      text: (p: string) => apiClient.get<string>(p, { responseType: "text" }),
+      form: (p: string, fd: FormData) => apiClient.postFormData<any>(p, fd),
+    }
+    ;(window as any).__AC52_ME__ = () => {
+      const u: any = getUserProfile() ?? getAuthUser() ?? {}
+      return { id: u.id ?? null, name: [u.firstName, u.lastName].filter(Boolean).join(" ") || u.email || "", email: u.email ?? "", role: u.role?.name ?? u.roleName ?? "" }
+    }
     const runtime = startAccountingV52Runtime(el, {
       shellHtml: ACCOUNTING_V52_SHELL_HTML,
       initialPage,
       onNavigate: (page: string) => {
+        if (starting) return
         if (!hasSettledOnInitialPage) {
           if (page !== initialPage) return
           hasSettledOnInitialPage = true
@@ -73,6 +96,8 @@ export function AccountingV52App() {
       },
     })
     apiRef.current = runtime
+    starting = false
+    runtime.setPage(initialPage)
 
     // Every Accounting style is scoped to .accounting-v52-root, but the runtime appends its drawers, focus and deep
     // views, toolbar and menus to <body>, where they rendered unstyled below the page (and the sidebar covered
@@ -145,7 +170,27 @@ export function AccountingV52App() {
       const ce = event as CustomEvent
       const detail = ce.detail || {}
       const action = String(detail.action || "")
-      const LIVE_ACTIONS = new Set(["coa-save", "upload-document", "close-task-complete", "timesheet-approve", "timesheet-return", "create-tax-pack", "approval-decision", "journal-submit", "ap-pay-bill"])
+      const LIVE_ACTIONS = new Set([
+        "coa-save",
+        "upload-document",
+        "close-task-complete",
+        "timesheet-approve",
+        "timesheet-return",
+        "create-tax-pack",
+        "approval-decision",
+        "journal-submit",
+        "ap-pay-bill",
+        "invoice-create",
+        "customer-create",
+        "cash-post",
+        "receipt-post",
+        "expense-create",
+        "stock-adjust",
+        "asset-create",
+        "recurring-run",
+        "recurring-run-due",
+        "recon-signoff",
+      ])
       if (!LIVE_ACTIONS.has(action)) return
       event.preventDefault()
       if (busyRef.current) return
@@ -189,6 +234,16 @@ export function AccountingV52App() {
           "journal-submit": { scopes: JOURNAL_DEPENDENT_SCOPES, title: "Journal submitted" },
           // A supplier payment posts a journal and a cashbook entry, and reduces the bill (and the procurement invoice).
           "ap-pay-bill": { scopes: ["payables", ...JOURNAL_DEPENDENT_SCOPES], title: "Supplier payment" },
+          "invoice-create": { scopes: ["receivables", ...JOURNAL_DEPENDENT_SCOPES], title: "Customer invoice created" },
+          "customer-create": { scopes: ["receivables"], title: "Customer created" },
+          "cash-post": { scopes: ["cash", ...JOURNAL_DEPENDENT_SCOPES], title: "Cashbook entry posted" },
+          "receipt-post": { scopes: ["receivables", "cash", ...JOURNAL_DEPENDENT_SCOPES], title: "Customer receipt posted" },
+          "expense-create": { scopes: ["expenses", ...JOURNAL_DEPENDENT_SCOPES], title: "Expense recorded" },
+          "stock-adjust": { scopes: ["inventory", ...JOURNAL_DEPENDENT_SCOPES], title: "Inventory updated" },
+          "asset-create": { scopes: ["assets", ...JOURNAL_DEPENDENT_SCOPES], title: "Fixed asset created" },
+          "recurring-run": { scopes: ["recurring", ...JOURNAL_DEPENDENT_SCOPES], title: "Recurring schedule run" },
+          "recurring-run-due": { scopes: ["recurring", ...JOURNAL_DEPENDENT_SCOPES], title: "Due schedules processed" },
+          "recon-signoff": { scopes: ["reconciliation", "cash", ...JOURNAL_DEPENDENT_SCOPES], title: "Reconciliation signed off" },
         }
         const meta = ACTION_SCOPE[action] || { scopes: ["coa"] as Ac52DataScope[], title: "Updated" }
         // Drop the in-flight entry too, not just the loaded flag: a fetch issued before this
@@ -218,6 +273,8 @@ export function AccountingV52App() {
 
     return () => {
       window.removeEventListener("matanho:before-action", onBeforeAction)
+      delete (window as any).__AC52_HTTP__
+      delete (window as any).__AC52_ME__
       apiRef.current?.destroy()
       apiRef.current = null
     }

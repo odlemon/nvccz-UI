@@ -679,6 +679,31 @@ html.dark [data-arcus-shared-topbar] button,
 .procurement-v23-root .vault-summary h4 {
   color: #fff !important;
 }
+/* The banner's supporting text, buttons and links sit on the same purple, so they keep their own light colour too:
+   the shared black reset made every one of them black-on-purple. */
+.procurement-v23-root .vault-summary p,
+.procurement-v23-root .vault-summary span,
+.procurement-v23-root .vault-summary strong,
+.procurement-v23-root .vault-summary b,
+.procurement-v23-root .vault-summary a,
+.procurement-v23-root .vault-summary li {
+  color: rgba(255, 255, 255, 0.92) !important;
+}
+.procurement-v23-root .vault-summary .btn,
+.procurement-v23-root .vault-summary .btn:not(.primary):not(.secondary),
+.procurement-v23-root .vault-summary .btn:not(.primary):not(.secondary) span,
+.procurement-v23-root .vault-summary .btn span,
+.procurement-v23-root .vault-hero .vault-summary button.btn:not(.primary):not(.secondary),
+.procurement-v23-root .vault-summary button {
+  color: #fff !important;
+  background: rgba(255, 255, 255, 0.14) !important;
+  border-color: rgba(255, 255, 255, 0.4) !important;
+}
+.procurement-v23-root .vault-summary .btn svg,
+.procurement-v23-root .vault-summary button svg {
+  stroke: #fff !important;
+  color: #fff !important;
+}
 
 /* Strong / bold text true black */
 .performance-v22-root strong,
@@ -707,6 +732,13 @@ html.dark [data-arcus-shared-topbar] button,
 }
 
 /* Same dark-mode exception as the headings above, for bold text. */
+/* Accounting's dark panels (the General Ledger "Ledger integrity" banner, entity headers, heroes, the pulse and asset
+   value cards, the letterhead) set white text on a dark blue gradient; the shared black heading and bold resets above
+   made their titles and figures black-on-navy, effectively invisible. Headings and bold text there take the panel's
+   own light colour. */
+.accounting-v52-root :is(.v12-ledger-hero, .v10-hero, .v5-letterhead, .v5-entity-head, .v6-entity-hero, .v21-pulse, .v46-auto-health, .v46-asset-value, .v12-vendor-logo, .v17-org-avatar, .vendor-logo) :is(h1, h2, h3, h4, strong, b) {
+  color: inherit !important;
+}
 .procurement-v23-root[data-theme="dark"] strong,
 .procurement-v23-root[data-theme="dark"] b,
 .procurement-v23-root.dark strong,
