@@ -69,6 +69,8 @@ services:
     build:
       context: ../src/api
       dockerfile: Dockerfile
+      args:
+        NODE_HEAP_MB: ${API_NODE_HEAP_MB:-6144}
     restart: unless-stopped
     mem_limit: 1536m
     depends_on:
