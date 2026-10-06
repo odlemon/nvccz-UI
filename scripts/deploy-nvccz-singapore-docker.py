@@ -222,10 +222,13 @@ def stage_upload(c):
             sftp.put(str(t / name), f"/tmp/nvccz-{name}")
             if sftp.stat(f"/tmp/nvccz-{name}").st_size != (t / name).stat().st_size:
                 raise SystemExit("upload size mismatch " + name)
-        sftp.put(str(COMPOSE_DIR / "docker-compose.singapore.yml"), f"{ROOT}/compose/docker-compose.yml")
-        sftp.put(str(COMPOSE_DIR / "nginx-nvccz.conf"), f"{ROOT}/compose/nginx-nvccz.conf")
+        # Windows working copies carry CRLF; normalise so nginx, compose and Dockerfiles see plain LF.
+        def put_lf(local: Path, remote: str) -> None:
+            put_text(sftp, remote, local.read_bytes().decode("utf-8").replace(chr(13) + chr(10), chr(10)))
+        put_lf(COMPOSE_DIR / "docker-compose.singapore.yml", f"{ROOT}/compose/docker-compose.yml")
+        put_lf(COMPOSE_DIR / "nginx-nvccz.conf", f"{ROOT}/compose/nginx-nvccz.conf")
         for f in ("Dockerfile", "server.js"):
-            sftp.put(str(COMPOSE_DIR / "upload-service" / f), f"{ROOT}/upload-service/{f}")
+            put_lf(COMPOSE_DIR / "upload-service" / f, f"{ROOT}/upload-service/{f}")
         existing = parse_env(read_remote(sftp, f"{ROOT}/secrets/prod.env"))
         blob, sec = env_blob(existing)
         put_text(sftp, f"{ROOT}/secrets/prod.env", blob, 0o600)
