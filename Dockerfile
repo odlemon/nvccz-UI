@@ -40,7 +40,9 @@ ENV NEXT_PUBLIC_APPLY_PORTAL_URL=$NEXT_PUBLIC_APPLY_PORTAL_URL
 ENV NEXT_PUBLIC_AUTH_TOKEN_KEY=$NEXT_PUBLIC_AUTH_TOKEN_KEY
 ENV NEXT_PUBLIC_AUTH_USER_KEY=$NEXT_PUBLIC_AUTH_USER_KEY
 ENV NEXT_PUBLIC_AUTH_PROFILE_KEY=$NEXT_PUBLIC_AUTH_PROFILE_KEY
-ENV NODE_OPTIONS=--max-old-space-size=4096
+# Build heap is a build arg so a shared host with little free memory can lower it; the default keeps the old 4 GB.
+ARG NODE_HEAP_MB=4096
+ENV NODE_OPTIONS=--max-old-space-size=${NODE_HEAP_MB}
 ENV NEXT_TELEMETRY_DISABLED=1
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
