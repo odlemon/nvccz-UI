@@ -281,8 +281,18 @@ echo DB_OK
 """
 
 
+def detached(c, name: str, script: str):
+    """Run a long stage on the server with nohup so a dropped SSH session cannot interrupt it; output in logs/<name>.out."""
+    s = c.open_sftp()
+    put_text(s, f"{ROOT}/logs/{name}.sh", script, 0o755)
+    s.close()
+    sh(c, f"cd {ROOT}; rm -f logs/{name}.out; nohup bash logs/{name}.sh > logs/{name}.out 2>&1 & echo started {name}")
+    log(f"{name} running detached; follow with: ssh ... tail -f {ROOT}/logs/{name}.out")
+    return 0
+
+
 def stage_db(c):
-    return sh(c, DB_INIT, timeout=3600)
+    return detached(c, "db", DB_INIT)
 
 
 # Reference data first, then the accounts the dev handbook lists, then demo data.
