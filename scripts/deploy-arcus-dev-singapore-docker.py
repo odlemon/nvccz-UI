@@ -260,9 +260,12 @@ echo UP_OK
 DB_INIT = r"""
 set -e
 cd /opt/arcus-dev
+set -a; . /opt/arcus-dev/secrets/dev.env; set +a
 # One-off containers with RUN_SEED=0: the long-running API cannot start on an empty database (its boot-time admin seed needs the
-# roles table), so schema creation happens first, outside it.
-RUN="docker compose -p arcus-dev --env-file /opt/arcus-dev/secrets/dev.env -f /opt/arcus-dev/compose/docker-compose.yml run --rm --no-deps -T -e RUN_SEED=0 api"
+# roles table), so schema creation happens first, outside it. `docker run` (not compose run) so the migrations get their own, larger
+# memory cap: every ts-node migration type-checks the project by default, and at the API container's 1.5 GB cap 73 of them ran out of
+# heap. Transpile-only plus a 2 GB heap lets them all finish.
+RUN="docker run --rm --network arcus-dev_default --memory 3g --memory-swap 5g --env-file /opt/arcus-dev/secrets/dev.env -e DATABASE_URL=mysql://arcus_dev:${MYSQL_PASSWORD}@mysql:3306/arcus_dev -e DB_HOST=mysql -e DB_PORT=3306 -e RUN_SEED=0 -e UAT_ALLOW_NON_DEV_DB=1 -e TS_NODE_TRANSPILE_ONLY=1 -e NODE_OPTIONS=--max-old-space-size=2048 arcus-dev-api:latest"
 count() { docker exec arcus-dev-mysql-1 sh -c "mysql -uroot -p\"\$MYSQL_ROOT_PASSWORD\" -N -e \"select count(*) from information_schema.tables where table_schema='arcus_dev'\" 2>/dev/null"; }
 T=$(count)
 echo "tables present: $T"
@@ -270,8 +273,13 @@ if [ "${T:-0}" -gt 0 ]; then echo "database is not empty: skipping prisma db pus
   echo "== prisma db push (empty database only)"
   $RUN npx prisma db push --skip-generate --accept-data-loss
 fi
-echo "== db:migrate:all"
-$RUN npm run db:migrate:all 2>&1 | tail -45
+echo "== financial_reports: a table managed outside Prisma; its two migrations need it to exist first"
+for f in add_financial_reports_table add_financial_report_fields alter_financial_reports_add_draft; do
+  docker exec -i arcus-dev-mysql-1 sh -c 'mysql --force -uroot -p"$MYSQL_ROOT_PASSWORD" arcus_dev' < /opt/arcus-dev/src/api/scripts/sql/$f.sql 2>&1 | grep -v "Using a password" | head -3 || true
+done
+echo "== db:migrate:all (full output in logs/migrate-all.out)"
+$RUN npm run db:migrate:all > /opt/arcus-dev/logs/migrate-all.out 2>&1 || true
+grep -E "^ok:|^failed:|^skipped:|^\[FAILED\]|heap out of memory" /opt/arcus-dev/logs/migrate-all.out | sort | uniq -c | head -20
 echo "tables now: $(count)"
 echo "== restart the API now that the schema exists"
 docker restart arcus-dev-api-1 >/dev/null
