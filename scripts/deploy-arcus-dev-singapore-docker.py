@@ -263,8 +263,8 @@ cd /opt/arcus-dev
 # One-off containers with RUN_SEED=0: the long-running API cannot start on an empty database (its boot-time admin seed needs the
 # roles table), so schema creation happens first, outside it.
 RUN="docker compose -p arcus-dev --env-file /opt/arcus-dev/secrets/dev.env -f /opt/arcus-dev/compose/docker-compose.yml run --rm --no-deps -T -e RUN_SEED=0 api"
-COUNT="docker exec arcus-dev-mysql-1 sh -c 'mysql -uroot -p\"\$MYSQL_ROOT_PASSWORD\" -N -e \"select count(*) from information_schema.tables where table_schema=\\\"arcus_dev\\\"\" 2>/dev/null'"
-T=$(eval "$COUNT")
+count() { docker exec arcus-dev-mysql-1 sh -c "mysql -uroot -p\"\$MYSQL_ROOT_PASSWORD\" -N -e \"select count(*) from information_schema.tables where table_schema='arcus_dev'\" 2>/dev/null"; }
+T=$(count)
 echo "tables present: $T"
 if [ "${T:-0}" -gt 0 ]; then echo "database is not empty: skipping prisma db push (never push over an existing schema)"; else
   echo "== prisma db push (empty database only)"
@@ -272,7 +272,7 @@ if [ "${T:-0}" -gt 0 ]; then echo "database is not empty: skipping prisma db pus
 fi
 echo "== db:migrate:all"
 $RUN npm run db:migrate:all 2>&1 | tail -45
-echo "tables now: $(eval "$COUNT")"
+echo "tables now: $(count)"
 echo "== restart the API now that the schema exists"
 docker restart arcus-dev-api-1 >/dev/null
 for i in $(seq 1 40); do curl -fsS http://127.0.0.1:3319/health >/dev/null 2>&1 && break; sleep 5; done
