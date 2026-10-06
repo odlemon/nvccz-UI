@@ -455,8 +455,9 @@ def stage_verify(c=None, https: bool = False):
         check(f"login {portal:8s} {email}", bool(tok), (j.get("message") or out[:100]))
         if tok:
             tokens[email] = tok
-    # Cross-portal separation: portal accounts must not enter staff and vice versa.
-    for portal, email, pw in [("staff", "lp.test@arcus.co.zw", "PortalTest!2026"), ("lp", "admin@nts.com", "admin123")]:
+    # Cross-portal separation as the API defines it (portalAuth.assertPortalLoginAllowed): LP/applicant accounts are refused on the staff
+    # portal and staff accounts on the investee portal. (The LP portal only requires LP access, which the admin has, so it is not asserted.)
+    for portal, email, pw in [("staff", "lp.test@arcus.co.zw", "PortalTest!2026"), ("staff", "investee.test@arcus.co.zw", "PortalTest!2026"), ("investee", "admin@nts.com", "admin123")]:
         payload = json.dumps({"email": email, "password": pw, "portal": portal})
         _, out = curl(["--resolve", f"{API_HOST}:{port}:{HOST}", "-X", "POST", f"{scheme}://{API_HOST}/api/auth/login",
                        "-H", "Content-Type: application/json", "-d", payload])
