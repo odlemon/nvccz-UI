@@ -313,6 +313,32 @@ def stage_seed(c):
     return sh(c, f"cd {ROOT}; API=arcus-dev-api-1\n{steps}\necho SEED_DONE", timeout=3600)
 
 
+# Roles come from src/config/hardcodedRoles.ts (`npm run sync:roles`), not from any migration, and the permission grants in the
+# migrations below need those rows to exist - so on a brand-new database they must run AFTER the roles, and a second
+# db:migrate:all pass applies the registered grants. Several accounting / user-management migrations are not registered with
+# db:migrate:all at all (their tables: accounting_job_runs, cashbook_reconciliation_statements, payment_runs, expense_claims...).
+POST = r"""
+cd /opt/arcus-dev
+API=arcus-dev-api-1
+step() { echo "=== $*"; docker exec -e UAT_ALLOW_NON_DEV_DB=1 $API "$@" 2>&1 | tail -6; [ "${PIPESTATUS[0]}" = "0" ] && echo "OK $*" || echo "FAILED $*"; }
+TS="npx ts-node --transpile-only -r dotenv/config"
+step npm run sync:roles
+step npm run db:migrate:all
+for m in run-user-management-permission-migration run-nts-p0-migration run-accounting-sweep-migration run-accounting-fiscal-dedupe-migration run-accounting-rbac-migration run-accounting-inventory-ledger run-accounting-job-runs-utc; do
+  step $TS scripts/$m.ts
+done
+step $TS scripts/run-performance-rbac-v2-migration.ts --force
+for sd in seed-performance-test-users seed-procurement-test-users seed-fundraising-client-demo; do
+  step $TS scripts/$sd.ts
+done
+echo POST_DONE
+"""
+
+
+def stage_post(c):
+    return detached(c, "post", POST)
+
+
 def nginx_conf() -> str:
     def block(host: str, port: int, ws: bool, extra: str = "") -> str:
         return f"""
@@ -453,7 +479,7 @@ def stage_verify(c=None, https: bool = False):
 
 
 STAGES = {"prep": stage_prep, "upload": stage_upload, "build": stage_build, "build-status": stage_build_status,
-          "up": stage_up, "db": stage_db, "seed": stage_seed, "nginx": stage_nginx, "certs": stage_certs}
+          "up": stage_up, "db": stage_db, "seed": stage_seed, "post": stage_post, "nginx": stage_nginx, "certs": stage_certs}
 
 
 def main() -> int:
