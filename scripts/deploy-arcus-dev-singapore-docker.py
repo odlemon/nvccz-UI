@@ -58,14 +58,17 @@ URL["api"] = f"https://{API_HOST}"
 ARCHIVE_EXCLUDES_API = [":!docs", ":!storage", ":!assets", ":!.github", ":!*.log"]
 ARCHIVE_EXCLUDES_UI = [":!design-refs", ":!docs", ":!scripts/_uat", ":!.claude", ":!qa-*", ":!.payroll-dumps*"]
 
+# LP/investee test logins share the staff password on this replica (seed-portal-test-users.ts reads PORTAL_TEST_PASSWORD).
+PORTAL_TEST_PASSWORD = "admin123"
+
 # Dev accounts, as documented in design-refs/portal-test-credentials.md and the dev seed scripts.
 ACCOUNTS = [
     ("staff", "admin@nts.com", "admin123"),
     ("staff", "perf.sysadmin@nts.local", "admin123"),
     ("staff", "acct.cfo@nts.local", "admin123"),
     ("staff", "proc.mgr@nts.local", "admin123"),
-    ("lp", "lp.test@arcus.co.zw", "PortalTest!2026"),
-    ("investee", "investee.test@arcus.co.zw", "PortalTest!2026"),
+    ("lp", "lp.test@arcus.co.zw", PORTAL_TEST_PASSWORD),
+    ("investee", "investee.test@arcus.co.zw", PORTAL_TEST_PASSWORD),
 ]
 
 
@@ -316,7 +319,7 @@ SEEDS = [
 
 def stage_seed(c):
     steps = "\n".join(
-        f'echo "--- {s}"; docker exec -e UAT_ALLOW_NON_DEV_DB=1 $API npx ts-node --transpile-only -r dotenv/config scripts/{s} 2>&1 | tail -4; '
+        f'echo "--- {s}"; docker exec -e UAT_ALLOW_NON_DEV_DB=1 -e PORTAL_TEST_PASSWORD={PORTAL_TEST_PASSWORD} $API npx ts-node --transpile-only -r dotenv/config scripts/{s} 2>&1 | tail -4; '
         f'[ "${{PIPESTATUS[0]}}" = "0" ] && echo "OK {s}" || echo "(non-fatal) FAILED {s}"' for s in SEEDS)
     return sh(c, f"cd {ROOT}; API=arcus-dev-api-1\n{steps}\necho SEED_DONE", timeout=3600)
 
@@ -457,7 +460,7 @@ def stage_verify(c=None, https: bool = False):
             tokens[email] = tok
     # Cross-portal separation as the API defines it (portalAuth.assertPortalLoginAllowed): LP/applicant accounts are refused on the staff
     # portal and staff accounts on the investee portal. (The LP portal only requires LP access, which the admin has, so it is not asserted.)
-    for portal, email, pw in [("staff", "lp.test@arcus.co.zw", "PortalTest!2026"), ("staff", "investee.test@arcus.co.zw", "PortalTest!2026"), ("investee", "admin@nts.com", "admin123")]:
+    for portal, email, pw in [("staff", "lp.test@arcus.co.zw", PORTAL_TEST_PASSWORD), ("staff", "investee.test@arcus.co.zw", PORTAL_TEST_PASSWORD), ("investee", "admin@nts.com", "admin123")]:
         payload = json.dumps({"email": email, "password": pw, "portal": portal})
         _, out = curl(["--resolve", f"{API_HOST}:{port}:{HOST}", "-X", "POST", f"{scheme}://{API_HOST}/api/auth/login",
                        "-H", "Content-Type: application/json", "-d", payload])

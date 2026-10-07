@@ -27,7 +27,9 @@ Change these A records from `31.220.82.129` to **`207.180.234.151`**: `dev`, `de
 ## Accounts (dev conventions, see `portal-test-credentials.md`)
 
 Staff `admin@nts.com` / `admin123` and the seeded staff roles (`perf.*`, `acct.*`, `proc.*`, `payroll.*` @nts.local, `admin123`);
-LP `lp.test@arcus.co.zw` and investee `investee.test@arcus.co.zw` (`PortalTest!2026`); LP SRD demo `lp.signatory@example.com`
+LP `lp.test@arcus.co.zw` and investee `investee.test@arcus.co.zw` (`admin123` on this replica: the seed stage passes
+`PORTAL_TEST_PASSWORD`; other environments keep `PortalTest!2026`); events uses the staff `admin@nts.com` login; vendor portal at
+`https://dev.vendor.matanho.com/vendor-portal`, funding application at `https://dev.apply.matanho.com/funding-application`; LP SRD demo `lp.signatory@example.com`
 (`Password123!`). Apply, vendor and events are public.
 
 ## Notes
