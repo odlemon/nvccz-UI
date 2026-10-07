@@ -44,13 +44,13 @@ CREDS = COMPOSE_DIR / "CREDENTIALS.singapore-dev.local.md"
 # portal -> (hostname, local port on the server)
 PORTALS = {
     "staff": ("dev.matanho.com", 3310),
-    "lp": ("dev.lp.matanho.com", 3311),
-    "investee": ("dev.investee.matanho.com", 3312),
-    "apply": ("dev.apply.matanho.com", 3313),
-    "vendor": ("dev.vendor.matanho.com", 3314),
-    "events": ("dev.events.matanho.com", 3315),
+    "lp": ("lp.matanho.com", 3311),
+    "investee": ("investee.matanho.com", 3312),
+    "apply": ("apply.matanho.com", 3313),
+    "vendor": ("vendor.matanho.com", 3314),
+    "events": ("events.matanho.com", 3315),
 }
-API_HOST, API_PORT = "dev-api.matanho.com", 3319
+API_HOST, API_PORT = "api.matanho.com", 3319
 ALL_HOSTS = [h for h, _ in PORTALS.values()] + [API_HOST]
 URL = {k: f"https://{h}" for k, (h, _) in PORTALS.items()}
 URL["api"] = f"https://{API_HOST}"
