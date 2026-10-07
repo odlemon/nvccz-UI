@@ -64,7 +64,7 @@ export function mapDashboardFunds(funds: OpsFund[] | null | undefined): Dashboar
   return (funds ?? []).map((f, i) => ({
     fundId: f.id,
     name: f.name,
-    nav: formatMoneyDisplay(f.latestSnapshot?.unrealizedPnlUsd ?? 0),
+    nav: formatMoneyDisplay(f.latestSnapshot?.navBaseCurrency ?? 0),
     valueDate: formatAsOf(f.latestSnapshot?.asOf),
     shares: '—',
     currency: f.baseCurrencyCode || 'USD',
