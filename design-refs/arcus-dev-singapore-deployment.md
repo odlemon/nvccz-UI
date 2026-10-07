@@ -11,19 +11,17 @@ Deploy with `scripts/deploy-arcus-dev-singapore-docker.py <stage>` (`prep, uploa
 | Hostname | Portal | localhost port |
 |---|---|---|
 | `dev.matanho.com` | Staff | 3310 |
-| `lp.matanho.com` | LP | 3311 |
-| `investee.matanho.com` | Investee | 3312 |
-| `apply.matanho.com` | Apply (public) | 3313 |
-| `vendor.matanho.com` | Vendor (public) | 3314 |
-| `events.matanho.com` | Events (public) | 3315 |
-| `api.matanho.com` | API, socket.io, media | 3319 |
+| `dev.lp.matanho.com` | LP | 3311 |
+| `dev.investee.matanho.com` | Investee | 3312 |
+| `dev.apply.matanho.com` | Apply (public) | 3313 |
+| `dev.vendor.matanho.com` | Vendor (public) | 3314 |
+| `dev.events.matanho.com` | Events (public) | 3315 |
+| `dev-api.matanho.com` | API, socket.io, media | 3319 |
 
-Only the staff portal carries the `dev.` prefix; the other portals and the API sit directly under `matanho.com`.
+## DNS cutover (GoDaddy, zone `matanho.com`, TTL 600 s)
 
-## DNS (GoDaddy, zone `matanho.com`, TTL 600 s)
-
-A records pointing at **`207.180.234.151`**: change `dev` (currently `31.220.82.129`), and add `lp`, `investee`, `apply`,
-`vendor`, `events`, `api`. Then run the `certs` stage: one Let's Encrypt certificate per hostname via `certbot --nginx`
+Change these A records from `31.220.82.129` to **`207.180.234.151`**: `dev`, `dev-api`, `dev.lp`, `dev.investee`, `dev.apply`,
+`dev.vendor`, `dev.events`. Then run the `certs` stage: one Let's Encrypt certificate per hostname via `certbot --nginx`
 (HTTP-01 on port 80), with the HTTP to HTTPS redirect. Hostnames not yet pointing here are skipped and reported.
 
 ## Accounts (dev conventions, see `portal-test-credentials.md`)
