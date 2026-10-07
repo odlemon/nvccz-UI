@@ -193,7 +193,7 @@ MIGRATE = f"""
 cd {ROOT}
 NET=$(docker inspect nvccz-prod-mysql-1 --format '{{{{range $k,$v := .NetworkSettings.Networks}}}}{{{{$k}}}} {{{{end}}}}' | awk '{{print $1}}')
 DBURL=$({COMPOSE} config 2>/dev/null | grep -m1 -oE 'DATABASE_URL: [^ ]+' | cut -d' ' -f2-)
-IMG=$({COMPOSE} images -q api 2>/dev/null | head -1); [ -z "$IMG" ] && IMG=nvccz-prod-api
+IMG=nvccz-prod-api:latest  # the freshly built tag; `compose images` would name the running (old) container's image
 echo "network=$NET image=$IMG db=$(echo "$DBURL" | sed -E 's|://([^:]+):[^@]+@|://\\1:<pw>@|')"
 RUN="docker run --rm -i --network $NET --env-file {ROOT}/secrets/prod.env -e DATABASE_URL=$DBURL -e DB_HOST=mysql -e UAT_ALLOW_NON_DEV_DB=1 -e TS_NODE_TRANSPILE_ONLY=1 -e NODE_OPTIONS=--max-old-space-size=3072 --entrypoint"
 TS="npx ts-node --transpile-only -r dotenv/config"
