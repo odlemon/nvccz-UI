@@ -78,12 +78,11 @@ def log(msg: str) -> None:
 
 def connect() -> paramiko.SSHClient:
     pw = os.environ.get("NVCCZ_SSH_PASSWORD")
-    if not pw:
-        raise SystemExit("Set NVCCZ_SSH_PASSWORD for the server's root account.")
     c = paramiko.SSHClient()
     c.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-    c.connect(HOST, username=USER, password=pw, timeout=30, banner_timeout=30, auth_timeout=30,
-              look_for_keys=False, allow_agent=False)
+    # Without NVCCZ_SSH_PASSWORD, fall back to the local SSH key / agent.
+    c.connect(HOST, username=USER, password=pw or None, timeout=30, banner_timeout=30, auth_timeout=30,
+              look_for_keys=not pw, allow_agent=not pw)
     c.get_transport().set_keepalive(20)
     return c
 
