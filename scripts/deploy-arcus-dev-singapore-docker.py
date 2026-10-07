@@ -330,7 +330,7 @@ def stage_seed(c):
 POST = r"""
 cd /opt/arcus-dev
 API=arcus-dev-api-1
-step() { echo "=== $*"; docker exec -e UAT_ALLOW_NON_DEV_DB=1 $API "$@" 2>&1 | tail -6; [ "${PIPESTATUS[0]}" = "0" ] && echo "OK $*" || echo "FAILED $*"; }
+step() { echo "=== $*"; docker exec -e UAT_ALLOW_NON_DEV_DB=1 -e TS_NODE_TRANSPILE_ONLY=1 -e NODE_OPTIONS=--max-old-space-size=3072 $API "$@" 2>&1 | tail -6; [ "${PIPESTATUS[0]}" = "0" ] && echo "OK $*" || echo "FAILED $*"; }
 TS="npx ts-node --transpile-only -r dotenv/config"
 step npm run sync:roles
 step npm run db:migrate:all
