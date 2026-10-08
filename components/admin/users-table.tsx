@@ -19,9 +19,9 @@ import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { UserForm } from "./user-form"
 import { UserDrawer } from "./user-drawer"
-import { User, CreateUserRequest } from "@/lib/api/admin-api"
+import { User, CreateUserRequest, adminApiService } from "@/lib/api/admin-api"
 import { toast } from "sonner"
-import { Users, Search, X, Plus, RefreshCw, ArrowUpDown, ArrowUp, ArrowDown, Edit, Trash2 } from "lucide-react"
+import { Users, Search, X, Plus, RefreshCw, ArrowUpDown, ArrowUp, ArrowDown, Edit, Trash2, Mail, Loader2 } from "lucide-react"
 import { UsersTableSkeleton } from "./users-table-skeleton"
 import { STATUS_BADGE_CLASS, STATUS_LABELS, formatDateTime, formatMoney, humanize, statusLabel } from "./user-master-shared"
 import {
@@ -39,13 +39,17 @@ function UsersDataTable({
   columns, 
   onView, 
   onEdit, 
-  onDelete 
+  onDelete,
+  onResendCredentials,
+  resendingId,
 }: { 
   data: any[]
   columns: any[]
   onView: (item: any) => void
   onEdit: (item: any) => void
   onDelete: (item: any) => void
+  onResendCredentials: (item: any) => void
+  resendingId: string | null
 }) {
   const [sortColumn, setSortColumn] = useState<string | null>(null)
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc')
@@ -142,6 +146,20 @@ function UsersDataTable({
                       <Edit className="w-4 h-4" />
                     </Button>
                     <Button
+                      variant="outline"
+                      size="icon"
+                      title="Resend login credentials"
+                      aria-label="Resend login credentials"
+                      disabled={resendingId === row.id}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        onResendCredentials(row)
+                      }}
+                      className="rounded-full h-8 w-8 p-0 shadow-sm"
+                    >
+                      {resendingId === row.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Mail className="w-4 h-4" />}
+                    </Button>
+                    <Button
                       variant="gradient-danger"
                       size="icon"
                       onClick={(e) => {
@@ -235,6 +253,7 @@ export function UsersTable() {
   const [editingUser, setEditingUser] = useState<User | null>(null)
   const [viewingUser, setViewingUser] = useState<User | null>(null)
   const [statusFilter, setStatusFilter] = useState<string>('all')
+  const [resendingId, setResendingId] = useState<string | null>(null)
 
   // Fetch data on mount
   useEffect(() => {
@@ -270,6 +289,19 @@ export function UsersTable() {
       } catch (error: any) {
         toast.error(error || 'Failed to remove user')
       }
+    }
+  }
+
+  const handleResendCredentials = async (user: User) => {
+    if (!window.confirm(`Email ${user.firstName} ${user.lastName} a new temporary password and the login link?\n\nTheir current password stops working and they must set a new one at sign-in.`)) return
+    setResendingId(user.id)
+    try {
+      const result = await adminApiService.resendCredentials(user.id)
+      toast.success(result?.message || `Credentials sent to ${user.email}`)
+    } catch (error: any) {
+      toast.error(error?.message || 'Failed to resend credentials')
+    } finally {
+      setResendingId(null)
     }
   }
 
@@ -582,6 +614,8 @@ export function UsersTable() {
           onView={handleView}
           onEdit={handleEdit}
           onDelete={handleDelete}
+          onResendCredentials={handleResendCredentials}
+          resendingId={resendingId}
         />
       )}
 

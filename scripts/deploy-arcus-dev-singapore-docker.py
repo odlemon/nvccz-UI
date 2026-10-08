@@ -334,9 +334,11 @@ step() { echo "=== $*"; docker exec -e UAT_ALLOW_NON_DEV_DB=1 -e TS_NODE_TRANSPI
 TS="npx ts-node --transpile-only -r dotenv/config"
 step npm run sync:roles
 step npm run db:migrate:all
-for m in run-user-management-permission-migration run-nts-p0-migration run-accounting-sweep-migration run-accounting-fiscal-dedupe-migration run-accounting-rbac-migration run-accounting-inventory-ledger run-accounting-job-runs-utc; do
+for m in run-user-management-permission-migration run-nts-p0-migration run-accounting-sweep-migration run-accounting-fiscal-dedupe-migration run-accounting-rbac-migration; do
   step $TS scripts/$m.ts
 done
+step $TS scripts/run-accounting-inventory-ledger.ts --by=admin@nts.com
+step $TS scripts/run-accounting-job-runs-utc.ts --before=2026-09-27T23:45:00Z
 step $TS scripts/run-performance-rbac-v2-migration.ts --force
 for sd in seed-performance-test-users seed-procurement-test-users seed-fundraising-client-demo; do
   step $TS scripts/$sd.ts

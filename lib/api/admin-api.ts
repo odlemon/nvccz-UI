@@ -256,6 +256,11 @@ export const adminApiService = {
     return response
   },
 
+  /** POST /users/:id/resend-credentials — new temporary password (forced change at sign-in) emailed with the login link. */
+  async resendCredentials(userId: string): Promise<{ success: boolean; message: string; data?: { email: string } }> {
+    return apiClient.post<{ success: boolean; message: string; data?: { email: string } }>(`/users/${userId}/resend-credentials`, {})
+  },
+
   // Roles Management
   async getAllRoles(): Promise<RolesResponse> {
     const response = await apiClient.get('/hardcoded-roles')
