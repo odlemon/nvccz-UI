@@ -36,6 +36,8 @@ services:
     build:
       context: ../src/api
       dockerfile: Dockerfile
+      args:
+        NODE_HEAP_MB: ${API_NODE_HEAP_MB:-1536}
     restart: unless-stopped
     depends_on:
       mysql:
