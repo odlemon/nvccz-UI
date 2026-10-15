@@ -110,6 +110,7 @@ export function startMatanhoRuntime(rootEl, options = {}) {
     aiDraft: saved.aiDraft || {type:'Executive update',audience:'Investment team',subject:'Q3 progress update',body:''},
     aiDraftPending: false,
     newsBookmarks: saved.newsBookmarks || [],
+    newsPage: 1,
     profile: options.liveSession
       ? {
           ...(saved.profile || {}),
@@ -618,9 +619,23 @@ export function startMatanhoRuntime(rootEl, options = {}) {
   function newsArticleView(n) {
     if(!n) return `${pageHead('', '', `<button class="secondary-btn" data-action="back-news">${icon('arrow')} Back to news</button>`)}<div class="empty-state">${icon('newsletter')}<h3>Post not found.</h3></div>`;
     const nested=nestReplies(n.replies);
+    const replyComposer=n.isExternal ? (n.originalLink ? `<a class="primary-btn" href="${esc(n.originalLink)}" target="_blank" rel="noopener noreferrer">Read original article</a>` : '') : postReplyForm(n.id);
     return `${pageHead('', '', `<button class="secondary-btn" data-action="back-news">${icon('arrow')} Back to news</button>`)}<div class="article-layout article-layout-premium"><article class="card article-main article-main-premium"><div class="article-kicker">Company post</div><h1>${esc(n.title)}</h1><div class="article-byline"><div class="article-author">${avatar({name:n.authorName,initials:(n.authorName||'').split(' ').map(w=>w[0]||'').join('').slice(0,2).toUpperCase()})}<div><strong>${esc(n.authorName)}</strong><span>${timeAgo(n.createdAt)}</span></div></div></div><div class="article-copy"><p class="article-lead">${postContentHtml(n.content)}</p></div></article><aside><section class="card side-list"><div class="card-title"><h3>${n.replies.length} comment${n.replies.length===1?'':'s'}</h3></div>${nested.length?nested.map(r=>`<div class="post live-comment"><div class="post-head">${avatar({name:r.authorName,initials:(r.authorName||'').split(' ').map(w=>w[0]||'').join('').slice(0,2).toUpperCase()})}<div><strong>${esc(r.authorName)}</strong><span> · ${timeAgo(r.createdAt)}</span></div></div><p>${postContentHtml(r.content)}</p></div>`).join(''):'<div class="empty-state-row">No comments yet.</div>'}${postReplyForm(n.id)}</section></aside></div>`;
   }
-function newsView(){ return state.selectedNews ? newsArticleView((D.newsPosts||[]).find(x=>x.id===state.selectedNews)||(D.newsPosts||[])[0]) : newsLibraryView(); }
+function newsLibraryViewWithThumbs(){
+  const posts=D.newsPosts||[];
+  if(!posts.length) return newsLibraryView();
+  const pageSize=10, pages=Math.max(1,Math.ceil(posts.length/pageSize));
+  state.newsPage=Math.min(Math.max(state.newsPage||1,1),pages);
+  const pagePosts=posts.slice((state.newsPage-1)*pageSize,state.newsPage*pageSize);
+  const pageButtons=Array.from({length:pages},(_,i)=>`<button class="news-page-button ${state.newsPage===i+1?'active':''}" data-news-page="${i+1}" aria-current="${state.newsPage===i+1?'page':'false'}">${i+1}</button>`).join('');
+  return `${pageHead('News','Company announcements and updates.','')}<div class="news-feed-grid">${pagePosts.map((n,i)=>{const lead=state.newsPage===1&&i===0;return `<article class="news-cover-card${lead?' news-cover-lead':''}" data-news-open="${esc(n.id)}"><div class="news-cover-media">${n.imageUrl?`<img class="news-cover-image" src="${esc(n.imageUrl)}" alt="${esc(n.title)} cover image" loading="lazy"/>`:`<div class="news-cover-placeholder" aria-label="${esc(n.authorName||'News')} cover image">${icon('news')}</div>`}<span class="news-cover-source">${esc(n.authorName||'News')}</span></div><div class="news-cover-copy"><div class="news-cover-meta">${esc(timeAgo(n.createdAt))} <span>·</span> ${n.isExternal?'External article':'Company update'}</div><h2>${esc(n.title)}</h2><p>${esc(excerpt(n.content,180))}</p><div class="news-cover-footer"><span class="news-read-link">${n.isExternal?'Read source':'Open post'} ${icon('arrow')}</span></div></div></article>`}).join('')}</div><nav class="news-pagination" aria-label="News pages"><button class="news-page-direction" data-news-page="${Math.max(1,state.newsPage-1)}" ${state.newsPage===1?'disabled':''}>${icon('arrow')} Previous</button><div class="news-page-numbers">${pageButtons}</div><span class="news-page-count">Page ${state.newsPage} of ${pages}</span><button class="news-page-direction next" data-news-page="${Math.min(pages,state.newsPage+1)}" ${state.newsPage===pages?'disabled':''}>Next ${icon('arrow')}</button></nav>`;
+}
+function newsArticleViewWithExternal(n){
+  if(!n || !n.isExternal) return newsArticleView(n);
+  return `${pageHead('', '', `<button class="secondary-btn" data-action="back-news">${icon('arrow')} Back to news</button>`)}<div class="article-layout article-layout-premium"><article class="card article-main article-main-premium"><div class="article-kicker">${esc(n.authorName||'External source')}</div><h1>${esc(n.title)}</h1>${n.imageUrl?`<img class="news-detail-cover" src="${esc(n.imageUrl)}" alt="${esc(n.title)} cover image"/>`:''}<div class="article-copy"><p class="article-lead">${esc(n.content)}</p></div></article><aside><section class="card side-list"><div class="card-title"><h3>External article</h3></div><p>This article is read-only in the ERP. Comments are handled by the publisher.</p><a class="primary-btn" href="${esc(n.originalLink)}" target="_blank" rel="noopener noreferrer">Read original article</a></section></aside></div>`;
+}
+function newsView(){ return state.selectedNews ? newsArticleViewWithExternal((D.newsPosts||[]).find(x=>x.id===state.selectedNews)||(D.newsPosts||[])[0]) : newsLibraryViewWithThumbs(); }
 
     function newslettersView() {
     if (state.newsletterMode==='reader') return newsletterReaderView();
@@ -1302,6 +1317,7 @@ function servicesView() {
     const pt=e.target.closest('[data-performance-tab]'); if(pt){state.performanceTab=pt.dataset.performanceTab;render();scrollTo(0,0);return}
     const pg=e.target.closest('[data-performance-goal]'); if(pg){const goals=['Zambia renewable energy mandate','Diversify sector research pipeline','Build client insights capability','Team knowledge sharing'];modal(goals[Number(pg.dataset.performanceGoal)]||'Goal detail',`<div class="modal-insight"><span class="eyebrow">Goal update</span><h3>Progress is supported by current evidence.</h3><p>Review milestones, evidence and confidence before submitting the next update.</p><div class="form-actions"><button class="secondary-btn" data-action="close-portal">Close</button><button class="primary-btn" data-action="close-portal">Open goal workspace</button></div></div>`);return}
     const fb=e.target.closest('[data-feedback-open]'); if(fb){modal('Feedback detail',`<div class="modal-insight"><span class="eyebrow">Confidential feedback</span><h3>Clear judgement and trusted communication.</h3><p>This feedback is linked to your Q3 performance narrative and can be included as review evidence.</p><div class="form-actions"><button class="secondary-btn" data-action="close-portal">Close</button><button class="primary-btn" data-action="close-portal">Add to review</button></div></div>`);return}
+    const np=e.target.closest('[data-news-page]'); if(np && !np.disabled){state.newsPage=Number(np.dataset.newsPage)||1;render();scrollTo(0,0);return}
     const no=e.target.closest('[data-news-open]'); if(no){state.selectedNews=no.dataset.newsOpen;state.route='news';syncUrl();render();scrollTo(0,0);return}
     const nb=e.target.closest('[data-news-bookmark]'); if(nb){const id=Number(nb.dataset.newsBookmark);state.newsBookmarks=state.newsBookmarks.includes(id)?state.newsBookmarks.filter(x=>x!==id):[...state.newsBookmarks,id];saveState();render();toast(state.newsBookmarks.includes(id)?'Saved for later.':'Removed from saved.','success');return}
     const nm=e.target.closest('[data-newsletter-mode]'); if(nm){state.newsletterMode=nm.dataset.newsletterMode;state.route='newsletters';syncUrl();render();scrollTo(0,0);return}
@@ -1321,6 +1337,16 @@ function servicesView() {
     const cmd=e.target.closest('[data-command-route]'); if(cmd){if(cmd.dataset.commandPerson)state.selectedPerson=cmd.dataset.commandPerson;if(cmd.dataset.commandNews)state.selectedNews=Number(cmd.dataset.commandNews);closePortal();navigate(cmd.dataset.commandRoute);return}
     if(e.target.classList.contains('overlay'))closePortal();
   }, __hv3Sig);
+  document.addEventListener('error', e => {
+    const image=e.target;
+    if(!(image instanceof HTMLImageElement))return;
+    if(image.classList.contains('news-cover-image')){
+      image.hidden=true;
+      image.parentElement?.classList.add('news-cover-unavailable');
+    }else if(image.classList.contains('news-detail-cover')){
+      image.hidden=true;
+    }
+  }, {capture:true,signal:__hv3Abort.signal});
 
   document.addEventListener('input', e => {
     if(e.target.id==='saturationRange'){rootEl.style.setProperty('--user-saturation',String(Number(e.target.value)/100));const label=document.getElementById('saturationValue');if(label)label.textContent=`${e.target.value}%`;const preview=document.getElementById('settingsPreviewText');const density=document.getElementById('densitySelect');if(preview)preview.textContent=`Light Japandi · ${e.target.value}% OLED colour · ${density?density.value:state.settings.density}`;return}
@@ -1344,7 +1370,7 @@ function servicesView() {
     if(e.target.id==='aiTopForm'||e.target.id==='aiComposer'){const p=new FormData(e.target).get('prompt');e.target.reset();aiRespond(p);return}
     if(e.target.id==='aiSearchForm'){state.aiSearchQuery=String(new FormData(e.target).get('query')||'').trim();saveState();render();return}
     if(e.target.id==='aiDraftForm'){const f=new FormData(e.target);state.aiDraft={type:String(f.get('type')),audience:String(f.get('audience')),subject:String(f.get('subject')),body:String(f.get('body'))};saveState();toast('Draft saved privately.','success');return}
-    if(e.target.id==='postReplyForm'){const f=new FormData(e.target),text=String(f.get('reply')||'').trim();if(!text)return;emitIntegrationEvent('post.reply.created',{postId:e.target.dataset.replyPost,content:text});return}
+    if(e.target.id==='postReplyForm'){const f=new FormData(e.target),text=String(f.get('reply')||'').trim();if(!text)return;const postId=String(e.target.dataset.replyPost||'');if(postId.includes('-')){toast('External articles are read-only. Use the original article link to comment.');return}emitIntegrationEvent('post.reply.created',{postId,content:text});return}
     if(e.target.id==='discussionForm'){const f=new FormData(e.target);closePortal();emitIntegrationEvent('post.created',{title:f.get('title'),content:f.get('body'),category:f.get('category')});return}
     if(e.target.id==='postForm'){const f=new FormData(e.target);closePortal();emitIntegrationEvent('post.created',{title:f.get('title'),content:f.get('content'),category:null,isNotified:f.has('notify')});return}
     if(e.target.id==='newsletterForm'){const f=new FormData(e.target);const imageFile=f.get('image');closePortal();emitIntegrationEvent('newsletter.created',{title:f.get('title'),content:f.get('content'),imageFile:(imageFile&&imageFile.size)?imageFile:null});return}

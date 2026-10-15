@@ -194,13 +194,14 @@ type ExternalNewsItem = {
   pubDate: string
   source_name: string
   category?: string[]
+  image_url?: string
 }
 
 async function loadExternalNews(): Promise<ExternalNewsItem[]> {
   try {
     const apiBase = (process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:3009/api").replace(/\/$/, "")
     const token = getAuthToken()
-    const response = await fetch(`${apiBase}/news-feed`, {
+    const response = await fetch(`${apiBase}/news-feed?page=1&pageSize=60`, {
       headers: token ? { Authorization: `Bearer ${token}` } : undefined,
     })
     if (!response.ok) return []
@@ -302,11 +303,14 @@ export function HomeV3App() {
         ...(live?.posts.data ?? []).filter((p) => !p.category),
         ...externalNews.map((article) => ({
           id: article.article_id,
+          isExternal: true,
           title: article.title,
           authorName: article.source_name,
           content: `${article.description ?? "Open the source article for the full report."}\n\nSource: ${article.link}`,
           createdAt: article.pubDate,
           replies: [],
+          originalLink: article.link,
+          imageUrl: article.image_url,
         })),
       ],
       forumPosts: (live?.posts.data ?? []).filter((p) => !!p.category),
