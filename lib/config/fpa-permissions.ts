@@ -219,7 +219,7 @@ export const FPA_ROLE_PERMISSIONS: Record<
   // Financial Analyst
   FIN_OFF: { access: 'write', subModules: { ...FPA_SUBMODULES_ANALYST }, actions: ANALYST_ACTIONS },
   ACCOUNTANT: { access: 'write', subModules: { ...FPA_SUBMODULES_ANALYST }, actions: ANALYST_ACTIONS },
-  INV_ANALYST: { access: 'write', subModules: { ...FPA_SUBMODULES_ANALYST }, actions: ANALYST_ACTIONS },
+  // Investment analysts in the restricted ERP access policy must not enter FP&A.
 
   // Department Head / Budget Owner (+ junior finance input)
   FIN_ASST: { access: 'write', subModules: { ...FPA_SUBMODULES_DEPT_OWNER }, actions: DEPT_OWNER_ACTIONS },

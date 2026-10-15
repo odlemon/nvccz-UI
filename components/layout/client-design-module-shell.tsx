@@ -7,6 +7,7 @@ import { ClientDesignAppSwitcher } from "./client-design-app-switcher"
 import { ArcusAppSwitcherProvider } from "./arcus-app-switcher-provider"
 import { SharedTopbar } from "./shared-topbar"
 import { getModuleByPath } from "@/lib/config/modules"
+import { useRolePermissions } from "@/lib/hooks/useRolePermissions"
 import { useClientDesignAuthBridge } from "@/lib/client-design-mock/auth-bridge"
 import { useBrandLogoOverride } from "@/lib/client-design-mock/brand-logo-override"
 import "@/components/layout/arcus-header-overrides.css"
@@ -42,11 +43,22 @@ export function ClientDesignModuleShell({
   const [currentModule, setCurrentModule] = useState(defaultModuleId)
   const pathname = usePathname()
   const shellRef = useRef<HTMLDivElement>(null)
+  const { hasModuleAccess, isAuthenticated, isLoading: permissionsLoading } = useRolePermissions()
 
   useEffect(() => {
-    const module = getModuleByPath(pathname)
-    if (module) setCurrentModule(module.id)
+    const routeConfig = getModuleByPath(pathname)
+    if (routeConfig) setCurrentModule(routeConfig.id)
   }, [pathname])
+
+  const routeModuleId = getModuleByPath(pathname)?.id ?? currentModule
+  // My Pay is employee self-service, not Payroll administration. Its API
+  // endpoints are authenticated and self-scoped on the server.
+  const isPersonalPayrollRoute = pathname === "/payroll/mypay"
+  const moduleDenied =
+    !permissionsLoading &&
+    isAuthenticated &&
+    !isPersonalPayrollRoute &&
+    !hasModuleAccess(routeModuleId)
 
   // The mounted "-mock" module's own nav rail (".sidebar", per the shared
   // convention in home-v3/performance-v22/portfolio-v11's *-overrides.css) is
@@ -145,6 +157,27 @@ export function ClientDesignModuleShell({
     // Module switching handled by ArcusAppSwitcherProvider -> AppSwitcherDropdown
   }
 
+  if (permissionsLoading) return <>{loadingFallback}</>
+  if (!isAuthenticated || moduleDenied) {
+    const reason = !isAuthenticated
+      ? "Sign in with an authorized staff account to continue."
+      : "Your account does not have permission to open this module."
+    return (
+      <main className="grid min-h-screen place-items-center bg-slate-50 p-6">
+        <section className="max-w-md rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-sm">
+          <h1 className="text-xl font-semibold text-slate-900">Access unavailable</h1>
+          <p className="mt-2 text-sm text-slate-600">{reason}</p>
+          <a
+            href={isAuthenticated ? "/home" : "/login"}
+            className="mt-6 inline-flex h-10 items-center rounded-lg bg-slate-900 px-4 text-sm font-medium text-white hover:bg-slate-700"
+          >
+            {isAuthenticated ? "Return to Home" : "Go to sign in"}
+          </a>
+        </section>
+      </main>
+    )
+  }
+
   return (
     <ArcusAppSwitcherProvider currentModule={currentModule}>
       <div
@@ -159,12 +192,14 @@ export function ClientDesignModuleShell({
             hideThemeToggle={hideThemeToggle}
           />
         )}
-        <div className="flex-1 min-h-0 overflow-hidden">
-          <Suspense fallback={loadingFallback}>{mockApp}</Suspense>
+        <div className={`flex-1 min-h-0 ${isPersonalPayrollRoute ? "overflow-auto" : "overflow-hidden"}`}>
+          {isPersonalPayrollRoute ? children : <Suspense fallback={loadingFallback}>{mockApp}</Suspense>}
         </div>
-        <div className="sr-only" aria-hidden>
-          {children}
-        </div>
+        {!isPersonalPayrollRoute && (
+          <div className="sr-only" aria-hidden>
+            {children}
+          </div>
+        )}
         <ClientDesignAppSwitcher currentModule={currentModule} showHeaderButton={false} />
       </div>
     </ArcusAppSwitcherProvider>

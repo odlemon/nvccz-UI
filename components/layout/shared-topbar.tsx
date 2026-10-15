@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react"
 import { Button } from "@/components/ui/button"
+import Link from "next/link"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { ORG_NAME } from "@/lib/branding"
@@ -28,6 +29,7 @@ import {
   CiCalendar,
   CiCircleInfo,
   CiCircleChevDown,
+  CiHome,
 } from "react-icons/ci"
 import { Moon, Sun } from "lucide-react"
 import { NotificationsBell } from "@/components/notifications/notifications-bell"
@@ -149,13 +151,27 @@ function SharedTopbarInner({ currentModule, moduleActions, hideThemeToggle = fal
     <TooltipProvider>
       <>
       <header data-arcus-shared-topbar className="h-20 border-b border-border bg-card/50 backdrop-blur-sm sticky top-0 z-50">
-        <div className="flex items-center justify-between h-full px-3 sm:px-6">
+        <div className="relative flex items-center justify-between h-full px-3 sm:px-6">
           {/* Left Section - spacer. Reserves room for a mounted "-mock" module's
               fixed-position nav rail (see client-design-module-shell.tsx), which
               this header has no other way to know the width of since it's a
               sibling, not an ancestor, of the rail. */}
           <div className="flex items-center gap-4" style={{ minWidth: "var(--reserved-sidebar-w, 0px)" }}>
           </div>
+          {!(["home", "home-v3", "homepage"].includes(currentModule)) && (
+            <Button
+              asChild
+              variant="outline"
+              size="sm"
+              className="absolute top-1/2 z-[60] -translate-y-1/2 gap-2"
+              style={{ left: "calc(var(--reserved-sidebar-w, 0px) + 0.75rem)" }}
+            >
+              <Link href="/home" aria-label="Go to Home">
+                <CiHome size={18} aria-hidden="true" />
+                Home
+              </Link>
+            </Button>
+          )}
 
           {/* Center Section - Search. Tight margins on small screens: at 375px the
               wide mx-8 pushed this into the right-hand controls and the search

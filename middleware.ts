@@ -559,11 +559,13 @@ export function middleware(request: NextRequest) {
               return NextResponse.next()
             }
 
-            // For other routes, redirect to homepage with error message
-            const homeUrl = new URL('/', request.url)
-            homeUrl.searchParams.set('error', 'access_denied')
-            homeUrl.searchParams.set('module', module)
-            return NextResponse.redirect(homeUrl)
+            // Keep authorization failure explicit. Root redirects authenticated
+            // staff to Home, which made a denied deep link look like successful
+            // FP&A navigation.
+            const deniedUrl = new URL('/access-denied', request.url)
+            deniedUrl.searchParams.set('module', module)
+            deniedUrl.searchParams.set('from', pathname)
+            return NextResponse.redirect(deniedUrl)
           }
 
           // If subModule is specified, check sub-module access
@@ -571,12 +573,11 @@ export function middleware(request: NextRequest) {
             const hasSubAccess = hasSubModuleAccess(roleCode, module, subModule)
 
             if (!hasSubAccess) {
-              // Redirect to module homepage or main page
-              const baseModulePath = matchedPath.split('/').slice(0, 2).join('/')
-              const moduleUrl = new URL(baseModulePath || '/', request.url)
-              moduleUrl.searchParams.set('error', 'access_denied')
-              moduleUrl.searchParams.set('submodule', subModule)
-              return NextResponse.redirect(moduleUrl)
+              const deniedUrl = new URL('/access-denied', request.url)
+              deniedUrl.searchParams.set('module', module)
+              deniedUrl.searchParams.set('submodule', subModule)
+              deniedUrl.searchParams.set('from', pathname)
+              return NextResponse.redirect(deniedUrl)
             }
           }
         }
