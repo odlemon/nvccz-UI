@@ -3000,6 +3000,13 @@ const __PR23_PAGE_TITLES = {
 function __pr23PageAllowed(page) {
   const live = __pr23Live();
   const access = live && live.access;
+  // Procurement RBAC is an identity-management surface, not a self-service permissions page.
+  // Only the CEO and the platform administrator may open it. Keep this explicit instead of
+  // relying on `isPrivileged`, which also covers executive/approval roles.
+  if (page === 'settings') {
+    const role = String(access && access.roleCode || '').trim().toUpperCase();
+    return role === 'CEO' || role === 'ADMIN' || role === 'ADMINISTRATOR' || role === 'SYSADMIN';
+  }
   if (!access || access.isPrivileged) return true;
   const grants = __PR23_PAGE_GRANTS[page];
   if (!grants || grants.some(__pr23Can)) return true;

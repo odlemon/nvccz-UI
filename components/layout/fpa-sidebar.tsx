@@ -89,10 +89,14 @@ export function FpaSidebar() {
         {accessibleSubModules.map((subModule) => {
           const Icon = subModule.icon
           const active = activeSubModuleId === subModule.id
+          // FP&A's first item is the global homepage entry. Its internal
+          // dashboard lives at /forecasting, but the navigation affordance
+          // must return an authenticated user to the platform homepage.
+          const href = subModule.id === "fpa-home" ? "/home" : subModule.path
           return (
             <Link
               key={subModule.id}
-              href={subModule.path}
+              href={href}
               title={subModule.name}
               prefetch
               className={cn(

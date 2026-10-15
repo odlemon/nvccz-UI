@@ -6,7 +6,7 @@ import {
   GraduationCap,
   HeartHandshake,
   MonitorSmartphone,
-  PalmTree,
+  TreePalm,
   Receipt,
   Search,
   Sparkles,
@@ -18,7 +18,7 @@ import { ehServiceRequests, ehServices, ehUser } from "@/lib/employee-hub-mock/f
 import { cn } from "@/lib/utils"
 
 const iconMap: Record<string, ReactNode> = {
-  PalmTree: <PalmTree className="h-5 w-5" />,
+  PalmTree: <TreePalm className="h-5 w-5" />,
   Receipt: <Receipt className="h-5 w-5" />,
   Wallet: <Wallet className="h-5 w-5" />,
   GraduationCap: <GraduationCap className="h-5 w-5" />,

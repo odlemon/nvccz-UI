@@ -819,9 +819,8 @@ export function BuilderDependencyMap({
 
 
   const selectClass =
-    "h-8 min-w-[108px] appearance-none rounded-[6px] border border-[#e2e8f0] bg-white pl-2.5 pr-7 text-[12px] text-[#000000] outline-none focus:border-[#2563eb] bg-[length:12px] bg-[right_8px_center] bg-no-repeat"
-  const selectChevron =
-    "bg-[url('data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%2712%27 height=%2712%27 viewBox=%270 0 24 24%27 fill=%27none%27 stroke=%27%2364748b%27 stroke-width=%272%27%3E%3Cpath d=%27m6 9 6 6 6-6%27/%3E%3C/svg%3E')]"
+    "h-8 min-w-[108px] appearance-none rounded-[6px] border border-[#e2e8f0] bg-white pl-2.5 pr-7 text-[12px] text-[#000000] outline-none focus:border-[#2563eb]"
+  const selectChevron = "fpa-select-chevron"
 
   return (
     <div

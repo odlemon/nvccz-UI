@@ -439,8 +439,7 @@ function NativeSelect({
         className={cn(
           inputClass,
           "appearance-none pr-8 cursor-pointer",
-          "bg-[length:12px] bg-[right_10px_center] bg-no-repeat",
-          "bg-[url('data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%2712%27 height=%2712%27 viewBox=%270 0 24 24%27 fill=%27none%27 stroke=%27%2364748b%27 stroke-width=%272%27%3E%3Cpath d=%27m6 9 6 6 6-6%27/%3E%3C/svg%3E')]",
+          "fpa-select-chevron fpa-select-chevron-right-10",
         )}
       >
         {options.map((o) => (

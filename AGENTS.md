@@ -30,3 +30,14 @@ Working on SSL/rate limiting across:
 
 ## Instructions
 You have permission to fix the code, push changes, and update whatever is needed to make this work correctly.
+
+## Codex repository guidance
+
+- Read `docs/ai-context/PROJECT_CONTEXT.md` for architecture, source paths, portal boundaries, deployment evidence, and known uncertainty. Update its affected sections after significant architectural changes; do not regenerate it for minor bug fixes.
+- Navigate from `app/` routes to `components/`, `lib/` clients/stores, then the sibling backend `C:\Users\lysp\Downloads\nvccz\src/` and `prisma/schema.prisma`. Confirm live versus mock/legacy/versioned implementations before editing.
+- Use the package scripts for validation: `npm run build`, `npm run lint`, portal-specific `npm run dev:*`, and targeted Playwright/UAT scripts. Backend tests and Prisma commands belong to the sibling repository. Never run migrations or seeds against production.
+- Keep secrets out of source, logs, context documents, commits, screenshots, and responses. Do not expose values from `.env*`, server secret files, JWTs, passwords, API keys, or production data.
+- Keep scope focused on the requested module and its documented dependencies. Avoid unrelated refactors or changing deployment topology without explicit authorization.
+- Browser verification must target the intended local/UAT portal and use test data. Confirm portal host/build selection when testing cross-portal redirects and auth.
+- Deployment verification is read-only unless the user explicitly authorizes an operational change. Prefer health checks, logs, and Host-header requests; do not restart services, alter DNS/TLS, run Compose, migrate databases, or deploy while doing discovery.
+- Production is strictly read-only for architecture work. Clearly label confirmed, documented, inferred, and unverified facts.

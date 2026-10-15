@@ -222,6 +222,18 @@
   }
 }
 
+/* Keep the FP&A builder select indicator out of Tailwind arbitrary-value parsing. */
+.fpa-select-chevron {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  background-position: right 8px center;
+  background-size: 12px;
+  background-repeat: no-repeat;
+}
+
+.fpa-select-chevron-right-10 {
+  background-position: right 10px center;
+}
+
 /* Thin scrollbars for FP&A / Fundraising panels */
 .fpa-thin-scroll,
 .fpa-thin-scroll *,

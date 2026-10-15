@@ -43,7 +43,6 @@ interface NewsResponse {
   nextPage?: string;
 }
 
-const NEWS_API_URL = "https://newsdata.io/api/1/latest?apikey=pub_593f3f328cd54e43b55ccfb18adfd9e8&q=Zimbabwe&language=en";
 const FALLBACK_IMAGE = "https://picsum.photos/800/400?random=";
 
 export function NewsTab() {
@@ -59,11 +58,7 @@ export function NewsTab() {
   const loadNews = async (pageToken?: string) => {
     try {
       setLoading(true);
-      const url = pageToken 
-        ? `${NEWS_API_URL}&page=${pageToken}`
-        : NEWS_API_URL;
-      
-      const response = await fetch(url);
+      const response = await fetch(`/api/news-feed${pageToken ? `?page=${encodeURIComponent(pageToken)}` : ""}`);
       const data: NewsResponse = await response.json();
       
       if (data.status === "success") {

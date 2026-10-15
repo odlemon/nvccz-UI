@@ -38,6 +38,7 @@ import {
   sendAssistantMessage,
 } from "@/lib/home-v3/actions"
 import { useAppDispatch, useAppSelector } from "@/lib/store"
+import { getAuthToken } from "@/lib/utils/cookies"
 import { refreshUserDetails, logoutUser } from "@/lib/store/slices/authSlice"
 import { getSwitcherModules } from "@/lib/config/modules"
 import { useRolePermissions } from "@/lib/hooks/useRolePermissions"
@@ -185,6 +186,31 @@ type RuntimeApi = {
   destroy: () => void
 }
 
+type ExternalNewsItem = {
+  article_id: string
+  title: string
+  link: string
+  description?: string
+  pubDate: string
+  source_name: string
+  category?: string[]
+}
+
+async function loadExternalNews(): Promise<ExternalNewsItem[]> {
+  try {
+    const apiBase = (process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:3009/api").replace(/\/$/, "")
+    const token = getAuthToken()
+    const response = await fetch(`${apiBase}/news-feed`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+    })
+    if (!response.ok) return []
+    const body = await response.json() as { results?: ExternalNewsItem[] }
+    return Array.isArray(body.results) ? body.results : []
+  } catch {
+    return []
+  }
+}
+
 /**
  * Mounts the full Matanho Employee Hub Premium V17.1 suite inside Next.js.
  * All client views/modals/tabs are in the extracted runtime; Next owns URLs.
@@ -204,6 +230,7 @@ export function HomeV3App() {
   pathnameRef.current = pathname
   const [liveDataReady, setLiveDataReady] = useState(false)
   const liveDataRef = useRef<Awaited<ReturnType<typeof loadHomeLiveData>> | null>(null)
+  const externalNewsRef = useRef<ExternalNewsItem[]>([])
 
   useEffect(() => {
     if (!user?.id || userDetails || isFetchingDetails) return
@@ -212,8 +239,9 @@ export function HomeV3App() {
 
   useEffect(() => {
     if (isLoading || liveDataRef.current) return
-    void loadHomeLiveData(user?.id).then((result) => {
+    void Promise.all([loadHomeLiveData(user?.id), loadExternalNews()]).then(([result, externalNews]) => {
       liveDataRef.current = result
+      externalNewsRef.current = externalNews
       setLiveDataReady(true)
     })
   }, [isLoading, user?.id])
@@ -234,6 +262,7 @@ export function HomeV3App() {
     seedProfileDocumentsCache(liveDataRef.current?.profileDocuments.data ?? null)
 
     const live = liveDataRef.current
+    const externalNews = externalNewsRef.current
     const sessionUser = buildHv3SessionUser(user, userDetails)
     const base = JSON.parse(JSON.stringify(MATANHO_DATA)) as typeof MATANHO_DATA
     const withSession = mergeHv3DataWithSession(base, sessionUser)
@@ -269,9 +298,30 @@ export function HomeV3App() {
       teamRows: live?.teamRows.data ?? [],
       performanceOverview: live?.performanceOverview.data ?? null,
       performanceFeedback: live?.performanceFeedback.data ?? null,
-      newsPosts: (live?.posts.data ?? []).filter((p) => !p.category),
+      newsPosts: [
+        ...(live?.posts.data ?? []).filter((p) => !p.category),
+        ...externalNews.map((article) => ({
+          id: article.article_id,
+          title: article.title,
+          authorName: article.source_name,
+          content: `${article.description ?? "Open the source article for the full report."}\n\nSource: ${article.link}`,
+          createdAt: article.pubDate,
+          replies: [],
+        })),
+      ],
       forumPosts: (live?.posts.data ?? []).filter((p) => !!p.category),
       newsletters: live?.newsletters.data ?? [],
+      news: externalNews.map((article, index) => ({
+        id: article.article_id,
+        title: article.title,
+        source: article.source_name,
+        category: article.category?.[0] ?? "Markets",
+        excerpt: article.description ?? "Open the source article for the full report.",
+        time: article.pubDate,
+        read: "External source",
+        image: `https://picsum.photos/900/520?random=${index + 300}`,
+        link: article.link,
+      })),
       directory: live?.directory.data ?? [],
       // Real, permission-filtered module list (same source as the header's own "Modules"
       // switcher) rather than the runtime's fabricated 9-app fixture with fake pin/recent/
