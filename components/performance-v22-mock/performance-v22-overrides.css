@@ -92,11 +92,11 @@ html.dark [data-arcus-shell] .performance-v22-root,
    (original v24.5 Role switch lives in the profile menu on the right — never a
    full-width Role switch strip under SharedTopbar). */
 [data-arcus-shell] .performance-v22-root .app {
-  grid-template-rows: 52px minmax(0, 1fr) !important;
+  grid-template-rows: minmax(0, 1fr) !important;
 }
 
 [data-arcus-shell] .performance-v22-root .topbar {
-  display: flex !important;
+  display: none !important;
   align-items: center !important;
   justify-content: flex-end !important;
   gap: 8px !important;
@@ -173,7 +173,7 @@ html.dark [data-arcus-shell] .performance-v22-root,
 }
 
 [data-arcus-shell] .performance-v22-root .workspace {
-  grid-row: 2 !important;
+  grid-row: 1 !important;
   height: 100% !important;
   max-height: 100% !important;
 }
@@ -251,6 +251,108 @@ html.dark [data-arcus-shell] .performance-v22-root .sidebar,
   color: #fff !important;
   -webkit-text-fill-color: #fff !important;
 }
+
+.performance-v22-root .v240-export-group {
+  display: inline-flex;
+  align-items: center;
+  overflow: hidden;
+  border: 1px solid #cfd8e6;
+  border-radius: 9px;
+  background: #fff;
+  box-shadow: 0 1px 2px rgb(15 23 42 / 5%);
+}
+.performance-v22-root .v240-export-group button {
+  min-height: 34px;
+  padding: 0 11px;
+  border: 0;
+  border-right: 1px solid #e4e9f0;
+  background: #fff;
+  color: #24334a;
+  font-size: 11px !important;
+  font-weight: 700;
+  cursor: pointer;
+}
+.performance-v22-root .v240-export-group button:last-child { border-right: 0; }
+.performance-v22-root .v240-export-group button:hover,
+.performance-v22-root .v240-export-group button:focus-visible {
+  background: #f1f5ff;
+  color: #195dd4;
+  outline: none;
+}
+
+.performance-v22-root .perf-page-export-group {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 4px;
+  padding: 3px;
+  border: 1px solid #d7deea;
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 1px 2px rgb(15 23 42 / 5%);
+}
+.performance-v22-root .perf-page-export-group button {
+  display: inline-flex;
+  min-width: 62px;
+  min-height: 31px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 9px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: #334155;
+  font-size: 10px !important;
+  font-weight: 700;
+  cursor: pointer;
+}
+.performance-v22-root .perf-page-export-group button:hover,
+.performance-v22-root .perf-page-export-group button:focus-visible {
+  background: #f1f5ff;
+  color: #195dd4;
+  outline: none;
+}
+.performance-v22-root .perf-page-export-group svg {
+  width: 14px;
+  height: 14px;
+  flex: 0 0 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.performance-v22-root .perf-page-export-fallback {
+  display: flex;
+  justify-content: flex-end;
+  margin: 0 0 8px;
+}
+.performance-v22-root .page-head > .actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 7px;
+  flex-wrap: wrap;
+}
+@media(max-width:640px) {
+  .performance-v22-root .perf-page-export-group { max-width: 100%; }
+  .performance-v22-root .perf-page-export-group button { min-width: 54px; padding: 0 6px; }
+}
+
+[data-arcus-shell] .performance-v22-root .app {
+  grid-template-rows: minmax(0, 1fr) !important;
+}
+[data-arcus-shell] .performance-v22-root .sidebar {
+  grid-row: 1 !important;
+}
+[data-arcus-shell] .performance-v22-root .workspace {
+  grid-row: 1 !important;
+  padding-top: 10px !important;
+}
+[data-arcus-shell] .performance-v22-root .topbar {
+  display: none !important;
+}
 .performance-v22-root .v21-risk-hero .eyebrow,
 .performance-v22-root .v21-risk-hero h2,
 .performance-v22-root .v21-risk-hero h3 {
@@ -272,4 +374,153 @@ html.dark [data-arcus-shell] .performance-v22-root .sidebar,
   max-width: none !important;
   color: #fff !important;
   -webkit-text-fill-color: #fff !important;
+}
+
+/* Performance Contracts: compact, responsive filters and objective editor. */
+.performance-v22-root .v13-contract-filters { display:flex; flex-wrap:wrap; align-items:end; justify-content:flex-end; gap:8px; }
+.performance-v22-root .v13-contract-filters > input { min-width:220px; }
+.performance-v22-root .v13-contract-filter { display:grid; gap:3px; color:#667085; font-size:10px; }
+.performance-v22-root .v13-contract-filter .v13-select { min-width:118px; height:34px; }
+.performance-v22-root .v13-contract-pagination { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:12px 14px; border-top:1px solid #e5eaf1; color:#667085; font-size:11px; }
+.performance-v22-root .v13-contract-pagination > div { display:flex; align-items:center; gap:10px; }
+.performance-v22-root .v13-table tbody tr[data-v13-action="contract-open"] { cursor:pointer; }
+.performance-v22-root .v13-table tbody tr[data-v13-action="contract-open"]:hover,
+.performance-v22-root .v13-table tbody tr[data-v13-action="contract-open"]:focus-visible { background:#f5f8ff; outline:none; }
+.performance-v22-root .v13-contract-detail-state { display:flex; min-height:150px; flex-direction:column; align-items:center; justify-content:center; gap:10px; text-align:center; color:#475467; }
+.performance-v22-root .v13-contract-detail-state p { max-width:640px; margin:0; }
+.performance-v22-root .v13-contract-detail-spinner { display:inline-block; width:24px; height:24px; border:3px solid #d7e3f5; border-top-color:#1769e0; border-radius:50%; animation:v13-contract-spin .7s linear infinite; }
+.performance-v22-root .v13-contract-detail { width:100%; max-width:none; }
+.performance-v22-root .v13-contract-detail .v13-layer-head { min-width:0; }
+.performance-v22-root .v13-contract-detail .v13-two { grid-template-columns:minmax(0,2fr) minmax(350px,.9fr) !important; gap:16px; }
+.performance-v22-root .v13-contract-detail .v13-two > main,
+.performance-v22-root .v13-contract-detail .v13-two > aside { min-width:0; }
+.performance-v22-root .v13-contract-detail .v13-table { min-width:900px; }
+.performance-v22-root .v13-contract-detail .v13-table-wrap { max-width:100%; overflow:auto; }
+.performance-v22-root .v13-contract-objectives-head { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:0 0 10px; }
+.performance-v22-root .v13-contract-objective-row { display:grid; gap:12px; padding:13px; border:1px solid #dfe6f0; border-radius:11px; background:#fff; }
+.performance-v22-root .v13-contract-objective-heading { display:flex; align-items:center; justify-content:space-between; gap:10px; }
+.performance-v22-root .v13-contract-objective-heading strong { color:#24334a; font-size:12px; }
+.performance-v22-root .v13-contract-objective-form { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; align-items:start; }
+.performance-v22-root .v13-contract-objective-form > label { display:grid; min-width:0; gap:5px; color:#475467; font-size:11px; font-weight:600; }
+.performance-v22-root .v13-contract-objective-form .objective-title-field,
+.performance-v22-root .v13-contract-objective-form .measure-field { grid-column:span 2; }
+.performance-v22-root .v13-contract-objective-form .evidence-field { grid-column:1 / -1; }
+.performance-v22-root .v13-contract-objective-form .company-kpi-field { grid-column:span 2; }
+.performance-v22-root .v13-contract-objective-form input:not([type="hidden"]),
+.performance-v22-root .v13-contract-objective-form select,
+.performance-v22-root .v13-contract-objective-form textarea { display:block; box-sizing:border-box; width:100%; min-width:0; min-height:36px; padding:8px 10px; border:1px solid #cbd5e1 !important; border-radius:8px; background:#fff !important; color:#172b4d !important; font-family:inherit; font-size:12px; font-weight:500; line-height:1.35; box-shadow:none; }
+.performance-v22-root .v13-contract-objective-form textarea { min-height:56px; resize:vertical; }
+.performance-v22-root .v13-contract-objective-form input:focus,
+.performance-v22-root .v13-contract-objective-form select:focus,
+.performance-v22-root .v13-contract-objective-form textarea:focus { border-color:#3b82f6 !important; outline:3px solid rgb(59 130 246 / 14%); }
+.performance-v22-root .v13-contract-objective-form input::placeholder,
+.performance-v22-root .v13-contract-objective-form textarea::placeholder { color:#98a2b3 !important; font-weight:400; }
+.performance-v22-root .v13-contract-objective-form input[type="hidden"] { display:none; }
+.performance-v22-root .v13-contract-input-suffix { display:flex; align-items:center; min-height:36px; border:1px solid #cbd5e1; border-radius:8px; background:#fff; }
+.performance-v22-root .v13-contract-input-suffix input { border:0 !important; background:transparent !important; box-shadow:none !important; }
+.performance-v22-root .v13-contract-input-suffix > span { padding:0 10px 0 4px; color:#667085; font-size:11px; }
+.performance-v22-root .v13-contract-objective-row .btn { min-height:30px; }
+.performance-v22-root .v13-contract-submit-spinner { display:inline-block; width:14px; height:14px; flex:0 0 14px; border:2px solid currentColor; border-right-color:transparent; border-radius:50%; animation:v13-contract-spin .7s linear infinite; vertical-align:middle; }
+.performance-v22-root .modal-foot [data-v13-action="contract-save"] { display:inline-flex; align-items:center; justify-content:center; gap:8px; }
+.performance-v22-root .modal-foot [data-v13-action="contract-save"][aria-busy="true"] { cursor:wait; opacity:.86; }
+@keyframes v13-contract-spin { to { transform:rotate(360deg); } }
+.performance-v22-root .v13-contract-pagination button:disabled { opacity:.45; pointer-events:none; }
+@media(max-width:900px) {
+  .performance-v22-root .v13-contract-detail .v13-two { grid-template-columns:minmax(0,1fr) !important; }
+  .performance-v22-root .v13-contract-filters { justify-content:flex-start; }
+  .performance-v22-root .v13-contract-objective-form { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .performance-v22-root .v13-contract-objective-form .objective-title-field,
+  .performance-v22-root .v13-contract-objective-form .measure-field,
+  .performance-v22-root .v13-contract-objective-form .company-kpi-field { grid-column:span 2; }
+}
+@media(max-width:560px) {
+  .performance-v22-root .v13-contract-objectives-head { align-items:flex-start; flex-direction:column; }
+  .performance-v22-root .v13-contract-objective-form { grid-template-columns:minmax(0,1fr); }
+  .performance-v22-root .v13-contract-objective-form .objective-title-field,
+  .performance-v22-root .v13-contract-objective-form .measure-field,
+  .performance-v22-root .v13-contract-objective-form .company-kpi-field,
+  .performance-v22-root .v13-contract-objective-form .objective-progress-source,
+  .performance-v22-root .v13-contract-objective-form .evidence-field { grid-column:1; }
+}
+
+/* Contract document preview is a lightweight overlay; opening it keeps the
+   active Performance workspace mounted and displays the generated PDF blob. */
+.v13-contract-document-backdrop { position:fixed; inset:0; z-index:10050; display:flex; align-items:center; justify-content:center; padding:20px; background:rgb(15 23 42 / 58%); }
+.v13-contract-document-dialog { display:flex; width:min(1100px,96vw); height:min(900px,94vh); flex-direction:column; overflow:hidden; border:1px solid #d7e0ec; border-radius:14px; background:#fff; box-shadow:0 24px 80px rgb(15 23 42 / 28%); }
+.v13-contract-document-dialog > header { display:flex; min-height:62px; align-items:center; justify-content:space-between; gap:12px; padding:10px 16px; border-bottom:1px solid #e5eaf1; }
+.v13-contract-document-dialog > header > div { display:grid; gap:3px; }
+.v13-contract-document-dialog > header strong { color:#172b4d; font-size:14px; }
+.v13-contract-document-dialog > header span { color:#667085; font-size:11px; }
+.v13-contract-document-dialog > header button { min-height:34px; padding:0 13px; border:1px solid #d0d9e6; border-radius:8px; background:#fff; color:#24334a; cursor:pointer; }
+.v13-contract-document-frame { width:100%; height:100%; flex:1; border:0; background:#eef2f7; }
+.v13-contract-document-loading { display:flex; min-height:180px; flex:1; flex-direction:column; align-items:center; justify-content:center; gap:12px; color:#475467; text-align:center; }
+.v13-contract-document-loading p { margin:0; color:#667085; }
+@media(max-width:600px) { .v13-contract-document-backdrop { padding:0; } .v13-contract-document-dialog { width:100vw; height:100vh; border-radius:0; } }
+
+/* Tasks & Projects: real API filters and lane-level pagination. */
+.performance-v22-root .perf-task-filterbar { display:flex; flex-wrap:wrap; align-items:end; gap:8px; }
+.performance-v22-root .perf-task-filter-label { display:grid; min-width:132px; gap:4px; color:#667085; font-size:10px; }
+.performance-v22-root .perf-task-filter-label select,
+.performance-v22-root .perf-task-filter-label input { min-height:34px; max-width:210px; padding:0 9px; border:1px solid #d5ddeb; border-radius:8px; background:#fff; color:#1f2937; font:inherit; font-size:11px; }
+.performance-v22-root .perf-task-search { flex:1 1 220px; }
+.performance-v22-root .perf-task-search input { width:100%; max-width:none; }
+.performance-v22-root .perf-task-filter-note { margin-left:auto; padding:0 3px 9px; color:#667085; font-size:10px; }
+.performance-v22-root .perf-task-pagination { display:grid; gap:7px; margin-top:10px; padding-top:9px; border-top:1px solid #e5eaf1; color:#667085; font-size:10px; }
+.performance-v22-root .perf-task-pagination > div { display:flex; align-items:center; justify-content:space-between; gap:6px; }
+.performance-v22-root .perf-task-pagination button { min-height:28px; padding:0 9px; border:1px solid #d5ddeb; border-radius:7px; background:#fff; color:#24334a; font:inherit; cursor:pointer; }
+.performance-v22-root .perf-task-pagination button:disabled { cursor:not-allowed; opacity:.45; }
+.performance-v22-root .project-task-assign-list { display:grid; gap:6px; }
+.performance-v22-root .project-task-assign-list > label { display:grid; grid-template-columns:16px minmax(0,1fr); align-items:start; gap:9px; padding:9px 10px; border:1px solid #e1e7f0; border-radius:8px; background:#fff; cursor:pointer; }
+.performance-v22-root .project-task-assign-list > label > input { margin:2px 0 0; }
+.performance-v22-root .project-task-assign-list > label > span { display:grid; min-width:0; gap:3px; }
+.performance-v22-root .project-task-assign-list strong { overflow-wrap:anywhere; }
+.performance-v22-root .project-task-assign-list small { color:#667085; overflow-wrap:anywhere; }
+.performance-v22-root .perf-task-lane-empty { margin:8px 0; padding:14px 10px; border:1px dashed #d5ddeb; border-radius:8px; color:#667085; font-size:10px; text-align:center; }
+.performance-v22-root .task-card[draggable="true"] { cursor:grab; }
+.performance-v22-root .task-card.dragging-v5 { cursor:grabbing; opacity:.55; }
+.performance-v22-root .lane.drag-target-v5 { outline:2px dashed #6b43ff; outline-offset:2px; }
+.performance-v22-root .lane.task-drop-saving { opacity:.65; pointer-events:none; }
+.performance-v22-root .task-card .progress.is-unknown { background:#eef2f7; }
+@media(max-width:760px) { .performance-v22-root .perf-task-filter-note { margin-left:0; } .performance-v22-root .perf-task-filter-label { flex:1 1 135px; } }
+.performance-v22-root .pm22-export-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: 4px;
+  vertical-align: middle;
+}
+.performance-v22-root .pm22-export-button {
+  display: inline-flex;
+  min-width: 70px;
+  height: 36px;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 0 12px;
+  border: 1px solid #d5deeb;
+  border-radius: 9px;
+  background: #fff;
+  color: #26364d;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color .15s ease, border-color .15s ease;
+}
+.performance-v22-root .pm22-export-button:hover {
+  border-color: #b9c7da;
+  background: #f8fafc;
+}
+.performance-v22-root .pm22-export-button svg {
+  width: 14px;
+  height: 14px;
+  flex: 0 0 14px;
+  fill: none !important;
+  stroke: currentColor !important;
+}
+@media (max-width: 720px) {
+  .performance-v22-root .pm22-export-group { gap: 4px; margin-left: 0; }
+  .performance-v22-root .pm22-export-button { min-width: 0; height: 34px; gap: 5px; padding: 0 9px; }
 }

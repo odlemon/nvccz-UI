@@ -2,7 +2,7 @@
 /**
  * Start a dedicated portal dev server (same pattern as deploy/arcus docker-compose).
  *
- * Usage: node scripts/run-portal-dev.mjs [staff|lp|investee|apply|vendor]
+ * Usage: node scripts/run-portal-dev.mjs [staff|lp|investee|apply|vendor|events]
  *
  * Optional overrides, so a second set of instances can run alongside the default ones without
  * fighting over ports or over each other's build output:
@@ -21,11 +21,11 @@ const flag = (name) => {
 }
 
 const portal = (argv.find((a) => !a.startsWith("--")) || "staff").toLowerCase()
-const ports = { staff: 3001, lp: 3110, investee: 3120, apply: 3130, vendor: 3140 }
+const ports = { staff: 3001, lp: 3110, investee: 3120, apply: 3130, vendor: 3140, events: 3150 }
 const port = Number(flag("port") || process.env.PORTAL_PORT || ports[portal])
 
 if (!port) {
-  console.error(`Unknown portal "${portal}". Use: staff | lp | investee | apply | vendor`)
+  console.error(`Unknown portal "${portal}". Use: staff | lp | investee | apply | vendor | events`)
   process.exit(1)
 }
 
@@ -72,6 +72,11 @@ if (portal === "staff") {
   if (!env.NEXT_PUBLIC_APPLY_PORTAL_REDIRECT) {
     env.NEXT_PUBLIC_APPLY_PORTAL_REDIRECT = "1"
   }
+}
+
+if (portal === "events") {
+  env.NEXT_PUBLIC_ORGANIZATION_NAME = env.NEXT_PUBLIC_ORGANIZATION_NAME || "ZB"
+  env.NEXT_PUBLIC_ORGANIZATION_LOGO = env.NEXT_PUBLIC_ORGANIZATION_LOGO || "/events/zb-logo.png"
 }
 
 console.log(`Starting ${portal} portal on http://localhost:${port} (distDir=${distDir})`)

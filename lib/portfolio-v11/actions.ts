@@ -9,12 +9,13 @@ import { fundsApi } from '@/lib/api/funds-api'
 import { investmentImplementationApi } from '@/lib/api/investment-implementation-api'
 import { investmentOpsApi } from '@/lib/api/investment-ops-api'
 import { lpFeesApi } from '@/lib/api/lp-fees-distributions-api'
+import { lpPortalAdminApi } from '@/lib/api/lp-portal-admin-api'
 import { portfolioCompaniesApi } from '@/lib/api/portfolio-companies-api'
 import { stockPickerCashApi } from '@/lib/api/stock-picker-cash-api'
 import { termSheetApi } from '@/lib/api/term-sheet-api'
 import { usersApi } from '@/lib/api/users-api'
 import { getAuthUser } from '@/lib/utils/cookies'
-import { asArray } from './adapters'
+import { adaptCapitalCalls, asArray } from './adapters'
 import { loadPortfolioV11Scopes, type PortfolioDataScope } from './bootstrap'
 import { loadDealDetail } from './live-loaders'
 
@@ -37,6 +38,16 @@ async function rehydrate(scopes: PortfolioDataScope[], filters?: Record<string, 
   return payload
 }
 
+async function refreshCapitalCallDetail(fundId: string, callId: string) {
+  const response = await capitalCallsApi.detail(fundId, callId)
+  const call = adaptCapitalCalls([{
+    fundId,
+    fundName: String(response.data.fund?.name || ''),
+    call: response.data,
+  }])[0]
+  if (call) window.MatanhoPortfolioUI?.updateCapitalCall?.(call)
+}
+
 function firstFundId(ds: Record<string, string>) {
   return ds.fundId || ds.fund_id || ds.portfolioId || ''
 }
@@ -54,11 +65,32 @@ export async function handlePortfolioV11Action(detail: {
         document?: File
       }
   file?: File
-}): Promise<{ handled: boolean; message?: string; error?: string }> {
+}): Promise<{ handled: boolean; message?: string; error?: string; tone?: 'success' | 'warning' }> {
   const action = detail.action || ''
   const ds = detail.dataset || {}
 
   try {
+    if (action === 'api-invite-lp') {
+      const response = await lpPortalAdminApi.inviteMembership({
+        clientId: ds.clientId,
+        email: ds.email,
+        firstName: ds.firstName,
+        lastName: ds.lastName,
+        lpRole: ds.lpRole === 'MANAGER' ? 'MANAGER' : 'VIEWER',
+        fundIds: [],
+      })
+      await rehydrate(['lps'])
+      const invite = response.data?.invite
+      return {
+        handled: true,
+        message: invite?.activationEmailSent
+          ? 'Invitation accepted by mail server'
+          : invite?.created
+            ? 'Portal account created; invitation email was not sent'
+            : 'Portal access updated for existing account',
+        tone: invite?.created && !invite.activationEmailSent ? 'warning' : 'success',
+      }
+    }
     if (action === 'api-create-application' || action === 'submit-add-deal') {
       const filesBag =
         !detail.files || Array.isArray(detail.files)
@@ -129,7 +161,14 @@ export async function handlePortfolioV11Action(detail: {
     ) {
       await capitalCallsApi.sendNotices(ds.fundId, ds.id || ds.capitalCallId)
       await rehydrate(['capitalCalls', 'funds'])
+      await refreshCapitalCallDetail(ds.fundId, ds.id || ds.capitalCallId)
       return { handled: true, message: 'Capital call notices sent' }
+    }
+
+    if (action === 'capital-call-preview-notice' && ds.fundId && ds.id && ds.allocationId) {
+      const response = await capitalCallsApi.notice(ds.fundId, ds.id, ds.allocationId)
+      window.MatanhoPortfolioUI?.showCapitalCallNotice?.(response.data)
+      return { handled: true, message: 'Live notice preview loaded' }
     }
 
     if ((action === 'run-recon-batch' || action === 'start-reconciliation') && ds.id) {
@@ -263,10 +302,13 @@ export async function handlePortfolioV11Action(detail: {
       }
       const carryText = String(ds.carry || '')
       const hurdleMatch = carryText.match(/(\d+(?:\.\d+)?)\s*%\s*hurdle/i)
-      // The edit form's "Status" options (Investing/Fundraising/Realising/Closed) are UI labels, not
-      // the backend's real OPEN/CLOSED/PAUSED enum — only map the one unambiguous case (Closed) and
-      // leave status untouched otherwise, rather than overwriting real backend state with a guess.
-      const statusMap: Record<string, 'OPEN' | 'CLOSED' | 'PAUSED'> = { Closed: 'CLOSED' }
+      // The edit-fund modal now offers the backend's real status labels (Open / Closed / Paused),
+      // so all three map directly. No guesswork, no silent pass-through.
+      const statusMap: Record<string, 'OPEN' | 'CLOSED' | 'PAUSED'> = {
+        Open: 'OPEN',
+        Closed: 'CLOSED',
+        Paused: 'PAUSED',
+      }
       await fundsApi.update(fundId, {
         name: ds.name || undefined,
         description: ds.description || undefined,
@@ -290,10 +332,13 @@ export async function handlePortfolioV11Action(detail: {
       await clientsApi.create({
         legal_name: ds.name || ds.legalName || 'New LP',
         email: ds.email || `lp.${Date.now()}@example.com`,
-        type: ds.type || 'entity',
+        type: ds.type === 'Individual' ? 'individual' : ds.type || 'entity',
         country: ds.country || 'ZW',
         fund_id: ds.fundId || ds.fund_id,
         amount: ds.amount ? Number(ds.amount) : undefined,
+        currency: ds.currency || 'USD',
+        effective_date: ds.effectiveDate || undefined,
+        notes: ds.notes || undefined,
       })
       await rehydrate(['lps'])
       return { handled: true, message: 'LP created' }
@@ -307,17 +352,17 @@ export async function handlePortfolioV11Action(detail: {
       const fundId = ds.fundId
       if (!fundId) return { handled: true, error: 'Fund is required' }
       const res = await capitalCallsApi.initiate(fundId, {
-        callPercent: Number(ds.callPercent || 10),
+        callPercent: ds.callPercent ? Number(ds.callPercent) : undefined,
+        targetAmount: ds.targetAmount ? Number(ds.targetAmount) : undefined,
         paymentDueDate:
           ds.paymentDueDate || new Date(Date.now() + 30 * 86400000).toISOString().slice(0, 10),
         transactionDate: ds.transactionDate || new Date().toISOString().slice(0, 10),
         bankInstructions: ds.bankInstructions || 'Remit per LPA collection account.',
+        purpose: ds.purpose || '',
       })
       await rehydrate(['capitalCalls', 'funds'])
-      // The typed "Total amount" is converted client-side into a flat percent of
-      // each LP's own commitment (see FINDING-PV11-002) — it only matches the
-      // typed figure by coincidence, so report what was actually raised instead
-      // of silently implying the target was hit exactly.
+      // The service solves a commitment call percent whose saved LP snapshots
+      // sum to the exact target amount (subject to eligible uncalled balances).
       const allocations = (res as any)?.data?.allocations || []
       const actualTotal = allocations.reduce(
         (sum: number, a: any) => sum + (Number(a.currentCallAmount) || 0),
@@ -334,6 +379,13 @@ export async function handlePortfolioV11Action(detail: {
           : 'Capital call created',
       }
     }
+
+    if (action === 'capital-call-preview' && ds.fundId) { const response: any = await capitalCallsApi.preview(ds.fundId, { targetAmount: Number(ds.targetAmount || 0) }); window.MatanhoPortfolioUI?.setCapitalCallPreview?.(response.data || response); return { handled: true, message: 'Live exact-total allocation preview loaded' } }
+    if (action === 'capital-call-submit-approval' && ds.fundId && ds.id) { await capitalCallsApi.submitForApproval(ds.fundId, ds.id); await rehydrate(['capitalCalls','funds']); await refreshCapitalCallDetail(ds.fundId, ds.id); window.MatanhoPortfolioUI?.notify?.('Submitted for approval','A different authorised user must approve this call.','success'); return { handled: true, message: 'Submitted for approval' } }
+    if (action === 'capital-call-approve' && ds.fundId && ds.id) { await capitalCallsApi.approve(ds.fundId, ds.id); await rehydrate(['capitalCalls','funds']); await refreshCapitalCallDetail(ds.fundId, ds.id); return { handled: true, message: 'Capital call approved and posted' } }
+    if (action === 'capital-call-reject' && ds.fundId && ds.id) { await capitalCallsApi.reject(ds.fundId, ds.id, ds.reason || ''); await rehydrate(['capitalCalls','funds']); await refreshCapitalCallDetail(ds.fundId, ds.id); return { handled: true, message: 'Capital call rejected' } }
+    if (action === 'capital-call-activity' && ds.fundId && ds.id) { await capitalCallsApi.addActivity(ds.fundId, ds.id, ds.note || ''); await rehydrate(['capitalCalls','funds']); await refreshCapitalCallDetail(ds.fundId, ds.id); return { handled: true, message: 'Activity note saved' } }
+    if (action === 'capital-call-update' && ds.fundId && ds.id) { await capitalCallsApi.updateDraft(ds.fundId, ds.id, { callPercent:Number(ds.callPercent), transactionDate:ds.transactionDate, paymentDueDate:ds.paymentDueDate, bankInstructions:ds.bankInstructions, purpose:ds.purpose }); await rehydrate(['capitalCalls','funds']); await refreshCapitalCallDetail(ds.fundId, ds.id); return { handled: true, message: 'Draft updated' } }
 
     if (action === 'api-create-distribution' || action === 'submit-distribution') {
       const fundId = ds.fundId
@@ -356,9 +408,9 @@ export async function handlePortfolioV11Action(detail: {
         'RETURN_OF_CAPITAL',
         'OTHER',
       ] as const
-      const source = (
-        allowedSources.includes(ds.source as (typeof allowedSources)[number]) ? ds.source : 'OTHER'
-      ) as (typeof allowedSources)[number]
+      const source = allowedSources.includes(ds.source as (typeof allowedSources)[number])
+        ? (ds.source as (typeof allowedSources)[number])
+        : 'OTHER'
       await lpFeesApi.declareDistribution(fundId, {
         distributionDate: ds.distributionDate,
         source,

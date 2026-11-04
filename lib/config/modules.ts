@@ -155,9 +155,9 @@ export const MODULE_CONFIG: ModuleConfig[] = [
     description: "Personal home, news, work, people, services and Matanho AI",
     icon: CiHome,
     color: "oklch(0.55 0.18 255)",
-    path: "/home-v3",
+    path: "/home",
     subModules: [
-      { id: "hv3-home", name: "Home", path: "/home-v3", icon: CiHome, description: "Personal home" },
+      { id: "hv3-home", name: "Home", path: "/home", icon: CiHome, description: "Personal home" },
       { id: "hv3-cover", name: "Daily Cover", path: "/home-v3/cover", icon: CiFileOn, description: "Daily cover studio" },
       { id: "hv3-news", name: "News", path: "/home-v3/news", icon: CiFileOn, description: "News" },
       { id: "hv3-newsletters", name: "Newsletters", path: "/home-v3/newsletters", icon: Mail, description: "Newsletters" },
@@ -303,7 +303,7 @@ export const MODULE_CONFIG: ModuleConfig[] = [
   {
     id: "performance-v22",
     name: "Performance Management",
-    description: "Matanho Performance Management — command centre, scorecards, reviews and compliance",
+    description: "Matanho Performance Management",
     icon: CiViewTimeline,
     color: "oklch(0.55 0.16 280)",
     // Canonical routes are /performance/* (middleware redirects /performance-v22 → /performance).
@@ -360,13 +360,13 @@ export const MODULE_CONFIG: ModuleConfig[] = [
       { id: "pr6-vault", name: "Document Vault", path: "/payroll/vault", icon: CiFileOn, description: "Document vault" },
       { id: "pr6-reports", name: "Reports", path: "/payroll/reports", icon: CiViewTable, description: "Compliance reports" },
       { id: "pr6-settings", name: "Settings", path: "/payroll/settings", icon: CiSettings, description: "Settings & integrations" },
-      { id: "pr6-mypay", name: "My Pay", path: "/payroll/mypay", icon: CiWallet, description: "My Pay" },
+      { id: "pr6-mypay", name: "Payroll", path: "/payroll", icon: CiWallet, description: "Payroll" },
     ]
   },
   {
     id: "procurement-v23",
     name: "Procurement",
-    description: "Procurement & tender management — client V23 faithful port",
+    description: "Procurement & tender management",
     icon: CiViewList,
     color: "oklch(0.56 0.10 220)",
     path: "/procurement",
@@ -392,7 +392,7 @@ export const MODULE_CONFIG: ModuleConfig[] = [
   {
     id: "accounting-v52",
     name: "Accounting",
-    description: "Accounting operating system — client V52 faithful port",
+    description: "Accounting operating system",
     icon: CiDollar,
     color: "oklch(0.55 0.14 255)",
     path: "/accounting",
@@ -792,24 +792,6 @@ export const MODULE_CONFIG: ModuleConfig[] = [
     ],
   },
   {
-    id: "fundraising-kyc",
-    name: "Fundraising KYC",
-    description: "Client Matanho Investor KYC Onboarding design — faithful Next.js port for comparison",
-    icon: UserCheck,
-    color: "oklch(0.48 0.12 170)",
-    path: "/fundraising-kyc",
-    subModules: [
-      { id: "frk-applicant", name: "Applicant profile", path: "/fundraising-kyc", icon: UserCheck, description: "Relationship and product" },
-      { id: "frk-identity", name: "Identity", path: "/fundraising-kyc/identity", icon: Contact, description: "Zimbabwe KYC details" },
-      { id: "frk-liveness", name: "Selfie & liveness", path: "/fundraising-kyc/liveness", icon: CiUser, description: "Authorised person check" },
-      { id: "frk-ownership", name: "Ownership", path: "/fundraising-kyc/ownership", icon: Users, description: "UBOs and controllers" },
-      { id: "frk-investment", name: "Investment & funds", path: "/fundraising-kyc/investment", icon: CircleDollarSign, description: "Purpose and origin" },
-      { id: "frk-compliance", name: "Compliance", path: "/fundraising-kyc/compliance", icon: ScrollText, description: "PEP, sanctions and tax" },
-      { id: "frk-documents", name: "Documents", path: "/fundraising-kyc/documents", icon: FileText, description: "Evidence and signature" },
-      { id: "frk-review", name: "Review & submit", path: "/fundraising-kyc/review", icon: CiCircleCheck, description: "Final certification" },
-    ],
-  },
-  {
     id: "investee-portal-v8",
     name: "Investee Portal",
     description: "Portfolio company KPI, reporting, governance and requests",
@@ -933,15 +915,15 @@ export const MODULE_CONFIG: ModuleConfig[] = [
 ]
 
 export const getModuleById = (id: string): ModuleConfig | undefined => {
-  return MODULE_CONFIG.find(module => module.id === id)
+  return MODULE_CONFIG.find(moduleConfig => moduleConfig.id === id)
 }
 
 export const getSubModuleByPath = (path: string): SubModuleConfig | undefined => {
-  for (const module of MODULE_CONFIG) {
-    const subModule = module.subModules.find(sub => sub.path === path)
+  for (const moduleConfig of MODULE_CONFIG) {
+    const subModule = moduleConfig.subModules.find(sub => sub.path === path)
     if (subModule) return subModule
-    if (module.groups) {
-      for (const group of module.groups) {
+    if (moduleConfig.groups) {
+      for (const group of moduleConfig.groups) {
         if (group.path && group.path === path) {
           return {
             id: group.id,

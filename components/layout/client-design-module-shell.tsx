@@ -12,6 +12,15 @@ import { useClientDesignAuthBridge } from "@/lib/client-design-mock/auth-bridge"
 import { useBrandLogoOverride } from "@/lib/client-design-mock/brand-logo-override"
 import "@/components/layout/arcus-header-overrides.css"
 
+/**
+ * Last module this document authorized for the signed-in user. The App Router
+ * rebuilds this shell from the root when a history entry's route tree does not
+ * match its URL (Back/Forward into /portfolio/<page>), so a per-mount value
+ * cannot smooth that rebuild: the shell would paint the loading fallback and
+ * only then mount the module.
+ */
+let lastAuthorizedModule: string | null = null
+
 interface ClientDesignModuleShellProps {
   children: React.ReactNode
   defaultModuleId: string
@@ -22,6 +31,7 @@ interface ClientDesignModuleShellProps {
   skipTopbar?: boolean
   /** When true, hide the built-in theme toggle in SharedTopbar. */
   hideThemeToggle?: boolean
+  hideHomeButton?: boolean
 }
 
 /**
@@ -37,6 +47,7 @@ export function ClientDesignModuleShell({
   mockApp,
   skipTopbar = false,
   hideThemeToggle = false,
+  hideHomeButton = false,
 }: ClientDesignModuleShellProps) {
   useClientDesignAuthBridge()
   useBrandLogoOverride()
@@ -44,6 +55,10 @@ export function ClientDesignModuleShell({
   const pathname = usePathname()
   const shellRef = useRef<HTMLDivElement>(null)
   const { hasModuleAccess, isAuthenticated, isLoading: permissionsLoading } = useRolePermissions()
+  // A cached, already-authorized module should stay mounted while role details are
+  // refreshed in the background. Replacing the entire module with the loading
+  // fallback during that refresh caused a visible blank flash on client navigation.
+  const [resolvedAuthorizedModule, setResolvedAuthorizedModule] = useState<string | null>(lastAuthorizedModule)
 
   useEffect(() => {
     const routeConfig = getModuleByPath(pathname)
@@ -51,14 +66,29 @@ export function ClientDesignModuleShell({
   }, [pathname])
 
   const routeModuleId = getModuleByPath(pathname)?.id ?? currentModule
-  // My Pay is employee self-service, not Payroll administration. Its API
-  // endpoints are authenticated and self-scoped on the server.
-  const isPersonalPayrollRoute = pathname === "/payroll/mypay"
+  // Home is the authenticated landing page for every staff role. It is not a
+  // business module, so it must not be blocked by the module-level RBAC gate.
+  const isHomeRoute = pathname === "/" || pathname === "/home" || pathname === "/home/"
+  // Payroll V6 evaluates its own role policy through the Payroll access API;
+  // the platform module gate does not include Payroll-only role assignments.
+  const isPayrollAdminRoute = pathname === "/payroll" || pathname.startsWith("/payroll/")
   const moduleDenied =
     !permissionsLoading &&
     isAuthenticated &&
-    !isPersonalPayrollRoute &&
+    !isHomeRoute &&
+    !isPayrollAdminRoute &&
     !hasModuleAccess(routeModuleId)
+
+  useEffect(() => {
+    if (permissionsLoading) return
+    // See lastAuthorizedModule: survives the rebuild of this document's shell.
+    lastAuthorizedModule = isAuthenticated && !moduleDenied ? routeModuleId : null
+    setResolvedAuthorizedModule(lastAuthorizedModule)
+  }, [permissionsLoading, isAuthenticated, moduleDenied, routeModuleId])
+  const keepAuthorizedModuleMounted =
+    permissionsLoading &&
+    isAuthenticated &&
+    resolvedAuthorizedModule === routeModuleId
 
   // The mounted "-mock" module's own nav rail (".sidebar", per the shared
   // convention in home-v3/performance-v22/portfolio-v11's *-overrides.css) is
@@ -157,7 +187,7 @@ export function ClientDesignModuleShell({
     // Module switching handled by ArcusAppSwitcherProvider -> AppSwitcherDropdown
   }
 
-  if (permissionsLoading) return <>{loadingFallback}</>
+  if (permissionsLoading && !keepAuthorizedModuleMounted) return <>{loadingFallback}</>
   if (!isAuthenticated || moduleDenied) {
     const reason = !isAuthenticated
       ? "Sign in with an authorized staff account to continue."
@@ -190,16 +220,17 @@ export function ClientDesignModuleShell({
             onModuleSelect={handleModuleSelect}
             currentModule={currentModule}
             hideThemeToggle={hideThemeToggle}
+            hideHomeButton={hideHomeButton}
           />
         )}
-        <div className={`flex-1 min-h-0 ${isPersonalPayrollRoute ? "overflow-auto" : "overflow-hidden"}`}>
-          {isPersonalPayrollRoute ? children : <Suspense fallback={loadingFallback}>{mockApp}</Suspense>}
+        <div className="flex-1 min-h-0 overflow-hidden">
+          {isPayrollAdminRoute
+            ? mockApp
+            : <Suspense fallback={loadingFallback}>{mockApp}</Suspense>}
         </div>
-        {!isPersonalPayrollRoute && (
-          <div className="sr-only" aria-hidden>
-            {children}
-          </div>
-        )}
+        <div className="sr-only" aria-hidden>
+          <Suspense fallback={null}>{children}</Suspense>
+        </div>
         <ClientDesignAppSwitcher currentModule={currentModule} showHeaderButton={false} />
       </div>
     </ArcusAppSwitcherProvider>

@@ -21,11 +21,15 @@ export interface LpPortalMembership {
   fundIds: string[]
   status: MembershipStatus | null
   createdAt: string
+  invite?: { created: boolean; activationEmailSent: boolean } | null
 }
 
 export interface CreateLpMembershipRequest {
   clientId: string
-  userId: string
+  userId?: string
+  email?: string
+  firstName?: string
+  lastName?: string
   lpRole?: LpRole
   fundIds: string[]
 }

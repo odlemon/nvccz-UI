@@ -24,6 +24,10 @@ export function useFpaBootstrap(preferredModelId?: string) {
     await dispatch(bootstrapFpaSelection(modelId))
   }
 
+  const retryBootstrap = async () => {
+    await dispatch(bootstrapFpaSelection(preferredModelId))
+  }
+
   return {
     bootstrapped,
     loading: loadingModels,
@@ -35,6 +39,7 @@ export function useFpaBootstrap(preferredModelId?: string) {
     versions,
     error,
     selectModel,
+    retryBootstrap,
     setScenarioId: (id: string | null) => dispatch(setSelectedScenarioId(id)),
     setVersionId: (id: string | null) => dispatch(setSelectedVersionId(id)),
   }

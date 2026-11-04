@@ -122,7 +122,7 @@ function CampaignSummaryCard({
         </span>
       </div>
 
-      <p className="mt-2 text-[11px] text-[#141414]">{campaign.type.replace(/_/g, " ")}</p>
+      <p className="mt-2 text-[11px] text-[#141414]">{campaign.type.replace(/_/g, " ")} · {campaign.reference}</p>
       <p className="mt-0.5 text-[11px] leading-relaxed text-[#111111]">
         {campaign.startDate ? `Starts ${new Date(campaign.startDate).toLocaleDateString()}` : "No start date set"}
         {campaign.closeDate ? ` · Target close ${new Date(campaign.closeDate).toLocaleDateString()}` : ""}

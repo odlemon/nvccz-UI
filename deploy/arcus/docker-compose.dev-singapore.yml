@@ -88,9 +88,13 @@ services:
       DB_HOST: mysql
       DB_PORT: "3306"
       DATABASE_URL: mysql://arcus_dev:${MYSQL_PASSWORD}@mysql:3306/arcus_dev
-      RUN_SEED: "1"
+      RUN_SEED: "0"
       REMOTE_UPLOAD_SERVICE_URL: http://upload:3050/upload
       REMOTE_MEDIA_INTERNAL_BASE: http://upload:3050/uploads
+      EVENTS_PORTAL_URL: https://dev.events.matanho.com
+      EMAIL_FROM_ADDRESS_EVENTS: events@matanho.com
+      EVENTS_BRAND_NAME: ZB
+      EVENTS_BRAND_WEBSITE: https://zb.co.zw
     volumes:
       - arcus_dev_api_storage:/app/storage/local-upload-mock
 
@@ -162,6 +166,8 @@ services:
       args:
         <<: *ui-args
         NEXT_PUBLIC_PORTAL: events
+        NEXT_PUBLIC_ORGANIZATION_NAME: ZB
+        NEXT_PUBLIC_ORGANIZATION_LOGO: /events/zb-logo.png
     ports:
       - "127.0.0.1:3315:3000"
 

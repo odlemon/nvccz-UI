@@ -79,9 +79,12 @@ export function BulkUploadGuestsDialog({ isOpen, onClose, eventId }: BulkUploadG
         mode === "file" ? { file: file! } : { text }
       )
       if (res.success) {
-        toast.success("Guests uploaded successfully", {
-          description: `${res.data?.length ?? 0} guests created — invitations sent`,
-        })
+        const delivery = res.announcementDelivery ?? res.data?.announcementDelivery ?? []
+        const failed = delivery.filter((item: any) => item.status === "FAILED")
+        toast[failed.length ? "warning" : "success"](
+          failed.length ? "Guests uploaded, but some announcements failed" : "Guests uploaded; announcements are sending",
+          { description: `${res.data?.created ?? 0} guests created; ${failed.length} announcement failures.` }
+        )
         await dispatch(fetchEventGuests({ eventId }))
         reset()
         onClose()
@@ -101,7 +104,7 @@ export function BulkUploadGuestsDialog({ isOpen, onClose, eventId }: BulkUploadG
         <DialogHeader>
           <DialogTitle>Bulk Upload Guests</DialogTitle>
           <DialogDescription>
-            Add many guests at once via CSV/XLSX file or pasted text. Each guest receives an invitation email with a unique RSVP link.
+            Add guests via CSV/XLSX or pasted text. Each new guest receives the Save the Date announcement. Official RSVP invitations are sent separately.
           </DialogDescription>
         </DialogHeader>
 
@@ -153,7 +156,7 @@ export function BulkUploadGuestsDialog({ isOpen, onClose, eventId }: BulkUploadG
                 {file ? file.name : "Click to choose a file"}
               </span>
               <span className="text-xs text-muted-foreground mt-1">
-                Expected columns: name, email, phone (company/title optional)
+                Required columns: name, email, salutation (Mr or Mrs), phone; company/title optional
               </span>
               <input
                 id="bulk-file"
@@ -171,7 +174,7 @@ export function BulkUploadGuestsDialog({ isOpen, onClose, eventId }: BulkUploadG
               <Button
                 onClick={() => handleUpload("file")}
                 disabled={submitting || !file}
-                className="rounded-full bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700"
+                className="rounded-full bg-[#00843d] text-white hover:bg-[#006d32]"
               >
                 {submitting ? (
                   <>
@@ -181,7 +184,7 @@ export function BulkUploadGuestsDialog({ isOpen, onClose, eventId }: BulkUploadG
                 ) : (
                   <>
                     <Upload className="w-4 h-4 mr-2" />
-                    Upload & invite
+                  Upload & send announcement
                   </>
                 )}
               </Button>
@@ -195,12 +198,12 @@ export function BulkUploadGuestsDialog({ isOpen, onClose, eventId }: BulkUploadG
               value={text}
               onChange={(e) => setText(e.target.value)}
               rows={8}
-              placeholder={"John Doe, john@example.com, +263771234567\nJane Smith, jane@example.com, +263772345678"}
+              placeholder={"John Doe, john@example.com, Mr, +263771234567\nJane Smith, jane@example.com, Mrs, +263772345678"}
               className="font-mono text-sm rounded-xl"
             />
             <p className="text-xs text-muted-foreground flex items-center gap-1">
               <FileText className="w-3 h-3" />
-              One guest per line as <code className="bg-muted px-1 rounded">name, email, phone</code>
+              One guest per line as <code className="bg-muted px-1 rounded">name, email, Mr or Mrs, phone</code>
             </p>
 
             <DialogFooter>
@@ -210,7 +213,7 @@ export function BulkUploadGuestsDialog({ isOpen, onClose, eventId }: BulkUploadG
               <Button
                 onClick={() => handleUpload("text")}
                 disabled={submitting || !text.trim()}
-                className="rounded-full bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700"
+                className="rounded-full bg-[#00843d] text-white hover:bg-[#006d32]"
               >
                 {submitting ? (
                   <>
@@ -220,7 +223,7 @@ export function BulkUploadGuestsDialog({ isOpen, onClose, eventId }: BulkUploadG
                 ) : (
                   <>
                     <Upload className="w-4 h-4 mr-2" />
-                    Upload & invite
+                  Upload & send announcement
                   </>
                 )}
               </Button>

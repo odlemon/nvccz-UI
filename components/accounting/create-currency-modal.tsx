@@ -57,6 +57,8 @@ export function CreateCurrencyModal({ isOpen, onClose, onSuccess, currency }: Cr
 
     if (!formData.code.trim()) {
       newErrors.code = "Currency code is required"
+    } else if (formData.code.trim().toUpperCase() === "ZWL") {
+      newErrors.code = "ZWL is retired and can no longer be added to Accounting"
     } else if (formData.code.length < 2 || formData.code.length > 10) {
       newErrors.code = "Currency code must be between 2-10 characters"
     }
@@ -154,7 +156,7 @@ export function CreateCurrencyModal({ isOpen, onClose, onSuccess, currency }: Cr
                 id="code"
                 value={formData.code}
                 onChange={(e) => handleInputChange('code', e.target.value)}
-                placeholder="e.g., USD, EUR, ZWL"
+                placeholder="e.g., USD, ZIG"
                 className={cn("rounded-full h-10", errors.code ? 'border-red-500' : '')}
                 maxLength={10}
               />
@@ -172,7 +174,7 @@ export function CreateCurrencyModal({ isOpen, onClose, onSuccess, currency }: Cr
                 id="name"
                 value={formData.name}
                 onChange={(e) => handleInputChange('name', e.target.value)}
-                placeholder="e.g., US Dollar, Euro, Zimbabwean Dollar"
+                placeholder="e.g., US Dollar, ZiG (Zimbabwe Gold)"
                 className={cn("rounded-full h-10", errors.name ? 'border-red-500' : '')}
                 maxLength={100}
               />

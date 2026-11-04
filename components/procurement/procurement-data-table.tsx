@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -54,6 +54,8 @@ export interface ProcurementDataTableProps<T> {
   pageSize?: number
   exportable?: boolean
   onExport?: (data: T[]) => void
+  exportControls?: (data: T[]) => React.ReactNode
+  accuratePagination?: boolean
   emptyMessage?: string
   showSearch?: boolean
   showFilters?: boolean
@@ -87,6 +89,8 @@ export function ProcurementDataTable<T extends { id: string }>({
   pageSize = 10,
   exportable = true,
   onExport,
+  exportControls,
+  accuratePagination = false,
   emptyMessage = "No data available",
   showSearch = true,
   showFilters = true,
@@ -107,10 +111,8 @@ export function ProcurementDataTable<T extends { id: string }>({
 
   // Use backend pagination data if available, otherwise calculate frontend pagination
   const isBackendPagination = usePagination === 'backend' && paginationData
-  const totalEntries = isBackendPagination ? paginationData.total : (Array.isArray(data) ? data.length : 0)
   const currentPageNumber = isBackendPagination ? paginationData.page : currentPage
   const currentLimit = isBackendPagination ? paginationData.limit : currentPageSize
-  const totalPages = isBackendPagination ? paginationData.totalPages : Math.ceil((Array.isArray(data) ? data.length : 0) / currentPageSize)
 
   // Filter and search data (only for frontend pagination)
   const filteredData = useMemo(() => {
@@ -186,6 +188,12 @@ export function ProcurementDataTable<T extends { id: string }>({
     })
   }, [filteredData, sortConfig, isBackendPagination])
 
+  const totalEntries = isBackendPagination ? paginationData.total : (accuratePagination ? sortedData.length : data.length)
+  const totalPages = isBackendPagination ? paginationData.totalPages : Math.ceil(totalEntries / currentPageSize)
+  useEffect(() => {
+    if (accuratePagination && !isBackendPagination && currentPage > Math.max(1, totalPages)) setCurrentPage(Math.max(1, totalPages))
+  }, [currentPage, totalPages, isBackendPagination, accuratePagination])
+
   // Paginate data (only for frontend pagination)
   const paginatedData = useMemo(() => {
     if (isBackendPagination) return sortedData // Backend handles pagination
@@ -245,7 +253,6 @@ export function ProcurementDataTable<T extends { id: string }>({
   const handlePageSizeChange = (newPageSize: number) => {
     if (isBackendPagination) {
       onPageSizeChange?.(newPageSize)
-      onPageChange?.(1) // Reset to first page
     } else {
       setCurrentPageSize(newPageSize)
       setCurrentPage(1) // Reset to first page
@@ -282,7 +289,7 @@ export function ProcurementDataTable<T extends { id: string }>({
     )
   }
 
-  const startEntry = ((currentPageNumber - 1) * currentLimit) + 1
+  const startEntry = totalEntries ? ((currentPageNumber - 1) * currentLimit) + 1 : 0
   const endEntry = Math.min(currentPageNumber * currentLimit, totalEntries)
 
   return (
@@ -297,7 +304,7 @@ export function ProcurementDataTable<T extends { id: string }>({
                 Create New
               </Button>
             )}
-            {exportable && (
+            {exportControls ? exportControls(sortedData) : exportable && (
               <Button variant="outline" onClick={handleExport}>
                 <Download className="w-4 h-4 mr-2" />
                 Export
@@ -411,14 +418,17 @@ export function ProcurementDataTable<T extends { id: string }>({
                       key={row.id}
                       onClick={() => onView?.(row)}
                       onKeyDown={(e) => {
-                        if (!onView) return
+                        // Keep the native table-row role. Only activate the row when the row
+                        // itself has focus; Enter/Space on a nested checkbox or action button
+                        // must remain owned by that control.
+                        if (!onView || e.target !== e.currentTarget) return
                         if (e.key === "Enter" || e.key === " ") {
                           e.preventDefault()
                           onView(row)
                         }
                       }}
                       tabIndex={onView ? 0 : -1}
-                      role={onView ? "button" : undefined}
+                      aria-label={onView ? `${title}: open row` : undefined}
                       className={`transition-colors ${onView ? "cursor-pointer hover:bg-gray-50 focus:bg-gray-50" : ""}`}
                     >
                       {(bulkActions.length > 0 || onBulkAction) && (

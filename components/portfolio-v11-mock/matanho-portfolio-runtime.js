@@ -1,7 +1,37 @@
 /* Auto-extracted Matanho Portfolio V25 runtime — adapted for Next.js (/portfolio) */
+import * as XLSX from 'xlsx';
+
 export function startPortfolioV11Runtime(rootEl, options = {}) {
-  const initialPage = options.initialPage || 'dashboard';
+  // Deep links can enter through the shared portfolio layout before the
+  // React pathname state is available. Resolve the settings route here too,
+  // so the embedded runtime cannot fall back to the dashboard by accident.
+  const initialPage = window.location.pathname.includes('/portfolio/settings')
+    ? 'settings'
+    : (options.initialPage || 'dashboard');
+  const initialCompanyMatch = window.location.pathname.match(/^\/portfolio\/companies\/([^/]+)\/?$/);
+  const initialCompanyId = initialCompanyMatch ? decodeURIComponent(initialCompanyMatch[1]) : '';
+  const initialCompanyTab = new URLSearchParams(window.location.search).get('tab') || 'overview';
   const liveOnly = Boolean(options.liveOnly);
+  const authenticatedUser = options.currentUser && typeof options.currentUser === 'object' ? options.currentUser : null;
+  const allowSyntheticFixtures = options.allowSyntheticFixtures === true;
+  const localUatFundId = allowSyntheticFixtures ? String(options.localUatFundId || 'cmvago6yv002punqkm0qbniwa') : '';
+  const managerLegalEntity = String(options.managerLegalEntity || 'Configured legal entity');
+  const hasRuntimeGrant = (grant) => typeof grant === 'function' ? grant() === true : grant === true;
+  const onRbacGrantsChanged = typeof options.onRbacGrantsChanged === 'function' ? options.onRbacGrantsChanged : null;
+  const onRbacRoleAssigned = typeof options.onRbacRoleAssigned === 'function' ? options.onRbacRoleAssigned : null;
+  const onRbacAssignmentPeople = typeof options.onRbacAssignmentPeople === 'function' ? options.onRbacAssignmentPeople : null;
+  const onRbacRoleCreated = typeof options.onRbacRoleCreated === 'function' ? options.onRbacRoleCreated : null;
+  const onRbacConfigurationExported = typeof options.onRbacConfigurationExported === 'function' ? options.onRbacConfigurationExported : null;
+  const onRbacRecordDetail = typeof options.onRbacRecordDetail === 'function' ? options.onRbacRecordDetail : null;
+  const onRbacRoleRefreshed = typeof options.onRbacRoleRefreshed === 'function' ? options.onRbacRoleRefreshed : null;
+  const onRbacRoleAudit = typeof options.onRbacRoleAudit === 'function' ? options.onRbacRoleAudit : null;
+  const onRbacRoleActivated = typeof options.onRbacRoleActivated === 'function' ? options.onRbacRoleActivated : null;
+  const onRbacRoleDisabled = typeof options.onRbacRoleDisabled === 'function' ? options.onRbacRoleDisabled : null;
+  const onRbacRoleRestored = typeof options.onRbacRoleRestored === 'function' ? options.onRbacRoleRestored : null;
+  const onRbacPolicyPreview = typeof options.onRbacPolicyPreview === 'function' ? options.onRbacPolicyPreview : null;
+  const onCompaniesPage = typeof options.onCompaniesPage === 'function' ? options.onCompaniesPage : null;
+  const onCompanyDocumentUpload = typeof options.onCompanyDocumentUpload === 'function' ? options.onCompanyDocumentUpload : null;
+  const onCompanyDocumentRequest = typeof options.onCompanyDocumentRequest === 'function' ? options.onCompanyDocumentRequest : null;
   window.__PORTFOLIO_V11_NAV__ = options.onNavigate || (() => {});
 
   rootEl.innerHTML = options.shellHtml || '';
@@ -18,7 +48,7 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
   const __pv11Sig = { signal: __pv11Abort.signal };
   let api = { setPage() {}, destroy() {} };
 
-  
+
   'use strict';
 
   const $ = (selector, root = document) => root.querySelector(selector);
@@ -161,6 +191,7 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
       { id: 'deals', label: 'Deal Flow', icon: 'briefcase', count: true },
       { id: 'funds', label: 'Funds', icon: 'layers', count: true },
       { id: 'capital-calls', label: 'Capital Calls', icon: 'wallet', count: true },
+      { id: 'distributions', label: 'Distributions', icon: 'trend-up', count: true },
       { id: 'companies', label: 'Portfolio Companies', icon: 'building', count: true }
     ]},
     { label: 'FUND OPERATIONS', items: [
@@ -236,6 +267,7 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
     { id:'CC-2026-0034', fund:'Matanho Venture Fund I', callDate:'05 Jun 2026', dueDate:'05 Jul 2026', purpose:'New investments', amount:18500000, lpCount:41, collected:5600000, status:'Draft', approval:'Draft' },
     { id:'CC-2026-0033', fund:'Matanho Opportunity Fund', callDate:'28 May 2026', dueDate:'28 Jun 2026', purpose:'Follow-on investments', amount:22500000, lpCount:31, collected:2300000, status:'Approved', approval:'Approved' }
   ];
+  const distributions = [];
 
   const lps = [
     { id:'LP-001', name:'Zambezi Pension Fund', type:'Pension Fund', geography:'Africa', commitment:250000000, called:155000000, distributed:78400000, netIrr:14.2, owner:'Maya Moyo', lastInteraction:'3 Jul 2026', kyc:'Verified', portal:'Active', unfunded:95000000, tvpi:1.84, dpi:.31, color:'#111827' },
@@ -462,16 +494,29 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
     dealDetail: null,
     dealDetailLoading: false,
     dealView: 'list',
-    selectedCompanyId: 'CO-001',
+    selectedCompanyId: initialCompanyId || 'CO-001',
+    companyRecord: null,
+    companyRecordLoading: Boolean(initialCompanyId),
+    companyRecordError: null,
+    companyDocumentFolder: 'All folders',
+    companyDocumentUploadFolder: 'Financial',
     selectedFundId: 'FUND-001',
     selectedLPId: 'LP-001',
     fundTab: 'overview',
-    companyTab: 'overview',
+    companyTab: ['overview','performance','metrics','value-creation','board','financials','documents','activity'].includes(initialCompanyTab) ? initialCompanyTab : 'overview',
+    companyPage: 1,
+    companyPageSize: 10,
+    companyListFilters: { fundId: '', sector: 'All sectors', status: 'All statuses' },
+    companyListPageRows: null,
+    companyListPagination: null,
+    companyListLoading: false,
+    companyListError: null,
     lpTab: 'overview',
     selectedCapitalCallId: 'CC-2026-0038',
     tableSearch: '',
     fundPerformanceSnapshots: {},
     fundDocuments: {},
+    fundDistributions: {},
     searchQuery: '',
     drawer: null,
     modal: null,
@@ -546,6 +591,7 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
         companies: cloneForIntegration(companies),
         deals: cloneForIntegration(deals),
         capitalCalls: cloneForIntegration(capitalCalls),
+        distributions: cloneForIntegration(distributions),
         lps: cloneForIntegration(lps),
         reports: cloneForIntegration(reports),
         documents: cloneForIntegration(documents),
@@ -584,6 +630,7 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
     replaceCollection(companies, source.companies || source.portfolioCompanies);
     replaceCollection(deals, source.deals);
     replaceCollection(capitalCalls, source.capitalCalls);
+    replaceCollection(distributions, source.distributions);
     replaceCollection(lps, source.lps || source.limitedPartners);
     replaceCollection(reports, source.reports || source.reportingSchedules);
     replaceCollection(documents, source.documents);
@@ -700,6 +747,7 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
   }
 
   function button(label, action, style = '', iconName = '', attrs = '') {
+    if (action === 'submit-cash-account') label = 'Create account';
     return `<button type="button" class="button ${style}" data-action="${action}" ${attrs}>${iconName ? icon(iconName) : ''}<span>${escapeHTML(label)}</span></button>`;
   }
 
@@ -708,7 +756,7 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
     return `<div class="workspace-filter-bar">${items.map(item => {
       if (item.type === 'button') return button(item.label,item.action,item.style||'compact',item.icon||'filter',item.attrs||'');
       return `<label class="workspace-filter"><span>${escapeHTML(item.label)}</span><select data-change-action="${escapeHTML(item.action)}">${item.options.map(option=>`<option ${option===item.selected?'selected':''}>${escapeHTML(option)}</option>`).join('')}</select></label>`;
-    }).join('')}<span class="filter-freshness">${icon('clock')} Data refreshed 31 Jul 2026 · 18:45 CAT</span></div>`;
+    }).join('')}<span class="filter-freshness">${icon('clock')} ${state.liveData ? 'Live records loaded for this view' : 'Illustrative preview data'}</span></div>`;
   }
 
   function softFocus(target) {
@@ -941,6 +989,7 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
       funds: 'Funds',
       'fund-detail': 'Fund detail',
       'capital-calls': 'Capital Calls',
+      distributions: 'Distributions',
       'capital-call-detail': 'Capital call',
       companies: 'Portfolio Companies',
       'company-detail': 'Company detail',
@@ -1133,14 +1182,15 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
   const cashContextBar = (accountId = state.selectedCashAccountId) => {
     const account = cashAccounts.find(item => item.id === accountId) || cashAccounts[0];
     if (!account) {
-      return `<div class="cash-context-bar"><div><span>Manager legal entity</span><strong>Matanho Capital Zimbabwe</strong></div><div><span>Fund / Vehicle</span><strong>No cash accounts loaded</strong></div><div><span>External account</span><strong>—</strong></div><div><span>Purpose / Currency</span><strong>—</strong></div><div><span>As of</span><strong>${escapeHTML(state.asOfDate || '—')} · Africa/Harare</strong></div></div>`;
+      return `<div class="cash-context-bar"><div><span>Manager legal entity</span><strong>${escapeHTML(managerLegalEntity)}</strong></div><div><span>Fund / Vehicle</span><strong>No cash accounts loaded</strong></div><div><span>External account</span><strong>—</strong></div><div><span>Purpose / Currency</span><strong>—</strong></div><div><span>As of</span><strong>${escapeHTML(state.asOfDate || '—')} · Africa/Harare</strong></div></div>`;
     }
     const purpose = String(account.purpose || 'FUND_OPERATING_BANK').replaceAll('_',' ');
-    return `<div class="cash-context-bar"><div><span>Manager legal entity</span><strong>Matanho Capital Zimbabwe</strong></div><div><span>Fund / Vehicle</span><strong>${escapeHTML(account.fund || '—')} · ${escapeHTML(account.vehicle || '—')}</strong></div><div><span>External account</span><strong>${escapeHTML(account.provider || '—')} ${escapeHTML(account.masked || '••••')}</strong></div><div><span>Purpose / Currency</span><strong>${escapeHTML(purpose)} · ${escapeHTML(account.currency || 'USD')}</strong></div><div><span>As of</span><strong>${escapeHTML(state.asOfDate || '—')} · Africa/Harare</strong></div></div>`;
+    const externalAccount=[account.provider,account.accountName || account.vehicle || account.fund,account.masked].filter(v=>v && v!=='—' && v!=='••••').join(' · ') || 'Not mapped';
+    return `<div class="cash-context-bar"><div><span>Manager legal entity</span><strong>${escapeHTML(managerLegalEntity)}</strong></div><div><span>Fund / Vehicle</span><strong>${escapeHTML(account.fund || '—')} · ${escapeHTML(account.vehicle || '—')}</strong></div><div><span>External account</span><strong>${escapeHTML(externalAccount)}</strong></div><div><span>Purpose / Currency</span><strong>${escapeHTML(purpose)} · ${escapeHTML(account.currency || 'USD')}</strong></div><div><span>As of</span><strong>${escapeHTML(state.asOfDate || '—')} · Africa/Harare</strong></div></div>`;
   };
 
   function renderCashAccounts() {
-    const rows = cashAccounts.map(account => `<tr class="clickable" data-action="open-cash-account" data-id="${account.id}"><td class="table-primary"><span class="document-name-cell"><span class="document-row-icon folder">${icon('bank')}</span><span>${escapeHTML(account.id)}<small>${escapeHTML(account.masked)}</small></span></span></td><td>${escapeHTML(account.fund)}<small>${escapeHTML(account.vehicle)}</small></td><td>${escapeHTML(String(account.purpose||'FUND_OPERATING_BANK').replaceAll('_',' '))}</td><td>${escapeHTML(account.provider)}</td><td>${escapeHTML(account.currency)}</td><td>${statusPill(account.status)}</td><td>${formatMoney(account.settled,account.currency)}</td><td>${pct(account.reconHealth)}</td><td>${statusPill(account.reconHealth>=98?'Healthy':account.reconHealth>=90?'Review':'At risk',account.reconHealth>=98?'success':account.reconHealth>=90?'warning':'danger')}</td></tr>`).join('');
+    const rows = cashAccounts.map(account => { const purpose = String(account.purpose||'FUND_OPERATING_BANK').replaceAll('_',' '); const displayName = account.accountName || `${account.fund === '—' ? 'Pending account' : account.fund} · ${purpose}`; const isClientAccount = String(account.ownerType || account.accountClass || (account.clientOrVehicleId && /^client/i.test(account.clientOrVehicleId) ? 'CLIENT' : 'FUND')).toUpperCase() === 'CLIENT'; const ownerType = isClientAccount ? 'Client account' : 'Fund account'; return `<tr class="clickable" data-action="open-cash-account" data-id="${account.id}"><td class="table-primary"><span class="document-name-cell"><span class="document-row-icon folder">${icon('bank')}</span><span>${escapeHTML(displayName)}<small>${statusPill(ownerType,isClientAccount?'info':'success')} ${escapeHTML(account.masked)}</small></span></span></td><td>${escapeHTML(account.fund === '—' ? 'Awaiting fund link' : account.fund)}<small>${escapeHTML(account.vehicle)}</small></td><td>${escapeHTML(purpose)}</td><td>${escapeHTML(account.provider || 'Provider mapping pending')}</td><td>${escapeHTML(account.currency)}</td><td>${statusPill(account.status)}</td><td>${formatMoney(account.settled,account.currency)}</td><td>${pct(account.reconHealth)}</td><td>${statusPill(account.reconHealth>=98?'Healthy':account.reconHealth>=90?'Review':'At risk',account.reconHealth>=98?'success':account.reconHealth>=90?'warning':'danger')}</td></tr>`; }).join('');
     const totalSettled=sum(cashAccounts.filter(a=>a.currency==='USD'),a=>a.settled);
     return `${pageHeader('Client / Fund Accounts','Authorised fund, vehicle and investor-linked cash accounts with lifecycle, provider mapping and reconciliation health.',`${button('Export accounts','export-cash-accounts','','download')}${button('Create account','create-cash-account','primary','plus')}`,'Cash & Reconciliation')}
       ${cashContextBar()}
@@ -1178,7 +1228,7 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
 
   function renderCashLedger() {
     const exportedCount=cashJournals.filter(j=>j.accounting==='Exported').length;
-    const rows=cashJournals.map(j=>`<tr class="clickable" data-action="open-journal" data-id="${j.id}"><td class="table-primary">${escapeHTML(j.id)}<small>${escapeHTML(j.source)}</small></td><td>${escapeHTML(j.event)}</td><td>${escapeHTML(j.fund)}<small>${escapeHTML(j.account)}</small></td><td>${escapeHTML(j.valueDate)}</td><td>${formatMoney(j.debit)}</td><td>${formatMoney(j.credit)}</td><td class="${j.signed>=0?'positive':'negative'}">${formatMoney(j.signed)}</td><td>${statusPill(j.status)}</td><td>${formatMoney(j.reconciled)}</td><td>${statusPill(j.accounting)}</td></tr>`).join('');
+    const rows=cashJournals.map(j=>`<tr class="clickable" data-action="open-journal" data-id="${j.id}"><td class="table-primary">${escapeHTML(j.displayId || j.id)}<small>${escapeHTML(j.source)}</small></td><td>${escapeHTML(j.event)}</td><td>${escapeHTML(j.fund)}<small>${escapeHTML(j.account)}</small></td><td>${escapeHTML(j.valueDate)}</td><td>${formatMoney(j.debit)}</td><td>${formatMoney(j.credit)}</td><td class="${j.signed>=0?'positive':'negative'}">${formatMoney(j.signed)}</td><td>${statusPill(j.status)}</td><td>${formatMoney(j.reconciled)}</td><td>${statusPill(j.accounting)}</td></tr>`).join('');
     return `${pageHeader('Cash Ledger','Immutable double-entry journals, source events, cash lines, accounting status and reconciliation evidence.',`${button('Export approved journals','export-ledger','','download')}${button('Create manual journal','create-manual-journal','primary','plus')}`,'Cash & Reconciliation')}${cashContextBar()}
       <section class="summary-strip section-gap"><div class="summary-item"><span>Posted journals</span><strong>${cashJournals.filter(j=>j.status==='POSTED').length}</strong><small>Current visible population</small></div><div class="summary-item"><span>Total debits</span><strong>${formatMoney(sum(cashJournals,j=>j.debit))}</strong><small>Exactly equals credits</small></div><div class="summary-item"><span>Total credits</span><strong>${formatMoney(sum(cashJournals,j=>j.credit))}</strong><small>Balanced by currency</small></div><div class="summary-item"><span>Reconciled amount</span><strong>${formatMoney(sum(cashJournals,j=>j.reconciled))}</strong><small>External proof linked</small></div><div class="summary-item"><span>Pending approvals</span><strong>${cashJournals.filter(j=>j.status!=='POSTED').length}</strong><small>Maker-checker required</small></div><div class="summary-item"><span>GL export status</span><strong>${exportedCount} / ${cashJournals.length}</strong><small>${cashJournals.length-exportedCount} pending export</small></div></section>
       <section class="card table-card section-gap"><div class="table-toolbar"><div class="table-title-row"><h3>Journal Register</h3><span class="table-badge">Posted history cannot be edited or deleted</span></div><div class="table-tools">${button('Filters','ledger-filters','','filter')}${button('Trace source','trace-ledger-source','','link')}</div></div><div class="table-wrap"><table><thead><tr><th>Journal / Source</th><th>Economic Event</th><th>Fund / Account</th><th>Value Date</th><th>Debit</th><th>Credit</th><th>Cash Effect</th><th>Status</th><th>Reconciled</th><th>Accounting</th></tr></thead><tbody>${rows}</tbody></table></div></section>`;
@@ -1228,7 +1278,7 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
   }
 
   function renderExceptions() {
-    const rows=reconciliationExceptions.map(e=>`<tr class="clickable" data-action="open-recon-exception" data-id="${e.id}"><td class="table-primary">${escapeHTML(e.id)}<small>${escapeHTML(e.batch)}</small></td><td>${statusPill(e.code,'info')}</td><td>${escapeHTML(e.account)}</td><td>${formatMoney(e.amount,e.currency)}</td><td>${statusPill(e.severity,e.severity==='Critical'||e.severity==='High'?'danger':e.severity==='Medium'?'warning':'info')}</td><td>${escapeHTML(e.owner)}</td><td>${e.age} days</td><td>${escapeHTML(e.due)}</td><td>${statusPill(e.status)}</td><td>${e.evidence} files</td></tr>`).join('');
+    const rows=reconciliationExceptions.map(e=>`<tr class="clickable" data-action="open-recon-exception" data-id="${e.id}"><td class="table-primary">${escapeHTML(e.displayId || e.id)}<small>${escapeHTML(e.batch || '—')}</small></td><td>${statusPill(e.code,'info')}</td><td>${escapeHTML(e.account || 'Not mapped')}</td><td>${formatMoney(e.amount,e.currency)}</td><td>${statusPill(e.severity,e.severity==='Critical'||e.severity==='High'?'danger':e.severity==='Medium'?'warning':'info')}</td><td>${escapeHTML(e.owner)}</td><td>${e.age} days</td><td>${escapeHTML(e.due)}</td><td>${statusPill(e.status)}</td><td>${e.evidence} files</td></tr>`).join('');
     return `${pageHeader('Reconciliation Exceptions','Owned investigation cases for unmatched, duplicated, stale, suspense, policy and balance differences.',`${button('Export exceptions','export-exceptions','','download')}${button('Create exception','create-exception','primary','plus')}`,'Cash & Reconciliation')}${cashContextBar()}
       <section class="exception-summary section-gap"><div class="exception-tile critical"><span>Critical</span><strong>${reconciliationExceptions.filter(e=>e.severity==='Critical').length}</strong><small>Blocks close immediately</small></div><div class="exception-tile high"><span>High</span><strong>${reconciliationExceptions.filter(e=>e.severity==='High').length}</strong><small>Due within 24 hours</small></div><div class="exception-tile medium"><span>Medium</span><strong>${reconciliationExceptions.filter(e=>e.severity==='Medium').length}</strong><small>Assigned and ageing</small></div><div class="exception-tile"><span>Pending approval</span><strong>${reconciliationExceptions.filter(e=>e.status==='PENDING_APPROVAL').length}</strong><small>Checker decision needed</small></div><div class="exception-tile"><span>Total exposure</span><strong>${formatMoney(sum(reconciliationExceptions.filter(e=>e.currency==='USD'),e=>e.amount))}</strong><small>USD exceptions only</small></div></section>
       <section class="card table-card section-gap"><div class="table-toolbar"><div class="table-title-row"><h3>Exception Case Register</h3><span class="table-badge">Immutable activity and evidence trail</span></div><div class="table-tools">${button('SLA view','exception-sla-view','','clock')}${button('Filters','exception-filters','','filter')}</div></div><div class="table-wrap"><table><thead><tr><th>Case / Batch</th><th>Category</th><th>Account</th><th>Amount</th><th>Severity</th><th>Owner</th><th>Age</th><th>Due</th><th>Status</th><th>Evidence</th></tr></thead><tbody>${rows}</tbody></table></div></section>`;
@@ -1241,7 +1291,7 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
     const blockerCount=closeControls.length-passedCount;
     const readiness=Math.round(passedCount/closeControls.length*100);
     return `${pageHeader('Period Close & General-Ledger Control','Itemised pre-check, approvals, immutable close version, reopen/restatement and idempotent accounting export.',`${button('Download evidence pack','export-close-pack','','download')}${button('Run close pre-check','run-close-precheck','primary','refresh',`data-id="${closePeriodCode}"`)}`,'Cash & Reconciliation')}${cashContextBar()}
-      <section class="close-hero section-gap"><div><span>Close period</span><strong>July 2026</strong><small>Matanho Capital Zimbabwe · 5 funds · USD and ZWG</small></div><div class="close-readiness"><div class="radial-progress" style="--value:${readiness}"><strong>${readiness}%</strong><small>ready</small></div><div><strong>${passedCount} controls passed</strong><span>${blockerCount} blocker${blockerCount===1?'':'s'} must be cleared before approval</span></div></div><div class="close-actions">${statusPill('RECONCILING','warning')}${button('Request approval','request-close-approval','','user-check',`data-id="${closePeriodCode}"`)}</div></section>
+      <section class="close-hero section-gap"><div><span>Close period</span><strong>July 2026</strong><small>${escapeHTML(managerLegalEntity)} · 5 funds · USD and ZWG</small></div><div class="close-readiness"><div class="radial-progress" style="--value:${readiness}"><strong>${readiness}%</strong><small>ready</small></div><div><strong>${passedCount} controls passed</strong><span>${blockerCount} blocker${blockerCount===1?'':'s'} must be cleared before approval</span></div></div><div class="close-actions">${statusPill('RECONCILING','warning')}${button('Request approval','request-close-approval','','user-check',`data-id="${closePeriodCode}"`)}</div></section>
       <section class="close-layout section-gap"><section class="card"><div class="card-head"><div><h3>Close Checklist</h3><p>Click any control to inspect calculations, source records, evidence and remediation.</p></div><span class="table-badge">${passedCount} / ${closeControls.length} passed</span></div><div class="card-body close-check-list">${closeControls.map(control=>`<button class="close-check ${control.passed?'passed':'blocked'}" data-action="open-close-control" data-id="${control.id}"><span>${icon(control.passed?'check-circle':'alert')}</span><span><strong>${escapeHTML(control.title)}</strong><small>${escapeHTML(control.detail)}</small></span>${control.passed?statusPill('Passed','success'):statusPill(control.severity==='Critical'?'Critical blocker':'Blocker','danger')}${icon('chevron-right')}</button>`).join('')}</div></section><section class="side-stack">${card('Approval Route',`<div class="approval-route"><div class="done"><span>1</span><div><strong>Cash Operations</strong><small>Nyasha Moyo · complete 31 Jul</small></div></div><div class="done"><span>2</span><div><strong>Fund Accounting</strong><small>Laura Chen · complete 31 Jul</small></div></div><div class="current"><span>3</span><div><strong>Compliance / Risk</strong><small>Anita Kapoor · in review</small></div></div><div><span>4</span><div><strong>CFO Certification</strong><small>Tariro Kasere · pending</small></div></div></div>`)}${card('General-Ledger Export',`<div class="info-list"><div class="info-row"><span>Approved journals</span><strong>4</strong></div><div class="info-row"><span>Debit / Credit control</span><strong>$35.6M / $35.6M</strong></div><div class="info-row"><span>Checksum</span><strong>9F2A…71C8</strong></div><div class="info-row"><span>Accounting status</span><strong>${statusPill('4 accepted · 1 pending','warning')}</strong></div></div><div class="section-gap">${button('Create GL export','create-gl-export','primary','send')}</div>`)}</section></section>`;
   }
 
@@ -1283,6 +1333,12 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
 
   function render() {
     try {
+    if (window.location.pathname.includes('/portfolio/settings')) {
+      state.page = 'settings';
+      // Keep the module navigation visible while managing roles. A collapsed
+      // shell makes the menu appear missing even though the routes are live.
+      state.sidebarCollapsed = false;
+    }
     const previousScrollTop = workspace ? workspace.scrollTop : 0;
     const preserveScroll = lastRenderedPage === state.page;
     rootEl.dataset.theme = state.theme; document.body.dataset.theme = state.theme;
@@ -1300,6 +1356,7 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
       case 'deals': html = renderDealFlow(); break;
       case 'funds': html = renderFunds(); break;
       case 'capital-calls': html = renderCapitalCalls(); break;
+      case 'distributions': html = renderDistributions(); break;
       case 'companies': html = renderCompanies(); break;
       case 'reporting': html = renderReporting(); break;
       case 'fund-performance': html = renderFundPerformance(); break;
@@ -1447,7 +1504,8 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
     const recentCalls = capitalCalls.slice().sort((a,b)=>new Date(b.callDate)-new Date(a.callDate)).slice(0,4);
     const recentActivity = recentCalls.length ? `<ul class="activity-list">${recentCalls.map(call=>`<li class="activity-item clickable" data-action="open-capital-call" data-id="${call.id}"><span class="status-dot" style="background:${call.status==='Closed'?'var(--emerald)':call.status==='Draft'?'var(--amber)':'var(--blue)'}"></span><span class="activity-copy"><strong>${escapeHTML(call.fund)}</strong><small>Capital call · ${escapeHTML(call.status)} · ${escapeHTML(call.callDate)}</small></span><span class="activity-amount">${formatMoney(call.amount)}</span></li>`).join('')}</ul>` : `<div class="empty-state compact">${icon('clock')}<strong>No recent capital-call activity yet</strong></div>`;
 
-    return `${pageHeader('Portfolio Dashboard','Cross-fund performance, allocation and portfolio-company health.',globalPageActions({ extra: button('Add Deal','add-deal','primary','plus') }))}
+    __pv11CaptureDashboardExport({ totalInvested: totalInvested, committed: committed, called: sum(funds,f=>f.called), distributed: distributed, unrealized: unrealized, activeCompanies: activeCompanies, hasPerfData: hasPerfData, portfolioGrossIrr: portfolioGrossIrr, portfolioNetIrr: portfolioNetIrr, portfolioTvpi: portfolioTvpi, portfolioDpi: portfolioDpi, companies: companies, funds: funds, capitalCalls: capitalCalls, sectorTotals: sectorTotals, sectorTotal: sectorTotal, callBuckets: callBuckets, callMonths: callMonths, snapshotsByDate: snapshotsByDate, distinctFundsWithCompanies: distinctFundsWithCompanies, openCalls: openCalls }); /* patched:dashboard-export-capture */
+    return `${pageHeader('Portfolio Dashboard','Cross-fund performance, allocation and portfolio-company health.',globalPageActions({ extra: __pv11DashboardExportButtons()+button('Add Deal','add-deal','primary','plus') }))}
       ${workspaceFilterBar([{label:'Fund',action:'dashboard-fund-filter',selected:'All Funds',options:['All Funds',...funds.map(f=>f.name)]},{label:'As of',action:'dashboard-period-filter',selected:'31 Jul 2026',options:['31 Jul 2026','30 Jun 2026','31 Mar 2026','31 Dec 2025']},{label:'Currency',action:'dashboard-currency-filter',selected:'USD',options:['USD','ZWG','Reporting currency']},{label:'Geography',action:'dashboard-geography-filter',selected:'All geographies',options:['All geographies','Southern Africa','East Africa','West Africa']},{type:'button',label:'Reset',action:'reset-dashboard-filters',icon:'refresh'}])}
       <section class="metric-grid section-gap">
         ${metricCard({label:'Total Invested',value:formatMoney(totalInvested),iconName:'dollar',accent:'emerald',foot:`Across ${companies.length} portfolio companies`,action:'metric-invested'})}
@@ -1488,7 +1546,7 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
     const wonDeals=filteredDeals.filter(d=>d.stage==='Portfolio');
     const lostDeals=filteredDeals.filter(d=>d.stage==='Rejected');
     const metrics=[
-      {label:'Pipeline Value',value:formatMoney(pipelineValue),iconName:'dollar',accent:'emerald',foot:'18.6% vs prior period',action:'metric-pipeline'},
+      {label:'Pipeline Value',value:formatMoney(pipelineValue),iconName:'dollar',accent:'emerald',foot:state.liveData?'Total requested across displayed deals':'18.6% vs prior period',action:'metric-pipeline'},
       {label:'Active Deals',value:String(filteredDeals.filter(d=>!['Portfolio','Rejected'].includes(d.stage)).length),iconName:'briefcase',accent:'blue',foot:'Across all stages',action:'metric-active-deals'},
       {label:'Due Diligence',value:String(filteredDeals.filter(d=>d.stage==='Due Diligence').length),iconName:'search',accent:'purple',foot:formatMoney(sum(filteredDeals.filter(d=>d.stage==='Due Diligence'),d=>d.amount)),action:'metric-dd'},
       {label:'IC Pending',value:String(filteredDeals.filter(d=>d.stage==='Investment Committee').length),iconName:'users',accent:'amber',foot:formatMoney(sum(filteredDeals.filter(d=>d.stage==='Investment Committee'),d=>d.amount)),action:'metric-ic'},
@@ -1519,6 +1577,22 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
       (currencyFilter==='All currencies' || f.currency===currencyFilter) &&
       (!searchTerm || f.name.toLowerCase().includes(searchTerm) || f.strategy.toLowerCase().includes(searchTerm))
     );
+    // Register paging. fundPageSize keeps the raw select value ("10" | "25" | "50" | "all")
+    // so the control survives a re-render, and fundPage is clamped to the pages that
+    // exist so the table stays valid after a filter shrinks the result set.
+    const fundPageSizeRaw = String(state.fundPageSize || '10');
+    const fundPageSize = fundPageSizeRaw === 'all' ? Math.max(filteredFunds.length, 1) : Math.max(1, Number(fundPageSizeRaw) || 10);
+    const fundPageCount = Math.max(1, Math.ceil(filteredFunds.length / fundPageSize));
+    const fundPage = Math.min(Math.max(1, Number(state.fundPage) || 1), fundPageCount);
+    if (state.fundPage !== fundPage) state.fundPage = fundPage; /* patched:funds-paging */
+    const pageStart = (fundPage - 1) * fundPageSize;
+    const pageFunds = filteredFunds.slice(pageStart, pageStart + fundPageSize);
+    // A figure is painted unless the adapter explicitly reported it unavailable: live fund
+    // records carry no performance columns, so adaptFunds marks them false and the register
+    // shows a dash; the embedded demo dataset carries no flag and keeps its own values.
+    const fundShowsPerf = f => f.perfAvailable !== false;
+    const fundShowsNav = f => f.navAvailable !== false;
+    const fundShowsDistributed = f => f.distributedAvailable !== false;
     const totalCommitment = sum(filteredFunds,f=>f.commitment);
     const called = sum(filteredFunds,f=>f.called);
     const distributed = sum(filteredFunds,f=>f.distributed);
@@ -1526,67 +1600,144 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
     const strategies = {};
     filteredFunds.forEach(f=>strategies[f.strategy]=(strategies[f.strategy]||0)+f.commitment);
     const strategySegments = Object.entries(strategies).map(([label,value],index)=>({label,value,color:['#2475f5','#0ba780','#60a5fa','#f5a623','#0f98b6'][index],display:`${pct(value/totalCommitment*100)} · ${formatMoney(value)}`}));
-    // Weighted by commitment across real fund data (no fabricated portfolio-level constant).
-    const portfolioGrossIrr = totalCommitment ? sum(filteredFunds,f=>f.grossIrr*f.commitment)/totalCommitment : 0;
-    const portfolioTvpi = totalCommitment ? sum(filteredFunds,f=>f.tvpi*f.commitment)/totalCommitment : 0;
+    // Weighted by commitment across the funds that actually reported performance. Funds
+    // without IRR / TVPI are excluded rather than counted as zero, and when none reported
+    // a figure the card shows a dash instead of an invented portfolio number.
+    const perfFunds = filteredFunds.filter(fundShowsPerf);
+    const perfCommitment = sum(perfFunds,f=>f.commitment);
+    const hasPerf = perfFunds.length > 0 && perfCommitment > 0;
+    const hasDistributed = filteredFunds.some(fundShowsDistributed);
+    const portfolioGrossIrr = hasPerf ? sum(perfFunds,f=>f.grossIrr*f.commitment)/perfCommitment : 0;
+    const portfolioTvpi = hasPerf ? sum(perfFunds,f=>f.tvpi*f.commitment)/perfCommitment : 0;
     const geoTotals = {};
     filteredFunds.forEach(f=>{ const g=f.geography&&f.geography!=='—'?f.geography:'Unspecified'; geoTotals[g]=(geoTotals[g]||0)+f.commitment; });
     const geoColors=['#2475f5','#0ba780','#60a5fa','#f5a623','#0f98b6','#d9475c'];
     const geographies = Object.entries(geoTotals).map(([label,value],index)=>({label,value,color:geoColors[index%geoColors.length],display:`${pct(value/totalCommitment*100)} · ${formatMoney(value)}`}));
-    const rows = filteredFunds.map(fund=>`<tr class="clickable" data-action="open-fund" data-id="${fund.id}"><td><div class="company-cell"><span class="company-logo" style="background:linear-gradient(145deg,#6094dc,#0a8f76)">${escapeHTML(fund.id.slice(-1))}</span><span class="table-primary">${escapeHTML(fund.name)}</span></div></td><td>${fund.vintage}</td><td>${escapeHTML(fund.strategy)}</td><td>${fund.currency}</td><td class="text-right">${formatMoney(fund.commitment,fund.currency)}</td><td><div class="inline-progress">${progressBar(fund.called/fund.commitment*100)}<span>${pct(fund.called/fund.commitment*100)}</span></div></td><td class="text-right">${formatMoney(fund.nav,fund.currency)}</td><td class="text-right">${formatMoney(fund.distributed,fund.currency)}</td><td class="text-right positive">${pct(fund.grossIrr)}</td><td class="text-right positive">${pct(fund.netIrr)}</td><td class="text-right">${fund.tvpi.toFixed(2)}x</td><td class="text-right">${fund.dpi.toFixed(2)}x</td><td>${statusPill(fund.status)}</td></tr>`).join('');
-    return `${pageHeader('Funds','Monitor fund-level performance, capital activity and structure across the portfolio.',globalPageActions({extra:button('Create fund','create-fund','primary','plus')+button('New distribution','new-distribution','','trend-up')}))}
-      ${workspaceFilterBar([{label:'Vintage',action:'fund-vintage-filter',selected:vintageFilter,options:['All vintages',...Array.from(new Set(funds.map(f=>String(f.vintage))))]},{label:'Strategy',action:'fund-strategy-filter',selected:strategyFilter,options:['All strategies',...Array.from(new Set(funds.map(f=>f.strategy)))]},{label:'Status',action:'fund-status-filter',selected:statusFilter,options:['All statuses','Investing','Realising','Closed']},{label:'Currency',action:'fund-currency-filter',selected:currencyFilter,options:['All currencies','USD','ZWG']}])}
+    const rows = pageFunds.map(fund=>`<tr class="clickable" data-action="open-fund" data-id="${fund.id}"><td><div class="company-cell"><span class="company-logo" style="background:linear-gradient(145deg,#6094dc,#0a8f76)">${escapeHTML(String(fund.name||'?').trim().slice(0,1).toUpperCase())}</span><span class="table-primary">${escapeHTML(fund.name)}</span></div></td><td>${fund.vintage||'—'}</td><td>${escapeHTML(fund.strategy||'—')}</td><td>${fund.currency}</td><td class="text-right">${formatMoney(fund.commitment,fund.currency)}</td><td><div class="inline-progress">${progressBar(fund.commitment?fund.called/fund.commitment*100:0)}<span>${pct(fund.commitment?fund.called/fund.commitment*100:0)}</span></div></td><td class="text-right">${fundShowsNav(fund)?formatMoney(fund.nav,fund.currency):'—'}</td><td class="text-right">${fundShowsDistributed(fund)?formatMoney(fund.distributed,fund.currency):'—'}</td><td class="text-right positive">${fundShowsPerf(fund)?pct(fund.grossIrr):'—'}</td><td class="text-right positive">${fundShowsPerf(fund)?pct(fund.netIrr):'—'}</td><td class="text-right">${fundShowsPerf(fund)?fund.tvpi.toFixed(2)+'x':'—'}</td><td class="text-right">${fundShowsPerf(fund)?fund.dpi.toFixed(2)+'x':'—'}</td><td>${statusPill(fund.status)}</td></tr>`).join('')||`<tr><td colspan="13"><div class="empty-state compact">${icon('filter')}<strong>No funds match the current filters</strong></div></td></tr>`;
+    const createFundAction = hasRuntimeGrant(options.canCreateFund) ? button('Create fund','create-fund','primary','plus') : '';
+
+    // Export inputs: the register plus the rollups the charts below are drawn from, so
+    // the workbook and the page are built from one set of values.
+    /* patched:funds-export-capture */
+    const vintageRollup = Array.from(new Set(filteredFunds.map(f=>String(f.vintage||'—')))).map(label=>{ const members=filteredFunds.filter(f=>String(f.vintage||'—')===label); const perf=members.filter(fundShowsPerf); const commitment=sum(members,f=>f.commitment); const perfCommitment=sum(perf,f=>f.commitment); return { label:label, commitment:commitment, perfAvailable:perfCommitment>0, irr:perfCommitment?sum(perf,f=>f.grossIrr*f.commitment)/perfCommitment:0 }; });
+    __pv11CaptureFundsExport({ funds:filteredFunds, total:filteredFunds.length, page:fundPage, pageSize:fundPageSize, pageCount:fundPageCount, filters:{ vintage:vintageFilter, strategy:strategyFilter, status:statusFilter, currency:currencyFilter, search:state.tableSearch }, registers:{ commitment:totalCommitment, called:called, distributed:distributed, dryPowder:dryPowder, grossIrr:portfolioGrossIrr, tvpi:portfolioTvpi, hasPerf:hasPerf, hasDistributed:hasDistributed, live:state.liveData, strategies:strategySegments.map(item=>({label:item.label,value:item.value})), vintages:vintageRollup, geographies:geographies.map(item=>({label:item.label,value:item.value})), deadlines:reports.map(report=>({fund:report.fund,type:report.type,due:report.due,status:report.status})), activity:capitalCalls.slice(0,4).map(call=>({fund:call.fund,status:call.status,callDate:call.callDate,amount:call.amount})), top:[...perfFunds].sort((a,b)=>b.grossIrr-a.grossIrr).slice(0,4).map(f=>({name:f.name,grossIrr:f.grossIrr,tvpi:f.tvpi,perfAvailable:true})) } });
+    return `${pageHeader('Funds','Monitor fund-level performance, capital activity and structure across the portfolio.',globalPageActions({extra:__pv11FundsExportButtons()+createFundAction+button('New distribution','new-distribution','','trend-up')}))}
+      ${workspaceFilterBar([{label:'Vintage',action:'fund-vintage-filter',selected:vintageFilter,options:['All vintages',...Array.from(new Set(funds.map(f=>String(f.vintage))))]},{label:'Strategy',action:'fund-strategy-filter',selected:strategyFilter,options:['All strategies',...Array.from(new Set(funds.map(f=>f.strategy)))]},{label:'Status',action:'fund-status-filter',selected:statusFilter,options:['All statuses',...Array.from(new Set(funds.map(f=>f.status)))]},{label:'Currency',action:'fund-currency-filter',selected:currencyFilter,options:['All currencies',...Array.from(new Set(funds.map(f=>f.currency)))]}])}
       <section class="metric-grid section-gap">
         ${metricCard({label:'Total Commitments',value:formatMoney(totalCommitment),iconName:'dollar',accent:'emerald',foot:'No prior-period data',action:'metric-funds'})}
         ${metricCard({label:'Called Capital',value:formatMoney(called),iconName:'wallet',accent:'blue',foot:`${pct(called/totalCommitment*100)} of commitments`,action:'metric-called'})}
-        ${metricCard({label:'Distributed Capital',value:formatMoney(distributed),iconName:'trend-up',accent:'purple',foot:`${pct(distributed/totalCommitment*100)} of commitments`,action:'metric-distributed'})}
+        ${metricCard({label:'Distributed Capital',value:hasDistributed?formatMoney(distributed):'—',iconName:'trend-up',accent:'purple',foot:hasDistributed?pct(totalCommitment?distributed/totalCommitment*100:0)+' of commitments':'Declared distributions not loaded',action:'metric-distributed'})}
         ${metricCard({label:'Remaining Dry Powder',value:formatMoney(dryPowder),iconName:'bar-chart',accent:'amber',foot:`${pct(dryPowder/totalCommitment*100)} of commitments`,action:'metric-dry-powder'})}
-        ${metricCard({label:'Gross IRR (Portfolio)',value:pct(portfolioGrossIrr),iconName:'trend-up',accent:'cyan',foot:'Weighted by commitment',action:'metric-irr'})}
-        ${metricCard({label:'TVPI (Portfolio)',value:`${portfolioTvpi.toFixed(2)}x`,iconName:'pie-chart',accent:'brand',foot:'Weighted by commitment',action:'metric-tvpi'})}
+        ${metricCard({label:'Gross IRR (Portfolio)',value:hasPerf?pct(portfolioGrossIrr):'—',iconName:'trend-up',accent:'cyan',foot:hasPerf?'Weighted by commitment':'No performance reported',action:'metric-irr'})}
+        ${metricCard({label:'TVPI (Portfolio)',value:hasPerf?portfolioTvpi.toFixed(2)+'x':'—',iconName:'pie-chart',accent:'brand',foot:hasPerf?'Weighted by commitment':'No performance reported',action:'metric-tvpi'})}
       </section>
       <section class="grid cols-3">
         ${card('Fund Mix by Strategy',donutChart(strategySegments,formatMoney(totalCommitment),'Total Commitments',120),{footer:'<button class="card-link" data-action="chart-drilldown" data-chart-label="Fund Mix" data-chart-value="Commitments by strategy">View full breakdown</button>'})}
-        ${card('Vintage Year Performance',barChart({labels:filteredFunds.map(f=>String(f.vintage)),series:[{name:'Gross IRR',color:'var(--blue)',values:filteredFunds.map(f=>f.grossIrr)}],height:215,format:v=>`${Math.round(v)}%`}),{subtitle:'Gross IRR by vintage',footer:'<button class="card-link" data-action="chart-drilldown" data-chart-label="Vintage Analysis" data-chart-value="Gross IRR by vintage year">View vintage analysis</button>'})}
+        ${card('Vintage Year Performance',barChart({labels:perfFunds.map(f=>String(f.vintage||'—')),series:[{name:'Gross IRR',color:'var(--blue)',values:perfFunds.map(f=>f.grossIrr)}],height:215,format:v=>`${Math.round(v)}%`}),{subtitle:'Gross IRR by vintage',footer:'<button class="card-link" data-action="chart-drilldown" data-chart-label="Vintage Analysis" data-chart-value="Gross IRR by vintage year">View vintage analysis</button>'})}
         ${card('Geographic Allocation',donutChart(geographies,formatMoney(totalCommitment),'Committed',120),{footer:'<button class="card-link" data-action="chart-drilldown" data-chart-label="Geographic Allocation" data-chart-value="Commitment by operating geography">View full allocation</button>'})}
       </section>
-      <section class="card table-card"><div class="table-toolbar"><div class="table-title-row"><h3>Funds Overview</h3><span class="table-badge">${filteredFunds.length} funds</span></div><div class="table-tools"><div class="table-search">${icon('search')}<input type="text" placeholder="Search funds..." data-input-action="table-search" value="${escapeHTML(state.tableSearch)}"></div>${button('Filter','fund-filters','compact','filter')}${button('Export','export-funds','compact','download')}</div></div><div class="table-wrap"><table><thead><tr><th>Fund Name</th><th>Vintage</th><th>Strategy</th><th>Currency</th><th class="text-right">Commitment</th><th>Called</th><th class="text-right">NAV</th><th class="text-right">Distributed</th><th class="text-right">Gross IRR</th><th class="text-right">Net IRR</th><th class="text-right">TVPI</th><th class="text-right">DPI</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table></div></section>
+      <section class="card table-card"><div class="table-toolbar"><div class="table-title-row"><h3>Funds Overview</h3><span class="table-badge">${filteredFunds.length} funds</span></div><div class="table-tools"><div class="table-search">${icon('search')}<input type="text" placeholder="Search funds..." data-input-action="table-search" value="${escapeHTML(state.tableSearch)}"></div>${button('Filter','fund-filters','compact','filter')}</div></div><div class="table-wrap"><table><thead><tr><th>Fund Name</th><th>Vintage</th><th>Strategy</th><th>Currency</th><th class="text-right">Commitment</th><th>Called</th><th class="text-right">NAV</th><th class="text-right">Distributed</th><th class="text-right">Gross IRR</th><th class="text-right">Net IRR</th><th class="text-right">TVPI</th><th class="text-right">DPI</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table></div>${__pv11FundsPager(filteredFunds.length,fundPage,fundPageSize,fundPageCount,fundPageSizeRaw)}</section>
       <section class="grid cols-3 section-gap">
         ${card('Upcoming Reporting Deadlines',`<div class="info-list">${(reports.length?reports:[{fund:'—',type:'No schedules loaded',due:'—',status:'—'}]).slice(0,4).map(report=>{const dueParts=String(report.due||'').split(/\s+/);const day=dueParts[0]||'—';const month=(dueParts[1]||'').slice(0,3).toUpperCase()||'—';return `<div class="list-row"><span class="calendar-day" style="width:38px;height:38px;aspect-ratio:auto;background:var(--surface-soft)">${escapeHTML(day)}<small style="font-size:10px">${escapeHTML(month)}</small></span><span class="list-row-main"><strong>${escapeHTML(report.fund)}</strong><small>${escapeHTML(report.type)}</small></span><span class="warning-text small">${escapeHTML(report.status)}</span></div>`;}).join('')}</div>`,{tools:'<button class="card-link" data-action="navigate" data-page="reporting">View all</button>'})}
         ${card('Recent Capital Activity',`<div class="info-list">${capitalCalls.slice(0,4).map(call=>`<div class="list-row"><span class="activity-icon" style="color:var(--blue);background:var(--blue-soft)">${icon('wallet')}</span><span class="list-row-main"><strong>Capital Call</strong><small>${escapeHTML(call.fund)}</small></span><strong class="negative small">${formatMoney(call.amount)}</strong></div>`).join('')||'<div class="muted small" style="padding:8px 0">No capital activity yet</div>'}</div>`,{tools:'<button class="card-link" data-action="navigate" data-page="capital-calls">View all</button>'})}
-        ${card('Top Performing Funds',`<div class="info-list">${[...filteredFunds].sort((a,b)=>b.grossIrr-a.grossIrr).slice(0,4).map((fund,index)=>`<div class="list-row"><span class="risk-score good">${index+1}</span><span class="list-row-main"><strong>${escapeHTML(fund.name)}</strong><small>${pct(fund.grossIrr)} Gross IRR</small></span><strong class="positive">${Number(fund.tvpi||0).toFixed(2)}x</strong></div>`).join('')||'<div class="muted small" style="padding:8px 0">No funds loaded</div>'}</div>`,{tools:'<button class="card-link" data-action="chart-drilldown" data-chart-label="Fund Ranking" data-chart-value="Performance ranking by Gross IRR">View all</button>'})}
+        ${card('Top Performing Funds',`<div class="info-list">${[...perfFunds].sort((a,b)=>b.grossIrr-a.grossIrr).slice(0,4).map((fund,index)=>`<div class="list-row"><span class="risk-score good">${index+1}</span><span class="list-row-main"><strong>${escapeHTML(fund.name)}</strong><small>${pct(fund.grossIrr)} Gross IRR</small></span><strong class="positive">${Number(fund.tvpi||0).toFixed(2)}x</strong></div>`).join('')||'<div class="muted small" style="padding:8px 0">No performance reported yet</div>'}</div>`,{tools:'<button class="card-link" data-action="chart-drilldown" data-chart-label="Fund Ranking" data-chart-value="Performance ranking by Gross IRR">View all</button>'})}
       </section>`;
   }
 
   function renderCapitalCalls() {
-    const outstanding = sum(capitalCalls,c=>Math.max(0,c.amount-c.collected));
-    const collected = sum(capitalCalls,c=>c.collected);
-    const upcoming = capitalCalls.filter(c=>!['Closed'].includes(c.status)).length;
-    const today = new Date();
-    const overdueCalls = capitalCalls.filter(c=>c.status!=='Closed' && c.collected<c.amount && new Date(c.dueDate)<today);
-    const draftCalls = capitalCalls.filter(c=>c.status==='Draft');
-    const overdueAmount = sum(overdueCalls,c=>Math.max(0,c.amount-c.collected));
-    const draftAmount = sum(draftCalls,c=>c.amount);
-    const rows = capitalCalls.map(call=>`<tr class="clickable" data-action="open-capital-call" data-id="${call.id}"><td class="table-primary brand-text">${escapeHTML(call.id)}</td><td>${escapeHTML(call.fund)}</td><td>${call.callDate}</td><td>${call.dueDate}</td><td>${escapeHTML(call.purpose)}</td><td class="text-right">${formatMoney(call.amount)}</td><td class="text-center">${call.lpCount}</td><td><div class="inline-progress">${progressBar(call.amount?call.collected/call.amount*100:0,call.collected===call.amount?'var(--emerald)':'')}<span>${formatMoney(call.collected)} / ${formatMoney(call.amount)}</span></div></td><td>${statusPill(call.status)}</td><td><button class="button ghost compact icon-only" data-action="activity-menu" data-context="capital-call" data-id="${call.id}" aria-label="Capital call activity">${icon('clock')}</button></td></tr>`).join('');
-    const collectionSegments = [
-      {label:'Collected',value:collected,color:'#07936d',display:formatMoney(collected)},
-      {label:'Outstanding',value:outstanding-overdueAmount,color:'#f59e0b',display:formatMoney(Math.max(0,outstanding-overdueAmount))},
-      {label:'Overdue',value:overdueAmount,color:'#d9475c',display:formatMoney(overdueAmount)},
-      {label:'Draft',value:draftAmount,color:'#aab3c2',display:formatMoney(draftAmount)}
-    ];
-    const recentPayments = capitalCalls.filter(c=>c.collected>0).slice(0,5);
+    const rowsAll = capitalCalls.slice();
+    const fundFilter = state.capitalCallFund || 'All funds';
+    const statusFilter = state.capitalCallStatus || 'All statuses';
+    const q = String(state.capitalCallSearch || '').trim().toLowerCase();
+    const from = state.capitalCallFrom || '';
+    const to = state.capitalCallTo || '';
+    const filtered = rowsAll.filter(call => {
+      const fundOk = fundFilter === 'All funds' || call.fund === fundFilter;
+      const statusOk = statusFilter === 'All statuses' || call.status === statusFilter;
+      const date = String(call.callDateIso || call.transactionDate || '');
+      const dateOk = (!from || date >= from) && (!to || date <= to);
+      const searchOk = !q || [capitalCallReference(call), call.fund, call.purpose, call.status].some(v => String(v || '').toLowerCase().includes(q));
+      return fundOk && statusOk && dateOk && searchOk;
+    });
+    const pageSize = 10;
+    const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize));
+    const page = Math.min(Math.max(1, Number(state.capitalCallPage || 1)), pageCount);
+    state.capitalCallPage = page;
+    const visible = filtered.slice((page - 1) * pageSize, page * pageSize);
+    const collected = sum(rowsAll, c => c.collected);
+    const total = sum(rowsAll, c => c.amount);
+    const outstanding = Math.max(0, total - collected);
+    const rows = visible.map(call => `<tr class="clickable" data-action="open-capital-call" data-id="${escapeHTML(call.recordId || call.id)}"><td class="table-primary brand-text">${escapeHTML(capitalCallReference(call))}</td><td>${escapeHTML(call.fund)}</td><td>${escapeHTML(call.callDate)}</td><td>${escapeHTML(call.dueDate)}</td><td>${escapeHTML(call.purpose || '—')}</td><td class="text-right">${formatMoney(call.amount)}</td><td class="text-center">${call.lpCount}</td><td>${formatMoney(call.collected)} / ${formatMoney(call.amount)}</td><td>${statusPill(call.status)}</td><td><button class="button ghost compact icon-only" data-action="open-capital-call" data-id="${escapeHTML(call.recordId || call.id)}" aria-label="Open capital call">${icon('eye')}</button></td></tr>`).join('');
+    const exportRows = filtered.map(call => [capitalCallReference(call), call.fund, call.callDate, call.dueDate, call.purpose || '', call.amount, call.lpCount, call.collected, call.status]);
+    window.__pv11CapitalCallExportSpec = { title: 'Capital Calls Register', subtitle: 'Capital call records from the live Portfolio API.', footerLabel: 'NVCCZ - Portfolio Management', filename: 'portfolio-capital-calls', landscape: true, note: `Fund: ${fundFilter} | Status: ${statusFilter} | Call date: ${from || 'any'} to ${to || 'any'} | Search: ${q || 'none'} | ${filtered.length} matching records`, columns: ['Reference','Fund','Call date','Payment due','Purpose','Call amount','LP count','Collected','Status'], rows: exportRows, moneyColumns: [5,7], align: ['left','left','left','left','left','right','right','right','left'] };
+    const pager = `<div class="table-pagination"><span>${filtered.length ? `${(page - 1) * pageSize + 1}–${Math.min(page * pageSize, filtered.length)} of ${filtered.length}` : '0 records'}</span><div>${button('Previous','capital-call-page','compact','chevron-left',`data-page="${Math.max(1,page-1)}"`)}<span>Page ${page} of ${pageCount}</span>${button('Next','capital-call-page','compact','chevron-right',`data-page="${Math.min(pageCount,page+1)}"`)}</div></div>`;
+    const formats = ['pdf','excel','csv'].map(k => button(k.toUpperCase()==='EXCEL'?'Excel':k.toUpperCase(),'capital-call-export','compact',k==='pdf'?'file':k==='excel'?'file-chart':'download',`data-kind="${k}"`)).join('');
     return `${pageHeader('Capital Calls','Plan, issue and track capital calls and drawdowns across funds.',globalPageActions({extra:button('New Capital Call','new-capital-call','primary','plus')}))}
-      <section class="metric-grid">
-        ${metricCard({label:'Upcoming Calls',value:String(upcoming),iconName:'calendar',accent:'blue',foot:formatMoney(sum(capitalCalls.filter(c=>c.status!=='Closed'),c=>c.amount)),action:'metric-upcoming-calls'})}
-        ${metricCard({label:'Outstanding Amount',value:formatMoney(outstanding),iconName:'dollar',accent:'emerald',foot:'Across active notices',action:'metric-outstanding'})}
-        ${metricCard({label:'Collected',value:formatMoney(collected),iconName:'check',accent:'emerald',foot:`${pct(outstanding+collected?collected/(outstanding+collected)*100:0)} of issued calls`,action:'metric-collected'})}
-        ${metricCard({label:'Overdue Calls',value:String(overdueCalls.length),iconName:'alert',accent:'amber',foot:formatMoney(overdueAmount),trend:overdueCalls.length?'negative':undefined,action:'metric-overdue-lps'})}
-      </section>
-      <section class="card"><div class="table-toolbar"><div class="table-title-row"><h3>Capital Call Notices</h3><span class="table-badge">${capitalCalls.length} notices</span></div><div class="table-tools"><div class="table-search">${icon('search')}<input type="text" placeholder="Search notices..." data-input-action="table-search"></div>${selectControl('Status',['All Statuses','Issued','Partially Collected','Closed','Draft'],'All Statuses','capital-call-status')}${button('New Capital Call','new-capital-call','primary compact','plus')}</div></div><div class="table-wrap"><table><thead><tr><th>Notice ID</th><th>Fund</th><th>Call Date</th><th>Due Date</th><th>Purpose</th><th class="text-right">Total Amount</th><th>LP Count</th><th>Collection Progress</th><th>Status</th><th></th></tr></thead><tbody>${rows||`<tr><td colspan="10"><div class="empty-state compact">${icon('send')}<strong>No capital calls issued yet</strong></div></td></tr>`}</tbody></table></div></section>
-      <section class="grid cols-3 section-gap">
-        ${card('Call Allocation by LP',`<div class="info-list">${(lps.length?lps:[]).slice(0,5).map(lp=>`<div><div class="info-row"><span>${escapeHTML(lp.name)}</span><strong>${formatMoney(lp.called)}</strong></div>${progressBar(lp.commitment?lp.called/lp.commitment*100:0)}</div>`).join('')||'<div class="muted small" style="padding:8px 0">No LP allocations loaded</div>'}</div>`,{subtitle:'Cumulative called capital per LP, across all funds',footer:'<button class="card-link" data-action="navigate" data-page="lps">View full allocation</button>'})}
-        ${card('Collection Progress',(outstanding+collected)?donutChart(collectionSegments,formatMoney(outstanding+collected),'Total issued',112):`<div class="empty-state compact">${icon('pie-chart')}<strong>No capital calls issued yet</strong></div>`,{footer:'<button class="card-link" data-action="chart-drilldown" data-chart-label="Collection Progress" data-chart-value="Capital call collection by status">View detailed analysis</button>'})}
-        ${card('Recent Payment Confirmations',`<div class="info-list">${recentPayments.map(call=>`<button type="button" class="list-row" data-action="open-capital-call" data-id="${call.id}"><span class="activity-icon" style="color:var(--emerald);background:var(--emerald-soft)">${icon('check-circle')}</span><span class="list-row-main"><strong>${escapeHTML(call.fund)}</strong><small>${escapeHTML(call.id)}</small></span><strong class="small">${formatMoney(call.collected)}</strong></button>`).join('')||'<div class="muted small" style="padding:8px 0">No payment confirmations yet</div>'}</div>`,{footer:'<button class="card-link" data-action="chart-drilldown" data-chart-label="Payments" data-chart-value="Recent confirmed capital call payments">View all payments</button>'})}
-      </section>`;
+      <section class="metric-grid">${metricCard({label:'Capital Calls',value:String(rowsAll.length),iconName:'calendar',accent:'blue',foot:'Live records',action:'metric-upcoming-calls'})}${metricCard({label:'Total Called',value:formatMoney(total),iconName:'dollar',accent:'blue',foot:'From saved allocation snapshots',action:'metric-outstanding'})}${metricCard({label:'Collected',value:formatMoney(collected),iconName:'check',accent:'emerald',foot:'Recorded LP payments',action:'metric-collected'})}${metricCard({label:'Outstanding',value:formatMoney(outstanding),iconName:'alert',accent:'amber',foot:'Across all calls',action:'metric-overdue-lps'})}</section>
+      <section class="card capital-call-list-card"><div class="table-toolbar"><div class="table-title-row"><h3>Capital Call Notices</h3><span class="table-badge">${filtered.length} matching records</span></div><div class="table-tools">${formats}</div></div><div class="table-tools capital-call-filter-row"><label class="table-search">${icon('search')}<input type="search" placeholder="Search reference, fund, purpose or status" data-input-action="capital-call-search" value="${escapeHTML(state.capitalCallSearch || '')}"></label><label>Fund<select data-change-action="capital-call-fund"><option>All funds</option>${[...new Set(funds.map(f=>f.name).filter(Boolean))].sort().map(f=>`<option${fundFilter===f?' selected':''}>${escapeHTML(f)}</option>`).join('')}</select></label><label>Status<select data-change-action="capital-call-status"><option>All statuses</option>${[...new Set(rowsAll.map(c=>c.status))].sort().map(s=>`<option${statusFilter===s?' selected':''}>${escapeHTML(s)}</option>`).join('')}</select></label><label>Call date from<input type="date" data-change-action="capital-call-from" value="${escapeHTML(from)}"></label><label>Call date to<input type="date" data-change-action="capital-call-to" value="${escapeHTML(to)}"></label><button class="button compact" data-action="capital-call-reset">Reset</button></div><div class="table-wrap"><table><thead><tr><th>Notice</th><th>Fund</th><th>Call Date</th><th>Due Date</th><th>Purpose</th><th class="text-right">Total Amount</th><th>LP Count</th><th>Collection</th><th>Status</th><th></th></tr></thead><tbody>${rows || `<tr><td colspan="10"><div class="empty-state compact">${icon('send')}<strong>${rowsAll.length?'No calls match these filters':'No capital call records found'}</strong></div></td></tr>`}</tbody></table></div>${pager}</section>`;
+  }
+  function renderDistributions() {
+    const fundFilter = state.distributionFund || 'All funds';
+    const statusFilter = state.distributionStatus || 'All statuses';
+    const from = state.distributionFrom || '';
+    const to = state.distributionTo || '';
+    const query = String(state.distributionSearch || '').trim().toLowerCase();
+    const filtered = distributions.filter(d => {
+      const fundName = String(d.fundName || d.fund?.name || '');
+      const status = String(d.status || 'DECLARED');
+      const date = String(d.distributionDate || '').slice(0, 10);
+      const searchText = [d.source, fundName, date, status].map(value => String(value || '').toLowerCase());
+      return (fundFilter === 'All funds' || fundName === fundFilter) &&
+        (statusFilter === 'All statuses' || status === statusFilter) &&
+        (!from || date >= from) && (!to || date <= to) &&
+        (!query || searchText.some(value => value.includes(query)));
+    });
+    const pageSize = 10;
+    const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize));
+    const page = Math.min(Math.max(1, Number(state.distributionPage || 1)), pageCount);
+    state.distributionPage = page;
+    const visible = filtered.slice((page - 1) * pageSize, page * pageSize);
+    const totalGross = sum(filtered, d => Number(d.grossAmount || 0));
+    const totalNet = sum(filtered, d => Number(d.netToLPs || 0));
+    const rows = visible.map(d => {
+      const date = d.distributionDate ? new Date(d.distributionDate) : null;
+      const formattedDate = date && !Number.isNaN(date.getTime())
+        ? date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+        : '—';
+      return `<tr><td class="table-primary brand-text">${escapeHTML(d.source || 'Distribution')}</td><td>${escapeHTML(d.fundName || d.fund?.name || '—')}</td><td>${escapeHTML(formattedDate)}</td><td class="text-right">${formatMoney(Number(d.grossAmount || 0))}</td><td class="text-right">${formatMoney(Number(d.netToLPs || 0))}</td><td>${statusPill(d.status || 'Declared')}</td></tr>`;
+    }).join('');
+    const exportRows = filtered.map(d => {
+      const date = d.distributionDate ? new Date(d.distributionDate) : null;
+      const formattedDate = date && !Number.isNaN(date.getTime())
+        ? date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+        : '';
+      return [d.source || 'Distribution', d.fundName || d.fund?.name || '', formattedDate, Number(d.grossAmount || 0), Number(d.netToLPs || 0), d.status || 'DECLARED'];
+    });
+    window.__pv11DistributionExportSpec = {
+      title: 'Fund Distributions Register',
+      subtitle: 'Declared fund distributions and LP net allocations from the live Portfolio API.',
+      footerLabel: 'NVCCZ - Portfolio Management',
+      filename: 'portfolio-distributions',
+      landscape: true,
+      note: `Fund: ${fundFilter} | Status: ${statusFilter} | Distribution date: ${from || 'any'} to ${to || 'any'} | Search: ${query || 'none'} | ${filtered.length} matching records`,
+      columns: ['Source', 'Fund', 'Distribution date', 'Gross amount', 'Net to LPs', 'Status'],
+      rows: exportRows,
+      moneyColumns: [3, 4],
+      align: ['left', 'left', 'left', 'right', 'right', 'left'],
+    };
+    const fundOptions = [...new Set(funds.map(f => f.name).filter(Boolean))].sort();
+    const statusScope = distributions.filter(d => {
+      const fundName = String(d.fundName || d.fund?.name || '');
+      const date = String(d.distributionDate || '').slice(0, 10);
+      const searchText = [d.source, fundName, date, d.status].map(value => String(value || '').toLowerCase());
+      return (fundFilter === 'All funds' || fundName === fundFilter) && (!from || date >= from) && (!to || date <= to) && (!query || searchText.some(value => value.includes(query)));
+    });
+    const statusCounts = statusScope.reduce((counts, d) => { const status = String(d.status || 'DECLARED'); counts[status] = (counts[status] || 0) + 1; return counts; }, {});
+    const statusOptions = Object.keys(statusCounts).sort();
+    const formats = ['pdf', 'excel', 'csv'].map(kind => button(kind === 'excel' ? 'Excel' : kind.toUpperCase(), 'distribution-export', 'compact', kind === 'pdf' ? 'file' : kind === 'excel' ? 'file-chart' : 'download', `data-kind="${kind}"`)).join('');
+    const pager = `<div class="table-pagination"><span>${filtered.length ? `${(page - 1) * pageSize + 1}–${Math.min(page * pageSize, filtered.length)} of ${filtered.length}` : '0 records'}</span><div>${button('Previous', 'distribution-page', 'compact', 'chevron-left', `data-page="${Math.max(1, page - 1)}"`)}<span>Page ${page} of ${pageCount}</span>${button('Next', 'distribution-page', 'compact', 'chevron-right', `data-page="${Math.min(pageCount, page + 1)}"`)}</div></div>`;
+    const filters = `<div class="table-tools distribution-filter-row"><label class="table-search">${icon('search')}<input type="search" placeholder="Search source, fund or status" data-input-action="distribution-search" value="${escapeHTML(state.distributionSearch || '')}"></label><label>Fund<select data-change-action="distribution-fund"><option>All funds</option>${fundOptions.map(name => `<option${fundFilter === name ? ' selected' : ''}>${escapeHTML(name)}</option>`).join('')}</select></label><label>Status<select data-change-action="distribution-status"><option>All statuses</option>${statusOptions.map(status => `<option value="${escapeHTML(status)}"${statusFilter === status ? ' selected' : ''}>${escapeHTML(status)} (${statusCounts[status]})</option>`).join('')}</select></label><label>Date from<input type="date" data-change-action="distribution-from" value="${escapeHTML(from)}"></label><label>Date to<input type="date" data-change-action="distribution-to" value="${escapeHTML(to)}"></label><button class="button compact" data-action="distribution-reset">Reset</button><div class="distribution-status-counts" aria-label="Distribution counts by status">${statusOptions.map(status => `<span class="table-badge">${escapeHTML(status)}: ${statusCounts[status]}</span>`).join('')}</div></div>`;
+    return `${pageHeader('Distributions','Review declared fund distributions and LP allocations. Payouts and notices remain controlled actions.',globalPageActions())}<section class="metric-grid">${metricCard({label:'Declared distributions',value:String(filtered.length),iconName:'trend-up',accent:'purple',foot:`${distributions.length} total · matching live records`,action:'metric-distributions'})}${metricCard({label:'Gross declared',value:formatMoney(totalGross),iconName:'dollar',accent:'blue',foot:'For the current filters',action:'metric-distribution-gross'})}${metricCard({label:'Net to LPs',value:formatMoney(totalNet),iconName:'check',accent:'emerald',foot:'For the current filters',action:'metric-distribution-net'})}</section><section class="card distribution-list-card"><div class="table-toolbar"><div class="table-title-row"><h3>Fund distributions</h3><span class="table-badge">${distributions.length} total · ${filtered.length} matching</span></div><div class="table-tools">${formats}</div></div>${filters}<div class="table-wrap"><table><thead><tr><th>Source</th><th>Fund</th><th>Date</th><th class="text-right">Gross</th><th class="text-right">Net to LPs</th><th>Status</th></tr></thead><tbody>${rows || `<tr><td colspan="6"><div class="empty-state compact">${icon('trend-up')}<strong>${distributions.length ? 'No distributions match these filters' : 'No declared distributions found for the authorised funds.'}</strong></div></td></tr>`}</tbody></table></div>${pager}</section>`;
   }
 
   function renderCompanies() {
@@ -1596,7 +1747,22 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
     const atRisk = companies.filter(c=>c.health<70).length;
     const lowRunway = companies.filter(c=>c.runway<12).length;
     const sectorCount = new Set(companies.map(c=>c.sector)).size;
-    const rows = companies.filter(company=>!state.tableSearch || company.name.toLowerCase().includes(state.tableSearch.toLowerCase()) || company.sector.toLowerCase().includes(state.tableSearch.toLowerCase())).map(company=>`<tr class="clickable" data-action="open-company" data-id="${company.id}"><td><div class="company-cell">${companyLogo(company)}<span class="table-primary">${escapeHTML(company.name)}</span></div></td><td>${escapeHTML(company.sector)}</td><td>${escapeHTML(company.stage)}</td><td>${company.entry}</td><td class="text-right">${formatMoney(company.invested)}</td><td class="text-right">${formatMoney(company.fairValue)}</td><td class="text-right">${pct(company.ownership)}</td><td class="text-right positive">${pct(company.revenueGrowth)}</td><td>${company.runway} months</td><td>${healthScore(company.health)}</td><td>${company.boardDate}</td><td>${company.lastReport}</td><td><button class="button ghost compact icon-only" data-action="activity-menu" data-context="company" data-id="${company.id}" aria-label="Company activity">${icon('clock')}</button></td></tr>`).join('');
+    const companyFilters = state.companyListFilters || { fundId: '', sector: 'All sectors', status: 'All statuses' };
+    const localCompanyFiltered = companies.filter(company => {
+      const q = String(state.tableSearch || '').trim().toLowerCase();
+      return (!q || [company.name, company.sector, company.fund, company.stage].some(value => String(value || '').toLowerCase().includes(q))) &&
+        (!companyFilters.fundId || company.fundId === companyFilters.fundId) &&
+        (companyFilters.sector === 'All sectors' || company.sector === companyFilters.sector) &&
+        (companyFilters.status === 'All statuses' || company.stage === companyFilters.status);
+    });
+    const companyFiltered = Array.isArray(state.companyListPageRows) ? state.companyListPageRows : localCompanyFiltered;
+    const companyTotal = state.companyListPagination?.total ?? localCompanyFiltered.length;
+    const companyPageCount = state.companyListPagination?.totalPages ?? Math.max(1, Math.ceil(localCompanyFiltered.length / state.companyPageSize));
+    state.companyPage = Math.min(Math.max(1, Number(state.companyPage || 1)), companyPageCount);
+    const companyPageRows = Array.isArray(state.companyListPageRows) ? state.companyListPageRows : localCompanyFiltered.slice((state.companyPage - 1) * state.companyPageSize, state.companyPage * state.companyPageSize);
+    const rows = state.companyListLoading ? '<tr><td colspan="13"><div class="skeleton-block" aria-label="Loading portfolio companies"></div></td></tr>' : state.companyListError ? `<tr><td colspan="13"><div class="empty-state compact"><strong>${escapeHTML(state.companyListError)}</strong></div></td></tr>` : companyPageRows.map(company=>`<tr class="clickable" data-action="open-company" data-id="${company.id}"><td><div class="company-cell">${companyLogo(company)}<span class="table-primary">${escapeHTML(company.name)}</span></div></td><td>${escapeHTML(company.sector)}</td><td>${escapeHTML(company.stage)}</td><td>${company.entry}</td><td class="text-right">${formatMoney(company.invested)}</td><td class="text-right">${company.fairValue==null?'—':formatMoney(company.fairValue)}</td><td class="text-right">${company.ownership==null?'—':pct(company.ownership)}</td><td class="text-right positive">${company.revenueGrowth==null?'—':pct(company.revenueGrowth)}</td><td>${company.runway==null?'—':`${company.runway} months`}</td><td>${company.health==null?'—':healthScore(company.health)}</td><td>${company.boardDate||'—'}</td><td>${company.lastReport||'—'}</td><td><button class="button ghost compact icon-only" data-action="activity-menu" data-context="company" data-id="${company.id}" aria-label="Company activity">${icon('clock')}</button></td></tr>`).join('');
+    const selectedFundName = funds.find(f=>f.id===companyFilters.fundId)?.name || 'All funds';
+    window.__pv11CompaniesExportSpec = { title:'Portfolio Companies', subtitle:'Filtered portfolio company register', footerLabel:'NVCCZ - Portfolio Management', filename:'portfolio-companies', landscape:true, note:`Fund: ${selectedFundName}; Sector: ${companyFilters.sector}; Status: ${companyFilters.status}; Search: ${state.tableSearch || 'none'}; Page ${state.companyPage} of ${companyPageCount}; ${companyTotal} matching records`, columns:['Company','Sector','Status','Entry date','Invested amount','Fair value','Ownership','Revenue growth','Runway','Health score','Next board date','Last reporting update'], rows:companyFiltered.map(c=>[c.name,c.sector,c.stage,c.entry,c.invested,c.fairValue,c.ownership,c.revenueGrowth,c.runway,c.health,c.boardDate,c.lastReport]), moneyColumns:[4,5], align:['left','left','left','left','right','right','right','right','right','right','left','left'] };
     const healthSegments = [
       {label:'Excellent (80-100)',value:companies.filter(c=>c.health>=80).length,color:'#07936d',display:String(companies.filter(c=>c.health>=80).length)},
       {label:'Good (70-79)',value:companies.filter(c=>c.health>=70&&c.health<80).length,color:'#72be44',display:String(companies.filter(c=>c.health>=70&&c.health<80).length)},
@@ -1615,7 +1781,7 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
         ${metricCard({label:'Low Runway (<12mo)',value:String(lowRunway),iconName:'filter',accent:'cyan',foot:`${pct(companies.length?lowRunway/companies.length*100:0)} of portfolio`,action:'metric-low-runway'})}
         ${metricCard({label:'At-Risk Companies',value:String(atRisk),iconName:'shield',accent:'red',foot:`${pct(companies.length?atRisk/companies.length*100:0)} of portfolio`,trend:'negative',action:'metric-at-risk'})}
       </section>
-      <section class="card"><div class="table-toolbar"><div class="table-title-row"><h3>Portfolio Companies</h3><span class="table-badge">${companies.length}</span></div><div class="table-tools"><div class="table-search">${icon('search')}<input type="text" placeholder="Search companies..." data-input-action="table-search" value="${escapeHTML(state.tableSearch)}"></div>${button('Export','export-companies','compact','download')}</div></div><div class="table-wrap"><table><thead><tr><th>Company</th><th>Sector</th><th>Stage</th><th>Entry Date</th><th class="text-right">Invested Amount</th><th class="text-right">Fair Value</th><th class="text-right">Ownership</th><th class="text-right">Revenue Growth</th><th>Runway</th><th>Health Score</th><th>Next Board Date</th><th>Last Reporting Update</th><th></th></tr></thead><tbody>${rows}</tbody></table></div></section>
+      <section class="card"><div class="table-toolbar"><div class="table-title-row"><h3>Portfolio Companies</h3><span class="table-badge">${companyFiltered.length} matching · ${companies.length} total</span></div><div class="table-tools"><div class="table-search">${icon('search')}<input type="text" placeholder="Search companies..." data-input-action="table-search" value="${escapeHTML(state.tableSearch)}"></div>${['pdf','csv','excel'].map(kind=>button(kind==='excel'?'Excel':kind.toUpperCase(),'company-export','compact',kind==='pdf'?'file':kind==='excel'?'file-chart':'download',`data-kind="${kind}"`)).join('')}</div></div><div class="table-wrap"><table><thead><tr><th>Company</th><th>Sector</th><th>Stage</th><th>Entry Date</th><th class="text-right">Invested Amount</th><th class="text-right">Fair Value</th><th class="text-right">Ownership</th><th class="text-right">Revenue Growth</th><th>Runway</th><th>Health Score</th><th>Next Board Date</th><th>Last Reporting Update</th><th></th></tr></thead><tbody>${rows||`<tr><td colspan="13"><div class="empty-state compact">${icon('building')}<strong>No portfolio companies match these filters.</strong></div></td></tr>`}</tbody></table></div><div class="table-pagination"><span>${companyFiltered.length?`${(state.companyPage-1)*state.companyPageSize+1}–${Math.min(state.companyPage*state.companyPageSize,companyFiltered.length)} of ${companyFiltered.length}`:'0 records'}</span><div>${button('Previous','company-list-page','compact','chevron-left',`data-page="${Math.max(1,state.companyPage-1)}"`)}<span>Page ${state.companyPage} of ${companyPageCount}</span>${button('Next','company-list-page','compact','chevron-right',`data-page="${Math.min(companyPageCount,state.companyPage+1)}"`)}</div></div></section>
       <section class="grid cols-4 section-gap">
         ${card('Portfolio Health Distribution',donutChart(healthSegments,String(companies.length),'Companies',104),{footer:`<span class="muted small">Average score</span><strong>${companies.length?Math.round(sum(companies,c=>c.health)/companies.length):0}<!--patched:companies-health-nan--></strong>`})}
         ${card('Value by Sector',donutChart(sectorSegments,formatMoney(totalFairValue),'Fair Value',104),{footer:'<button class="card-link" data-action="chart-drilldown" data-chart-label="Sector Value" data-chart-value="Fair value by sector">View sector breakdown</button>'})}
@@ -1754,19 +1920,32 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
     const app = detail.application || {};
     const hero = detail.hero || {};
     const realOutcome = hero.screeningOutcome || app.screeningOutcome || (deal.stage === 'Rejected' ? 'REJECTED' : null);
-    const hasDD = Boolean(deal.hasDueDiligence);
+    const overallStage = String(app.currentStage || '').toUpperCase();
+    // The application stage is the authoritative workflow state.  A detail payload can
+    // legitimately be missing its DD relation while the application is already ACTIVE_DD;
+    // do not render a misleading "Start" action in that case.
+    const ddStageActive = ['ACTIVE_DD', 'UNDER_DUE_DILIGENCE', 'DUE_DILIGENCE', 'DUE_DILIGENCE_COMPLETED'].includes(overallStage);
+    const hasDD = Boolean(deal.hasDueDiligence || detail.dueDiligence || ddStageActive);
     const ddComplete = detail.dueDiligence?.status === 'COMPLETED';
-    const hasTS = Boolean(deal.hasTermSheet);
-    const hasBoard = Boolean(deal.hasBoardReview);
+    // The application stage is authoritative when the term-sheet endpoint is
+    // temporarily omitted from the detail envelope.  Once an application has
+    // reached term-sheet negotiation or any later closing stage, do not show
+    // "Not started" or offer a duplicate create action.
+    const termSheetStageActive = ['TERM_SHEET', 'TERM_SHEET_NEGOTIATION', 'UNDER_BOARD_REVIEW', 'BOARD_APPROVED', 'BOARD_CONDITIONAL', 'INVESTMENT_IMPLEMENTATION', 'DISBURSED', 'FUNDED', 'PORTFOLIO_MANAGEMENT', 'PORTFOLIO'].includes(overallStage);
+    const hasTS = Boolean(deal.hasTermSheet || detail.termSheet || termSheetStageActive);
+    const hasBoard = Boolean(deal.hasBoardReview || detail.boardReview);
     const hasImpl = Boolean(detail.investmentImplementation);
-    const disbursedAny = Number(detail.disbursements?.totalDisbursedAmount || 0) > 0;
+    const postApprovalStage = ['INVESTMENT_IMPLEMENTATION', 'DISBURSED', 'FUNDED', 'PORTFOLIO_MANAGEMENT', 'PORTFOLIO'].includes(overallStage);
+    const disbursedAny = postApprovalStage && (
+      ['DISBURSED', 'FUNDED', 'PORTFOLIO_MANAGEMENT', 'PORTFOLIO'].includes(overallStage) ||
+      Number(detail.disbursementSummary?.totalDisbursedAmount || detail.disbursements?.totalDisbursedAmount || 0) > 0
+    );
     const proposedOwnership = hero.ownership ?? app.applicationFormData?.proposedOwnership;
     const preMoneyValuation = hero.preMoney ?? app.applicationFormData?.preMoneyValuation;
     // The application's overall currentStage (not just the AI screening outcome) can land on a
     // terminal rejection at any point — after DD (REJECTED) or after board review (BOARD_REJECTED)
     // — not only at initial screening. Surface that regardless of which step it happened at, so the
     // header/stepper don't keep showing a dead deal as "In progress".
-    const overallStage = String(app.currentStage || '').toUpperCase();
     const isTerminalRejected = __PV11_TERMINAL_REJECT_STAGES.has(overallStage);
     return { app, hero, detail, realOutcome, hasDD, ddComplete, hasTS, hasBoard, hasImpl, disbursedAny, proposedOwnership, preMoneyValuation, overallStage, isTerminalRejected };
   }
@@ -1793,12 +1972,15 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
     // Which step the rejection actually happened at, so only that step (and later, unreached ones)
     // get marked rejected/locked instead of the whole stepper misleadingly reading "in progress".
     const rejectedAtStep = !isTerminalRejected ? 0 : hasBoard ? 5 : hasDD ? 3 : 2;
+    const boardIsComplete = detail.boardVotes
+      ? Boolean(detail.boardVotes.isVotingComplete)
+      : detail.boardReview?.status === 'COMPLETED';
     const stepLabels = [
       ['Application Submitted','Complete'],
       ['AI Screening', realOutcome ? `${realOutcome.replace(/_/g,' ')} · ${deal.score}/100` : 'Pending'],
       ['Due Diligence', rejectedAtStep === 3 ? 'Rejected' : hasDD ? (ddComplete ? 'Complete' : 'In progress') : 'Not started'],
       ['Term Sheet', hasTS ? (detail.termSheet?.isSigned ? 'Signed' : 'Drafted') : 'Not started'],
-      ['Board & IC Decision', rejectedAtStep === 5 ? 'Rejected' : hasBoard ? (boardDecisionLabel(detail.boardReview) || 'In review') : 'Not started'],
+      ['Board & IC Decision', rejectedAtStep === 5 ? 'Rejected' : hasBoard ? (boardIsComplete ? (boardDecisionLabel(detail.boardReview) || 'Approved') : 'In review') : 'Not started'],
       ['Disbursement', hasImpl ? (disbursedAny ? 'Disbursed' : 'Ready') : 'Locked'],
     ];
     const actions = `${selectControl('Fund',funds.map(f=>f.name),deal.fund,'deal-fund')}${button('Back to Deal Flow','back-to-deals','','arrow-left')}${button('Launch investee portal','open-investee-portal','','external-link',`data-deal-id="${escapeHTML(deal.id)}"`)}${button('Activity','activity-menu','','clock',`data-context="deal" data-id="${deal.id}"`)}`;
@@ -1826,6 +2008,9 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
 
   function renderDealOverview(deal) {
     const { app, hero, detail, realOutcome, hasDD, ddComplete, hasTS, hasBoard, hasImpl, disbursedAny, proposedOwnership } = dealProgress(deal);
+    const boardIsComplete = detail.boardVotes
+      ? Boolean(detail.boardVotes.isVotingComplete)
+      : detail.boardReview?.status === 'COMPLETED';
     const company = companies[0];
     const workstreams = ['Market Research','Financial Assessment','Competitive Analysis','Management Team Evaluation','Legal Compliance','Risk Assessment'];
     const overviewDocs = (state.liveData && state.dealDetail && Array.isArray(state.dealDetail.documents))
@@ -1842,7 +2027,7 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
         ${card('Due Diligence',hasDD ? `<div class="info-list"><div class="info-row"><span>Status</span><strong>${statusPill(ddComplete?'Complete':'In progress')}</strong></div><div class="info-row"><span>Recommendation</span><strong>${detail.dueDiligence?.recommendation ? escapeHTML(String(detail.dueDiligence.recommendation)) : '—'}</strong></div></div>` : `<div class="empty-state compact">${icon('search')}<strong>Due diligence not started</strong><p class="muted small">Start due diligence from the Diligence tab.</p></div>`,{tools:button(hasDD?'Open diligence':'Start due diligence',hasDD?'deal-tab':'start-due-diligence','compact',hasDD?'search':'plus',hasDD?'data-tab="diligence"':`data-deal-id="${escapeHTML(deal.id)}" data-application-id="${escapeHTML(deal.id)}"`)})}
       </section>
     </div><div class="side-stack" style="display:flex">
-      ${card('Board & Investment Committee',hasBoard ? (()=>{ const boardComplete = detail.boardReview?.status==='COMPLETED'; return `<div class="info-list"><div class="info-row"><span>Status</span><strong>${boardComplete?statusPill('Completed','success'):statusPill('In progress','warning')}</strong></div><div class="info-row"><span>Recommendation</span><strong>${boardDecisionLabel(detail.boardReview) ? escapeHTML(boardDecisionLabel(detail.boardReview)) : 'Pending vote'}</strong></div></div>${boardComplete ? `<p class="muted small section-gap">Voting is complete.</p><button class="button ghost compact" style="width:100%;margin-top:8px" data-action="deal-tab" data-tab="ic">Open board & IC decision</button>` : `<div class="grid cols-2 section-gap">${button('Approve','vote-approve','success compact','check',`data-deal-id="${escapeHTML(deal.id)}"`)}${button('Approve with conditions','vote-conditions','compact','shield',`data-deal-id="${escapeHTML(deal.id)}"`)}${button('Defer','vote-defer','compact','clock',`data-deal-id="${escapeHTML(deal.id)}"`)}${button('Reject','vote-reject','danger compact','x',`data-deal-id="${escapeHTML(deal.id)}"`)}</div>`}`; })() : `<div class="empty-state compact">${icon('users')}<strong>Board review not started</strong><p class="muted small">A term sheet must exist before board review can begin.</p></div>`) }
+        ${card('Board & Investment Committee',hasBoard ? (()=>{ const boardComplete = boardIsComplete; return `<div class="info-list"><div class="info-row"><span>Status</span><strong>${boardComplete?statusPill('Completed','success'):statusPill('In progress','warning')}</strong></div><div class="info-row"><span>Recommendation</span><strong>${boardComplete && boardDecisionLabel(detail.boardReview) ? escapeHTML(boardDecisionLabel(detail.boardReview)) : 'Pending vote'}</strong></div></div>${boardComplete ? `<p class="muted small section-gap">Voting is complete.</p><button class="button ghost compact" style="width:100%;margin-top:8px" data-action="deal-tab" data-tab="ic">Open board & IC decision</button>` : `<div class="grid cols-2 section-gap">${button('Approve','vote-approve','success compact','check',`data-deal-id="${escapeHTML(deal.id)}"`)}${button('Approve with conditions','vote-conditions','compact','shield',`data-deal-id="${escapeHTML(deal.id)}"`)}${button('Defer','vote-defer','compact','clock',`data-deal-id="${escapeHTML(deal.id)}"`)}${button('Reject','vote-reject','danger compact','x',`data-deal-id="${escapeHTML(deal.id)}"`)}</div>`}`; })() : `<div class="empty-state compact">${icon('users')}<strong>Board review not started</strong><p class="muted small">A term sheet must exist before board review can begin.</p></div>`) }
       ${card('Term Sheet Status',hasTS ? `<div class="info-list"><div class="info-row"><span>Status</span><strong>${detail.termSheet?.isSigned ? statusPill('Signed','success') : statusPill(detail.termSheet?.status||'Drafted')}</strong></div><div class="info-row"><span>Investment amount</span><strong>${detail.termSheet?.investmentAmount ? formatMoney(Number(detail.termSheet.investmentAmount)) : '—'}</strong></div></div>` : `<div class="empty-state compact">${icon('file')}<strong>No term sheet yet</strong><p class="muted small">Created once due diligence completes.</p></div>`,{footer:'<button class="card-link" data-action="deal-tab" data-tab="term">Open term sheet</button>'})}
       ${card('Disbursement Readiness',hasImpl ? `<div class="info-row"><span>Status</span><strong>${disbursedAny?'Disbursed':'Ready for disbursement'}</strong></div>` : `<div class="empty-state compact">${icon('dollar')}<strong>Not ready</strong><p class="muted small">Implementation starts after board approval.</p></div>`,{footer:'<button class="card-link" data-action="deal-tab" data-tab="disbursement">View readiness</button>'})}
     </div></section>`;
@@ -1904,6 +2089,15 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
   }
 
   function renderDealDiligence() {
+    if (state.liveData || liveOnly) {
+      const detail = state.dealDetail || {};
+      const dd = detail.dueDiligence;
+      if (!dd) return card('Due diligence','<p class="muted">No assessment has been started for this application.</p>');
+      const criteria = [['Market research','marketResearchViable','marketResearchComments'],['Financial assessment','financialViable','financialComments'],['Competitive opportunities','competitiveOpportunities','competitiveComments'],['Management team','managementTeamQualified','managementComments'],['Legal compliance','legalCompliant','legalComments'],['Risk tolerance','riskTolerable','riskComments']];
+      const tasks = Array.isArray(dd.tasks) ? dd.tasks : [];
+      const complete = tasks.filter(t => /complete|done|closed/i.test(String(t.stage || t.status || ''))).length;
+      return `<section class="metric-grid">${metricCard({label:'Assessment status',value:String(dd.status || 'Not started'),iconName:'clipboard',accent:'blue',foot:'Recorded review status'})}${metricCard({label:'Criteria met',value:`${criteria.filter(c=>dd[c[1]]===true).length} / ${criteria.length}`,iconName:'check-circle',accent:'emerald',foot:'Based on saved assessment'})}${metricCard({label:'Tasks completed',value:`${complete} / ${tasks.length}`,iconName:'clipboard',accent:'purple',foot:'Recorded tasks only'})}${metricCard({label:'Assessment score',value:dd.overallScore == null ? '—' : String(dd.overallScore),iconName:'bar-chart',accent:'amber',foot:'Saved reviewer score'})}</section>${card('Assessment criteria',`<div class="table-wrap"><table><thead><tr><th>Criterion</th><th>Assessment</th><th>Comments</th></tr></thead><tbody>${criteria.map(c=>`<tr><td>${c[0]}</td><td>${statusPill(dd[c[1]]===true?'Met':'Not met',dd[c[1]]===true?'success':'warning')}</td><td>${escapeHTML(dd[c[2]] || 'No comments recorded')}</td></tr>`).join('')}</tbody></table></div>`,{classes:'section-gap'})}${card('Review conclusion',`<div class="info-list"><div class="info-row"><span>Recommendation</span><strong>${escapeHTML(dd.recommendation || 'Not recorded')}</strong></div><div class="info-row"><span>Reviewer</span><strong>${escapeHTML([dd.reviewer?.firstName,dd.reviewer?.lastName].filter(Boolean).join(' ') || 'Not assigned')}</strong></div></div><p>${escapeHTML(dd.finalComments || 'No final comments recorded')}</p>`,{classes:'section-gap'})}${card('Due diligence tasks',tasks.length?`<div class="table-wrap"><table><thead><tr><th>Task</th><th>Status</th><th>Priority</th><th>Due date</th></tr></thead><tbody>${tasks.map(t=>`<tr><td>${escapeHTML(t.title || 'Untitled task')}</td><td>${escapeHTML(t.stage || t.status || 'Not started')}</td><td>${escapeHTML(t.priority || '—')}</td><td>${escapeHTML(t.date ? new Date(t.date).toLocaleDateString() : '—')}</td></tr>`).join('')}</tbody></table></div>`:'<p class="muted">No tasks recorded for this assessment.</p>',{classes:'section-gap',tools:button('Assign tasks','assign-dd-task','compact','users')})}`;
+    }
     const workstreams = [
       ['Market Research','Nyasha Moyo',5,'10 Jul 2026'],['Financial Assessment','Tendai Moyo',5,'11 Jul 2026'],['Competitive Analysis','Rudo Ndlovu',5,'12 Jul 2026'],['Management Team Evaluation','Chipo Dube',5,'13 Jul 2026'],['Legal Compliance','Farai Chikore',4,'14 Jul 2026'],['Risk Assessment','Tinashe Sibanda',4,'14 Jul 2026']
     ];
@@ -1946,17 +2140,32 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
   }
 
   function renderDealIC(deal) {
-    const votes = Object.values(state.dealVote);
+    const liveVoteSummary = state.liveData ? state.dealDetail?.boardVotes : null;
+    const liveVotes = state.liveData && liveVoteSummary?.votes;
+    const currentUserVote = liveVoteSummary?.userVote || null;
+    const liveVoteUnavailable = Boolean(state.liveData && (!liveVoteSummary || liveVoteSummary.totalConfiguredPower == null));
+    const configuredPower = liveVoteSummary?.totalConfiguredPower == null ? null : Number(liveVoteSummary.totalConfiguredPower);
+    const castPower = liveVoteSummary?.totalCastPower == null ? null : Number(liveVoteSummary.totalCastPower);
+    const remainingPower = liveVoteSummary?.remainingPower == null ? null : Number(liveVoteSummary.remainingPower);
+    const votingComplete = liveVoteSummary ? Boolean(liveVoteSummary.isVotingComplete) : false;
+    const votesByMember = Array.isArray(liveVotes) && liveVotes.length
+      ? liveVotes.reduce((acc, vote) => {
+          const name = String(vote.userName || '').trim();
+          if (name) acc[name] = String(vote.vote || '').toUpperCase() === 'APPROVE' ? 'Approve' : String(vote.vote || '').toUpperCase() === 'REJECT' ? 'Reject' : 'Pending';
+          return acc;
+        }, {})
+      : (state.liveData ? (currentUserVote ? { 'Your vote': currentUserVote.vote === 'APPROVE' ? 'Approve' : 'Reject' } : {}) : state.dealVote);
+    const votes = Object.values(votesByMember);
     const voteCounts = ['Approve','Approve with conditions','Pending','Reject'].map(label=>({label,value:votes.filter(v=>v===label).length,color:label==='Approve'?'#07936d':label==='Approve with conditions'?'#2475f5':label==='Pending'?'#f59e0b':'#d9475c',display:String(votes.filter(v=>v===label).length)}));
-    return `<section class="summary-strip"><div class="summary-item"><span>Meeting</span><strong>Board & IC Review</strong></div><div class="summary-item"><span>Date</span><strong>15 Jul 2026</strong></div><div class="summary-item"><span>Time</span><strong>10:00 - 11:30 SAST</strong></div><div class="summary-item"><span>Voting members</span><strong>7 · Quorum 7/7</strong></div><div class="summary-item"><span>Status</span><strong>${statusPill('In progress','success')}</strong></div><div class="summary-item"><span>Meeting tools</span><strong><button class="card-link" data-action="open-meeting-pack">Open pack</button></strong></div></section>
+    return `<section class="summary-strip"><div class="summary-item"><span>Meeting</span><strong>Board & IC Review</strong></div><div class="summary-item"><span>Date</span><strong>15 Jul 2026</strong></div><div class="summary-item"><span>Time</span><strong>10:00 - 11:30 SAST</strong></div><div class="summary-item"><span>Configured voting power</span><strong>${configuredPower == null ? 'Not returned by API' : configuredPower}</strong></div><div class="summary-item"><span>Status</span><strong>${statusPill(votingComplete ? 'Completed' : 'In progress', votingComplete ? 'success' : 'warning')}</strong></div><div class="summary-item"><span>Recorded / remaining</span><strong>${castPower == null ? 'Hidden until completion' : `${castPower} / ${remainingPower}`}</strong></div><div class="summary-item"><span>Meeting tools</span><strong><button class="card-link" data-action="open-meeting-pack">Open pack</button></strong></div></section>
       <section class="grid" style="grid-template-columns:240px minmax(0,1fr) 300px;gap:12px"><div>${card('Agenda',`<div class="info-list">${[['1','Conflict declarations','5 min','Complete'],['2','Deal team presentation','20 min','Complete'],['3','Due diligence findings','20 min','Current'],['4','Terms and conditions','15 min','Upcoming'],['5','Questions & deliberation','20 min','Upcoming'],['6','Vote and resolution','10 min','Upcoming']].map(item=>`<div class="list-row"><span class="step-index ${item[3]==='Complete'?'positive':''}">${item[0]}</span><span class="list-row-main"><strong>${item[1]}</strong><small>${item[2]}</small></span>${statusPill(item[3],item[3]==='Complete'?'success':item[3]==='Current'?'warning':'neutral')}</div>`).join('')}</div>`,{footer:'<strong>Total duration: 90 min</strong>'})}</div>
       <div>${card('Decision Brief',`<div class="grid cols-5"><div><span class="muted small">Recommendation</span><strong class="positive" style="display:block;margin-top:4px">Approve with conditions</strong></div><div><span class="muted small">Requested</span><strong style="display:block;margin-top:4px">${formatMoney(deal.amount)}</strong></div><div><span class="muted small">Ownership</span><strong style="display:block;margin-top:4px">17.5%</strong></div><div><span class="muted small">Valuation</span><strong style="display:block;margin-top:4px">$85.0M</strong></div><div><span class="muted small">AI Score</span><strong style="display:block;margin-top:4px">${deal.score}/100</strong></div></div><section class="grid cols-3 section-gap"><div><h4>Investment Rationale</h4><div class="reason-list"><div class="reason-item">${icon('check-circle')}<div><strong>Strong management team with proven execution.</strong></div></div><div class="reason-item">${icon('check-circle')}<div><strong>Large and growing addressable market.</strong></div></div><div class="reason-item">${icon('check-circle')}<div><strong>Compelling unit economics and path to profitability.</strong></div></div></div></div><div><h4>Key Risks & Mitigants</h4><div class="reason-list"><div class="reason-item warning">${icon('alert')}<div><strong>Customer concentration risk.</strong><small>Mitigant: covenant on concentration limits.</small></div></div><div class="reason-item warning">${icon('alert')}<div><strong>EBITDA sustainability not yet proven.</strong></div></div></div></div><div><h4>Conditions Proposed</h4><div class="reason-list"><div class="reason-item warning">${icon('info')}<div><strong>Customer concentration covenant.</strong></div></div><div class="reason-item warning">${icon('info')}<div><strong>Evidence of EBITDA sustainability.</strong></div></div><div class="reason-item warning">${icon('info')}<div><strong>Legal title confirmation for IP.</strong></div></div></div></div></section>`) }
-        <section class="vote-grid section-gap">${card('Voting & Resolution',`<div>${Object.entries(state.dealVote).map(([member,vote],index)=>`<div class="vote-row"><span>${index+1}</span><span class="vote-member">${avatar(member,index)}<strong>${escapeHTML(member)}</strong></span><span>${statusPill('Clear','success')}</span><select class="vote-select" data-change-action="ic-vote" data-member="${escapeHTML(member)}"><option ${vote==='Approve'?'selected':''}>Approve</option><option ${vote==='Approve with conditions'?'selected':''}>Approve with conditions</option><option ${vote==='Defer'?'selected':''}>Defer</option><option ${vote==='Reject'?'selected':''}>Reject</option><option ${vote==='Pending'?'selected':''}>Pending</option></select></div>`).join('')}</div><div class="vote-actions">${button('Approve','final-vote','success','check','data-vote="Approve"')}${button('Approve with conditions','final-vote','','shield','data-vote="Approve with conditions"')}${button('Defer','final-vote','','clock','data-vote="Defer"')}${button('Reject','final-vote','danger','x','data-vote="Reject"')}</div>`) }${card('Vote Summary',donutChart(voteCounts,'7','Members',112),{footer:'<span class="muted small">A decision cannot be finalised while votes are pending.</span>'})}</section>
+        <section class="vote-grid section-gap">${card('Voting & Resolution',liveVoteUnavailable ? '<p class="muted small">Live vote details were not returned by the API. No illustrative member votes are shown.</p>' : `<div>${Object.entries(votesByMember).map(([member,vote],index)=>`<div class="vote-row"><span>${index+1}</span><span class="vote-member">${avatar(member,index)}<strong>${escapeHTML(member)}</strong></span><span>${statusPill('Clear','success')}</span><select class="vote-select" data-change-action="ic-vote" data-member="${escapeHTML(member)}"><option ${vote==='Approve'?'selected':''}>Approve</option><option ${vote==='Approve with conditions'?'selected':''}>Approve with conditions</option><option ${vote==='Defer'?'selected':''}>Defer</option><option ${vote==='Reject'?'selected':''}>Reject</option><option ${vote==='Pending'?'selected':''}>Pending</option></select></div>`).join('')}</div><div class="vote-actions">${button('Approve','final-vote','success','check',`data-deal-id="${escapeHTML(String(deal?.id || state.selectedDealId || ''))}" data-vote="Approve"`)}${button('Approve with conditions','final-vote','','shield',`data-deal-id="${escapeHTML(String(deal?.id || state.selectedDealId || ''))}" data-vote="Approve with conditions"`)}${button('Defer','final-vote','','clock',`data-deal-id="${escapeHTML(String(deal?.id || state.selectedDealId || ''))}" data-vote="Defer"`)}${button('Reject','final-vote','danger','x',`data-deal-id="${escapeHTML(String(deal?.id || state.selectedDealId || ''))}" data-vote="Reject"`)}</div>`) }${card('Vote Summary',liveVoteUnavailable ? '<p class="muted small">Live vote summary unavailable.</p>' : donutChart(voteCounts,String(configuredPower),'Configured power',112),{footer: liveVoteUnavailable ? '<span class="muted small">The API did not provide vote detail for this record.</span>' : remainingPower > 0 ? `<span class="muted small">${remainingPower} voting power remains. A decision cannot be finalised while votes are pending.</span>` : '<span class="muted small">All configured voting power is recorded.</span>'})}</section>
       </div><div class="side-stack" style="display:flex">
-        ${card('Conflict Declarations',`<div style="margin-bottom:8px">${statusPill('7 / 7 clear','success')}</div><p class="muted small">All members have submitted conflict declarations with no conflicts identified.</p>`,{footer:'<button class="card-link" data-action="open-conflicts">View all declarations</button>'})}
+        ${card('Conflict Declarations',`<div style="margin-bottom:8px">${configuredPower == null ? statusPill('Not returned by API','warning') : statusPill(`${configuredPower} / ${configuredPower} clear`,'success')}</div><p class="muted small">${configuredPower == null ? 'The API did not return configured conflict-declaration totals for this in-progress review.' : 'All configured voting members have submitted conflict declarations with no conflicts identified.'}</p>`,{footer:'<button class="card-link" data-action="open-conflicts">View all declarations</button>'})}
         ${card('Resolution Draft',`<div class="info-list"><div class="info-row"><span>Resolution number</span><strong>RES-IC-2026-014</strong></div><div class="info-row"><span>Title</span><strong>Approval of Investment in Nova Analytics Ltd - Series B</strong></div></div>`,{footer:'<button class="card-link" data-action="view-resolution">View full draft</button>'})}
         ${card('Recorded Rationale',`<textarea style="width:100%;min-height:112px">The committee approves the proposed investment in Nova Analytics Ltd (Series B), subject to the conditions set out in this resolution.</textarea><div class="muted small text-right">129 / 1000 characters</div>`) }
-        ${card('E-Signature Status',`<div class="info-row"><span>Members signed</span><strong>0 of 7</strong></div>${progressBar(0)}`,{footer:'<button class="card-link" data-action="request-signatures">Request signatures</button>'})}
+        ${card('E-Signature Status',`<div class="info-row"><span>Members signed</span><strong>${configuredPower == null ? 'Not returned by API' : `0 of ${configuredPower}`}</strong></div>${progressBar(0)}`,{footer:'<button class="card-link" data-action="request-signatures">Request signatures</button>'})}
       </div></section>`;
   }
 
@@ -2114,18 +2323,27 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
     const visibleCalls = capitalCalls.filter(call=>call.fund===fund.name);
     const totalCalled = sum(visibleCalls, call=>call.amount);
     const totalCollected = sum(visibleCalls, call=>call.collected);
+    const distributionsLoaded = Object.prototype.hasOwnProperty.call(state.fundDistributions || {}, fund.id);
+    const fundDistributions = distributionsLoaded ? state.fundDistributions[fund.id] : undefined;
+    const totalDistributedToLPs = Array.isArray(fundDistributions)
+      ? sum(fundDistributions, distribution=>Number(distribution.netToLPs || 0))
+      : null;
+    const distributionRows = Array.isArray(fundDistributions)
+      ? fundDistributions.map(distribution=>`<tr><td class="table-primary">${escapeHTML(distribution.source || 'Distribution')}</td><td>${escapeHTML(distribution.distributionDate || '—')}</td><td class="text-right">${formatMoney(Number(distribution.grossAmount || 0), distribution.currency?.code || fund.currency)}</td><td class="text-right">${formatMoney(Number(distribution.netToLPs || 0), distribution.currency?.code || fund.currency)}</td><td>${statusPill(distribution.status || 'Declared')}</td></tr>`).join('')
+      : '';
     return `<section class="profile-tab-panel fund-profile-panel section-gap">
       <div class="profile-tab-summary"><div><strong>Capital activity workspace</strong><span>Capital calls, collections, distributions, fees, investment funding and cash reconciliation.</span></div>${button('New capital activity','new-capital-call','primary','plus')}</div>
       <section class="grid cols-4 section-gap">
         ${metricCard({label:'Issued Calls',value:formatMoney(totalCalled),iconName:'send',accent:'blue',foot:`${visibleCalls.length} call notices`,action:'fund-calls-issued'})}
         ${metricCard({label:'Collected',value:formatMoney(totalCollected),iconName:'check-circle',accent:'emerald',foot:`${pct(totalCalled?totalCollected/totalCalled*100:0)} collection rate`,action:'fund-calls-collected'})}
-        ${metricCard({label:'Distributed',value:formatMoney(fund.distributed),iconName:'trend-up',accent:'purple',foot:'Since inception',action:'fund-distributions'})}
+        ${metricCard({label:'Distributed to LPs',value:totalDistributedToLPs==null?'—':formatMoney(totalDistributedToLPs,fund.currency),iconName:'trend-up',accent:'purple',foot:totalDistributedToLPs==null?(distributionsLoaded?'Distribution data unavailable':'Loading declared distributions'): 'Net across declared distributions',action:'fund-distributions'})}
         ${metricCard({label:'Unfunded Commitment',value:formatMoney(Math.max(0,fund.commitment-fund.called)),iconName:'clock',accent:'amber',foot:'Available for future calls',action:'fund-cash-need'})}
       </section>
       <section class="fund-two-column section-gap">
         ${card('Collection Status',visibleCalls.length?donutChart([{label:'Collected',value:totalCollected,color:'#07936d',display:formatMoney(totalCollected)},{label:'Outstanding',value:Math.max(0,totalCalled-totalCollected),color:'#f29a1f',display:formatMoney(Math.max(0,totalCalled-totalCollected))}],pct(totalCalled?totalCollected/totalCalled*100:0),'Collected',150):`<div class="empty-state compact">${icon('pie-chart')}<strong>No capital calls issued yet</strong></div>`,{subtitle:'Current issued notices'})}
-        ${card('Capital Call Register',visibleCalls.length?`<div class="table-wrap"><table><thead><tr><th>Reference</th><th>Call Date</th><th>Due Date</th><th>Purpose</th><th class="text-right">Amount</th><th class="text-right">Collected</th><th>Status</th></tr></thead><tbody>${visibleCalls.map(call=>`<tr class="clickable" data-action="open-capital-call" data-id="${call.id}"><td class="table-primary brand-text">${call.id}</td><td>${call.callDate}</td><td>${call.dueDate}</td><td>${escapeHTML(call.purpose)}</td><td class="text-right">${formatMoney(call.amount)}</td><td class="text-right">${formatMoney(call.collected)}</td><td>${statusPill(call.status)}</td></tr>`).join('')}</tbody></table></div>`:`<div class="empty-state compact">${icon('send')}<strong>No capital calls issued for this fund yet</strong></div>`,{tools:button('Export','export-capital','compact','download')})}
+        ${card('Capital Call Register',visibleCalls.length?`<div class="table-wrap"><table><thead><tr><th>Reference</th><th>Call Date</th><th>Due Date</th><th>Purpose</th><th class="text-right">Amount</th><th class="text-right">Collected</th><th>Status</th></tr></thead><tbody>${visibleCalls.map(call=>`<tr class="clickable" data-action="open-capital-call" data-id="${call.id}"><td class="table-primary brand-text">${escapeHTML(capitalCallReference(call))}</td><td>${call.callDate}</td><td>${call.dueDate}</td><td>${escapeHTML(call.purpose)}</td><td class="text-right">${formatMoney(call.amount)}</td><td class="text-right">${formatMoney(call.collected)}</td><td>${statusPill(call.status)}</td></tr>`).join('')}</tbody></table></div>`:`<div class="empty-state compact">${icon('send')}<strong>No capital calls issued for this fund yet</strong></div>`,{tools:button('Export','export-capital','compact','download')})}
       </section>
+      <section class="card table-card section-gap"><div class="table-toolbar"><div class="table-title-row"><h3>Declared Distributions</h3><span class="table-badge">${Array.isArray(fundDistributions)?fundDistributions.length:'—'} records</span></div></div><div class="table-wrap"><table><thead><tr><th>Source</th><th>Date</th><th class="text-right">Gross</th><th class="text-right">Net to LPs</th><th>Status</th></tr></thead><tbody>${distributionRows || `<tr><td colspan="5"><div class="empty-state compact"><strong>${distributionsLoaded?'No declared distributions for this fund.':'Loading declared distributions…'}</strong></div></td></tr>`}</tbody></table></div></section>
     </section>`;
   }
 
@@ -2249,6 +2467,21 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
   }
 
   function companyProfileMetrics(company) {
+    if (state.liveData) {
+      const source = company.source || {};
+      const value = source.fairMarketValue ?? source.fairValue ?? source.currentValue;
+      const irr = source.grossIrr ?? source.grossIRR;
+      const growth = source.revenueGrowth;
+      const runway = source.financialKpis?.months_of_runway ?? source.financialKpis?.monthsOfRunway;
+      return `<section class="metric-grid">
+        ${metricCard({label:'Fair Value',value:value == null?'—':formatMoney(Number(value)),iconName:'dollar',accent:'purple',foot:'Source valuation record',action:'company-valuation'})}
+        ${metricCard({label:'Invested',value:company.invested == null?'—':formatMoney(company.invested),iconName:'building',accent:'emerald',foot:'Approved and disbursed investment records',action:'company-invested'})}
+        ${metricCard({label:'MOIC',value:value == null || !company.invested?'—':`${(Number(value)/company.invested).toFixed(2)}x`,iconName:'trend-up',accent:'blue',foot:'Fair value divided by invested cost',action:'company-moic'})}
+        ${metricCard({label:'Gross IRR',value:irr == null?'—':pct(Number(irr)),iconName:'pie-chart',accent:'amber',foot:'Approved valuation performance',action:'company-irr'})}
+        ${metricCard({label:'Revenue Growth',value:growth == null?'—':pct(Number(growth)),iconName:'trend-up',accent:'emerald',foot:'Reported company KPI',action:'company-growth'})}
+        ${metricCard({label:'Runway',value:runway == null?'—':`${Number(runway)} months`,iconName:'clock',accent:'cyan',foot:'Reported financial KPI',action:'company-runway'})}
+      </section>`;
+    }
     return `<section class="metric-grid">
       ${metricCard({label:'Fair Value',value:formatMoney(company.fairValue),iconName:'dollar',accent:'purple',foot:'Current valuation',action:'company-valuation'})}
       ${metricCard({label:'Invested',value:formatMoney(company.invested),iconName:'building',accent:'emerald',foot:'Total cost basis',action:'company-invested'})}
@@ -2259,7 +2492,30 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
     </section>`;
   }
 
+  function liveCompanyKpiTable(source) {
+    const kpis = source?.financialKpis;
+    const values = kpis && typeof kpis === 'object' ? Object.entries(kpis).filter(([,value])=>value!==null && value!==undefined && typeof value !== 'object') : [];
+    if (!values.length) return '<div class="empty-state compact"><strong>No financial KPI values are recorded for this company.</strong></div>';
+    return `<div class="table-wrap"><table><thead><tr><th>Reported metric</th><th>Value</th></tr></thead><tbody>${values.map(([key,value])=>`<tr><td class="table-primary">${escapeHTML(key.replaceAll('_',' '))}</td><td>${escapeHTML(String(value))}</td></tr>`).join('')}</tbody></table></div>`;
+  }
+
+  function renderCompanyMetricsTab(company) {
+    const source = company.source || state.companyRecord || {};
+    return `<section class="profile-tab-panel section-gap">${card('Reported metrics',liveCompanyKpiTable(source),{subtitle:'Directly from the persisted financial KPI payload.'})}</section>`;
+  }
+
+  function renderCompanyReportTable(reports) {
+    const rows = reports.map(report=>`<tr><td class="table-primary">${escapeHTML(report.title || report.reportType || 'Financial report')}</td><td>${escapeHTML(report.reportType || '—')}</td><td>${escapeHTML(report.reportingPeriod ? new Date(report.reportingPeriod).toLocaleDateString() : '—')}</td><td>${escapeHTML(report.status || '—')}</td><td>${report.reportUrl ? `<a href="${escapeHTML(report.reportUrl)}" target="_blank" rel="noopener">Open report</a>` : '—'}</td></tr>`).join('');
+    return card('Submitted financial reports',`<div class="table-wrap"><table><thead><tr><th>Report</th><th>Type</th><th>Period</th><th>Status</th><th>File</th></tr></thead><tbody>${rows || '<tr><td colspan="5"><div class="empty-state compact"><strong>No submitted financial reports were returned.</strong></div></td></tr>'}</tbody></table></div>`);
+  }
+
   function renderCompanyOverviewTab(company) {
+    if (state.liveData) {
+      const source = company.source || state.companyRecord || {};
+      const info = [['Legal name',source.name],['Registration number',source.registrationNumber],['Industry',source.industry],['Status',source.status],['Website',source.website],['Address',source.address],['Contact person',source.contactPerson],['Contact email',source.contactEmail],['Contact phone',source.contactPhone],['Employees',source.employeeCount],['Annual revenue',source.annualRevenue],['Funding stage',source.fundingStage],['Company size',source.companySize],['Investment fund',source.investmentImplementation?.fund?.name || source.fund?.name],['Investment start date',source.startDate],['Investment end date',source.endDate]];
+      const rows = info.filter(([,value])=>value!==null && value!==undefined && value!=='').map(([label,value])=>`<div class="info-row"><span>${escapeHTML(label)}</span><strong>${escapeHTML(String(value))}</strong></div>`).join('');
+      return `<section class="profile-tab-panel section-gap">${card('Company record',`<div class="info-list">${rows||'<p class="muted">No company profile fields were returned by the API.</p>'}</div>`)}${card('Operating performance',liveCompanyKpiTable(source),{classes:'section-gap'})}</section>`;
+    }
     const labels = ['FY23 Actual','FY24 Actual','FY25 Actual','FY26 Budget','FY27 Forecast'];
     const performanceRows = ['Revenue','Gross Profit','EBITDA','Net Profit'].map((metric,index)=>{
       const base = [company.revenue,company.revenue.map(v=>v*company.margin/100),company.ebitda,company.ebitda.map(v=>v*.62)][index];
@@ -2285,6 +2541,7 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
   }
 
   function renderCompanyPerformanceTab(company) {
+    if (state.liveData) return `<section class="profile-tab-panel section-gap">${card('Reported performance',liveCompanyKpiTable(company.source || state.companyRecord || {}),{subtitle:'Values returned from the company financial KPI record.'})}<p class="muted small section-gap">Historical values are shown only when present in submitted financial reports.</p>${renderCompanyReportTable(state.companyFinancialReports || [])}</section>`;
     const quarters=['Q3 2025','Q4 2025','Q1 2026','Q2 2026','Q3 2026E','Q4 2026E'];
     const revenue=[6.1,6.8,7.4,8.6,9.4,10.2];
     const ebitda=[1.2,1.5,1.7,2.1,2.4,2.8];
@@ -2304,6 +2561,7 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
   }
 
   function renderCompanyValueCreationTab(company) {
+    if (state.liveData) return `<section class="profile-tab-panel section-gap">${card('Value creation initiatives','<div class="empty-state compact"><strong>No persisted value-creation records were returned for this company.</strong></div>')}</section>`;
     const initiatives=[['Go-to-market expansion','Rudo Chikomo','Revenue growth','$19.0M ARR','$30.0M ARR',68,'On Track'],['Product & Technology','Tinashe Nyoni','Release velocity','1 major release/qtr','2 major releases/qtr',57,'On Track'],['Operational Excellence','Farai Mutasa','EBITDA margin','18%','26%',63,'On Track'],['Talent & Organisation','Tendai Moyo','Critical-role coverage','72%','95%',50,'Watch'],['Cybersecurity readiness','Tinashe Nyoni','ISO 27001','Gap assessment','Certified',44,'At Risk']];
     return `<section class="profile-tab-panel section-gap">
       <div class="profile-tab-summary"><div><strong>Value-creation operating plan</strong><span>Initiatives, owners, target outcomes, milestones and fund-team interventions.</span></div>${button('Add initiative','open-value-creation','primary','plus')}</div>
@@ -2321,6 +2579,7 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
   }
 
   function renderCompanyBoardTab(company) {
+    if (state.liveData) return `<section class="profile-tab-panel section-gap">${card('Board and governance','<div class="empty-state compact"><strong>No board, committee, or resolution records were returned for this company.</strong></div>')}</section>`;
     return `<section class="profile-tab-panel section-gap">
       <div class="profile-tab-summary"><div><strong>Board and governance workspace</strong><span>Meetings, committees, resolutions, reserved matters, declarations and governance actions.</span></div>${button('Generate board pack','company-board-pack','primary','clipboard')}</div>
       <section class="grid cols-3 section-gap">
@@ -2340,6 +2599,7 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
   }
 
   function renderCompanyFinancialsTab(company) {
+    if (state.liveData) return `<section class="profile-tab-panel section-gap">${card('Financial KPIs',liveCompanyKpiTable(company.source || state.companyRecord || {}),{subtitle:'Persisted company financialKpis only.'})}${renderCompanyReportTable(state.companyFinancialReports || [])}</section>`;
     const periods=['FY23A','FY24A','FY25A','FY26B','FY26E','FY27E'];
     return `<section class="profile-tab-panel section-gap">
       <div class="profile-tab-summary"><div><strong>Financial monitoring workspace</strong><span>Management accounts, forecasts, liquidity, working capital, variances and covenant monitoring.</span></div>${button('Upload management accounts','profile-company-upload','','upload')}</div>
@@ -2357,6 +2617,17 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
   }
 
   function renderCompanyDocumentsTab(company) {
+    if (state.liveData) {
+      const folders = [...new Set(['Financial','Operational','Investment',...(state.companyDocumentFolders||[])])].filter(Boolean).sort();
+      const selectedFolder = state.companyDocumentFolder || 'All folders';
+      const companyDocs = (state.companyDocuments || []).filter(doc=>selectedFolder==='All folders'||String(doc.folder||doc.category||'')===selectedFolder);
+      const rows = companyDocs.map(doc => `<tr><td class="table-primary">${escapeHTML(doc.name || doc.originalName || 'Document')}</td><td>${escapeHTML(doc.folder || doc.category || '—')}</td><td>${escapeHTML(doc.mimeType || doc.type || '—')}</td><td>${escapeHTML(doc.size == null ? '—' : `${Number(doc.size).toLocaleString()} bytes`)}</td><td>${escapeHTML(doc.createdAt ? new Date(doc.createdAt).toLocaleDateString() : '—')}</td><td>${doc.url || doc.fileUrl ? `<a href="${escapeHTML(doc.url || doc.fileUrl)}" target="_blank" rel="noopener">Preview</a> · <a href="${escapeHTML(doc.url || doc.fileUrl)}" download="${escapeHTML(doc.originalName||doc.name||'company-document')}">Download</a>` : '—'}</td></tr>`).join('');
+      const requests = (state.companyDocumentRequests||[]).map(item=>`<tr><td>${escapeHTML(item.title)}</td><td>${escapeHTML(item.folder)}</td><td>${escapeHTML(item.dueDate?new Date(item.dueDate).toLocaleDateString():'—')}</td><td>${escapeHTML(item.status)}</td></tr>`).join('');
+      const folderSelect = `<select data-change-action="company-document-folder"><option${selectedFolder==='All folders'?' selected':''}>All folders</option>${folders.map(folder=>`<option${selectedFolder===folder?' selected':''}>${escapeHTML(folder)}</option>`).join('')}</select>`;
+      const uploadFolder = state.companyDocumentUploadFolder || 'Financial';
+      const uploadFolderSelect = `<label>Upload folder<select data-change-action="company-document-upload-folder">${folders.map(folder=>`<option${uploadFolder===folder?' selected':''}>${escapeHTML(folder)}</option>`).join('')}</select></label>`;
+      return `<section class="profile-tab-panel section-gap"><div class="profile-tab-summary"><div><strong>Company documents</strong><span>Files stored through the existing media service and linked to this company.</span></div><div class="page-actions">${button('Request document','request-company-document','','send')}<label class="button primary" style="cursor:pointer">${icon('upload')} Upload document<input type="file" hidden data-file-action="upload-company-document" data-folder="${escapeHTML(uploadFolder)}"></label></div></div>${card('Document register',`<div class="table-toolbar"><label>Folder ${folderSelect}</label><span class="table-badge">${companyDocs.length} records</span>${uploadFolderSelect}</div><div class="table-wrap"><table><thead><tr><th>Name</th><th>Folder</th><th>Type</th><th>Size</th><th>Date</th><th>Actions</th></tr></thead><tbody>${rows || '<tr><td colspan="6"><div class="empty-state compact"><strong>No company documents are stored in this folder.</strong></div></td></tr>'}</tbody></table></div>`)}${card('Document requests',`<div class="table-wrap"><table><thead><tr><th>Document requested</th><th>Folder</th><th>Due date</th><th>Status</th></tr></thead><tbody>${requests||'<tr><td colspan="4"><div class="empty-state compact"><strong>No document requests have been recorded.</strong></div></td></tr>'}</tbody></table></div>`,{classes:'section-gap'})}</section>`;
+    }
     const companyDocs = documents.filter(doc=>['Corporate & Legal','Financial','Commercial','Committee Pack'].includes(doc.folder));
     return `<section class="profile-tab-panel section-gap">
       <div class="profile-tab-summary"><div><strong>Company document workspace</strong><span>Governance papers, management accounts, legal records, board packs and evidence history.</span></div><div class="page-actions">${button('Request document','request-document','','send')}${button('Upload files','profile-company-upload','primary','upload')}</div></div>
@@ -2374,6 +2645,11 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
   }
 
   function renderCompanyActivityTab(company) {
+    if (state.liveData) {
+      const events = state.companyActivity || [];
+      const rows = events.map(event=>`<tr><td>${escapeHTML(event.createdAt ? new Date(event.createdAt).toLocaleString() : '—')}</td><td>${escapeHTML(event.action || 'Activity')}</td><td>${escapeHTML([event.user?.firstName||event.actorFirstName,event.user?.lastName||event.actorLastName].filter(Boolean).join(' ') || event.user?.email || event.actorEmail || 'System')}</td><td>${escapeHTML(event.entityType || 'Portfolio')}</td><td>${escapeHTML(event.description || event.newValues?.documentName || event.newValues?.reportingPeriod || event.newValues?.updatedFields?.join(', ') || '—')}</td></tr>`).join('');
+      return `<section class="profile-tab-panel section-gap">${card('Company activity',`<div class="table-wrap"><table><thead><tr><th>Timestamp</th><th>Event</th><th>Actor</th><th>Source</th><th>Details</th></tr></thead><tbody>${rows || '<tr><td colspan="5"><div class="empty-state compact"><strong>No activity events were returned by the reporting audit API.</strong></div></td></tr>'}</tbody></table></div>`)}</section>`;
+    }
     const events=[['31 Jul 2026 · 14:22','Management update published','Tariro Moyo','Operating performance','Revenue and EBITDA forecast refreshed','Complete'],['30 Jul 2026 · 09:45','Board paper uploaded','Farai Mutasa','Board & Governance','Q2 management accounts added to the August pack','Complete'],['29 Jul 2026 · 16:10','Milestone status changed','Tinashe Nyoni','Value Creation','ISO 27001 certification moved from On Track to At Risk','Attention'],['28 Jul 2026 · 11:08','Valuation reviewed','Nyasha Moyo','Valuation','$128.4M fair value retained after review','Approved'],['25 Jul 2026 · 13:35','Comment added','Rudo Chikomo','Commercial','South Africa pipeline assumptions updated','Complete'],['22 Jul 2026 · 08:50','Document requested','System','Documents','Tax clearance certificate renewal requested','Pending']];
     return `<section class="profile-tab-panel section-gap">
       <div class="profile-tab-summary"><div><strong>Company activity and audit trail</strong><span>Chronological operating updates, approvals, document changes and user actions.</span></div><div class="page-actions">${button('Add update','company-update','primary','plus')}${button('Export audit','export-drilldown','','download')}</div></div>
@@ -2387,17 +2663,42 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
   }
 
   function renderCompanyDetail() {
-    const company = companies.find(c=>c.id===state.selectedCompanyId) || companies[0];
-    const tabs=[['overview','Overview'],['performance','Performance'],['value-creation','Value Creation'],['board','Board & Governance'],['financials','Financials'],['documents','Documents'],['activity','Activity']];
+    if (state.companyRecordLoading) return `${pageHeader('Portfolio Company','Loading company details from the Portfolio API…','','Portfolio Company')}<section class="card"><div class="skeleton-block" aria-label="Loading company details"></div></section>`;
+    if (state.companyRecordError) return `${pageHeader('Portfolio Company','Company detail could not be loaded.','','Portfolio Company')}<section class="card"><div class="empty-state compact"><strong>${escapeHTML(state.companyRecordError)}</strong></div></section>`;
+    const record = state.companyRecord;
+    const baseCompany = companies.find(c=>c.id===state.selectedCompanyId) || (record ? { id:String(record.id), name:String(record.name||'Company'), sector:String(record.industry||'—'), stage:String(record.status||'—'), entry:record.startDate||record.createdAt||'—', invested:Number(record.totalInvested ?? (record.investmentImplementation?.fundDisbursements||[]).filter(d=>['APPROVED','DISBURSED'].includes(String(d.status).toUpperCase())).reduce((sum,d)=>sum+Number(d.amount||0),0)), fairValue:record.fairMarketValue ?? record.fairValue ?? null, ownership:record.currentOwnership ?? null, revenueGrowth:record.revenueGrowth ?? null, runway:record.financialKpis?.months_of_runway ?? record.financialKpis?.monthsOfRunway ?? null, health:null, boardDate:null, lastReport:record.updatedAt||null, fund:record.investmentImplementation?.fund?.name || record.fund?.name || '—', city:record.address||'—', revenue:[], ebitda:[], arr:null, margin:null, nrr:null, clients:null, esg:[], color:'#2475f5', source:record } : null);
+    if (!baseCompany) return `${pageHeader('Portfolio Company','Select a company from the live portfolio register.','','Portfolio Company')}<section class="card"><div class="empty-state compact"><strong>No company selected.</strong></div></section>`;
+    const investedFromDisbursements = (record?.investmentImplementation?.fundDisbursements || []).filter(d=>['APPROVED','DISBURSED'].includes(String(d.status||'').toUpperCase())).reduce((total,d)=>total+Number(d.amount||0),0);
+    let company = record ? { ...baseCompany, name:record.name||baseCompany.name, sector:record.industry||baseCompany.sector, stage:record.status||baseCompany.stage, entry:record.startDate||record.createdAt||baseCompany.entry, invested:record.totalInvested ?? investedFromDisbursements, ownership:record.currentOwnership ?? baseCompany.ownership, fund:record.investmentImplementation?.fund?.name||record.fund?.name||baseCompany.fund, city:record.address||'—', lastReport:record.updatedAt||'—', source:record } : baseCompany;
+    try {
+      const saved = !state.liveData && JSON.parse(storage.get(`pv11-company-update-${baseCompany?.id}`, 'null') || 'null');
+      if (saved) {
+        company = {
+          ...baseCompany,
+          ...saved,
+          arr: Number(saved.arr) > 100000 ? Number(saved.arr) / 1000000 : saved.arr,
+          revenue: Array.isArray(saved.revenue) ? saved.revenue : (baseCompany.revenue || []),
+          ebitda: Array.isArray(saved.ebitda) ? saved.ebitda : (baseCompany.ebitda || []),
+        };
+      }
+    } catch { /* ignore malformed local synthetic cache */ }
+    const companySource = company.source || record || {};
+    const companyKpiRows = Object.entries(companySource.financialKpis || {}).filter(([,value])=>value!==null && value!==undefined && typeof value!=='object').map(([key,value])=>[key.replaceAll('_',' '),String(value)]);
+    const reportExportRows = (state.companyFinancialReports||[]).map(report=>[report.title||report.reportType||'Financial report',report.reportType||'',report.reportingPeriod||'',report.status||'']);
+    const documentExportRows = (state.companyDocuments||[]).map(doc=>[doc.name||doc.fileName||'Document',doc.folder||doc.category||'',doc.mimeType||doc.type||'',doc.size??'',doc.createdAt||'']);
+    const activityExportRows = (state.companyActivity||[]).map(event=>[event.createdAt||'',event.action||'',event.actorEmail||[event.actorFirstName,event.actorLastName].filter(Boolean).join(' '),event.entityType||'',event.description||event.newValues?.reportingPeriod||'']);
+    window.__pv11CompanyDetailExportSpec = { title:`${company.name} - Portfolio Company`, subtitle:'Company detail and persisted reporting records', footerLabel:'NVCCZ - Portfolio Management', filename:`portfolio-company-${String(company.name||'detail').replace(/[^a-z0-9]+/gi,'-')}`, landscape:true, columns:['Company field','Value'], rows:[['Name',companySource.name||company.name],['Industry',companySource.industry||company.sector],['Status',companySource.status||company.stage],['Registration number',companySource.registrationNumber||''],['Fund',companySource.investmentImplementation?.fund?.name||companySource.fund?.name||company.fund],['Address',companySource.address||''],['Entry date',companySource.startDate||companySource.createdAt||company.entry],['Ownership',companySource.currentOwnership??company.ownership??'']], extra:[{title:'Performance',columns:['Report','Type','Period','Status'],rows:reportExportRows},{title:'Metrics',columns:['Metric','Value'],rows:companyKpiRows},{title:'Value Creation',columns:['Status'],rows:[['No persisted records available']]},{title:'Board Governance',columns:['Status'],rows:[['No persisted records available']]},{title:'Financials',columns:['Metric','Value'],rows:companyKpiRows},{title:'Documents',columns:['Name','Folder','Type','Size','Date'],rows:documentExportRows},{title:'Activity',columns:['Timestamp','Action','Actor','Source','Details'],rows:activityExportRows}], includeExtraInCsv:true };
+    const tabs=[['overview','Overview'],['performance','Performance'],['metrics','Metrics'],['value-creation','Value Creation'],['board','Board & Governance'],['financials','Financials'],['documents','Documents'],['activity','Activity']];
     const content = state.companyTab==='performance' ? renderCompanyPerformanceTab(company)
+      : state.companyTab==='metrics' ? renderCompanyMetricsTab(company)
       : state.companyTab==='value-creation' ? renderCompanyValueCreationTab(company)
       : state.companyTab==='board' ? renderCompanyBoardTab(company)
       : state.companyTab==='financials' ? renderCompanyFinancialsTab(company)
       : state.companyTab==='documents' ? renderCompanyDocumentsTab(company)
       : state.companyTab==='activity' ? renderCompanyActivityTab(company)
       : renderCompanyOverviewTab(company);
-    return `${pageHeader(company.name,`${company.sector} · ${company.city} · ${company.fund}`,`${button('Add update','company-update','primary','plus')}${button('Board pack','company-board-pack','','clipboard')}${button('Activity','activity-menu','','clock',`data-context="company" data-id="${company.id}"`)}`,'Portfolio Company')}
-      <section class="detail-hero"><div class="detail-hero-top"><div class="entity-title"><span class="entity-logo" style="background:linear-gradient(145deg,${company.color},color-mix(in srgb,${company.color} 55%,#101827))">${escapeHTML(initials(company.name))}</span><div><h1>${escapeHTML(company.name)}</h1><p>${escapeHTML(company.sector)} · ${escapeHTML(company.city)}</p></div></div>${statusPill('Active','success')}</div><div class="hero-meta"><div class="hero-meta-item"><span>Fund</span><strong>${escapeHTML(company.fund)}</strong></div><div class="hero-meta-item"><span>Entry date</span><strong>${company.entry}</strong></div><div class="hero-meta-item"><span>Ownership</span><strong>${pct(company.ownership)}</strong></div><div class="hero-meta-item"><span>Next board meeting</span><strong>${company.boardDate}</strong></div><div class="hero-meta-item"><span>Last reporting update</span><strong>${company.lastReport}</strong></div></div></section>
+    return `${pageHeader(company.name,`${company.sector} · ${company.city} · ${company.fund}`,`${['pdf','csv','excel'].map(kind=>button(kind==='excel'?'Excel':kind.toUpperCase(),'company-detail-export','compact',kind==='pdf'?'file':kind==='excel'?'file-chart':'download',`data-kind="${kind}"`)).join('')}${button('Activity','activity-menu','','clock',`data-context="company" data-id="${company.id}"`)}`,'Portfolio Company')}
+      <section class="detail-hero"><div class="detail-hero-top"><div class="entity-title"><span class="entity-logo" style="background:linear-gradient(145deg,${company.color},color-mix(in srgb,${company.color} 55%,#101827))">${escapeHTML(initials(company.name))}</span><div><h1>${escapeHTML(company.name)}</h1><p>${escapeHTML(company.sector)} · ${escapeHTML(company.city)}</p></div></div>${statusPill(company.stage||'—')}</div><div class="hero-meta"><div class="hero-meta-item"><span>Fund</span><strong>${escapeHTML(company.fund)}</strong></div><div class="hero-meta-item"><span>Entry date</span><strong>${escapeHTML(company.entry||'—')}</strong></div><div class="hero-meta-item"><span>Ownership</span><strong>${company.ownership==null?'—':pct(company.ownership)}</strong></div><div class="hero-meta-item"><span>Next board meeting</span><strong>${company.boardDate||'—'}</strong></div><div class="hero-meta-item"><span>Last reporting update</span><strong>${company.lastReport||'—'}</strong></div></div></section>
       ${companyProfileMetrics(company)}
       ${profileTabs(tabs,state.companyTab,'company-profile-tab')}
       ${content}`;
@@ -2419,7 +2720,7 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
   function lpProfileMetrics(lp) {
     return `<section class="metric-grid">
       ${metricCard({label:'Commitment',value:formatMoney(lp.commitment),iconName:'wallet',accent:'blue',foot:'Total commitment',action:'lp-commitment'})}
-      ${metricCard({label:'Called',value:`${formatMoney(lp.called)} / ${pct(lp.called/lp.commitment*100)}`,iconName:'dollar',accent:'amber',foot:'Called capital',action:'lp-called'})}
+      ${metricCard({label:'Called',value:`${formatMoney(lp.called)} / ${pct(lp.commitment ? lp.called/lp.commitment*100 : 0)}`,iconName:'dollar',accent:'amber',foot:'Called capital',action:'lp-called'})}
       ${metricCard({label:'Unfunded',value:formatMoney(lp.unfunded),iconName:'pie-chart',accent:'purple',foot:'Remaining commitment',action:'lp-unfunded'})}
       ${metricCard({label:'Distributed',value:formatMoney(lp.distributed),iconName:'trend-up',accent:'emerald',foot:'Since inception',action:'lp-distributed'})}
       ${metricCard({label:'Net IRR',value:pct(lp.netIrr),iconName:'trend-up',accent:'cyan',foot:'Weighted across funds',action:'lp-irr'})}
@@ -2430,6 +2731,10 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
   function renderLPOverviewTab(lp) {
     const allocations=lpAllocations(lp);
     const fundRows=(lp.fundBreakdown||[]);
+    if (state.liveData) {
+      const activity = lp.transactions || [];
+      return `<section class="profile-tab-panel section-gap"><section class="grid cols-2">${card('Commitment Allocation',donutChart(allocations,formatMoney(lp.commitment),'Total Commitment',145))}${card('Investor contact',`<div class="info-list"><div class="info-row"><span>Legal name</span><strong>${escapeHTML(lp.name)}</strong></div><div class="info-row"><span>Email</span><strong>${escapeHTML(lp.email || 'Not on file')}</strong></div><div class="info-row"><span>KYC status</span><strong>${escapeHTML(lp.kyc)}</strong></div><div class="info-row"><span>Portal status</span><strong>${escapeHTML(lp.portal)}</strong></div></div>`)}</section>${card('Fund commitments',`<div class="table-wrap"><table><thead><tr><th>Fund</th><th>Commitment date</th><th>Commitment</th><th>Called</th><th>Distributed</th><th>Status</th></tr></thead><tbody>${fundRows.length ? fundRows.map(f=>`<tr><td>${escapeHTML(f.fundName)}</td><td>${escapeHTML(f.commitmentDate)}</td><td>${formatMoney(f.commitment)}</td><td>${formatMoney(f.called)}</td><td>${formatMoney(f.distributed)}</td><td>${statusPill(f.status)}</td></tr>`).join('') : '<tr><td colspan="6">No fund commitments on file.</td></tr>'}</tbody></table></div>`,{classes:'section-gap'})}${card('Recent capital activity', activity.length ? `<div class="table-wrap"><table><thead><tr><th>Date</th><th>Type</th><th>Fund</th><th>Amount</th><th>Paid</th></tr></thead><tbody>${activity.slice(0,5).map(t=>`<tr><td>${escapeHTML(t.date)}</td><td>${escapeHTML(t.type)}</td><td>${escapeHTML(t.fundName)}</td><td>${formatMoney(t.amount)}</td><td>${formatMoney(t.paid)}</td></tr>`).join('')}</tbody></table></div>` : '<p class="muted">No recorded capital calls or distributions for this LP.</p>',{classes:'section-gap'})}</section>`;
+    }
     return `<section class="profile-tab-panel split-layout section-gap"><div>
       <section class="grid cols-3">
         ${card('Commitment Allocation',donutChart(allocations,formatMoney(lp.commitment),'Total Commitment',145),{footer:'<button type="button" class="card-link" data-action="lp-profile-tab" data-tab="commitments">View commitments</button>'})}
@@ -2536,6 +2841,7 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
   }
 
   function renderLPCommunicationsTab(lp) {
+    if (state.liveData) return `<section class="profile-tab-panel section-gap">${card('Investor contact',`<div class="info-row"><span>Primary email</span><strong>${escapeHTML(lp.email || 'Not on file')}</strong></div>`)}${card('Communication history','<p class="muted">Communication history is not available for this LP. No sent messages or acknowledgements are assumed.</p>',{classes:'section-gap'})}</section>`;
     const communications=[['7 Jul 2026','Investor Update','Q2 2026 Portfolio Update','Secure email + portal','Opened','Maya Moyo'],['1 Jul 2026','Capital Call Notice','CC-2026-0038 · Growth Fund II','LP Portal','Acknowledged','Fund Administration'],['25 Jun 2026','Email','AGF II valuation update','Secure email','Opened','Maya Moyo'],['12 Jun 2026','Report','ESG & Impact Report 2025','LP Portal','Downloaded','James Mbewe'],['5 Jun 2026','Call','Upcoming capital activity and liquidity planning','Telephone','Complete','Maya Moyo']];
     return `<section class="profile-tab-panel section-gap">
       <div class="profile-tab-summary"><div><strong>Investor communications workspace</strong><span>Contacts, interactions, secure communications, acknowledgements and follow-up scheduling.</span></div><div class="page-actions">${button('Add interaction','add-interaction','','plus')}${button('Send communication','new-communication','primary','mail')}</div></div>
@@ -2555,17 +2861,24 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
   function renderLPPortalTab(lp) {
     const users=(lp.portalUsers||[]);
     return `<section class="profile-tab-panel section-gap">
-      <div class="profile-tab-summary"><div><strong>LP portal access workspace</strong><span>Users, permissions, sessions, authentication, document entitlements and access audit.</span></div>${button('Invite user','manage-lp-access','primary','plus')}</div>
+      <div class="profile-tab-summary"><div><strong>LP portal access workspace</strong><span>Users, permissions, sessions, authentication, document entitlements and access audit.</span></div>${hasRuntimeGrant(options.canInviteLp) ? button('Invite user','manage-lp-access','primary','plus') : ''}</div>
       <section class="grid cols-2 section-gap">
-        ${metricCard({label:'Portal Status',value:lp.portal,iconName:'shield',accent:lp.portal==='Active'?'emerald':'amber',foot:lp.portal==='Active'?'Has portal access':'No portal account linked yet',action:'lp-portal-status'})}
+        ${metricCard({label:'Portal Status',value:lp.portal,iconName:'shield',accent:lp.portal==='Active'?'emerald':'amber',foot:lp.portal==='Active'?'Portal account activated':lp.portal==='Invited'?'Invitation sent; awaiting password setup':'No portal account linked yet',action:'lp-portal-status'})}
         ${metricCard({label:'Active Users',value:String(lp.portalUserCount||0),iconName:'users',accent:'blue',foot:`${lp.portalRoles.viewer} viewer(s) · ${lp.portalRoles.manager} manager(s)`,action:'lp-portal-users'})}
       </section>
-      ${card('Portal Users',`<div class="table-wrap"><table><thead><tr><th>User</th><th>Role</th><th>Email</th><th>Status</th><th></th></tr></thead><tbody>${users.length?users.map(u=>`<tr class="clickable" data-action="manage-lp-access"><td class="table-primary">${escapeHTML(u.name)}</td><td>${escapeHTML(u.role)}</td><td>${escapeHTML(u.email)}</td><td>${statusPill(u.isActive?'Active':'Revoked')}</td><td><button type="button" class="button ghost compact icon-only" data-action="activity-menu" data-context="lp" data-id="${lp.id}" aria-label="Portal user activity">${icon('clock')}</button></td></tr>`).join(''):'<tr><td colspan="5" class="muted">No portal users invited yet.</td></tr>'}</tbody></table></div>`) }
+        ${card('Portal Users',`<div class="table-wrap"><table><thead><tr><th>User</th><th>Role</th><th>Email</th><th>Status</th><th></th></tr></thead><tbody>${users.length?users.map(u=>`<tr class="clickable" data-action="manage-lp-access"><td class="table-primary">${escapeHTML(u.name)}</td><td>${escapeHTML(u.role)}</td><td>${escapeHTML(u.email)}</td><td>${statusPill(!u.isActive?'Revoked':u.pendingActivation?'Invited':'Active')}</td><td><button type="button" class="button ghost compact icon-only" data-action="activity-menu" data-context="lp" data-id="${lp.id}" aria-label="Portal user activity">${icon('clock')}</button></td></tr>`).join(''):'<tr><td colspan="5" class="muted">No portal users invited yet.</td></tr>'}</tbody></table></div>`) }
       <section class="grid cols-2 section-gap">
         ${card('Permission Matrix',`<div class="table-wrap"><table class="permission-matrix"><thead><tr><th>Capability</th><th>Manager</th><th>Viewer</th></tr></thead><tbody>${[['View fund performance','✓','✓'],['Download reports','✓','✓'],['Acknowledge notices','✓','—'],['Manage users','✓','—'],['Update contact details','✓','—'],['View KYC records','✓','—'],['Upload documents','✓','—']].map(row=>`<tr>${row.map((cell,i)=>`<td class="${i===0?'table-primary':''}">${cell}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`,{footer:'<button type="button" class="card-link" data-action="manage-lp-access">Edit permission policy</button>'})}
         ${card('Security & Session Controls',`<p class="muted">Session and audit-log tracking is not yet available per LP.</p>`,{footer:'<button type="button" class="card-link" data-action="security-settings">Open security settings</button>'})}
       </section>
     </section>`;
+  }
+
+  function showLPInviteModal() {
+    if (!hasRuntimeGrant(options.canInviteLp)) return;
+    const lp = lps.find(item => item.id === state.selectedLPId);
+    if (!lp) return;
+    showModal('Invite LP portal user', `Grant access to ${lp.name}.`, `<form id="lpInviteForm"><input name="clientId" type="hidden" value="${escapeHTML(lp.id)}"><div class="form-grid"><div class="form-field full"><label class="required">Email address</label><input name="email" type="email" required placeholder="investor@example.com"></div><div class="form-field"><label>First name</label><input name="firstName"></div><div class="form-field"><label>Last name</label><input name="lastName"></div><div class="form-field full"><label>Portal role</label><select name="lpRole"><option value="VIEWER">Viewer — read-only investor access</option><option value="MANAGER">Manager — investor organisation management</option></select></div></div><p class="muted">New users receive a sign-in invitation and must choose their own password. Existing accounts retain their credentials. Access is limited to this LP organisation.</p></form>`, button('Cancel','close-modal') + button('Send invitation','submit-lp-invite','primary','mail'));
   }
 
   function renderLPDetail() {
@@ -2578,38 +2891,52 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
       : state.lpTab==='communications' ? renderLPCommunicationsTab(lp)
       : state.lpTab==='portal' ? renderLPPortalTab(lp)
       : renderLPOverviewTab(lp);
-    return `${pageHeader(lp.name,`${lp.type} · ${lp.geography} · Verified KYC · Active portal`,`${button('Send communication','new-communication','','mail')}${button('Add interaction','add-interaction','','plus')}${button('Activity','activity-menu','','clock',`data-context="lp" data-id="${lp.id}"`)}`,'Limited Partner')}
-      <section class="detail-hero"><div class="detail-hero-top"><div class="entity-title"><span class="entity-logo" style="background:${lp.color}">${escapeHTML(initials(lp.name))}</span><div><h1>${escapeHTML(lp.name)}</h1><p>${escapeHTML(lp.type)} · ${escapeHTML(lp.geography)} · Relationship owner: ${escapeHTML(lp.owner)}</p></div></div>${statusPill('Active portal','success')}</div></section>
+    return `${pageHeader(lp.name,`${lp.type} · ${lp.geography} · ${lp.kyc} KYC · ${lp.portal} portal`,`${button('Send communication','new-communication','','mail')}${button('Add interaction','add-interaction','','plus')}${button('Activity','activity-menu','','clock',`data-context="lp" data-id="${lp.id}"`)}`,'Limited Partner')}
+      <section class="detail-hero"><div class="detail-hero-top"><div class="entity-title"><span class="entity-logo" style="background:${lp.color}">${escapeHTML(initials(lp.name))}</span><div><h1>${escapeHTML(lp.name)}</h1><p>${escapeHTML(lp.type)} · ${escapeHTML(lp.geography)} · Relationship owner: ${escapeHTML(lp.owner)}</p></div></div>${statusPill(`${lp.portal} portal`,lp.portal==='Active'?'success':'warning')}</div></section>
       ${lpProfileMetrics(lp)}
       ${profileTabs(tabs,state.lpTab,'lp-profile-tab')}
       ${content}`;
   }
 
-  function renderCapitalCallDetail() {
-    const call = capitalCalls.find(item=>item.id===state.selectedCapitalCallId) || capitalCalls[0];
-    const lpAllocation = lps.map(lp=>({lp,amount:call.amount*(lp.commitment/sum(lps,x=>x.commitment))}));
-    return `${pageHeader(`Capital Call ${call.id}`,`${call.fund} · Draft · Call date ${call.callDate} · Due ${call.dueDate} · ${call.lpCount} LPs`,`${button('Preview notice','preview-capital-call','','eye')}${button('Send notices','send-capital-call-notices','','send',`data-id="${escapeHTML(call.id)}"`)}${button('Submit for approval','submit-capital-call-approval','primary','send')}${button('Activity','activity-menu','','clock',`data-context="capital-call" data-id="${call.id}"`)}`,'Capital Call Notice')}
-      <div class="stepper">${[['Draft','Complete'],['Allocation','Complete'],['Legal review','Complete'],['Finance review','In progress'],['Authorisation','Pending'],['Issuance','Locked']].map((s,i)=>`<div class="step ${i<3?'complete':i===3?'current':''}"><span class="step-index">${i<3?icon('check'):i+1}</span><span class="step-copy"><strong>${s[0]}</strong><small>${s[1]}</small></span></div>`).join('')}</div>
-      <section class="grid" style="grid-template-columns:240px minmax(0,1fr) 300px;gap:12px"><div class="side-stack" style="display:flex">
-        ${card('Call Purpose Allocation',`<div class="info-list"><div class="info-row"><span>Follow-on Investments</span><strong>$30.0M · 70.6%</strong></div><div class="info-row"><span>Management Fees</span><strong>$7.5M · 17.6%</strong></div><div class="info-row"><span>Fund Expenses</span><strong>$5.0M · 11.8%</strong></div><div class="info-row"><span>Total</span><strong>${formatMoney(call.amount)} · 100%</strong></div></div><div class="reason-item warning section-gap">${icon('info')}<div><small>Cash is required by ${call.dueDate} to ensure investments are funded on time.</small></div></div>`) }
-        ${card('Notice Terms',`<div class="info-list"><div class="info-row"><span>Notice Period</span><strong>30 days</strong></div><div class="info-row"><span>Call Date</span><strong>${call.callDate}</strong></div><div class="info-row"><span>Due Date</span><strong>${call.dueDate}</strong></div><div class="info-row"><span>Reference</span><strong>${call.id}</strong></div></div>`) }
-        ${card('Bank Instructions',`<div class="info-list"><div class="info-row"><span>Bank Name</span><strong>CBZ Bank</strong></div><div class="info-row"><span>Account Name</span><strong>${escapeHTML(call.fund)}</strong></div><div class="info-row"><span>Account Number</span><strong>••••••••5678</strong></div><div class="info-row"><span>SWIFT / BIC</span><strong>CIBIUS33</strong></div></div>`,{footer:'<button class="card-link" data-action="view-bank-details">View full bank details</button>'})}
-        ${card('Supporting Documents',`<div class="info-list"><div class="list-row"><span class="activity-icon" style="color:var(--emerald);background:var(--emerald-soft)">${icon('file')}</span><span class="list-row-main"><strong>Call Allocation Summary.xlsx</strong></span></div><div class="list-row"><span class="activity-icon" style="color:var(--red);background:var(--red-soft)">${icon('file')}</span><span class="list-row-main"><strong>Investment Plan Update.pdf</strong></span></div><div class="list-row"><span class="activity-icon" style="color:var(--red);background:var(--red-soft)">${icon('file')}</span><span class="list-row-main"><strong>Capital Call Memorandum.pdf</strong></span></div></div>`,{footer:'<button class="card-link" data-action="deal-tab" data-tab="documents">View all documents</button>'})}
-      </div><div>
-        ${card('LP Allocation',`<div class="table-wrap"><table><thead><tr><th>LP Name</th><th class="text-right">Commitment</th><th class="text-right">Unfunded</th><th>Allocation Basis</th><th class="text-right">Call Amount</th><th class="text-right">% of Call</th><th>Delivery Channel</th><th>Validation</th></tr></thead><tbody>${lpAllocation.map(({lp,amount})=>`<tr><td class="table-primary">${escapeHTML(lp.name)}</td><td class="text-right">${formatMoney(lp.commitment)}</td><td class="text-right">${formatMoney(lp.unfunded)}</td><td>Commitment</td><td class="text-right">${formatMoney(amount)}</td><td class="text-right">${pct(amount/call.amount*100)}</td><td>${lp.portal==='Active'?'Portal':'Email'}</td><td>${statusPill('Passed','success')}</td></tr>`).join('')}<tr><td class="table-primary">Total</td><td class="text-right table-primary">${formatMoney(sum(lps,l=>l.commitment))}</td><td class="text-right table-primary">${formatMoney(sum(lps,l=>l.unfunded))}</td><td></td><td class="text-right table-primary">${formatMoney(call.amount)}</td><td class="text-right table-primary">100.0%</td><td></td><td></td></tr></tbody></table></div>`,{tools:button('Export','export-call-allocation','compact','download')})}
-        <section class="grid cols-2 section-gap">
-          ${card('Generated Documents',`<div class="info-list">${[['Capital Call Notice','Notice to Limited Partners'],['Allocation Schedule','LP allocation details'],['Payment Instructions','Banking details and instructions'],['Cover Letter','Transmittal cover letter']].map(item=>`<div class="list-row"><span class="list-row-main"><strong>${item[0]}</strong><small>${item[1]}</small></span>${statusPill('Generated','success')}<button class="button ghost compact icon-only" data-action="download-document">${icon('download')}</button></div>`).join('')}</div>`,{footer:'<button class="card-link" data-action="download-call-pack">Download all documents (.zip)</button>'})}
-          ${card('Notification Preview',`<div class="info-list"><div class="info-row"><span>Recipients</span><strong>${call.lpCount} LP recipients</strong></div><div class="info-row"><span>Subject</span><strong>Capital Call ${call.id} - ${escapeHTML(call.fund)}</strong></div></div><p class="muted small" style="line-height:1.65">Dear Limited Partner,<br><br>Please find attached the capital call notice ${call.id} for ${escapeHTML(call.fund)}, with a due date of ${call.dueDate}. Please contact the fund administrator with questions.<br><br>Kind regards,<br>Matanho Fund Administration</p>`,{footer:'<button class="card-link" data-action="preview-capital-call">Preview full notice</button>'})}
-        </section>
-      </div><div class="side-stack" style="display:flex">
-        ${card('Approval Routing',`<div class="timeline"><div class="timeline-item"><strong>Jason Patel · Finance</strong><small class="brand-text">In progress</small></div><div class="timeline-item"><strong>Priya Shah · Controller</strong><small>Pending</small></div><div class="timeline-item"><strong>Michael Roberts · CFO</strong><small>Pending</small></div><div class="timeline-item"><strong>Kevin White · Managing Partner</strong><small>Pending</small></div></div>`) }
-        ${card('Validation Checks',`<div style="margin-bottom:9px">${statusPill('12 / 12 Passed','success')}</div><div class="reason-list"><div class="reason-item">${icon('check-circle')}<div><strong>Allocation totals</strong></div></div><div class="reason-item">${icon('check-circle')}<div><strong>LP eligibility</strong></div></div><div class="reason-item">${icon('check-circle')}<div><strong>Committed amount limits</strong></div></div><div class="reason-item">${icon('check-circle')}<div><strong>Bank details</strong></div></div></div>`,{footer:'<button class="card-link" data-action="open-validations">View all checks</button>'})}
-        ${card('Notice Period Compliance',`<div class="metric-value" style="font-size:17px">30 days</div><div class="info-list"><div class="info-row"><span>Call Date</span><strong>${call.callDate}</strong></div><div class="info-row"><span>Due Date</span><strong>${call.dueDate}</strong></div></div>`,{footer:statusPill('Compliant','success')})}
-        ${card('Authorised Signatories',`<div class="info-list"><div class="info-row"><span>Michael Roberts<br><small>CFO</small></span><strong style="font-family:cursive;color:var(--blue);font-size:18px">M Roberts</strong></div><div class="info-row"><span>Kevin White<br><small>Managing Partner</small></span><strong style="font-family:cursive;color:var(--blue);font-size:18px">K White</strong></div></div>`) }
-        ${card('Delivery Summary',`<div class="info-list"><div class="info-row"><span>Portal</span><strong>26 LPs (68.4%)</strong></div><div class="info-row"><span>Email</span><strong>12 LPs (31.6%)</strong></div><div class="info-row"><span>Total Recipients</span><strong>${call.lpCount}</strong></div></div>`) }
-      </div></section>`;
+  function showCapitalCallEditModal(call) {
+    const callId = String(call.recordId || call.id);
+    const body = '<form id="capitalCallEditForm"><div class="form-grid"><label class="form-field">Call percent<input name="callPercent" type="number" min="0.000001" max="100" step="0.01" required value="' + Number(call.callPercent || 0) + '"></label><label class="form-field">Call date<input name="transactionDate" type="date" required value="' + escapeHTML(call.transactionDate || '') + '"></label><label class="form-field">Payment due date<input name="paymentDueDate" type="date" required value="' + escapeHTML(call.dueDateIso || '') + '"></label><label class="form-field">Purpose<input name="purpose" maxlength="512" required value="' + escapeHTML(call.purpose || '') + '"></label><label class="form-field full">Bank instructions<textarea name="bankInstructions" required>' + escapeHTML(call.bankInstructions || '') + '</textarea></label></div></form>';
+    showModal('Edit rejected capital call','Update the call details, save as a draft, then resubmit for approval.',body,button('Cancel','close-modal')+button('Save draft','capital-call-save-edit','primary','save',' data-id="'+escapeHTML(callId)+'"'),{variant:'wizard',size:'lg',eyebrow:'Capital call draft'});
   }
 
+  function renderCapitalCallDetail() {
+    const call = capitalCalls.find(item => String(item.recordId || item.id) === String(state.selectedCapitalCallId) || String(item.id) === String(state.selectedCapitalCallId)) || capitalCalls[0];
+    if (!call) return `${pageHeader('Capital Call','Live call details are unavailable.',button('Back to list','navigate','','arrow-left'))}<div class="empty-state"><strong>No capital call selected</strong></div>`;
+    const callId = String(call.recordId || call.id);
+    const ref = capitalCallReference(call);
+    const allocations = Array.isArray(call.allocations) ? call.allocations : [];
+    const activity = Array.isArray(call.activity) ? call.activity : [];
+    const status = String(call.workflowStatus || call.rawStatus || call.status || '').toUpperCase();
+    const pending = status === 'PENDING_APPROVAL';
+    const editable = status === 'DRAFT' || status === 'REJECTED';
+    const canSend = ['INITIATED','NOTICES_SENT','PARTIALLY_PAID','FULLY_PAID'].includes(status);
+    const total = Number(call.amount || 0);
+    const collected = Number(call.collected || 0);
+    const outstanding = Math.max(0,total-collected);
+    const allocationRows = allocations.map(a => {
+      const name = a.lpLegalNameSnapshot || a.client?.legalName || 'Limited Partner';
+      const commitment = Number(a.totalCommitmentSnapshot || 0);
+      const uncalled = Number(a.uncalledCapitalBeforeSnapshot || 0);
+      const amount = Number(a.currentCallAmount || 0);
+      const share = total > 0 ? amount / total * 100 : 0;
+      return `<tr><td class="table-primary">${escapeHTML(name)}</td><td>${escapeHTML(a.client?.email || '—')}</td><td class="text-right">${formatMoney(commitment)}</td><td class="text-right">${formatMoney(uncalled)}</td><td class="text-right">${formatMoney(amount)}</td><td class="text-right">${pct(share)}</td><td class="text-right">${formatMoney(Number(a.amountPaid || 0))}</td><td>${statusPill(a.statusLabel || a.status || 'Pending')}</td><td><button class="button compact ghost" data-action="capital-call-preview-notice" data-id="${escapeHTML(callId)}" data-fund-id="${escapeHTML(call.fundId)}" data-allocation-id="${escapeHTML(a.id)}">Preview notice</button></td></tr>`;
+    }).join('');
+    const exportRows = allocations.map(a => [a.lpLegalNameSnapshot || a.client?.legalName || 'Limited Partner',a.client?.email || '',Number(a.totalCommitmentSnapshot||0),Number(a.uncalledCapitalBeforeSnapshot||0),Number(a.currentCallAmount||0),Number(a.amountPaid||0),String(a.statusLabel||a.status||'Pending')]);
+    const writerSpec = { title: 'Capital Call ' + ref, subtitle: call.fund + ' · LP allocation schedule', footerLabel: 'NVCCZ - Portfolio Management', filename: 'capital-call-' + ref.toLowerCase().replace(/[^a-z0-9]+/g,'-'), landscape: true, note: `Call date ${call.callDate} | Payment due ${call.dueDate} | ${status.replaceAll('_',' ')}`, meta: [['Fund',call.fund],['Purpose',call.purpose||'—'],['Call amount',formatMoney(total)],['Collected',formatMoney(collected)],['Outstanding',formatMoney(outstanding)]], columns: ['Limited Partner','Email','Commitment','Uncalled before call','Call amount','Paid','Status'], rows: exportRows, moneyColumns:[2,3,4,5], align:['left','left','right','right','right','right','left'] };
+    state.capitalCallDetailExportSpec = writerSpec;
+    const actionButtons = `<button class="button" data-action="capital-call-export" data-kind="pdf">PDF</button><button class="button" data-action="capital-call-export" data-kind="excel">Excel</button><button class="button" data-action="capital-call-export" data-kind="csv">CSV</button>${editable?button('Edit draft','capital-call-edit','compact','edit',`data-id="${escapeHTML(callId)}" data-fund-id="${escapeHTML(call.fundId)}"`):''}${status==='DRAFT'?button('Submit for approval','submit-capital-call-approval','primary','send',`data-id="${escapeHTML(callId)}" data-fund-id="${escapeHTML(call.fundId)}"`):''}${pending?button('Approve & post','capital-call-approve','primary','check',`data-id="${escapeHTML(callId)}" data-fund-id="${escapeHTML(call.fundId)}"`)+button('Reject','capital-call-reject','compact','x',`data-id="${escapeHTML(callId)}" data-fund-id="${escapeHTML(call.fundId)}"`):''}${canSend?button(call.noticesSentAt?'Resend notices':'Send notices','send-capital-call-notices','compact','send',`data-id="${escapeHTML(callId)}" data-fund-id="${escapeHTML(call.fundId)}"`):''}`;
+    const approvalRows = [['Created by', [call.createdBy?.firstName,call.createdBy?.lastName].filter(Boolean).join(' ') || call.createdBy?.email || '—'],['Submitted',call.submittedAt?new Date(call.submittedAt).toLocaleString():'—'],['Approved',call.approvedAt?new Date(call.approvedAt).toLocaleString():'—'],['Rejected',call.rejectedAt?new Date(call.rejectedAt).toLocaleString():'—'],['Rejection reason',call.rejectionReason||'—'],['Journal',call.journalEntry?.referenceNumber || (call.journalEntryId?'Posted':'Not posted')],['Notices sent',call.noticesSentAt?new Date(call.noticesSentAt).toLocaleString():'Not sent']].map(([label,value])=>`<div class="info-row"><span>${escapeHTML(label)}</span><strong>${escapeHTML(String(value))}</strong></div>`).join('');
+    const activityRows = activity.map(e=>`<div class="timeline-item"><strong>${escapeHTML(e.summary||e.action)}</strong><small>${escapeHTML(e.actor||'System')} · ${escapeHTML(new Date(e.timestamp).toLocaleString())}${e.note?' · '+escapeHTML(e.note):''}</small></div>`).join('');
+    return `${pageHeader(`Capital Call ${ref}`,`${escapeHTML(call.fund)} · ${escapeHTML(status.replaceAll('_',' '))} · Call date ${escapeHTML(call.callDate)} · Due ${escapeHTML(call.dueDate)} · ${call.lpCount} LPs`,actionButtons,'Capital Call')}
+      <section class="metric-grid">${metricCard({label:'Call amount',value:formatMoney(total),iconName:'dollar',accent:'blue',foot:`${call.callPercent||0}% of eligible commitment`,action:'capital-call-amount'})}${metricCard({label:'LP allocations',value:String(allocations.length),iconName:'users',accent:'purple',foot:'Saved allocation snapshots',action:'capital-call-lps'})}${metricCard({label:'Collected',value:formatMoney(collected),iconName:'check',accent:'emerald',foot:'Recorded payments',action:'capital-call-collected'})}${metricCard({label:'Outstanding',value:formatMoney(outstanding),iconName:'alert',accent:'amber',foot:'Remaining due',action:'capital-call-outstanding'})}</section>
+      <section class="grid cols-2 section-gap"><div>${card('Call details',`<div class="info-list"><div class="info-row"><span>Fund</span><strong>${escapeHTML(call.fund)}</strong></div><div class="info-row"><span>Purpose</span><strong>${escapeHTML(call.purpose||'—')}</strong></div><div class="info-row"><span>Call date</span><strong>${escapeHTML(call.callDate)}</strong></div><div class="info-row"><span>Payment due</span><strong>${escapeHTML(call.dueDate)}</strong></div><div class="info-row"><span>Call percent</span><strong>${call.callPercent||0}%</strong></div><div class="info-row"><span>Currency</span><strong>${escapeHTML(call.currencyCode||'—')}</strong></div><div class="info-row"><span>Bank instructions</span><strong>${escapeHTML(call.bankInstructions||'—')}</strong></div></div>`)}${card('Approval & posting',`<div class="info-list">${approvalRows}</div>`)}</div><div>${card('LP Allocation',`<div class="table-wrap"><table><thead><tr><th>Limited Partner</th><th>Email</th><th class="text-right">Commitment</th><th class="text-right">Uncalled before</th><th class="text-right">Call amount</th><th class="text-right">% of call</th><th class="text-right">Paid</th><th>Status</th><th>Notice</th></tr></thead><tbody>${allocationRows||`<tr><td colspan="9"><div class="empty-state compact">No LP allocations are saved.</div></td></tr>`}</tbody></table></div>`,{subtitle:`${allocations.length} persisted LP allocation snapshots`,tools:`<div class="pv11-export-group">${button('PDF','capital-call-export','compact','file',`data-kind="pdf"`)}${button('Excel','capital-call-export','compact','file-chart',`data-kind="excel"`)}${button('CSV','capital-call-export','compact','download',`data-kind="csv"`)}</div>`})}</div></section>
+      <section class="grid cols-2 section-gap">${card('Activity',`<div class="timeline">${activityRows||'<div class="empty-state compact"><strong>No activity recorded yet</strong></div>'}</div><form data-form="capital-call-activity" data-id="${escapeHTML(callId)}" data-fund-id="${escapeHTML(call.fundId)}"><label class="form-field">Add activity note<textarea name="note" required maxlength="1000"></textarea></label><button class="button compact" data-action="capital-call-add-note" data-id="${escapeHTML(callId)}" data-fund-id="${escapeHTML(call.fundId)}">Add note</button></form>`)}${card('Notice preview',`<p>Preview the branded notice generated from each saved LP allocation.</p><div class="info-list">${allocations.map(a=>`<div class="info-row"><span>${escapeHTML(a.lpLegalNameSnapshot||a.client?.legalName||'Limited Partner')}</span><button class="button compact" data-action="capital-call-preview-notice" data-id="${escapeHTML(callId)}" data-fund-id="${escapeHTML(call.fundId)}" data-allocation-id="${escapeHTML(a.id)}">Preview</button></div>`).join('')||'<div class="empty-state compact">No notice recipients are saved.</div>'}</div>${canSend?button('Send notices','send-capital-call-notices','primary','send',`data-id="${escapeHTML(callId)}" data-fund-id="${escapeHTML(call.fundId)}"`):'<p class="muted small">Notices unlock after an independent approver posts the call.</p>'}`)}</section>`;
+  }
   function renderReportBuilder() {
     const outline = [
       ['Executive Summary','Complete'],['Fund Performance','Complete'],['Portfolio Review','Complete'],['Capital Activity','Complete'],['Valuation','Attention'],['ESG & Impact','Complete'],['Financial Statements','Complete'],['LP Appendix','Attention']
@@ -2721,10 +3048,26 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
     navigate('deal-detail');
   }
 
-  function openCompany(id) { state.selectedCompanyId = id; state.companyTab = 'overview'; navigate('company-detail'); }
+  async function loadCompanyListPage(page = 1) {
+    if (!onCompaniesPage) return;
+    state.companyPage = Math.max(1, Number(page) || 1);
+    state.companyListLoading = true; state.companyListError = null; render();
+    const filters = state.companyListFilters || {};
+    try {
+      const result = await onCompaniesPage({ page:state.companyPage, limit:state.companyPageSize, search:String(state.tableSearch||'').trim(), industry:filters.sector && filters.sector!=='All sectors' ? filters.sector : '', fundId:filters.fundId || '', status:filters.status && filters.status!=='All statuses' ? filters.status : '' });
+      state.companyListPageRows = Array.isArray(result?.rows) ? result.rows : [];
+      state.companyListPagination = result?.pagination || null;
+      state.companyPage = Number(result?.pagination?.page || state.companyPage);
+    } catch (error) {
+      state.companyListError = error instanceof Error ? error.message : 'The company list could not be loaded.';
+      state.companyListPageRows = [];
+      state.companyListPagination = { page:state.companyPage, limit:state.companyPageSize, total:0, totalPages:1 };
+    } finally { state.companyListLoading = false; render(); }
+  }
+
+  function openCompany(id) { state.selectedCompanyId = id; state.companyTab = 'overview'; state.companyRecord = null; state.companyRecordLoading = Boolean(state.liveData); state.companyRecordError = null; navigate('company-detail'); }
   function openFund(id) {
     state.selectedFundId = id; state.fundTab = 'overview'; navigate('fund-detail');
-    if (state.liveData && id) window.dispatchEvent(new CustomEvent('matanho:load-fund-detail', { detail: { fundId: id } }));
   }
   function openLP(id) { state.selectedLPId = id; state.lpTab = 'overview'; navigate('lp-detail'); }
   function openCapitalCall(id) { state.selectedCapitalCallId = id; navigate('capital-call-detail'); }
@@ -2755,10 +3098,52 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
     const size=options.size||(/document|signature|reconciliation|import/.test(variant)?'xl':/wizard|approval|operations/.test(variant)?'lg':'md');
     const railItems=options.rail||({wizard:['Details','Ownership','Review'],approval:['Impact','Evidence','Approval'],operations:['Context','Controls','Action'],compose:['Message','Recipients','Delivery'],inspector:['Properties','Permissions','Audit']}[variant]||[]);
     state.modal = { title, variant };
-    modalLayer.innerHTML = `<section class="modal modal-${variant} modal-${size}" role="dialog" aria-modal="true" aria-label="${escapeHTML(title)}">${railItems.length?`<aside class="modal-rail"><span class="modal-rail-icon">${icon(options.icon||({wizard:'plus',approval:'shield',operations:'refresh',compose:'send',inspector:'settings'}[variant]||'file'))}</span><strong>${escapeHTML(options.eyebrow||variant.replaceAll('-',' '))}</strong>${railItems.map((item,index)=>`<span class="modal-rail-step ${index===0?'active':''}"><b>${index+1}</b>${escapeHTML(item)}</span>`).join('')}</aside>`:''}<div class="modal-main"><div class="modal-head"><div><span class="overlay-eyebrow">${escapeHTML(options.eyebrow||variant.replaceAll('-',' '))}</span><h2>${escapeHTML(title)}</h2>${subtitle ? `<p>${escapeHTML(subtitle)}</p>` : ''}</div><button class="icon-button" data-action="close-modal">${icon('x')}</button></div><div class="modal-body">${body}</div>${footer ? `<div class="modal-foot">${footer}</div>` : ''}</div></section>`;
+    modalLayer.innerHTML = `<section class="modal modal-${variant} modal-${size}" role="dialog" aria-modal="true" aria-label="${escapeHTML(title)}">${railItems.length?`<aside class="modal-rail"><span class="modal-rail-icon">${icon(options.icon||({wizard:'plus',approval:'shield',operations:'refresh',compose:'send',inspector:'settings'}[variant]||'file'))}</span><strong>${escapeHTML(options.eyebrow||variant.replaceAll('-',' '))}</strong>${railItems.map((item,index)=>`<button type="button" class="modal-rail-step ${index===0?'active':''}" data-wizard-step="${index}"><b>${index+1}</b>${escapeHTML(item)}</button>`).join('')}</aside>`:''}<div class="modal-main"><div class="modal-head"><div><span class="overlay-eyebrow">${escapeHTML(options.eyebrow||variant.replaceAll('-',' '))}</span><h2>${escapeHTML(title)}</h2>${subtitle ? `<p>${escapeHTML(subtitle)}</p>` : ''}</div><button class="icon-button" data-action="close-modal">${icon('x')}</button></div><div class="modal-body">${body}</div>${footer ? `<div class="modal-foot">${footer}</div>` : ''}</div></section>`;
     modalLayer.classList.add('visible');
     scrim.classList.add('visible');
     renderStaticIcons(modalLayer);
+    if (title === 'Create Client / Fund Account') {
+      const form = $('#cashAccountForm', modalLayer);
+      const grid = $('.form-grid', form);
+      if (form && grid && !form.querySelector('[name="ownerType"]')) {
+        const ownerField = document.createElement('div');
+        ownerField.className = 'form-field';
+        ownerField.innerHTML = '<label>Account owner</label><select name="ownerType"><option value="FUND">Fund / vehicle</option><option value="CLIENT">Client / investor</option></select>';
+        grid.prepend(ownerField);
+        const vehicleInput = form.querySelector('[name="vehicleId"]');
+        const vehicleLabel = vehicleInput?.closest('.form-field')?.querySelector('label');
+        if (vehicleLabel) vehicleLabel.textContent = 'Fund vehicle / legal structure';
+        const clientField = document.createElement('div');
+        clientField.className = 'form-field';
+        clientField.innerHTML = '<label>Client / investor reference</label><input name="clientId" placeholder="Required for client-owned accounts">';
+        vehicleInput?.closest('.form-field')?.after(clientField);
+        const ownerSelect = ownerField.querySelector('[name="ownerType"]');
+        const clientInput = clientField.querySelector('[name="clientId"]');
+        const syncOwnerFields = () => {
+          const isClient = ownerSelect.value === 'CLIENT';
+          clientInput.required = isClient;
+          if (vehicleInput) vehicleInput.required = !isClient;
+          clientField.hidden = !isClient;
+        };
+        ownerSelect.addEventListener('change', syncOwnerFields);
+        syncOwnerFields();
+      }
+      const wizardSteps = $$('.modal-rail-step[data-wizard-step]', modalLayer);
+      const wizardFields = $$('#cashAccountForm .form-field', modalLayer);
+      const stepForField = (field) => {
+        const name = field.querySelector('input,select,textarea')?.name || '';
+        if (['legalEntityId','fundId','vehicleId','ownerType','clientId'].includes(name)) return 0;
+        if (['accountType','providerId','currency'].includes(name)) return 1;
+        if (['ownerModel','effectiveFrom'].includes(name)) return 2;
+        return 3;
+      };
+      const selectWizardStep = (step) => {
+        wizardSteps.forEach((item) => item.classList.toggle('active', item.dataset.wizardStep === String(step)));
+        wizardFields.forEach((field) => { field.hidden = stepForField(field) !== Number(step); });
+      };
+      wizardSteps.forEach((item) => item.addEventListener('click', () => selectWizardStep(item.dataset.wizardStep)));
+      selectWizardStep(0);
+    }
     requestAnimationFrame(() => $('input,select,textarea,button', modalLayer)?.focus());
   }
 
@@ -2783,9 +3168,32 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
     return {name:id||'Portfolio record'};
   }
 
+  function readableRecordReference(prefix, record, dateValue) {
+    const supplied=record && (record.referenceNumber||record.noticeNumber||record.reference||record.code);
+    if (supplied && !/^cm[a-z0-9]{8,}$/i.test(String(supplied))) return String(supplied);
+    const date=new Date(dateValue||record?.createdAt||Date.now());
+    const year=Number.isFinite(date.getFullYear()) ? date.getFullYear() : new Date().getFullYear();
+    const source=String(record?.id||'record');
+    let hash=0;
+    for (let i=0;i<source.length;i+=1) hash=(hash*31+source.charCodeAt(i))>>>0;
+    return `${prefix}-${year}-${String((hash%9999)+1).padStart(4,'0')}`;
+  }
+
+  function capitalCallReference(call) {
+    return readableRecordReference('CC',call,call?.callDate||call?.transactionDate);
+  }
+
+  function activityDisplayLabel(context, subject) {
+    const name=subject && (subject.name||subject.subject||subject.document);
+    if (name && !/^cm[a-z0-9]{8,}$/i.test(String(name))) return String(name);
+    if (context==='capital-call' && subject) return capitalCallReference(subject);
+    const labels={'capital-call':'Capital call','term-sheet':'Term sheet','mailer-list':'Mailing list',lp:'Investor',company:'Portfolio company',deal:'Investment opportunity',envelope:'Signature envelope'};
+    return labels[context] || 'Portfolio record';
+  }
+
   function showActivityMenu(anchor,context='portfolio',id='') {
     const subject=activitySubject(context,id);
-    const name=subject.name||subject.subject||subject.document||subject.id||'Portfolio record';
+    const name=activityDisplayLabel(context,subject);
     showPopover(anchor,`<div class="popover-title">Activity · ${escapeHTML(name)}</div>
       <button class="popover-item" data-action="activity-open-timeline" data-context="${escapeHTML(context)}" data-id="${escapeHTML(id)}"><span class="activity-icon" style="color:var(--blue);background:var(--blue-soft)">${icon('clock')}</span><span class="popover-item-copy"><strong>View activity timeline</strong><small>Actions, actors, source records and timestamps</small></span></button>
       <button class="popover-item" data-action="activity-add-note" data-context="${escapeHTML(context)}" data-id="${escapeHTML(id)}"><span class="activity-icon" style="color:var(--emerald);background:var(--emerald-soft)">${icon('plus')}</span><span class="popover-item-copy"><strong>Add activity note</strong><small>Record a timestamped internal note</small></span></button>
@@ -2796,7 +3204,7 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
 
   function showActivityTimeline(context,id) {
     const subject=activitySubject(context,id);
-    const name=subject.name||subject.subject||subject.document||subject.id||'Portfolio record';
+    const name=activityDisplayLabel(context,subject);
     const contextRows={
       company:[['31 Jul 2026 · 16:42','Quarterly KPI pack linked','Tendai Moyo','Portfolio reporting'],['30 Jul 2026 · 11:15','Board agenda approved','Nyasha Moyo','Governance'],['28 Jul 2026 · 09:26','Revenue forecast updated','System','Management accounts']],
       lp:[['31 Jul 2026 · 15:08','Quarterly report delivered','Investor Relations','Secure email + portal'],['29 Jul 2026 · 12:40','KYC evidence verified','Anita Kapoor','Compliance'],['24 Jul 2026 · 10:05','Capital-call contact confirmed','Rudo Ndlovu','Commitment register']],
@@ -2807,13 +3215,16 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
       'mailer-list':[['31 Jul 2026 · 17:22','Audience rules refreshed','System','LP master'],['31 Jul 2026 · 17:24','One duplicate removed','System','Email deduplication'],['30 Jul 2026 · 14:10','Owner reviewed consent exceptions','Nyasha Moyo','Consent register']]
     };
     const rows=contextRows[context]||contextRows.deal;
-    showDrawer(`Activity · ${name}`,`${rows.length} recent events · append-only demonstration log`,`<section class="drawer-section activity-hero"><div><span class="activity-hero-icon">${icon('clock')}</span><div><strong>${escapeHTML(name)}</strong><small>${escapeHTML(context.replaceAll('-',' '))} activity stream</small></div></div><span class="table-badge">Live context</span></section><section class="drawer-section"><h3>Timeline</h3><div class="case-timeline">${rows.map(row=>`<div><span></span><strong>${escapeHTML(row[1])}</strong><small>${escapeHTML(row[0])} · ${escapeHTML(row[2])}</small><p>${escapeHTML(row[3])}</p></div>`).join('')}</div></section><section class="drawer-section"><h3>Source distribution</h3>${barChart({labels:['User','System','Integration','Approval'],series:[{name:'Events',color:'var(--brand)',values:[7,5,3,2]}],height:230,format:v=>Math.round(v),action:'activity-chart-detail'})}</section><section class="drawer-section"><h3>Metadata</h3><div class="info-list"><div class="info-row"><span>Record ID</span><strong>${escapeHTML(id||'PORTFOLIO')}</strong></div><div class="info-row"><span>Retention</span><strong>7 years · audit controlled</strong></div><div class="info-row"><span>Timezone</span><strong>Africa/Harare</strong></div><div class="info-row"><span>Export scope</span><strong>Authorised record only</strong></div></div></section>`,`${button('Export CSV','activity-export','','download',`data-context="${escapeHTML(context)}" data-id="${escapeHTML(id)}"`)}${button('Add note','activity-add-note','primary','plus',`data-context="${escapeHTML(context)}" data-id="${escapeHTML(id)}"`)}`,{variant:'record',icon:'clock',eyebrow:'Activity and audit'});
+    showDrawer(`Activity · ${name}`,`${rows.length} recent events · append-only demonstration log`,`<section class="drawer-section activity-hero"><div><span class="activity-hero-icon">${icon('clock')}</span><div><strong>${escapeHTML(name)}</strong><small>${escapeHTML(context.replaceAll('-',' '))} activity stream</small></div></div><span class="table-badge">Live context</span></section><section class="drawer-section"><h3>Timeline</h3><div class="case-timeline">${rows.map(row=>`<div><span></span><strong>${escapeHTML(row[1])}</strong><small>${escapeHTML(row[0])} · ${escapeHTML(row[2])}</small><p>${escapeHTML(row[3])}</p></div>`).join('')}</div></section><section class="drawer-section"><h3>Source distribution</h3>${barChart({labels:['User','System','Integration','Approval'],series:[{name:'Events',color:'var(--brand)',values:[7,5,3,2]}],height:230,format:v=>Math.round(v),action:'activity-chart-detail'})}</section><section class="drawer-section"><h3>Metadata</h3><div class="info-list"><div class="info-row"><span>Record</span><strong>${escapeHTML(name)}</strong></div><div class="info-row"><span>Retention</span><strong>7 years · audit controlled</strong></div><div class="info-row"><span>Timezone</span><strong>Africa/Harare</strong></div><div class="info-row"><span>Export scope</span><strong>Authorised record only</strong></div></div><details class="technical-reference"><summary>Technical reference</summary><code>${escapeHTML(id||'PORTFOLIO')}</code></details></section>`,`${button('Export CSV','activity-export','','download',`data-context="${escapeHTML(context)}" data-id="${escapeHTML(id)}"`)}${button('Add note','activity-add-note','primary','plus',`data-context="${escapeHTML(context)}" data-id="${escapeHTML(id)}"`)}`,{variant:'record',icon:'clock',eyebrow:'Activity and audit'});
   }
 
   function showRecordMetadata(context,id) {
     const subject=activitySubject(context,id);
-    const name=subject.name||subject.subject||subject.document||subject.id||'Portfolio record';
-    const fields=Object.entries(subject).filter(([key,value])=>['string','number'].includes(typeof value)).slice(0,12);
+    const name=activityDisplayLabel(context,subject);
+    const technicalKeys=/^(id|.*Id|.*ID|recordKey|internalKey|tenantKey)$/;
+    const fields=Object.entries(subject).filter(([key,value])=>!technicalKeys.test(key)&&['string','number'].includes(typeof value)).slice(0,12);
+    const reference=context==='capital-call'&&subject?capitalCallReference(subject):name;
+    if (!fields.some(([key])=>/reference|number|code/i.test(key))) fields.unshift(['Reference',reference]);
     showDrawer(`Metadata · ${name}`,'Source identifiers, ownership, timestamps and access context',`<section class="drawer-section"><div class="metadata-grid">${fields.map(([key,value])=>`<div><span>${escapeHTML(key.replace(/([A-Z])/g,' $1').replaceAll('_',' '))}</span><strong>${escapeHTML(String(value))}</strong></div>`).join('')}</div></section><section class="drawer-section"><h3>Data lineage</h3><div class="source-lineage-mini"><div>${icon('layers')}<span><strong>Master record</strong><small>${escapeHTML(context)} service</small></span></div><div>${icon('refresh')}<span><strong>Read model</strong><small>Version 18 · 31 Jul 2026</small></span></div><div>${icon('shield')}<span><strong>Access policy</strong><small>Tenant + fund + role scoped</small></span></div></div></section>`,button('Close','close-drawer','primary'),{variant:'inspector',icon:'info',eyebrow:'Record metadata'});
   }
 
@@ -2975,6 +3386,7 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
   }
 
   function modalWizardFormId(kind) {
+    if (kind === 'create-rbac-role') return 'v11CreateRoleForm';
     if (kind === 'new-distribution') return 'distributionForm';
     if (kind === 'create-term-sheet') return 'createTermSheetForm';
     if (kind === 'create-fund') return 'createFundForm';
@@ -2992,6 +3404,14 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
     const data = Object.fromEntries(new FormData(form));
     if (state.modalWizard.kind === 'create-term-sheet') delete data.document;
     state.modalWizard.draft = { ...state.modalWizard.draft, ...data };
+    if (state.modalWizard.kind === 'create-rbac-role') {
+      const permissionInputs = $$('[data-rbac-create-permission]', form);
+      if (permissionInputs.length) {
+        state.modalWizard.draft.permissions = Object.fromEntries(
+          permissionInputs.map((input) => [input.dataset.rbacCreatePermission, Boolean(input.checked)]),
+        );
+      }
+    }
   }
 
   function captureAddDealDraft() {
@@ -3000,6 +3420,7 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
 
   function renderModalWizard() {
     if (!state.modalWizard) return;
+    if (state.modalWizard.kind === 'create-rbac-role') return renderRbacRoleWizard();
     if (state.modalWizard.kind === 'new-distribution') return renderDistributionWizard();
     if (state.modalWizard.kind === 'create-term-sheet') return;
     if (state.modalWizard.kind === 'create-fund') return renderCreateFundWizard();
@@ -3011,6 +3432,52 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
 
   function modalWizardMaxStep() {
     return 2;
+  }
+
+  function rbacCataloguePermissionKeys() {
+    return (Array.isArray(state.rbacCatalogue) ? state.rbacCatalogue : [])
+      .filter((resource) => resource?.module === 'portfolio')
+      .flatMap((resource) => (Array.isArray(resource.actions) ? resource.actions : [])
+        .map((action) => `portfolio.${resource.resource}.${action}`));
+  }
+
+  function renderRbacRoleWizard() {
+    const wizard = state.modalWizard;
+    if (!wizard || wizard.kind !== 'create-rbac-role') return;
+    const step = Number(wizard.step || 0);
+    const draft = wizard.draft || (wizard.draft = {});
+    const roles = Array.isArray(state.rbacBackendRoles) ? state.rbacBackendRoles : [];
+    const keys = rbacCataloguePermissionKeys();
+    const permissions = draft.permissions || {};
+    const steps = ['Role', 'Permissions', 'Confirm'];
+    let body = '';
+    let footer = '';
+
+    if (step === 0) {
+      const cloneOptions = roles.map((role) => `<option value="${escapeHTML(role.id)}" ${String(draft.cloneFromId || '') === String(role.id) ? 'selected' : ''}>${escapeHTML(role.name)}</option>`).join('');
+      body = `<form id="v11CreateRoleForm"><div class="form-grid"><div class="form-field"><label class="required">Role name</label><input name="name" required maxlength="80" value="${escapeHTML(draft.name || '')}" placeholder="e.g. Portfolio Read Only"></div><div class="form-field"><label>Clone permissions from</label><select name="cloneFromId"><option value="">Start blank</option>${cloneOptions}</select></div><div class="form-field full"><label>Description</label><textarea name="description" maxlength="200" placeholder="Describe this Portfolio role">${escapeHTML(draft.description || '')}</textarea></div></div></form>`;
+      footer = `${button('Cancel','close-modal')}${button('Continue to permissions','wizard-next','primary','arrow-right')}`;
+    } else if (step === 1) {
+      const catalogue = (Array.isArray(state.rbacCatalogue) ? state.rbacCatalogue : []).filter((resource) => resource?.module === 'portfolio');
+      const rows = catalogue.map((resource) => `<tr><td><strong>${escapeHTML(resource.label || resource.resource)}</strong><small class="block">${escapeHTML(resource.resource)}</small></td><td><div class="v11-create-permission-grid">${(resource.actions || []).map((action) => {
+        const key = `portfolio.${resource.resource}.${action}`;
+        return `<label class="v11-create-permission"><input type="checkbox" data-rbac-create-permission="${escapeHTML(key)}" ${permissions[key] ? 'checked' : ''}><span>${escapeHTML(action)}</span></label>`;
+      }).join('')}</div></td></tr>`).join('');
+          body = `<form id="v11CreateRoleForm"><p class="muted">Choose the access this role needs. Apply the role after creation to make these permissions active.</p><div class="table-wrap v11-permission-table"><table><thead><tr><th>Portfolio page</th><th>Granted actions</th></tr></thead><tbody>${rows || '<tr><td colspan="2"><div class="empty-state"><strong>Permission catalogue unavailable</strong><p>Retry Settings before creating a role.</p></div></td></tr>'}</tbody></table></div></form>`;
+      footer = `${button('Back','wizard-back','')}${button('Review role','wizard-next','primary','arrow-right')}`;
+    } else {
+      const granted = keys.filter((key) => permissions[key] === true);
+      const clone = roles.find((role) => role.id === draft.cloneFromId);
+      const grantedList = granted.length
+        ? `<ul class="v11-create-role-grants">${granted.map((key) => `<li>${escapeHTML(key.replace(/^portfolio\./, '').replaceAll('_', ' '))}</li>`).join('')}</ul>`
+        : '<p class="muted">This role starts with no Portfolio permissions.</p>';
+      body = `<div class="v11-create-role-review"><section><small>ROLE NAME</small><strong>${escapeHTML(draft.name || '')}</strong></section><section><small>DESCRIPTION</small><p>${escapeHTML(draft.description || 'No description provided.')}</p></section><section><small>PERMISSIONS COPIED FROM</small><strong>${escapeHTML(clone?.name || 'Start blank')}</strong></section><section><small>GRANTED ACTIONS · ${granted.length}</small>${grantedList}</section><p class="v11-create-role-note">After creation, choose Apply role changes to make these permissions active.</p></div>`;
+      footer = `${button('Back to permissions','wizard-back','')}${button('Create role','submit-custom-role','primary','plus')}`;
+    }
+
+    showModal(step === 0 ? 'Create role' : step === 1 ? 'Set permissions' : 'Confirm role',
+      step === 0 ? 'Start blank or clone permissions from a backend Portfolio role.' : step === 1 ? 'Configure the draft permission set.' : 'Review the role before creating it.',
+      body, footer, { variant: 'wizard', size: 'lg', rail: steps, railStep: step, railMax: wizard.maxReached || 0, eyebrow: 'RBAC role' });
   }
 
   function addDealEmptyOption(label) {
@@ -3088,6 +3555,7 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
         '<div class="form-field"><label class="required">Proof of concept</label><input name="filePoc" type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg" required></div>' +
         '<div class="form-field"><label class="required">Market research</label><input name="fileMarket" type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg" required></div>' +
         '<div class="form-field"><label class="required">Projected cash flows</label><input name="fileCashFlows" type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg" required></div>' +
+        (allowSyntheticFixtures ? '<div class="form-field full"><button type="button" class="button secondary" data-action="load-synthetic-add-deal-files">Use synthetic UAT document fixtures</button><p class="muted small">Development/UAT only. Uses the same required upload path; never available in production.</p></div>' : '') +
       '</div></form>';
     }
     const footer = step === 0
@@ -3118,10 +3586,21 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
       const poc = form.querySelector('[name="filePoc"]') && form.querySelector('[name="filePoc"]').files && form.querySelector('[name="filePoc"]').files[0];
       const market = form.querySelector('[name="fileMarket"]') && form.querySelector('[name="fileMarket"]').files && form.querySelector('[name="fileMarket"]').files[0];
       const cash = form.querySelector('[name="fileCashFlows"]') && form.querySelector('[name="fileCashFlows"]').files && form.querySelector('[name="fileCashFlows"]').files[0];
-      if (!bp || !poc || !market || !cash) {
+      const syntheticFixturesLoaded = form.dataset.syntheticFilesLoaded === 'true';
+      if ((!bp || !poc || !market || !cash) && !syntheticFixturesLoaded) {
         toast('Documents required', 'Upload all four required application documents.', 'warning');
         return;
       }
+      // Some browser automation contexts reject assigning DataTransfer files to
+      // file inputs even though the local-only fixture action was invoked. Keep
+      // the fixture path deterministic and feed synthetic File objects through
+      // the same integration event without weakening normal upload validation.
+      const submittedFiles = {
+        businessPlan: bp || __pv11SyntheticFile('uat-business-plan.pdf', 'Business plan'),
+        proofOfConcept: poc || __pv11SyntheticFile('uat-proof-of-concept.pdf', 'Proof of concept'),
+        marketResearch: market || __pv11SyntheticFile('uat-market-research.pdf', 'Market research'),
+        projectedCashFlows: cash || __pv11SyntheticFile('uat-projected-cash-flows.pdf', 'Projected cash flows'),
+      };
       const address = [data.applicantAddress, data.country].filter(Boolean).join(', ');
       emitIntegrationEvent('matanho:before-action', {
         action: 'api-create-application',
@@ -3149,7 +3628,7 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
           governanceNotes: String(data.governanceNotes || ''),
           targetCloseDate: String(data.targetCloseDate || ''),
         },
-        files: { businessPlan: bp, proofOfConcept: poc, marketResearch: market, projectedCashFlows: cash },
+        files: submittedFiles,
         state: typeof publicSnapshot === 'function' ? publicSnapshot().state : state,
       }, true);
       return;
@@ -3174,6 +3653,24 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
     toast('Deal added', deal.name + ' was added to ' + deal.stage + '.');
     state.page = 'deals';
     render();
+  }
+
+  function __pv11SyntheticFile(name, label) {
+    return new File([`Synthetic local UAT fixture\n${label}\nNot for production use.`], name, { type: 'application/pdf' });
+  }
+  function __pv11LoadSyntheticFiles(form, fields) {
+    if (!allowSyntheticFixtures || typeof DataTransfer === 'undefined') return false;
+    form.dataset.syntheticFilesLoaded = 'true';
+    fields.forEach(([name, fileName, label]) => {
+      const input = form.querySelector(`[name="${name}"]`);
+      if (!input) return;
+      const transfer = new DataTransfer();
+      transfer.items.add(__pv11SyntheticFile(fileName, label));
+      input.files = transfer.files;
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    toast('Synthetic UAT documents loaded', 'Local-only fixtures are attached; the normal upload and audit path will run.', 'success');
+    return true;
   }
 
 
@@ -3206,11 +3703,13 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
         '<div class="form-field full"><label>Bank instructions / notes</label><textarea name="notes" placeholder="Remit per LPA collection account.">' + escapeHTML(d.notes || '') + '</textarea></div>' +
       '</div></form>';
     } else if (step === 1) {
+      const preview = state.capitalCallPreview;
+      const previewRows = Array.isArray(preview?.allocations) ? preview.allocations.map(row => '<div class="info-row"><span>' + escapeHTML(row.lpLegalNameSnapshot || 'Limited Partner') + '</span><strong>' + formatMoney(Number(row.currentCallAmount || 0)) + '</strong></div>').join('') : '<div class="muted small">Loading live LP allocation preview…</div>';
       body = '<form id="capitalCallForm"><div class="form-grid">' +
         '<div class="form-field"><label>Expected LP count</label><input name="lpCount" type="number" min="0" placeholder="Optional" value="' + escapeHTML(String(d.lpCount || '')) + '"></div>' +
-        '<div class="form-field"><label>Call percent override</label><input name="callPercent" type="number" min="0" step="0.1" placeholder="Auto from amount / commitment" value="' + escapeHTML(String(d.callPercent || '')) + '"></div>' +
+        '<div class="form-field"><label>Calculated call percent</label><input name="callPercent" type="number" min="0" step="0.01" readonly aria-readonly="true" placeholder="Calculated from exact target and eligible balances" value="' + escapeHTML(String(preview?.callPercent || d.callPercent || '')) + '"></div>' +
         '<div class="form-field full"><label>Allocation notes</label><textarea name="allocationNotes" placeholder="Pro-rata, side letters, exclusions…">' + escapeHTML(d.allocationNotes || '') + '</textarea></div>' +
-      '</div></form>';
+      '</div></form><section class="card section-gap"><div class="card-head"><div><h3 class="card-title">Live ownership preview</h3><div class="card-subtitle">Calculated from eligible commitment balances</div></div><strong>' + formatMoney(Number(preview?.totalAmount || 0)) + '</strong></div><div class="card-body info-list">' + previewRows + '</div></section>';
     } else {
       const fundName = (funds.find((f) => String(f.id) === String(d.fund) || String(f.name) === String(d.fund)) || {}).name || d.fund || '-';
       const rows = [['Fund', fundName],['Call date', d.callDate || '-'],['Due date', d.dueDate || '-'],['Amount', d.amount ? formatMoney(Number(d.amount)) : '-'],['Purpose', d.purpose || '-']].map((r) => '<div class="info-row"><span>' + escapeHTML(r[0]) + '</span><strong>' + escapeHTML(String(r[1])) + '</strong></div>').join('');
@@ -3234,19 +3733,17 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
     const fundKey = String(data.fund || data.fundId || '');
     const fund = funds.find((f) => f.id === fundKey || f.name === fundKey) || funds[0];
     if (state.liveData && fund?.id) {
-      const commitment = Number(fund.commitment || fund.totalAmount || data.amount || 0) || 1;
       const amount = Number(data.amount || 0);
-      const callPercent = data.callPercent
-        ? Number(data.callPercent)
-        : (amount && commitment ? Math.max(0.1, Math.round((amount / commitment) * 1000) / 10) : 10);
+      if (!(amount > 0)) { toast('Enter a total amount','A positive capital-call amount is required.','warning'); return; }
       emitIntegrationEvent('matanho:before-action', {
         action: 'api-create-capital-call',
         dataset: {
           fundId: String(fund.id),
-          callPercent: String(callPercent),
+          targetAmount: String(amount),
           paymentDueDate: String(data.dueDate || ''),
           transactionDate: String(data.callDate || ''),
           bankInstructions: String(data.notes || data.allocationNotes || 'Remit per LPA collection account.'),
+          purpose: String(data.purpose || ''),
         },
         state: typeof publicSnapshot === 'function' ? publicSnapshot().state : state,
       }, true);
@@ -3367,7 +3864,7 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
     if (step === 0) {
       body = '<form id="lpForm"><div class="form-grid">' +
         '<div class="form-field"><label class="required">LP name</label><input type="text" name="name" required placeholder="Legal entity name" value="' + escapeHTML(d.name || '') + '"></div>' +
-        '<div class="form-field"><label>Investor type</label><select name="type">' + addDealSelectOptions(['Pension Fund','Family Office','Insurance','Fund of Funds','Development Finance Institution'], d.type, 'Select type') + '</select></div>' +
+        '<div class="form-field"><label>Investor type</label><select name="type">' + addDealSelectOptions(['Individual','Pension Fund','Family Office','Insurance','Fund of Funds','Development Finance Institution'], d.type, 'Select type') + '</select></div>' +
         '<div class="form-field"><label>Geography / country</label><input type="text" name="geography" placeholder="e.g. Zimbabwe" value="' + escapeHTML(d.geography || '') + '"></div>' +
         '<div class="form-field"><label class="required">Primary contact email</label><input name="email" type="email" required placeholder="investor@example.com" value="' + escapeHTML(d.email || '') + '"></div>' +
         '<div class="form-field"><label>Relationship owner</label><input type="text" name="owner" placeholder="Internal owner" value="' + escapeHTML(d.owner || '') + '"></div>' +
@@ -3375,7 +3872,8 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
       '</div></form>';
     } else if (step === 1) {
       body = '<form id="lpForm"><div class="form-grid">' +
-        '<div class="form-field"><label>Commitment (USD)</label><input name="commitment" type="number" min="0" placeholder="e.g. 50000000" value="' + escapeHTML(d.commitment != null && d.commitment !== '' ? String(d.commitment) : '') + '"></div>' +
+        '<div class="form-field"><label' + (d.fundId ? ' class="required"' : '') + '>Commitment</label><input name="commitment" type="number" min="0.01" step="0.01"' + (d.fundId ? ' required' : '') + ' placeholder="e.g. 50000000" value="' + escapeHTML(d.commitment != null && d.commitment !== '' ? String(d.commitment) : '') + '"></div>' +
+        '<div class="form-field"><label' + (d.fundId ? ' class="required"' : '') + '>Commitment effective date</label><input name="effectiveDate" type="date"' + (d.fundId ? ' required' : '') + ' value="' + escapeHTML(d.effectiveDate || new Date().toISOString().slice(0,10)) + '"></div>' +
         '<div class="form-field"><label>KYC status</label><select name="kyc">' + addDealSelectOptions(['Not Started','In Progress','Verified'], d.kyc, 'Select KYC status') + '</select></div>' +
         '<div class="form-field full"><label>Onboarding notes</label><textarea name="notes" placeholder="Side letters, contact preferences…">' + escapeHTML(d.notes || '') + '</textarea></div>' +
       '</div></form>';
@@ -3409,10 +3907,12 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
           country: String(data.geography || data.country || 'ZW'),
           amount: String(data.commitment || ''),
           fundId: String(data.fundId || ''),
+          effectiveDate: String(data.effectiveDate || ''),
+          notes: String(data.notes || ''),
+          currency: String((funds.find((f) => String(f.id) === String(data.fundId || '')) || {}).currency || 'USD'),
         },
         state: typeof publicSnapshot === 'function' ? publicSnapshot().state : state,
       }, true);
-      state.modalWizard = null;
       return;
     }
     const commitment = Number(data.commitment || 0);
@@ -3458,7 +3958,7 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
 
   function showAccountDetail(id) {
     const a=cashAccounts.find(item=>item.id===id)||cashAccounts[0]; if(!a){toast('No cash accounts','Seed cash accounts to open this view.','warning');return;} state.selectedCashAccountId=a.id;
-    showDrawer(`${a.id} · ${a.masked}`,`${a.fund} · ${a.vehicle}`,`<section class="drawer-account-hero"><div><span>${icon('bank')}</span><div><strong>${escapeHTML(a.provider)}</strong><small>${escapeHTML(String(a.purpose||'FUND_OPERATING_BANK').replaceAll('_',' '))} · ${escapeHTML(a.currency)}</small></div></div>${statusPill(a.status)}</section><section class="drawer-section"><div class="account-cash-grid"><div><span>Posted</span><strong>${formatMoney(a.posted,a.currency)}</strong></div><div><span>Settled</span><strong>${formatMoney(a.settled,a.currency)}</strong></div><div><span>Reserved</span><strong>${formatMoney(a.reserved,a.currency)}</strong></div><div><span>Held</span><strong>${formatMoney(a.held,a.currency)}</strong></div><div class="highlight"><span>Deployable</span><strong>${formatMoney(a.deployable,a.currency)}</strong></div><div><span>Distributable</span><strong>${formatMoney(a.distributable,a.currency)}</strong></div></div></section><section class="drawer-section"><h3>Ownership & Configuration</h3><div class="info-list"><div class="info-row"><span>Manager legal entity</span><strong>Matanho Capital Zimbabwe</strong></div><div class="info-row"><span>Fund / Vehicle</span><strong>${escapeHTML(a.fund)} / ${escapeHTML(a.vehicle)}</strong></div><div class="info-row"><span>Ownership model</span><strong>${escapeHTML(a.ownership)}</strong></div><div class="info-row"><span>Tolerance policy</span><strong>${escapeHTML(a.currency)}-CASH-STD · ${formatMoney(a.tolerance,a.currency)}</strong></div><div class="info-row"><span>GL mapping</span><strong>${escapeHTML(a.gl)}</strong></div><div class="info-row"><span>Last statement</span><strong>${escapeHTML(a.lastStatement)}</strong></div></div></section><section class="drawer-section"><h3>Reconciliation health</h3><div class="inline-progress">${progressBar(a.reconHealth)}<span>${a.reconHealth.toFixed(1)}%</span></div><div class="section-gap">${button('Open reconciliation','open-reconciliation-for-account','primary','refresh',`data-id="${a.id}"`)}</div></section>`,`${button('Explain balance','explain-cash-position','','info',`data-id="${a.id}"`)}${button('View ledger','navigate-cash-ledger','primary','list')}`,{variant:'operations',icon:'bank',eyebrow:'Fund cash account'});
+    showDrawer(`${a.id} · ${a.masked}`,`${a.fund} · ${a.vehicle}`,`<section class="drawer-account-hero"><div><span>${icon('bank')}</span><div><strong>${escapeHTML(a.provider)}</strong><small>${escapeHTML(String(a.purpose||'FUND_OPERATING_BANK').replaceAll('_',' '))} · ${escapeHTML(a.currency)}</small></div></div>${statusPill(a.status)}</section><section class="drawer-section"><div class="account-cash-grid"><div><span>Posted</span><strong>${formatMoney(a.posted,a.currency)}</strong></div><div><span>Settled</span><strong>${formatMoney(a.settled,a.currency)}</strong></div><div><span>Reserved</span><strong>${formatMoney(a.reserved,a.currency)}</strong></div><div><span>Held</span><strong>${formatMoney(a.held,a.currency)}</strong></div><div class="highlight"><span>Deployable</span><strong>${formatMoney(a.deployable,a.currency)}</strong></div><div><span>Distributable</span><strong>${formatMoney(a.distributable,a.currency)}</strong></div></div></section><section class="drawer-section"><h3>Ownership & Configuration</h3><div class="info-list"><div class="info-row"><span>Manager legal entity</span><strong>${escapeHTML(managerLegalEntity)}</strong></div><div class="info-row"><span>Fund / Vehicle</span><strong>${escapeHTML(a.fund)} / ${escapeHTML(a.vehicle)}</strong></div><div class="info-row"><span>Ownership model</span><strong>${escapeHTML(a.ownership)}</strong></div><div class="info-row"><span>Tolerance policy</span><strong>${escapeHTML(a.currency)}-CASH-STD · ${formatMoney(a.tolerance,a.currency)}</strong></div><div class="info-row"><span>GL mapping</span><strong>${escapeHTML(a.gl)}</strong></div><div class="info-row"><span>Last statement</span><strong>${escapeHTML(a.lastStatement)}</strong></div></div></section><section class="drawer-section"><h3>Reconciliation health</h3><div class="inline-progress">${progressBar(a.reconHealth)}<span>${a.reconHealth.toFixed(1)}%</span></div><div class="section-gap">${button('Open reconciliation','open-reconciliation-for-account','primary','refresh',`data-id="${a.id}"`)}</div></section>`,`${button('Explain balance','explain-cash-position','','info',`data-id="${a.id}"`)}${button('View ledger','navigate-cash-ledger','primary','list')}`,{variant:'operations',icon:'bank',eyebrow:'Fund cash account'});
   }
 
   function showCashExplanation(id=state.selectedCashAccountId) {
@@ -3557,10 +4057,31 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
       case 'navigate': navigate(trigger.dataset.page); break;
       case 'open-deal': if (event.type === 'click') openDeal(trigger.dataset.dealId || trigger.dataset.id); break;
       case 'open-company': openCompany(trigger.dataset.id); break;
+      case 'company-list-page': void loadCompanyListPage(Number(trigger.dataset.page || 1)); break;
+      case 'company-export': {
+        const spec = window.__pv11CompaniesExportSpec;
+        if (!spec || typeof window.__PORTFOLIO_EXPORT__ !== 'function') { toast('Export unavailable','The branded export writer is not ready.','warning'); break; }
+        Promise.resolve(window.__PORTFOLIO_EXPORT__(trigger.dataset.kind || 'csv', spec)).then(name=>toast('Export ready',name,'success')).catch(error=>toast('Export failed',error.message || 'Export failed','error'));
+        break;
+      }
+      case 'company-detail-export': {
+        const spec = window.__pv11CompanyDetailExportSpec;
+        if (!spec || typeof window.__PORTFOLIO_EXPORT__ !== 'function') { toast('Export unavailable','The branded export writer is not ready.','warning'); break; }
+        Promise.resolve(window.__PORTFOLIO_EXPORT__(trigger.dataset.kind || 'csv', spec)).then(name=>toast('Export ready',name,'success')).catch(error=>toast('Export failed',error.message || 'Export failed','error'));
+        break;
+      }
       case 'open-fund': openFund(trigger.dataset.id); break;
       case 'open-lp': openLP(trigger.dataset.id); break;
+      case 'manage-lp-access': showLPInviteModal(); break;
+      case 'submit-lp-invite': {
+        const form = $('#lpInviteForm');
+        if (!hasRuntimeGrant(options.canInviteLp) || !form?.reportValidity()) break;
+        emitIntegrationEvent('matanho:before-action', { action:'api-invite-lp', dataset:Object.fromEntries(new FormData(form)) }, true);
+        break;
+      }
       case 'open-capital-call': openCapitalCall(trigger.dataset.id); break;
       case 'open-cash-account': showAccountDetail(trigger.dataset.id); break;
+      case 'submit-cash-account': submitCashAccount(); break;
       case 'explain-cash-position': showCashExplanation(trigger.dataset.id); break;
       case 'open-journal': showJournalDetail(trigger.dataset.id); break;
       case 'open-reservation': showDrawer(trigger.dataset.id,'Reservation detail and lifecycle',`<section class="drawer-section"><div class="reason-item">${icon('lock')}<div><strong>Availability commitment</strong><small>Reservation reduces deployable cash without changing the posted ledger.</small></div></div></section><section class="drawer-section"><h3>Controlled actions</h3><div class="action-grid">${button('Extend','reservation-extend','','calendar')}${button('Release','reservation-release','','unlock')}${button('Trace source','reservation-trace','primary','link')}</div></section>`,button('Close','close-drawer','primary'),{variant:'operations',icon:'lock'}); break;
@@ -3601,7 +4122,13 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
       case 'sign-term-sheet': showTermSigningConfirmation(); break;
       case 'confirm-term-signature': { const form=$('#termSignatureForm'); if(!form?.reportValidity()) break; if(!$('#termSignConsent')?.checked){toast('Consent required','Confirm that the signatory reviewed the current term sheet.','warning');break;} const envelope=signatureEnvelopes.find(item=>item.documentId==='DOC-009'); const index=Number(new FormData(form).get('signerIndex')); if(envelope&&envelope.recipients[index]) envelope.recipients[index][2]='Signed'; if(envelope){envelope.progress=Math.round(envelope.recipients.filter(r=>r[2]==='Signed').length/envelope.recipients.length*100);envelope.status=envelope.progress===100?'Completed':'Waiting for others';} const doc=documents.find(item=>item.id==='DOC-009'); if(doc) doc.signatureStatus=envelope?.status==='Completed'?'Completed':'Partially signed'; closeOverlays();toast('Term sheet signed','Electronic consent, signature evidence and the controlled document hash were recorded.');render();break;}
       case 'open-term-clause': showTermClauseDrawer(trigger.dataset.section,trigger.dataset.clause); break;
-      case 'company-profile-tab': state.companyTab = trigger.dataset.tab || 'overview'; render(); revealActiveProfileTab(); break;
+      case 'company-profile-tab': {
+        state.companyTab = trigger.dataset.tab || 'overview';
+        if (state.page === 'company-detail' && /^\/portfolio\/companies\//.test(window.location.pathname)) {
+          const url = new URL(window.location.href); url.searchParams.set('tab', state.companyTab); window.history.replaceState(window.history.state, '', url.pathname + url.search + url.hash);
+        }
+        render(); revealActiveProfileTab(); break;
+      }
       case 'fund-profile-tab': state.fundTab = trigger.dataset.tab || 'overview'; render(); revealActiveProfileTab(); break;
       case 'lp-profile-tab': state.lpTab = trigger.dataset.tab || 'overview'; render(); revealActiveProfileTab(); break;
       case 'back-to-deals': navigate('deals'); break;
@@ -3667,6 +4194,14 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
       case 'export-drilldown': exportCSV('matanho-drilldown.csv',[['Metric','Value'],['Selection','Prototype drill-down'],['Fund',state.activeFund],['As of',state.asOfDate]]); break;
       case 'deal-filters': showDealFilters(); break;
       case 'company-filters': showCompanyFilters(); break;
+      case 'request-company-document': showCompanyDocumentRequestModal(); break;
+      case 'submit-company-document-request': void submitCompanyDocumentRequest(); break;
+      case 'apply-company-list-filters': {
+        const form = $('#companyFilterForm');
+        if (form) state.companyListFilters = Object.fromEntries(new FormData(form));
+        state.companyPage = 1; closeOverlays(); void loadCompanyListPage(1); break;
+      }
+      case 'company-list-reset': state.companyListFilters = { fundId:'', sector:'All sectors', status:'All statuses' }; state.companyPage = 1; closeOverlays(); if(state.page==='companies')void loadCompanyListPage(1); else render(); break;
       case 'fund-filters': genericFilterDrawer('Fund filters',['Strategy','Vintage year','Status','Currency','Geography']); break;
       case 'report-filters': genericFilterDrawer('Reporting filters',['Report type','Fund','Owner','Status','Due date']); break;
       case 'lp-filters': genericFilterDrawer('LP filters',['Investor type','Geography','KYC status','Portal status','Commitment size']); break;
@@ -3713,7 +4248,7 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
       case 'request-report-review': toast('Review requested','Rudo Moyo and the Investment Committee were notified.'); break;
       case 'refresh-report-data': toast('Data refreshed','Linked figures were refreshed from the prototype data model.'); break;
       case 'generate-report': navigate('report-builder'); break;
-      case 'save-settings': toast('Not saved','Workspace, security, notification and data settings are preview-only in this build and are not persisted. Role permission changes above reset on reload.','warning'); break;
+      case 'save-settings': toast('Not saved','Workspace, security, notifications and data settings are preview-only in this build. Portfolio role policies are stored separately.','warning'); break;
       case 'configure-integration': genericDetailDrawer('Integration Configuration','Frontend prototype connector settings'); break;
       case 'ic-vote': break;
       case 'final-vote': showDecisionConfirmation(trigger.dataset.vote==='Reject'?'reject':trigger.dataset.vote==='Defer'?'defer':'approve',`${trigger.dataset.vote} investment decision`,`Nova Analytics · Series B · Investment Committee`,{'Decision':trigger.dataset.vote,'Investment':'USD 18.0M','Proposed ownership':'17.5%','Resolution':'RES-IC-2026-014','Open conditions':'3'},'Confirm vote'); state.pendingDecision.vote=trigger.dataset.vote; break;
@@ -3784,7 +4319,7 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
       case 'navigate-period-close': closeOverlays(); navigate('period-close'); break;
       case 'cash-currency': state.cashCurrency=trigger.value||trigger.dataset.value||'USD'; render(); break;
       case 'cash-available-explain': case 'cash-settled-explain': case 'cash-posted-explain': case 'cash-holds-explain': case 'cash-distributable-explain': showCashExplanation(); break;
-      case 'create-cash-account': showModal('Create Client / Fund Account','Register an authorised account under the complete ownership hierarchy.',`<form id="cashAccountForm"><div class="form-grid"><div class="form-field"><label>Manager legal entity</label><select><option>Matanho Capital Zimbabwe</option></select></div><div class="form-field"><label>Fund</label><select>${funds.map(f=>`<option>${escapeHTML(f.name)}</option>`).join('')}</select></div><div class="form-field"><label>Vehicle</label><input value="Main Fund Vehicle"></div><div class="form-field"><label>Cash purpose</label><select><option>SUBSCRIPTION_COLLECTION</option><option>INVESTMENT_DISBURSEMENT</option><option>FUND_OPERATING_BANK</option><option>DISTRIBUTION_ACCOUNT</option><option>ESCROW_OR_CUSTODY</option></select></div><div class="form-field"><label>Provider</label><input value="CBZ Bank Zimbabwe"></div><div class="form-field"><label>Currency</label><select><option>USD</option><option>ZWG</option></select></div><div class="form-field"><label>Ownership model</label><select><option>SEGREGATED</option><option>OMNIBUS</option><option>HYBRID</option></select></div><div class="form-field"><label>Effective from</label><input type="date" value="2026-08-01"></div><div class="form-field full"><label>Provider account identifier</label><input type="password" value="000000002001"></div></div></form>`,`${button('Save draft','close-modal')}${button('Submit for approval','submit-cash-account','primary','send')}`,{variant:'wizard',size:'lg',rail:['Ownership','Provider & Currency','Mappings & Controls','Review']}); break;
+      case 'create-cash-account': showModal('Create Client / Fund Account','Register an authorised account under the complete ownership hierarchy.',`<form id="cashAccountForm"><div class="form-grid"><div class="form-field"><label>Manager legal entity</label><select name="legalEntityId"><option value="le_arcus">${escapeHTML(managerLegalEntity)}</option></select></div><div class="form-field"><label>Fund</label><select name="fundId">${funds.map(f=>`<option value="${escapeHTML(f.id)}">${escapeHTML(f.name)}</option>`).join('')}</select></div><div class="form-field"><label>Vehicle</label><input name="vehicleId" value="Main Fund Vehicle" required></div><div class="form-field"><label>Cash purpose</label><select name="accountType"><option value="SUBSCRIPTION_COLLECTION">SUBSCRIPTION_COLLECTION</option><option value="INVESTMENT_DISBURSEMENT">INVESTMENT_DISBURSEMENT</option><option value="FUND_OPERATING_BANK">FUND_OPERATING_BANK</option><option value="DISTRIBUTION_ACCOUNT">DISTRIBUTION_ACCOUNT</option><option value="ESCROW_OR_CUSTODY">ESCROW_OR_CUSTODY</option></select></div><div class="form-field"><label>Provider</label><input name="providerId" value="provider_cbz" required></div><div class="form-field"><label>Currency</label><select name="currency"><option>USD</option><option>ZWG</option></select></div><div class="form-field"><label>Ownership model</label><select name="ownerModel"><option>SEGREGATED</option><option>OMNIBUS</option><option>HYBRID</option></select></div><div class="form-field"><label>Effective from</label><input name="effectiveFrom" type="date" value="2026-08-01" required></div><div class="form-field full"><label>Provider account identifier</label><input name="externalAccountIdentifier" type="text" inputmode="numeric" autocomplete="off" placeholder="Enter the bank or custodian reference" required><small class="field-help">Stored securely and masked after creation; used for provider mapping and reconciliation.</small></div></div></form>`,`${button('Save draft','close-modal')}${button('Submit for approval','submit-cash-account','primary','send')}`,{variant:'wizard',size:'lg',rail:['Ownership','Provider & Currency','Mappings & Controls','Review']}); break;
       case 'create-manual-journal': showModal('Create Controlled Manual Journal','Balanced draft with source evidence, value date and independent checker.',`<div class="journal-builder"><div class="form-grid"><div class="form-field"><label>Source event</label><input value="MANUAL-ADJ-2026-001"></div><div class="form-field"><label>Value date</label><input type="date" value="2026-08-01"></div><div class="form-field full"><label>Reason</label><textarea>Correct bank fee classification supported by provider evidence.</textarea></div></div><div class="journal-line-editor"><div><strong>Ledger account</strong><strong>Debit</strong><strong>Credit</strong></div><div><select><option>Approved fund expense control</option></select><input value="25000.00"><input value="0.00"></div><div><select><option>Fund bank cash · FCA-2001</option></select><input value="0.00"><input value="25000.00"></div><div class="total"><strong>Totals</strong><b>25,000.00</b><b>25,000.00</b></div></div><div class="reason-item">${icon('check-circle')}<div><strong>Journal is balanced</strong><small>Maker Tariro Moyo cannot approve this draft.</small></div></div></div>`,`${button('Save draft','close-modal')}${button('Submit to checker','submit-manual-journal','primary','send')}`,{variant:'operations',size:'lg',rail:['Header','Double-entry lines','Evidence','Approval']}); break;
       case 'upload-statement': showModal('Upload External Statement','Receive and stage a bank, custodian, escrow or payment-provider file without changing ledger cash.',`<div class="upload-dropzone">${icon('upload')}<strong>Drop CSV, Excel or MT940 file here</strong><small>Maximum 100,000 lines · original file and hash retained</small>${button('Choose file','close-modal','primary','folder')}</div><div class="import-upload-settings"><div><span>Provider layout</span><strong>Auto-detect from approved registry</strong></div><div><span>Commit mode</span><strong>Validate and stage only</strong></div><div><span>Maker-checker</span><strong>Required before commit</strong></div></div>`,button('Cancel','close-modal'),{variant:'import',size:'lg',rail:['File identity','Account mapping','Control totals','Review']}); break;
       case 'start-reconciliation': showModal('Start Reconciliation Batch','Select one account, currency and period; no cross-scope records may enter the candidate population.',`<form><div class="form-grid"><div class="form-field full"><label>Cash account</label><select>${cashAccounts.map(a=>`<option>${a.id} · ${escapeHTML(a.fund)} · ${a.masked}</option>`).join('')}</select></div><div class="form-field"><label>Currency</label><select><option>USD</option><option>ZWG</option></select></div><div class="form-field"><label>Period</label><input type="month" value="2026-07"></div><div class="form-field"><label>Date tolerance</label><select><option>3 business days</option><option>5 business days</option></select></div><div class="form-field"><label>Matching policy</label><select><option>Exact + suggested</option><option>Exact only</option></select></div></div></form>`,`${button('Cancel','close-modal')}${button('Create batch','submit-reconciliation','primary','refresh')}`,{variant:'operations',rail:['Scope','Policy','Candidate population','Review']}); break;
@@ -3817,6 +4352,28 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
         else if (['open-analyst-workload','open-ic-calendar','open-owner-completion','performance-settings','permissions-matrix','manage-lp-access','manage-roles','security-settings','fund-documents','open-version-history','open-conflicts','view-resolution','request-signatures','view-bank-details','download-call-pack','preview-capital-call','open-meeting-pack','open-team','open-board-calendar','open-interaction','email-contact','call-contact','add-interaction','open-all-dd-tasks','view-bank-details','export-closing','activity-chart-detail','term-version-chart'].includes(action)) showRecordMetadata('workspace-control',action);
         else softFocus(trigger);
     }
+  }
+
+  function submitCashAccount() {
+    const form = $('#cashAccountForm');
+    if (!form?.reportValidity()) return;
+    const data = Object.fromEntries(new FormData(form));
+    emitIntegrationEvent('matanho:before-action', {
+      action: 'api-create-cash-account',
+      dataset: {
+        ownerType: String(data.ownerType || 'FUND'),
+        legalEntityId: String(data.legalEntityId || 'le_arcus'),
+        portfolioId: String(data.fundId || ''),
+        clientOrVehicleId: String(data.ownerType === 'CLIENT' ? data.clientId : data.vehicleId || ''),
+        ownerModel: String(data.ownerModel || 'SEGREGATED'),
+        moneyClass: 'CLIENT_MONEY',
+        accountType: String(data.accountType || 'FUND_OPERATING_BANK'),
+        providerId: String(data.providerId || ''),
+        currency: String(data.currency || 'USD'),
+        externalAccountIdentifier: String(data.externalAccountIdentifier || ''),
+        effectiveFrom: String(data.effectiveFrom || ''),
+      },
+    }, true);
   }
 
 
@@ -3861,7 +4418,35 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
   }
 
   function showCompanyFilters() {
-    genericFilterDrawer('Portfolio Company Filters',['Fund','Sector','Investment stage','Health score','Runway','Reporting status','Board date']);
+    if (state.page !== 'companies') {
+      genericFilterDrawer('Portfolio Company Filters',['Fund','Sector','Investment stage','Health score','Runway','Reporting status','Board date']);
+      return;
+    }
+    const current = state.companyListFilters || { fundId:'', sector:'All sectors', status:'All statuses' };
+    const fundsFromRecords = [...new Map(companies.filter(c=>c.fundId).map(c=>[c.fundId,{id:c.fundId,name:c.fund}])).values()].sort((a,b)=>a.name.localeCompare(b.name));
+    const fundOptions = `<option value="">All funds</option>${fundsFromRecords.map(f=>`<option value="${escapeHTML(f.id)}"${current.fundId===f.id?' selected':''}>${escapeHTML(f.name)}</option>`).join('')}`;
+    const options = (values, selected, allLabel) => `<option value="">${allLabel}</option>${[...new Set(values.filter(Boolean))].sort().map(value=>`<option value="${escapeHTML(value)}"${selected===value?' selected':''}>${escapeHTML(value)}</option>`).join('')}`;
+    const body = `<form id="companyFilterForm"><div class="form-grid"><div class="form-field"><label>Fund</label><select name="fundId">${fundOptions}</select></div><div class="form-field"><label>Sector</label><select name="sector">${options(companies.map(c=>c.sector),current.sector,'All sectors')}</select></div><div class="form-field"><label>Investment status</label><select name="status">${options(companies.map(c=>c.stage),current.status,'All statuses')}</select></div></div></form>`;
+    showDrawer('Portfolio Company Filters','Filter by values returned from live portfolio company records.',body,`${button('Reset','company-list-reset')}${button('Apply filters','apply-company-list-filters','primary','filter')}`);
+  }
+
+  function showCompanyDocumentRequestModal() {
+    const folders = [...new Set(['Financial','Operational','Investment',...(state.companyDocumentFolders||[])])].filter(Boolean).sort();
+    const options = folders.map(folder=>`<option${folder===(state.companyDocumentUploadFolder||'Financial')?' selected':''}>${escapeHTML(folder)}</option>`).join('');
+    const form = `<form id="companyDocumentRequestForm"><div class="form-grid"><div class="form-field full"><label class="required">Document name</label><input name="title" required maxlength="512" placeholder="e.g. FY2026 audited financial statements"></div><div class="form-field"><label class="required">Folder</label><select name="folder" required>${options}</select></div><div class="form-field"><label>Due date</label><input type="date" name="dueDate"></div></div></form>`;
+    showModal('Request document',`Request a file from ${companies.find(item=>item.id===state.selectedCompanyId)?.name||'this portfolio company'}.`,form,`${button('Cancel','close-modal')}${button('Create request','submit-company-document-request','primary','send')}`,{variant:'wizard',size:'md',eyebrow:'Company document workflow'});
+  }
+
+  async function submitCompanyDocumentRequest() {
+    const form = $('#companyDocumentRequestForm');
+    if (!form?.reportValidity()) return;
+    if (!onCompanyDocumentRequest) { toast('Request unavailable','The document request API is not connected.','error'); return; }
+    const values = Object.fromEntries(new FormData(form));
+    try {
+      state.pageLoading = true; render();
+      await onCompanyDocumentRequest({ companyId:String(state.selectedCompanyId), title:String(values.title||''), folder:String(values.folder||''), dueDate:String(values.dueDate||'') || undefined });
+      closeOverlays(); toast('Document requested','The request is saved and appears in this company’s document register and activity.','success');
+    } catch (error) { state.pageLoading = false; toast('Request failed',error instanceof Error?error.message:'The document request could not be saved.','error'); render(); }
   }
 
   function showDistributionModal() {
@@ -4130,7 +4715,7 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
 
   function showFundEditModal() {
     const fund=funds.find(f=>f.id===state.selectedFundId)||funds[0];
-    showModal('Edit fund',fund.name, `<form id="fundEditForm"><input type="hidden" name="fundId" value="${escapeHTML(fund.id)}"><div class="form-grid"><div class="form-field full"><label>Fund name</label><input name="name" value="${escapeHTML(fund.name)}"></div><div class="form-field"><label>Status</label><select name="status"><option ${fund.status==='Investing'?'selected':''}>Investing</option><option ${fund.status==='Fundraising'?'selected':''}>Fundraising</option><option ${fund.status==='Realising'?'selected':''}>Realising</option><option>Closed</option></select></div><div class="form-field"><label>Strategy</label><input name="strategy" value="${escapeHTML(fund.strategy)}" readonly title="Strategy is set from focus industries at fund creation"></div><div class="form-field"><label>Primary geography</label><input name="geography" value="${escapeHTML(fund.geography==='—'?'':fund.geography)}"></div><div class="form-field"><label>Management fee</label><input name="managementFee" value="${escapeHTML(fund.managementFee==='—'?'':fund.managementFee)}" placeholder="e.g. 2.0%"></div><div class="form-field full"><label>Carry terms</label><input name="carry" value="${escapeHTML(fund.carry==='—'?'':fund.carry)}" placeholder="e.g. 20% above 8% hurdle"></div></div></form>`, `${button('Cancel','close-modal')}${button('Save changes','submit-fund-edit','primary','save')}`);
+    showModal('Edit fund',fund.name, `<form id="fundEditForm"><input type="hidden" name="fundId" value="${escapeHTML(fund.id)}"><div class="form-grid"><div class="form-field full"><label>Fund name</label><input name="name" value="${escapeHTML(fund.name)}"></div><div class="form-field"><label>Status</label><select name="status">${__pv11FundStatusOptions(fund.status)}</select></div><div class="form-field"><label>Strategy</label><input name="strategy" value="${escapeHTML(fund.strategy)}" readonly title="Strategy is set from focus industries at fund creation"></div><div class="form-field"><label>Primary geography</label><input name="geography" value="${escapeHTML(fund.geography==='—'?'':fund.geography)}"></div><div class="form-field"><label>Management fee</label><input name="managementFee" value="${escapeHTML(fund.managementFee==='—'?'':fund.managementFee)}" placeholder="e.g. 2.0%"></div><div class="form-field full"><label>Carry terms</label><input name="carry" value="${escapeHTML(fund.carry==='—'?'':fund.carry)}" placeholder="e.g. 20% above 8% hurdle"></div></div></form>`, `${button('Cancel','close-modal')}${button('Save changes','submit-fund-edit','primary','save')}`);
   }
 
   function submitFundEdit() {
@@ -4152,7 +4737,19 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
 
   function handleChangeAction(action, target) {
     switch(action) {
-      case 'fund-filter': state.activeFund=target.value; toast('Fund filter updated',target.value); render(); break;
+      case 'fund-filter':
+        state.activeFund=target.value;
+        toast('Fund filter updated',target.value);
+        render();
+        // Live portfolio pages load fund-scoped records from the API. Keep the
+        // embedded runtime state and the host loader in sync when the user
+        // changes the shared fund selector; otherwise capital-call rows remain
+        // from the previous scope even though the selector changed.
+        emitIntegrationEvent('matanho:reload-request', {
+          fundName: target.value,
+          asOfDate: state.asOfDate,
+        });
+        break;
       case 'date-filter': state.asOfDate=target.value; toast('Reporting date updated',target.value); render(); break;
       case 'theme-setting': state.theme=target.value.toLowerCase(); storage.set('matanho-portfolio-theme',state.theme); render(); break;
       case 'analytics-period': state.analyticsPeriod=target.value; render(); break;
@@ -4161,10 +4758,19 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
       case 'reconciliation-period': state.reconciliationPeriod=target.value; render(); break;
       case 'report-vault-fund': state.reportFilterFund=target.value; render(); break;
       case 'report-vault-status': state.reportFilterStatus=target.value; render(); break;
-      case 'fund-vintage-filter': state.fundVintageFilter=target.value; render(); break;
-      case 'fund-strategy-filter': state.fundStrategyFilter=target.value; render(); break;
-      case 'fund-status-filter': state.fundStatusFilter=target.value; render(); break;
-      case 'fund-currency-filter': state.fundCurrencyFilter=target.value; render(); break;
+      case 'fund-vintage-filter': state.fundVintageFilter=target.value; state.fundPage=1; render(); break;
+      case 'fund-strategy-filter': state.fundStrategyFilter=target.value; state.fundPage=1; render(); break;
+      case 'fund-status-filter': state.fundStatusFilter=target.value; state.fundPage=1; render(); break;
+      case 'fund-currency-filter': state.fundCurrencyFilter=target.value; state.fundPage=1; render(); break;
+      case 'fund-page-size': state.fundPageSize=target.value; state.fundPage=1; render(); break;
+      case 'fd-page-size': {
+        var fdKey = target.dataset.key || 'holdings';
+        state.fundDetailPaging = state.fundDetailPaging || {};
+        state.fundDetailPaging[fdKey] = state.fundDetailPaging[fdKey] || {};
+        state.fundDetailPaging[fdKey].size = target.value;
+        state.fundDetailPaging[fdKey].page = 1;
+        render(); break;
+      }
       /* patched:filter-dedicated-cases */
       case 'dashboard-fund-filter': state.dashboardFundFilter=target.value; render(); break;
       case 'dashboard-period-filter': state.dashboardPeriodFilter=target.value; render(); break;
@@ -4210,6 +4816,11 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
     const target=event.target;
     if(target.dataset.changeAction) handleChangeAction(target.dataset.changeAction,target);
     if(target.dataset.fileAction==='upload-document') uploadDocuments(target.files);
+    if(target.dataset.fileAction==='upload-company-document'&&target.files?.[0]){
+      const file=target.files[0];
+      if(!onCompanyDocumentUpload){toast('Upload unavailable','The company document API is not connected.','error');target.value='';return;}
+      Promise.resolve(onCompanyDocumentUpload({companyId:String(state.selectedCompanyId),file,folder:String(target.dataset.folder||state.companyDocumentUploadFolder||'Financial')})).then(()=>toast('Document uploaded',`${file.name} was saved to the company document register.`,'success')).catch(error=>toast('Upload failed',error instanceof Error?error.message:'The company document could not be uploaded.','error')).finally(()=>{target.value='';});
+    }
     if(target.dataset.fileAction==='upload-bank-statement') uploadBankStatement(target.files);
     if(target.dataset.fileAction==='upload-fund-document'&&target.files?.[0]){
       const fund=funds.find(f=>f.id===state.selectedFundId)||funds[0];
@@ -4223,7 +4834,7 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
     if(target.dataset.inputAction==='command-search') openCommandPalette(target.value);
     if(target.dataset.inputAction==='table-search') {
       clearTimeout(searchTimer);
-      searchTimer=setTimeout(()=>{ state.tableSearch=target.value; render(); requestAnimationFrame(()=>{ const input=$('[data-input-action="table-search"]'); if(input){input.focus(); input.setSelectionRange(input.value.length,input.value.length);} }); },180);
+      searchTimer=setTimeout(()=>{ state.tableSearch=target.value; state.fundPage=1; if(state.page==='companies'){state.companyPage=1; void loadCompanyListPage(1);} else render(); requestAnimationFrame(()=>{ const input=$('[data-input-action="table-search"]'); if(input){input.focus(); input.setSelectionRange(input.value.length,input.value.length);} }); },180);
     }
   }, __pv11Sig);
 
@@ -4482,7 +5093,47 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
         ? '<button type="button" class="modal-rail-step ' + active + ' ' + done + '" data-action="' + action + '" data-step="' + index + '"><b>' + (index + 1) + '</b>' + escapeHTML(item) + '</button>'
         : '<span class="modal-rail-step ' + active + ' ' + done + '"><b>' + (index + 1) + '</b>' + escapeHTML(item) + '</span>';
     }).join('') + '</aside>') : '') + '<div class="modal-main"><div class="modal-head"><div><span class="overlay-eyebrow">' + escapeHTML(options.eyebrow||variant.replaceAll('-',' ')) + '</span><h2>' + escapeHTML(title) + '</h2>' + (subtitle ? ('<p>' + escapeHTML(subtitle) + '</p>') : '') + '</div><div class="modal-window-controls"><button class="icon-button" data-action="modal-toggle-size" aria-label="Toggle popup size" title="Toggle popup size">' + icon('maximize') + '</button><button class="icon-button" data-action="close-modal" aria-label="Close popup">' + icon('x') + '</button></div></div><div class="modal-body">' + body + '</div>' + (footer ? ('<div class="modal-foot">' + footer + '</div>') : '') + '</div></section>';
-    modalLayer.classList.add('visible'); scrim.classList.add('visible'); renderStaticIcons(modalLayer); requestAnimationFrame(()=>$('input,select,textarea,button',modalLayer)?.focus());
+    modalLayer.classList.add('visible'); scrim.classList.add('visible'); renderStaticIcons(modalLayer);
+    if (title === 'Create Client / Fund Account') {
+      const form = $('#cashAccountForm', modalLayer);
+      const grid = $('.form-grid', form);
+      if (form && grid && !form.querySelector('[name="ownerType"]')) {
+        const ownerField = document.createElement('div');
+        ownerField.className = 'form-field';
+        ownerField.innerHTML = '<label>Account owner</label><select name="ownerType"><option value="FUND">Fund / vehicle</option><option value="CLIENT">Client / investor</option></select>';
+        grid.prepend(ownerField);
+        const vehicleInput = form.querySelector('[name="vehicleId"]');
+        const vehicleLabel = vehicleInput?.closest('.form-field')?.querySelector('label');
+        if (vehicleLabel) vehicleLabel.textContent = 'Fund vehicle / legal structure';
+        const clientField = document.createElement('div');
+        clientField.className = 'form-field';
+        clientField.innerHTML = '<label>Client / investor reference</label><input name="clientId" placeholder="Required for client-owned accounts">';
+        vehicleInput?.closest('.form-field')?.after(clientField);
+        const ownerSelect = ownerField.querySelector('[name="ownerType"]');
+        const clientInput = clientField.querySelector('[name="clientId"]');
+        const syncOwnerFields = () => { const isClient = ownerSelect.value === 'CLIENT'; clientInput.required = isClient; if (vehicleInput) vehicleInput.required = !isClient; clientField.hidden = !isClient; };
+        ownerSelect.addEventListener('change', syncOwnerFields); syncOwnerFields();
+      }
+      const wizardSteps = $$('.modal-rail-step[data-action="modal-rail-step"]', modalLayer);
+      const wizardFields = $$('#cashAccountForm .form-field', modalLayer);
+      const review = document.createElement('section');
+      review.className = 'cash-account-review info-list';
+      review.hidden = true;
+      form.appendChild(review);
+      const stepForField = (field) => { const name = field.querySelector('input,select,textarea')?.name || ''; if (['legalEntityId','fundId','vehicleId','ownerType','clientId'].includes(name)) return 0; if (['accountType','providerId','currency'].includes(name)) return 1; if (['ownerModel','effectiveFrom'].includes(name)) return 2; return 3; };
+      const reviewValue = (data, key, fallback = 'Not provided') => { const field = form.elements[key]; const value = field?.tagName === 'SELECT' ? field.options[field.selectedIndex]?.text : data.get(key); return escapeHTML(String(value || fallback)); };
+      const renderReview = () => {
+        const data = new FormData(form);
+        const owner = data.get('ownerType') === 'CLIENT' ? 'Client / investor' : 'Fund / vehicle';
+        review.innerHTML = `<div class="modal-section-heading"><div><span class="overlay-eyebrow">Confirmation</span><h3>Account details to be created</h3></div><span class="table-badge">Ready to create</span></div><div class="info-row"><span>Account owner</span><strong>${owner}</strong></div><div class="info-row"><span>Legal entity</span><strong>${reviewValue(data,'legalEntityId')}</strong></div><div class="info-row"><span>Fund</span><strong>${reviewValue(data,'fundId')}</strong></div><div class="info-row"><span>Fund vehicle / client</span><strong>${reviewValue(data, data.get('ownerType') === 'CLIENT' ? 'clientId' : 'vehicleId')}</strong></div><div class="info-row"><span>Cash purpose</span><strong>${reviewValue(data,'accountType')}</strong></div><div class="info-row"><span>Provider</span><strong>${reviewValue(data,'providerId')}</strong></div><div class="info-row"><span>Currency</span><strong>${reviewValue(data,'currency')}</strong></div><div class="info-row"><span>Ownership model</span><strong>${reviewValue(data,'ownerModel')}</strong></div><div class="info-row"><span>Effective from</span><strong>${reviewValue(data,'effectiveFrom')}</strong></div><div class="info-row"><span>Provider identifier</span><strong>•••• ${escapeHTML(String(data.get('externalAccountIdentifier') || '').slice(-4) || 'Not provided')}</strong></div>`;
+      };
+      const selectWizardStep = (step) => { const selected = Number(step); wizardSteps.forEach((item) => item.classList.toggle('active', item.dataset.step === String(selected))); wizardFields.forEach((field) => { field.hidden = stepForField(field) !== selected || selected === 3; }); review.hidden = selected !== 3; if (selected === 3) renderReview(); };
+      wizardSteps.forEach((item) => item.addEventListener('click', () => selectWizardStep(item.dataset.step)));
+      form.addEventListener('input', () => { if (!review.hidden) renderReview(); });
+      form.addEventListener('change', () => { if (!review.hidden) renderReview(); });
+      selectWizardStep(0);
+    }
+    requestAnimationFrame(()=>$('input,select,textarea,button',modalLayer)?.focus());
   };
 
   showMailerListDrawer=function(id){
@@ -4524,7 +5175,26 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
       case 'submit-report-schedule': submitReportSchedule(); return;
       case 'reset-dashboard-filters': toast('Dashboard filters reset','All funds, USD and the latest as-of date are selected.'); softFocus(trigger.closest('.workspace-filter-bar')); return;
       case 'save-company-update': closeOverlays(); toast('Update saved','The company update remains in draft.'); return;
-      case 'publish-company-update': closeOverlays(); toast('Company update published','Portfolio monitoring and activity feeds were refreshed.'); render(); return;
+      case 'publish-company-update': {
+        const company = companies.find(c=>c.id===state.selectedCompanyId) || companies[0];
+        const form = $('#companyUpdateForm');
+        const fields = form ? form.querySelectorAll('input[type="number"]') : [];
+        const revenue = Number(fields[0]?.value || 0);
+        const ebitda = Number(fields[1]?.value || 0);
+        storage.set(`pv11-company-update-${company.id}`, JSON.stringify({
+          // Company KPI values are stored in USD millions; the view applies
+          // the currency formatter's unit conversion exactly once.
+          arr: revenue,
+          revenue: [0, 0, 0, revenue, revenue],
+          ebitda: [0, 0, 0, ebitda, ebitda],
+          revenueGrowth: revenue > 0 ? 12.4 : 0,
+          lastReport: new Date().toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric' }),
+        }));
+        closeOverlays();
+        toast('Company update published','Portfolio monitoring and activity feeds were refreshed.');
+        render();
+        return;
+      }
       case 'submit-dd-task': submitDDTask(); return;
       case 'toggle-dd-task': { const task=state.dueDiligenceTasks.find(t=>t.id===trigger.dataset.id); if(task){task.status=task.status==='Complete'?'In Review':'Complete'; closeOverlays(); toast('Task updated',`${task.title}: ${task.status}`); render();} return; }
       case 'add-dd-comment': showSimpleCommentModal('Add diligence comment'); return;
@@ -4565,6 +5235,12 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
           const form = document.getElementById(formId);
           if (form && !form.reportValidity()) return;
           captureModalWizardDraft();
+          if (state.modalWizard.kind === 'create-rbac-role' && state.modalWizard.step === 0) {
+            const keys = rbacCataloguePermissionKeys();
+            const clone = (state.rbacBackendRoles || []).find((role) => role.id === state.modalWizard.draft.cloneFromId);
+            const cloneGrants = new Set(clone?.sharedPermissions || []);
+            state.modalWizard.draft.permissions = Object.fromEntries(keys.map((key) => [key, cloneGrants.has(key)]));
+          }
           state.modalWizard.step = Math.min(modalWizardMaxStep(), (state.modalWizard.step || 0) + 1);
           state.modalWizard.maxReached = Math.max(state.modalWizard.maxReached || 0, state.modalWizard.step);
           renderModalWizard();
@@ -4941,6 +5617,13 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
     { id:'USR-009', name:'Anita Kapoor', initials:'AK', role:'legal', title:'Compliance & Legal Reviewer', email:'anita.kapoor@matanho.com', status:'Invited', scope:'Legal and compliance records', lastActive:'Invitation pending' }
   ];
 
+  // Settings uses only server-returned Portfolio role records. The persona fixtures above
+  // remain for legacy preview paths and are never used as the live role directory.
+  state.rbacBackendRoles = null;
+  state.rbacRolesLoaded = false;
+  state.rbacLoadError = null;
+  state.rbacCatalogue = [];
+
   state.currentRole = state.currentRole || storage.get('matanho-portfolio-role','ceo');
   if (!v11RoleDefinitions[state.currentRole]) state.currentRole = 'ceo';
   state.settingsTab = state.settingsTab || 'roles';
@@ -4959,23 +5642,41 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
     'deal-detail':'deals','applicant-portal':'deals','company-detail':'companies','fund-detail':'funds','lp-detail':'lps','capital-call-detail':'capital-calls','report-builder':'reports-vault','analytics-detail':'dashboard','reconciliation-workspace':'reconciliations'
   }[page] || page);
 
-  function v11CurrentRole() { return v11RoleDefinitions[state.currentRole] || v11RoleDefinitions.ceo; }
-  function v11CanRead(page, roleId=state.currentRole) {
-    const role=v11RoleDefinitions[roleId] || v11RoleDefinitions.ceo;
+  function v11CurrentRole() {
+    if (liveOnly && authenticatedUser) {
+      const name = authenticatedUser.roleName || authenticatedUser.role?.name || authenticatedUser.role || authenticatedUser.roleCode || 'Staff user';
+      const normalized = String(name).trim();
+      return { id: authenticatedUser.roleId || 'authenticated-role', name: normalized, short: normalized.split(/\s+/).map(part=>part[0]).join('').slice(0,3).toUpperCase(), colour:'var(--brand)', icon:'users', permissions:state.rbacSessionPermissions||{}, protected:state.rbacCanManagePolicies===true };
+    }
+    return v11RoleDefinitions[state.currentRole] || v11RoleDefinitions.ceo;
+  }
+  function v11CanRead(page, roleId) {
+    if(roleId===undefined&&state.rbacSessionPermissions) return Boolean(state.rbacSessionPermissions[v11PageResource(page)]?.read);
+    if(liveOnly&&authenticatedUser&&roleId===undefined) return false;
+    const role=v11RoleDefinitions[roleId||state.currentRole] || v11RoleDefinitions.ceo;
     return Boolean(role.permissions[v11PageResource(page)]?.read);
   }
-  function v11CanWrite(page, roleId=state.currentRole) {
-    const role=v11RoleDefinitions[roleId] || v11RoleDefinitions.ceo;
+  function v11CanWrite(page, roleId) {
+    if(roleId===undefined&&state.rbacSessionPermissions) return Boolean(state.rbacSessionPermissions[v11PageResource(page)]?.write);
+    if(liveOnly&&authenticatedUser&&roleId===undefined) return false;
+    const role=v11RoleDefinitions[roleId||state.currentRole] || v11RoleDefinitions.ceo;
     return Boolean(role.permissions[v11PageResource(page)]?.write);
   }
   function v11FirstReadablePage(roleId=state.currentRole) {
     return v11PermissionPages.find(page=>v11CanRead(page,roleId)) || 'dashboard';
   }
   function v11RoleMember(roleId=state.currentRole) {
-    return v11RoleMembers.find(member=>member.role===roleId) || v11RoleMembers[0];
+    const member=v11RoleMembers.find(member=>member.role===roleId) || v11RoleMembers[0];
+    if(member)return member;
+    if(authenticatedUser)return {id:authenticatedUser.id||'current-user',name:[authenticatedUser.firstName,authenticatedUser.lastName].filter(Boolean).join(' ')||authenticatedUser.email||'Current user',email:authenticatedUser.email||'',role:roleId};
+    return {id:'current-user',name:'Current user',email:'',role:roleId};
   }
   function v11RoleMemberCount(roleId) { return v11RoleMembers.filter(member=>member.role===roleId).length; }
-  function v11IsFullAuthority(roleId=state.currentRole) { return ['ceo','admin','cio'].includes(roleId); }
+  function v11IsFullAuthority(roleId) {
+    if(typeof state.rbacCanManagePolicies==='boolean') return state.rbacCanManagePolicies;
+    const resolved=roleId||state.currentRole,role=v11RoleDefinitions[resolved];
+    return ['admin'].includes(resolved)||Boolean(role?.protected)||Boolean(role?.sharedPermissions?.includes('rbac.manage'))||Boolean(role?.sharedPermissions?.includes('portfolio.settings.manage'));
+  }
 
   const v11BasePublicSnapshot = publicSnapshot;
   publicSnapshot = function() {
@@ -4983,24 +5684,78 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
     snapshot.data.rbac={
       activeRole:state.currentRole,
       roles:cloneForIntegration(Object.values(v11RoleDefinitions)),
-      users:cloneForIntegration(v11RoleMembers)
+      users:cloneForIntegration(v11RoleMembers),
+      catalogue:cloneForIntegration(state.rbacCatalogue||[])
     };
     return snapshot;
   };
 
   const v11BaseHydrate = hydrateFromBackend;
+  const v11SharedResourceForPage = page => ({
+    dashboard:'dashboard',funds:'funds','cash-accounts':'cash_accounts','cash-overview':'cash_overview','cash-ledger':'cash_ledger','cash-reservations':'reservations','statement-imports':'statement_imports',reconciliations:'reconciliations',exceptions:'exceptions','period-close':'period_close','documents-vault':'documents_vault',settings:'settings',lps:'lp_management',reporting:'reporting_schedules','mailer-lists':'mailer_lists'
+  }[page] || page.replace(/-/g,'_'));
+  function v11PermissionsFromShared(grants) {
+    const set=new Set(Array.isArray(grants)?grants:[]), output={};
+    v11PermissionPages.forEach(page=>{
+      const prefix=`portfolio.${v11SharedResourceForPage(page)}.`;
+      const write=['create','edit','approve','delete','manage'].some(action=>set.has(prefix+action));
+      output[page]={read:set.has(prefix+'view')||set.has('portfolio.access.view')||write,write};
+    });
+    return output;
+  }
+  function v11SharedRole(role,index) {
+    const colours=['var(--brand)','var(--cyan)','var(--purple)','var(--blue)','var(--emerald)','var(--amber)','var(--red)'];
+    const hasConfiguredPolicy=Boolean(role.activeVersion||role.draftVersion);
+    const policyPermissions = role.activeVersion?.permissions || role.draftVersion?.permissions;
+    const grants=hasConfiguredPolicy
+      ? (Array.isArray(role.permissions)?role.permissions:Object.entries(policyPermissions||{}).filter(([,value])=>value===true).map(([key])=>key))
+      : (Array.isArray(role.legacyPermissions)?role.legacyPermissions:(Array.isArray(role.permissions)?role.permissions:[]));
+    const protectedRole = role.protected === true;
+    const permissions = protectedRole
+      ? Object.fromEntries(v11PermissionPages.map(page => [page, { read: true, write: true }]))
+      : v11PermissionsFromShared(grants);
+    return {id:role.id,name:role.name,short:String(role.name||'Role').split(/\s+/).map(x=>x[0]).join('').slice(0,3).toUpperCase(),colour:colours[index%colours.length],icon:'users',description:role.description||'Configured staff role.',approvalLimit:'Configured by workflow',scope:'Feature access only',permissions,sharedPermissions:grants,activePermissions:Array.isArray(role.activePermissions)?role.activePermissions:Object.entries(role.activeVersion?.permissions||{}).filter(([,value])=>value===true).map(([key])=>key),protected:protectedRole,globalRoleId:role.globalRoleId||null,revision:role.revision||0,activeVersion:role.activeVersion?.version??role.activeVersion??null,draftVersion:role.draftVersion?.version??role.draftVersion??null,status:role.status||'enabled'};
+  }
+
+  function v11ApplyPersistedRoleState(role,persisted) {
+    if(!role||!persisted)return;
+    if(Number.isInteger(persisted.revision)) role.revision=persisted.revision;
+    if(Object.prototype.hasOwnProperty.call(persisted,'status')) role.status=persisted.status||'enabled';
+    if(Object.prototype.hasOwnProperty.call(persisted,'activeVersion')) role.activeVersion=persisted.activeVersion?.version??persisted.activeVersion??null;
+    if(Object.prototype.hasOwnProperty.call(persisted,'draftVersion')) role.draftVersion=persisted.draftVersion?.version??persisted.draftVersion??null;
+    const permissionSource=persisted.draftVersion?.permissions||persisted.activeVersion?.permissions;
+    if(permissionSource&&typeof permissionSource==='object') {
+      role.sharedPermissions=Object.entries(permissionSource).filter(([,value])=>value===true).map(([key])=>key);
+      role.permissions=v11PermissionsFromShared(role.sharedPermissions);
+    }
+    if(persisted.activeVersion?.permissions) role.activePermissions=Object.entries(persisted.activeVersion.permissions).filter(([,value])=>value===true).map(([key])=>key);
+  }
   hydrateFromBackend = function(payload={}) {
     const source=payload.data || payload;
     const incoming=source.rbac;
-    if (incoming?.roles) incoming.roles.forEach(role=>{
-      if (!role?.id) return;
-      if (v11RoleDefinitions[role.id]) Object.assign(v11RoleDefinitions[role.id],role);
-      else v11RoleDefinitions[role.id]=role;
-    });
+    if(typeof incoming?.canManagePolicies==='boolean') state.rbacCanManagePolicies=incoming.canManagePolicies;
+    if(typeof incoming?.effectiveSource==='string') state.rbacEffectiveSource=incoming.effectiveSource;
+    if(Array.isArray(incoming?.effectivePermissions)) state.rbacSessionPermissions=v11PermissionsFromShared(incoming.effectivePermissions);
+    if (Array.isArray(incoming?.catalogue)) state.rbacCatalogue=incoming.catalogue;
+    if (Array.isArray(incoming?.roles)) {
+      state.rbacBackendRoles=incoming.roles.filter(role=>role?.id).map((role,index)=>v11SharedRole(role,index));
+      state.rbacRolesLoaded=true;
+      state.rbacLoadError=null;
+      state.rbacBackendRoles.forEach(role=>{v11RoleDefinitions[role.id]=role;});
+    }
     if (Array.isArray(incoming?.users)) v11RoleMembers.splice(0,v11RoleMembers.length,...incoming.users);
     if (incoming?.activeRole && v11RoleDefinitions[incoming.activeRole]) state.currentRole=incoming.activeRole;
+    if (!v11RoleDefinitions[state.currentRole]) state.currentRole=Object.keys(v11RoleDefinitions)[0]||'ceo';
+    if (!v11RoleDefinitions[state.rbacSelectedRole]) state.rbacSelectedRole=state.currentRole;
     return v11BaseHydrate(payload);
   };
+
+  function failRbacSettings(message='The Portfolio role directory could not be loaded.') {
+    state.rbacBackendRoles=[];
+    state.rbacRolesLoaded=true;
+    state.rbacLoadError=String(message||'The Portfolio role directory could not be loaded.');
+    if(state.page==='settings'&&state.settingsTab==='roles') render();
+  }
 
   const v11BaseRenderNav = renderNav;
   renderNav = function() {
@@ -5064,7 +5819,7 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
   ];
 
   function v11SettingsNav() {
-    return `<nav class="v11-settings-nav" aria-label="Settings sections">${v11SettingsTabs.map(([id,label,ic])=>`<button class="${state.settingsTab===id?'active':''}" data-action="settings-tab" data-tab="${id}">${icon(ic)}<span>${escapeHTML(label)}</span>${id==='roles'?`<small>${Object.keys(v11RoleDefinitions).length} roles</small>`:''}</button>`).join('')}</nav>`;
+    return `<nav class="v11-settings-nav" aria-label="Settings sections">${v11SettingsTabs.map(([id,label,ic])=>`<button class="${state.settingsTab===id?'active':''}" data-action="settings-tab" data-tab="${id}">${icon(ic)}<span>${escapeHTML(label)}</span>${id==='roles'?`<small>${Array.isArray(state.rbacBackendRoles)?state.rbacBackendRoles.length:'—'} roles</small>`:''}</button>`).join('')}</nav>`;
   }
 
   function v11SettingToggle(label,description,checked=true,changeAction='v11-setting-toggle') {
@@ -5080,11 +5835,31 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
     return `<button class="v11-permission-toggle ${value?'on':''}" data-action="toggle-role-permission" data-role="${roleId}" data-page="${page}" data-access="${access}" ${disabled?'disabled':''} aria-pressed="${value}" title="${disabled?'Only CEO, Administrator or CIO may change access':'Toggle '+access+' access'}"><span>${value?icon('check'):''}</span>${access==='read'?'Read':'Write'}</button>`;
   }
 
+  function v11SharedPermissionToggle(roleId,resource,action,value) {
+    const disabled=!v11IsFullAuthority();
+    return `<button class="v11-permission-toggle ${value?'on':''}" data-action="toggle-shared-role-permission" data-role="${roleId}" data-resource="${resource}" data-grant-action="${action}" ${disabled?'disabled':''} aria-pressed="${value}" title="${disabled?'Only the CEO or System Administrator may change access':'Toggle '+action+' permission'}"><span>${value?icon('check'):''}</span>${escapeHTML(action)}</button>`;
+  }
+
   function v11RenderRolesSettings() {
-    const selected=v11RoleDefinitions[state.rbacSelectedRole] || v11CurrentRole();
+    if (!state.rbacRolesLoaded) {
+      return `<div class="v11-settings-content"><section class="card v11-settings-card" role="status"><div class="flex items-center gap-3"><span class="v11-rbac-loading-spinner" aria-hidden="true"></span><span>Loading Portfolio roles…</span></div></section></div>`;
+    }
+    if (state.rbacLoadError) {
+      return `<div class="v11-settings-content"><section class="card v11-settings-card"><div class="empty-state"><strong>Portfolio roles unavailable</strong><p>${escapeHTML(state.rbacLoadError)}</p>${button('Retry','retry-rbac-settings','primary compact','refresh-cw')}</div></section></div>`;
+    }
+    const backendRoles=Array.isArray(state.rbacBackendRoles)?state.rbacBackendRoles:[];
+    if (!backendRoles.length) {
+      const createButton=v11IsFullAuthority()?button('Create your first staff role','create-custom-role','primary','plus'):'';
+      return `<div class="v11-settings-content"><section class="v11-rbac-summary"><div><small>PORTFOLIO ROLE DIRECTORY</small><h2>0 backend roles</h2><p>No Portfolio access-role records are configured yet.</p></div><div class="v11-rbac-summary-metrics"><span><strong>0</strong><small>Roles</small></span><span><strong>0</strong><small>Assignments</small></span><span><strong>${escapeHTML(state.rbacEffectiveSource||'legacy')}</strong><small>Access source</small></span></div></section><section class="card v11-settings-card"><div class="empty-state"><strong>No staff roles yet</strong><p>Create a staff role here and configure its Portfolio policy. It will also appear in Admin Management.</p>${createButton}</div></section></div>`;
+    }
+    const selected=backendRoles.find(role=>role.id===state.rbacSelectedRole)||backendRoles[0];
+    state.rbacSelectedRole=selected.id;
     const selectedMembers=v11RoleMembers.filter(member=>member.role===selected.id);
-    const matrixRows=navGroups.map(group=>`<tr class="v11-permission-group"><th colspan="3">${escapeHTML(group.label)}</th></tr>${group.items.map(item=>{const p=selected.permissions[item.id]||{read:false,write:false};return `<tr><td><span class="v11-permission-module">${icon(item.icon)}<span><strong>${escapeHTML(item.label)}</strong><small>${escapeHTML(group.label)}</small></span></span></td><td>${v11PermissionToggle(selected.id,item.id,'read',p.read)}</td><td>${v11PermissionToggle(selected.id,item.id,'write',p.write)}</td></tr>`}).join('')}`).join('');
-    return `<div class="v11-settings-content"><section class="v11-rbac-summary"><div><small>ACTIVE SECURITY CONTEXT</small><h2>${escapeHTML(v11CurrentRole().name)}</h2><p>${escapeHTML(v11CurrentRole().scope)}</p></div><div class="v11-rbac-summary-metrics"><span><strong>${Object.keys(v11RoleDefinitions).length}</strong><small>Roles</small></span><span><strong>${v11RoleMembers.length}</strong><small>Users</small></span><span><strong>100%</strong><small>MFA coverage</small></span><span><strong>0</strong><small>Orphan access</small></span></div></section><div class="v11-rbac-layout"><aside class="v11-role-directory"><div class="section-heading-with-action"><h3>Roles</h3>${v11IsFullAuthority()?button('New role','create-custom-role','compact','plus'):''}</div>${Object.values(v11RoleDefinitions).map(role=>`<button class="v11-role-card ${selected.id===role.id?'active':''}" data-action="select-rbac-role" data-role="${role.id}" style="--role-colour:${role.colour}"><span class="v11-role-icon">${icon(role.icon)}</span><span><strong>${escapeHTML(role.name)}</strong><small>${escapeHTML(role.description)}</small></span><b>${v11RoleMemberCount(role.id)}</b></button>`).join('')}</aside><main class="v11-rbac-main"><section class="card v11-role-profile"><div class="v11-role-profile-head"><span class="v11-role-icon large" style="--role-colour:${selected.colour}">${icon(selected.icon)}</span><div><small>ROLE PROFILE</small><h2>${escapeHTML(selected.name)}</h2><p>${escapeHTML(selected.description)}</p></div><div class="v11-role-profile-actions">${statusPill(v11IsFullAuthority(selected.id)?'Full authority':'Scoped access',v11IsFullAuthority(selected.id)?'success':'info')}${button('Preview access','preview-role-access','compact','eye',`data-role="${selected.id}"`)}</div></div><div class="v11-role-facts"><span><small>Data scope</small><strong>${escapeHTML(selected.scope)}</strong></span><span><small>Approval authority</small><strong>${escapeHTML(selected.approvalLimit)}</strong></span><span><small>Members</small><strong>${selectedMembers.length}</strong></span><span><small>Last reviewed</small><strong>01 Aug 2026</strong></span></div></section><section class="card table-card section-gap"><div class="table-toolbar"><div><h3>Read and write permissions</h3><p>Read controls visibility. Write controls create, edit, approve and decision actions.</p></div><div>${statusPill(v11IsFullAuthority()?'Editing enabled':'Read-only configuration',v11IsFullAuthority()?'success':'neutral')}</div></div><div class="table-wrap v11-permission-table"><table><thead><tr><th>Workspace</th><th>Read</th><th>Write</th></tr></thead><tbody>${matrixRows}</tbody></table></div></section><section class="card table-card section-gap"><div class="table-toolbar"><div><h3>Role members</h3><p>People, scope, status and last activity for this role.</p></div>${v11IsFullAuthority()?button('Add person','add-role-member','primary compact','user-plus',`data-role="${selected.id}"`):''}</div><div class="table-wrap"><table><thead><tr><th>Person</th><th>Title</th><th>Scope</th><th>Status</th><th>Last active</th><th></th></tr></thead><tbody>${selectedMembers.length?selectedMembers.map(member=>`<tr data-action="v11-role-member-detail" data-id="${member.id}"><td class="table-primary"><span class="v11-person-cell">${personAvatar(member.name,"avatar-gradient")}<span>${escapeHTML(member.name)}<small>${escapeHTML(member.email)}</small></span></span></td><td>${escapeHTML(member.title)}</td><td>${escapeHTML(member.scope)}</td><td>${statusPill(member.status)}</td><td>${escapeHTML(member.lastActive)}</td><td>${v11IsFullAuthority()?button('Remove','remove-role-member','ghost compact','x',`data-id="${member.id}"`):''}</td></tr>`).join(''):`<tr><td colspan="6"><div class="empty-state"><strong>No members assigned</strong><p>Add an authorised person to this role.</p></div></td></tr>`}</tbody></table></div></section></main></div></div>`;
+    const liveCatalogue=Array.isArray(state.rbacCatalogue)&&state.rbacCatalogue.length?state.rbacCatalogue.filter(item=>item.module==='portfolio'):null;
+    const matrixRows=liveCatalogue ? liveCatalogue.map(item=>{const prefix=`portfolio.${item.resource}.`;const grants=new Set(selected.sharedPermissions||[]);return `<tr data-rbac-resource="${escapeHTML(item.resource)}" data-rbac-role="${escapeHTML(selected.id)}"><td><span class="v11-permission-module">${icon('grid')}<span><strong>${escapeHTML(item.label)}</strong><small>${escapeHTML(item.module)} · ${escapeHTML(item.resource)}</small></span></span></td><td><div class="v11-action-grants">${item.actions.map(action=>v11SharedPermissionToggle(selected.id,item.resource,action,grants.has(prefix+action))).join('')}</div></td></tr>`;}).join('') : navGroups.map(group=>`<tr class="v11-permission-group"><th colspan="2">${escapeHTML(group.label)}</th></tr>${group.items.map(item=>{const p=selected.permissions[item.id]||{read:false,write:false};return `<tr><td><span class="v11-permission-module">${icon(item.icon)}<span><strong>${escapeHTML(item.label)}</strong><small>${escapeHTML(group.label)}</small></span></span></td><td>${v11PermissionToggle(selected.id,item.id,'read',p.read)}${v11PermissionToggle(selected.id,item.id,'write',p.write)}</td></tr>`}).join('')}`).join('');
+    const policyStatus = selected.status==='disabled' ? 'Disabled' : selected.draftVersion&&selected.draftVersion!==selected.activeVersion ? 'Changes pending' : selected.activeVersion ? 'Active' : 'Legacy';
+    const policyActions = v11IsFullAuthority() ? `${selected.status==='disabled' ? button('Restore policy','restore-portfolio-policy','primary compact','refresh-cw',`data-role="${selected.id}"`) : selected.activeVersion ? button('Disable policy','disable-portfolio-policy','danger compact','pause',`data-role="${selected.id}"`) : ''}${button('Preview impact','preview-policy-impact','compact','eye',`data-role="${selected.id}"`)}` : '';
+    return `<div class="v11-settings-content"><section class="v11-rbac-summary"><div><small>PORTFOLIO ROLE DIRECTORY</small><h2>${escapeHTML(selected.name)}</h2><p>${escapeHTML(state.rbacEffectiveSource||'legacy')} access resolution</p></div><div class="v11-rbac-summary-metrics"><span><strong>${backendRoles.length}</strong><small>Roles</small></span><span><strong>${v11RoleMembers.length}</strong><small>Users</small></span><span><strong>${escapeHTML(policyStatus)}</strong><small>Policy status</small></span><span><strong>${selected.activeVersion||selected.draftVersion||'—'}</strong><small>Version</small></span></div></section><div class="v11-rbac-layout"><aside class="v11-role-directory"><div class="section-heading-with-action"><h3>Roles</h3>${v11IsFullAuthority()?button('New role','create-custom-role','compact','plus'):''}</div>${backendRoles.map(role=>`<button class="v11-role-card ${selected.id===role.id?'active':''}" data-action="select-rbac-role" data-role="${escapeHTML(role.id)}" style="--role-colour:${role.colour}"><span class="v11-role-icon">${icon(role.icon)}</span><span><strong>${escapeHTML(role.name)}</strong><small>${escapeHTML(role.description)}</small></span><b>${v11RoleMemberCount(role.id)}</b></button>`).join('')}</aside><main class="v11-rbac-main"><section class="card v11-role-profile"><div class="v11-role-profile-head"><span class="v11-role-icon large" style="--role-colour:${selected.colour}">${icon(selected.icon)}</span><div><small>PORTFOLIO POLICY · ${escapeHTML(policyStatus)}</small><h2>${escapeHTML(selected.name)}</h2><p>${escapeHTML(selected.description)}</p></div><div class="v11-role-profile-actions">${statusPill(policyStatus,policyStatus==='Active'?'success':policyStatus==='Changes pending'?'warning':'neutral')}${policyActions}${button('Preview access','preview-role-access','compact','eye',`data-role="${escapeHTML(selected.id)}"`)}</div></div><div class="v11-role-facts"><span><small>Data scope</small><strong>${escapeHTML(selected.scope)}</strong></span><span><small>Approval authority</small><strong>${escapeHTML(selected.approvalLimit)}</strong></span><span><small>Members</small><strong>${selectedMembers.length}</strong></span><span><small>Policy source</small><strong>${selected.globalRoleId?'Linked staff role':'Portfolio-only role'}</strong></span></div></section><section class="card table-card section-gap"><div class="table-toolbar"><div><h3>Page and action permissions</h3><p>Choose the permissions, then apply the changes above to make them active.</p></div><div>${statusPill(v11IsFullAuthority()?'Editing enabled':'Read-only configuration',v11IsFullAuthority()?'success':'neutral')}</div></div><div class="table-wrap v11-permission-table"><table><thead><tr><th>Page</th><th>Granted actions</th></tr></thead><tbody>${matrixRows}</tbody></table></div></section><section class="card table-card section-gap"><div class="table-toolbar"><div><h3>Role members</h3><p>Assignments update the person's staff role in Admin Management and their Portfolio policy.</p></div>${v11IsFullAuthority()?button('Assign existing user','add-role-member','primary compact','user-plus',`data-role="${escapeHTML(selected.id)}"`):''}</div><div class="table-wrap"><table><thead><tr><th>Person</th><th>Title</th><th>Scope</th><th>Status</th><th>Last active</th><th></th></tr></thead><tbody>${selectedMembers.length?selectedMembers.map(member=>`<tr data-action="v11-role-member-detail" data-id="${escapeHTML(member.id)}"><td class="table-primary"><span class="v11-person-cell">${personAvatar(member.name,"avatar-gradient")}<span>${escapeHTML(member.name)}<small>${escapeHTML(member.email)}</small></span></span></td><td>${escapeHTML(member.title)}</td><td>${escapeHTML(member.scope)}</td><td>${statusPill(member.status)}</td><td>${escapeHTML(member.lastActive)}</td><td>${v11IsFullAuthority()&&!onRbacRoleAssigned?button('Remove','remove-role-member','ghost compact','x',`data-id="${escapeHTML(member.id)}"`):''}</td></tr>`).join(''):`<tr><td colspan="6"><div class="empty-state"><strong>No members assigned</strong><p>Assign an existing person to this role.</p></div></td></tr>`}</tbody></table></div></section></main></div></div>`;
   }
 
   function v11RenderSecuritySettings() {
@@ -5111,7 +5886,7 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
   const v11BaseRenderSettings = renderSettings;
   renderSettings = function() {
     const body=state.settingsTab==='workspace'?v11RenderWorkspaceSettings():state.settingsTab==='roles'?v11RenderRolesSettings():state.settingsTab==='security'?v11RenderSecuritySettings():state.settingsTab==='integrations'?v11RenderIntegrationsSettings():state.settingsTab==='notifications'?v11RenderNotificationsSettings():state.settingsTab==='data'?v11RenderDataSettings():v11RenderApiSettings();
-    return `${pageHeader('Settings & Access Control','Configure workspace behaviour, role-based read/write access, security, integrations and data governance.',`${statusPill(v11CurrentRole().name,v11IsFullAuthority()?'success':'info')}${button('Export configuration','export-settings','','download')}${button('Save changes','save-settings','primary','save')}`,'Workspace Administration')}<section class="v11-settings-shell">${v11SettingsNav()}<main>${body}</main></section>`;
+    return `${pageHeader('Settings & Access Control','Configure workspace behaviour, role-based read/write access, security, integrations and data governance.',`${statusPill(v11CurrentRole().name,v11IsFullAuthority()?'success':'info')}${button('Export configuration','export-settings','','download')}${button(state.settingsTab==='roles'?'Apply role changes':'Save changes','save-settings','primary','save')}`,'Workspace Administration')}<section class="v11-settings-shell">${v11SettingsNav()}<main>${body}</main></section>`;
   };
 
   function v11EnvelopeRows() {
@@ -5165,6 +5940,9 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
       rolePill.style.setProperty('--role-colour',role.colour);
       rolePill.innerHTML=`<span>${icon(role.icon)}</span><span><small>Viewing as</small><strong>${escapeHTML(role.short)}</strong></span>`;
     }
+    // Cash-account creation is a direct creation flow in this workspace; it does
+    // not require a separate approval step.
+    $$('[data-action="submit-cash-account"]').forEach(button => { button.textContent = 'Create account'; });
   }
 
   function v11IsMutationAction(action='') {
@@ -5212,10 +5990,6 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
   function v11PostRender() {
     v11UpdateUserChrome();
     const resource=v11PageResource(state.page);
-    if(v11CanRead(resource) && !v11CanWrite(resource)) {
-      const page=$('.page',workspace);
-      if(page && !$('.v11-readonly-banner',page)) page.insertAdjacentHTML('afterbegin',`<div class="v11-readonly-banner">${icon('eye')}<span><strong>Read-only workspace</strong><small>${escapeHTML(v11CurrentRole().name)} can view and export this area but cannot change controlled records.</small></span>${button('View permissions','open-current-role-access','ghost compact','shield')}</div>`);
-    }
     $$('[data-action]',workspace).forEach(node=>{
       const action=node.dataset.action;
       if(v11IsMutationAction(action)) {
@@ -5239,7 +6013,10 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
 
   const v11BaseRender=render;
   render=function() {
-    if(!v11CanRead(state.page)) state.page=v11FirstReadablePage();
+    // The signed-in policy is hydrated after the runtime starts. Until it arrives
+    // v11CanRead() denies every page in live mode, and redirecting here rewrote
+    // deep links and restored history entries to the first readable page.
+    if(state.rbacSessionPermissions&&!v11CanRead(state.page)) state.page=v11FirstReadablePage(); /* patched:page-guard */
     v11BaseRender();
     v11PostRender();
   };
@@ -5251,20 +6028,125 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
     showPopover(anchor,`<div class="popover-title">Signed in as</div><div class="popover-item v11-current-user" style="cursor:default">${personAvatar(member.name,"avatar-gradient")}<span class="popover-item-copy"><strong>${escapeHTML(member.name)}</strong><small>${escapeHTML(member.title)} · Matanho Capital</small></span>${statusPill(role.short,'info')}</div><div class="popover-divider"></div><div class="popover-title">Preview role access</div><div class="v11-role-switch-list">${Object.values(v11RoleDefinitions).map(item=>`<button class="popover-item ${item.id===state.currentRole?'active':''}" data-action="switch-demo-role" data-role="${item.id}"><span class="activity-icon" style="color:${item.colour};background:color-mix(in srgb,${item.colour} 12%,transparent)">${icon(item.icon)}</span><span class="popover-item-copy"><strong>${escapeHTML(item.name)}</strong><small>${escapeHTML(item.scope)}</small></span>${item.id===state.currentRole?icon('check-circle'):icon('chevron-right')}</button>`).join('')}</div><div class="popover-divider"></div>${v11CanRead('settings')?`<button class="popover-item" data-action="navigate" data-page="settings">${icon('settings')}<span class="popover-item-copy"><strong>Workspace settings</strong><small>RBAC, security, integrations and data controls</small></span></button>`:''}<button class="popover-item" data-action="toggle-theme">${icon(state.theme==='light'?'moon':'sun')}<span class="popover-item-copy"><strong>${state.theme==='light'?'Use dark theme':'Use light theme'}</strong><small>Change appearance on this browser</small></span></button><div class="popover-divider"></div><button class="popover-item" data-action="sign-out-demo">${icon('external-link')}<span class="popover-item-copy"><strong>Sign out</strong><small>Demo action only</small></span></button>`,390);
   };
 
-  function v11ShowRoleAccess(roleId=state.currentRole) {
+  function v11ShowRoleAccess(roleId=state.currentRole, selectedTab='properties') {
     const role=v11RoleDefinitions[roleId]||v11CurrentRole();
-    const readable=v11PermissionPages.filter(page=>role.permissions[page]?.read);
-    const writable=v11PermissionPages.filter(page=>role.permissions[page]?.write);
-    showModal(`${role.name} Access`,`${readable.length} readable workspaces · ${writable.length} writable workspaces`,`<div class="v11-role-access-preview"><header style="--role-colour:${role.colour}"><span>${icon(role.icon)}</span><div><small>ROLE ACCESS PREVIEW</small><h2>${escapeHTML(role.name)}</h2><p>${escapeHTML(role.description)}</p></div></header><section><h3>Read and write</h3><div class="v11-access-chip-grid">${writable.map(page=>`<span>${icon('edit')}<strong>${escapeHTML(v11PageLabels[page])}</strong><small>Read + write</small></span>`).join('')}</div></section><section><h3>Read only</h3><div class="v11-access-chip-grid">${readable.filter(page=>!role.permissions[page].write).map(page=>`<span>${icon('eye')}<strong>${escapeHTML(v11PageLabels[page])}</strong><small>Read only</small></span>`).join('')||'<p class="muted">No read-only workspaces.</p>'}</div></section><section class="info-list"><div class="info-row"><span>Scope</span><strong>${escapeHTML(role.scope)}</strong></div><div class="info-row"><span>Approval authority</span><strong>${escapeHTML(role.approvalLimit)}</strong></div><div class="info-row"><span>Members</span><strong>${v11RoleMemberCount(role.id)}</strong></div></section></div>`,`${button('Close','close-modal','primary')}`,{variant:'inspector',size:'lg',eyebrow:'Effective permissions'});
+    const catalogue=Array.isArray(state.rbacCatalogue)?state.rbacCatalogue.filter(item=>item?.module==='portfolio'):[];
+    const effectiveGrants=new Set(role.status!=='disabled'&&role.activeVersion
+      ? (role.activePermissions||role.sharedPermissions||[])
+      : (role.legacyPermissions||[]));
+    const permissions= catalogue.map(resource=>({
+      resource,
+      actions:(resource.actions||[]).filter(action=>effectiveGrants.has(`portfolio.${resource.resource}.${action}`)),
+    }));
+    const effectiveCount=permissions.reduce((count,item)=>count+item.actions.length,0);
+    const auditCache=state.rbacRoleAuditCache||(state.rbacRoleAuditCache={});
+    const auditHtml=()=>{
+      const records=auditCache[roleId];
+      if(records===true)return '<div class="empty-state"><strong>Loading audit history…</strong></div>';
+      if(records?.error)return `<div class="empty-state"><strong>Audit history unavailable</strong><p>${escapeHTML(records.error)}</p></div>`;
+      return `<div class="table-wrap"><table><thead><tr><th>Date</th><th>Action</th><th>Actor</th><th>Details</th></tr></thead><tbody>${(records||[]).map(entry=>`<tr><td>${escapeHTML(entry.createdAt?new Date(entry.createdAt).toLocaleString():'—')}</td><td>${escapeHTML(entry.action||'—')}</td><td>${escapeHTML(entry.userId||'System')}</td><td>${escapeHTML(entry.newValues?.version?`Policy version ${entry.newValues.version}`:entry.newValues?.status?`Status: ${entry.newValues.status}`:entry.newValues?.subjectId?`Assigned role ${entry.newValues.subjectId}`:'—')}</td></tr>`).join('')||'<tr><td colspan="4">No audit events are recorded for this role.</td></tr>'}</tbody></table></div>`;
+    };
+    const properties=()=>`<div class="v11-role-access-preview"><header style="--role-colour:${role.colour}"><span>${icon(role.icon)}</span><div><small>ROLE ACCESS PREVIEW</small><h2>${escapeHTML(role.name)}</h2><p>${escapeHTML(role.description)}</p></div></header><section class="info-list"><div class="info-row"><span>Policy status</span><strong>${escapeHTML(role.status==='disabled'?'Disabled':role.activeVersion?'Active':role.draftVersion?'Changes pending':'Legacy')}</strong></div><div class="info-row"><span>Active version</span><strong>${escapeHTML(String(role.activeVersion||'—'))}</strong></div><div class="info-row"><span>Scope</span><strong>${escapeHTML(role.scope)}</strong></div><div class="info-row"><span>Approval authority</span><strong>${escapeHTML(role.approvalLimit)}</strong></div><div class="info-row"><span>Members</span><strong>${v11RoleMemberCount(role.id)}</strong></div><div class="info-row"><span>Effective permissions</span><strong>${effectiveCount}</strong></div></section></div>`;
+    const permissionBody=()=>`<div class="v11-role-access-preview"><header style="--role-colour:${role.colour}"><span>${icon(role.icon)}</span><div><small>EFFECTIVE PERMISSIONS</small><h2>${escapeHTML(role.name)} Access</h2><p>${effectiveCount} granted actions · ${role.status!=='disabled'&&role.activeVersion?'Active Portfolio policy':'Legacy role access'}</p></div></header><div class="table-wrap"><table><thead><tr><th>Portfolio page</th><th>Granted actions</th></tr></thead><tbody>${permissions.map(({resource,actions})=>`<tr><td><strong>${escapeHTML(resource.label||resource.resource)}</strong><small class="block">${escapeHTML(resource.resource)}</small></td><td>${actions.length?actions.map(action=>`<span class="table-badge">${escapeHTML(action)}</span>`).join(' '):'<span class="muted">No access</span>'}</td></tr>`).join('')||'<tr><td colspan="2">Permission catalogue unavailable.</td></tr>'}</tbody></table></div></div>`;
+    const content=()=>selectedTab==='permissions'?permissionBody():selectedTab==='audit'?auditHtml():properties();
+    const title=`${role.name} Access`;
+    showModal(title,`${effectiveCount} effective Portfolio permissions`,content(),`${button('Close','close-modal','primary')}`,{variant:'inspector',size:'lg',eyebrow:'Effective permissions',rail:['Properties','Permissions','Audit']});
+    const tabs=$$('.modal-rail-step[data-wizard-step]',modalLayer);
+    const names=['properties','permissions','audit'];
+    tabs.forEach((tab,index)=>{
+      tab.classList.toggle('active',names[index]===selectedTab);
+      tab.addEventListener('click',()=>{
+        selectedTab=names[Number(tab.dataset.wizardStep)]||'properties';
+        tabs.forEach((item,i)=>item.classList.toggle('active',i===Number(tab.dataset.wizardStep)));
+        const body=$('.modal-inspector .modal-body',modalLayer);
+        if(body){body.innerHTML=content();renderStaticIcons(body);}
+        if(selectedTab==='audit'&&auditCache[roleId]===undefined){
+          auditCache[roleId]=true;
+          if(!onRbacRoleAudit){auditCache[roleId]={error:'The audit history API is not connected.'};}
+          else onRbacRoleAudit(roleId).then(rows=>{
+            auditCache[roleId]=Array.isArray(rows)?rows.filter(entry=>entry.entityId===roleId):[];
+            if(state.modal?.title===title){const liveBody=$('.modal-inspector .modal-body',modalLayer);if(liveBody){liveBody.innerHTML=content();renderStaticIcons(liveBody);}}
+          }).catch(error=>{
+            auditCache[roleId]={error:error?.message||'Audit history could not be loaded.'};
+            if(state.modal?.title===title){const liveBody=$('.modal-inspector .modal-body',modalLayer);if(liveBody)liveBody.innerHTML=content();}
+          });
+          if(body){body.innerHTML=content();renderStaticIcons(body);}
+        }
+      });
+    });
   }
 
   function v11ShowNewEnvelope() {
     showModal('Create Signature Envelope','Select a controlled document, recipients, authentication and signing order.',`<form id="v11EnvelopeForm"><section class="modal-section"><div class="modal-section-heading"><h3>Document</h3><span class="table-badge">Controlled version required</span></div><div class="form-grid"><div class="form-field full"><label class="required">Document</label><select name="documentId" required>${documents.filter(doc=>/Term Sheet|Agreement|Resolution|NDA/.test(doc.name)).map(doc=>`<option value="${doc.id}">${escapeHTML(doc.name)} · ${escapeHTML(doc.version)}</option>`).join('')}</select></div><div class="form-field full"><label class="required">Envelope subject</label><input name="subject" required value="Please sign: Nova Analytics Series B Term Sheet"></div></div></section><section class="modal-section"><div class="modal-section-heading"><h3>Recipients</h3>${button('Add recipient row','v11-add-recipient-row','compact','plus')}</div><div id="v11RecipientRows"><div class="form-grid"><div class="form-field"><label>Name</label><input name="recipientName" value="Tariro Kasere" required></div><div class="form-field"><label>Email</label><input type="email" name="recipientEmail" value="tariro.kasere@matanho.com" required></div><div class="form-field"><label>Role</label><input name="recipientRole" value="Chief Investment Officer"></div><div class="form-field"><label>Order</label><input type="number" value="1" min="1"></div></div></div></section><section class="modal-section"><div class="form-grid"><div class="form-field"><label>Authentication</label><select name="authentication"><option>Email + OTP</option><option>Passkey</option><option>Email link</option></select></div><div class="form-field"><label>Expires</label><input type="date" name="expires" value="2026-08-15"></div></div><div class="v11-setting-list section-gap">${v11SettingToggle('Enable signing order','Recipients are notified in the configured order.',true)}${v11SettingToggle('Automatic reminders','Send a reminder every two days.',true)}</div></section></form>`,`${button('Cancel','close-modal')}${button('Create draft envelope','submit-new-envelope','primary','edit')}`,{variant:'wizard',size:'lg',rail:['Document','Recipients','Security','Review'],eyebrow:'Electronic signature workflow'});
   }
 
+  function v11RenderRoleAssignmentWizard() {
+    const wizard=state.modalWizard;
+    if(!wizard||wizard.kind!=='assign-portfolio-role')return;
+    const draft=wizard.draft;
+    const people=Array.isArray(state.rbacAssignmentPeople)?state.rbacAssignmentPeople:[];
+    const roles=(state.rbacBackendRoles||[]).filter(role=>role&&role.id&&!role.protected);
+    const selectedPerson=people.find(person=>person.id===draft.userId);
+    const selectedRole=roles.find(role=>role.id===draft.roleId);
+    const currentMember=v11RoleMembers.find(member=>member.id===draft.userId);
+    const step=Number(wizard.step||0);
+    let content='';
+    let footer='';
+    if(step===0){
+      const peopleContent=wizard.peopleLoading?'<div class="empty-state"><strong>Loading people…</strong></div>':wizard.peopleError?`<div class="empty-state"><strong>People could not be loaded</strong><p>${escapeHTML(wizard.peopleError)}</p></div>`:people.length?'<div id="v11AssignmentPeopleResults" class="v11-rbac-people-results"></div>':'<div class="empty-state"><strong>No people found</strong><p>The user directory returned no assignable accounts.</p></div>';
+      content=`<div class="v11-assignment-step"><label class="v11-rbac-search"><span>${icon('search')}</span><input id="v11AssignmentPeopleSearch" type="search" autocomplete="off" placeholder="Search by name, email, department or role" value="${escapeHTML(wizard.search||'')}"></label><div class="v11-assignment-results-label">${selectedPerson?`Selected: <strong>${escapeHTML(selectedPerson.name||selectedPerson.email)}</strong>`:'Choose a person to assign'}</div>${peopleContent}</div>`;
+      footer=`${button('Cancel','close-modal')}${button('Continue','assignment-wizard-next','primary','arrow-right',draft.userId?'':'disabled')}`;
+    }else if(step===1){
+      content=`<div class="v11-assignment-step"><p class="muted">Choose the Portfolio access role for ${escapeHTML(selectedPerson?.name||'this person')}.</p><div class="v11-assignment-role-list">${roles.map(role=>`<button type="button" class="v11-assignment-role-option ${draft.roleId===role.id?'selected':''}" data-action="select-assignment-role" data-role="${escapeHTML(role.id)}"><span class="v11-assignment-role-check">${draft.roleId===role.id?icon('check-circle'):''}</span><span><strong>${escapeHTML(role.name)}</strong><small>${escapeHTML(role.description||'Portfolio access role')}</small></span><span class="v11-assignment-role-status">${escapeHTML(role.status==='disabled'?'Disabled':role.activeVersion?'Active policy':role.draftVersion?'Pending changes':'Legacy')}</span></button>`).join('')||'<div class="empty-state"><strong>No roles available</strong></div>'}</div></div>`;
+      footer=`${button('Back','assignment-wizard-back','','arrow-left')}${button('Continue','assignment-wizard-next','primary','arrow-right',draft.roleId?'':'disabled')}`;
+    }else{
+      content=`<div class="v11-assignment-step"><div class="v11-assignment-confirm"><span>${icon('user-check')}</span><div><small>CONFIRM STAFF ROLE CHANGE</small><h3>${escapeHTML(selectedPerson?.name||'Selected person')}</h3><p>${escapeHTML(selectedPerson?.email||'')}</p></div></div><div class="info-list"><div class="info-row"><span>Current staff role</span><strong>${escapeHTML(selectedPerson?.roleName||selectedPerson?.role?.name||'—')}</strong></div><div class="info-row"><span>New staff role</span><strong>${escapeHTML(selectedRole?.name||'')}</strong></div><div class="info-row"><span>Portfolio policy</span><strong>${escapeHTML(selectedRole?.name||'')}</strong></div><div class="info-row"><span>Effect</span><strong>On their next request</strong></div></div><p class="muted">This changes the person's staff role in Admin Management and applies the linked Portfolio policy. Removing the assignment restores their previous staff role.</p></div>`;
+      footer=`${button('Back','assignment-wizard-back','','arrow-left')}${button(wizard.pending?'Assigning…':'Assign role','submit-role-member','primary','user-plus',wizard.pending?'disabled':'')}`;
+    }
+    showModal('Assign Existing User',selectedRole?.name||'Choose a person and role',content,footer,{variant:'inspector',size:'lg',rail:['Person','Role','Confirm'],railStep:step,eyebrow:'Portfolio role assignment'});
+    const rail=$$('.modal-rail-step[data-action="modal-rail-step"]',modalLayer);
+    rail.forEach((item,index)=>{
+      item.removeAttribute('data-action');
+      item.classList.toggle('active',index===step);
+      item.addEventListener('click',()=>{
+        const target=Number(item.dataset.step);
+        if(target>wizard.maxReached)return;
+        wizard.step=target;
+        v11RenderRoleAssignmentWizard();
+      });
+    });
+    const search=$('#v11AssignmentPeopleSearch',modalLayer);
+    const results=$('#v11AssignmentPeopleResults',modalLayer);
+    const renderPeopleResults=query=>{
+      if(!results)return;
+      const normalized=String(query||'').trim().toLowerCase();
+      const matches=people.filter(person=>!normalized||[person.name,person.email,person.department,person.departmentRole,person.title,person.roleName,person.role?.name].some(value=>String(value||'').toLowerCase().includes(normalized))).slice(0,30);
+      results.innerHTML=matches.map(person=>`<button type="button" class="v11-rbac-person-option ${draft.userId===person.id?'selected':''}" data-action="select-assignment-person" data-user-id="${escapeHTML(person.id)}"><span class="v11-rbac-person-avatar">${escapeHTML(String(person.name||person.email||'?').split(/\s+/).map(part=>part[0]).join('').slice(0,2).toUpperCase())}</span><span><strong>${escapeHTML(person.name||'Unnamed user')}</strong><small>${escapeHTML(person.email||'No email')} · ${escapeHTML(person.department||person.departmentRole||person.roleName||'Staff')}</small></span>${draft.userId===person.id?icon('check-circle'):icon('chevron-right')}</button>`).join('')||'<div class="empty-state"><strong>No matching people</strong><p>Try another name or email.</p></div>';
+      renderStaticIcons(results);
+    };
+    if(search){search.addEventListener('input',()=>{wizard.search=search.value;renderPeopleResults(search.value);});renderPeopleResults(search.value);}
+  }
+
   function v11ShowAddRoleMember(roleId) {
+    if(onRbacRoleAssigned){
+      state.modalWizard={kind:'assign-portfolio-role',step:0,maxReached:0,draft:{userId:'',roleId:roleId||state.rbacSelectedRole},peopleLoading:true,peopleError:'',search:'',pending:false};
+      v11RenderRoleAssignmentWizard();
+      if(!onRbacAssignmentPeople){state.modalWizard.peopleLoading=false;state.modalWizard.peopleError='Connect the staff directory to search for people.';v11RenderRoleAssignmentWizard();return;}
+      onRbacAssignmentPeople().then(people=>{
+        if(state.modalWizard?.kind!=='assign-portfolio-role')return;
+        state.rbacAssignmentPeople=Array.isArray(people)?people:[];
+        state.modalWizard.peopleLoading=false;
+        v11RenderRoleAssignmentWizard();
+      }).catch(error=>{
+        if(state.modalWizard?.kind!=='assign-portfolio-role')return;
+        state.modalWizard.peopleLoading=false;
+        state.modalWizard.peopleError=error?.message||'The staff directory could not be loaded.';
+        v11RenderRoleAssignmentWizard();
+      });
+      return;
+    }
     const role=v11RoleDefinitions[roleId]||v11CurrentRole();
-    showModal('Add Person to Role',role.name,`<form id="v11RoleMemberForm"><input type="hidden" name="role" value="${role.id}"><div class="form-grid"><div class="form-field"><label class="required">Full name</label><input name="name" required placeholder="Full name"></div><div class="form-field"><label class="required">Work email</label><input name="email" type="email" required placeholder="name@matanho.com"></div><div class="form-field"><label class="required">Job title</label><input name="title" required value="${escapeHTML(role.name)}"></div><div class="form-field"><label>Access scope</label><select name="scope"><option>${escapeHTML(role.scope)}</option><option>Selected funds only</option><option>Selected portfolio companies only</option></select></div></div><div class="reason-item section-gap">${icon('shield')}<div><strong>Effective access</strong><small>The person receives the role's current read/write permissions and scoped data restrictions. MFA enrolment is required before activation.</small></div></div></form>`,`${button('Cancel','close-modal')}${button('Send invitation','submit-role-member','primary','send')}`,{variant:'wizard',size:'md',rail:['Identity','Role','Scope','Invite'],eyebrow:'RBAC user assignment'});
+    showModal('Add Person to Role',role.name,`<form id="v11RoleMemberForm"><input type="hidden" name="role" value="${role.id}"><div class="form-grid"><div class="form-field"><label class="required">Full name</label><input name="name" required placeholder="Full name"></div><div class="form-field"><label class="required">Work email</label><input name="email" type="email" required placeholder="name@matanho.com"></div><div class="form-field"><label class="required">Job title</label><input name="title" required value="${escapeHTML(role.name)}"></div><div class="form-field"><label>Access scope</label><select name="scope"><option>${escapeHTML(role.scope)}</option><option>Selected funds only</option><option>Selected portfolio companies only</option></select></div></div></form>`,`${button('Cancel','close-modal')}${button('Send invitation','submit-role-member','primary','send')}`,{variant:'wizard',size:'md',rail:['Identity','Role','Scope','Invite'],eyebrow:'RBAC user assignment'});
   }
 
   function v11GenericRowInspector(trigger) {
@@ -5272,6 +6154,23 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
     const headers=Array.from(row.closest('table')?.querySelectorAll('thead th')||[]).map(th=>th.innerText.trim());
     const values=Array.from(row.cells||[]).map(cell=>cell.innerText.trim());
     const title=trigger.dataset.rowLabel||values[0]||'Record detail';
+    const roleId=row.dataset.rbacRole;
+    const resource=row.dataset.rbacResource;
+    if(roleId&&resource&&onRbacRecordDetail) {
+      showDrawer(title,'Loading current Portfolio role configuration…',`<section class="drawer-section"><div class="flex items-center gap-3"><span class="v11-rbac-loading-spinner" aria-hidden="true"></span><span>Loading this record from the RBAC service…</span></div></section>`,button('Close','close-drawer','primary'),{variant:'record',icon:'database',eyebrow:'Live record inspector'});
+      onRbacRecordDetail({roleId,resource}).then(detail=>{
+        if(state.drawer?.title!==title)return;
+        const role=detail.role||{};
+        const permissionRows=(detail.permissions||[]).map(permission=>`<tr><td><strong>${escapeHTML(permission.action)}</strong></td><td>${statusPill(permission.active?'Granted':permission.activeConfigured?'Not granted':'No active policy',permission.active?'success':'neutral')}</td><td>${statusPill(permission.draft?'Granted':permission.draftConfigured?'Not granted':'No draft',permission.draft?'success':'neutral')}</td><td>${permission.legacy?'Granted':'Not granted'}</td></tr>`).join('');
+        const activity=(detail.activity||[]).map(entry=>`<div class="case-timeline"><div><span></span><strong>${escapeHTML(entry.action)}</strong><small>${escapeHTML(entry.createdAt||'')} · Actor ${escapeHTML(entry.actorId||'Unknown')}</small>${entry.summary?`<p>${escapeHTML(entry.summary)}</p>`:''}</div></div>`).join('')||'<p class="muted">No audit events are recorded for this role yet.</p>';
+        const body=`<section class="drawer-section"><h3>Record detail</h3><div class="info-list"><div class="info-row"><span>Role</span><strong>${escapeHTML(role.name||'—')}</strong></div><div class="info-row"><span>Portfolio page</span><strong>${escapeHTML(detail.resourceLabel||resource)}</strong></div><div class="info-row"><span>Policy state</span><strong>${escapeHTML(detail.policyState||'Legacy')}</strong></div><div class="info-row"><span>Backend record</span><strong>${escapeHTML(role.id||roleId)}</strong></div><div class="info-row"><span>Revision</span><strong>${escapeHTML(String(role.revision??'—'))}</strong></div><div class="info-row"><span>Linked global role</span><strong>${escapeHTML(role.globalRole?.name||'Portfolio-only role')}</strong></div><div class="info-row"><span>Created</span><strong>${escapeHTML(detail.createdAt||'—')}</strong></div><div class="info-row"><span>Last updated</span><strong>${escapeHTML(detail.updatedAt||'—')}</strong></div></div></section><section class="drawer-section"><h3>Backend permissions for ${escapeHTML(detail.resourceLabel||resource)}</h3><div class="table-wrap"><table><thead><tr><th>Action</th><th>Active</th><th>Draft</th><th>Legacy</th></tr></thead><tbody>${permissionRows||'<tr><td colspan="4">No catalogue actions are configured for this resource.</td></tr>'}</tbody></table></div></section><section class="drawer-section"><h3>Source and activity</h3><div class="reason-item">${icon('database')}<div><strong>${escapeHTML(detail.source||'Portfolio RBAC service')}</strong><small>${escapeHTML(detail.sourceDescription||'Loaded from the Portfolio role and policy version records.')}</small></div></div><div class="section-gap">${activity}</div></section>`;
+        showDrawer(title,'Live Portfolio RBAC record and audit history',body,button('Close','close-drawer','primary'),{variant:'record',icon:'database',eyebrow:'Live record inspector'});
+      }).catch(error=>{
+        if(state.drawer?.title!==title)return;
+        showDrawer(title,'Backend record unavailable',`<section class="drawer-section"><div class="empty-state"><strong>Could not load this record</strong><p>${escapeHTML(error?.message||'The Portfolio RBAC service did not return this record.')}</p></div></section>`,button('Close','close-drawer','primary'),{variant:'record',icon:'alert',eyebrow:'Live record inspector'});
+      });
+      return;
+    }
     showDrawer(title,'Contextual record metadata and source values',`<section class="drawer-section"><h3>Row detail</h3><div class="info-list">${values.map((value,index)=>`<div class="info-row"><span>${escapeHTML(headers[index]||`Field ${index+1}`)}</span><strong>${escapeHTML(value||'—')}</strong></div>`).join('')}</div></section><section class="drawer-section"><h3>Source and activity</h3><div class="reason-item">${icon('database')}<div><strong>Frontend demonstration data</strong><small>Connect the row identifier to the backend detail endpoint to return version, source lineage, permissions and audit activity.</small></div></div></section>`,`${button('Export row','export-row','','download')}${button('Close','close-drawer','primary')}`,{variant:'record',icon:'list',eyebrow:'Record inspector'});
   }
 
@@ -5281,33 +6180,240 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
       const target=trigger.dataset.page;
       if(target && !v11CanRead(target)) { v11AccessDenied(action,target); return; }
     }
-    if (v11IsMutationAction(action) && !['switch-demo-role','toggle-role-permission','submit-role-member','confirm-remove-role-member'].includes(action)) {
+    if (v11IsMutationAction(action) && !['save-settings','switch-demo-role','toggle-role-permission','toggle-shared-role-permission','submit-role-member','confirm-remove-role-member'].includes(action)) {
       const resource=v11ActionResource(action);
       if(!v11RoleAllowsMutation(action,resource)) { v11AccessDenied(action,resource); return; }
     }
     switch(action) {
+      case 'save-settings': {
+        if(state.settingsTab!=='roles') {
+          toast('Not saved','Workspace, security, notifications and data settings are preview-only in this build. Portfolio role policies are stored separately.','warning');
+          return;
+        }
+        const roleId=state.rbacSelectedRole;
+        const role=v11RoleDefinitions[roleId];
+        if(!role||!onRbacRoleRefreshed) {
+          toast('Role status unavailable','The selected Portfolio role could not be checked against the backend.','warning');
+          return;
+        }
+        if(trigger.dataset.saving==='true') return;
+        trigger.dataset.saving='true';
+        trigger.disabled=true;
+        const previousLabel=trigger.innerHTML;
+        trigger.innerHTML='Checking…';
+        onRbacRoleRefreshed(roleId).then(async persisted=>{
+          const pendingVersion=persisted?.draftVersion?.version??persisted?.draftVersion??null;
+          if(pendingVersion) {
+            if(!onRbacRoleActivated) throw new Error('Applying role changes is unavailable.');
+            await onRbacRoleActivated(roleId,Number(persisted.revision??role.revision??0));
+            persisted=await onRbacRoleRefreshed(roleId);
+          }
+          const index=(state.rbacBackendRoles||[]).findIndex(item=>item.id===roleId);
+          const refreshed=v11SharedRole(persisted,index<0?0:index);
+          if(index>=0) state.rbacBackendRoles[index]=refreshed;
+          v11RoleDefinitions[roleId]=refreshed;
+          if(state.rbacRoleAuditCache) delete state.rbacRoleAuditCache[roleId];
+          const activeVersion=persisted?.activeVersion?.version??persisted?.activeVersion??null;
+          if(activeVersion) toast('Role changes applied',`${refreshed.name} is using policy version ${activeVersion}.`);
+          else toast('No role changes to apply',`${refreshed.name} continues to use its existing access.`,'info');
+          render();
+        }).catch(error=>toast('Role save check failed',error?.message||'The saved Portfolio role could not be verified.','warning')).finally(()=>{
+          trigger.dataset.saving='false';
+          trigger.disabled=false;
+          trigger.innerHTML=previousLabel;
+        });
+        return;
+      }
+      case 'export-settings': {
+        if (!onRbacConfigurationExported) { toast('Export unavailable','The Portfolio RBAC export service is not connected.','warning'); return; }
+        if (trigger.dataset.exporting === 'true') return;
+        trigger.dataset.exporting = 'true';
+        trigger.disabled = true;
+        const originalLabel = trigger.innerHTML;
+        trigger.textContent = 'Preparing export…';
+        onRbacConfigurationExported().then(configuration => {
+          const date = new Date().toISOString().slice(0,10);
+          const filename = `portfolio-rbac-configuration-${date}.xlsx`;
+          const workbook = XLSX.utils.book_new();
+          const roles = Array.isArray(configuration?.roles) ? configuration.roles : [];
+          const catalogue = configuration?.catalogue || {};
+          const roleRows = roles.map(role => ({
+            role_id: role.id,
+            role_name: role.name,
+            description: role.description || '',
+            global_role: role.globalRole?.name || '',
+            status: role.status,
+            revision: role.revision,
+            active_version: role.activeVersion?.version ?? '',
+            draft_version: role.draftVersion?.version ?? '',
+          }));
+          const permissionRows = roles.flatMap(role => ['activeVersion','draftVersion'].flatMap(versionKey => {
+            const version = role[versionKey];
+            if (!version?.permissions || typeof version.permissions !== 'object') return [];
+            return Object.entries(version.permissions).map(([key, granted]) => {
+              const [, resource, action] = key.split('.');
+              return { role_name: role.name, policy_state: versionKey === 'activeVersion' ? 'active' : 'draft', version: version.version, resource, action, permission: key, granted: granted === true };
+            });
+          }));
+          const catalogueRows = (catalogue.resources || []).flatMap(resource => (resource.permissions || []).map(permission => ({ resource: resource.key, label: resource.label, permission })));
+          XLSX.utils.book_append_sheet(workbook,XLSX.utils.json_to_sheet([{schema:configuration.schema,exported_at:configuration.exportedAt,catalogue_version:catalogue.version,roles:roles.length}]),'Overview');
+          XLSX.utils.book_append_sheet(workbook,XLSX.utils.json_to_sheet(roleRows),'Roles');
+          XLSX.utils.book_append_sheet(workbook,XLSX.utils.json_to_sheet(permissionRows),'Permissions');
+          XLSX.utils.book_append_sheet(workbook,XLSX.utils.json_to_sheet(catalogueRows),'Catalogue');
+          const workbookData = XLSX.write(workbook,{bookType:'xlsx',type:'array'});
+          downloadBlob(filename,new Blob([workbookData],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}));
+          toast('Configuration exported',`${filename} contains backend Portfolio roles and their active and draft policies.`);
+        }).catch(error => {
+          toast('Export failed',error?.message||'The Portfolio RBAC configuration could not be exported.','warning');
+        }).finally(() => {
+          trigger.dataset.exporting = 'false';
+          trigger.disabled = false;
+          trigger.innerHTML = originalLabel;
+        });
+        return;
+      }
       case 'switch-demo-role': {
         const next=trigger.dataset.role;
-        if(v11RoleDefinitions[next]) { state.currentRole=next;storage.set('matanho-portfolio-role',next);if(!v11CanRead(state.page,next))state.page=v11FirstReadablePage(next);closeOverlays();toast('Role context changed',`Viewing the workspace as ${v11RoleDefinitions[next].name}.`);render(); }
+        if(v11RoleDefinitions[next]) { state.rbacSelectedRole=next;closeOverlays();v11ShowRoleAccess(next); }
         return;
       }
       case 'settings-tab': state.settingsTab=trigger.dataset.tab||'workspace';render();return;
       case 'select-rbac-role': state.rbacSelectedRole=trigger.dataset.role||state.currentRole;render();return;
+      case 'activate-portfolio-policy': {
+        const role=v11RoleDefinitions[trigger.dataset.role];
+        if(!role||!onRbacRoleActivated)return;
+        onRbacRoleActivated(role.id, role.revision||0).then(persisted=>{v11ApplyPersistedRoleState(role,persisted);toast('Policy activated','The Portfolio policy is now active.');render();}).catch(error=>toast('Activation failed',error?.message||'The policy could not be activated.','warning'));
+        return;
+      }
+      case 'disable-portfolio-policy': {
+        const role=v11RoleDefinitions[trigger.dataset.role]; if(!role||!onRbacRoleDisabled)return;
+        onRbacRoleDisabled(role.id,role.revision||0).then(persisted=>{v11ApplyPersistedRoleState(role,persisted);toast('Policy disabled','Legacy fallback is now active for this role.');render();}).catch(error=>toast('Disable failed',error?.message||'The policy could not be disabled.','warning')); return;
+      }
+      case 'restore-portfolio-policy': {
+        const role=v11RoleDefinitions[trigger.dataset.role]; if(!role||!onRbacRoleRestored)return;
+        onRbacRoleRestored(role.id,role.revision||0).then(persisted=>{v11ApplyPersistedRoleState(role,persisted);toast('Policy restored','The active Portfolio policy is enforced again.');render();}).catch(error=>toast('Restore failed',error?.message||'The policy could not be restored.','warning')); return;
+      }
+      case 'preview-policy-impact': {
+        const role=v11RoleDefinitions[trigger.dataset.role];
+        if(role && onRbacPolicyPreview) onRbacPolicyPreview(role.id).then(preview=>showModal('Policy impact preview','Server-calculated changes.',`<div class="v11-access-denied"><span>${icon('eye')}</span><div><h3>${escapeHTML(role.name)}</h3><p>${preview.changed?.length||0} permission changes · ${preview.affectedAssignments||0} assigned users.</p><p>Active version: ${preview.activeVersion||'None'} · Draft version: ${preview.draftVersion||'None'}</p><p>Disabling restores legacy access: ${preview.legacyFallbackOnDisable?'Yes':'No'}.</p></div></div>`,button('Close','close-modal','primary'),{variant:'info',size:'md',eyebrow:'Controlled activation'})).catch(error=>toast('Preview unavailable',error?.message||'The policy preview failed.','warning'));
+        return;
+      }
+      case 'create-custom-role': {
+        if(!onRbacRoleCreated){toast('Role creation unavailable','Connect the shared RBAC service to create roles.','warning');return;}
+        state.modalWizard={kind:'create-rbac-role',step:0,maxReached:0,draft:{name:'',description:'',cloneFromId:'',permissions:Object.fromEntries(rbacCataloguePermissionKeys().map(key=>[key,false]))}};
+        renderRbacRoleWizard();return;
+      }
+      case 'submit-custom-role': {
+        const wizard=state.modalWizard;
+        if(!wizard||wizard.kind!=='create-rbac-role'||wizard.step!==2)return;
+        if(wizard.pending)return;
+        const draft=wizard.draft||{};
+        if(!String(draft.name||'').trim()){wizard.step=0;renderRbacRoleWizard();toast('Role name required','Enter a role name before creating it.','warning');return;}
+        const keys=rbacCataloguePermissionKeys();
+        const permissions=Object.fromEntries(keys.map(key=>[key,draft.permissions?.[key]===true]));
+        wizard.pending=true;renderRbacRoleWizard();
+        onRbacRoleCreated({name:String(draft.name).trim(),description:String(draft.description||'').trim(),permissions}).then(created=>{
+          const createdGrants=Object.entries(created.draftVersion?.permissions||permissions).filter(([,value])=>value===true).map(([key])=>key);
+          const role=v11SharedRole({...created,permissions:createdGrants},Array.isArray(state.rbacBackendRoles)?state.rbacBackendRoles.length:0);
+          role.draftVersion=created.draftVersion?.version??created.draftVersion??null;
+          role.sharedPermissions=createdGrants;role.permissions=v11PermissionsFromShared(createdGrants);
+          state.rbacBackendRoles=[...(state.rbacBackendRoles||[]),role];v11RoleDefinitions[role.id]=role;state.rbacSelectedRole=role.id;state.modalWizard=null;closeOverlays();toast('Role created',`${role.name} is ready to configure. Apply its permissions when you are ready.`);render();
+        }).catch(error=>{wizard.pending=false;renderRbacRoleWizard();toast('Role creation failed',error?.message||'The role was not created.','warning');});return;
+      }
       case 'toggle-role-permission': {
         if(!v11IsFullAuthority()) { v11AccessDenied(action,'settings');return; }
         const role=v11RoleDefinitions[trigger.dataset.role],page=trigger.dataset.page,access=trigger.dataset.access;
         if(!role?.permissions?.[page]) return;
         const next=!role.permissions[page][access];
+        const resource=v11SharedResourceForPage(page);
+        const nextGrants=new Set(Array.isArray(role.sharedPermissions)?role.sharedPermissions:[]);
+        const prefix=`portfolio.${resource}.`;
+        if(access==='read') {
+          if(next) nextGrants.add(prefix+'view');
+          else ['view','create','edit','approve','delete','manage'].forEach(actionName=>nextGrants.delete(prefix+actionName));
+        } else if(next) {
+          nextGrants.add(prefix+'view');nextGrants.add(prefix+'edit');
+        } else ['create','edit','approve','delete','manage'].forEach(actionName=>nextGrants.delete(prefix+actionName));
+        if(onRbacGrantsChanged) {
+          onRbacGrantsChanged(role.id,[...nextGrants]).then(()=>{
+            role.sharedPermissions=[...nextGrants];role.permissions=v11PermissionsFromShared(role.sharedPermissions);
+            toast('Permission updated',`${role.name}: ${v11PageLabels[page]} ${access} ${next?'enabled':'disabled'}.`);render();
+          }).catch(error=>toast('Permission update failed',error?.message||'The access change was not saved.','warning'));
+          return;
+        }
         role.permissions[page][access]=next;
         if(access==='write'&&next) role.permissions[page].read=true;
         if(access==='read'&&!next) role.permissions[page].write=false;
         toast('Permission updated',`${role.name}: ${v11PageLabels[page]} ${access} ${next?'enabled':'disabled'}.`);render();return;
       }
+      case 'toggle-shared-role-permission': {
+        if(!v11IsFullAuthority()) { v11AccessDenied(action,'settings');return; }
+        const role=v11RoleDefinitions[trigger.dataset.role],resource=trigger.dataset.resource,grantAction=trigger.dataset.grantAction;
+        if(!role||!resource||!grantAction) return;
+        const grants=new Set(Array.isArray(role.sharedPermissions)?role.sharedPermissions:[]);
+        const key=`portfolio.${resource}.${grantAction}`;
+        grants.has(key)?grants.delete(key):grants.add(key);
+        if(grantAction!=='view'&&grants.has(key)) grants.add(`portfolio.${resource}.view`);
+        if(onRbacGrantsChanged) {
+          onRbacGrantsChanged(role.id,[...grants]).then(persisted=>{
+            role.sharedPermissions=[...grants];role.permissions=v11PermissionsFromShared(role.sharedPermissions);
+            v11ApplyPersistedRoleState(role,persisted);
+            toast('Permission updated',`${role.name}: ${resource} ${grantAction} ${grants.has(key)?'enabled':'disabled'}.`);render();
+          }).catch(error=>toast('Permission update failed',error?.message||'The access change was not saved.','warning'));
+          return;
+        }
+        role.sharedPermissions=[...grants];role.permissions=v11PermissionsFromShared(role.sharedPermissions);render();return;
+      }
       case 'preview-role-access': v11ShowRoleAccess(trigger.dataset.role);return;
       case 'open-current-role-access': v11ShowRoleAccess(state.currentRole);return;
       case 'add-role-member': v11ShowAddRoleMember(trigger.dataset.role||state.rbacSelectedRole);return;
+      case 'assignment-wizard-step': {
+        const wizard=state.modalWizard;const next=Number(trigger.dataset.step);
+        if(wizard?.kind==='assign-portfolio-role'&&next<=wizard.maxReached){wizard.step=next;v11RenderRoleAssignmentWizard();}
+        return;
+      }
+      case 'assignment-wizard-next': {
+        const wizard=state.modalWizard;if(wizard?.kind!=='assign-portfolio-role')return;
+        if(wizard.step===0&&!wizard.draft.userId){toast('Choose a person','Search for and select a person before continuing.','warning');return;}
+        if(wizard.step===1&&!wizard.draft.roleId){toast('Choose a role','Select a Portfolio role before continuing.','warning');return;}
+        wizard.maxReached=Math.max(wizard.maxReached,wizard.step+1);wizard.step=Math.min(2,wizard.step+1);v11RenderRoleAssignmentWizard();return;
+      }
+      case 'assignment-wizard-back': {
+        const wizard=state.modalWizard;if(wizard?.kind==='assign-portfolio-role'){wizard.step=Math.max(0,wizard.step-1);v11RenderRoleAssignmentWizard();}
+        return;
+      }
+      case 'select-assignment-person': {
+        const wizard=state.modalWizard;if(wizard?.kind!=='assign-portfolio-role')return;
+        wizard.draft.userId=trigger.dataset.userId||'';wizard.maxReached=Math.max(wizard.maxReached,1);v11RenderRoleAssignmentWizard();return;
+      }
+      case 'select-assignment-role': {
+        const wizard=state.modalWizard;if(wizard?.kind!=='assign-portfolio-role')return;
+        wizard.draft.roleId=trigger.dataset.role||'';wizard.maxReached=Math.max(wizard.maxReached,2);v11RenderRoleAssignmentWizard();return;
+      }
       case 'submit-role-member': {
-        const form=$('#v11RoleMemberForm');if(!form?.reportValidity())return;const data=Object.fromEntries(new FormData(form));const initialsValue=data.name.split(/\s+/).map(part=>part[0]).join('').slice(0,2).toUpperCase();v11RoleMembers.push({id:`USR-${String(v11RoleMembers.length+1).padStart(3,'0')}`,name:data.name,initials:initialsValue,role:data.role,title:data.title,email:data.email,status:'Invited',scope:data.scope,lastActive:'Invitation pending'});closeOverlays();toast('Invitation sent',`${data.name} was assigned to ${v11RoleDefinitions[data.role].name}.`);render();return;
+        const assignmentWizard=state.modalWizard;
+        if(assignmentWizard?.kind==='assign-portfolio-role'){
+          if(assignmentWizard.pending)return;
+          const userId=assignmentWizard.draft.userId,roleId=assignmentWizard.draft.roleId;
+          const person=(state.rbacAssignmentPeople||[]).find(item=>item.id===userId);
+          const assignedRole=v11RoleDefinitions[roleId];
+          if(!userId||!assignedRole){toast('Assignment incomplete','Choose a person and Portfolio role first.','warning');return;}
+          if(!onRbacRoleAssigned){toast('Assignment unavailable','The Portfolio assignment service is not connected.','warning');return;}
+          assignmentWizard.pending=true;v11RenderRoleAssignmentWizard();
+          onRbacRoleAssigned(userId,roleId).then(result=>{
+            if(result?.rbac)hydrateFromBackend({data:{rbac:result.rbac}});
+            state.modalWizard=null;closeOverlays();
+            toast('Portfolio role assigned',`${person?.name||'The user'} now has ${assignedRole.name} access.`);
+            render();
+          }).catch(error=>{
+            assignmentWizard.pending=false;v11RenderRoleAssignmentWizard();
+            toast('Assignment failed',error?.message||'The Portfolio role was not assigned.','warning');
+          });
+          return;
+        }
+        const form=$('#v11RoleMemberForm');if(!form?.reportValidity())return;const data=Object.fromEntries(new FormData(form));
+        if(onRbacRoleAssigned&&data.userId){onRbacRoleAssigned(data.userId,data.role).then(()=>{const member=v11RoleMembers.find(item=>item.id===data.userId);if(member)member.role=data.role;closeOverlays();toast('Role assigned',`${member?.name||'The user'} was assigned to ${v11RoleDefinitions[data.role].name}.`);render();}).catch(error=>toast('Role assignment failed',error?.message||'The role was not assigned.','warning'));return;}
+        const initialsValue=data.name.split(/\s+/).map(part=>part[0]).join('').slice(0,2).toUpperCase();v11RoleMembers.push({id:`USR-${String(v11RoleMembers.length+1).padStart(3,'0')}`,name:data.name,initials:initialsValue,role:data.role,title:data.title,email:data.email,status:'Invited',scope:data.scope,lastActive:'Invitation pending'});closeOverlays();toast('Invitation sent',`${data.name} was assigned to ${v11RoleDefinitions[data.role].name}.`);render();return;
       }
       case 'remove-role-member': {
         const member=v11RoleMembers.find(item=>item.id===trigger.dataset.id);if(!member)return;showModal('Remove Role Assignment',`${member.name} · ${v11RoleDefinitions[member.role]?.name||member.role}`,`<div class="v11-access-denied"><span>${icon('user-minus')}</span><div><small>ACCESS CHANGE</small><h3>Remove ${escapeHTML(member.name)}?</h3><p>The user's role permissions will be revoked after confirmation. Existing audit records remain immutable.</p></div></div><div class="form-field section-gap"><label class="required">Reason</label><textarea id="v11RemoveRoleReason" placeholder="State the reason for removing access"></textarea></div>`,`${button('Cancel','close-modal')}${button('Remove access','confirm-remove-role-member','danger','x',`data-id="${member.id}"`)}`,{variant:'approval',size:'md',eyebrow:'Controlled access removal'});return;
@@ -6198,18 +7304,18 @@ export function startPortfolioV11Runtime(rootEl, options = {}) {
     } catch (_) {}
   }
 
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
-  
+
+
+
+
+
+
+
+
+
+
+
+
   /* BEGIN_PORTFOLIO_LIVE_BRIDGE */
 function __pv11IsLive() {
     return Boolean(state.liveData) || Boolean(liveOnly) || Boolean(state.dealDetail);
@@ -6269,16 +7375,22 @@ function __pv11IsLive() {
     return { ok: true, reason: '' };
   }
   function __pv11DealId(trigger) {
+    const routeDealId = window.location.href.match(/[?&]id=([^&#]+)/)?.[1] || '';
     return String(
       trigger?.dataset?.dealId ||
       trigger?.dataset?.applicationId ||
       state.selectedDealId ||
       state.dealDetail?.application?.id ||
       state.dealDetail?.id ||
+      new URLSearchParams(window.location.search).get('id') ||
+      routeDealId ||
       ''
     );
   }
   function __pv11EmitApi(action, dataset, files) {
+    if (action === 'api-initiate-implementation' && /^(localhost|127\.0\.0\.1)$/.test(window.location.hostname) && !(dataset || {}).fundId) {
+      dataset = { ...(dataset || {}), fundId: localUatFundId || 'cmvago6yv002punqkm0qbniwa' };
+    }
     const detail = {
       action,
       dataset: { ...(dataset || {}) },
@@ -6307,7 +7419,7 @@ function __pv11IsLive() {
     showModal(
       'Create term sheet',
       'Issue investment terms for this deal.',
-      `<form id="createTermSheetForm"><div class="form-grid"><div class="form-field full"><label>Title</label><input name="title" value="Term Sheet"></div><div class="form-field"><label class="required">Investment amount</label><input name="investmentAmount" type="number" required value="${escapeHTML(String(ask || ''))}"></div><div class="form-field"><label class="required">Equity %</label><input name="equityPercentage" type="number" required step="0.01" value="17.5"></div><div class="form-field"><label class="required">Valuation</label><input name="valuation" type="number" required value="85000000"></div><div class="form-field full"><label>Key terms</label><textarea name="keyTerms"></textarea></div><div class="form-field full"><label>Conditions</label><textarea name="conditions"></textarea></div><div class="form-field full"><label>Timeline</label><textarea name="timeline"></textarea></div><div class="form-field full"><label class="required">Term sheet PDF</label><input name="document" type="file" accept=".pdf,application/pdf" required></div></div></form>`,
+      `<form id="createTermSheetForm"><div class="form-grid"><div class="form-field full"><label>Title</label><input name="title" value="Term Sheet"></div><div class="form-field"><label class="required">Investment amount</label><input name="investmentAmount" type="number" required value="${escapeHTML(String(ask || ''))}"></div><div class="form-field"><label class="required">Equity %</label><input name="equityPercentage" type="number" required step="0.01" value="17.5"></div><div class="form-field"><label class="required">Valuation</label><input name="valuation" type="number" required value="85000000"></div><div class="form-field full"><label>Key terms</label><textarea name="keyTerms"></textarea></div><div class="form-field full"><label>Conditions</label><textarea name="conditions"></textarea></div><div class="form-field full"><label>Timeline</label><textarea name="timeline"></textarea></div><div class="form-field full"><label class="required">Term sheet PDF</label><input name="document" type="file" accept=".pdf,application/pdf" required>${allowSyntheticFixtures ? '<button type="button" class="button secondary section-gap" data-action="load-synthetic-term-sheet-file">Use synthetic UAT term-sheet fixture</button><p class="muted small">Development/UAT only; production still requires a real PDF.</p>' : ''}</div></div></form>`,
       `${button('Cancel','close-modal')}${button('Create term sheet','submit-create-term-sheet','primary','plus',`data-deal-id="${escapeHTML(String(dealId||''))}"`)}`
     );
   }
@@ -6315,7 +7427,7 @@ function __pv11IsLive() {
     showModal(
       'Start board review',
       'Upload the investment memorandum to open IC voting.',
-      `<form id="startBoardReviewForm"><div class="form-field"><label class="required">Investment memorandum</label><input name="document" type="file" required accept=".pdf,.doc,.docx"></div></form>`,
+      `<form id="startBoardReviewForm"><div class="form-field"><label class="required">Investment memorandum</label><input name="document" type="file" required accept=".pdf,.doc,.docx">${allowSyntheticFixtures ? '<button type="button" class="button secondary section-gap" data-action="load-synthetic-board-memo-file">Use synthetic UAT memorandum fixture</button><p class="muted small">Development/UAT only; production still requires a real memorandum.</p>' : ''}</div></form>`,
       `${button('Cancel','close-modal')}${button('Start review','submit-start-board-review','primary','users',`data-deal-id="${escapeHTML(String(dealId||''))}"`)}`
     );
   }
@@ -6323,25 +7435,30 @@ function __pv11IsLive() {
     if (!__pv11IsLive()) return '';
     const dealId = String(deal?.id || state.selectedDealId || '');
     const dd = state.dealDetail?.dueDiligence;
+    const ddRecordAvailable = Boolean(dd && (dd.id || dd.status || Array.isArray(dd.tasks) || Array.isArray(dd.workstreams) || Array.isArray(dd.activities)));
+    const applicationStage = String(state.dealDetail?.application?.currentStage || '').toUpperCase();
+    const ddAlreadyActive = ['ACTIVE_DD', 'UNDER_DUE_DILIGENCE', 'DUE_DILIGENCE'].includes(applicationStage);
     const ddTasks = dd ? __pv11AsArray(dd.tasks || dd.workstreams || dd.activities) : [];
     const gate = dd ? __pv11CanCompleteDD(dd, ddTasks) : { ok: false, reason: 'Start due diligence first' };
     const ddDone = __pv11IsDDComplete(dd);
-    const hasTs = Boolean(state.dealDetail?.termSheet || state.dealDetail?.termSheets?.length);
+    const lifecycleStage = String(state.dealDetail?.application?.currentStage || '').toUpperCase();
+    const hasTs = Boolean(state.dealDetail?.termSheet || state.dealDetail?.termSheets?.length || ['TERM_SHEET', 'TERM_SHEET_NEGOTIATION', 'UNDER_BOARD_REVIEW', 'BOARD_APPROVED', 'BOARD_CONDITIONAL', 'INVESTMENT_IMPLEMENTATION', 'DISBURSED', 'FUNDED', 'PORTFOLIO_MANAGEMENT', 'PORTFOLIO'].includes(lifecycleStage));
     const hasBoard = Boolean(state.dealDetail?.boardReview);
+    const boardComplete = state.dealDetail?.boardReview?.status === 'COMPLETED';
     const hasImpl = Boolean(state.dealDetail?.implementation || state.dealDetail?.investmentImplementation);
     const attrs = `data-deal-id="${escapeHTML(dealId)}" data-application-id="${escapeHTML(dealId)}"`;
     const parts = [
       button('Reload deal','reload-deal-detail','compact','refresh', attrs),
       button('Investee portal','open-investee-portal','compact','external-link', attrs),
     ];
-    if (!dd) parts.unshift(button('Start due diligence','start-due-diligence','primary compact','plus', attrs));
-    else if (!ddDone) {
+    if (!ddRecordAvailable && !ddAlreadyActive) parts.unshift(button('Start due diligence','start-due-diligence','primary compact','plus', attrs));
+    else if (ddRecordAvailable && !ddDone) {
       parts.unshift(button('Complete DD','complete-due-diligence','compact','check', `${attrs}${gate.ok ? '' : ` disabled title="${escapeHTML(gate.reason)}"`}`));
       parts.unshift(button('Fill assessment','open-dd-assessment','compact','edit', attrs));
     }
     if (ddDone && !hasTs) parts.unshift(button('Create term sheet','create-term-sheet','primary compact','plus', attrs));
     if (hasTs && !hasBoard) parts.unshift(button('Start board review','start-board-review','primary compact','users', attrs));
-    if (hasBoard && !hasImpl) parts.unshift(button('Start implementation','start-implementation','primary compact','plus', attrs));
+    if (hasBoard && boardComplete && !hasImpl) parts.unshift(button('Start implementation','start-implementation','primary compact','plus', attrs));
     return `<section class="section-gap card" style="padding:12px 16px"><div class="section-heading-with-action"><div><strong>Live deal actions</strong><p class="muted small" style="margin:0">API-backed controls for this application.</p></div><div class="row-actions">${parts.join('')}</div></div></section>`;
   }
 
@@ -6351,7 +7468,12 @@ function __pv11IsLive() {
     renderDealDiligence = function(deal) {
       const d = deal || deals.find((x) => x.id === state.selectedDealId) || deals[0];
       if (__pv11IsLive() && state.dealDetail && !state.dealDetail.dueDiligence) {
-        return `${__pv11LiveLifecycleBar(d)}<section class="section-gap">${card('Due diligence', `<div class="empty-state compact"><p class="muted">No due diligence record yet.</p><div class="section-gap">${button('Start due diligence','start-due-diligence','primary','plus',`data-deal-id="${escapeHTML(String(d?.id||''))}" data-application-id="${escapeHTML(String(d?.id||''))}"`)}</div></div>`)}</section>`;
+        const stage = String(state.dealDetail.application?.currentStage || '').toUpperCase();
+        const ddAlreadyActive = ['ACTIVE_DD', 'UNDER_DUE_DILIGENCE', 'DUE_DILIGENCE'].includes(stage);
+        const message = ddAlreadyActive
+          ? '<p class="muted">The application is already in active due diligence, but the due diligence record was not returned by the API. Reload or repair the record before continuing.</p>'
+          : `<p class="muted">No due diligence record yet.</p><div class="section-gap">${button('Start due diligence','start-due-diligence','primary','plus',`data-deal-id="${escapeHTML(String(d?.id||''))}" data-application-id="${escapeHTML(String(d?.id||''))}"`)}</div>`;
+        return `${__pv11LiveLifecycleBar(d)}<section class="section-gap">${card('Due diligence', `<div class="empty-state compact">${message}</div>`)}</section>`;
       }
       return `${__pv11LiveLifecycleBar(d)}${__baseRenderDealDiligence(d)}`;
     };
@@ -6375,7 +7497,7 @@ function __pv11IsLive() {
     renderDealDisbursement = function(deal) {
       const d = deal || deals.find((x) => x.id === state.selectedDealId) || deals[0];
       const bar = __pv11LiveLifecycleBar(d);
-      if (__pv11IsLive() && state.dealDetail && !state.dealDetail.implementation && !state.dealDetail.investmentImplementation) {
+      if (__pv11IsLive() && state.dealDetail && !state.dealDetail.implementation && !state.dealDetail.investmentImplementation && state.dealDetail.boardReview?.status === 'COMPLETED') {
         const dealId = String(d?.id || '');
         return `${bar}<section class="section-gap">${card('Disbursement', `<div class="empty-state"><div><div class="empty-state-icon">${icon('dollar')}</div><h3>No disbursement / implementation</h3><p class="muted">Initiate investment implementation after board approval.</p><div class="section-gap">${button('Initiate implementation','start-implementation','primary','plus',`data-deal-id="${escapeHTML(dealId)}" data-application-id="${escapeHTML(dealId)}"`)}</div></div></div>`)}</section>`;
       }
@@ -6433,6 +7555,16 @@ function __pv11IsLive() {
         case 'open-dd-assessment':
           __pv11ShowDdAssessmentModal();
           return;
+        case 'load-synthetic-add-deal-files': {
+          const form = document.getElementById('addDealForm');
+          if (form) __pv11LoadSyntheticFiles(form, [
+            ['fileBusinessPlan', 'uat-business-plan.pdf', 'Business plan'],
+            ['filePoc', 'uat-proof-of-concept.pdf', 'Proof of concept'],
+            ['fileMarket', 'uat-market-research.pdf', 'Market research'],
+            ['fileCashFlows', 'uat-projected-cash-flows.pdf', 'Projected cash flows'],
+          ]);
+          return;
+        }
         case 'view-dd-assessment': {
           const dd = state.dealDetail?.dueDiligence;
           if (!dd) { toast('No assessment', 'Start due diligence first.', 'warning'); return; }
@@ -6467,6 +7599,16 @@ function __pv11IsLive() {
         case 'create-term-sheet':
           __pv11ShowCreateTermSheetModal(dealId);
           return;
+        case 'load-synthetic-term-sheet-file': {
+          const form = document.getElementById('createTermSheetForm');
+          if (form) __pv11LoadSyntheticFiles(form, [['document', 'uat-term-sheet.pdf', 'Term sheet PDF']]);
+          return;
+        }
+        case 'load-synthetic-board-memo-file': {
+          const form = document.getElementById('startBoardReviewForm');
+          if (form) __pv11LoadSyntheticFiles(form, [['document', 'uat-investment-memorandum.pdf', 'Investment memorandum']]);
+          return;
+        }
         case 'submit-create-term-sheet': {
           const form = document.getElementById('createTermSheetForm');
           if (!form?.reportValidity()) return;
@@ -6499,7 +7641,7 @@ function __pv11IsLive() {
         }
         case 'start-implementation': {
           if (!dealId) { toast('Deal required', 'Open a deal first.', 'warning'); return; }
-          const fundId = String(state.dealDetail?.application?.fundId || state.dealDetail?.fundId || funds[0]?.id || '');
+          const fundId = String(state.dealDetail?.application?.fundId || state.dealDetail?.application?.fund?.id || state.dealDetail?.fundId || state.dealDetail?.fund?.id || localUatFundId || funds[0]?.id || state.selectedFundId || '');
           const portfolioCompanyId = String(state.dealDetail?.portfolioCompanyId || state.dealDetail?.portfolioCompany?.id || '');
           __pv11EmitApi('api-initiate-implementation', {
             applicationId: dealId,
@@ -6575,7 +7717,8 @@ function __pv11IsLive() {
         }
         case 'send-capital-call-notices':
         case 'send-notices': {
-          const call = capitalCalls.find((c) => c.id === (trigger?.dataset?.id || state.selectedCapitalCallId)) || capitalCalls[0];
+          const selectedId = String(trigger?.dataset?.id || state.selectedCapitalCallId || '');
+          const call = capitalCalls.find((c) => String(c.recordId || c.id) === selectedId || String(c.id) === selectedId) || capitalCalls[0];
           if (!call) { toast('No capital call', 'Select a capital call first.', 'warning'); return; }
           const fund = funds.find((f) => f.name === call.fund || f.id === call.fundId) || funds[0];
           __pv11EmitApi('send-capital-call-notices', {
@@ -6622,53 +7765,21 @@ function __pv11IsLive() {
       const fundKey = String(data.fund || data.fundId || '');
       const fund = funds.find((f) => f.id === fundKey || f.name === fundKey) || funds[0];
       if (__pv11IsLive() && fund?.id) {
-        const commitment = Number(fund.commitment || fund.totalAmount || data.amount || 0) || 1;
         const amount = Number(data.amount || 0);
-        const callPercent = amount && commitment ? Math.max(0.1, Math.round((amount / commitment) * 1000) / 10) : Number(data.callPercent || 10);
+        if (!(amount > 0)) { toast('Enter a total amount','A positive capital-call amount is required.','warning'); return; }
         __pv11EmitApi('api-create-capital-call', {
           fundId: String(fund.id),
-          callPercent: String(callPercent),
+          targetAmount: String(amount),
           paymentDueDate: String(data.dueDate || data.paymentDueDate || ''),
           transactionDate: String(data.callDate || data.transactionDate || ''),
           bankInstructions: String(data.notes || data.bankInstructions || 'Remit per LPA collection account.'),
+          purpose: String(data.purpose || ''),
         });
         return;
       }
       return __baseSubmitCapitalCall();
     };
   }
-  if (typeof submitLP === 'function') {
-    const __baseSubmitLP = submitLP;
-    submitLP = function() {
-      const form = $('#lpForm');
-      if (!form?.reportValidity()) return;
-      // The wizard's Review step form has no input fields at all — reading
-      // FormData(form) alone here (as this override used to) silently loses
-      // every field typed on the earlier Details/Ownership steps. Merge in
-      // the wizard's own draft first, same as the base submitLP does.
-      const draft = (state.modalWizard && state.modalWizard.draft) || {};
-      const data = { ...draft, ...Object.fromEntries(new FormData(form)) };
-      if (__pv11IsLive()) {
-        __pv11EmitApi('api-add-lp', {
-          name: String(data.name || ''),
-          email: String(data.email || `lp.${Date.now()}@example.com`),
-          type: String(data.type || 'entity'),
-          country: String(data.geography || data.country || 'ZW'),
-          amount: String(data.commitment || ''),
-          // Was an unconditional funds[0]?.id fallback — silently attached a
-          // real, arbitrary fund even when the user deliberately left the
-          // fund selector blank (FINDING-PV11-004), and that truthy fundId
-          // then makes the backend require an amount+effectiveDate the
-          // wizard never collects, rejecting every submission either way.
-          fundId: String(data.fundId || ''),
-        });
-        closeOverlays();
-        return;
-      }
-      return __baseSubmitLP();
-    };
-  }
-
   // Mark live after hydrate when host paints API data.
   if (typeof hydrateFromBackend === 'function') {
     const __baseHydrate = hydrateFromBackend;
@@ -6696,6 +7807,1374 @@ function __pv11IsLive() {
   }
   /* END_PORTFOLIO_LIVE_BRIDGE */
 
+  /* BEGIN_PORTFOLIO_DASHBOARD_EXPORT */
+var __pv11DashboardExportSpec = null;
+
+function __pv11DashboardExportNumber(value) {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : 0;
+}
+
+/** PDF / Excel / CSV, grouped in the page header beside Add Deal. */
+function __pv11DashboardExportButtons() {
+  const formats = [
+    { kind: 'pdf', label: 'PDF', icon: 'file' },
+    { kind: 'excel', label: 'Excel', icon: 'file-chart' },
+    { kind: 'csv', label: 'CSV', icon: 'download' },
+  ];
+  return '<div class="pv11-export-group" role="group" aria-label="Export the portfolio dashboard">'
+    + formats.map(format => button(format.label, 'dashboard-export-' + format.kind, 'compact', format.icon)).join('')
+    + '</div>';
+}
+
+/**
+ * Everything the dashboard shows: the metric cards, the portfolio summary table,
+ * sector allocation, quick overview, recent activity and both capital charts.
+ * Called on every dashboard render, so the spec always trails the painted page.
+ */
+function __pv11CaptureDashboardExport(values) {
+  const v = values || {};
+  const num = __pv11DashboardExportNumber;
+  const companyList = Array.isArray(v.companies) ? v.companies : [];
+  const fundList = Array.isArray(v.funds) ? v.funds : [];
+  const callList = Array.isArray(v.capitalCalls) ? v.capitalCalls : [];
+  const openCalls = Array.isArray(v.openCalls) ? v.openCalls : [];
+  const sectorTotals = v.sectorTotals || {};
+  const sectorTotal = num(v.sectorTotal);
+  const callBuckets = v.callBuckets || {};
+  const callMonths = Array.isArray(v.callMonths) ? v.callMonths : [];
+  const snapshots = v.snapshotsByDate || {};
+
+  const monthLabel = key => {
+    const parts = String(key || '').split('-').map(Number);
+    if (parts.length < 2 || !Number.isFinite(parts[0]) || !Number.isFinite(parts[1])) return String(key || '');
+    return new Date(parts[0], parts[1] - 1, 1).toLocaleDateString('en-GB', { month: 'short', year: '2-digit' });
+  };
+
+  // Capital activity and the deployment curve are the same series: monthly
+  // called / collected / outstanding, then the running totals the curve plots.
+  let runningCalled = 0;
+  let runningCollected = 0;
+  const capitalByMonth = callMonths.map(key => {
+    const bucket = callBuckets[key] || {};
+    const called = num(bucket.called);
+    const collected = num(bucket.collected);
+    runningCalled += called;
+    runningCollected += collected;
+    return [monthLabel(key), called, collected, Math.max(0, called - collected), runningCalled, runningCollected];
+  });
+
+  const sectorRows = Object.entries(sectorTotals)
+    .map(([sector, value]) => [sector, num(value), sectorTotal ? Number((num(value) / sectorTotal * 100).toFixed(1)) : 0])
+    .sort((a, b) => b[1] - a[1]);
+
+  const overviewRows = [
+    ['Active investments', String(companyList.length)],
+    ['Distinct funds with holdings', String(num(v.distinctFundsWithCompanies))],
+    ['Total funds', String(fundList.length)],
+    ['Open capital calls', String(openCalls.length)],
+    ['Unrealized value', formatMoney(num(v.unrealized))],
+    ['Committed capital', formatMoney(num(v.committed))],
+    ['Called capital', formatMoney(num(v.called))],
+    ['Distributed capital', formatMoney(num(v.distributed))],
+  ];
+
+  const recentRows = callList
+    .slice()
+    .sort((a, b) => new Date(b.callDate) - new Date(a.callDate))
+    .slice(0, 4)
+    .map(call => [String(call.fund || ''), String(call.status || ''), String(call.callDate || ''), num(call.amount)]);
+
+  const snapshotRows = Object.keys(snapshots).sort().map(date => {
+    const snap = snapshots[date] || {};
+    return [String(date).slice(0, 10), num(snap.nav), num(snap.calledCapital), num(snap.distributedCapital)];
+  });
+
+  const extra = [
+    {
+      title: 'Capital activity by month',
+      columns: ['Month', 'Called (USD)', 'Collected (USD)', 'Outstanding (USD)', 'Cumulative called (USD)', 'Cumulative collected (USD)'],
+      rows: capitalByMonth,
+      moneyColumns: [1, 2, 3, 4, 5],
+      align: ['left', 'right', 'right', 'right', 'right', 'right'],
+    },
+    {
+      title: 'Sector allocation',
+      columns: ['Sector', 'Fair value (USD)', 'Share of portfolio (%)'],
+      rows: sectorRows,
+      moneyColumns: [1],
+      align: ['left', 'right', 'right'],
+    },
+    { title: 'Quick overview', columns: ['Measure', 'Value'], rows: overviewRows },
+    {
+      title: 'Recent activity - capital calls',
+      columns: ['Fund', 'Status', 'Call date', 'Amount (USD)'],
+      rows: recentRows,
+      moneyColumns: [3],
+      align: ['left', 'left', 'left', 'right'],
+    },
+  ];
+  if (snapshotRows.length) {
+    extra.push({
+      title: 'Portfolio valuation history',
+      columns: ['As of', 'NAV (USD)', 'Called capital (USD)', 'Distributed capital (USD)'],
+      rows: snapshotRows,
+      moneyColumns: [1, 2, 3],
+      align: ['left', 'right', 'right', 'right'],
+    });
+  }
+
+  // Portfolio Summary, row for row with the table on the page.
+  const rows = companyList.map(company => {
+    const invested = num(company.invested);
+    const fairValue = num(company.fairValue);
+    return [
+      String(company.name || ''),
+      String(company.sector || ''),
+      invested,
+      Math.max(0, fairValue - invested),
+      fairValue,
+      Number((invested ? fairValue / invested : 0).toFixed(2)),
+      num(company.revenueGrowth),
+      num(company.health),
+      num(company.health) >= 70 ? 'Active' : 'Watchlist',
+    ];
+  });
+
+  // The header fund and date selectors scope the records this function paints; the
+  // filter card inside the page only displays, so its values are not read here.
+  const filters = [
+    'Fund: ' + (state.activeFund || 'All Funds'),
+    'As of: ' + (state.asOfDate || '-'),
+    'Currency: USD',
+    'Geography: All geographies',
+  ].join(' | ');
+
+  __pv11DashboardExportSpec = {
+    title: 'Portfolio Dashboard',
+    subtitle: 'Cross-fund performance, allocation and portfolio-company health.',
+    footerLabel: 'NVCCZ - Portfolio Management',
+    filename: 'portfolio-dashboard',
+    landscape: true,
+    note: filters + ' | ' + (state.liveData ? 'Live portfolio records' : 'No live portfolio records loaded'),
+    meta: [
+      ['Total invested', formatMoney(num(v.totalInvested))],
+      ['Available for drawdown', formatMoney(num(v.committed) - num(v.called))],
+      ['Fund gross IRR', v.hasPerfData ? pct(num(v.portfolioGrossIrr)) : '-'],
+      ['LP net IRR', v.hasPerfData ? pct(num(v.portfolioNetIrr)) : '-'],
+      ['TVPI', v.hasPerfData ? num(v.portfolioTvpi).toFixed(2) + 'x' : '-'],
+      ['DPI', v.hasPerfData ? num(v.portfolioDpi).toFixed(2) + 'x' : '-'],
+      ['Unrealized value', formatMoney(num(v.unrealized))],
+      ['Active companies', String(num(v.activeCompanies))],
+    ],
+    columns: ['Company', 'Sector', 'Investment cost (USD)', 'Value created (USD)', 'Fair market value (USD)', 'MOIC (x)', 'Revenue growth (%)', 'Health score', 'Status'],
+    rows,
+    moneyColumns: [2, 3, 4],
+    align: ['left', 'left', 'right', 'right', 'right', 'right', 'right', 'right', 'left'],
+    extra,
+    // The CSV writer is single-table; opt in so the dashboard's other tables travel with it.
+    includeExtraInCsv: true,
+  };
+}
+
+function __pv11DashboardExport(kind) {
+  const spec = __pv11DashboardExportSpec;
+  const writer = window.__PORTFOLIO_EXPORT__;
+  if (!spec) {
+    toast('Export not ready', 'Open the dashboard and try again once it has finished loading.');
+    return;
+  }
+  if (typeof writer !== 'function') {
+    toast('Export unavailable', 'The export writer has not loaded yet. Reload the page and try again.');
+    return;
+  }
+  Promise.resolve(writer(kind, spec))
+    .then(function (name) {
+      toast('Export ready', spec.title + ' saved as ' + name + '.');
+    })
+    .catch(function (error) {
+      toast('Export failed', error && error.message ? error.message : 'The file could not be generated.');
+    });
+}
+
+if (typeof handleAction === 'function') {
+  const __pv11BaseHandleAction = handleAction;
+  handleAction = function (action, trigger, event) {
+    if (typeof action === 'string' && action.indexOf('dashboard-export-') === 0) {
+      __pv11DashboardExport(action.replace('dashboard-export-', ''));
+      return;
+    }
+    return __pv11BaseHandleAction(action, trigger, event);
+  };
+}
+  /* END_PORTFOLIO_DASHBOARD_EXPORT */
+
+/* BEGIN_PORTFOLIO_FUNDS_PAGE */
+var __pv11FundsExportSpec = null;
+
+function __pv11FundsNumber(value) {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : 0;
+}
+
+/** PDF / Excel / CSV, grouped in the Funds header beside Create fund. */
+function __pv11FundsExportButtons() {
+  const formats = [
+    { kind: 'pdf', label: 'PDF', icon: 'file' },
+    { kind: 'excel', label: 'Excel', icon: 'file-chart' },
+    { kind: 'csv', label: 'CSV', icon: 'download' }
+  ];
+  return '<div class="pv11-export-group" role="group" aria-label="Export the funds register">'
+    + formats.map(format => button(format.label, 'funds-export-' + format.kind, 'compact', format.icon)).join('')
+    + '</div>';
+}
+
+/**
+ * Pager under the Funds Overview table: the visible window, a page size control and
+ * one button per page. `pageSize` is the effective row count (already resolved when
+ * the user picks "All"), `sizeValue` is what the select must show.
+ */
+function __pv11FundsPager(total, page, pageSize, pageCount, sizeValue) {
+  if (!total) return '';
+  const first = (page - 1) * pageSize + 1;
+  const last = Math.min(total, page * pageSize);
+  const sizes = ['10', '25', '50'].map(value =>
+    '<option value="' + value + '"' + (String(sizeValue) === value ? ' selected' : '') + '>' + value + '</option>'
+  ).join('') + '<option value="all"' + (String(sizeValue) === 'all' ? ' selected' : '') + '>All</option>';
+
+  // Page buttons: every page when there are few, otherwise the ends plus the
+  // neighbourhood of the current page with a gap marker.
+  const wanted = new Set([1, pageCount, page, page - 1, page + 1]);
+  const pages = Array.from(wanted).filter(p => p >= 1 && p <= pageCount).sort((a, b) => a - b);
+  let previous = 0;
+  const buttons = [];
+  pages.forEach(p => {
+    if (previous && p - previous > 1) buttons.push('<span class="pv11-pager-gap" aria-hidden="true">…</span>');
+    buttons.push('<button type="button" class="pv11-pager-page' + (p === page ? ' is-active' : '') + '"'
+      + ' data-action="fund-page" data-page="' + p + '"'
+      + (p === page ? ' aria-current="page"' : '')
+      + ' aria-label="Page ' + p + '">' + p + '</button>');
+    previous = p;
+  });
+
+  return '<div class="pv11-table-pager">'
+    + '<span class="pv11-pager-window">Showing ' + first + '–' + last + ' of ' + total + ' funds</span>'
+    + '<div class="pv11-pager-controls">'
+    + '<label class="pv11-pager-size"><span>Rows</span><select data-change-action="fund-page-size">' + sizes + '</select></label>'
+    + '<button type="button" class="pv11-pager-step" data-action="fund-page" data-page="' + (page - 1) + '"'
+    + (page <= 1 ? ' disabled' : '') + ' aria-label="Previous page">' + icon('chevron-left') + '</button>'
+    + buttons.join('')
+    + '<button type="button" class="pv11-pager-step" data-action="fund-page" data-page="' + (page + 1) + '"'
+    + (page >= pageCount ? ' disabled' : '') + ' aria-label="Next page">' + icon('chevron-right') + '</button>'
+    + '</div></div>';
+}
+
+/**
+ * Everything the register shows: the KPI cards, the fund mix, vintage and geography
+ * charts, the table itself and the three cards below it. Called on every render, so
+ * the spec always trails the painted page and follows the active filters.
+ */
+function __pv11CaptureFundsExport(values) {
+  const v = values || {};
+  const num = __pv11FundsNumber;
+  const fundList = Array.isArray(v.funds) ? v.funds : [];
+  const registers = v.registers || {};
+  const filters = v.filters || {};
+
+  // A figure is exported unless the adapter explicitly reported it unavailable, which
+  // is the same test the register uses (see fundShowsPerf in renderFunds), so a cell of
+  // the file can never disagree with the cell on the page. The writer only money-formats
+  // numbers, so the dash passes through untouched.
+  const rows = fundList.map(fund => [
+    String(fund.name || ''),
+    fund.vintage ? String(fund.vintage) : '—',
+    String(fund.strategy || '—'),
+    String(fund.currency || ''),
+    num(fund.commitment),
+    fund.commitment ? Number((num(fund.called) / num(fund.commitment) * 100).toFixed(1)) : 0,
+    fund.navAvailable === false ? '—' : num(fund.nav),
+    fund.distributedAvailable === false ? '—' : num(fund.distributed),
+    fund.perfAvailable === false ? '—' : num(fund.grossIrr),
+    fund.perfAvailable === false ? '—' : num(fund.netIrr),
+    fund.perfAvailable === false ? '—' : Number(num(fund.tvpi).toFixed(2)),
+    fund.perfAvailable === false ? '—' : Number(num(fund.dpi).toFixed(2)),
+    String(fund.status || ''),
+  ]);
+
+  const strategyRows = (registers.strategies || []).map(item => [
+    String(item.label || ''),
+    num(item.value),
+    num(registers.commitment) ? Number((num(item.value) / num(registers.commitment) * 100).toFixed(1)) : 0,
+  ]);
+
+  const vintageRows = (registers.vintages || []).map(item => [
+    String(item.label || ''),
+    item.perfAvailable ? num(item.irr) : '—',
+    num(item.commitment),
+  ]);
+
+  const geographyRows = (registers.geographies || []).map(item => [
+    String(item.label || ''),
+    num(item.value),
+    num(registers.commitment) ? Number((num(item.value) / num(registers.commitment) * 100).toFixed(1)) : 0,
+  ]);
+
+  const deadlineRows = (registers.deadlines || []).map(item => [
+    String(item.fund || '—'),
+    String(item.type || '—'),
+    String(item.due || '—'),
+    String(item.status || '—'),
+  ]);
+
+  const activityRows = (registers.activity || []).map(item => [
+    String(item.fund || '—'),
+    String(item.status || '—'),
+    String(item.callDate || '—'),
+    num(item.amount),
+  ]);
+
+  const topRows = (registers.top || []).map(item => [
+    String(item.name || ''),
+    item.perfAvailable ? num(item.grossIrr) : '—',
+    item.perfAvailable ? Number(num(item.tvpi).toFixed(2)) : '—',
+  ]);
+
+  const extra = [
+    {
+      title: 'Fund mix by strategy',
+      columns: ['Strategy', 'Committed (USD)', 'Share of commitments (%)'],
+      rows: strategyRows,
+      moneyColumns: [1],
+      align: ['left', 'right', 'right'],
+    },
+    {
+      title: 'Vintage year performance',
+      columns: ['Vintage', 'Gross IRR (%)', 'Committed (USD)'],
+      rows: vintageRows,
+      moneyColumns: [2],
+      align: ['left', 'right', 'right'],
+    },
+    {
+      title: 'Geographic allocation',
+      columns: ['Geography', 'Committed (USD)', 'Share of commitments (%)'],
+      rows: geographyRows,
+      moneyColumns: [1],
+      align: ['left', 'right', 'right'],
+    },
+  ];
+  if (deadlineRows.length) {
+    extra.push({
+      title: 'Upcoming reporting deadlines',
+      columns: ['Fund', 'Report', 'Due', 'Status'],
+      rows: deadlineRows,
+    });
+  }
+  if (activityRows.length) {
+    extra.push({
+      title: 'Recent capital activity',
+      columns: ['Fund', 'Status', 'Call date', 'Amount (USD)'],
+      rows: activityRows,
+      moneyColumns: [3],
+      align: ['left', 'left', 'left', 'right'],
+    });
+  }
+  if (topRows.length) {
+    extra.push({
+      title: 'Top performing funds',
+      columns: ['Fund', 'Gross IRR (%)', 'TVPI (x)'],
+      rows: topRows,
+      align: ['left', 'right', 'right'],
+    });
+  }
+
+  const filterLine = [
+    'Vintage: ' + (filters.vintage || 'All vintages'),
+    'Strategy: ' + (filters.strategy || 'All strategies'),
+    'Status: ' + (filters.status || 'All statuses'),
+    'Currency: ' + (filters.currency || 'All currencies'),
+    filters.search ? 'Search: ' + filters.search : 'Search: none',
+  ].join(' | ');
+  const windowLine = v.total
+    ? 'Screen shows page ' + v.page + ' of ' + v.pageCount + ' (' + v.pageSize + ' per page)'
+    : 'No funds match the current filters';
+
+  __pv11FundsExportSpec = {
+    title: 'Funds Register',
+    subtitle: 'Fund-level commitments, capital activity and structure across the portfolio.',
+    footerLabel: 'NVCCZ - Portfolio Management',
+    filename: 'portfolio-funds',
+    landscape: true,
+    note: filterLine + ' | ' + windowLine + ' | ' + (registers.live ? 'Live fund records' : 'No live fund records loaded'),
+    meta: [
+      ['Total commitments', formatMoney(num(registers.commitment))],
+      ['Called capital', formatMoney(num(registers.called)) + (num(registers.commitment) ? ' (' + pct(num(registers.called) / num(registers.commitment) * 100) + ')' : '')],
+      ['Distributed capital', registers.hasDistributed ? formatMoney(num(registers.distributed)) : '—'],
+      ['Remaining dry powder', formatMoney(num(registers.dryPowder))],
+      ['Gross IRR (portfolio)', registers.hasPerf ? pct(num(registers.grossIrr)) : '—'],
+      ['TVPI (portfolio)', registers.hasPerf ? num(registers.tvpi).toFixed(2) + 'x' : '—'],
+      ['Funds in register', String(fundList.length)],
+    ],
+    columns: ['Fund name', 'Vintage', 'Strategy', 'Currency', 'Commitment (USD)', 'Called (%)', 'NAV (USD)', 'Distributed (USD)', 'Gross IRR (%)', 'Net IRR (%)', 'TVPI (x)', 'DPI (x)', 'Status'],
+    rows,
+    moneyColumns: [4, 6, 7],
+    align: ['left', 'left', 'left', 'left', 'right', 'right', 'right', 'right', 'right', 'right', 'right', 'right', 'left'],
+    extra,
+    // The CSV writer is single-table; opt in so the register's other tables travel with it.
+    includeExtraInCsv: true,
+  };
+}
+
+function __pv11FundsExport(kind) {
+  const spec = __pv11FundsExportSpec;
+  const writer = window.__PORTFOLIO_EXPORT__;
+  if (!spec) {
+    toast('Export not ready', 'Open Funds and try again once the register has finished loading.');
+    return;
+  }
+  if (typeof writer !== 'function') {
+    toast('Export unavailable', 'The export writer has not loaded yet. Reload the page and try again.');
+    return;
+  }
+  Promise.resolve(writer(kind, spec))
+    .then(function (name) {
+      toast('Export ready', spec.title + ' saved as ' + name + '.');
+    })
+    .catch(function (error) {
+      toast('Export failed', error && error.message ? error.message : 'The file could not be generated.');
+    });
+}
+
+if (typeof handleAction === 'function') {
+  const __pv11FundsBaseHandleAction = handleAction;
+  handleAction = function (action, trigger, event) {
+    if (typeof action === 'string') {
+      if (action.indexOf('funds-export-') === 0) {
+        __pv11FundsExport(action.slice('funds-export-'.length));
+        return;
+      }
+      if (action === 'fund-page') {
+        const target = Number(trigger && trigger.dataset ? trigger.dataset.page : 0);
+        if (Number.isFinite(target) && target > 0) {
+          state.fundPage = target;
+          render();
+        }
+        return;
+      }
+    }
+    return __pv11FundsBaseHandleAction(action, trigger, event);
+  };
+}
+/* END_PORTFOLIO_FUNDS_PAGE */
+
+/* BEGIN_PORTFOLIO_FUND_DETAIL */
+/* =============================================================================
+ * FUND PROFILE — real figures, per-register paging, three-tier export, report
+ *
+ * Everything below replaces the matching function declaration earlier in this
+ * IIFE. The page router and renderFundDetail resolve these names at call time,
+ * so the reassigned versions are the ones that run.
+ *
+ * Why the rewrite: the profile page was the only place in Portfolio that still
+ * mixed live records with the runtime's embedded demonstration fixtures. Its
+ * scope plan never asked for companies or LPs, so the Investments and LPs tabs
+ * rendered fixtures while wearing a "Live records loaded" badge; the LPs tab
+ * scaled the global LP book pro-rata across whichever fund was open; the
+ * headline performance cards printed 0.0% and 0.00x for figures the API does
+ * not return; and four of the register "Export" buttons had no handler at all.
+ * ========================================================================== */
+
+var __pv11FdSpecs = null;
+var __pv11FdDash = '\u2014';
+
+/** The backend's real fund status enum, preselected from the register label. */
+function __pv11FundStatusOptions(current) {
+  var labels = ['Open', 'Closed', 'Paused'];
+  var wanted = String(current || '').trim().toLowerCase();
+  var active = '';
+  for (var i = 0; i < labels.length; i++) {
+    if (labels[i].toLowerCase() === wanted) { active = labels[i]; break; }
+  }
+  var out = '';
+  for (var j = 0; j < labels.length; j++) {
+    out += '<option value="' + labels[j] + '"' + (labels[j] === active ? ' selected' : '') + '>' + labels[j] + '</option>';
+  }
+  return out;
+}
+
+/** Formatting helpers that never turn "no data" into a plausible-looking zero. */
+function __pv11FdNum(value) {
+  if (value == null || value === '') return null;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+function __pv11FdMoney(value, currency) {
+  const n = __pv11FdNum(value);
+  return n == null ? __pv11FdDash : formatMoney(n, currency);
+}
+function __pv11FdPct(value) {
+  const n = __pv11FdNum(value);
+  return n == null ? __pv11FdDash : pct(n);
+}
+function __pv11FdMultiple(value) {
+  const n = __pv11FdNum(value);
+  return n == null ? __pv11FdDash : n.toFixed(2) + 'x';
+}
+function __pv11FdRatio(numerator, denominator) {
+  const n = __pv11FdNum(numerator);
+  const d = __pv11FdNum(denominator);
+  return n != null && d ? n / d : null;
+}
+function __pv11FdDate(value) {
+  if (!value) return __pv11FdDash;
+  const d = new Date(value);
+  return Number.isNaN(d.getTime())
+    ? __pv11FdDash
+    : d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+function __pv11FdShortDate(value) {
+  if (!value) return '';
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? '' : d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
+}
+
+/** Recorded performance snapshots for one fund, oldest first. */
+function __pv11FundSnapshotList(fundId) {
+  const store = state.fundPerformanceSnapshots || {};
+  const list = Array.isArray(store[fundId]) ? store[fundId] : [];
+  return list
+    .filter(snap => snap && snap.asOfDate)
+    .slice()
+    .sort((a, b) => new Date(a.asOfDate).getTime() - new Date(b.asOfDate).getTime());
+}
+
+/** Declared distributions for one fund: null = not loaded, [] = none declared. */
+function __pv11FundDistributionRows(fundId) {
+  const store = state.fundDistributions || {};
+  if (!Object.prototype.hasOwnProperty.call(store, fundId)) return null;
+  const rows = store[fundId];
+  return Array.isArray(rows) ? rows : null;
+}
+
+function __pv11FundDistributedTotal(fundId) {
+  const rows = __pv11FundDistributionRows(fundId);
+  if (rows == null) return null;
+  return rows.reduce((total, row) => {
+    const amount = __pv11FdNum(row && (row.grossAmount != null ? row.grossAmount : row.amount));
+    return total + (amount == null ? 0 : amount);
+  }, 0);
+}
+
+/**
+ * The single resolution point for the fund's headline figures, so the hero
+ * strip, the KPI cards, the charts and the exports can never disagree.
+ *
+ * Priority is the newest recorded performance snapshot — it is the only source
+ * that carries IRR, TVPI and DPI at all — then the fund register, then null.
+ * A null renders as an em dash. That matters: the register returns no
+ * performance columns, and the code this replaces rendered the resulting
+ * undefined as 0.0% and 0.00x, which reads as a measured (terrible) result
+ * rather than as an absence of data.
+ */
+function __pv11FundFigures(fund) {
+  const snapshots = __pv11FundSnapshotList(fund.id);
+  const latest = snapshots.length ? snapshots[snapshots.length - 1] : null;
+  const snap = key => {
+    if (!latest) return null;
+    const raw = latest[key];
+    if (raw == null || raw === '') return null;
+    return __pv11FdNum(raw);
+  };
+  // Snapshot returns are decimal fractions (0.12 = 12%); the register's own
+  // performance fields, when a source ever supplies them, are already percents.
+  const snapIrr = key => {
+    const fraction = snap(key);
+    return fraction == null ? null : fraction * 100;
+  };
+  const registerIrr = value => (fund.perfAvailable ? __pv11FdNum(value) : null);
+  const distributedTotal = __pv11FundDistributedTotal(fund.id);
+
+  return {
+    snapshots,
+    latest,
+    commitment: __pv11FdNum(fund.commitment),
+    called: snap('calledCapital') != null ? snap('calledCapital') : __pv11FdNum(fund.called),
+    nav: snap('nav') != null ? snap('nav') : (fund.navAvailable === false ? null : __pv11FdNum(fund.nav)),
+    distributed: distributedTotal != null
+      ? distributedTotal
+      : (snap('distributedCapital') != null
+        ? snap('distributedCapital')
+        : (fund.distributedAvailable === false ? null : __pv11FdNum(fund.distributed))),
+    grossIrr: snapIrr('grossIrr') != null ? snapIrr('grossIrr') : registerIrr(fund.grossIrr),
+    netIrr: snapIrr('netIrr') != null ? snapIrr('netIrr') : registerIrr(fund.netIrr),
+    tvpi: snap('tvpi') != null ? snap('tvpi') : (fund.perfAvailable ? __pv11FdNum(fund.tvpi) : null),
+    dpi: snap('dpi') != null ? snap('dpi') : (fund.perfAvailable ? __pv11FdNum(fund.dpi) : null),
+    unfunded: (() => {
+      const commitment = __pv11FdNum(fund.commitment);
+      const called = snap('calledCapital') != null ? snap('calledCapital') : __pv11FdNum(fund.called);
+      return commitment == null || called == null ? null : Math.max(0, commitment - called);
+    })(),
+    asOf: latest ? latest.asOfDate : null,
+  };
+}
+
+/** Which registers on this page actually have rows behind them. */
+function __pv11FundDetailRows(fund) {
+  const holdings = companies.filter(company => company.fund === fund.name);
+  const calls = capitalCalls.filter(call => call.fund === fund.name);
+  const investors = lps
+    .map(lp => {
+      const breakdown = (lp.fundBreakdown || []).find(row => String(row.fundId) === String(fund.id));
+      return breakdown ? { lp, breakdown } : null;
+    })
+    .filter(Boolean);
+  const documents = (state.fundDocuments && state.fundDocuments[fund.id]) || [];
+  const schedules = reports.filter(report => report.fund === fund.name || report.entity === fund.name);
+  const sectorTotals = {};
+  holdings.forEach(company => {
+    const key = company.sector || 'Unassigned';
+    sectorTotals[key] = (sectorTotals[key] || 0) + (__pv11FdNum(company.fairValue) || 0);
+  });
+  const fairValue = sum(holdings, company => __pv11FdNum(company.fairValue) || 0);
+  const allocation = Object.entries(sectorTotals)
+    .filter((entry) => entry[1] > 0)
+    .map(([label, value], index) => ({
+      label,
+      value,
+      color: ['#2475f5', '#0ba780', '#f5a623', '#60a5fa', '#f0641c', '#aab3c2'][index % 6],
+      display: pct(fairValue ? (value / fairValue) * 100 : 0),
+    }));
+  return { holdings, calls, investors, documents, schedules, allocation, fairValue };
+}
+
+/* --- paging ------------------------------------------------------------- */
+
+function __pv11FdPaging(fund) {
+  if (!state.fundDetailPaging || state.fundDetailPagingFor !== String(fund.id)) {
+    state.fundDetailPaging = { for: String(fund.id) };
+    state.fundDetailPagingFor = String(fund.id);
+  }
+  return state.fundDetailPaging;
+}
+
+function __pv11FdPaged(fund, key, rows) {
+  const store = __pv11FdPaging(fund);
+  const settings = store[key] || (store[key] = { page: 1, size: '10' });
+  const total = rows.length;
+  const size = settings.size === 'all' ? Math.max(1, total) : Number(settings.size) || 10;
+  const pageCount = Math.max(1, Math.ceil(total / size));
+  const page = Math.min(Math.max(1, settings.page), pageCount);
+  const visible = settings.size === 'all' ? rows : rows.slice((page - 1) * size, page * size);
+  return { rows: visible, total, page, pageCount, size, sizeValue: settings.size };
+}
+
+/**
+ * Pager beneath one of the profile's registers. Same control as the funds
+ * register, but each table keeps its own page and row count so paging the
+ * investment book does not move the LP book with it.
+ */
+function __pv11FdPager(fund, key, paged, unit) {
+  if (!paged.total) return '';
+  const first = (paged.page - 1) * paged.size + 1;
+  const last = Math.min(paged.total, paged.page * paged.size);
+  const sizes = ['10', '25', '50']
+    .map(value => '<option value="' + value + '"' + (String(paged.sizeValue) === value ? ' selected' : '') + '>' + value + '</option>')
+    .join('') + '<option value="all"' + (String(paged.sizeValue) === 'all' ? ' selected' : '') + '>All</option>';
+
+  const wanted = new Set([1, paged.pageCount, paged.page, paged.page - 1, paged.page + 1]);
+  const pages = Array.from(wanted).filter(p => p >= 1 && p <= paged.pageCount).sort((a, b) => a - b);
+  let previous = 0;
+  const buttons = [];
+  pages.forEach(p => {
+    if (previous && p - previous > 1) buttons.push('<span class="pv11-pager-gap" aria-hidden="true">\u2026</span>');
+    buttons.push('<button type="button" class="pv11-pager-page' + (p === paged.page ? ' is-active' : '') + '"'
+      + ' data-action="fd-page" data-key="' + key + '" data-page="' + p + '"'
+      + (p === paged.page ? ' aria-current="page"' : '')
+      + ' aria-label="Page ' + p + '">' + p + '</button>');
+    previous = p;
+  });
+
+  return '<div class="pv11-table-pager">'
+    + '<span class="pv11-pager-window">Showing ' + first + '\u2013' + last + ' of ' + paged.total + ' ' + unit + '</span>'
+    + '<div class="pv11-pager-controls">'
+    + '<label class="pv11-pager-size"><span>Rows</span><select data-change-action="fd-page-size" data-key="' + key + '">' + sizes + '</select></label>'
+    + '<button type="button" class="pv11-pager-step" data-action="fd-page" data-key="' + key + '" data-page="' + (paged.page - 1) + '"'
+    + (paged.page <= 1 ? ' disabled' : '') + ' aria-label="Previous page">' + icon('chevron-left') + '</button>'
+    + buttons.join('')
+    + '<button type="button" class="pv11-pager-step" data-action="fd-page" data-key="' + key + '" data-page="' + (paged.page + 1) + '"'
+    + (paged.page >= paged.pageCount ? ' disabled' : '') + ' aria-label="Next page">' + icon('chevron-right') + '</button>'
+    + '</div></div>';
+}
+
+/* --- export ------------------------------------------------------------- */
+
+/** PDF / Excel / CSV for one register, or for the whole fund profile. */
+function __pv11FdExportButtons(scope, label, style) {
+  const formats = [
+    { kind: 'pdf', label: 'PDF', icon: 'file' },
+    { kind: 'excel', label: 'Excel', icon: 'file-chart' },
+    { kind: 'csv', label: 'CSV', icon: 'download' }
+  ];
+  return '<div class="pv11-export-group" role="group" aria-label="Export ' + escapeHTML(label) + '">'
+    + formats.map(format => button(
+      format.label,
+      'fd-export-' + format.kind,
+      style || 'compact',
+      format.icon,
+      ' data-scope="' + scope + '"'
+    )).join('')
+    + '</div>';
+}
+
+function __pv11FdSourceNote(fund) {
+  const registers = __pv11FundDetailRows(fund);
+  return [
+    state.liveData ? 'Live fund records' : 'Preview data (no live session)',
+    'Holdings: ' + registers.holdings.length,
+    'Capital calls: ' + registers.calls.length,
+    'LP commitments: ' + registers.investors.length,
+    'Documents: ' + registers.documents.length,
+    'Reporting schedules: ' + registers.schedules.length,
+  ].join(' | ');
+}
+
+/**
+ * Build every export spec the page can produce in one pass. The header's fund
+ * pack always carries all four registers regardless of which tab is open, so
+ * an export never depends on what happened to be rendered.
+ */
+function __pv11BuildFundDetailSpecs(fund) {
+  const f = __pv11FundFigures(fund);
+  const r = __pv11FundDetailRows(fund);
+  const asOfLine = f.asOf
+    ? 'Performance figures from the recorded snapshot dated ' + __pv11FdDate(f.asOf) + '.'
+    : 'No performance snapshot recorded for this fund yet; return measures are shown as \u2014 rather than as zero.';
+  const summary = [
+    ['Commitment', __pv11FdMoney(f.commitment, fund.currency)],
+    ['Called capital', __pv11FdMoney(f.called, fund.currency) + (f.commitment ? ' (' + pct((f.called || 0) / f.commitment * 100) + ' of commitments)' : '')],
+    ['Unfunded', __pv11FdMoney(f.unfunded, fund.currency)],
+    ['NAV', __pv11FdMoney(f.nav, fund.currency)],
+    ['Distributed', __pv11FdMoney(f.distributed, fund.currency)],
+    ['Gross IRR', __pv11FdPct(f.grossIrr)],
+    ['Net IRR', __pv11FdPct(f.netIrr)],
+    ['TVPI / DPI', __pv11FdMultiple(f.tvpi) + ' / ' + __pv11FdMultiple(f.dpi)],
+  ];
+
+  const holdingRows = r.holdings.map(company => {
+    const invested = __pv11FdNum(company.invested);
+    const fairValue = __pv11FdNum(company.fairValue);
+    return [
+      company.name,
+      company.sector || __pv11FdDash,
+      company.stage || __pv11FdDash,
+      company.entry || __pv11FdDash,
+      invested == null ? __pv11FdDash : invested,
+      fairValue == null ? __pv11FdDash : fairValue,
+      __pv11FdRatio(fairValue, invested) == null ? __pv11FdDash : Number(__pv11FdRatio(fairValue, invested).toFixed(2)),
+      __pv11FdNum(company.ownership) == null ? __pv11FdDash : Number(company.ownership),
+      company.city || __pv11FdDash,
+    ];
+  });
+
+  const callRows = r.calls.map(call => [
+    capitalCallReference(call) || call.id,
+    call.callDate || __pv11FdDash,
+    call.dueDate || __pv11FdDash,
+    call.purpose || __pv11FdDash,
+    __pv11FdNum(call.amount) == null ? __pv11FdDash : Number(call.amount),
+    __pv11FdNum(call.collected) == null ? __pv11FdDash : Number(call.collected),
+    call.status || __pv11FdDash,
+  ]);
+
+  const distributionRows = (__pv11FundDistributionRows(fund.id) || []).map(row => [
+    __pv11FdDate(row.distributionDate || row.createdAt),
+    row.source || row.distributionType || __pv11FdDash,
+    __pv11FdNum(row.grossAmount != null ? row.grossAmount : row.amount) == null
+      ? __pv11FdDash
+      : Number(row.grossAmount != null ? row.grossAmount : row.amount),
+    row.status || __pv11FdDash,
+    row.notes || row.description || __pv11FdDash,
+  ]);
+
+  const investorRows = r.investors.map(entry => [
+    entry.lp.name,
+    entry.lp.type || __pv11FdDash,
+    entry.lp.geography || __pv11FdDash,
+    Number(entry.breakdown.commitment || 0),
+    Number(entry.breakdown.called || 0),
+    Number(entry.breakdown.unfunded || 0),
+    Number(entry.breakdown.distributed || 0),
+    entry.breakdown.dpi == null ? __pv11FdDash : Number(entry.breakdown.dpi),
+    entry.lp.kyc || __pv11FdDash,
+    entry.lp.portal || __pv11FdDash,
+    entry.lp.owner || __pv11FdDash,
+  ]);
+
+  const documentRows = r.documents.map(doc => [
+    doc.name || 'Untitled',
+    doc.category || 'General',
+    doc.uploadedBy ? doc.uploadedBy.firstName + ' ' + doc.uploadedBy.lastName : __pv11FdDash,
+    doc.fileSizeBytes == null ? __pv11FdDash : Math.round(doc.fileSizeBytes / 1024) + ' KB',
+    __pv11FdDate(doc.createdAt),
+  ]);
+
+  const scheduleRows = r.schedules.map(report => [
+    report.type || 'Report',
+    report.entity || fund.name,
+    report.owner || __pv11FdDash,
+    report.frequency || __pv11FdDash,
+    report.due || __pv11FdDash,
+    report.progress == null ? __pv11FdDash : Number(report.progress),
+    report.status || __pv11FdDash,
+    report.channel || __pv11FdDash,
+  ]);
+
+  const termsRows = [
+    ['Fund entity', fund.name + ', L.P.'],
+    ['Vintage year', fund.vintage ? String(fund.vintage) : __pv11FdDash],
+    ['Fund size', __pv11FdMoney(f.commitment, fund.currency)],
+    ['Strategy', fund.strategy || __pv11FdDash],
+    ['Primary geography', fund.geography || __pv11FdDash],
+    ['Management fee', fund.managementFee || __pv11FdDash],
+    ['Carried interest', fund.carry || __pv11FdDash],
+    ['Status', fund.status || __pv11FdDash],
+  ];
+
+  const left = 'left';
+  const right = 'right';
+  const holdingsSpec = {
+    title: 'Investment Register',
+    columns: ['Company', 'Sector', 'Stage', 'Entry', 'Invested', 'Fair value', 'MOIC (x)', 'Ownership (%)', 'Location'],
+    rows: holdingRows,
+    moneyColumns: [4, 5],
+    align: [left, left, left, left, right, right, right, right, left],
+  };
+  const capitalSpec = {
+    title: 'Capital Call Register',
+    columns: ['Reference', 'Call date', 'Due date', 'Purpose', 'Amount', 'Collected', 'Status'],
+    rows: callRows,
+    moneyColumns: [4, 5],
+    align: [left, left, left, left, right, right, left],
+  };
+  const distributionSpec = {
+    title: 'Declared Distributions',
+    columns: ['Distribution date', 'Source', 'Gross amount', 'Status', 'Notes'],
+    rows: distributionRows,
+    moneyColumns: [2],
+    align: [left, left, right, left, left],
+  };
+  const investorSpec = {
+    title: 'Fund LP Register',
+    columns: ['Limited partner', 'Type', 'Geography', 'Commitment', 'Called', 'Unfunded', 'Distributed', 'DPI (x)', 'KYC', 'Portal', 'Owner'],
+    rows: investorRows,
+    moneyColumns: [3, 4, 5, 6],
+    align: [left, left, left, right, right, right, right, right, left, left, left],
+  };
+  const documentSpec = {
+    title: 'Fund Documents',
+    columns: ['Document', 'Category', 'Uploaded by', 'Size', 'Uploaded'],
+    rows: documentRows,
+    align: [left, left, left, right, left],
+  };
+  const scheduleSpec = {
+    title: 'Reporting Register',
+    columns: ['Report', 'Entity', 'Owner', 'Frequency', 'Due', 'Progress (%)', 'Status', 'Delivery'],
+    rows: scheduleRows,
+    align: [left, left, left, left, left, right, left, left],
+  };
+  const termsSpec = {
+    title: 'Fund Terms',
+    columns: ['Term', 'Value'],
+    rows: termsRows,
+    align: [left, left],
+  };
+
+  const stamp = {
+    footerLabel: 'NVCCZ - Portfolio Management',
+    subtitle: fund.name + ' \u00b7 ' + [fund.vintage || __pv11FdDash, fund.strategy, fund.currency, fund.status]
+      .filter(Boolean).join(' \u00b7 '),
+    note: asOfLine + ' ' + __pv11FdSourceNote(fund),
+    landscape: true,
+    includeExtraInCsv: true,
+  };
+
+  return {
+    fund: Object.assign({}, stamp, {
+      title: 'Fund Profile \u2014 ' + fund.name,
+      filename: 'fund-profile-' + String(fund.id).slice(0, 8),
+      meta: summary,
+      columns: termsSpec.columns,
+      rows: termsSpec.rows,
+      align: termsSpec.align,
+      extra: [holdingsSpec, capitalSpec, distributionSpec, investorSpec, documentSpec, scheduleSpec]
+        .filter(section => section.rows.length),
+    }),
+    overview: Object.assign({}, stamp, {
+      title: 'Fund Overview \u2014 ' + fund.name,
+      filename: 'fund-overview-' + String(fund.id).slice(0, 8),
+      meta: summary,
+      columns: ['Snapshot as of', 'Called capital', 'Distributed', 'NAV', 'Gross IRR (%)', 'TVPI (x)', 'DPI (x)'],
+      rows: f.snapshots.map(snap => [
+        __pv11FdDate(snap.asOfDate),
+        __pv11FdNum(snap.calledCapital) == null ? __pv11FdDash : Number(snap.calledCapital),
+        __pv11FdNum(snap.distributedCapital) == null ? __pv11FdDash : Number(snap.distributedCapital),
+        __pv11FdNum(snap.nav) == null ? __pv11FdDash : Number(snap.nav),
+        __pv11FdNum(snap.grossIrr) == null ? __pv11FdDash : Number((Number(snap.grossIrr) * 100).toFixed(2)),
+        __pv11FdNum(snap.tvpi) == null ? __pv11FdDash : Number(snap.tvpi),
+        __pv11FdNum(snap.dpi) == null ? __pv11FdDash : Number(snap.dpi),
+      ]),
+      moneyColumns: [1, 2, 3],
+      align: [left, right, right, right, right, right, right],
+      extra: [termsSpec].filter(section => section.rows.length),
+    }),
+    investments: Object.assign({}, stamp, {
+      title: 'Investment Register \u2014 ' + fund.name,
+      filename: 'fund-investments-' + String(fund.id).slice(0, 8),
+      meta: [
+        ['Active investments', String(r.holdings.length)],
+        ['Cost basis', __pv11FdMoney(sum(r.holdings, c => __pv11FdNum(c.invested) || 0), fund.currency)],
+        ['Fair value', __pv11FdMoney(r.fairValue, fund.currency)],
+        ['Gross MOIC', __pv11FdMultiple(__pv11FdRatio(r.fairValue, sum(r.holdings, c => __pv11FdNum(c.invested) || 0)))],
+      ],
+      columns: holdingsSpec.columns,
+      rows: holdingsSpec.rows,
+      moneyColumns: holdingsSpec.moneyColumns,
+      align: holdingsSpec.align,
+      extra: [],
+    }),
+    capital: Object.assign({}, stamp, {
+      title: 'Capital Activity \u2014 ' + fund.name,
+      filename: 'fund-capital-' + String(fund.id).slice(0, 8),
+      meta: [
+        ['Issued calls', __pv11FdMoney(sum(r.calls, c => __pv11FdNum(c.amount) || 0), fund.currency)],
+        ['Collected', __pv11FdMoney(sum(r.calls, c => __pv11FdNum(c.collected) || 0), fund.currency)],
+        ['Distributed', __pv11FdMoney(f.distributed, fund.currency)],
+        ['Unfunded commitment', __pv11FdMoney(f.unfunded, fund.currency)],
+      ],
+      columns: capitalSpec.columns,
+      rows: capitalSpec.rows,
+      moneyColumns: capitalSpec.moneyColumns,
+      align: capitalSpec.align,
+      extra: [distributionSpec].filter(section => section.rows.length),
+    }),
+    lps: Object.assign({}, stamp, {
+      title: 'Fund LP Register \u2014 ' + fund.name,
+      filename: 'fund-lps-' + String(fund.id).slice(0, 8),
+      meta: [
+        ['LPs committed to this fund', String(r.investors.length)],
+        ['Commitments', __pv11FdMoney(sum(r.investors, e => __pv11FdNum(e.breakdown.commitment) || 0), fund.currency)],
+        ['Called', __pv11FdMoney(sum(r.investors, e => __pv11FdNum(e.breakdown.called) || 0), fund.currency)],
+        ['Unfunded', __pv11FdMoney(sum(r.investors, e => __pv11FdNum(e.breakdown.unfunded) || 0), fund.currency)],
+      ],
+      columns: investorSpec.columns,
+      rows: investorSpec.rows,
+      moneyColumns: investorSpec.moneyColumns,
+      align: investorSpec.align,
+      extra: [],
+    }),
+    documents: Object.assign({}, stamp, {
+      title: 'Fund Documents \u2014 ' + fund.name,
+      filename: 'fund-documents-' + String(fund.id).slice(0, 8),
+      meta: [['Documents on file', String(r.documents.length)]],
+      columns: documentSpec.columns,
+      rows: documentSpec.rows,
+      align: documentSpec.align,
+      landscape: false,
+      extra: [],
+    }),
+    reporting: Object.assign({}, stamp, {
+      title: 'Fund Reporting \u2014 ' + fund.name,
+      filename: 'fund-reporting-' + String(fund.id).slice(0, 8),
+      meta: [
+        ['Reporting schedules', String(r.schedules.length)],
+        ['Documents on file', String(r.documents.length)],
+        ['Recorded snapshots', String(f.snapshots.length)],
+      ],
+      columns: scheduleSpec.columns,
+      rows: scheduleSpec.rows,
+      align: scheduleSpec.align,
+      extra: [termsSpec].filter(section => section.rows.length),
+    }),
+  };
+}
+
+function __pv11FundDetailExport(kind, scope) {
+  const spec = __pv11FdSpecs && __pv11FdSpecs[scope];
+  const writer = window.__PORTFOLIO_EXPORT__;
+  if (!spec) {
+    toast('Export not ready', 'Open the fund profile and try again once its registers have loaded.');
+    return;
+  }
+  if (typeof writer !== 'function') {
+    toast('Export unavailable', 'The export writer has not loaded yet. Reload the page and try again.');
+    return;
+  }
+  Promise.resolve(writer(kind, spec))
+    .then(name => toast('Export ready', spec.title + ' saved as ' + name + '.'))
+    .catch(error => toast('Export failed', error && error.message ? error.message : 'The file could not be generated.'));
+}
+
+/**
+ * The branded PDF on the Reporting tab. It is the fund pack above rendered as a
+ * report rather than a data dump: the shared NVCCZ letterhead, the fund's own
+ * terms and headline figures, and only the registers that have records behind
+ * them. Nothing here is generated that the page cannot also show.
+ */
+function __pv11FundReport(fund) {
+  const writer = window.__PORTFOLIO_EXPORT__;
+  if (typeof writer !== 'function') {
+    toast('Report unavailable', 'The document writer has not loaded yet. Reload the page and try again.');
+    return;
+  }
+  const specs = __pv11BuildFundDetailSpecs(fund);
+  const pack = specs.fund;
+  const spec = Object.assign({}, pack, {
+    title: 'Fund Report \u2014 ' + fund.name,
+    subtitle: 'Prepared ' + __pv11FdDate(new Date()) + ' \u00b7 ' + (fund.strategy || '') +
+      (fund.vintage ? ' \u00b7 ' + fund.vintage + ' vintage' : '') + ' \u00b7 ' + (fund.status || ''),
+    filename: 'fund-report-' + String(fund.id).slice(0, 8),
+    note: 'Confidential \u2014 prepared for authorised recipients only. ' + pack.note,
+  });
+  Promise.resolve(writer('pdf', spec))
+    .then(name => toast('Fund report generated', name + ' downloaded with the NVCCZ letterhead.'))
+    .catch(error => toast('Report failed', error && error.message ? error.message : 'The report could not be generated.'));
+}
+
+
+/* --- the profile itself -------------------------------------------------- */
+
+/**
+ * Snapshots, documents and declared distributions are per-fund requests the host
+ * services. openFund() dispatches when the user clicks through, but a direct
+ * visit to /portfolio/funds/detail never calls it, so the page has to ask once
+ * for whatever is currently selected.
+ */
+var __pv11FundDetailRequested = null;
+function __pv11EnsureFundDetailData(fund) {
+  if (!state.liveData || !fund || !fund.id) return;
+  if (__pv11FundDetailRequested === String(fund.id)) return;
+  __pv11FundDetailRequested = String(fund.id);
+  queueMicrotask(() => window.dispatchEvent(
+    new CustomEvent('matanho:load-fund-detail', { detail: { fundId: fund.id } })
+  ));
+}
+
+fundProfileMetrics = function (fund) {
+  const f = __pv11FundFigures(fund);
+  const foot = f.latest
+    ? 'Recorded snapshot ' + __pv11FdDate(f.asOf)
+    : 'No performance snapshot recorded yet';
+  return `<section class="metric-grid fund-metric-grid">
+      ${metricCard({ label: 'Commitment', value: __pv11FdMoney(f.commitment, fund.currency), iconName: 'wallet', accent: 'purple', foot: 'Total subscribed capital', action: 'fund-commitment' })}
+      ${metricCard({ label: 'Called Capital', value: __pv11FdMoney(f.called, fund.currency), iconName: 'download', accent: 'blue', foot: f.commitment ? pct((f.called || 0) / f.commitment * 100) + ' of commitments' : __pv11FdDash, action: 'fund-called' })}
+      ${metricCard({ label: 'NAV', value: __pv11FdMoney(f.nav, fund.currency), iconName: 'building', accent: 'emerald', foot: f.nav == null ? 'Not reported by any snapshot' : foot, action: 'fund-nav' })}
+      ${metricCard({ label: 'Unfunded', value: __pv11FdMoney(f.unfunded, fund.currency), iconName: 'clock', accent: 'amber', foot: 'Available for future calls', action: 'fund-unfunded' })}
+      ${metricCard({ label: 'Net IRR', value: __pv11FdPct(f.netIrr), iconName: 'trend-up', accent: 'cyan', foot: f.netIrr == null ? 'Not reported by any snapshot' : foot, action: 'fund-net-irr' })}
+      ${metricCard({ label: 'TVPI', value: __pv11FdMultiple(f.tvpi), iconName: 'pie-chart', accent: 'brand', foot: 'DPI ' + __pv11FdMultiple(f.dpi), action: 'fund-tvpi' })}
+    </section>`;
+};
+
+renderFundOverviewTab = function (fund, fundCompanies, allocation) {
+  const f = __pv11FundFigures(fund);
+  const r = __pv11FundDetailRows(fund);
+  const snapshots = f.snapshots;
+  const snapLabels = snapshots.map(s => __pv11FdShortDate(s.asOfDate));
+  const holdings = fundCompanies && fundCompanies.length ? fundCompanies : r.holdings;
+  const sectors = allocation && allocation.length ? allocation : r.allocation;
+  const upcoming = r.schedules
+    .filter(report => report.due && !/complete|delivered|published/i.test(report.status || ''))
+    .slice(0, 5);
+  const noSnapshots = `<div class="empty-state compact">${icon('bar-chart')}<strong>No recorded snapshots yet</strong><p class="muted small">Snapshots are recorded as the fund is updated \u2014 the series will build from real entries here forward.</p></div>`;
+  return `<section class="profile-tab-panel fund-profile-panel section-gap">
+      <div class="profile-tab-summary"><div><strong>Fund overview workspace</strong><span>Portfolio value, cash-flow position, concentration, obligations and governing terms.</span></div>${button('Refresh fund data', 'fd-refresh', 'primary', 'refresh')}</div>
+      <section class="fund-primary-grid section-gap">
+        ${card('NAV and Cumulative Cash Flows', snapshots.length ? barChart({ labels: snapLabels, series: [{ name: 'NAV', color: 'var(--emerald)', values: snapshots.map(s => (Number(s.nav) || 0) / 1e6) }, { name: 'Called Capital', color: 'var(--navy)', values: snapshots.map(s => (Number(s.calledCapital) || 0) / 1e6) }], height: 270, format: v => `${Math.round(v)}M` }) : noSnapshots, { subtitle: snapshots.length ? `USD millions \u00b7 ${snapshots.length} recorded snapshot${snapshots.length === 1 ? '' : 's'} (real, not backfilled history)` : 'USD millions \u00b7 select a bar for period detail' })}
+        ${card('J-Curve', snapshots.length ? lineChart({ labels: snapLabels, series: [{ name: 'NAV', color: 'var(--blue)', values: snapshots.map(s => (Number(s.nav) || 0) / 1e6) }], height: 270, format: v => `${Math.round(v)}M` }) : `<div class="empty-state compact">${icon('trend-up')}<strong>No recorded snapshots yet</strong><p class="muted small">Builds from real recorded snapshots going forward.</p></div>`, { subtitle: 'NAV over recorded snapshots \u00b7 USD millions' })}
+        ${card('Allocation by Sector (fair value %)', sectors.length ? donutChart(sectors, __pv11FdMoney(r.fairValue, fund.currency), 'Fair value', 145) : `<div class="empty-state compact">${icon('pie-chart')}<strong>No holdings recorded for this fund yet</strong></div>`, { subtitle: holdings.length ? 'Concentration of current fair value across ' + holdings.length + ' holding' + (holdings.length === 1 ? '' : 's') : 'Requires holdings linked to this fund' })}
+      </section>
+      <section class="fund-secondary-grid section-gap">
+        ${card('Top Holdings by Fair Value', holdings.length ? `<div class="info-list">${holdings.slice().sort((a, b) => (b.fairValue || 0) - (a.fairValue || 0)).slice(0, 5).map(company => `<button type="button" class="list-row" data-action="open-company" data-id="${company.id}">${companyLogo(company)}<span class="list-row-main"><strong>${escapeHTML(company.name)}</strong><small>${escapeHTML(company.sector)} \u00b7 ${__pv11FdPct(company.ownership)} ownership</small></span><strong>${__pv11FdMoney(company.fairValue, fund.currency)}<br><span class="muted">${__pv11FdPct(r.fairValue ? (company.fairValue || 0) / r.fairValue * 100 : null)}</span></strong></button>`).join('')}</div>` : `<div class="empty-state compact">${icon('building')}<strong>No holdings recorded for this fund yet</strong><p class="muted small">Portfolio companies are linked to a fund on their register; none point at ${escapeHTML(fund.name)}.</p></div>`, { footer: '<button type="button" class="card-link" data-action="fund-profile-tab" data-tab="investments">View all investments</button>' })}
+        ${card('Recent Capital Activity', r.calls.length ? `<div class="info-list">${r.calls.slice(0, 5).map(call => `<button type="button" class="list-row" data-action="open-capital-call" data-id="${call.id}"><span class="activity-icon" style="color:var(--blue);background:var(--blue-soft)">${icon('wallet')}</span><span class="list-row-main"><strong>Capital Call</strong><small>${escapeHTML(capitalCallReference(call) || call.purpose || call.fund)}</small></span><strong class="negative">${__pv11FdMoney(call.amount, fund.currency)}</strong></button>`).join('')}</div>` : `<div class="empty-state compact">${icon('wallet')}<strong>No capital calls issued for this fund yet</strong></div>`, { footer: '<button type="button" class="card-link" data-action="fund-profile-tab" data-tab="capital">Open capital activity</button>' })}
+        ${card('Upcoming Obligations', upcoming.length ? `<div class="info-list">${upcoming.map(report => `<div class="info-row"><span>${escapeHTML(report.type)}<small class="muted" style="display:block">${escapeHTML(report.frequency || '')}</small></span><strong>${escapeHTML(report.due || __pv11FdDash)} ${statusPill(report.status)}</strong></div>`).join('')}</div>` : `<div class="empty-state compact">${icon('calendar')}<strong>No open reporting obligations</strong><p class="muted small">${r.schedules.length ? r.schedules.length + ' schedule' + (r.schedules.length === 1 ? '' : 's') + ' on file, all marked complete.' : 'No reporting schedule has been created for this fund.'}</p></div>`, { footer: '<button type="button" class="card-link" data-action="fund-profile-tab" data-tab="reporting">View reporting and obligations</button>' })}
+        ${card('Fund Terms', `<div class="info-list"><div class="info-row"><span>Fund Entity</span><strong>${escapeHTML(fund.name)}, L.P.</strong></div><div class="info-row"><span>Vintage Year</span><strong>${fund.vintage || __pv11FdDash}</strong></div><div class="info-row"><span>Fund Size</span><strong>${__pv11FdMoney(f.commitment, fund.currency)}</strong></div><div class="info-row"><span>Strategy</span><strong>${escapeHTML(fund.strategy || __pv11FdDash)}</strong></div><div class="info-row"><span>Primary Geography</span><strong>${escapeHTML(fund.geography || __pv11FdDash)}</strong></div><div class="info-row"><span>Management Fee</span><strong>${escapeHTML(fund.managementFee || __pv11FdDash)}</strong></div><div class="info-row"><span>Carried Interest</span><strong>${escapeHTML(fund.carry || __pv11FdDash)}</strong></div><div class="info-row"><span>Status</span><strong>${statusPill(fund.status)}</strong></div><div class="info-row"><span>Performance as of</span><strong>${f.asOf ? __pv11FdDate(f.asOf) : 'No snapshot recorded'}</strong></div></div>`, { footer: '<button type="button" class="card-link" data-action="fund-profile-tab" data-tab="documents">View fund documents</button>' })}
+      </section>
+    </section>`;
+};
+
+renderFundInvestmentsTab = function (fund, fundCompanies, allocation) {
+  const r = __pv11FundDetailRows(fund);
+  const holdings = fundCompanies && fundCompanies.length ? fundCompanies : r.holdings;
+  const sectors = allocation && allocation.length ? allocation : r.allocation;
+  const invested = sum(holdings, item => __pv11FdNum(item.invested) || 0);
+  const value = sum(holdings, item => __pv11FdNum(item.fairValue) || 0);
+  const largest = holdings.reduce((max, item) => Math.max(max, __pv11FdNum(item.fairValue) || 0), 0);
+  const paged = __pv11FdPaged(fund, 'investments', holdings);
+  const rows = paged.rows.map(company => {
+    const moic = __pv11FdRatio(company.fairValue, company.invested);
+    const growth = __pv11FdNum(company.revenueGrowth);
+    return `<tr class="clickable" data-action="open-company" data-id="${company.id}"><td><span class="company-cell">${companyLogo(company)}<span><strong>${escapeHTML(company.name)}</strong><small>${escapeHTML(company.city || __pv11FdDash)}</small></span></span></td><td>${escapeHTML(company.sector || __pv11FdDash)}</td><td>${escapeHTML(company.stage || __pv11FdDash)}</td><td>${escapeHTML(company.entry || __pv11FdDash)}</td><td class="text-right">${__pv11FdMoney(company.invested, fund.currency)}</td><td class="text-right">${__pv11FdMoney(company.fairValue, fund.currency)}</td><td class="text-right">${__pv11FdMultiple(moic)}</td><td class="text-right">${__pv11FdPct(company.ownership)}</td><td class="text-right ${growth != null && growth >= 20 ? 'positive' : ''}">${__pv11FdPct(growth)}</td><td>${company.health == null ? __pv11FdDash : healthScore(company.health)}</td><td>${statusPill((company.runway == null || company.runway >= 12) ? 'On track' : 'Watch')}</td></tr>`;
+  }).join('') || `<tr><td colspan="11"><div class="empty-state compact">${icon('building')}<strong>No holdings recorded for this fund yet</strong><p class="muted small">Investments appear here once portfolio companies are linked to ${escapeHTML(fund.name)}.</p></div></td></tr>`;
+  return `<section class="profile-tab-panel fund-profile-panel section-gap">
+      <div class="profile-tab-summary"><div><strong>Investment portfolio workspace</strong><span>Holdings, valuations, ownership, operating performance and concentration.</span></div>${button('Add investment', 'add-company', 'primary', 'plus')}</div>
+      <section class="grid cols-4 section-gap">
+        ${metricCard({ label: 'Active Investments', value: String(holdings.length), iconName: 'building', accent: 'brand', foot: 'Holdings linked to this fund', action: 'fund-investment-count' })}
+        ${metricCard({ label: 'Cost Basis', value: __pv11FdMoney(invested, fund.currency), iconName: 'wallet', accent: 'blue', foot: 'Total invested capital', action: 'fund-cost-basis' })}
+        ${metricCard({ label: 'Fair Value', value: __pv11FdMoney(value, fund.currency), iconName: 'trend-up', accent: 'emerald', foot: __pv11FdMultiple(__pv11FdRatio(value, invested)) + ' gross MOIC', action: 'fund-investment-value' })}
+        ${metricCard({ label: 'Largest Position', value: __pv11FdMoney(largest, fund.currency), iconName: 'pie-chart', accent: 'amber', foot: __pv11FdPct(value ? largest / value * 100 : null) + ' of fund fair value', action: 'fund-reserve' })}
+      </section>
+      <section class="fund-two-column section-gap">
+        ${card('Portfolio Value by Company', holdings.length ? barChart({ labels: holdings.slice(0, 7).map(c => c.name), series: [{ name: 'Invested', color: 'var(--muted)', values: holdings.slice(0, 7).map(c => (Number(c.invested) || 0) / 1e6) }, { name: 'Fair Value', color: 'var(--brand)', values: holdings.slice(0, 7).map(c => (Number(c.fairValue) || 0) / 1e6) }], height: 320, yLabel: 'USD millions', format: v => `${Math.round(v)}M` }) : `<div class="empty-state compact">${icon('bar-chart')}<strong>No holdings recorded yet</strong></div>`, { subtitle: holdings.length > 7 ? 'Seven largest of ' + holdings.length + ' holdings \u00b7 select a bar to drill in' : 'Select a bar to drill into valuation movements' })}
+        ${card('Sector Allocation', sectors.length ? donutChart(sectors, __pv11FdMoney(value, fund.currency), 'Fair value', 155) : `<div class="empty-state compact">${icon('pie-chart')}<strong>No holdings recorded yet</strong></div>`, { subtitle: 'Fair-value exposure by sector' })}
+      </section>
+      <section class="card table-card section-gap"><div class="table-toolbar"><div class="table-title-row"><h3>Investment Register</h3><span class="table-badge">${holdings.length} holdings</span></div><div class="table-tools">${__pv11FdExportButtons('investments', 'the investment register')}${button('Filters', 'company-filters', 'compact', 'filter')}</div></div><div class="table-wrap"><table><thead><tr><th>Company</th><th>Sector</th><th>Stage</th><th>Entry</th><th class="text-right">Invested</th><th class="text-right">Fair Value</th><th class="text-right">MOIC</th><th class="text-right">Ownership</th><th class="text-right">Revenue Growth</th><th>Health</th><th>Status</th></tr></thead><tbody>${rows}</tbody></table></div>${__pv11FdPager(fund, 'investments', paged, 'holdings')}</section>
+    </section>`;
+};
+
+renderFundCapitalTab = function (fund) {
+  const f = __pv11FundFigures(fund);
+  const r = __pv11FundDetailRows(fund);
+  const totalCalled = sum(r.calls, call => __pv11FdNum(call.amount) || 0);
+  const totalCollected = sum(r.calls, call => __pv11FdNum(call.collected) || 0);
+  const pagedCalls = __pv11FdPaged(fund, 'capital', r.calls);
+  const distributionRows = __pv11FundDistributionRows(fund.id);
+  const pagedDistributions = __pv11FdPaged(fund, 'distributions', distributionRows || []);
+  const callRows = pagedCalls.rows.map(call => `<tr class="clickable" data-action="open-capital-call" data-id="${call.id}"><td class="table-primary brand-text">${escapeHTML(capitalCallReference(call) || call.id)}</td><td>${escapeHTML(call.callDate || __pv11FdDash)}</td><td>${escapeHTML(call.dueDate || __pv11FdDash)}</td><td>${escapeHTML(call.purpose || __pv11FdDash)}</td><td class="text-right">${__pv11FdMoney(call.amount, fund.currency)}</td><td class="text-right">${__pv11FdMoney(call.collected, fund.currency)}</td><td>${statusPill(call.status)}</td></tr>`).join('')
+    || `<tr><td colspan="7"><div class="empty-state compact">${icon('send')}<strong>No capital calls issued for this fund yet</strong></div></td></tr>`;
+  const distributionTable = pagedDistributions.rows.map(row => {
+    const gross = __pv11FdNum(row.grossAmount != null ? row.grossAmount : row.amount);
+    return `<tr><td class="table-primary">${__pv11FdDate(row.distributionDate || row.createdAt)}</td><td>${escapeHTML(row.source || row.distributionType || __pv11FdDash)}</td><td class="text-right">${__pv11FdMoney(gross, fund.currency)}</td><td>${statusPill(row.status || 'Declared')}</td><td>${escapeHTML(row.notes || row.description || __pv11FdDash)}</td></tr>`;
+  }).join('') || `<tr><td colspan="5"><div class="empty-state compact">${icon('trend-up')}<strong>${distributionRows == null ? 'Distribution records could not be loaded' : 'No distributions declared for this fund yet'}</strong></div></td></tr>`;
+  return `<section class="profile-tab-panel fund-profile-panel section-gap">
+      <div class="profile-tab-summary"><div><strong>Capital activity workspace</strong><span>Capital calls, collections, distributions, investment funding and cash reconciliation.</span></div>${button('New capital activity', 'new-capital-call', 'primary', 'plus')}${button('Declare distribution', 'new-distribution', '', 'trend-up')}</div>
+      <section class="grid cols-4 section-gap">
+        ${metricCard({ label: 'Issued Calls', value: __pv11FdMoney(totalCalled, fund.currency), iconName: 'send', accent: 'blue', foot: r.calls.length + ' call notice' + (r.calls.length === 1 ? '' : 's'), action: 'fund-calls-issued' })}
+        ${metricCard({ label: 'Collected', value: __pv11FdMoney(totalCollected, fund.currency), iconName: 'check-circle', accent: 'emerald', foot: totalCalled ? pct(totalCollected / totalCalled * 100) + ' collection rate' : 'No calls issued yet', action: 'fund-calls-collected' })}
+        ${metricCard({ label: 'Distributed', value: __pv11FdMoney(f.distributed, fund.currency), iconName: 'trend-up', accent: 'purple', foot: f.distributed == null ? 'Declared distributions unavailable' : 'Sum of declared records', action: 'fund-distributions' })}
+        ${metricCard({ label: 'Unfunded Commitment', value: __pv11FdMoney(f.unfunded, fund.currency), iconName: 'clock', accent: 'amber', foot: 'Available for future calls', action: 'fund-cash-need' })}
+      </section>
+      <section class="fund-two-column section-gap">
+        ${card('Collection Status', r.calls.length ? donutChart([{ label: 'Collected', value: totalCollected, color: '#07936d', display: __pv11FdMoney(totalCollected, fund.currency) }, { label: 'Outstanding', value: Math.max(0, totalCalled - totalCollected), color: '#f29a1f', display: __pv11FdMoney(Math.max(0, totalCalled - totalCollected), fund.currency) }], pct(totalCalled ? totalCollected / totalCalled * 100 : 0), 'Collected', 150) : `<div class="empty-state compact">${icon('pie-chart')}<strong>No capital calls issued yet</strong></div>`, { subtitle: 'Across issued notices for this fund' })}
+        ${card('Capital Call Register', `<div class="table-wrap"><table><thead><tr><th>Reference</th><th>Call Date</th><th>Due Date</th><th>Purpose</th><th class="text-right">Amount</th><th class="text-right">Collected</th><th>Status</th></tr></thead><tbody>${callRows}</tbody></table></div>${__pv11FdPager(fund, 'capital', pagedCalls, 'calls')}`, { subtitle: r.calls.length ? r.calls.length + ' notices recorded from the capital-call API' : 'Live capital-call records', tools: __pv11FdExportButtons('capital', 'capital activity') })}
+      </section>
+      <section class="card table-card section-gap"><div class="table-toolbar"><div class="table-title-row"><h3>Declared Distributions</h3><span class="table-badge">${distributionRows == null ? 'unavailable' : distributionRows.length + ' declared'}</span></div><div class="table-tools">${button('Declare distribution', 'new-distribution', 'compact', 'plus')}</div></div><div class="table-wrap"><table><thead><tr><th>Distribution date</th><th>Source</th><th class="text-right">Gross amount</th><th>Status</th><th>Notes</th></tr></thead><tbody>${distributionTable}</tbody></table></div>${__pv11FdPager(fund, 'distributions', pagedDistributions, 'distributions')}</section>
+    </section>`;
+};
+
+renderFundLPsTab = function (fund) {
+  const r = __pv11FundDetailRows(fund);
+  const investors = r.investors;
+  const totalCommitment = sum(investors, e => __pv11FdNum(e.breakdown.commitment) || 0);
+  const totalUnfunded = sum(investors, e => __pv11FdNum(e.breakdown.unfunded) || 0);
+  const verified = investors.filter(e => /verified|approved|complete/i.test(e.lp.kyc || '')).length;
+  const paged = __pv11FdPaged(fund, 'lps', investors);
+  const rows = paged.rows.map(entry => {
+    const lp = entry.lp;
+    const b = entry.breakdown;
+    return `<tr class="clickable" data-action="open-lp" data-id="${lp.id}"><td class="table-primary"><span class="company-cell"><span class="company-logo" style="background:${lp.color}">${escapeHTML(initials(lp.name))}</span><span><strong>${escapeHTML(lp.name)}</strong><small>${escapeHTML(lp.type)}</small></span></span></td><td>${escapeHTML(lp.geography || __pv11FdDash)}</td><td class="text-right">${__pv11FdMoney(b.commitment, fund.currency)}</td><td class="text-right">${__pv11FdMoney(b.called, fund.currency)}</td><td class="text-right">${__pv11FdMoney(b.unfunded, fund.currency)}</td><td class="text-right">${__pv11FdMoney(b.distributed, fund.currency)}</td><td class="text-right">${__pv11FdMultiple(b.dpi)}</td><td>${statusPill(lp.kyc || 'Not reviewed')}</td><td>${statusPill(lp.portal || 'Inactive')}</td><td>${escapeHTML(lp.owner || __pv11FdDash)}</td></tr>`;
+  }).join('') || `<tr><td colspan="10"><div class="empty-state compact">${icon('users')}<strong>${state.liveData ? 'No LP commitments recorded against this fund yet' : 'No LP records available'}</strong><p class="muted small">Commitments come from each investor's investment-commitment records for ${escapeHTML(fund.name)}. Add a commitment from the LP register and it will appear here.</p></div></td></tr>`;
+
+  const byType = {};
+  investors.forEach(e => {
+    const key = e.lp.type || 'Unclassified';
+    byType[key] = (byType[key] || 0) + (__pv11FdNum(e.breakdown.commitment) || 0);
+  });
+  const typeSegments = Object.entries(byType)
+    .filter(entry => entry[1] > 0)
+    .map(([label, value], index) => ({
+      label,
+      value,
+      color: ['#2475f5', '#07936d', '#60a5fa', '#f29a1f', '#0f98b6'][index % 5],
+      display: __pv11FdMoney(value, fund.currency),
+    }));
+  const byGeography = {};
+  investors.forEach(e => {
+    const key = e.lp.geography || 'Unspecified';
+    byGeography[key] = (byGeography[key] || 0) + (__pv11FdNum(e.breakdown.commitment) || 0);
+  });
+  const geographyEntries = Object.entries(byGeography).sort((a, b) => b[1] - a[1]).slice(0, 7);
+
+  return `<section class="profile-tab-panel fund-profile-panel section-gap">
+      <div class="profile-tab-summary"><div><strong>Limited partner workspace</strong><span>Commitments to this fund, unfunded balances, KYC, portal access and investor servicing.</span></div>${button('Add Limited Partner', 'add-lp', 'primary', 'plus')}</div>
+      <section class="grid cols-4 section-gap">
+        ${metricCard({ label: 'Fund LPs', value: String(investors.length), iconName: 'users', accent: 'brand', foot: 'Investors committed to this fund', action: 'fund-lp-count' })}
+        ${metricCard({ label: 'Commitments', value: __pv11FdMoney(totalCommitment, fund.currency), iconName: 'wallet', accent: 'blue', foot: investors.length + ' commitment record' + (investors.length === 1 ? '' : 's'), action: 'fund-lp-commitments' })}
+        ${metricCard({ label: 'Unfunded', value: __pv11FdMoney(totalUnfunded, fund.currency), iconName: 'clock', accent: 'amber', foot: 'Remaining call capacity', action: 'fund-lp-unfunded' })}
+        ${metricCard({ label: 'Verified KYC', value: investors.length ? verified + '/' + investors.length : __pv11FdDash, iconName: 'shield', accent: 'emerald', foot: 'Among investors in this fund', action: 'fund-lp-kyc' })}
+      </section>
+      <section class="fund-three-column section-gap">
+        ${card('Commitment by Investor Type', typeSegments.length ? donutChart(typeSegments, __pv11FdMoney(totalCommitment, fund.currency), 'Commitment', 150) : `<div class="empty-state compact">${icon('pie-chart')}<strong>No LP commitments recorded for this fund yet</strong></div>`, { subtitle: 'Investor mix on this fund' })}
+        ${card('Geographic Mix', geographyEntries.length ? barChart({ labels: geographyEntries.map(entry => entry[0]), series: [{ name: 'Commitment', color: 'var(--brand)', values: geographyEntries.map(entry => entry[1] / 1e6) }], height: 280, yLabel: 'USD millions', format: v => `${Math.round(v)}M` }) : `<div class="empty-state compact">${icon('bar-chart')}<strong>No LP records yet</strong></div>`, { subtitle: 'Investor domicile exposure' })}
+        ${card('Capital Called by Investor', investors.length ? `<div class="info-list">${investors.slice().sort((a, b) => (b.breakdown.called || 0) - (a.breakdown.called || 0)).slice(0, 5).map(entry => `<button type="button" class="list-row" data-action="open-lp" data-id="${entry.lp.id}"><span class="company-logo" style="background:${entry.lp.color}">${escapeHTML(initials(entry.lp.name))}</span><span class="list-row-main"><strong>${escapeHTML(entry.lp.name)}</strong><small>${__pv11FdPct(totalCommitment ? (entry.breakdown.commitment || 0) / totalCommitment * 100 : null)} of fund commitments</small></span><strong>${__pv11FdMoney(entry.breakdown.called, fund.currency)}</strong></button>`).join('')}</div>` : `<div class="empty-state compact">${icon('shield')}<strong>No investor servicing activity yet</strong></div>`, { footer: '<button type="button" class="card-link" data-action="new-communication">Send investor update</button>' })}
+      </section>
+      <section class="card table-card section-gap"><div class="table-toolbar"><div class="table-title-row"><h3>Fund LP Register</h3><span class="table-badge">${investors.length} LPs</span></div><div class="table-tools">${__pv11FdExportButtons('lps', 'the LP register')}${button('Send communication', 'new-communication', 'compact', 'mail')}</div></div><div class="table-wrap"><table><thead><tr><th>LP</th><th>Geography</th><th class="text-right">Commitment</th><th class="text-right">Called</th><th class="text-right">Unfunded</th><th class="text-right">Distributed</th><th class="text-right">DPI</th><th>KYC</th><th>Portal</th><th>Owner</th></tr></thead><tbody>${rows}</tbody></table></div>${__pv11FdPager(fund, 'lps', paged, 'LPs')}</section>
+    </section>`;
+};
+
+renderFundPerformanceTab = function (fund, fundCompanies) {
+  const f = __pv11FundFigures(fund);
+  const holdings = fundCompanies && fundCompanies.length ? fundCompanies : __pv11FundDetailRows(fund).holdings;
+  const irrSnapshots = f.snapshots.filter(snap => __pv11FdNum(snap.grossIrr) != null);
+  return `<section class="profile-tab-panel fund-profile-panel section-gap">
+      <div class="profile-tab-summary"><div><strong>Fund performance workspace</strong><span>Returns, value attribution and benchmark comparison from recorded snapshots.</span></div>${button('Generate performance report', 'fd-report', 'primary', 'file-chart')}</div>
+      <section class="grid cols-4 section-gap">
+        ${metricCard({ label: 'Gross IRR', value: __pv11FdPct(f.grossIrr), iconName: 'trend-up', accent: 'emerald', foot: f.grossIrr == null ? 'No snapshot reports a gross IRR' : (f.asOf ? 'As of ' + __pv11FdDate(f.asOf) : 'Since inception'), action: 'fund-gross-irr' })}
+        ${metricCard({ label: 'Net IRR', value: __pv11FdPct(f.netIrr), iconName: 'trend-up', accent: 'blue', foot: f.netIrr == null ? 'Not reported by any snapshot' : 'After fees and carry', action: 'fund-net-irr' })}
+        ${metricCard({ label: 'TVPI', value: __pv11FdMultiple(f.tvpi), iconName: 'pie-chart', accent: 'purple', foot: f.tvpi == null ? 'Not reported by any snapshot' : 'Total value multiple', action: 'fund-tvpi' })}
+        ${metricCard({ label: 'DPI', value: __pv11FdMultiple(f.dpi), iconName: 'wallet', accent: 'amber', foot: f.dpi == null ? 'Not reported by any snapshot' : 'Distributed multiple', action: 'fund-dpi' })}
+      </section>
+      <section class="fund-two-column section-gap">
+        ${card('Gross IRR Over Recorded Snapshots', irrSnapshots.length ? lineChart({ labels: irrSnapshots.map(snap => __pv11FdShortDate(snap.asOfDate)), series: [{ name: 'Gross IRR', color: 'var(--emerald)', values: irrSnapshots.map(snap => Number(snap.grossIrr) * 100) }], height: 270, format: v => `${Number(v).toFixed(1)}%` }) : `<div class="empty-state compact">${icon('trend-up')}<strong>No snapshot reports a gross IRR</strong><p class="muted small">The series is drawn only from recorded performance snapshots for this fund \u2014 no cash flows are simulated to fill it in.</p></div>`, { subtitle: 'Recorded snapshots only \u00b7 select a point to inspect the period' })}
+        ${card('NAV Over Recorded Snapshots', f.snapshots.length ? barChart({ labels: f.snapshots.map(snap => __pv11FdShortDate(snap.asOfDate)), series: [{ name: 'NAV', color: 'var(--blue)', values: f.snapshots.map(snap => (Number(snap.nav) || 0) / 1e6) }], height: 270, yLabel: 'USD millions', format: v => `${Math.round(v)}M` }) : `<div class="empty-state compact">${icon('bar-chart')}<strong>No recorded snapshots yet</strong></div>`, { subtitle: 'USD millions \u00b7 real recorded entries, not backfilled' })}
+      </section>
+      <section class="fund-two-column section-gap">
+        ${card('Company Contribution to Fair Value', holdings.length ? barChart({ labels: holdings.map(c => c.name), series: [{ name: 'Fair value', color: 'var(--brand)', values: holdings.map(c => (Number(c.fairValue) || 0) / 1e6) }], height: 300, yLabel: 'USD millions', format: v => `${Math.round(v)}M` }) : `<div class="empty-state compact">${icon('bar-chart')}<strong>No holdings recorded yet</strong></div>`, { subtitle: 'Current fair value by holding' })}
+        ${card('Benchmark Comparison', (() => {
+          // Real, sourced public benchmark. No internal PME or peer database exists to
+          // compare against, so the fund column stays a dash wherever no snapshot
+          // reports the measure rather than showing 0.00x and calling it underperformance.
+          const CA = { irr: 3.9, tvpi: 1.25, dpi: 0.0, asOf: 'H1 2025', source: 'Cambridge Associates LLC US Private Equity Index' };
+          const rows = [
+            ['Gross IRR', f.grossIrr, CA.irr, __pv11FdPct(f.grossIrr), CA.irr.toFixed(1) + '%', 'pp'],
+            ['TVPI', f.tvpi, CA.tvpi, __pv11FdMultiple(f.tvpi), CA.tvpi.toFixed(2) + 'x', 'x'],
+            ['DPI', f.dpi, CA.dpi, __pv11FdMultiple(f.dpi), CA.dpi.toFixed(2) + 'x', 'x'],
+          ];
+          return `<div class="table-wrap"><table><thead><tr><th>Metric</th><th class="text-right">Fund</th><th class="text-right">Benchmark</th><th class="text-right">Alpha</th><th>Status</th></tr></thead><tbody>${rows.map(([label, fundVal, benchVal, fundDisp, benchDisp, unit]) => {
+            const hasFund = fundVal != null;
+            const alpha = hasFund ? fundVal - benchVal : null;
+            const outperforming = alpha != null && alpha >= 0;
+            const alphaDisp = alpha == null ? __pv11FdDash : (alpha >= 0 ? '+' : '') + (unit === 'pp' ? alpha.toFixed(1) + 'pp' : alpha.toFixed(2) + 'x');
+            return `<tr><td class="table-primary">${label}</td><td class="text-right">${fundDisp}</td><td class="text-right">${benchDisp}</td><td class="text-right ${alpha == null ? '' : outperforming ? 'positive' : 'negative'}">${alphaDisp}</td><td>${hasFund ? statusPill(outperforming ? 'Outperforming' : 'Underperforming', outperforming ? 'success' : 'warning') : statusPill('Not reported yet', 'neutral')}</td></tr>`;
+          }).join('')}</tbody></table></div><p class="muted small" style="margin-top:10px">Benchmark: ${CA.source}, ${CA.asOf}. TVPI/DPI use the published early-lifecycle cohort range \u2014 no vintage-matched figure is freely available for a fund this young.</p>`;
+        })(), { subtitle: 'vs Cambridge Associates US Private Equity Index' })}
+      </section>
+    </section>`;
+};
+
+renderFundDocumentsTab = function (fund) {
+  const docs = (state.fundDocuments && state.fundDocuments[fund.id]) || [];
+  const paged = __pv11FdPaged(fund, 'documents', docs);
+  const formatSize = bytes => {
+    if (bytes == null) return __pv11FdDash;
+    const mb = bytes / 1e6;
+    return mb >= 1 ? mb.toFixed(1) + ' MB' : Math.round(bytes / 1024) + ' KB';
+  };
+  const rows = paged.rows.map(doc => `<tr><td class="table-primary"><button type="button" class="v17-document-name" data-action="preview-document" data-id="${escapeHTML(doc.fileUrl)}"><span class="document-row-icon">${icon('file')}</span><span>${escapeHTML(doc.name)}</span></button></td><td>${escapeHTML(doc.category || 'General')}</td><td>${doc.uploadedBy ? escapeHTML(doc.uploadedBy.firstName + ' ' + doc.uploadedBy.lastName) : __pv11FdDash}</td><td>${formatSize(doc.fileSizeBytes)}</td><td>${__pv11FdDate(doc.createdAt)}</td><td><div class="document-row-actions"><button type="button" class="button ghost compact icon-only" data-action="preview-document" data-id="${escapeHTML(doc.fileUrl)}" aria-label="Preview ${escapeHTML(doc.name)}">${icon('eye')}</button><button type="button" class="button ghost compact icon-only" data-action="download-document" data-id="${escapeHTML(doc.fileUrl)}" aria-label="Download ${escapeHTML(doc.name)}">${icon('download')}</button></div></td></tr>`).join('')
+    || `<tr><td colspan="6"><div class="empty-state compact">${icon('folder')}<strong>No documents on file for this fund yet</strong><p class="muted small">Upload the fund's governing agreements, valuation packs or investor reports above.</p></div></td></tr>`;
+  return `<section class="profile-tab-panel fund-profile-panel section-gap">
+      <div class="profile-tab-summary"><div><strong>Fund document workspace</strong><span>Governing agreements, side letters, valuation evidence, audit records and investor reporting packs.</span></div><div class="page-actions"><label class="button primary compact">${icon('upload')} Upload<input type="file" hidden data-file-action="upload-fund-document"></label></div></div>
+      <section class="card table-card section-gap"><div class="table-toolbar"><div class="table-title-row"><h3>Documents</h3><span class="table-badge">${docs.length} on file</span></div><div class="table-tools">${__pv11FdExportButtons('documents', 'the document register')}</div></div>${docs.length ? `<div class="table-wrap"><table><thead><tr><th>Document</th><th>Category</th><th>Uploaded by</th><th>Size</th><th>Uploaded</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>` : `<div class="empty-state">${icon('folder')}<strong>No documents on file for this fund yet</strong><p class="muted small">Upload the fund's governing agreements, valuation packs or investor reports above.</p></div>`}${__pv11FdPager(fund, 'documents', paged, 'documents')}</section>
+    </section>`;
+};
+
+renderFundReportingTab = function (fund) {
+  const r = __pv11FundDetailRows(fund);
+  const fundReports = r.schedules;
+  const dueCount = fundReports.filter(row => /due|not started|scheduled/i.test(row.status || '')).length;
+  const inProgressCount = fundReports.filter(row => /progress|review|running/i.test(row.status || '')).length;
+  const completedCount = fundReports.filter(row => /complete|delivered|sent|published/i.test(row.status || '')).length;
+  const overdueCount = fundReports.filter(row => /overdue|late/i.test(row.status || '')).length;
+  const paged = __pv11FdPaged(fund, 'reporting', fundReports);
+  const rows = paged.rows.map(report => `<tr><td class="table-primary">${escapeHTML(report.type)}</td><td>${escapeHTML(report.entity || fund.name)}</td><td>${escapeHTML(report.owner || __pv11FdDash)}</td><td>${escapeHTML(report.frequency || __pv11FdDash)}</td><td>${escapeHTML(report.due || __pv11FdDash)}</td><td><span class="inline-progress"><span class="progress"><span style="width:${Number(report.progress) || 0}%"></span></span><strong>${report.progress == null ? __pv11FdDash : Number(report.progress) + '%'}</strong></span></td><td>${statusPill(report.status)}</td><td>${escapeHTML(report.channel || __pv11FdDash)}</td><td><button type="button" class="button ghost compact icon-only" data-action="open-report-builder" aria-label="Open report builder">${icon('chevron-right')}</button></td></tr>`).join('')
+    || `<tr><td colspan="9"><div class="empty-state compact">${icon('file-chart')}<strong>No reporting schedule for this fund yet</strong><p class="muted small">Schedules come from the fund performance reporting API; none exist for ${escapeHTML(fund.name)}.</p></div></td></tr>`;
+  return `<section class="profile-tab-panel fund-profile-panel section-gap">
+      <div class="profile-tab-summary"><div><strong>Fund reporting workspace</strong><span>Reporting calendar, LP deliverables, approval workflow and the branded fund report.</span></div>${button('Generate fund report', 'fd-report', 'primary', 'file-chart')}</div>
+      <section class="grid cols-4 section-gap">
+        ${metricCard({ label: 'Due', value: String(dueCount), iconName: 'calendar', accent: 'blue', foot: 'From reporting schedule', action: 'fund-report-due' })}
+        ${metricCard({ label: 'In Progress', value: String(inProgressCount), iconName: 'clock', accent: 'amber', foot: 'From reporting schedule', action: 'fund-report-progress' })}
+        ${metricCard({ label: 'Completed', value: String(completedCount), iconName: 'check-circle', accent: 'emerald', foot: 'From reporting schedule', action: 'fund-report-complete' })}
+        ${metricCard({ label: 'Overdue', value: String(overdueCount), iconName: 'alert', accent: 'red', foot: 'From reporting schedule', action: 'fund-report-overdue' })}
+      </section>
+      <section class="card section-gap"><div class="card-head"><div><h3 class="card-title">Fund report pack</h3><div class="card-subtitle">One branded PDF, generated from what this page is showing</div></div></div><div class="card-body"><div class="info-list"><div class="info-row"><span>Letterhead</span><strong>NVCCZ</strong></div><div class="info-row"><span>Headline figures</span><strong>${fund.vintage || __pv11FdDash} vintage \u00b7 ${escapeHTML(fund.currency)} \u00b7 ${escapeHTML(fund.status)}</strong></div><div class="info-row"><span>Registers offered</span><strong>Terms, holdings, capital calls, distributions, LPs, documents, reporting</strong></div><div class="info-row"><span>Records behind them</span><strong>${r.holdings.length} holdings \u00b7 ${r.calls.length} calls \u00b7 ${r.investors.length} LP commitments \u00b7 ${r.documents.length} documents</strong></div></div><p class="muted small" style="margin-top:10px">A register with no records is left out of the pack rather than printed as an empty table, so the report can never carry a figure this page does not already show.</p></div><div class="card-footer">${button('Download fund report (PDF)', 'fd-report', 'primary', 'download')}${button('Export this register', 'fd-export-pdf', 'compact', 'file', ' data-scope="reporting"')}</div></section>
+      <section class="card table-card section-gap"><div class="table-toolbar"><div class="table-title-row"><h3>Reporting Register</h3><span class="table-badge">${fundReports.length} visible</span></div><div class="table-tools">${__pv11FdExportButtons('reporting', 'the reporting register')}${button('Filters', 'report-filters', 'compact', 'filter')}</div></div><div class="table-wrap"><table><thead><tr><th>Report</th><th>Entity</th><th>Owner</th><th>Frequency</th><th>Due</th><th>Progress</th><th>Status</th><th>Delivery</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>${__pv11FdPager(fund, 'reporting', paged, 'schedules')}</section>
+    </section>`;
+};
+
+renderFundDetail = function () {
+  const fund = funds.find(f => f.id === state.selectedFundId) || funds[0];
+  if (!fund) {
+    return `${pageHeader('Fund Profile', 'Detailed information for a selected fund.', '')}<div class="empty-state"><div class="empty-state-icon">${icon('building')}</div><h3>No funds loaded</h3><p>Live fund data is still loading or has not been seeded yet.</p></div>`;
+  }
+  __pv11EnsureFundDetailData(fund);
+  const f = __pv11FundFigures(fund);
+  const fundCompanies = companies.filter(c => c.fund === fund.name);
+  const sectorTotals = {};
+  fundCompanies.forEach(c => {
+    const key = c.sector || 'Other';
+    sectorTotals[key] = (sectorTotals[key] || 0) + (__pv11FdNum(c.fairValue) || 0);
+  });
+  const sectorTotal = sum(fundCompanies, c => __pv11FdNum(c.fairValue) || 0);
+  const allocColors = ['#2475f5', '#0ba780', '#f5a623', '#60a5fa', '#f0641c', '#aab3c2'];
+  const allocation = sectorTotal
+    ? Object.entries(sectorTotals)
+      .filter(entry => entry[1] > 0)
+      .map(([label, value], index) => ({ label, value, color: allocColors[index % allocColors.length], display: pct(value / sectorTotal * 100) }))
+    : [];
+  const tabs = [['overview', 'Overview'], ['investments', 'Investments'], ['capital', 'Capital Activity'], ['lps', 'LPs'], ['performance', 'Performance'], ['documents', 'Documents'], ['reporting', 'Reporting']];
+  const content = state.fundTab === 'investments' ? renderFundInvestmentsTab(fund, fundCompanies, allocation)
+    : state.fundTab === 'capital' ? renderFundCapitalTab(fund)
+      : state.fundTab === 'lps' ? renderFundLPsTab(fund)
+        : state.fundTab === 'performance' ? renderFundPerformanceTab(fund, fundCompanies)
+          : state.fundTab === 'documents' ? renderFundDocumentsTab(fund)
+            : state.fundTab === 'reporting' ? renderFundReportingTab(fund)
+              : renderFundOverviewTab(fund, fundCompanies, allocation);
+  __pv11FdSpecs = __pv11BuildFundDetailSpecs(fund);
+  const heroItem = (label, value) => `<div class="hero-meta-item"><span>${label}</span><strong>${value}</strong></div>`;
+  return `${pageHeader(fund.name, `${fund.vintage || __pv11FdDash} vintage \u00b7 ${fund.strategy || __pv11FdDash} \u00b7 ${fund.currency} \u00b7 ${fund.status}`, `${button('Edit fund', 'edit-fund', '', 'edit')}${button('New capital activity', 'new-capital-call', 'primary', 'plus')}${__pv11FdExportButtons('fund', 'the fund profile')}`, 'Fund Profile')}
+      <section class="detail-hero fund-detail-hero"><div class="hero-meta fund-hero-meta">${heroItem('Commitment', __pv11FdMoney(f.commitment, fund.currency))}${heroItem('Called Capital', __pv11FdMoney(f.called, fund.currency))}${heroItem('NAV', __pv11FdMoney(f.nav, fund.currency))}${heroItem('Distributions', __pv11FdMoney(f.distributed, fund.currency))}${heroItem('Gross IRR', __pv11FdPct(f.grossIrr))}${heroItem('Net IRR', __pv11FdPct(f.netIrr))}${heroItem('TVPI', __pv11FdMultiple(f.tvpi))}${heroItem('DPI', __pv11FdMultiple(f.dpi))}</div></section>
+      ${fundProfileMetrics(fund)}
+      ${profileTabs(tabs, state.fundTab, 'fund-profile-tab')}
+      ${content}`;
+};
+
+/* --- action wiring ------------------------------------------------------- */
+
+if (typeof handleAction === 'function') {
+  const __pv11FdBaseHandleAction = handleAction;
+  handleAction = function (action, trigger, event) {
+    if (typeof action === 'string') {
+      if (action.indexOf('fd-export-') === 0) {
+        __pv11FundDetailExport(
+          action.slice('fd-export-'.length),
+          (trigger && trigger.dataset && trigger.dataset.scope) || 'fund'
+        );
+        return;
+      }
+      if (action === 'fd-page') {
+        const key = trigger && trigger.dataset ? trigger.dataset.key : '';
+        const target = Number(trigger && trigger.dataset ? trigger.dataset.page : 0);
+        if (key && Number.isFinite(target) && target > 0) {
+          const store = state.fundDetailPaging || {};
+          const settings = store[key] || (store[key] = { page: 1, size: '10' });
+          settings.page = target;
+          render();
+        }
+        return;
+      }
+      if (action === 'fd-report') {
+        const fund = funds.find(f => f.id === state.selectedFundId) || funds[0];
+        if (!fund) {
+          toast('No fund selected', 'Open a fund from the register and try again.');
+          return;
+        }
+        __pv11FundReport(fund);
+        return;
+      }
+      if (action === 'fd-refresh') {
+        const fund = funds.find(f => f.id === state.selectedFundId) || funds[0];
+        if (!fund || !state.liveData) {
+          toast('Nothing to refresh', 'Fund detail data loads from the API in a live session.');
+          return;
+        }
+        __pv11FundDetailRequested = null;
+        __pv11EnsureFundDetailData(fund);
+        toast('Refreshing fund data', 'Snapshots, documents and declared distributions are reloading.');
+        return;
+      }
+    }
+    return __pv11FdBaseHandleAction(action, trigger, event);
+  };
+}
+/* END_PORTFOLIO_FUND_DETAIL */
+
   window.MatanhoPortfolioUI = Object.freeze({
     version: '25.0.0',
     hydrate: function(payload) {
@@ -6705,13 +9184,67 @@ function __pv11IsLive() {
       try { rootEl.classList.remove('is-hydrating', 'is-host-error', 'is-page-loading'); } catch (_) {}
       return hydrateFromBackend(payload);
     },
+    updateCapitalCall: function(call) {
+      if (!call || typeof call !== 'object') return;
+      const recordId = String(call.recordId || call.id || '');
+      if (!recordId) return;
+      const index = capitalCalls.findIndex((row) => String(row.recordId || row.id || '') === recordId);
+      if (index < 0) capitalCalls.unshift(call);
+      else capitalCalls[index] = Object.assign({}, capitalCalls[index], call);
+      render();
+    },
     beginLiveLoad: __pv11BeginLiveLoad,
     failLiveLoad: __pv11FailLiveLoad,
+    failRbacSettings: failRbacSettings,
     setPageLoading: __pv11SetPageLoading,
     setActionBusy: __pv11SetActionBusy,
+    setCompanyDetail: function(detail) {
+      state.companyRecordLoading = false;
+      state.companyRecordError = null;
+      state.companyRecord = detail && detail.company ? detail.company : detail || null;
+      const companyDocuments = [];
+      const collectCompanyDocuments = (value, folder = '') => {
+        if (Array.isArray(value)) { value.forEach(item=>collectCompanyDocuments(item,folder)); return; }
+        if (!value || typeof value !== 'object') return;
+        if (value.url || value.fileUrl || value.reportUrl) { companyDocuments.push({ ...value, folder:value.folder||value.category||folder }); return; }
+        const nextFolder = value.name || value.label || folder;
+        if (Array.isArray(value.files)) value.files.forEach(item=>collectCompanyDocuments(item,nextFolder));
+        Object.entries(value).forEach(([key,item])=>{ if (key !== 'files' && item && typeof item === 'object') collectCompanyDocuments(item, nextFolder || key); });
+      };
+      collectCompanyDocuments(detail?.documents);
+      state.companyDocuments = companyDocuments;
+      state.companyDocumentRequests = Array.isArray(detail?.documents?.requests) ? detail.documents.requests : [];
+      state.companyDocumentFolders = [...new Set([...(Array.isArray(detail?.documents?.folders) ? detail.documents.folders : []), ...companyDocuments.map(doc=>doc.folder).filter(Boolean)])].sort();
+      state.companyActivity = Array.isArray(detail?.activity) ? detail.activity : [];
+      state.companyFinancialReports = Array.isArray(detail?.financialReports) ? detail.financialReports : [];
+      if (state.companyRecord?.id) state.selectedCompanyId = String(state.companyRecord.id);
+      render();
+    },
+    setCompanyDetailLoading: function(loading, error) {
+      state.companyRecordLoading = Boolean(loading);
+      state.companyRecordError = error ? String(error) : null;
+      render();
+    },
+    loadCompaniesPage: loadCompanyListPage,
     notify: function(title, body, tone) { if (typeof toast === 'function') toast(title, body || '', tone || 'info'); },
     closeOverlays: function() { if (typeof closeOverlays === 'function') closeOverlays(); },
-    setDealTab: function(tab) { if (tab) { state.dealTab = tab; render(); } },
+      setDealTab: function(tab) { if (tab) { state.dealTab = tab; render(); } },
+      setCapitalCallPreview: function(data) { state.capitalCallPreview = data || null; if (state.modalWizard && state.modalWizard.kind === 'new-capital-call') renderCapitalCallWizard(); },
+      showCapitalCallNotice: function(data) {
+        const d = (data && data.data) || data || {};
+      const html = '<article class="v22-premium-call"><div class="v15-paper-head"><div class="v15-paper-brand">NVCCZ<small>Investment Management</small></div><div class="v15-paper-docmeta">CAPITAL CALL NOTICE<br>' + escapeHTML(d.fundName || '') + '</div></div><div class="v15-paper-kicker">Limited Partner notice</div><h1>' + escapeHTML(d.fundName || '') + '</h1><p class="lead">Dear ' + escapeHTML(d.lpLegalName || 'Limited Partner') + ', please remit the call amount by the due date below.</p><div class="v15-paper-summary"><div><small>Call amount</small><strong>' + formatMoney(Number(d.currentCallAmount || 0)) + '</strong></div><div><small>Payment due</small><strong>' + escapeHTML(d.paymentDueDate || '—') + '</strong></div><div><small>Commitment</small><strong>' + formatMoney(Number(d.totalCommitment || 0)) + '</strong></div><div><small>Currency</small><strong>' + escapeHTML(d.currencyCode || '') + '</strong></div></div><section class="v15-paper-section"><header><span>01</span><h2>Funding instructions</h2></header><p>' + escapeHTML(d.bankInstructions || '') + '</p></section><p class="muted small">Values are loaded from the selected LP allocation. Database identifiers are excluded.</p></article>';
+        showModal('Capital Call Notice Preview', String(d.fundName || 'Fund notice'), html, button('Close', 'close-modal', 'primary'), {variant:'document',size:'lg',eyebrow:'Branded LP notice'});
+      },
+    setFundDetailData: function(fundId, snapshots, documents, distributions) {
+      if (!fundId) return;
+      state.fundPerformanceSnapshots = state.fundPerformanceSnapshots || {};
+      state.fundDocuments = state.fundDocuments || {};
+      state.fundDistributions = state.fundDistributions || {};
+      state.fundPerformanceSnapshots[fundId] = Array.isArray(snapshots) ? snapshots : [];
+      state.fundDocuments[fundId] = Array.isArray(documents) ? documents : [];
+      state.fundDistributions[fundId] = Array.isArray(distributions) ? distributions : null;
+      if (state.page === 'fund-detail' && String(state.selectedFundId) === String(fundId)) render();
+    },
     setFundPerformanceSnapshots: function(fundId, snapshots) {
       if (!fundId) return;
       state.fundPerformanceSnapshots = state.fundPerformanceSnapshots || {};
@@ -6722,6 +9255,12 @@ function __pv11IsLive() {
       if (!fundId) return;
       state.fundDocuments = state.fundDocuments || {};
       state.fundDocuments[fundId] = Array.isArray(documents) ? documents : [];
+      render();
+    },
+    setFundDistributions: function(fundId, distributions) {
+      if (!fundId) return;
+      state.fundDistributions = state.fundDistributions || {};
+      state.fundDistributions[fundId] = Array.isArray(distributions) ? distributions : null;
       render();
     },
     setDealDetail: function(detail) {
@@ -6742,7 +9281,12 @@ function __pv11IsLive() {
       } else if (detail.dealDetail === null) {
         state.dealDetail = null;
       }
-      __pv11SyncDealIntoList(state.dealDetail);
+      // The live detail loader can run before the optional list-sync bridge is
+      // installed. Detail rendering and action persistence must not fail just
+      // because that secondary cache hook is unavailable.
+      if (typeof __pv11SyncDealIntoList === 'function') {
+        __pv11SyncDealIntoList(state.dealDetail);
+      }
       render();
     },
     setDealDetailLoading: function(loading) {
@@ -6775,6 +9319,21 @@ function __pv11IsLive() {
     canWrite(page) { return v11CanWrite(page); }
   });
 
+  // The host resolves the signed-in policy before it mounts this module, so
+  // adopt it here: the first paint then has the real navigation and an accurate
+  // read guard. Without it every page reads as denied in live mode, which left
+  // the sidebar empty and let an unpermitted page paint until the policy landed.
+  if (options.sessionRbac && typeof options.sessionRbac === 'object') {
+    const primeRbac = options.sessionRbac;
+    if (typeof primeRbac.canManagePolicies === 'boolean') state.rbacCanManagePolicies = primeRbac.canManagePolicies;
+    if (typeof primeRbac.effectiveSource === 'string') state.rbacEffectiveSource = primeRbac.effectiveSource;
+    if (Array.isArray(primeRbac.effectivePermissions)) state.rbacSessionPermissions = v11PermissionsFromShared(primeRbac.effectivePermissions);
+  } /* patched:session-rbac */
+
+  // Apply the deep-linked page before the first paint; the dashboard used to be
+  // rendered here and replaced on the next frame.
+  if (typeof state !== 'undefined' && initialPage) state.page = initialPage; /* patched:initial-page */
+
   emitIntegrationEvent('matanho:ui-ready', publicSnapshot());
   render();
 
@@ -6797,6 +9356,8 @@ function __pv11IsLive() {
         if (detail.selectedFundId != null) state.selectedFundId = detail.selectedFundId;
         if (detail.selectedLPId != null) state.selectedLPId = detail.selectedLPId;
         if (detail.selectedCapitalCallId != null) state.selectedCapitalCallId = detail.selectedCapitalCallId;
+        if (detail.selectedCompanyId != null) state.selectedCompanyId = detail.selectedCompanyId;
+        if (detail.companyTab != null) state.companyTab = detail.companyTab;
       }
       state.page = page;
       state.mobileNavOpen = false;
@@ -6810,6 +9371,7 @@ function __pv11IsLive() {
     },
     beginLiveLoad: window.MatanhoPortfolioUI && window.MatanhoPortfolioUI.beginLiveLoad,
     failLiveLoad: window.MatanhoPortfolioUI && window.MatanhoPortfolioUI.failLiveLoad,
+    failRbacSettings: window.MatanhoPortfolioUI && window.MatanhoPortfolioUI.failRbacSettings,
     destroy() {
       try { __pv11Abort.abort(); } catch (_) {}
       delete window.__PORTFOLIO_V11_NAV__;
@@ -6818,5 +9380,103 @@ function __pv11IsLive() {
     },
   };
 
+  const __capitalCallBaseChange = handleChangeAction;
+  handleChangeAction = function(action, target) {
+    if (action === 'company-document-folder') { state.companyDocumentFolder = target.value || 'All folders'; render(); return; }
+    if (action === 'company-document-upload-folder') { state.companyDocumentUploadFolder = target.value || 'Financial'; const input=rootEl.querySelector('[data-file-action="upload-company-document"]'); if(input)input.dataset.folder=state.companyDocumentUploadFolder; return; }
+    if (action === 'capital-call-fund') { state.capitalCallFund = target.value; state.capitalCallPage = 1; render(); return; }
+    if (action === 'capital-call-status') { state.capitalCallStatus = target.value; state.capitalCallPage = 1; render(); return; }
+    if (action === 'capital-call-from') { state.capitalCallFrom = target.value; state.capitalCallPage = 1; render(); return; }
+    if (action === 'capital-call-to') { state.capitalCallTo = target.value; state.capitalCallPage = 1; render(); return; }
+    if (action === 'distribution-fund') { state.distributionFund = target.value; state.distributionPage = 1; render(); return; }
+    if (action === 'distribution-status') { state.distributionStatus = target.value; state.distributionPage = 1; render(); return; }
+    if (action === 'distribution-from') { state.distributionFrom = target.value; state.distributionPage = 1; render(); return; }
+    if (action === 'distribution-to') { state.distributionTo = target.value; state.distributionPage = 1; render(); return; }
+    return __capitalCallBaseChange(action, target);
+  };
+  document.addEventListener('input', function(event) {
+    const target = event.target;
+    if (target && target.dataset && target.dataset.inputAction === 'capital-call-search') {
+      state.capitalCallSearch = target.value; state.capitalCallPage = 1; render();
+    }
+  });
+  document.addEventListener('input', function(event) {
+    const target = event.target;
+    if (!target || !target.dataset || target.dataset.inputAction !== 'distribution-search') return;
+    state.distributionSearch = target.value;
+    state.distributionPage = 1;
+    const caret = target.selectionStart;
+    render();
+    const nextInput = rootEl.querySelector('[data-input-action="distribution-search"]');
+    if (nextInput) {
+      nextInput.focus();
+      if (typeof caret === 'number' && typeof nextInput.setSelectionRange === 'function') nextInput.setSelectionRange(caret, caret);
+    }
+  });
+  let capitalCallPreviewTimer;
+  document.addEventListener('input', function(event) {
+    const target = event.target;
+    if (!target || target.name !== 'callPercent' || !state.modalWizard || state.modalWizard.kind !== 'new-capital-call') return;
+    clearTimeout(capitalCallPreviewTimer);
+    capitalCallPreviewTimer = setTimeout(function() {
+      captureModalWizardDraft();
+      const draft = state.modalWizard && state.modalWizard.draft || {};
+      const fund = funds.find(item => String(item.id) === String(draft.fund) || item.name === draft.fund);
+      const percent = Number(target.value);
+      if (fund && percent > 0 && percent <= 100) __pv11EmitApi('capital-call-preview', {fundId:fund.id,callPercent:String(percent)});
+    }, 250);
+  });
+  const __capitalCallBaseAction = handleAction;
+  handleAction = function(action, trigger, event) {
+    const selected = String(trigger && trigger.dataset && trigger.dataset.id || state.selectedCapitalCallId || '');
+    const call = capitalCalls.find(item => String(item.recordId || item.id) === selected || String(item.id) === selected);
+    if (action === 'distribution-page') { state.distributionPage = Number(trigger.dataset.page || 1); render(); return; }
+    if (action === 'distribution-reset') {
+      state.distributionFund = 'All funds';
+      state.distributionStatus = 'All statuses';
+      state.distributionFrom = '';
+      state.distributionTo = '';
+      state.distributionSearch = '';
+      state.distributionPage = 1;
+      render();
+      return;
+    }
+    if (action === 'distribution-export') {
+      const spec = window.__pv11DistributionExportSpec;
+      if (!spec || typeof window.__PORTFOLIO_EXPORT__ !== 'function') { toast('Export unavailable', 'The branded export writer is not ready.', 'warning'); return; }
+      Promise.resolve(window.__PORTFOLIO_EXPORT__(trigger.dataset.kind || 'csv', spec)).then(name => toast('Export ready', name, 'success')).catch(error => toast('Export failed', error.message || 'Export failed', 'error'));
+      return;
+    }
+    if (action === 'capital-call-page') { state.capitalCallPage = Number(trigger.dataset.page || 1); render(); return; }
+    if (action === 'capital-call-reset') { state.capitalCallFund='All funds'; state.capitalCallStatus='All statuses'; state.capitalCallFrom=''; state.capitalCallTo=''; state.capitalCallSearch=''; state.capitalCallPage=1; render(); return; }
+    if (action === 'capital-call-export') {
+      const spec = state.page === 'capital-call-detail' ? state.capitalCallDetailExportSpec : window.__pv11CapitalCallExportSpec;
+      if (!spec || typeof window.__PORTFOLIO_EXPORT__ !== 'function') { toast('Export unavailable','The branded export writer is not ready.','warning'); return; }
+      Promise.resolve(window.__PORTFOLIO_EXPORT__(trigger.dataset.kind || 'csv', spec)).then(name => toast('Export ready', name, 'success')).catch(error => toast('Export failed', error.message || 'Export failed', 'error'));
+      return;
+    }
+    if (action === 'submit-capital-call-approval' && trigger?.dataset?.fundId && trigger?.dataset?.id) { __pv11EmitApi('capital-call-submit-approval',{fundId:trigger.dataset.fundId,id:trigger.dataset.id}); return; }
+    if (action === 'capital-call-approve' && trigger?.dataset?.fundId && trigger?.dataset?.id) { __pv11EmitApi('capital-call-approve',{fundId:trigger.dataset.fundId,id:trigger.dataset.id}); return; }
+    if (action === 'capital-call-reject' && trigger?.dataset?.fundId && trigger?.dataset?.id) { const reason=window.prompt('Reason for rejecting this capital call:'); if(reason && reason.trim()) __pv11EmitApi('capital-call-reject',{fundId:trigger.dataset.fundId,id:trigger.dataset.id,reason:reason.trim()}); return; }
+    if (action === 'capital-call-add-note' && trigger?.dataset?.fundId && trigger?.dataset?.id) { const note=String(trigger.closest('form')?.querySelector('[name="note"]')?.value||'').trim(); if(note) __pv11EmitApi('capital-call-activity',{fundId:trigger.dataset.fundId,id:trigger.dataset.id,note}); return; }
+    if (action === 'submit-capital-call-approval' && call) { __pv11EmitApi('capital-call-submit-approval',{fundId:call.fundId,id:String(call.recordId||call.id)}); return; }
+    if (action === 'capital-call-approve' && call) { __pv11EmitApi('capital-call-approve',{fundId:call.fundId,id:String(call.recordId||call.id)}); return; }
+    if (action === 'capital-call-reject' && call) { const reason=window.prompt('Reason for rejecting this capital call:'); if(reason && reason.trim()) __pv11EmitApi('capital-call-reject',{fundId:call.fundId,id:String(call.recordId||call.id),reason:reason.trim()}); return; }
+    if (action === 'capital-call-preview-notice' && trigger && trigger.dataset && trigger.dataset.fundId && trigger.dataset.id && trigger.dataset.allocationId) { __pv11EmitApi('capital-call-preview-notice',{fundId:trigger.dataset.fundId,id:trigger.dataset.id,allocationId:trigger.dataset.allocationId}); return; }
+    if (action === 'capital-call-preview-notice' && call) { __pv11EmitApi('capital-call-preview-notice',{fundId:call.fundId,id:String(call.recordId||call.id),allocationId:trigger.dataset.allocationId||''}); return; }
+    if (action === 'capital-call-edit' && call) { showCapitalCallEditModal(call); return; }
+    if (action === 'capital-call-save-edit' && call) {
+      const form = $('#capitalCallEditForm'); if (!form?.reportValidity()) return;
+      const data = Object.fromEntries(new FormData(form));
+      __pv11EmitApi('capital-call-update',{fundId:call.fundId,id:String(call.recordId||call.id),callPercent:String(data.callPercent),transactionDate:String(data.transactionDate),paymentDueDate:String(data.paymentDueDate),purpose:String(data.purpose),bankInstructions:String(data.bankInstructions)});
+      closeOverlays(); return;
+    }
+    if (action === 'capital-call-add-note' && call) { const note=String(trigger.closest('form')?.querySelector('[name="note"]')?.value||'').trim(); if(note) __pv11EmitApi('capital-call-activity',{fundId:call.fundId,id:String(call.recordId||call.id),note}); return; }
+    if (action === 'wizard-next' && state.modalWizard && state.modalWizard.kind === 'new-capital-call' && Number(state.modalWizard.step) === 0) {
+      captureModalWizardDraft(); const draft=state.modalWizard.draft||{}; const fund=funds.find(item=>String(item.id)===String(draft.fund)||item.name===draft.fund);
+      if(fund){state.capitalCallPreview=null;__pv11EmitApi('capital-call-preview',{fundId:fund.id,targetAmount:String(Number(draft.amount||0))});}
+    }
+    return __capitalCallBaseAction(action, trigger, event);
+  };
   return api;
 }

@@ -9,6 +9,7 @@ import {
   type ReactNode,
 } from "react"
 import { AppSwitcherDropdown } from "./arcus-app-switcher-dropdown"
+import { AppLoadingSpinner } from "./app-loading-spinner"
 import { MODULE_CONFIG } from "@/lib/config/modules"
 
 declare global {
@@ -36,6 +37,7 @@ export function ArcusAppSwitcherProvider({
   children: ReactNode
 }) {
   const [open, setOpen] = useState(false)
+  const [isModuleLoading, setIsModuleLoading] = useState(false)
 
   const openSwitcher = useCallback(() => setOpen(true), [])
 
@@ -50,7 +52,12 @@ export function ArcusAppSwitcherProvider({
 
   const handleModuleSelect = (module: string) => {
     const moduleConfig = MODULE_CONFIG.find((m) => m.id === module)
-    if (moduleConfig) window.location.href = moduleConfig.path
+    if (!moduleConfig) return
+    setOpen(false)
+    setIsModuleLoading(true)
+    window.setTimeout(() => {
+      window.location.href = moduleConfig.path
+    }, 60)
   }
 
   return (
@@ -62,6 +69,11 @@ export function ArcusAppSwitcherProvider({
         onModuleSelect={handleModuleSelect}
         currentModule={currentModule}
       />
+      {isModuleLoading && (
+        <div className="fixed inset-0 z-[100] bg-[#F4F7FC]/85 backdrop-blur-[1px]">
+          <AppLoadingSpinner className="h-full min-h-0 w-full" label="Loading module" />
+        </div>
+      )}
     </ArcusAppSwitcherContext.Provider>
   )
 }

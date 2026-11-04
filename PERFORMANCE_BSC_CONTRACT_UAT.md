@@ -1,0 +1,1 @@
+﻿The export was re-run in the authenticated browser after the filename update. Department contract PDF downloaded as `performance-contract-department-finance-2026.pdf` (52,054 bytes, `%PDF-1.3` header, no download failure). This closes the export verification item.

@@ -74,8 +74,6 @@ export const STAFF_PUBLIC_PASS_THROUGH = [
   '/applications/form',
   '/home',
   '/portfolio',
-  // The V6 payroll port now serves /payroll (renamed from /payroll-v6).
-  '/payroll',
   // The V52 accounting port now serves /accounting (renamed from /accounting-v52).
   '/accounting',
   '/procurement',
@@ -123,7 +121,9 @@ export function isAuthRoute(pathname: string): boolean {
  * Matched on whole path segments, not raw prefixes. Plain `startsWith` made
  * `/accounting` also admit `/accounting-legacy` and `/accounting-v2` — frozen
  * modules that had required login — and after the payroll rename `/payroll`
- * would likewise have opened `/payroll-legacy` to anyone. This list runs before
+ * would likewise have opened `/payroll-legacy` to anyone. Payroll remains behind
+ * the normal staff authentication check; employee self-service is authenticated.
+ * This list runs before
  * the token check in middleware, so a stray prefix match publishes a module.
  */
 export function isStaffPublicPassThrough(pathname: string): boolean {

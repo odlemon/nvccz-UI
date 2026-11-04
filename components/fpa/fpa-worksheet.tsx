@@ -2412,8 +2412,10 @@ export function FpaWorksheet({
       : authorisedDepartmentIds
     if (!allowed.length) return false
     const cellDept = cell.departmentId || null
-    // Company-level cells (no department) are not owner-editable when scopes exist
-    if (!cellDept) return true
+    // The budget owner worksheet is already scoped by its department/task query.
+    // Some API versions omit departmentId on those scoped cells; keep that
+    // supported owner slice editable without widening access elsewhere.
+    if (!cellDept) return !(inBudgetContext && Boolean(budgetDepartmentId) && Boolean(myOwnerTaskId))
     return !allowed.includes(cellDept)
   }
 

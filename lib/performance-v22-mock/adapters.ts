@@ -27,6 +27,7 @@ import type {
   PerfNamed,
   PerfOrgBsc,
   PerfPillar,
+  PerfProject,
   PerfScoreRow,
   PerfReview,
   PerfRisk,
@@ -92,6 +93,22 @@ export function adaptTask(raw: any): PerfTask {
     isOverdue: raw?.isOverdue === true,
     isPerformanceTask: raw?.isPerformanceTask === true,
     goalId: strOrNull(raw?.goalId),
+    projectId: strOrNull(raw?.projectId),
+    teamMemberIds: team.map((member: any) => typeof member === "string" ? member : strOrNull(member?.id ?? member?.userId)).filter(Boolean),
+  }
+}
+
+/** `GET /api/performance/projects` includes live task and approved-time rollups. */
+export function adaptPerformanceProject(raw: any): PerfProject {
+  return {
+    id: str(raw?.id), name: str(raw?.name), description: strOrNull(raw?.description),
+    status: str(raw?.status || "PLANNED"), ownerId: strOrNull(raw?.ownerId), ownerName: strOrNull(raw?.ownerName),
+    goalId: strOrNull(raw?.goalId), goalTitle: strOrNull(raw?.goalTitle), departmentName: strOrNull(raw?.departmentName),
+    startDate: strOrNull(raw?.startDate), endDate: strOrNull(raw?.endDate), budget: num(raw?.budget),
+    taskCount: Number.isFinite(Number(raw?.taskCount)) ? Number(raw.taskCount) : 0,
+    doneCount: Number.isFinite(Number(raw?.doneCount)) ? Number(raw.doneCount) : 0,
+    overdueCount: Number.isFinite(Number(raw?.overdueCount)) ? Number(raw.overdueCount) : 0,
+    progress: num(raw?.progress), hoursLogged: Number.isFinite(Number(raw?.hoursLogged)) ? Number(raw.hoursLogged) : 0,
   }
 }
 
@@ -132,14 +149,31 @@ export function adaptNamed(raw: any): PerfNamed {
 export function adaptKpi(raw: any): PerfKpi {
   return {
     ...adaptNamed(raw),
+    status: strOrNull(raw?.approvalStatus ?? raw?.status),
     code: strOrNull(raw?.code ?? raw?.kpiCode),
-    department: strOrNull(raw?.department ?? raw?.departmentName),
+    unit: strOrNull(raw?.unit ?? raw?.unitKind ?? raw?.unitSymbol),
+    department: strOrNull(raw?.department ?? raw?.departmentName ?? raw?.catalogDepartmentName),
     owner:
       strOrNull(raw?.owner?.name) ??
       strOrNull([raw?.owner?.firstName, raw?.owner?.lastName].filter(Boolean).join(" ")) ??
       strOrNull(raw?.ownerName),
     frequency: strOrNull(raw?.frequency ?? raw?.trackingFrequency ?? raw?.updateFrequency),
     target: strOrNull(raw?.target ?? raw?.targetValue),
+    targetValue: num(raw?.targetValue),
+    amberThreshold: num(raw?.amberThreshold),
+    redThreshold: num(raw?.redThreshold),
+    perspective: strOrNull(raw?.scorecardPillar ?? raw?.perspective),
+    sourceSystem: strOrNull(raw?.sourceSystem),
+    updateMethod: strOrNull(raw?.updateMethod),
+    evidenceRule: strOrNull(raw?.evidenceRule),
+    approvalStatus: strOrNull(raw?.approvalStatus),
+    isReverseKpi: Boolean(raw?.isReverseKpi),
+    isActive: Boolean(raw?.isActive),
+    ownerId: strOrNull(raw?.ownerId),
+    linkedGoals: num(raw?.linkedGoals),
+    averageProgress: num(raw?.averageProgress),
+    performanceMetadata: raw?.performanceMetadata && typeof raw.performanceMetadata === "object" ? raw.performanceMetadata : null,
+    updatedAt: strOrNull(raw?.updatedAt),
   }
 }
 
@@ -177,6 +211,9 @@ export function adaptUser(raw: any): PerfUser {
     departmentRole: strOrNull(raw?.departmentRole),
     roleCode: strOrNull(raw?.roleCode),
     role: strOrNull(raw?.role?.name ?? raw?.role),
+    jobTitle: strOrNull(raw?.jobTitle),
+    reportingManagerId: strOrNull(raw?.reportingManagerId),
+    status: strOrNull(raw?.status),
   }
 }
 
@@ -289,20 +326,41 @@ export function adaptReview(raw: any): PerfReview {
     score: num(raw?.overallScore ?? raw?.score ?? raw?.finalScore),
     submittedAt: strOrNull(raw?.submittedAt),
     completedAt: strOrNull(raw?.completedAt),
+    reviewType: strOrNull(raw?.reviewType),
+    reviewPeriod: strOrNull(raw?.reviewPeriod),
+    stage: strOrNull(raw?.stage),
+    isLocked: raw?.isLocked === true,
+    selfFeedback: strOrNull(raw?.selfFeedback),
+    managerFeedback: strOrNull(raw?.managerFeedback),
+    strengths: strOrNull(raw?.strengths),
+    developmentPlan: strOrNull(raw?.developmentPlan),
+    ratingValue: num(raw?.ratingValue ?? raw?.overallScore),
+    quantitativeSnapshot: raw?.quantitativeSnapshot && typeof raw.quantitativeSnapshot === "object" ? raw.quantitativeSnapshot : null,
   }
 }
 
 /** `GET /api/accounting/timesheets/mine`. */
 export function adaptTimesheet(raw: any): PerfTimesheet {
+  const ending = strOrNull(raw?.weekEnding ?? raw?.periodEnd ?? raw?.endDate ?? raw?.weekEnd)
+  const entries = Array.isArray(raw?.entries) ? raw.entries.map((e: any) => ({
+    id: str(e?.id), projectId: str(e?.projectId), projectName: str(e?.project?.name ?? e?.projectName ?? ''),
+    taskId: strOrNull(e?.taskId), date: str(e?.date).slice(0, 10), hours: num(e?.hours) ?? 0,
+    billable: e?.billable === true, notes: strOrNull(e?.notes), source: strOrNull(e?.entrySource ?? e?.source),
+  })) : []
+  const end = ending ? new Date(`${ending.slice(0, 10)}T00:00:00Z`) : null
+  const start = end ? new Date(end.getTime() - 6 * 86400000).toISOString().slice(0, 10) : null
   return {
     id: str(raw?.id),
     name: str(raw?.title ?? raw?.periodLabel ?? raw?.weekOf ?? "Timesheet"),
     description: strOrNull(raw?.notes ?? raw?.description),
     status: strOrNull(raw?.status),
-    periodStart: strOrNull(raw?.periodStart ?? raw?.startDate ?? raw?.weekStart),
-    periodEnd: strOrNull(raw?.periodEnd ?? raw?.endDate ?? raw?.weekEnd),
-    totalHours: num(raw?.totalHours ?? raw?.hours),
-    billableHours: num(raw?.billableHours),
+    weekEnding: ending,
+    periodStart: strOrNull(raw?.periodStart ?? raw?.startDate ?? raw?.weekStart) ?? start,
+    periodEnd: ending,
+    totalHours: num(raw?.totalHours ?? raw?.hours) ?? entries.reduce((sum: number, e: any) => sum + e.hours, 0),
+    billableHours: num(raw?.billableHours) ?? entries.filter((e: any) => e.billable).reduce((sum: number, e: any) => sum + e.hours, 0),
+    expectedHours: num(raw?.expectedHours), overtimeHours: num(raw?.overtimeHours), utilizationPercent: num(raw?.utilizationPercent),
+    entries,
     submittedAt: strOrNull(raw?.submittedAt),
     approvedAt: strOrNull(raw?.approvedAt),
     approver: personName(raw?.approver ?? raw?.approvedBy),
@@ -463,13 +521,22 @@ export function adaptContract(raw: any): PerfContract {
     periodLabel: strOrNull(raw?.periodLabel),
     periodStart: strOrNull(raw?.periodStart),
     periodEnd: strOrNull(raw?.periodEnd),
-    subject: personName(raw?.subjectUser),
+    subject: strOrNull(raw?.subjectName) ?? personName(raw?.subjectUser),
     subjectId: strOrNull(raw?.subjectUserId),
     department: strOrNull(raw?.departmentName ?? raw?.department?.name),
-    reviewer: personName(raw?.reviewer),
-    approver: personName(raw?.approver),
+    reviewer: strOrNull(raw?.reviewerName) ?? personName(raw?.reviewer),
+    approver: strOrNull(raw?.approverName) ?? personName(raw?.approver),
     allocatedBudget: num(raw?.allocatedBudget),
     actualSpend: num(raw?.actualSpend),
+    state: strOrNull(raw?.state),
+    versionNo: num(raw?.versionNo),
+    goalCount: num(raw?.goalCount),
+    weightTotal: num(raw?.weightTotal),
+    evidenceCoverage: num(raw?.evidenceCoverage),
+    signaturesNeeded: num(raw?.signaturesNeeded),
+    signaturesGiven: num(raw?.signaturesGiven),
+    overdue: typeof raw?.overdue === "boolean" ? raw.overdue : null,
+    metadata: raw?.metadata && typeof raw.metadata === "object" ? raw.metadata : null,
   }
 }
 

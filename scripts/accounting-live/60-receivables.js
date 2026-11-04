@@ -19,7 +19,7 @@ AL.arStatus = { DRAFT: ['Draft', 'warn'], SENT: ['Sent', 'info'], PARTIALLY_PAID
 AL.cnStatus = { DRAFT: ['Draft', 'warn'], SENT: ['Issued', 'info'], PARTIALLY_APPLIED: ['Part applied', 'warn'], APPLIED: ['Applied', 'ok'] };
 AL.arCode = (x) => (x && x.currency && x.currency.code) || '';
 
-AL.page('receivables', () => {
+AL.page('receivables-workflows', () => {
   AL.meLoad();
   const canPrepare = AL.can('manage_accounting'), canPost = AL.can('manage_ledger');
   const e = AL.arLoad();
@@ -61,6 +61,7 @@ AL.page('receivables', () => {
       if (x.status === 'DRAFT' && canPost) acts.push(AL.btn('Send', 'ar-send', 'small primary', `data-id="${ae(x.id)}"`));
       if ((x.status === 'SENT' || x.status === 'PARTIALLY_PAID') && canPrepare) acts.push(AL.btn('Record receipt', 'ar-receipt', 'small', `data-id="${ae(x.id)}"`), AL.btn('Credit note', 'ar-cn', 'small', `data-id="${ae(x.id)}"`));
       if ((x.status === 'DRAFT' || x.status === 'SENT') && Number(x.paidAmount || 0) === 0 && canPost) acts.push(AL.btn('Void', 'ar-void', 'small danger', `data-id="${ae(x.id)}"`));
+      acts.unshift(AL.btn('Open', 'ar-invoice-detail', 'small', `data-id="${ae(x.id)}"`));
       return `<tr>
         <td><strong>${ae(x.invoiceNumber)}</strong><span class="v28-sub">${ae(AL.date(x.transactionDate))}</span></td>
         <td>${ae((x.customer && x.customer.name) || '—')}</td>
@@ -74,7 +75,7 @@ AL.page('receivables', () => {
     }).join('');
     body = `${filt}${rows ? AL.table(['Invoice', 'Customer', 'Description', 'Due', 'Total', 'Outstanding', 'Status', ''], rows, '1150px') : AL.empty('No invoices here.')}`;
   } else if (t === 'receipts') {
-    const rows = unallocated.map((r) => `<tr><td>${ae(AL.date(r.date))}</td><td><strong>${ae(r.customer ? r.customer.name : '')}</strong><span class="v28-sub">${ae(r.reference || r.description || '')}</span></td><td>${ae(r.bank ? r.bank.name : '')}</td><td>${ae(AL.money(r.amount, r.bank && r.bank.currency))}</td><td>${ae(AL.money(r.unallocated, r.bank && r.bank.currency))}</td><td class="al-actions">${canPrepare ? AL.btn('Allocate', 'ar-allocate', 'small primary', `data-id="${ae(r.id)}"`) : ''}</td></tr>`).join('');
+    const rows = unallocated.map((r) => `<tr><td>${ae(AL.date(r.date))}</td><td><strong>${ae(r.customer ? r.customer.name : '')}</strong><span class="v28-sub">${ae(r.reference || r.description || '')}</span></td><td>${ae(r.bank ? r.bank.name : '')}</td><td>${ae(AL.money(r.amount, r.bank && r.bank.currency))}</td><td>${ae(AL.money(r.unallocated, r.bank && r.bank.currency))}</td><td class="al-actions">${AL.btn('Open', 'ar-receipt-detail', 'small', `data-id="${ae(r.id)}"`)}${canPrepare ? AL.btn('Allocate', 'ar-allocate', 'small primary', `data-id="${ae(r.id)}"`) : ''}</td></tr>`).join('');
     body = rows ? AL.table(['Received', 'Customer', 'Bank', 'Amount', 'Not allocated', ''], rows, '900px') : AL.empty('Every customer receipt is allocated to invoices.');
   } else if (t === 'credit') {
     const rows = creditNotes.map((n) => {
@@ -84,6 +85,7 @@ AL.page('receivables', () => {
       if (n.status === 'DRAFT' && canPost) acts.push(AL.btn('Issue', 'cn-send', 'small primary', `data-id="${ae(n.id)}"`));
       if (n.status === 'DRAFT' && canPrepare) acts.push(AL.btn('Delete', 'cn-delete', 'small danger', `data-id="${ae(n.id)}"`));
       if ((n.status === 'SENT' || n.status === 'PARTIALLY_APPLIED') && Number(n.remainingAmount) > 0 && canPrepare) acts.push(AL.btn('Apply to invoice', 'cn-apply', 'small', `data-id="${ae(n.id)}"`));
+      acts.unshift(AL.btn('Open', 'cn-detail', 'small', `data-id="${ae(n.id)}"`));
       return `<tr><td><strong>${ae(n.creditNoteNumber)}</strong><span class="v28-sub">${ae(AL.date(n.createdAt))}</span></td><td>${ae(n.customer ? n.customer.name : '')}</td><td>${ae(n.originalInvoice ? n.originalInvoice.invoiceNumber : '—')}</td><td class="al-wrap">${ae(n.reason || '')}</td><td>${ae(AL.money(n.totalAmount, c))}</td><td>${ae(AL.money(n.remainingAmount, c))}</td><td>${AL.status(s[0], s[1])}</td><td class="al-actions">${acts.join('')}</td></tr>`;
     }).join('');
     body = rows ? AL.table(['Credit note', 'Customer', 'Against', 'Reason', 'Total', 'Not yet applied', 'Status', ''], rows, '1100px') : AL.empty('No credit notes.');
@@ -111,14 +113,30 @@ AL.wire.receivables = () => {
 };
 AL.actions['ar-tab'] = (el) => { AL.ui.ar.tab = el.dataset.tab; AL.redraw(); };
 AL.arInv = (id) => ((AL.cache.ar && AL.cache.ar.data && AL.cache.ar.data.invoices) || []).find((x) => x.id === id);
+AL.actions['ar-invoice-detail'] = (el) => {
+  const x = AL.arInv(el.dataset.id); if (!x) return;
+  const c = AL.arCode(x), status = AL.arStatus[x.status] || [x.status, 'info'];
+  const detail = [['Invoice', x.invoiceNumber], ['Customer', x.customer && x.customer.name], ['Invoice date', AL.date(x.transactionDate)], ['Due date', x.dueDate ? AL.date(x.dueDate) : '—'], ['Status', status[0]], ['Currency', c || '—'], ['Total', AL.money(x.totalAmount, c)], ['Paid', AL.money(x.paidAmount, c)], ['Outstanding', AL.money(x.outstandingAmount, c)], ['Description', x.description || '—'], ['Recorded by', x.createdBy && (x.createdBy.name || x.createdBy.email) || '—']].map(([k, v]) => `<div><span class="v28-sub">${ae(k)}</span><strong>${ae(String(v == null ? '—' : v))}</strong></div>`).join('');
+  AL.form({ title: x.invoiceNumber, sub: 'Customer invoice detail', wide: true, viewOnly: true, submitLabel: 'Close', fields: [], extra: `<div class="al-wide"><div class="v28-grid equal">${detail}</div></div>`, onSubmit: async () => false });
+};
 
 // ------------------------------------------------------------------------------------------------ invoices
 AL.arLineRow = (l = {}) => `<tr class="al-ar-line"><td><input class="v28-input" data-k="description" value="${ae(l.description || '')}"></td><td><input class="v28-input" type="number" min="0" step="any" data-k="quantity" value="${ae(l.quantity || 1)}"></td><td><input class="v28-input" type="number" min="0" step="0.01" data-k="unitPrice" value="${ae(l.unitPrice || '')}"></td><td><button class="v28-btn icon" data-al="ar-line-del" type="button" aria-label="Remove line">×</button></td></tr>`;
 AL.arReadLines = () => [...document.querySelectorAll('#alOverlay .al-ar-line')].map((tr) => ({ description: tr.querySelector('[data-k="description"]').value.trim(), quantity: Number(tr.querySelector('[data-k="quantity"]').value) || 0, unitPrice: Number(tr.querySelector('[data-k="unitPrice"]').value) || 0 })).filter((l) => l.description || l.unitPrice);
+AL.arLineRow = (l = {}) => `<tr class="al-ar-line"><td><select class="v28-input" data-k="itemId"><option value="">Service / non-stock item</option>${(AL.arInventoryItems || []).map((i) => `<option value="${ae(i.id)}" ${l.itemId === i.id ? 'selected' : ''}>${ae(i.skuNumber)} · ${ae(i.itemName)} (${ae(String(i.quantityOnHand))} on hand)</option>`).join('')}</select><input class="v28-input" data-k="description" value="${ae(l.description || '')}" placeholder="Item or service description"></td><td><input class="v28-input" type="number" min="0" step="any" data-k="quantity" value="${ae(l.quantity || 1)}"></td><td><input class="v28-input" type="number" min="0" step="0.01" data-k="unitPrice" value="${ae(l.unitPrice || '')}"></td><td><button class="v28-btn icon" data-al="ar-line-del" type="button" aria-label="Remove line">×</button></td></tr>`;
+AL.arReadLines = () => [...document.querySelectorAll('#alOverlay .al-ar-line')].map((tr) => ({ itemId: tr.querySelector('[data-k="itemId"]').value || undefined, description: tr.querySelector('[data-k="description"]').value.trim(), quantity: Number(tr.querySelector('[data-k="quantity"]').value) || 0, unitPrice: Number(tr.querySelector('[data-k="unitPrice"]').value) || 0 })).filter((l) => l.description || l.unitPrice || l.itemId);
+AL.actions['ar-receipt-detail'] = (el) => {
+  const r = (AL.cache.ar.data.unallocated || []).find((x) => x.id === el.dataset.id); if (!r) return;
+  const c = r.bank && r.bank.currency, detail = [['Received', AL.date(r.date)], ['Customer', r.customer && r.customer.name], ['Bank', r.bank && r.bank.name], ['Reference', r.reference || '—'], ['Description', r.description || '—'], ['Amount', AL.money(r.amount, c)], ['Not allocated', AL.money(r.unallocated, c)], ['Status', 'Awaiting allocation']].map(([k, v]) => `<div><span class="v28-sub">${ae(k)}</span><strong>${ae(String(v == null ? '—' : v))}</strong></div>`).join('');
+  AL.form({ title: 'Customer receipt', sub: 'Receipt detail', wide: true, viewOnly: true, submitLabel: 'Close', fields: [], extra: `<div class="al-wide"><div class="v28-grid equal">${detail}</div></div>`, onSubmit: async () => false });
+};
 AL.actions['ar-line-add'] = () => { const tb = document.querySelector('#alOverlay .al-ar-lines tbody'); if (tb) tb.insertAdjacentHTML('beforeend', AL.arLineRow()); };
 AL.actions['ar-line-del'] = (el) => { if (document.querySelectorAll('#alOverlay .al-ar-line').length > 1) el.closest('tr').remove(); };
 AL.actions['ar-new'] = (el) => AL.busy(el, async () => {
   const { customers } = AL.cache.ar.data;
+  const stockItems = []; let stockPage = 1; let stockPages = 1;
+  do { const d = await AL.get(`/accounting/inventory/items?isActive=true&page=${stockPage}&limit=100`); stockItems.push(...(d.items || d)); stockPages = Number(d.totalPages) || 1; stockPage++; } while (stockPage <= stockPages);
+  AL.arInventoryItems = stockItems.filter((i) => i.isActive !== false);
   const cur = await AL.get('/accounting/currencies');
   const base = (cur || []).find((c) => c.isDefault) || (cur || [])[0] || {};
   AL.form({
@@ -132,7 +150,7 @@ AL.actions['ar-new'] = (el) => AL.busy(el, async () => {
       { k: 'isTaxable', label: 'Charge VAT', type: 'checkbox' },
     ],
     initial: { currencyId: base.id, invoiceDate: AL.stiToday() },
-    extra: `<div class="al-wide"><div class="v28-tablewrap"><table class="v28-table al-ar-lines" style="min-width:640px"><thead><tr><th>Item</th><th>Quantity</th><th>Unit price</th><th></th></tr></thead><tbody>${AL.arLineRow()}</tbody></table></div>${AL.btn('Add line', 'ar-line-add', 'small', 'type="button"')}</div>`,
+    extra: `<div class="al-wide"><p class="v28-sub">Choose an Inventory item to reduce stock and post cost of sales when sent. Leave it as Service / non-stock for non-stock charges.</p><div class="v28-tablewrap"><table class="v28-table al-ar-lines" style="min-width:740px"><thead><tr><th>Inventory item / description</th><th>Quantity</th><th>Unit price</th><th></th></tr></thead><tbody>${AL.arLineRow()}</tbody></table></div>${AL.btn('Add line', 'ar-line-add', 'small', 'type="button"')}</div>`,
     validate: (v) => {
       const ls = AL.arReadLines();
       if (!ls.length) return 'Add at least one line.';
@@ -240,6 +258,12 @@ AL.actions['ar-cn'] = (el) => {
   });
 };
 AL.cnFind = (id) => ((AL.cache.ar && AL.cache.ar.data && AL.cache.ar.data.creditNotes) || []).find((n) => n.id === id);
+AL.actions['cn-detail'] = (el) => {
+  const n = AL.cnFind(el.dataset.id); if (!n) return;
+  const c = n.currency && n.currency.code, status = AL.cnStatus[n.status] || [n.status, 'info'];
+  const detail = [['Credit note', n.creditNoteNumber], ['Customer', n.customer && n.customer.name], ['Against invoice', n.originalInvoice && n.originalInvoice.invoiceNumber || '—'], ['Created', AL.date(n.createdAt)], ['Status', status[0]], ['Currency', c || '—'], ['Total', AL.money(n.totalAmount, c)], ['Not yet applied', AL.money(n.remainingAmount, c)], ['Reason', n.reason || '—'], ['Recorded by', n.createdBy && (n.createdBy.name || n.createdBy.email) || '—']].map(([k, v]) => `<div><span class="v28-sub">${ae(k)}</span><strong>${ae(String(v == null ? '—' : v))}</strong></div>`).join('');
+  AL.form({ title: n.creditNoteNumber, sub: 'Credit note detail', wide: true, viewOnly: true, submitLabel: 'Close', fields: [], extra: `<div class="al-wide"><div class="v28-grid equal">${detail}</div></div>`, onSubmit: async () => false });
+};
 AL.actions['cn-send'] = (el) => { const n = AL.cnFind(el.dataset.id); if (!n) return; AL.confirm({ title: `Issue ${n.creditNoteNumber}`, confirmLabel: 'Issue and post', doneTitle: 'Credit note issued', body: `${AL.money(n.totalAmount, n.currency && n.currency.code)} is credited to ${n.customer ? n.customer.name : 'the customer'}: income and VAT are reduced and the receivable with them.`, onConfirm: async () => { await AL.post(`/accounting/credit-notes/${encodeURIComponent(n.id)}/send`, {}); return ''; }, after: () => AL.arReload() }); };
 AL.actions['cn-delete'] = (el) => { const n = AL.cnFind(el.dataset.id); if (!n) return; AL.confirm({ title: `Delete ${n.creditNoteNumber}`, danger: true, confirmLabel: 'Delete draft', doneTitle: 'Credit note deleted', body: 'The draft and its unposted journal are withdrawn.', onConfirm: async () => { await AL.del(`/accounting/credit-notes/${encodeURIComponent(n.id)}`); return ''; }, after: () => AL.arReload() }); };
 AL.actions['cn-apply'] = (el) => {
@@ -262,3 +286,6 @@ AL.actions['ar-customer'] = () => AL.form({
   onSubmit: async (v) => { await AL.post('/accounting/customers', { ...v, paymentTerms: v.paymentTerms ? Number(v.paymentTerms) : undefined }); return v.name; },
   after: () => AL.arReload(),
 });
+
+/* Shared legacy React content fills this stable slot on the restored route. */
+AL.page('receivables', () => '<div class="v28-page"><div id="ac52LegacyReceivablesSlot" class="ac52-legacy-mount"></div></div>');

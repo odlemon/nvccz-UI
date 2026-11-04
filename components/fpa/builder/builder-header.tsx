@@ -44,6 +44,8 @@ type Props = {
   onChangeHistory: () => void
   onOpenModelSettings?: () => void
   onPublish?: () => void
+  onCreateVersion?: () => void
+  onSeedDefaults?: () => void
   /** Design polish: show A.3 mock labels until live publish metadata is wired. */
   hardcodeChrome?: boolean
   versionLocked?: boolean
@@ -71,6 +73,8 @@ export function BuilderHeader({
   onChangeHistory,
   onOpenModelSettings,
   onPublish,
+  onCreateVersion,
+  onSeedDefaults,
   hardcodeChrome = true,
   versionLocked = false,
   publishDisabled = false,
@@ -133,6 +137,16 @@ export function BuilderHeader({
                 )}
               </SelectContent>
             </Select>
+            {canConfigure && onCreateVersion && versions.length === 0 ? (
+              <button
+                type="button"
+                onClick={onCreateVersion}
+                disabled={busyKey === "create-version"}
+                className="mt-1 text-left text-[11px] font-medium text-[#2563eb] hover:underline disabled:opacity-50"
+              >
+                {busyKey === "create-version" ? "Creating workspace…" : "Create workspace version"}
+              </button>
+            ) : null}
           </div>
 
           {/* Workspace — label above */}
@@ -243,6 +257,17 @@ export function BuilderHeader({
             )}
             Validate Model
           </button>
+          {canConfigure && onSeedDefaults ? (
+            <button
+              type="button"
+              onClick={onSeedDefaults}
+              disabled={busyKey === "seed-defaults"}
+              className="h-10 inline-flex items-center rounded-md border border-[#e2e8f0] bg-white px-3 text-[12px] font-medium text-[#2563eb] hover:bg-[#f8fafc] disabled:opacity-50"
+              title="Create only missing local FP&A defaults for this model"
+            >
+              {busyKey === "seed-defaults" ? "Preparing…" : "Prepare local defaults"}
+            </button>
+          ) : null}
 
           <button
             type="button"

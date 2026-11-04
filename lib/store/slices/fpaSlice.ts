@@ -75,9 +75,18 @@ export const bootstrapFpaSelection = createAsyncThunk(
   'fpa/bootstrapSelection',
   async (preferredModelId: string | undefined, { rejectWithValue }) => {
     try {
-      const listRes = await fpaApi.listModels()
+      let listRes = await fpaApi.listModels()
       if (!listRes.success) throw new Error(listRes.message || 'Failed to list models')
-      const models = listRes.data || []
+      // A freshly restored browser session can briefly race auth hydration and
+      // receive an empty successful response. Retry once so that transient
+      // bootstrap emptiness does not become a permanent "no model" state.
+      let models = listRes.data || []
+      if (!models.length) {
+        await new Promise((resolve) => setTimeout(resolve, 150))
+        listRes = await fpaApi.listModels()
+        if (!listRes.success) throw new Error(listRes.message || 'Failed to list models')
+        models = listRes.data || []
+      }
       const active = models.filter((m) => m.status !== 'ARCHIVED')
       // Prefer published models for Planning Workspace; fall back to any active.
       const published = active.filter((m) => String(m.status).toUpperCase() === 'PUBLISHED')

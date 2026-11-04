@@ -1,6 +1,8 @@
 import { apiClient, type ApiResponse } from '@/lib/api/api-client'
 
-const PUBLIC_API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://31.220.82.129:3009/api'
+// Keep local/UAT development on the sibling local API unless an explicit
+// deployment-specific API base is configured.
+const PUBLIC_API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://127.0.0.1:3009/api'
 
 export interface EventAuthor {
   id: string
@@ -52,10 +54,25 @@ export interface EventGuest {
   eventId: string
   email: string
   name: string
+  salutation: string | null
   phone: string | null
   company: string | null
   title: string | null
   invitationToken: string
+  announcementSentAt: string | null
+  announcementDeliveryStatus: 'PENDING' | 'SENDING' | 'ACCEPTED' | 'FAILED'
+  announcementDeliveryError: string | null
+  anniversaryVideoUrl: string | null
+  videoConsentAt: string | null
+  invitationSentAt: string | null
+  deliveryStatus: 'PENDING' | 'SENDING' | 'ACCEPTED' | 'DELIVERED' | 'BOUNCED' | 'FAILED'
+  deliveryError: string | null
+  openedAt: string | null
+  lastOpenedAt: string | null
+  openCount: number
+  clickedAt: string | null
+  lastClickedAt: string | null
+  clickCount: number
   rsvpStatus: RSVPStatus
   rsvpRespondedAt: string | null
   rsvpNotes: string | null
@@ -68,6 +85,13 @@ export interface EventGuest {
   emergencyPhone: string | null
   createdAt: string
   updatedAt: string
+}
+
+export interface InvitationDelivery {
+  guestId: string
+  email: string
+  status: 'SENT' | 'FAILED'
+  error?: string
 }
 
 export interface BudgetItem {
@@ -225,13 +249,16 @@ export const eventsApi = {
   },
 
   // Guest Management
-  getGuests: async (eventId: string, page = 1, limit = 10): Promise<ApiResponse<EventGuest[]> & { pagination?: any }> => {
-    return apiClient.get<ApiResponse<EventGuest[]>>(`/events/${eventId}/guests?page=${page}&limit=${limit}`)
+  getGuests: async (eventId: string, page = 1, limit = 9, search = ''): Promise<ApiResponse<EventGuest[]> & { pagination?: any; pendingInvitationCount?: number }> => {
+    const params = new URLSearchParams({ page: String(page), limit: String(limit) })
+    if (search.trim()) params.set('search', search.trim())
+    return apiClient.get<ApiResponse<EventGuest[]> & { pagination?: any; pendingInvitationCount?: number }>(`/events/${eventId}/guests?${params.toString()}`)
   },
   
   addGuests: async (eventId: string, guests: Array<{
     email: string
     name: string
+    salutation?: string
     phone?: string
     company?: string
     title?: string
@@ -239,8 +266,32 @@ export const eventsApi = {
     accessibilityNeeds?: string
     emergencyContact?: string
     emergencyPhone?: string
-  }>): Promise<ApiResponse<EventGuest[]>> => {
-    return apiClient.post<ApiResponse<EventGuest[]>>(`/events/${eventId}/guests`, { guests })
+  }>): Promise<ApiResponse<EventGuest[]> & { announcementDelivery?: InvitationDelivery[]; skippedExisting?: number }> => {
+    return apiClient.post<ApiResponse<EventGuest[]> & { announcementDelivery?: InvitationDelivery[] }>(`/events/${eventId}/guests`, { guests })
+  },
+
+  sendOfficialInvitations: async (eventId: string): Promise<ApiResponse<EventGuest[]> & { delivery?: InvitationDelivery[] }> => {
+    return apiClient.post<ApiResponse<EventGuest[]> & { delivery?: InvitationDelivery[] }>(
+      `/events/${eventId}/guests/send-invitations`, {}
+    )
+  },
+
+  resendAnnouncements: async (
+    eventId: string,
+    payload: { guestIds?: string[] } = {}
+  ): Promise<ApiResponse<EventGuest[]> & { announcementDelivery?: InvitationDelivery[] }> => {
+    return apiClient.post<ApiResponse<EventGuest[]> & { announcementDelivery?: InvitationDelivery[] }>(
+      `/events/${eventId}/guests/resend-announcements`, payload
+    )
+  },
+
+  resendInvitations: async (
+    eventId: string,
+    payload: { guestIds?: string[]; emails?: string[] }
+  ): Promise<ApiResponse<EventGuest[]> & { delivery?: InvitationDelivery[] }> => {
+    return apiClient.post<ApiResponse<EventGuest[]> & { delivery?: InvitationDelivery[] }>(
+      `/events/${eventId}/guests/resend-invitations`, payload
+    )
   },
   
   checkInGuest: async (eventId: string, guestId: string, notes?: string): Promise<ApiResponse<EventGuest>> => {
@@ -251,7 +302,7 @@ export const eventsApi = {
   bulkUploadGuests: async (
     eventId: string,
     payload: { file?: File; text?: string }
-  ): Promise<ApiResponse<EventGuest[]>> => {
+  ): Promise<ApiResponse<any> & { announcementDelivery?: InvitationDelivery[] }> => {
     const formData = new FormData()
     if (payload.file) formData.append('file', payload.file)
     if (payload.text) formData.append('text', payload.text)
@@ -368,6 +419,22 @@ export const eventsApi = {
   },
 
   // Public RSVP by invitation token — no JWT required
+  getPublicRSVPDetails: async (token: string): Promise<ApiResponse<any>> => {
+    const res = await fetch(`${PUBLIC_API_BASE}/events/rsvp/${token}`, { headers: { accept: 'application/json' }, cache: 'no-store' })
+    return res.json()
+  },
+  uploadPublicRegistrationVideo: async (token: string, data: FormData): Promise<ApiResponse<any>> => {
+    const res = await fetch(`${PUBLIC_API_BASE}/events/rsvp/${token}/register-video`, {
+      method: 'POST', headers: { accept: 'application/json' }, body: data,
+    })
+    return res.json()
+  },
+  submitPublicRegistration: async (token: string, data: FormData): Promise<ApiResponse<any>> => {
+    const res = await fetch(`${PUBLIC_API_BASE}/events/rsvp/${token}/register`, {
+      method: 'POST', headers: { accept: 'application/json' }, body: data,
+    })
+    return res.json()
+  },
   respondToRSVP: async (token: string, data: {
     rsvpStatus: 'ACCEPTED' | 'DECLINED' | 'MAYBE'
     notes?: string
@@ -385,6 +452,18 @@ export const eventsApi = {
       body: JSON.stringify(data)
     })
     return res.json()
+  },
+
+  trackRSVPLinkClick: async (token: string): Promise<void> => {
+    try {
+      await fetch(`${PUBLIC_API_BASE}/events/rsvp/${token}/click`, {
+        method: "POST",
+        headers: { "accept": "application/json" },
+        keepalive: true,
+      })
+    } catch {
+      // Link tracking is best-effort and must not block the RSVP form.
+    }
   },
 
   // Public feedback submission — no JWT required

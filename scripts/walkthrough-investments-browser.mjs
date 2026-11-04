@@ -70,24 +70,18 @@ async function apiLogin() {
 async function injectAuth(page, auth) {
   const host = new URL(BASE).hostname
   const cookies = [
-    { name: TOKEN_KEY, value: auth.token, domain: host, path: '/', maxAge: COOKIE_MAX_AGE, sameSite: 'Lax' },
+    { name: TOKEN_KEY, value: String(auth.token), url: BASE },
     {
       name: USER_KEY,
       value: encodeURIComponent(JSON.stringify(auth.user)),
-      domain: host,
-      path: '/',
-      maxAge: COOKIE_MAX_AGE,
-      sameSite: 'Lax',
+      url: BASE,
     },
   ]
   if (auth.profile) {
     cookies.push({
       name: PROFILE_KEY,
       value: encodeURIComponent(JSON.stringify(auth.profile)),
-      domain: host,
-      path: '/',
-      maxAge: COOKIE_MAX_AGE,
-      sameSite: 'Lax',
+      url: BASE,
     })
   }
   await page.context().addCookies(cookies)
@@ -315,8 +309,12 @@ async function main() {
     console.log('API login…')
     const auth = await apiLogin()
     console.log('Logged in as', EMAIL)
-    await injectAuth(page, auth)
-    pass.push('Login (API + cookies)')
+    await page.addInitScript(({ tokenKey, userKey, profileKey, auth }) => {
+      localStorage.setItem(tokenKey, auth.token)
+      localStorage.setItem(userKey, JSON.stringify(auth.user))
+      if (auth.profile) localStorage.setItem(profileKey, JSON.stringify(auth.profile))
+    }, { tokenKey: TOKEN_KEY, userKey: USER_KEY, profileKey: PROFILE_KEY, auth })
+    pass.push('Login (API + local storage)')
   }
 
   // Verify static assets load

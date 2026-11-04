@@ -346,7 +346,7 @@ export function FundraisingDocuments() {
                 </button>
               ) : null}
             </div>
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-6">
               {categories.map((cat) => {
                 const t = tone(cat)
                 const active = folder === cat
@@ -358,7 +358,7 @@ export function FundraisingDocuments() {
                     onClick={() => setFolder(active ? "all" : cat)}
                     className={cn(
                       CARD,
-                      "flex flex-col items-start gap-2 rounded-full p-3 text-left transition-all hover:shadow-md",
+                      "flex min-h-[124px] flex-col items-start gap-2 rounded-2xl p-3 text-left transition-all hover:shadow-md",
                       active && `ring-2 ${t.ring}`,
                     )}
                   >

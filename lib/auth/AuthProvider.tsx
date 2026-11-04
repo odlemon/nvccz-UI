@@ -33,15 +33,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const isPublicDesignPreview =
     PORTAL_ID === 'staff' &&
-    (pathname === '/home' ||
-      (pathname?.startsWith('/home/') ?? false) ||
-      pathname === '/portfolio' ||
-      (pathname?.startsWith('/portfolio/') ?? false) ||
-      pathname === '/payroll' ||
-      (pathname?.startsWith('/payroll/') ?? false) ||
-      pathname === '/performance' ||
-      (pathname?.startsWith('/performance/') ?? false) ||
-      pathname === '/fundraising-kyc' ||
+    (pathname === '/fundraising-kyc' ||
       (pathname?.startsWith('/fundraising-kyc/') ?? false) ||
       pathname === '/investee-portal-v8' ||
       (pathname?.startsWith('/investee-portal-v8/') ?? false) ||

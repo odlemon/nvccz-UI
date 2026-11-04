@@ -6,7 +6,10 @@ let socket: Socket | null = null
 const getWebSocketUrl = (): string => {
   const wsUrl = process.env.NEXT_PUBLIC_WS_URL
   if (wsUrl) return wsUrl
-  const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "http://31.220.82.129:3009/api"
+  // Keep realtime traffic on the same API host as REST in local development.
+  // Production and other environments should set NEXT_PUBLIC_API_BASE_URL or
+  // NEXT_PUBLIC_WS_URL explicitly.
+  const apiUrl = process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:3009/api"
   return apiUrl.replace(/\/api\/?$/, "")
 }
 

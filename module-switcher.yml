@@ -1,0 +1,208 @@
+- generic [ref=f1e1]:
+  - generic [ref=f1e35]:
+    - banner [ref=f1e36]:
+      - generic [ref=f1e37]:
+        - textbox "Search here..." [ref=f1e43]
+        - generic [ref=f1e44]:
+          - button "Matanho" [ref=f1e45]
+          - button "Switch module" [active] [ref=f1e46] [cursor=pointer]:
+            - generic [ref=f1e55]: Modules
+          - button "1232 unread notifications" [ref=f1e57]:
+            - generic [ref=f1e61]: 99+
+          - generic [ref=f1e62] [cursor=pointer]: AN
+    - generic [ref=f1e68]:
+      - complementary [ref=f1e69]:
+        - generic [ref=f1e70]:
+          - img "Matanho" [ref=f1e71]
+          - button "Collapse navigation" [ref=f1e72] [cursor=pointer]
+        - generic [ref=f1e75]:
+          - generic [ref=f1e76]:
+            - generic [ref=f1e77]: Home
+            - button "Home" [ref=f1e78] [cursor=pointer]
+            - button "Daily Cover" [ref=f1e84] [cursor=pointer]
+          - generic [ref=f1e89]:
+            - generic [ref=f1e90]: Communication
+            - button "News" [ref=f1e91] [cursor=pointer]
+            - button "Newsletters" [ref=f1e96] [cursor=pointer]
+            - button "Forums" [ref=f1e101] [cursor=pointer]
+          - generic [ref=f1e106]:
+            - generic [ref=f1e107]: Work
+            - button "Calendar" [ref=f1e108] [cursor=pointer]
+            - button "My Work" [ref=f1e113] [cursor=pointer]
+            - button "Performance" [ref=f1e118] [cursor=pointer]
+          - generic [ref=f1e122]:
+            - generic [ref=f1e123]: People
+            - button "People" [ref=f1e124] [cursor=pointer]
+            - button "My Profile" [ref=f1e130] [cursor=pointer]
+          - generic [ref=f1e135]:
+            - generic [ref=f1e136]: Services
+            - button "Services" [ref=f1e137] [cursor=pointer]
+          - generic [ref=f1e142]:
+            - generic [ref=f1e143]: Apps
+            - button "Apps" [ref=f1e144] [cursor=pointer]
+            - button "Matanho AI" [ref=f1e151] [cursor=pointer]
+        - generic [ref=f1e156]:
+          - button "Settings" [ref=f1e157] [cursor=pointer]
+          - button "Help & Support" [ref=f1e162] [cursor=pointer]
+          - generic "Click your profile to collapse navigation" [ref=f1e167] [cursor=pointer]:
+            - button "Admin NTS Admin NTS admin" [ref=f1e168]:
+              - img "Admin NTS" [ref=f1e170]
+              - generic [ref=f1e171]:
+                - strong [ref=f1e172]: Admin NTS
+                - generic [ref=f1e173]: admin
+      - main [ref=f1e175]:
+        - generic:
+          - generic:
+            - heading [level=1]
+        - generic [ref=f1e176]:
+          - generic [ref=f1e177]:
+            - generic [ref=f1e178]: Good evening, Admin
+            - generic [ref=f1e181]: 08:50PM
+            - generic [ref=f1e182]: Monday, 12 October 2026
+            - generic [ref=f1e183]: In Office · Harare, Zimbabwe
+            - generic [ref=f1e188]:
+              - generic [ref=f1e189]: Daily perspective
+              - strong [ref=f1e190]: Begin gently, then build with conviction.
+          - generic [ref=f1e191]:
+            - button "Previous Japandi scene" [ref=f1e192] [cursor=pointer]
+            - generic [ref=f1e195]:
+              - generic [ref=f1e196]: Daily scene
+              - strong [ref=f1e197]: Minimal zen
+              - generic [ref=f1e198]: Perspective · changes automatically each day
+            - button "Next Japandi scene" [ref=f1e199] [cursor=pointer]
+          - generic [ref=f1e202]:
+            - generic [ref=f1e203]:
+              - generic [ref=f1e204]: Plan · focus · begin
+              - strong [ref=f1e205]: Start your day
+              - generic [ref=f1e206]: Choose a task, set your status and start a focused timer.
+            - button "Start your day" [ref=f1e207] [cursor=pointer]
+        - generic [ref=f1e210]:
+          - generic [ref=f1e215]:
+            - strong [ref=f1e216]:
+              - text: Matanho Assistant
+              - generic [ref=f1e217]: AI
+            - generic [ref=f1e218]: Ask for insights, prepare meetings or turn priorities into action.
+          - generic [ref=f1e219]:
+            - button "Today’s priorities" [ref=f1e220] [cursor=pointer]
+            - button "Prepare next meeting" [ref=f1e221] [cursor=pointer]
+            - button "Attention needed" [ref=f1e222] [cursor=pointer]
+          - generic [ref=f1e223]:
+            - textbox "Ask anything…" [ref=f1e224]
+            - button "Send" [ref=f1e225] [cursor=pointer]
+        - generic [ref=f1e230]:
+          - generic [ref=f1e232]:
+            - generic [ref=f1e233]: Portfolio signal
+            - strong [ref=f1e234]: Assets under management
+          - generic [ref=f1e235]:
+            - generic [ref=f1e236]: US$8.81M
+            - generic [ref=f1e237]: No trend history yet
+        - generic [ref=f1e238]:
+          - article [ref=f1e239]:
+            - generic [ref=f1e240]:
+              - generic [ref=f1e241]:
+                - heading "Today’s Priorities" [level=3] [ref=f1e242]
+                - paragraph [ref=f1e243]: 2 of 6 complete
+              - button "Open My Work" [ref=f1e244] [cursor=pointer]
+            - generic [ref=f1e247]:
+              - button [ref=f1e248] [cursor=pointer]
+              - generic [ref=f1e252]:
+                - strong [ref=f1e253]: Financial Assessment
+                - generic [ref=f1e254]: 03 Sept · 14:00
+              - generic [ref=f1e255]: Medium
+            - generic [ref=f1e256]:
+              - button [ref=f1e257] [cursor=pointer]
+              - generic [ref=f1e258]:
+                - strong [ref=f1e259]: Due diligence — Management & operations
+                - generic [ref=f1e260]: 10 Sept · 17:29
+              - generic [ref=f1e261]: High
+            - generic [ref=f1e262]:
+              - button [ref=f1e263] [cursor=pointer]
+              - generic [ref=f1e264]:
+                - strong [ref=f1e265]: Due diligence — Financial deep dive
+                - generic [ref=f1e266]: 10 Sept · 17:29
+              - generic [ref=f1e267]: High
+            - generic [ref=f1e268]:
+              - button [ref=f1e269] [cursor=pointer]
+              - generic [ref=f1e270]:
+                - strong [ref=f1e271]: Due diligence — Legal & regulatory
+                - generic [ref=f1e272]: 10 Sept · 17:29
+              - generic [ref=f1e273]: High
+            - generic [ref=f1e274]:
+              - button [ref=f1e275] [cursor=pointer]
+              - generic [ref=f1e276]:
+                - strong [ref=f1e277]: Due diligence — Market & commercial
+                - generic [ref=f1e278]: 10 Sept · 17:29
+              - generic [ref=f1e279]: High
+            - generic [ref=f1e280]:
+              - button [ref=f1e281] [cursor=pointer]
+              - generic [ref=f1e285]:
+                - strong [ref=f1e286]: Due diligence — Market & commercial
+                - generic [ref=f1e287]: 11 Sept · 01:08
+              - generic [ref=f1e288]: High
+          - article [ref=f1e289]:
+            - generic [ref=f1e290]:
+              - generic [ref=f1e291]:
+                - heading "Upcoming Schedule" [level=3] [ref=f1e292]
+                - paragraph [ref=f1e293]: Your next three commitments
+              - button "View calendar" [ref=f1e294] [cursor=pointer]
+            - generic [ref=f1e297]: Nothing on your calendar yet.
+    - generic [aria-hidden] [ref=f1e298]: Home Version 3
+  - region "Notifications alt+T"
+  - alert [ref=f1e299]
+  - dialog "Select Module" [ref=f1e302]:
+    - generic [ref=f1e303]:
+      - heading "Select Module" [level=2] [ref=f1e304]
+      - button "Close" [ref=f1e305]
+    - generic [ref=f1e309]:
+      - button "Homepage Personal home, news, work, people, services and Matanho AI" [ref=f1e310] [cursor=pointer]:
+        - generic [ref=f1e315]:
+          - generic [ref=f1e316]: Homepage
+          - generic [ref=f1e317]: Personal home, news, work, people, services and Matanho AI
+      - button "Portfolio Management Manage investment portfolios, funds, LPs and reporting" [ref=f1e318] [cursor=pointer]:
+        - generic [ref=f1e323]:
+          - generic [ref=f1e324]: Portfolio Management
+          - generic [ref=f1e325]: Manage investment portfolios, funds, LPs and reporting
+      - button "Performance Management Matanho Performance Management — command centre, scorecards, reviews and compliance" [ref=f1e326] [cursor=pointer]:
+        - generic [ref=f1e335]:
+          - generic [ref=f1e336]: Performance Management
+          - generic [ref=f1e337]: Matanho Performance Management — command centre, scorecards, reviews and compliance
+      - button "Payroll Payroll, tax, leave, vault and employee self-service" [ref=f1e338] [cursor=pointer]:
+        - generic [ref=f1e345]:
+          - generic [ref=f1e346]: Payroll
+          - generic [ref=f1e347]: Payroll, tax, leave, vault and employee self-service
+      - button "Procurement Procurement & tender management — client V23 faithful port" [ref=f1e348] [cursor=pointer]:
+        - generic [ref=f1e360]:
+          - generic [ref=f1e361]: Procurement
+          - generic [ref=f1e362]: Procurement & tender management — client V23 faithful port
+      - button "Accounting Accounting operating system — client V52 faithful port" [ref=f1e363] [cursor=pointer]:
+        - generic [ref=f1e370]:
+          - generic [ref=f1e371]: Accounting
+          - generic [ref=f1e372]: Accounting operating system — client V52 faithful port
+      - button "Events Manage investor relations and fundraising events" [ref=f1e373] [cursor=pointer]:
+        - generic [ref=f1e378]:
+          - generic [ref=f1e379]: Events
+          - generic [ref=f1e380]: Manage investor relations and fundraising events
+      - button "Admin Management User and role management" [ref=f1e381] [cursor=pointer]:
+        - generic [ref=f1e388]:
+          - generic [ref=f1e389]: Admin Management
+          - generic [ref=f1e390]: User and role management
+      - button "Investments Institutional investment operations, portfolio, and order management terminal" [ref=f1e391] [cursor=pointer]:
+        - generic [ref=f1e397]:
+          - generic [ref=f1e398]: Investments
+          - generic [ref=f1e399]: Institutional investment operations, portfolio, and order management terminal
+      - button "Street Rates Street vs official USD/ZWG exchange rate intelligence" [ref=f1e400] [cursor=pointer]:
+        - generic [ref=f1e405]:
+          - generic [ref=f1e406]: Street Rates
+          - generic [ref=f1e407]: Street vs official USD/ZWG exchange rate intelligence
+      - button "FP&A Planning, budgeting, forecasting and scenario modelling" [ref=f1e408] [cursor=pointer]:
+        - generic [ref=f1e413]:
+          - generic [ref=f1e414]: FP&A
+          - generic [ref=f1e415]: Planning, budgeting, forecasting and scenario modelling
+      - button "Fundraising & Investor Relations Campaigns, pipeline, mandates, commitments and investor onboarding" [ref=f1e416] [cursor=pointer]:
+        - generic [ref=f1e423]:
+          - generic [ref=f1e424]: Fundraising & Investor Relations
+          - generic [ref=f1e425]: Campaigns, pipeline, mandates, commitments and investor onboarding
+      - button "Fundraising KYC Client Matanho Investor KYC Onboarding design — faithful Next.js port for comparison" [ref=f1e426] [cursor=pointer]:
+        - generic [ref=f1e432]:
+          - generic [ref=f1e433]: Fundraising KYC
+          - generic [ref=f1e434]: Client Matanho Investor KYC Onboarding design — faithful Next.js port for comparison

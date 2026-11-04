@@ -12,7 +12,7 @@
   --shadow:0 18px 46px rgba(0,0,0,.28);--shadow-soft:0 8px 24px rgba(0,0,0,.18)
 }
 .accounting-v52-root *{box-sizing:border-box}.accounting-v52-root, .accounting-v52-root{height:100%;margin:0}.accounting-v52-root{font-family:Inter,ui-sans-serif,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:var(--bg);color:var(--ink);font-size:13px;line-height:1.45;overflow:hidden}
-.accounting-v52-root button, .accounting-v52-root input, .accounting-v52-root select, .accounting-v52-root textarea{font:inherit;color:inherit}.accounting-v52-root button{cursor:pointer}.accounting-v52-root a{color:inherit}.accounting-v52-root .hidden{display:none!important}.accounting-v52-root .app{height:100vh;display:grid;grid-template-columns:var(--sidebar) minmax(0,1fr);transition:grid-template-columns .24s ease}.accounting-v52-root .app.collapsed{--sidebar:88px}
+.accounting-v52-root button:not(.ac52-legacy-mount *), .accounting-v52-root input:not(.ac52-legacy-mount *), .accounting-v52-root select:not(.ac52-legacy-mount *), .accounting-v52-root textarea:not(.ac52-legacy-mount *){font:inherit;color:inherit}.accounting-v52-root button:not(.ac52-legacy-mount *){cursor:pointer}.accounting-v52-root a{color:inherit}.accounting-v52-root .hidden:not(.ac52-legacy-mount *){display:none!important}.accounting-v52-root .app{height:100vh;display:grid;grid-template-columns:var(--sidebar) minmax(0,1fr);transition:grid-template-columns .24s ease}.accounting-v52-root .app.collapsed{--sidebar:88px}
 .accounting-v52-root .sidebar{background:linear-gradient(180deg,var(--nav),var(--nav-2) 62%,var(--nav-3));color:#c8d3e6;display:flex;flex-direction:column;min-width:0;position:relative;z-index:20;box-shadow:10px 0 34px rgba(3,16,39,.08)}
 .accounting-v52-root .sidebar:before{content:"";position:absolute;inset:0;background:radial-gradient(circle at 110% 5%,rgba(55,123,255,.22),transparent 32%),radial-gradient(circle at -20% 82%,rgba(114,87,246,.17),transparent 28%);pointer-events:none}.accounting-v52-root .brand{height:98px;display:flex;align-items:center;gap:11px;padding:12px 17px;border-bottom:1px solid rgba(255,255,255,.08);position:relative}.accounting-v52-root .brand img{width:165px;height:66px;object-fit:contain;object-position:left center}.accounting-v52-root .brand-mark{display:none;width:48px;height:48px;border-radius:16px;background:linear-gradient(145deg,var(--blue),var(--violet));align-items:center;justify-content:center;font-weight:900;font-size:19px;color:white;box-shadow:0 13px 28px rgba(23,104,255,.35)}.accounting-v52-root .collapsed .brand{justify-content:center;padding:12px 8px}.accounting-v52-root .collapsed .brand img{display:none}.accounting-v52-root .collapsed .brand-mark{display:flex}
 .accounting-v52-root .tenant{margin:12px 10px 2px;padding:11px;border:1px solid rgba(255,255,255,.09);background:rgba(255,255,255,.055);border-radius:14px;display:flex;align-items:center;gap:10px;position:relative}.accounting-v52-root .tenant-icon{width:35px;height:35px;border-radius:11px;background:linear-gradient(145deg,#1768ff,#00a7ff);display:grid;place-items:center;color:white;font-weight:900}.accounting-v52-root .tenant-meta{min-width:0}.accounting-v52-root .tenant-meta strong{display:block;color:white;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.accounting-v52-root .tenant-meta span{display:block;color:#8096ba;font-size:10px;margin-top:2px}.accounting-v52-root .collapsed .tenant-meta{display:none}.accounting-v52-root .collapsed .tenant{justify-content:center;padding:8px}
@@ -20,7 +20,7 @@
 .accounting-v52-root .sidebar-foot{position:relative;border-top:1px solid rgba(255,255,255,.08);padding:11px}.accounting-v52-root .health{background:rgba(255,255,255,.055);border:1px solid rgba(255,255,255,.08);border-radius:13px;padding:9px;display:flex;align-items:center;gap:9px}.accounting-v52-root .pulse{width:9px;height:9px;border-radius:50%;background:#58a7ff;box-shadow:0 0 0 5px rgba(88,167,255,.12)}.accounting-v52-root .health strong{display:block;color:#fff;font-size:10px}.accounting-v52-root .health span{display:block;color:#7890b4;font-size:10px}.accounting-v52-root .collapsed .health div{display:none}.accounting-v52-root .collapsed .health{justify-content:center;padding:12px 7px}
 .accounting-v52-root .shell{min-width:0;display:grid;grid-template-rows:var(--topbar) minmax(0,1fr);overflow:hidden}.accounting-v52-root .topbar{background:color-mix(in srgb,var(--surface) 94%,transparent);border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px;padding:0 19px;backdrop-filter:blur(20px);z-index:16}.accounting-v52-root .icon-btn{width:40px;height:40px;border:1px solid var(--line);border-radius:12px;background:var(--surface);display:grid;place-items:center;transition:.18s;box-shadow:0 3px 10px rgba(28,45,75,.02)}.accounting-v52-root .icon-btn:hover{color:var(--blue);border-color:color-mix(in srgb,var(--blue) 45%,var(--line));transform:translateY(-1px)}.accounting-v52-root .icon-btn svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.8}.accounting-v52-root .search-launch{height:42px;min-width:250px;max-width:500px;flex:1;border:1px solid var(--line);border-radius:13px;background:var(--surface-2);display:flex;align-items:center;gap:9px;padding:0 12px;color:var(--muted);text-align:left}.accounting-v52-root .search-launch svg{width:17px;height:17px;stroke:currentColor;fill:none}.accounting-v52-root .search-launch kbd{margin-left:auto;border:1px solid var(--line);border-radius:7px;padding:2px 6px;background:var(--surface);font-size:10px}.accounting-v52-root .spacer{flex:1}.accounting-v52-root .top-select{height:40px;border:1px solid var(--line);border-radius:12px;background:var(--surface);padding:0 32px 0 11px;max-width:205px}.accounting-v52-root .live-pill{height:36px;padding:0 11px;border-radius:11px;background:var(--blue-soft);color:var(--blue);font-size:10px;font-weight:800;display:flex;align-items:center;gap:7px}.accounting-v52-root .live-pill i{width:7px;height:7px;border-radius:50%;background:var(--blue);box-shadow:0 0 0 4px color-mix(in srgb,var(--blue) 13%,transparent)}.accounting-v52-root .profile{display:flex;align-items:center;gap:8px;padding-left:3px}.accounting-v52-root .avatar{width:38px;height:38px;border-radius:12px;background:linear-gradient(145deg,var(--blue),var(--violet));display:grid;place-items:center;color:#fff;font-weight:900;box-shadow:0 7px 18px rgba(23,104,255,.2)}.accounting-v52-root .profile strong{display:block;font-size:11px}.accounting-v52-root .profile span{display:block;color:var(--muted);font-size:10px;margin-top:1px}.accounting-v52-root .content{overflow:auto;padding:21px 23px 50px;scrollbar-width:thin}.accounting-v52-root .page{max-width:1760px;margin:0 auto;animation:pagein .22s ease}@keyframes pagein{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:none}}
 .accounting-v52-root .page-head{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;margin-bottom:17px}.accounting-v52-root .eyebrow{font-size:10px;text-transform:uppercase;letter-spacing:.13em;color:var(--blue);font-weight:900;margin-bottom:5px}.accounting-v52-root .page-head h1{font-size:27px;line-height:1.08;letter-spacing:-.035em;margin:0}.accounting-v52-root .page-head p{color:var(--muted);margin:7px 0 0;max-width:850px}.accounting-v52-root .actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.accounting-v52-root .btn{height:39px;border:1px solid var(--line);border-radius:11px;background:var(--surface);padding:0 13px;display:inline-flex;align-items:center;justify-content:center;gap:7px;font-weight:780;white-space:nowrap;transition:.17s}.accounting-v52-root .btn:hover{border-color:color-mix(in srgb,var(--blue) 48%,var(--line));transform:translateY(-1px);box-shadow:0 8px 18px rgba(19,41,78,.07)}.accounting-v52-root .btn.primary{background:linear-gradient(135deg,var(--blue),#357cff);border-color:transparent;color:white;box-shadow:0 10px 23px rgba(23,104,255,.23)}.accounting-v52-root .btn.violet{background:linear-gradient(135deg,var(--violet),#8d79ff);border-color:transparent;color:white}.accounting-v52-root .btn.cyan{background:linear-gradient(135deg,#008ddd,var(--cyan));border-color:transparent;color:white}.accounting-v52-root .btn.danger{background:var(--red);border-color:transparent;color:white}.accounting-v52-root .btn.soft{background:var(--blue-soft);border-color:transparent;color:var(--blue)}.accounting-v52-root .btn.small{height:31px;border-radius:9px;font-size:10px;padding:0 9px}.accounting-v52-root .btn:disabled{cursor:not-allowed;opacity:.45;transform:none;box-shadow:none}.accounting-v52-root .btn svg{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:1.9}
-.accounting-v52-root .grid{display:grid;gap:14px}.accounting-v52-root .kpis{grid-template-columns:repeat(6,minmax(145px,1fr));margin-bottom:14px}.accounting-v52-root .kpi{background:linear-gradient(145deg,var(--surface),color-mix(in srgb,var(--surface) 93%,var(--blue-soft)));border:1px solid var(--line);border-radius:var(--radius);padding:14px;box-shadow:var(--shadow-soft);min-width:0;position:relative;overflow:hidden}.accounting-v52-root .kpi:after{content:"";position:absolute;width:95px;height:95px;border-radius:50%;right:-42px;top:-45px;background:radial-gradient(circle,color-mix(in srgb,var(--blue) 13%,transparent),transparent 70%)}.accounting-v52-root .kpi-top{display:flex;align-items:center;justify-content:space-between;gap:8px}.accounting-v52-root .kpi-label{color:var(--muted);font-size:10px;font-weight:780}.accounting-v52-root .kpi-icon{width:30px;height:30px;border-radius:9px;background:var(--blue-soft);color:var(--blue);display:grid;place-items:center}.accounting-v52-root .kpi-icon svg{width:15px;height:15px;stroke:currentColor;fill:none}.accounting-v52-root .kpi-value{font-size:21px;font-weight:880;letter-spacing:-.035em;margin-top:10px}.accounting-v52-root .kpi-foot{display:flex;align-items:center;gap:6px;color:var(--muted);font-size:10px;margin-top:4px}.accounting-v52-root .trend{font-weight:850;color:var(--blue)}.accounting-v52-root .trend.warn{color:var(--amber)}.accounting-v52-root .trend.bad{color:var(--red)}
+.accounting-v52-root .grid:not(.ac52-legacy-mount *){display:grid;gap:14px}.accounting-v52-root .kpis{grid-template-columns:repeat(6,minmax(145px,1fr));margin-bottom:14px}.accounting-v52-root .kpi{background:linear-gradient(145deg,var(--surface),color-mix(in srgb,var(--surface) 93%,var(--blue-soft)));border:1px solid var(--line);border-radius:var(--radius);padding:14px;box-shadow:var(--shadow-soft);min-width:0;position:relative;overflow:hidden}.accounting-v52-root .kpi:after{content:"";position:absolute;width:95px;height:95px;border-radius:50%;right:-42px;top:-45px;background:radial-gradient(circle,color-mix(in srgb,var(--blue) 13%,transparent),transparent 70%)}.accounting-v52-root .kpi-top{display:flex;align-items:center;justify-content:space-between;gap:8px}.accounting-v52-root .kpi-label{color:var(--muted);font-size:10px;font-weight:780}.accounting-v52-root .kpi-icon{width:30px;height:30px;border-radius:9px;background:var(--blue-soft);color:var(--blue);display:grid;place-items:center}.accounting-v52-root .kpi-icon svg{width:15px;height:15px;stroke:currentColor;fill:none}.accounting-v52-root .kpi-value{font-size:21px;font-weight:880;letter-spacing:-.035em;margin-top:10px}.accounting-v52-root .kpi-foot{display:flex;align-items:center;gap:6px;color:var(--muted);font-size:10px;margin-top:4px}.accounting-v52-root .trend{font-weight:850;color:var(--blue)}.accounting-v52-root .trend.warn{color:var(--amber)}.accounting-v52-root .trend.bad{color:var(--red)}
 .accounting-v52-root .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);box-shadow:var(--shadow-soft);min-width:0}.accounting-v52-root .card-head{padding:14px 15px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;gap:12px}.accounting-v52-root .card-title{min-width:0}.accounting-v52-root .card-title strong{display:block;font-size:12px}.accounting-v52-root .card-title span{display:block;color:var(--muted);font-size:10px;margin-top:2px}.accounting-v52-root .card-tools{display:flex;gap:7px;align-items:center;flex-wrap:wrap}.accounting-v52-root .card-body{padding:15px}.accounting-v52-root .two{grid-template-columns:minmax(0,1.5fr) minmax(340px,.7fr)}.accounting-v52-root .three{grid-template-columns:repeat(3,minmax(0,1fr))}.accounting-v52-root .four{grid-template-columns:repeat(4,minmax(0,1fr))}.accounting-v52-root .split-3{display:grid;grid-template-columns:270px minmax(0,1fr) 340px;gap:14px;align-items:start}.accounting-v52-root .split-2{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:14px;align-items:start}.accounting-v52-root .stack{display:grid;gap:11px}.accounting-v52-root .sticky{position:sticky;top:0}.accounting-v52-root .tabs{display:flex;gap:3px;background:var(--surface-3);padding:3px;border-radius:10px;width:max-content;max-width:100%;overflow:auto}.accounting-v52-root .tab{border:0;background:transparent;border-radius:8px;padding:7px 11px;color:var(--muted);font-size:10px;font-weight:780;white-space:nowrap}.accounting-v52-root .tab.active{background:var(--surface);color:var(--ink);box-shadow:0 2px 8px rgba(19,41,78,.08)}
 .accounting-v52-root .table-wrap{overflow:auto;scrollbar-width:thin}.accounting-v52-root .data-table{width:100%;border-collapse:collapse;min-width:760px}.accounting-v52-root .data-table th{position:sticky;top:0;background:var(--surface-2);z-index:1;text-align:left;color:var(--muted);font-size:10px;text-transform:uppercase;letter-spacing:.07em;font-weight:850;padding:10px 11px;border-bottom:1px solid var(--line);white-space:nowrap}.accounting-v52-root .data-table td{padding:10px 11px;border-bottom:1px solid var(--line);font-size:10px;white-space:nowrap;vertical-align:middle}.accounting-v52-root .data-table tr:hover td{background:color-mix(in srgb,var(--blue-soft) 42%,transparent)}.accounting-v52-root .data-table tr.selected td{background:var(--blue-soft)}.accounting-v52-root .data-table .num{text-align:right;font-variant-numeric:tabular-nums}.accounting-v52-root .data-table .link{color:var(--blue);font-weight:800;cursor:pointer}.accounting-v52-root .sub{display:block;color:var(--muted);font-size:10px;margin-top:2px}.accounting-v52-root .badge{display:inline-flex;align-items:center;gap:5px;height:22px;border-radius:8px;padding:0 7px;background:var(--blue-soft);color:var(--blue);font-size:10px;font-weight:850}.accounting-v52-root .badge:before{content:"";width:5px;height:5px;border-radius:50%;background:currentColor}.accounting-v52-root .badge.pending{background:var(--amber-soft);color:#b87100}.accounting-v52-root .badge.bad{background:var(--red-soft);color:var(--red)}.accounting-v52-root .badge.neutral{background:var(--surface-3);color:var(--muted)}.accounting-v52-root .status-line{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:9px 0;border-bottom:1px solid var(--line)}.accounting-v52-root .status-line:last-child{border-bottom:0}.accounting-v52-root .status-line strong{font-size:10px}.accounting-v52-root .status-line span{color:var(--muted);font-size:10px}.accounting-v52-root .progress{height:7px;border-radius:6px;background:var(--surface-3);overflow:hidden}.accounting-v52-root .progress i{display:block;height:100%;background:linear-gradient(90deg,var(--blue),var(--cyan));border-radius:inherit}.accounting-v52-root .progress.amber i{background:var(--amber)}.accounting-v52-root .progress.red i{background:var(--red)}
 .accounting-v52-root .filterbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px}.accounting-v52-root .input, .accounting-v52-root .select, .accounting-v52-root .textarea{border:1px solid var(--line);background:var(--surface);border-radius:10px;min-height:38px;padding:8px 10px;outline:none}.accounting-v52-root .input:focus, .accounting-v52-root .select:focus, .accounting-v52-root .textarea:focus{border-color:color-mix(in srgb,var(--blue) 55%,var(--line));box-shadow:0 0 0 3px color-mix(in srgb,var(--blue) 10%,transparent)}.accounting-v52-root .input{min-width:190px}.accounting-v52-root .textarea{width:100%;min-height:110px;resize:vertical}.accounting-v52-root .field{display:grid;gap:5px}.accounting-v52-root .field label{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-weight:800}.accounting-v52-root .form-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}.accounting-v52-root .form-grid.two-col{grid-template-columns:repeat(2,minmax(0,1fr))}.accounting-v52-root .form-grid .wide{grid-column:span 2}.accounting-v52-root .form-grid .full{grid-column:1/-1}.accounting-v52-root .note{border:1px solid var(--line);border-left:3px solid var(--blue);background:var(--surface-2);border-radius:10px;padding:10px 11px;font-size:10px;color:var(--muted)}.accounting-v52-root .note.warn{border-left-color:var(--amber);background:var(--amber-soft)}.accounting-v52-root .note.bad{border-left-color:var(--red);background:var(--red-soft)}
@@ -43,9 +43,9 @@
   --sidebar:248px;--topbar:68px;--radius:12px;
   --shadow:0 12px 30px rgba(18,38,70,.055);--shadow-soft:0 5px 16px rgba(18,38,70,.04)
 }
-.accounting-v52-root *{scrollbar-color:#aebed5 transparent;scrollbar-width:thin}
+.accounting-v52-root :not(.ac52-legacy-mount, .ac52-legacy-mount *){scrollbar-color:#aebed5 transparent;scrollbar-width:thin}
 .accounting-v52-root, .accounting-v52-root{min-height:0;overflow:hidden}
-.accounting-v52-root, .accounting-v52-root button, .accounting-v52-root input, .accounting-v52-root select, .accounting-v52-root textarea{font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","SF Pro Display",Roboto,"Helvetica Neue","Segoe UI",sans-serif}
+.accounting-v52-root, .accounting-v52-root button:not(.ac52-legacy-mount *), .accounting-v52-root input:not(.ac52-legacy-mount *), .accounting-v52-root select:not(.ac52-legacy-mount *), .accounting-v52-root textarea:not(.ac52-legacy-mount *){font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","SF Pro Display",Roboto,"Helvetica Neue","Segoe UI",sans-serif}
 .accounting-v52-root{font-size:12.5px;letter-spacing:-.006em}
 .accounting-v52-root .app{height:100dvh;min-height:0;grid-template-columns:var(--sidebar) minmax(0,1fr)}
 .accounting-v52-root .app.collapsed{--sidebar:78px}
@@ -80,7 +80,7 @@
 .accounting-v52-root .profile .avatar{width:35px;height:35px;border-radius:9px;box-shadow:none;background:#1559ba}.accounting-v52-root .profile strong{font-weight:600}
 .accounting-v52-root .page-head{margin-bottom:13px;align-items:center}.accounting-v52-root .eyebrow{font-size:10px;font-weight:650;letter-spacing:.11em;margin-bottom:4px}.accounting-v52-root .page-head h1{font-size:24px;font-weight:620;letter-spacing:-.035em}.accounting-v52-root .page-head p{margin-top:5px;font-size:10.5px;line-height:1.5}
 .accounting-v52-root .actions{gap:6px}.accounting-v52-root .btn{height:36px;border-radius:8px;padding:0 11px;font-weight:560;box-shadow:none;letter-spacing:-.005em}.accounting-v52-root .btn:hover{transform:none;box-shadow:0 5px 14px rgba(19,41,78,.055)}.accounting-v52-root .btn.primary{background:#1768df;border-color:#1768df;box-shadow:none}.accounting-v52-root .btn.primary:hover{background:#135fcf}.accounting-v52-root .btn.violet{background:#644fe1}.accounting-v52-root .btn.cyan{background:#0c83c7}.accounting-v52-root .btn.danger{background:#c93b43}.accounting-v52-root .btn.soft{background:#edf4ff;border:1px solid #d5e5ff}.accounting-v52-root .btn.small{height:29px;border-radius:7px;font-size:10px;padding:0 8px}
-.accounting-v52-root .grid{gap:11px}.accounting-v52-root .kpis{gap:8px;margin-bottom:11px}.accounting-v52-root .kpi{border-radius:10px;padding:11px 12px;box-shadow:none;background:var(--surface);transition:transform .17s,box-shadow .17s,border-color .17s;cursor:pointer}.accounting-v52-root .kpi:after{display:none}.accounting-v52-root .kpi:hover{border-color:#b7c9e3;box-shadow:0 7px 20px rgba(17,39,75,.055)}.accounting-v52-root .kpi-value{font-size:20px;font-weight:620;letter-spacing:-.035em}.accounting-v52-root .kpi-label{font-size:10px;font-weight:560}.accounting-v52-root .kpi-foot{font-size:10px}.accounting-v52-root .kpi-icon{width:28px;height:28px;border-radius:7px}.accounting-v52-root .kpi-icon svg{width:14px;height:14px}
+.accounting-v52-root .grid:not(.ac52-legacy-mount *){gap:11px}.accounting-v52-root .kpis{gap:8px;margin-bottom:11px}.accounting-v52-root .kpi{border-radius:10px;padding:11px 12px;box-shadow:none;background:var(--surface);transition:transform .17s,box-shadow .17s,border-color .17s;cursor:pointer}.accounting-v52-root .kpi:after{display:none}.accounting-v52-root .kpi:hover{border-color:#b7c9e3;box-shadow:0 7px 20px rgba(17,39,75,.055)}.accounting-v52-root .kpi-value{font-size:20px;font-weight:620;letter-spacing:-.035em}.accounting-v52-root .kpi-label{font-size:10px;font-weight:560}.accounting-v52-root .kpi-foot{font-size:10px}.accounting-v52-root .kpi-icon{width:28px;height:28px;border-radius:7px}.accounting-v52-root .kpi-icon svg{width:14px;height:14px}
 .accounting-v52-root .card{border-radius:11px;box-shadow:none;min-width:0;transition:transform .18s,box-shadow .18s,border-color .18s}.accounting-v52-root .card:hover{border-color:#c9d5e5}.accounting-v52-root .card.focus-zoom{transform:scale(1.012);box-shadow:0 18px 42px rgba(14,34,67,.12);z-index:8}.accounting-v52-root .card-head{padding:11px 12px;min-height:52px}.accounting-v52-root .card-body{padding:11px 12px}.accounting-v52-root .card-title strong{font-size:10.5px;font-weight:610}.accounting-v52-root .card-title span{font-size:10px}.accounting-v52-root .data-table th{font-size:10px;font-weight:620;padding:8px 9px}.accounting-v52-root .data-table td{font-size:10px;padding:8px 9px}.accounting-v52-root .data-table .link{font-weight:600}.accounting-v52-root .badge{font-size:10px;font-weight:620;height:20px;border-radius:6px}.accounting-v52-root .filterbar{gap:7px;padding:8px}.accounting-v52-root .input, .accounting-v52-root .select, .accounting-v52-root .textarea{border-radius:7px}.accounting-v52-root .form-grid{gap:8px}.accounting-v52-root .field label{font-weight:560}
 .accounting-v52-root .chart-shell{height:270px;min-width:0;overflow:hidden;padding:3px 1px 0}.accounting-v52-root .chart-shell svg{display:block;width:100%;height:100%;max-width:100%;overflow:visible}.accounting-v52-root .chart-axis{font-size:10px}.accounting-v52-root .chart-line{stroke-width:2.25}.accounting-v52-root .chart-bar{transition:opacity .15s,filter .15s,transform .15s;transform-box:fill-box;transform-origin:center bottom}.accounting-v52-root .chart-bar:hover{opacity:.86;filter:drop-shadow(0 3px 5px rgba(23,104,255,.16));transform:scaleX(1.035)}
 .accounting-v52-root .donut{width:112px;height:112px}.accounting-v52-root .donut:after{inset:15px}.accounting-v52-root .donut-content strong{font-size:20px}
@@ -297,8 +297,8 @@
 }
 
 /* Calm surfaces, vivid colour stays inside element borders. */
-.accounting-v52-root button, .accounting-v52-root .btn, .accounting-v52-root [class*="btn"]{box-shadow:none!important;text-shadow:none!important;filter:none!important}
-.accounting-v52-root .panel, .accounting-v52-root .card, .accounting-v52-root [class*="panel"], .accounting-v52-root [class*="card"]{background-clip:padding-box}
+.accounting-v52-root button:not(.ac52-legacy-mount *), .accounting-v52-root .btn, .accounting-v52-root [class*="btn"]{box-shadow:none!important;text-shadow:none!important;filter:none!important}
+.accounting-v52-root .panel, .accounting-v52-root .card, .accounting-v52-root [class*="panel"], .accounting-v52-root [class*="card"]:not(.ac52-legacy-mount *){background-clip:padding-box}
 
 /* Center all large/maximized report previews in the viewport. */
 .accounting-v52-root .modal.v17-preview.v19-report-modal.open, .accounting-v52-root .modal.v17-preview.v19-report-modal.v12-modal-max, .accounting-v52-root .modal.v12-modal-max.open, .accounting-v52-root #modal.v12-modal-max.open{
@@ -423,6 +423,14 @@
 .accounting-v52-root .v25-modal{width:min(980px,calc(100vw - 30px));max-height:calc(100vh - 36px);background:#fff;border:1px solid #cad8e9;border-radius:18px;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 22px 70px rgba(6,24,49,.22)}
 .accounting-v52-root .v25-modal.wide{width:min(1260px,calc(100vw - 30px))}.accounting-v52-root .v25-modal-head{padding:15px 17px;border-bottom:1px solid #dce6f2;display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.accounting-v52-root .v25-modal-head h2{font-size:17px;margin:0;color:#122038}.accounting-v52-root .v25-modal-head p{font-size:10px;color:#718198;margin:4px 0 0}.accounting-v52-root .v25-modal-body{padding:15px 17px;overflow:auto}.accounting-v52-root .v25-modal-foot{padding:12px 17px;border-top:1px solid #dce6f2;display:flex;justify-content:flex-end;gap:8px;background:#fbfdff}
 .accounting-v52-root .v25-close{width:34px;height:34px;border-radius:10px;border:1px solid #cbd9e9;background:#fff;font-size:18px;cursor:pointer}
+/* Record-detail field list: the row-detail modal emits one .v25-list-item per column as an inline <strong> label + <span> value with no stylesheet, so they ran together ("WhatSupplier invoice"). Lay each out as a wrapping label/value row. */
+.accounting-v52-root .v25-list{display:grid}
+.accounting-v52-root .v25-list-item{padding:11px 2px;border-bottom:1px solid #eef2f7}
+.accounting-v52-root .v25-list-item:last-child{border-bottom:0}
+.accounting-v52-root .v25-list-item > div{display:grid;grid-template-columns:minmax(88px,150px) 1fr;gap:2px 16px;align-items:baseline}
+.accounting-v52-root .v25-list-item strong{font-size:12px;font-weight:600;color:#667085}
+.accounting-v52-root .v25-list-item span{font-size:13px;color:#101828;line-height:1.5;white-space:normal;overflow-wrap:anywhere}
+@media (max-width:520px){.accounting-v52-root .v25-list-item > div{grid-template-columns:1fr}}
 
 /* v25.1 intelligence layer cleanup: one back control, left-aligned context, full opaque workspace. */
 .accounting-v52-root .v21-layer[data-level="2"]{background:#f5f8fc!important}
@@ -593,6 +601,7 @@
 }
 .accounting-v52-root .v27-drawer-tabs button{min-height:32px!important;padding:0 11px!important;color:#2f3d55!important;font-size:10px!important;font-weight:800!important;border-radius:8px!important}
 .accounting-v52-root .v27-drawer-tabs button.active{background:#7138ff!important;color:#fff!important;box-shadow:inset 0 1px rgba(255,255,255,.28)!important}
+@media(max-width:820px){.accounting-v52-root .al-status-row{grid-template-columns:minmax(110px,.8fr) minmax(0,1.5fr)}.accounting-v52-root .al-status-row>small{grid-column:2;margin-top:-4px}}
 @media(max-width:820px){
   .accounting-v52-root #main :is(.v34-tabs, .accounting-v52-root .v27-tabs-row, .accounting-v52-root .v28-toolbar, .accounting-v52-root .v17-subnav, .accounting-v52-root .v25-tabs, .accounting-v52-root .v23-tabs, .accounting-v52-root .v15-tabs, .accounting-v52-root .v12-tabs, .accounting-v52-root .v11-tabs, .accounting-v52-root .v8-tabs, .accounting-v52-root .v5-context-tabs, .accounting-v52-root .v5-settings-tabs, .accounting-v52-root .tabs){
     margin:8px 0 12px!important;padding:5px!important;border-left-width:3px!important;
@@ -603,7 +612,7 @@
 }
 
 
-.accounting-v52-root{font-family:Arial;background:#edf1f7;padding:30px}.accounting-v52-root .page{max-width:760px;margin:auto;background:#fff;padding:55px;box-shadow:0 10px 30px #ccd}.accounting-v52-root h1{font-size:26px}.accounting-v52-root h2{font-size:18px;margin-top:25px}.accounting-v52-root p, .accounting-v52-root li{line-height:1.6;font-size:12px}
+.accounting-v52-root{font-family:Arial;background:#edf1f7;padding:30px}.accounting-v52-root .page{max-width:760px;margin:auto;background:#fff;padding:55px;box-shadow:0 10px 30px #ccd}.accounting-v52-root h1:not(.ac52-legacy-mount *){font-size:26px}.accounting-v52-root h2:not(.ac52-legacy-mount *){font-size:18px;margin-top:25px}.accounting-v52-root p:not(.ac52-legacy-mount *), .accounting-v52-root li:not(.ac52-legacy-mount *){line-height:1.6;font-size:12px}
 
 
 /* Matanho Accounting v6 — enterprise precision, layered workflows and premium reporting */
@@ -614,7 +623,7 @@
   --v6-shadow:0 18px 54px rgba(8,31,68,.11);--v6-shadow-soft:0 8px 24px rgba(8,31,68,.07)
 }
 .accounting-v52-root, .accounting-v52-root{font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","SF Pro Display",Roboto,Inter,"Segoe UI",sans-serif!important;text-rendering:geometricPrecision;-webkit-font-smoothing:antialiased}
-.accounting-v52-root{font-size:13px!important}.accounting-v52-root .sub, .accounting-v52-root .tiny, .accounting-v52-root small, .accounting-v52-root .muted, .accounting-v52-root .card-title span, .accounting-v52-root .kpi-foot, .accounting-v52-root .badge, .accounting-v52-root .eyebrow, .accounting-v52-root .fact span, .accounting-v52-root .status-line span, .accounting-v52-root .person-v4 small, .accounting-v52-root .nav-group, .accounting-v52-root .chart-axis, .accounting-v52-root .chart-label, .accounting-v52-root .v5-panel-head p, .accounting-v52-root .v5-kpi .label, .accounting-v52-root .v5-kpi .meta, .accounting-v52-root .v5-callout span, .accounting-v52-root .v5-profile-menu span{font-size:10px!important;line-height:1.42!important;letter-spacing:0!important}
+.accounting-v52-root{font-size:13px!important}.accounting-v52-root .sub, .accounting-v52-root .tiny, .accounting-v52-root small:not(.ac52-legacy-mount *), .accounting-v52-root .muted, .accounting-v52-root .card-title span, .accounting-v52-root .kpi-foot, .accounting-v52-root .badge, .accounting-v52-root .eyebrow, .accounting-v52-root .fact span, .accounting-v52-root .status-line span, .accounting-v52-root .person-v4 small, .accounting-v52-root .nav-group, .accounting-v52-root .chart-axis, .accounting-v52-root .chart-label, .accounting-v52-root .v5-panel-head p, .accounting-v52-root .v5-kpi .label, .accounting-v52-root .v5-kpi .meta, .accounting-v52-root .v5-callout span, .accounting-v52-root .v5-profile-menu span{font-size:10px!important;line-height:1.42!important;letter-spacing:0!important}
 .accounting-v52-root .data-table th{font-size:10px!important;line-height:1.35!important}.accounting-v52-root .data-table td{font-size:10.5px!important;line-height:1.45!important}.accounting-v52-root .field label, .accounting-v52-root .input, .accounting-v52-root .select, .accounting-v52-root .textarea, .accounting-v52-root .btn, .accounting-v52-root .tab, .accounting-v52-root .v5-segmented button{font-size:10.5px!important}
 .accounting-v52-root .data-table th, .accounting-v52-root .data-table td, .accounting-v52-root .status-line, .accounting-v52-root .v6-tab-panel, .accounting-v52-root .v6-report-sheet td, .accounting-v52-root .v6-report-sheet th{overflow-wrap:anywhere;word-break:normal}
 .accounting-v52-root .badge{min-height:21px;height:auto!important;padding:4px 7px!important;border-radius:7px!important;background:#eaf2ff!important;color:#075bd8!important;border:1px solid #cfe0ff!important;box-shadow:inset 0 0 0 1px rgba(255,255,255,.35);font-weight:760!important}
@@ -819,7 +828,7 @@
   color:var(--ink)!important;
   -webkit-font-smoothing:antialiased;text-rendering:geometricPrecision;
 }
-.accounting-v52-root button, .accounting-v52-root input, .accounting-v52-root select, .accounting-v52-root textarea{font-family:inherit!important;letter-spacing:0!important}
+.accounting-v52-root button:not(.ac52-legacy-mount *), .accounting-v52-root input:not(.ac52-legacy-mount *), .accounting-v52-root select:not(.ac52-legacy-mount *), .accounting-v52-root textarea:not(.ac52-legacy-mount *){font-family:inherit!important;letter-spacing:0!important}
 .accounting-v52-root .app{grid-template-columns:var(--sidebar) minmax(0,1fr)!important}
 .accounting-v52-root .app.collapsed{--sidebar:76px!important}
 .accounting-v52-root .sidebar{
@@ -876,7 +885,7 @@
 .accounting-v52-root .btn:hover, .accounting-v52-root .v8-btn:hover{transform:none!important;box-shadow:0 5px 15px rgba(16,42,76,.07)!important}
 .accounting-v52-root .btn.primary, .accounting-v52-root .v8-btn.primary{background:linear-gradient(135deg,#1478f2,#0e8ee8)!important;box-shadow:0 6px 16px rgba(20,120,242,.17)!important}
 .accounting-v52-root .btn.small, .accounting-v52-root .v8-btn.small{height:29px!important;border-radius:8px!important;font-size:10px!important;padding:0 9px!important}
-.accounting-v52-root .grid, .accounting-v52-root .v8-grid{gap:11px!important}
+.accounting-v52-root .grid:not(.ac52-legacy-mount *), .accounting-v52-root .v8-grid{gap:11px!important}
 .accounting-v52-root .kpis, .accounting-v52-root .v8-kpis{gap:10px!important;margin-bottom:11px!important}
 .accounting-v52-root .kpi, .accounting-v52-root .v8-kpi{
   border-radius:13px!important;padding:12px!important;border:1px solid rgba(207,218,232,.92)!important;
@@ -902,11 +911,11 @@
   background:rgba(255,255,255,.78)!important;border:1px solid rgba(207,218,232,.94)!important;box-shadow:0 3px 12px rgba(18,43,75,.025)!important;
 }
 .accounting-v52-root .field label, .accounting-v52-root .v8-field label{font-size:10px!important;letter-spacing:.025em!important;font-weight:720!important;margin-bottom:4px!important;color:#4a5c74!important}
-.accounting-v52-root .input, .accounting-v52-root .select, .accounting-v52-root .textarea, .accounting-v52-root .v8-input, .accounting-v52-root .v8-select, .accounting-v52-root .v8-textarea, .accounting-v52-root input:not([type="checkbox"]):not([type="radio"]), .accounting-v52-root select, .accounting-v52-root textarea{
+.accounting-v52-root .input, .accounting-v52-root .select, .accounting-v52-root .textarea, .accounting-v52-root .v8-input, .accounting-v52-root .v8-select, .accounting-v52-root .v8-textarea, .accounting-v52-root input:not([type="checkbox"]):not([type="radio"]):not(.ac52-legacy-mount *), .accounting-v52-root select:not(.ac52-legacy-mount *), .accounting-v52-root textarea:not(.ac52-legacy-mount *){
   border-radius:9px!important;border-color:#d5dfeb!important;background:#fff!important;font-size:10px!important;min-height:34px!important;
   box-shadow:inset 0 1px 0 rgba(255,255,255,.8)!important;
 }
-.accounting-v52-root input:focus, .accounting-v52-root select:focus, .accounting-v52-root textarea:focus, .accounting-v52-root .input:focus, .accounting-v52-root .select:focus, .accounting-v52-root .textarea:focus{outline:none!important;border-color:#6ea9f5!important;box-shadow:0 0 0 3px rgba(20,120,242,.09)!important}
+.accounting-v52-root input:focus:not(.ac52-legacy-mount *), .accounting-v52-root select:focus:not(.ac52-legacy-mount *), .accounting-v52-root textarea:focus:not(.ac52-legacy-mount *), .accounting-v52-root .input:focus, .accounting-v52-root .select:focus, .accounting-v52-root .textarea:focus{outline:none!important;border-color:#6ea9f5!important;box-shadow:0 0 0 3px rgba(20,120,242,.09)!important}
 .accounting-v52-root .data-table, .accounting-v52-root .v8-table{font-size:10px!important;border-collapse:separate!important;border-spacing:0!important}
 .accounting-v52-root .data-table th, .accounting-v52-root .v8-table th{height:38px!important;padding:8px 10px!important;background:#f7f9fc!important;color:#63748b!important;font-size:10px!important;letter-spacing:.055em!important;text-transform:uppercase!important;font-weight:780!important;border-bottom:1px solid #dbe4ef!important}
 .accounting-v52-root .data-table td, .accounting-v52-root .v8-table td{padding:9px 10px!important;border-bottom:1px solid #e7edf4!important;line-height:1.34!important;vertical-align:middle!important}
@@ -967,7 +976,7 @@
 .accounting-v52-root .badge:not(.bad):not(.pending):not(.neutral), .accounting-v52-root .v8-status:not(.bad):not(.pending):not(.neutral){color:#0070f0!important;border-color:#1690ff!important}
 .accounting-v52-root .badge.pending, .accounting-v52-root .v8-status.pending{color:#d77b00!important;border-color:#ff9d00!important}.accounting-v52-root .badge.bad, .accounting-v52-root .v8-status.bad{color:#f2264d!important;border-color:#ff3155!important}.accounting-v52-root .badge.neutral, .accounting-v52-root .v8-status.neutral{color:#53647b!important;border-color:#93a4b8!important}
 /* Keep all text at or above 7pt (9.333px CSS pixels). JS also enforces computed sizes. */
-.accounting-v52-root small, .accounting-v52-root .sub, .accounting-v52-root .kpi-meta, .accounting-v52-root .v8-kpi .meta, .accounting-v52-root .card-title span, .accounting-v52-root .panel-head p, .accounting-v52-root .v8-panel-head p, .accounting-v52-root .v5-panel-head p, .accounting-v52-root .field label, .accounting-v52-root .v8-field label, .accounting-v52-root .data-table th, .accounting-v52-root .v8-table th, .accounting-v52-root .badge, .accounting-v52-root .v8-status, .accounting-v52-root .profile span, .accounting-v52-root .tenant-meta span, .accounting-v52-root .nav-group{font-size:var(--v10-min-font)!important;line-height:1.35!important}
+.accounting-v52-root small:not(.ac52-legacy-mount *), .accounting-v52-root .sub, .accounting-v52-root .kpi-meta, .accounting-v52-root .v8-kpi .meta, .accounting-v52-root .card-title span, .accounting-v52-root .panel-head p, .accounting-v52-root .v8-panel-head p, .accounting-v52-root .v5-panel-head p, .accounting-v52-root .field label, .accounting-v52-root .v8-field label, .accounting-v52-root .data-table th, .accounting-v52-root .v8-table th, .accounting-v52-root .badge, .accounting-v52-root .v8-status, .accounting-v52-root .profile span, .accounting-v52-root .tenant-meta span, .accounting-v52-root .nav-group{font-size:var(--v10-min-font)!important;line-height:1.35!important}
 .accounting-v52-root .data-table td, .accounting-v52-root .v8-table td{font-size:max(var(--v10-min-font),9.6px)!important}
 .accounting-v52-root svg text{font-size:var(--v10-min-font)!important}
 /* Unique interaction surfaces */
@@ -1042,7 +1051,7 @@
 .accounting-v52-root .v12-kpis{display:grid;grid-template-columns:repeat(6,minmax(145px,1fr));gap:9px;margin-bottom:11px}.accounting-v52-root .v12-kpi{border:1px solid var(--v12-line);border-radius:13px;background:linear-gradient(145deg,#fff,#f7fbff);padding:12px;position:relative;overflow:hidden;box-shadow:0 6px 18px rgba(13,39,73,.04)}.accounting-v52-root .v12-kpi:before{content:"";position:absolute;left:0;right:0;top:0;height:2px;background:var(--accent,var(--v12-blue))}.accounting-v52-root .v12-kpi span{display:block;color:var(--muted);font-size:10px;font-weight:730}.accounting-v52-root .v12-kpi strong{display:block;font-size:19px;letter-spacing:-.035em;line-height:1.05;margin:6px 0 4px}.accounting-v52-root .v12-kpi em{display:block;color:var(--muted);font-size:10px;font-style:normal;line-height:1.35}
 .accounting-v52-root .v12-grid{display:grid;gap:11px}.accounting-v52-root .v12-two{grid-template-columns:minmax(0,1.35fr) minmax(320px,.65fr);align-items:start}.accounting-v52-root .v12-three{grid-template-columns:repeat(3,minmax(0,1fr))}.accounting-v52-root .v12-stack{display:grid;gap:11px}.accounting-v52-root .v12-panel{border:1px solid var(--v12-line);background:var(--surface);border-radius:14px;overflow:hidden;box-shadow:0 8px 22px rgba(13,39,73,.045)}.accounting-v52-root .v12-panel-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;padding:12px 13px;border-bottom:1px solid #e1e9f2;background:#fbfdff}.accounting-v52-root .v12-panel-head h2{font-size:11px;margin:0}.accounting-v52-root .v12-panel-head p{font-size:10px;color:var(--muted);line-height:1.45;margin:3px 0 0}.accounting-v52-root .v12-panel-tools{display:flex;gap:6px;flex-wrap:wrap}.accounting-v52-root .v12-panel-body{padding:12px 13px}
 .accounting-v52-root .v12-tabs{display:flex;gap:5px;overflow:auto;padding:4px;border:1px solid var(--v12-line);border-radius:11px;background:#f5f8fc;margin-bottom:11px}.accounting-v52-root .v12-tab{border:0;background:transparent;border-radius:8px;padding:8px 11px;font-size:10px;font-weight:700;white-space:nowrap;color:#5f7086;cursor:pointer}.accounting-v52-root .v12-tab.active{background:#fff;color:#0870df;box-shadow:0 4px 12px rgba(13,39,73,.08)}
-.accounting-v52-root .v12-table-wrap{border:1px solid var(--v12-line);border-radius:11px;overflow:auto;max-height:520px}.accounting-v52-root .v12-table{width:100%;border-collapse:separate;border-spacing:0;min-width:900px}.accounting-v52-root .v12-table th{position:sticky;top:0;z-index:3;background:#f4f8fd;color:#5e7088;text-align:left;text-transform:uppercase;letter-spacing:.045em;font-size:10px;padding:9px;border-bottom:1px solid #cfdae8;cursor:pointer;white-space:nowrap}.accounting-v52-root .v12-table th[data-v12-sort]:after{content:" ↕";opacity:.45}.accounting-v52-root .v12-table td{font-size:10px;padding:9px;border-bottom:1px solid #e5ebf3;vertical-align:middle;line-height:1.42}.accounting-v52-root .v12-table tbody tr:hover>td{background:#f5faff}.accounting-v52-root .v12-table tbody tr:last-child td{border-bottom:0}.accounting-v52-root .v12-num{text-align:right;font-variant-numeric:tabular-nums}.accounting-v52-root .v12-link{color:#076edb;font-weight:800;cursor:pointer}.accounting-v52-root .v12-sub{display:block;color:var(--muted);font-size:10px;margin-top:2px}.accounting-v52-root .v12-row-expand td{background:#f6f9fd!important;padding:0!important}.accounting-v52-root .v12-row-expand-inner{padding:11px 15px 14px 32px}.accounting-v52-root .v12-row-expand .v12-table-wrap{max-height:260px}
+.accounting-v52-root .v12-table-wrap{border:1px solid var(--v12-line);border-radius:11px;overflow:auto;max-height:520px}.accounting-v52-root .v12-table{width:100%;border-collapse:separate;border-spacing:0;min-width:900px}.accounting-v52-root .v12-table th{position:sticky;top:0;z-index:3;background:#f4f8fd;color:#5e7088;text-align:left;text-transform:uppercase;letter-spacing:.045em;font-size:10px;padding:9px;border-bottom:1px solid #cfdae8;cursor:pointer;white-space:nowrap}.accounting-v52-root .v12-table th[data-v12-sort]{padding-right:24px}.accounting-v52-root .v12-table th[data-v12-sort]::before,.accounting-v52-root .v12-table th[data-v12-sort]::after{content:"";position:absolute;right:9px;width:0;height:0;border-left:4px solid transparent;border-right:4px solid transparent;opacity:.58}.accounting-v52-root .v12-table th[data-v12-sort]::before{top:calc(50% - 6px);border-bottom:4px solid #63768d}.accounting-v52-root .v12-table th[data-v12-sort]::after{top:calc(50% + 2px);border-top:4px solid #63768d}.accounting-v52-root .v12-table td{font-size:10px;padding:9px;border-bottom:1px solid #e5ebf3;vertical-align:middle;line-height:1.42}.accounting-v52-root .v12-table tbody tr:hover>td{background:#f5faff}.accounting-v52-root .v12-table tbody tr:last-child td{border-bottom:0}.accounting-v52-root .v12-num{text-align:right;font-variant-numeric:tabular-nums}.accounting-v52-root .v12-link{color:#076edb;font-weight:800;cursor:pointer}.accounting-v52-root .v12-sub{display:block;color:var(--muted);font-size:10px;margin-top:2px}.accounting-v52-root .v12-row-expand td{background:#f6f9fd!important;padding:0!important}.accounting-v52-root .v12-row-expand-inner{padding:11px 15px 14px 32px}.accounting-v52-root .v12-row-expand .v12-table-wrap{max-height:260px}
 .accounting-v52-root .v12-status{display:inline-flex;align-items:center;gap:5px;min-height:21px;border:1px solid currentColor;border-radius:999px;padding:2px 7px;font-size:10px;font-weight:800;white-space:nowrap}.accounting-v52-root .v12-status:before{content:"";width:4px;height:4px;border-radius:50%;background:currentColor}.accounting-v52-root .v12-status.ok{color:var(--v12-green)}.accounting-v52-root .v12-status.warn{color:#b86d00}.accounting-v52-root .v12-status.bad{color:#d32448}.accounting-v52-root .v12-status.blue{color:#076edb}.accounting-v52-root .v12-status.neutral{color:#68788d}
 .accounting-v52-root .v12-facts{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}.accounting-v52-root .v12-fact{border:1px solid var(--v12-line);border-radius:10px;padding:9px;background:#f8fafc}.accounting-v52-root .v12-fact span{display:block;color:var(--muted);font-size:10px}.accounting-v52-root .v12-fact strong{display:block;font-size:10px;margin-top:3px;line-height:1.35}.accounting-v52-root .v12-callout{border:1px solid #bcd7f6;border-left:3px solid var(--v12-blue);border-radius:10px;padding:10px;background:#f7fbff;font-size:10px;line-height:1.5}.accounting-v52-root .v12-callout.warn{border-color:#e9c886;border-left-color:var(--v12-amber);background:#fffaf1}.accounting-v52-root .v12-callout.bad{border-color:#e8aaba;border-left-color:var(--v12-red);background:#fff7f9}
 .accounting-v52-root .v12-lineage{display:grid;grid-template-columns:repeat(5,minmax(128px,1fr));gap:7px;overflow:auto}.accounting-v52-root .v12-lineage>div{border:1px solid var(--v12-line);border-radius:10px;background:#f8fbff;padding:10px;display:grid;grid-template-columns:24px 1fr;gap:7px}.accounting-v52-root .v12-lineage i{grid-row:1/3;width:24px;height:24px;border-radius:7px;background:#e6f1ff;color:#0870df;display:grid;place-items:center;font-size:10px;font-style:normal;font-weight:850}.accounting-v52-root .v12-lineage strong{font-size:10px}.accounting-v52-root .v12-lineage span{font-size:10px;color:var(--muted);line-height:1.35}
@@ -1125,12 +1134,12 @@
   --v16-line:#cbd8e7;--v16-soft:#f4f8fc;--v16-panel:#ffffff;
 }
 /* Calm, high-contrast enterprise polish. Colour stays inside controls. */
-.accounting-v52-root button, .accounting-v52-root .btn, .accounting-v52-root .v12-btn, .accounting-v52-root .v15-btn{box-shadow:none!important;text-shadow:none!important;background-image:none!important}
-.accounting-v52-root button:focus-visible, .accounting-v52-root [role="button"]:focus-visible, .accounting-v52-root input:focus-visible, .accounting-v52-root select:focus-visible, .accounting-v52-root textarea:focus-visible, .accounting-v52-root a:focus-visible{outline:2px solid var(--v16-blue)!important;outline-offset:2px!important}
+.accounting-v52-root button:not(.ac52-legacy-mount *), .accounting-v52-root .btn, .accounting-v52-root .v12-btn, .accounting-v52-root .v15-btn{box-shadow:none!important;text-shadow:none!important;background-image:none!important}
+.accounting-v52-root button:focus-visible:not(.ac52-legacy-mount *), .accounting-v52-root [role="button"]:focus-visible:not(.ac52-legacy-mount *), .accounting-v52-root input:focus-visible:not(.ac52-legacy-mount *), .accounting-v52-root select:focus-visible:not(.ac52-legacy-mount *), .accounting-v52-root textarea:focus-visible:not(.ac52-legacy-mount *), .accounting-v52-root a:focus-visible:not(.ac52-legacy-mount *){outline:2px solid var(--v16-blue)!important;outline-offset:2px!important}
 .accounting-v52-root .table-wrap, .accounting-v52-root .v12-table-wrap, .accounting-v52-root .v15-table-wrap{max-width:100%;overflow:auto!important;overscroll-behavior:contain}
 .accounting-v52-root .data-table th, .accounting-v52-root .v12-table th, .accounting-v52-root .v15-table th{position:sticky;top:0;z-index:2;background:#f4f8fc!important}
 .accounting-v52-root .card, .accounting-v52-root .v12-panel, .accounting-v52-root .v15-panel{min-width:0}
-.accounting-v52-root .card-title, .accounting-v52-root .v12-panel-title, .accounting-v52-root .v15-panel-title, .accounting-v52-root h1, .accounting-v52-root h2, .accounting-v52-root h3, .accounting-v52-root strong, .accounting-v52-root span, .accounting-v52-root p, .accounting-v52-root td, .accounting-v52-root th{overflow-wrap:break-word}
+.accounting-v52-root .card-title, .accounting-v52-root .v12-panel-title, .accounting-v52-root .v15-panel-title, .accounting-v52-root h1:not(.ac52-legacy-mount *), .accounting-v52-root h2:not(.ac52-legacy-mount *), .accounting-v52-root h3:not(.ac52-legacy-mount *), .accounting-v52-root strong:not(.ac52-legacy-mount *), .accounting-v52-root span:not(.ac52-legacy-mount *), .accounting-v52-root p:not(.ac52-legacy-mount *), .accounting-v52-root td:not(.ac52-legacy-mount *), .accounting-v52-root th:not(.ac52-legacy-mount *){overflow-wrap:break-word}
 
 /* Workspace utility layer inspired by role-based enterprise workspaces. */
 .accounting-v52-root .v16-workspace-bar{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin:10px 0 12px;padding:8px 10px;border:1px solid var(--v16-line);border-radius:12px;background:rgba(255,255,255,.92);backdrop-filter:blur(12px);box-shadow:0 7px 24px rgba(17,44,78,.055)}
@@ -1205,15 +1214,15 @@
 .accounting-v52-root .page-head, .accounting-v52-root .v15-head, .accounting-v52-root .v12-head, .accounting-v52-root .v17-head{margin-top:0!important;margin-bottom:18px!important;gap:18px}
 .accounting-v52-root .page-head h1, .accounting-v52-root .v15-head h1, .accounting-v52-root .v12-head h1, .accounting-v52-root .v17-head h1{letter-spacing:-.035em;line-height:1.08}
 .accounting-v52-root .page-head p, .accounting-v52-root .v15-head p, .accounting-v52-root .v12-head p, .accounting-v52-root .v17-head p{max-width:900px;line-height:1.5}
-.accounting-v52-root button, .accounting-v52-root .btn, .accounting-v52-root .v12-btn, .accounting-v52-root .v15-btn, .accounting-v52-root .v17-btn{box-shadow:none!important;text-shadow:none!important;background-image:none!important}
+.accounting-v52-root button:not(.ac52-legacy-mount *), .accounting-v52-root .btn, .accounting-v52-root .v12-btn, .accounting-v52-root .v15-btn, .accounting-v52-root .v17-btn{box-shadow:none!important;text-shadow:none!important;background-image:none!important}
 .accounting-v52-root .btn.primary, .accounting-v52-root .v12-btn.primary, .accounting-v52-root .v15-btn.primary, .accounting-v52-root .v17-btn.primary{background:var(--v17-blue)!important;border-color:var(--v17-blue)!important;color:#fff!important}
 .accounting-v52-root .btn.primary:hover, .accounting-v52-root .v12-btn.primary:hover, .accounting-v52-root .v15-btn.primary:hover, .accounting-v52-root .v17-btn.primary:hover{background:var(--v17-blue-dark)!important;border-color:var(--v17-blue-dark)!important}
 .accounting-v52-root .btn, .accounting-v52-root .v12-btn, .accounting-v52-root .v15-btn, .accounting-v52-root .v17-btn{transition:border-color .15s,background .15s,transform .15s;color:var(--v17-ink)}
 .accounting-v52-root .btn:hover, .accounting-v52-root .v12-btn:hover, .accounting-v52-root .v15-btn:hover, .accounting-v52-root .v17-btn:hover{transform:translateY(-1px)}
 .accounting-v52-root .badge, .accounting-v52-root .v15-status, .accounting-v52-root .v12-status{background:transparent!important;box-shadow:none!important}
 /* minimum visible size is approximately 7pt */
-.accounting-v52-root small, .accounting-v52-root .sub, .accounting-v52-root .hint, .accounting-v52-root .meta, .accounting-v52-root .eyebrow, .accounting-v52-root .v15-eye, .accounting-v52-root .v12-eye, .accounting-v52-root .field label, .accounting-v52-root .v15-field label, .accounting-v52-root .v12-field label, .accounting-v52-root .card-title span, .accounting-v52-root .v15-panel-head p, .accounting-v52-root .v12-panel-title span, .accounting-v52-root .nav-group, .accounting-v52-root .v17-small{font-size:10px!important}
-.accounting-v52-root .data-table th, .accounting-v52-root .data-table td, .accounting-v52-root .v12-table th, .accounting-v52-root .v12-table td, .accounting-v52-root .v15-table th, .accounting-v52-root .v15-table td, .accounting-v52-root input, .accounting-v52-root select, .accounting-v52-root textarea, .accounting-v52-root button, .accounting-v52-root .btn, .accounting-v52-root .v12-btn, .accounting-v52-root .v15-btn, .accounting-v52-root .v17-btn{font-size:10px!important}
+.accounting-v52-root small:not(.ac52-legacy-mount *), .accounting-v52-root .sub, .accounting-v52-root .hint, .accounting-v52-root .meta, .accounting-v52-root .eyebrow, .accounting-v52-root .v15-eye, .accounting-v52-root .v12-eye, .accounting-v52-root .field label, .accounting-v52-root .v15-field label, .accounting-v52-root .v12-field label, .accounting-v52-root .card-title span, .accounting-v52-root .v15-panel-head p, .accounting-v52-root .v12-panel-title span, .accounting-v52-root .nav-group, .accounting-v52-root .v17-small{font-size:10px!important}
+.accounting-v52-root .data-table th, .accounting-v52-root .data-table td, .accounting-v52-root .v12-table th, .accounting-v52-root .v12-table td, .accounting-v52-root .v15-table th, .accounting-v52-root .v15-table td, .accounting-v52-root input:not(.ac52-legacy-mount *), .accounting-v52-root select:not(.ac52-legacy-mount *), .accounting-v52-root textarea:not(.ac52-legacy-mount *), .accounting-v52-root button:not(.ac52-legacy-mount *), .accounting-v52-root .btn, .accounting-v52-root .v12-btn, .accounting-v52-root .v15-btn, .accounting-v52-root .v17-btn{font-size:10px!important}
 .accounting-v52-root .card-title strong, .accounting-v52-root .v15-panel-head h2, .accounting-v52-root .v12-panel-title strong, .accounting-v52-root .v17-panel-head h2{font-size:11px!important}
 .accounting-v52-root .profile .avatar{width:34px!important;height:34px!important;min-width:34px!important;border-radius:50%!important;overflow:hidden!important;padding:0!important}
 .accounting-v52-root .profile .avatar img, .accounting-v52-root .profile-menu-head img, .accounting-v52-root .v5-profile-menu img{width:100%!important;height:100%!important;object-fit:cover!important;object-position:center 18%!important;border-radius:50%!important;display:block!important}
@@ -1492,9 +1501,20 @@
 .accounting-v52-root .v23-kebab{width:31px;height:31px;border:1px solid #cbd9e7;border-radius:9px;background:#fff;color:#31465f;font-size:18px;line-height:1;display:inline-flex;align-items:center;justify-content:center;font-weight:800;box-shadow:none!important}
 .accounting-v52-root .v23-kebab:hover{border-color:#7faee0;background:#f5faff;color:#006cff}
 .accounting-v52-root .v23-menu{position:absolute;right:7px;top:36px;z-index:1600;width:220px;padding:6px;border:1px solid #cfdbe8;border-radius:12px;background:#fff;box-shadow:0 18px 48px rgba(16,34,59,.18);display:none;text-align:left}
+.accounting-v52-root .v23-action-cell.open > .v23-menu{position:fixed;right:auto;top:auto;z-index:120000}
 .accounting-v52-root .v23-action-cell.open .v23-menu{display:grid;gap:3px}
 .accounting-v52-root .v23-menu button{width:100%!important;min-height:34px!important;border:0!important;border-radius:8px!important;background:transparent!important;color:#223752!important;text-align:left!important;justify-content:flex-start!important;padding:0 10px!important;box-shadow:none!important;font-weight:700!important}
 .accounting-v52-root .v23-menu button:hover{background:#edf6ff!important;color:#005ed8!important}
+/* The v27 collapsed-action menu (openMenu27) is appended to <body> — outside .accounting-v52-root — and positioned with
+ * inline left/top, but it shipped with no stylesheet: with no `position` the coordinates were ignored and the menu fell
+ * into normal flow off-screen, so the row "⋯" (which every Approval Queue row uses for Open/Post/Reject) looked dead.
+ * Give it a fixed position and the same card treatment as the v23 menu so collapsed actions are reachable everywhere. */
+.v27-action-popover{position:fixed;z-index:120000;min-width:200px;max-width:260px;padding:6px;border:1px solid #cfdbe8;border-radius:12px;background:#fff;box-shadow:0 18px 48px rgba(16,34,59,.18);display:grid;gap:3px;text-align:left}
+.v27-action-popover button{display:flex;align-items:center;justify-content:space-between;gap:12px;width:100%;min-height:34px;border:0;border-radius:8px;background:transparent;color:#223752;text-align:left;padding:0 10px;font:700 12px/1.2 inherit;cursor:pointer}
+.v27-action-popover button:hover{background:#edf6ff;color:#005ed8}
+.v27-action-popover button small{color:#8aa0b8;font-weight:600}
+.v27-action-popover button.danger{color:#c82a47}
+.v27-action-popover button.danger:hover{background:#fef3f2;color:#b42318}
 
 /* Unified v23 filter control. */
 .accounting-v52-root .v23-filter-row{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:13px 0 9px}
@@ -1725,14 +1745,14 @@
   width:100%!important;max-width:none!important;margin:0!important;min-width:0!important;
 }
 .accounting-v52-root .page-head, .accounting-v52-root .v8-head, .accounting-v52-root .v12-head, .accounting-v52-root .v15-head, .accounting-v52-root .v17-head, .accounting-v52-root .v23-head, .accounting-v52-root .v25-head, .accounting-v52-root .v28-head{margin-bottom:14px!important;max-width:none!important}
-.accounting-v52-root .grid, .accounting-v52-root .v8-grid, .accounting-v52-root .v12-grid, .accounting-v52-root .v15-grid, .accounting-v52-root .v17-grid, .accounting-v52-root .v23-grid, .accounting-v52-root .v25-grid, .accounting-v52-root .v28-grid{gap:12px!important;min-width:0!important}
+.accounting-v52-root .grid:not(.ac52-legacy-mount *), .accounting-v52-root .v8-grid, .accounting-v52-root .v12-grid, .accounting-v52-root .v15-grid, .accounting-v52-root .v17-grid, .accounting-v52-root .v23-grid, .accounting-v52-root .v25-grid, .accounting-v52-root .v28-grid{gap:12px!important;min-width:0!important}
 .accounting-v52-root .stack, .accounting-v52-root .v8-stack, .accounting-v52-root .v12-stack, .accounting-v52-root .v15-stack, .accounting-v52-root .v17-stack, .accounting-v52-root .v23-stack, .accounting-v52-root .v25-stack, .accounting-v52-root .v28-stack{gap:12px!important;min-width:0!important}
 .accounting-v52-root .card, .accounting-v52-root .panel, .accounting-v52-root .v8-panel, .accounting-v52-root .v12-panel, .accounting-v52-root .v15-panel, .accounting-v52-root .v17-panel, .accounting-v52-root .v23-panel, .accounting-v52-root .v25-panel, .accounting-v52-root .v28-panel{min-width:0!important;max-width:none!important}
 .accounting-v52-root .kpis, .accounting-v52-root .v8-kpis, .accounting-v52-root .v12-kpis, .accounting-v52-root .v15-kpis, .accounting-v52-root .v17-kpis, .accounting-v52-root .v23-kpis, .accounting-v52-root .v25-kpis, .accounting-v52-root .v28-kpis{
   grid-template-columns:repeat(auto-fit,minmax(158px,1fr))!important;gap:10px!important;width:100%!important;
 }
 .accounting-v52-root .table-wrap, .accounting-v52-root .v8-table-wrap, .accounting-v52-root .v12-table-wrap, .accounting-v52-root .v15-table-wrap, .accounting-v52-root .v17-table-wrap, .accounting-v52-root .v23-table-wrap, .accounting-v52-root .v25-table-wrap, .accounting-v52-root .v28-table-wrap{width:100%!important;max-width:100%!important}
-.accounting-v52-root table{width:100%}
+.accounting-v52-root table:not(.ac52-legacy-mount *){width:100%}
 
 /* Command Centre: stretch the left analytical column to the same visual depth as the right rail. */
 .accounting-v52-root #main.v31-overview .v15-grid.v15-two, .accounting-v52-root #main.v31-overview .v17-grid.two, .accounting-v52-root #main.v31-overview .v28-grid.two{align-items:stretch!important}
@@ -1779,7 +1799,7 @@
 .accounting-v52-root .v25-page, .accounting-v52-root .v28-page{padding-left:0!important;padding-right:0!important}
 
 /* Every layout row uses the same rhythm and stretches its children. */
-.accounting-v52-root #main :is(.grid, .accounting-v52-root .v8-grid, .accounting-v52-root .v12-grid, .accounting-v52-root .v15-grid, .accounting-v52-root .v17-grid, .accounting-v52-root .v23-grid, .accounting-v52-root .v25-grid, .accounting-v52-root .v28-grid, .accounting-v52-root .v5-three-grid, .accounting-v52-root .v5-four-grid, .accounting-v52-root .v5-dense-grid, .accounting-v52-root .v25-grid-2, .accounting-v52-root .v25-grid-equal, .accounting-v52-root .v8-split, .accounting-v52-root .v8-split-even, .accounting-v52-root .split-2, .accounting-v52-root .split-3, .accounting-v52-root .two, .accounting-v52-root .three, .accounting-v52-root .four){
+.accounting-v52-root #main :is(.grid:not(.ac52-legacy-mount *), .accounting-v52-root .v8-grid, .accounting-v52-root .v12-grid, .accounting-v52-root .v15-grid, .accounting-v52-root .v17-grid, .accounting-v52-root .v23-grid, .accounting-v52-root .v25-grid, .accounting-v52-root .v28-grid, .accounting-v52-root .v5-three-grid, .accounting-v52-root .v5-four-grid, .accounting-v52-root .v5-dense-grid, .accounting-v52-root .v25-grid-2, .accounting-v52-root .v25-grid-equal, .accounting-v52-root .v8-split, .accounting-v52-root .v8-split-even, .accounting-v52-root .split-2, .accounting-v52-root .split-3, .accounting-v52-root .two, .accounting-v52-root .three, .accounting-v52-root .four){
   gap:var(--v32-gap)!important;
   align-items:stretch!important;
   align-content:stretch!important;
@@ -2051,7 +2071,7 @@
   -webkit-font-smoothing:antialiased;
   text-rendering:optimizeLegibility;
 }
-.accounting-v52-root button, .accounting-v52-root input, .accounting-v52-root select, .accounting-v52-root textarea{font-family:inherit!important;letter-spacing:-.003em}
+.accounting-v52-root button:not(.ac52-legacy-mount *), .accounting-v52-root input:not(.ac52-legacy-mount *), .accounting-v52-root select:not(.ac52-legacy-mount *), .accounting-v52-root textarea:not(.ac52-legacy-mount *){font-family:inherit!important;letter-spacing:-.003em}
 
 /* App shell: quiet chrome, maximum working canvas. */
 .accounting-v52-root .app{--sidebar:216px!important;grid-template-columns:var(--sidebar) minmax(0,1fr)!important}
@@ -2148,7 +2168,7 @@
 .accounting-v52-root .eyebrow, .accounting-v52-root [class*="kicker"]{letter-spacing:.08em!important}
 
 /* Consistent grid geometry. */
-.accounting-v52-root .grid, .accounting-v52-root .v8-grid, .accounting-v52-root .v11-grid, .accounting-v52-root .v12-grid, .accounting-v52-root .v15-grid, .accounting-v52-root .v17-grid, .accounting-v52-root .v23-grid, .accounting-v52-root .v25-grid, .accounting-v52-root .v28-grid, .accounting-v52-root .v34-grid, .accounting-v52-root .v35-spotlight, .accounting-v52-root .v5-three-grid, .accounting-v52-root .v5-four-grid, .accounting-v52-root .v5-dense-grid, .accounting-v52-root .v5-cash-summary{
+.accounting-v52-root .grid:not(.ac52-legacy-mount *), .accounting-v52-root .v8-grid, .accounting-v52-root .v11-grid, .accounting-v52-root .v12-grid, .accounting-v52-root .v15-grid, .accounting-v52-root .v17-grid, .accounting-v52-root .v23-grid, .accounting-v52-root .v25-grid, .accounting-v52-root .v28-grid, .accounting-v52-root .v34-grid, .accounting-v52-root .v35-spotlight, .accounting-v52-root .v5-three-grid, .accounting-v52-root .v5-four-grid, .accounting-v52-root .v5-dense-grid, .accounting-v52-root .v5-cash-summary{
   gap:var(--v40-gap)!important;
   min-width:0!important;
 }
@@ -2156,7 +2176,7 @@
   grid-template-columns:repeat(2,minmax(0,1fr))!important;
   align-items:stretch!important;
 }
-.accounting-v52-root :is(.v8-grid, .accounting-v52-root .v11-grid, .accounting-v52-root .v12-grid, .accounting-v52-root .v15-grid, .accounting-v52-root .v17-grid, .accounting-v52-root .v23-grid, .accounting-v52-root .v25-grid, .accounting-v52-root .v28-grid, .accounting-v52-root .v34-grid, .accounting-v52-root .grid)>*{min-width:0!important}
+.accounting-v52-root :is(.v8-grid, .accounting-v52-root .v11-grid, .accounting-v52-root .v12-grid, .accounting-v52-root .v15-grid, .accounting-v52-root .v17-grid, .accounting-v52-root .v23-grid, .accounting-v52-root .v25-grid, .accounting-v52-root .v28-grid, .accounting-v52-root .v34-grid, .accounting-v52-root .grid)>*:not(.ac52-legacy-mount *){min-width:0!important}
 
 /* KPI system: dense, consistent and executive-readable. */
 .accounting-v52-root .kpis, .accounting-v52-root .v8-kpis, .accounting-v52-root .v11-kpis, .accounting-v52-root .v12-kpis, .accounting-v52-root .v15-kpis, .accounting-v52-root .v17-kpis, .accounting-v52-root .v23-kpis, .accounting-v52-root .v25-kpis, .accounting-v52-root .v28-kpis, .accounting-v52-root .v34-kpis{
@@ -2260,23 +2280,23 @@
 /* Form discipline. */
 .accounting-v52-root .field{min-width:0!important}
 .accounting-v52-root .field label{display:block!important;margin:0 0 4px!important;color:#475467!important;font-size:10px!important;font-weight:700!important;line-height:1.25!important}
-.accounting-v52-root .input, .accounting-v52-root .select, .accounting-v52-root .textarea, .accounting-v52-root input:not([type="checkbox"]):not([type="radio"]), .accounting-v52-root select, .accounting-v52-root textarea{
+.accounting-v52-root .input, .accounting-v52-root .select, .accounting-v52-root .textarea, .accounting-v52-root input:not([type="checkbox"]):not([type="radio"]):not(.ac52-legacy-mount *), .accounting-v52-root select:not(.ac52-legacy-mount *), .accounting-v52-root textarea:not(.ac52-legacy-mount *){
   min-height:35px!important;border-radius:9px!important;border:1px solid #d6dbe2!important;background:#fff!important;box-shadow:none!important;font-size:10.5px!important;min-width:0!important;max-width:100%!important;
 }
-.accounting-v52-root input:focus, .accounting-v52-root select:focus, .accounting-v52-root textarea:focus, .accounting-v52-root .input:focus, .accounting-v52-root .select:focus, .accounting-v52-root .textarea:focus{outline:2px solid rgba(10,102,255,.13)!important;outline-offset:0!important;border-color:#76a8ff!important}
-.accounting-v52-root textarea{line-height:1.45!important;padding-top:8px!important}
+.accounting-v52-root input:focus:not(.ac52-legacy-mount *), .accounting-v52-root select:focus:not(.ac52-legacy-mount *), .accounting-v52-root textarea:focus:not(.ac52-legacy-mount *), .accounting-v52-root .input:focus, .accounting-v52-root .select:focus, .accounting-v52-root .textarea:focus{outline:2px solid rgba(10,102,255,.13)!important;outline-offset:0!important;border-color:#76a8ff!important}
+.accounting-v52-root textarea:not(.ac52-legacy-mount *){line-height:1.45!important;padding-top:8px!important}
 .accounting-v52-root .form-grid, .accounting-v52-root .v5-policy-form{gap:9px!important}
 
 /* Tables: enterprise density without compression. */
 .accounting-v52-root .table-wrap, .accounting-v52-root .v5-table-wrap, .accounting-v52-root .v8-table-wrap, .accounting-v52-root .v11-table-wrap, .accounting-v52-root .v12-table-wrap, .accounting-v52-root .v15-table-wrap, .accounting-v52-root .v17-table-wrap, .accounting-v52-root .v23-table-wrap, .accounting-v52-root .v25-table-wrap, .accounting-v52-root .v28-table-wrap, .accounting-v52-root .v34-table-wrap{
   width:100%!important;max-width:100%!important;overflow:auto!important;border-radius:11px!important;border:1px solid var(--v40-line)!important;background:#fff!important;scrollbar-gutter:stable!important;
 }
-.accounting-v52-root table, .accounting-v52-root .table, .accounting-v52-root .v5-table, .accounting-v52-root .v8-table, .accounting-v52-root .v11-table, .accounting-v52-root .v12-table, .accounting-v52-root .v15-table, .accounting-v52-root .v17-table, .accounting-v52-root .v23-table, .accounting-v52-root .v25-table, .accounting-v52-root .v28-table, .accounting-v52-root .v34-table{width:100%!important;border-collapse:separate!important;border-spacing:0!important;background:#fff!important}
-.accounting-v52-root th{position:sticky;top:0;z-index:2;background:#f8fafc!important;color:#667085!important;font-size:10px!important;text-transform:uppercase!important;letter-spacing:.045em!important;font-weight:780!important;white-space:nowrap!important;border-bottom:1px solid var(--v40-line)!important;padding:9px 10px!important}
-.accounting-v52-root td{font-size:10.5px!important;line-height:1.4!important;color:#344054!important;padding:9px 10px!important;border-bottom:1px solid #eef1f4!important;vertical-align:middle!important;max-width:360px!important}
-.accounting-v52-root tbody tr:last-child td{border-bottom:0!important}
-.accounting-v52-root tbody tr:hover td{background:#f9fbfd!important}
-.accounting-v52-root td strong{font-weight:720!important;color:#1d2939!important}
+.accounting-v52-root table:not(.ac52-legacy-mount *), .accounting-v52-root .table, .accounting-v52-root .v5-table, .accounting-v52-root .v8-table, .accounting-v52-root .v11-table, .accounting-v52-root .v12-table, .accounting-v52-root .v15-table, .accounting-v52-root .v17-table, .accounting-v52-root .v23-table, .accounting-v52-root .v25-table, .accounting-v52-root .v28-table, .accounting-v52-root .v34-table{width:100%!important;border-collapse:separate!important;border-spacing:0!important;background:#fff!important}
+.accounting-v52-root th:not(.ac52-legacy-mount *){position:sticky;top:0;z-index:2;background:#f8fafc!important;color:#667085!important;font-size:10px!important;text-transform:uppercase!important;letter-spacing:.045em!important;font-weight:780!important;white-space:nowrap!important;border-bottom:1px solid var(--v40-line)!important;padding:9px 10px!important}
+.accounting-v52-root td:not(.ac52-legacy-mount *){font-size:10.5px!important;line-height:1.4!important;color:#344054!important;padding:9px 10px!important;border-bottom:1px solid #eef1f4!important;vertical-align:middle!important;max-width:360px!important}
+.accounting-v52-root tbody tr:not(.ac52-legacy-mount tr) td:not(.ac52-legacy-mount *){border-bottom:0!important}
+.accounting-v52-root tbody tr:hover td:not(.ac52-legacy-mount *){background:#f9fbfd!important}
+.accounting-v52-root td strong:not(.ac52-legacy-mount *){font-weight:720!important;color:#1d2939!important}
 
 /* Statuses remain transparent and precise. */
 .accounting-v52-root .badge, .accounting-v52-root .status, .accounting-v52-root .pill, .accounting-v52-root [class*="status-pill"], .accounting-v52-root [class*="badge-"]{
@@ -2368,8 +2388,8 @@
 .accounting-v52-root .v33-ring{background:conic-gradient(#005CFF calc(var(--p)*1%),#e9eff6 0)!important}
 .accounting-v52-root .v33-legend-row .blue{background:#005CFF!important}.accounting-v52-root .v33-legend-row .violet{background:#6C47FF!important}.accounting-v52-root .v33-legend-row .amber{background:#F59E0B!important}
 .accounting-v52-root .v35-chartbox .series{stroke-width:2.15!important}.accounting-v52-root .v35-chartbox .point{stroke-width:1.7!important}
-.accounting-v52-root a, .accounting-v52-root .link, .accounting-v52-root .text-link{color:#005CFF}
-.accounting-v52-root input:focus, .accounting-v52-root select:focus, .accounting-v52-root textarea:focus{border-color:#005CFF!important;box-shadow:0 0 0 2px rgba(0,92,255,.10)!important}
+.accounting-v52-root a:not(.ac52-legacy-mount *), .accounting-v52-root .link, .accounting-v52-root .text-link{color:#005CFF}
+.accounting-v52-root input:focus:not(.ac52-legacy-mount *), .accounting-v52-root select:focus:not(.ac52-legacy-mount *), .accounting-v52-root textarea:focus:not(.ac52-legacy-mount *){border-color:#005CFF!important;box-shadow:0 0 0 2px rgba(0,92,255,.10)!important}
 
 
 
@@ -2393,10 +2413,10 @@
 .accounting-v52-root .kpi-value, .accounting-v52-root .v8-kpi .value, .accounting-v52-root .v11-kpi .value, .accounting-v52-root .v12-kpi .value, .accounting-v52-root .v15-kpi .value, .accounting-v52-root .v17-kpi .value, .accounting-v52-root .v23-kpi .value, .accounting-v52-root .v25-kpi .value, .accounting-v52-root .v28-kpi .value, .accounting-v52-root .v34-kpi .value, .accounting-v52-root .v5-kpi .value{
   color:#070B12!important;
 }
-.accounting-v52-root th{color:#344054!important}
-.accounting-v52-root td{color:#1F2937!important}
-.accounting-v52-root td strong{color:#0B1220!important}
-.accounting-v52-root .field label, .accounting-v52-root .form-label, .accounting-v52-root label{color:#344054!important}
+.accounting-v52-root th:not(.ac52-legacy-mount *){color:#344054!important}
+.accounting-v52-root td:not(.ac52-legacy-mount *){color:#1F2937!important}
+.accounting-v52-root td strong:not(.ac52-legacy-mount *){color:#0B1220!important}
+.accounting-v52-root .field label, .accounting-v52-root .form-label, .accounting-v52-root label:not(.ac52-legacy-mount *){color:#344054!important}
 .accounting-v52-root .nav-item{color:#475467!important}.accounting-v52-root .nav-group{color:#667085!important}.accounting-v52-root .nav-count{color:#475467!important}
 .accounting-v52-root .v33-chart-head span, .accounting-v52-root .v33-recon-steps span, .accounting-v52-root .v33-recon-health p, .accounting-v52-root .v33-legend-row span, .accounting-v52-root .v35-action span, .accounting-v52-root .v35-bar-row label, .accounting-v52-root .v35-mini span, .accounting-v52-root .v25-chart-label, .accounting-v52-root .v11-axis, .accounting-v52-root .v11-axis span{
   color:#46566B!important;
@@ -2568,7 +2588,7 @@
 }
 
 /* Slightly richer input focus, still contained. */
-.accounting-v52-root input:focus, .accounting-v52-root select:focus, .accounting-v52-root textarea:focus{
+.accounting-v52-root input:focus:not(.ac52-legacy-mount *), .accounting-v52-root select:focus:not(.ac52-legacy-mount *), .accounting-v52-root textarea:focus:not(.ac52-legacy-mount *){
   border-color:#0066FF!important;
   box-shadow:inset 0 0 0 1px rgba(0,102,255,.10),0 0 0 2px rgba(0,102,255,.08)!important;
 }
@@ -2581,8 +2601,8 @@
   --v44-green:#00B96B;--v44-amber:#FFAE00;--v44-red:#FF334D;--v44-ink:#040912;--v44-muted:#344054;
 }
 .accounting-v52-root, .accounting-v52-root #main, .accounting-v52-root .content, .accounting-v52-root .sidebar, .accounting-v52-root .topbar, .accounting-v52-root .drawer, .accounting-v52-root .modal{font-size:13px!important;color:var(--v44-ink)!important}
-.accounting-v52-root small, .accounting-v52-root .sub, .accounting-v52-root .v17-sub, .accounting-v52-root .v34-sub, .accounting-v52-root .panel-head p, .accounting-v52-root .v17-panel-head p, .accounting-v52-root .v34-panel-head p{font-size:10px!important}
-.accounting-v52-root button, .accounting-v52-root input, .accounting-v52-root select, .accounting-v52-root textarea, .accounting-v52-root label, .accounting-v52-root th, .accounting-v52-root td, .accounting-v52-root .badge, .accounting-v52-root .status, .accounting-v52-root .pill, .accounting-v52-root [class*="status-pill"], .accounting-v52-root [class*="badge-"]{font-size:10px!important}
+.accounting-v52-root small:not(.ac52-legacy-mount *), .accounting-v52-root .sub, .accounting-v52-root .v17-sub, .accounting-v52-root .v34-sub, .accounting-v52-root .panel-head p, .accounting-v52-root .v17-panel-head p, .accounting-v52-root .v34-panel-head p{font-size:10px!important}
+.accounting-v52-root button:not(.ac52-legacy-mount *), .accounting-v52-root input:not(.ac52-legacy-mount *), .accounting-v52-root select:not(.ac52-legacy-mount *), .accounting-v52-root textarea:not(.ac52-legacy-mount *), .accounting-v52-root label:not(.ac52-legacy-mount *), .accounting-v52-root th:not(.ac52-legacy-mount *), .accounting-v52-root td:not(.ac52-legacy-mount *), .accounting-v52-root .badge, .accounting-v52-root .status, .accounting-v52-root .pill, .accounting-v52-root [class*="status-pill"], .accounting-v52-root [class*="badge-"]{font-size:10px!important}
 .accounting-v52-root svg text{font-size:10px!important}
 .accounting-v52-root .nav-group{font-size:10px!important}.accounting-v52-root .nav-item{font-size:11px!important}.accounting-v52-root .nav-count{font-size:10px!important}
 
@@ -2599,7 +2619,7 @@
 .accounting-v52-root .nav-item.active{background:linear-gradient(180deg,#F8FBFF,#E7F0FF)!important;color:#004ED8!important;border-color:#B8D3FF!important;box-shadow:inset 3px 0 #005BFF,inset 0 1px 0 #fff!important}
 .accounting-v52-root .tab.active, .accounting-v52-root .v17-tab.active, .accounting-v52-root .v28-tab.active, .accounting-v52-root .v34-tab.active{background:linear-gradient(180deg,#fff,#EAF2FF)!important;border-color:#B9D2FF!important;color:#004ED8!important;box-shadow:inset 0 1px #fff!important}
 .accounting-v52-root .kpi-icon, .accounting-v52-root .v8-kpi-icon, .accounting-v52-root .v12-kpi-icon, .accounting-v52-root .v15-kpi-icon, .accounting-v52-root .v17-kpi-icon, .accounting-v52-root .v23-kpi-icon, .accounting-v52-root .v25-kpi-icon, .accounting-v52-root .v28-kpi-icon, .accounting-v52-root .v34-kpi-icon{background:linear-gradient(145deg,#EFF6FF,#CFE3FF)!important;border-color:#ADD0FF!important;color:#005BFF!important}
-.accounting-v52-root input:focus, .accounting-v52-root select:focus, .accounting-v52-root textarea:focus{border-color:#005BFF!important;box-shadow:inset 0 0 0 1px rgba(0,91,255,.12),0 0 0 2px rgba(0,91,255,.08)!important}
+.accounting-v52-root input:focus:not(.ac52-legacy-mount *), .accounting-v52-root select:focus:not(.ac52-legacy-mount *), .accounting-v52-root textarea:focus:not(.ac52-legacy-mount *){border-color:#005BFF!important;box-shadow:inset 0 0 0 1px rgba(0,91,255,.12),0 0 0 2px rgba(0,91,255,.08)!important}
 
 /* One deliberate chart system: plots fill their surface without clipping labels. */
 .accounting-v52-root #main :is(.chart, .accounting-v52-root .v8-chart, .accounting-v52-root .v11-chart, .accounting-v52-root .v12-chart, .accounting-v52-root .v15-chart, .accounting-v52-root .v17-chart, .accounting-v52-root .v23-chart, .accounting-v52-root .v25-chart, .accounting-v52-root .v28-chart, .accounting-v52-root .v34-chart, .accounting-v52-root .v33-chart){
@@ -2767,6 +2787,7 @@
 .accounting-v52-root .v46-lifecycle{display:grid;grid-template-columns:repeat(6,1fr);gap:7px;margin-bottom:14px}.accounting-v52-root .v46-stage{border:1px solid #dfe5ee;border-radius:12px;background:#fff;padding:10px;min-width:0}.accounting-v52-root .v46-stage i{width:22px;height:22px;border-radius:8px;background:#eef2ff;color:#244fd5;display:grid;place-items:center;font-style:normal;font-weight:900;font-size:9px}.accounting-v52-root .v46-stage strong{display:block;font-size:9px;margin-top:7px}.accounting-v52-root .v46-stage span{display:block;font-size:9px;color:#748093;margin-top:3px}.accounting-v52-root .v46-stage.warn{border-color:#ffd7ae;background:#fffaf5}.accounting-v52-root .v46-stage.warn i{background:#fff0de;color:#d96c00}
 .accounting-v52-root .v46-assets .v28-toolbar{background:#f5f7fb;border:1px solid #e0e5ee;border-radius:13px;padding:5px}.accounting-v52-root .v46-assets .v28-tabbar button.active{background:#173eac;color:#fff}.accounting-v52-root .v46-assets .v28-kpi{border-top:3px solid #2858d8}
 
+.accounting-v52-root .al-status-rows{display:grid;gap:8px}.accounting-v52-root .al-status-row{display:grid;grid-template-columns:minmax(125px,.8fr) minmax(0,1.8fr) minmax(92px,.6fr);align-items:start;column-gap:12px;line-height:1.35;font-size:11px}.accounting-v52-root .al-status-row>span{color:#52657b;min-width:0}.accounting-v52-root .al-status-row>strong{min-width:0;color:#172b45;font-weight:750;overflow-wrap:anywhere}.accounting-v52-root .al-status-row>small{color:#7b8ca0;font-size:10px;white-space:normal}.accounting-v52-root .al-status-row .v28-status{justify-self:start;margin-top:-2px}
 @media(max-width:1250px){
  .accounting-v52-root .v46-time-week, .accounting-v52-root .v46-auto-shell, .accounting-v52-root .v46-asset-hero{grid-template-columns:1fr}
  .accounting-v52-root .v46-time .v34-kpis, .accounting-v52-root .v46-auto .v27-kpis{grid-template-columns:repeat(3,minmax(0,1fr))}
@@ -3017,14 +3038,18 @@
 }
 .accounting-v52-root #main.v50-refined :is(.v48-recurring-top, .accounting-v52-root .v48-inv-layout, .accounting-v52-root .v48-asset-layout, .accounting-v52-root .v47-main-grid, .accounting-v52-root .v47-lower-grid)>*{min-width:0!important;height:100%!important}
 
-/* Tables: dense but calm, with a strong information ladder. */
-.accounting-v52-root #main.v50-refined table.v50-table{
+/* Tables: dense but calm, with a strong information ladder.
+   The legacy General Ledger register renders its own <Table> with class="w-full v50-table", so these v50 pins
+   reached the portalled module and restyled its header row (uppercase 10px/720 on a route where they are inert,
+   since the standalone legacy page has no .accounting-v52-root ancestor). Every selector below now excludes the
+   mount so the portalled screen keeps its native table styling. */
+.accounting-v52-root #main.v50-refined table.v50-table:not(.ac52-legacy-mount *){
   width:100%!important;
   border-collapse:separate!important;
   border-spacing:0!important;
   font-variant-numeric:tabular-nums!important;
 }
-.accounting-v52-root #main.v50-refined table.v50-table thead th{
+.accounting-v52-root #main.v50-refined table.v50-table thead th:not(.ac52-legacy-mount *){
   height:38px!important;
   padding:9px 11px!important;
   background:#F7F9FC!important;
@@ -3036,7 +3061,7 @@
   text-transform:uppercase!important;
   white-space:nowrap!important;
 }
-.accounting-v52-root #main.v50-refined table.v50-table tbody td{
+.accounting-v52-root #main.v50-refined table.v50-table tbody td:not(.ac52-legacy-mount *){
   min-height:42px!important;
   padding:10px 11px!important;
   color:#27364A!important;
@@ -3044,11 +3069,11 @@
   vertical-align:middle!important;
   line-height:1.35!important;
 }
-.accounting-v52-root #main.v50-refined table.v50-table tbody tr:hover td{background:#F8FAFE!important}
-.accounting-v52-root #main.v50-refined table.v50-table tbody tr:last-child td{border-bottom:0!important}
+.accounting-v52-root #main.v50-refined table.v50-table tbody tr:hover td:not(.ac52-legacy-mount *){background:#F8FAFE!important}
+.accounting-v52-root #main.v50-refined table.v50-table tbody tr:last-child td:not(.ac52-legacy-mount *){border-bottom:0!important}
 
 /* Buttons: compact, jewel-like, never cloudy. */
-.accounting-v52-root #main.v50-refined :is(button, .accounting-v52-root .btn, .accounting-v52-root .v48-btn, .accounting-v52-root .v44-btn):not(.nav-item):not(.v50-back){
+.accounting-v52-root #main.v50-refined :is(button, .accounting-v52-root .btn, .accounting-v52-root .v48-btn, .accounting-v52-root .v44-btn):not(.ac52-legacy-mount *):not(.nav-item):not(.v50-back){
   min-height:34px;
   border-radius:10px!important;
   font-weight:700!important;
@@ -3084,11 +3109,11 @@
 .accounting-v52-root #main.v50-refined :is(.status, .accounting-v52-root .pill, .accounting-v52-root .badge, .accounting-v52-root .chip).bad{background:transparent!important;border-color:#D84A63!important;color:#BC2843!important}
 
 /* Text ladder: one consistent semantic scale. */
-.accounting-v52-root #main.v50-refined h2{font-size:17px!important;line-height:1.2!important}
-.accounting-v52-root #main.v50-refined h3{font-size:14.5px!important;line-height:1.25!important}
-.accounting-v52-root #main.v50-refined h4{font-size:12.5px!important;line-height:1.3!important}
-.accounting-v52-root #main.v50-refined p, .accounting-v52-root #main.v50-refined td, .accounting-v52-root #main.v50-refined input, .accounting-v52-root #main.v50-refined select, .accounting-v52-root #main.v50-refined textarea{font-size:10.5px!important}
-.accounting-v52-root #main.v50-refined small{font-size:10px!important;color:#6B778A!important}
+.accounting-v52-root #main.v50-refined h2:not(.ac52-legacy-mount *){font-size:17px!important;line-height:1.2!important}
+.accounting-v52-root #main.v50-refined h3:not(.ac52-legacy-mount *){font-size:14.5px!important;line-height:1.25!important}
+.accounting-v52-root #main.v50-refined h4:not(.ac52-legacy-mount *){font-size:12.5px!important;line-height:1.3!important}
+.accounting-v52-root #main.v50-refined p:not(.ac52-legacy-mount *), .accounting-v52-root #main.v50-refined td:not(.ac52-legacy-mount *), .accounting-v52-root #main.v50-refined input:not(.ac52-legacy-mount *), .accounting-v52-root #main.v50-refined select:not(.ac52-legacy-mount *), .accounting-v52-root #main.v50-refined textarea:not(.ac52-legacy-mount *){font-size:10.5px!important}
+.accounting-v52-root #main.v50-refined small:not(.ac52-legacy-mount *){font-size:10px!important;color:#6B778A!important}
 
 /* Deliberate section rhythm. */
 .accounting-v52-root #main.v50-refined .v50-panel + .v50-panel, .accounting-v52-root #main.v50-refined .v48-surface + .v48-surface{margin-top:14px!important}
@@ -3325,7 +3350,7 @@
   border-color:#D8E1EC!important;
   background:linear-gradient(180deg,#FBFCFE 0%,color-mix(in srgb,var(--v52-accent-soft) 35%,#F8FAFC) 100%)!important;
 }
-.accounting-v52-root #main :is(input, .accounting-v52-root select, .accounting-v52-root textarea):focus{
+.accounting-v52-root #main :is(input:not(.ac52-legacy-mount *), .accounting-v52-root select:not(.ac52-legacy-mount *), .accounting-v52-root textarea:not(.ac52-legacy-mount *)):focus{
   border-color:var(--v52-accent)!important;
   box-shadow:0 0 0 3px color-mix(in srgb,var(--v52-accent) 10%,transparent)!important;
   outline:none!important;
@@ -3345,14 +3370,14 @@
 .accounting-v52-root #main :is(.btn, .accounting-v52-root .v48-btn, .accounting-v52-root .v44-btn, .accounting-v52-root .v51-btn):not(.primary):not(.blue):not(.violet):not(.danger):hover{border-color:color-mix(in srgb,var(--v52-accent) 30%,#CAD4E1)!important;background:color-mix(in srgb,var(--v52-accent-soft) 52%,white)!important;color:#152238!important}
 
 /* Tables: stronger header hierarchy and a quiet coloured hover marker. */
-.accounting-v52-root #main.v50-refined table.v50-table thead th, .accounting-v52-root #main .v51-table th{
+.accounting-v52-root #main.v50-refined table.v50-table thead th:not(.ac52-legacy-mount *), .accounting-v52-root #main .v51-table th:not(.ac52-legacy-mount *){
   background:linear-gradient(180deg,#F8FAFC 0%,color-mix(in srgb,var(--v52-accent-soft) 42%,#F5F7FA) 100%)!important;
   color:#415168!important;
   border-bottom-color:#D7E0EA!important;
 }
-.accounting-v52-root #main.v50-refined table.v50-table tbody tr, .accounting-v52-root #main .v51-table tbody tr{position:relative}
-.accounting-v52-root #main.v50-refined table.v50-table tbody tr:hover td, .accounting-v52-root #main .v51-table tbody tr:hover td{background:color-mix(in srgb,var(--v52-accent-soft) 52%,#FFFFFF)!important}
-.accounting-v52-root #main.v50-refined table.v50-table tbody tr:hover td:first-child, .accounting-v52-root #main .v51-table tbody tr:hover td:first-child{box-shadow:inset 2px 0 var(--v52-accent)!important}
+.accounting-v52-root #main.v50-refined table.v50-table tbody tr:not(.ac52-legacy-mount *), .accounting-v52-root #main .v51-table tbody tr:not(.ac52-legacy-mount *){position:relative}
+.accounting-v52-root #main.v50-refined table.v50-table tbody tr:hover td:not(.ac52-legacy-mount *), .accounting-v52-root #main .v51-table tbody tr:hover td:not(.ac52-legacy-mount *){background:color-mix(in srgb,var(--v52-accent-soft) 52%,#FFFFFF)!important}
+.accounting-v52-root #main.v50-refined table.v50-table tbody tr:hover td:first-child:not(.ac52-legacy-mount *), .accounting-v52-root #main .v51-table tbody tr:hover td:first-child:not(.ac52-legacy-mount *){box-shadow:inset 2px 0 var(--v52-accent)!important}
 
 /* Status pills remain transparent, but their signal is richer. */
 .accounting-v52-root #main :is(.status, .accounting-v52-root .pill, .accounting-v52-root .badge, .accounting-v52-root .chip, .accounting-v52-root .v51-pill){font-weight:800!important;letter-spacing:.005em!important}
@@ -3517,16 +3542,16 @@
   border-color:var(--line)!important;
   color:var(--ink)!important;
 }
-.accounting-v52-root[data-theme="dark"] :is(.data-table th,.v50-table th,.v51-table th,.v12-table th,.v17-table th){
+.accounting-v52-root[data-theme="dark"] :is(.data-table th,.v50-table th,.v51-table th,.v12-table th,.v17-table th):not(.ac52-legacy-mount *){
   background:var(--surface-3)!important;
   color:var(--muted)!important;
   border-bottom-color:var(--line)!important;
 }
-.accounting-v52-root[data-theme="dark"] :is(.data-table td,.v50-table td,.v51-table td,.v12-table td,.v17-table td){
+.accounting-v52-root[data-theme="dark"] :is(.data-table td,.v50-table td,.v51-table td,.v12-table td,.v17-table td):not(.ac52-legacy-mount *){
   border-bottom-color:var(--line)!important;
   color:var(--ink)!important;
 }
-.accounting-v52-root[data-theme="dark"] :is(.data-table tr:hover td,.v50-table tbody tr:hover td,.v51-table tbody tr:hover td){
+.accounting-v52-root[data-theme="dark"] :is(.data-table tr:hover td,.v50-table tbody tr:hover td,.v51-table tbody tr:hover td):not(.ac52-legacy-mount *){
   background:color-mix(in srgb,var(--blue-soft) 55%,var(--surface))!important;
 }
 .accounting-v52-root[data-theme="dark"] :is(.btn,.v48-btn,.v44-btn,.v51-btn):not(.primary):not(.blue):not(.violet):not(.danger){
@@ -3629,3 +3654,51 @@
   .accounting-v52-root #app:not(.v25-expanded) .nav-scroll{overflow-x:hidden!important}
   .accounting-v52-root #app:not(.v25-expanded) .v25-sidebar-toggle{justify-content:center!important}
 }
+/* Approval queue rows retain a visible entry-point for their detail/action menu. */
+.accounting-v52-root tr[data-v23-actions="1"] .v23-action-cell > .v23-kebab {
+  display: inline-flex !important;
+}
+.accounting-v52-root tr[data-v23-actions="1"] .v23-action-cell.open > .v23-menu {
+  display: grid !important;
+  gap: 3px;
+}
+.accounting-v52-root .table-wrap.v23-actions-overflow { overflow: visible !important; }
+.accounting-v52-root .v28-tablewrap.v23-actions-overflow { overflow: visible !important; }
+/* Chart of Accounts uses page scrolling for its paginated rows so the footer never overlays the table. */
+.accounting-v52-root .al-coa-tablewrap{max-height:none;overflow-x:auto;overflow-y:visible}
+/* COA pagination must follow the complete table; it must never overlay the final row. */
+.accounting-v52-root .al-coa-panel,
+.accounting-v52-root .al-coa-panel .v28-panel,
+.accounting-v52-root .al-coa-panel .v28-panel-body,
+.accounting-v52-root .al-coa-panel .al-coa-tablewrap{overflow:visible!important;max-height:none!important}
+.accounting-v52-root .al-coa-panel .al-pagination{position:relative;clear:both;z-index:1}
+.accounting-v52-root .al-coa-scroll{max-height:360px;overflow:auto;border:1px solid #e0e9f3;border-radius:10px}
+.accounting-v52-root .al-coa-scroll .v28-table{min-width:760px}
+.accounting-v52-root .al-coa-child-list .v28-table td,.accounting-v52-root .al-coa-journal-list .v28-table td{white-space:normal}
+.accounting-v52-root #main[data-v52-page="coa"] .v17-toolbar,
+.accounting-v52-root #main[data-v52-page="coa"] .v18-filter-toolbar,
+.accounting-v52-root #main[data-v52-page="coa"] .v18-filter-panel{display:none!important}
+.accounting-v52-root .al-legacy-cash-modal{width:min(672px,96vw)}
+.accounting-v52-root .al-legacy-cash-form{grid-template-columns:1fr;gap:16px}
+.accounting-v52-root .al-legacy-cash-form .al-wide{grid-column:auto}
+.accounting-v52-root .al-legacy-cash-form .v28-field>span{font-size:12px;font-weight:600;color:#263548}
+.accounting-v52-root .al-legacy-cash-form .v28-input,.accounting-v52-root .al-legacy-cash-form .v28-select{height:42px;border-radius:999px;padding:0 14px;font-size:12px}
+.accounting-v52-root .al-legacy-cash-form .v28-textarea{min-height:92px;border-radius:16px;padding:12px;font-size:12px}
+.accounting-v52-root .al-legacy-cash-form [hidden]{display:none!important}
+.accounting-v52-root #main .al-cash-banks{border:1px solid var(--v28-line);border-radius:14px;background:#fff;overflow:hidden}
+.accounting-v52-root #main .al-cash-banks>summary{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;cursor:pointer;list-style:none;user-select:none}
+.accounting-v52-root #main .al-cash-banks>summary::-webkit-details-marker{display:none}
+.accounting-v52-root #main .al-cash-banks>summary>span:first-child{display:flex;flex-direction:column;gap:3px}
+.accounting-v52-root #main .al-cash-banks>summary strong{font-size:11px}
+.accounting-v52-root #main .al-cash-banks>summary small{color:var(--v28-muted);font-size:10px}
+.accounting-v52-root #main .al-cash-banks-chevron{font-size:17px;line-height:1;transition:transform .16s ease}
+.accounting-v52-root #main .al-cash-banks[open] .al-cash-banks-chevron{transform:rotate(180deg)}
+.accounting-v52-root #main .al-cash-banks-body{padding:0 12px 12px;border-top:1px solid #e7eef6}
+.accounting-v52-root #main .al-cash-banks-body .v28-table-wrap{max-height:420px;overflow:auto}
+.accounting-v52-root #main .al-cash-pager{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;padding:12px 4px 2px;border-top:1px solid #e7eef6}
+.accounting-v52-root #main .al-cash-pager-controls{display:flex;align-items:center;gap:10px}
+.accounting-v52-root #main .al-cash-pager button:disabled{opacity:.48;cursor:not-allowed;transform:none!important}
+.accounting-v52-root #main .al-assets-tablewrap{max-height:none!important;overflow-x:auto!important;overflow-y:visible!important}
+.accounting-v52-root #main .al-assets-pagination{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;padding:12px 4px 2px;border-top:1px solid #e7eef6}
+.accounting-v52-root #main .al-assets-pagination>div{display:flex;align-items:center;gap:10px}
+.accounting-v52-root #main .al-assets-pagination button:disabled{opacity:.48;cursor:not-allowed;transform:none!important}

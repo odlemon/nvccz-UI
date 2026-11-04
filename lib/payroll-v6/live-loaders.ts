@@ -20,22 +20,31 @@
 import {
   getMyPayrollAccess,
   getPayrollDashboard,
+  getPayrollRun,
   listEmployees,
   listPayrollRuns,
   listLeaveBalances,
+  listLeaveBalanceEmployees,
   listTaxRules,
+  listPayrollCurrencies,
+  listPayrollComponentAccounts,
+  listPayrollComponentEmployees,
+  listStatutoryMappings,
   listAllowanceTypes,
   listDeductionTypes,
   listStatutoryBrackets,
   listStatutoryLevies,
   listBankTemplates,
   listTrainingCourses,
+  listTrainingAssignments,
+  listTrainingAssignmentAudienceOptions,
   listCertifications,
   getMyPayslips,
   getMyPayrollPortal,
   getMyLeaveBalances,
   listAuditEvents,
   type PayrollAccess,
+  type PayrollAuditPage,
   getPayrollVendors,
   listPayrollInputBatches,
   listPayrollPayGroups,
@@ -43,6 +52,7 @@ import {
   listPayrollRfqs,
   getPayrollAccessRoster,
   listPayrollDocuments,
+  listPayrollReports,
 } from "@/lib/api/payroll-v6-api"
 
 export type LoaderError = { source: string; message: string; status?: number }
@@ -56,8 +66,12 @@ export type PayrollV6LivePayload = {
   accessUnavailable: boolean
   employees: any[]
   payrollRuns: any[]
+  /** Totals from the latest completed single-currency run detail. */
+  componentMix: Record<string, any> | null
   exceptions: any[]
+  exceptionStats?: { employeesChecked: number; employeesWithoutFindings: number } | null
   auditEvents: any[]
+  auditData?: PayrollAuditPage | null
   counts: Record<string, number | null>
   dashboard: Record<string, any> | null
   reference: Record<string, any>
@@ -72,6 +86,7 @@ export type PayrollV6LivePayload = {
   accessRoster: Record<string, any> | null
   /** Document register in the runtime row shape; [] when the role cannot see the vault. */
   documents: any[]
+  reports: Record<string, any> | null
   /** "All documents" followed by the categories the backend accepts. */
   folders: string[]
   errors: LoaderError[]
@@ -183,9 +198,14 @@ function adaptEmployees(
     const last = e.user?.lastName ?? ""
     const cert = certsByEmployee.get(e.id)
     const annual = leaveByEmployee.get(e.id)
+    const basicSalary = num(e.basicSalary)
+    const usdPct = num(e.salarySplitUsdPct)
+    const zigPct = num(e.salarySplitZigPct)
+    const currencyCode = String(e.currency?.code || "USD").toUpperCase()
     return {
       // Real identifiers
       id: e.employeeNumber ?? e.id,
+      employeeNumber: e.employeeNumber ?? null,
       recordId: e.id,
       name: `${first} ${last}`.trim() || e.employeeNumber,
       initials: initialsOf(first, last),
@@ -200,8 +220,11 @@ function adaptEmployees(
       start: fmtDate(e.contractEffectiveDate) ?? DASH,
       phone: DASH, // not captured on the employee record
       // Money, straight from the payload
-      base: num(e.basicSalary),
-      zig: num(e.salarySplitZigPct) > 0 ? num(e.basicSalary) * num(e.salarySplitZigPct) : 0,
+      base: basicSalary,
+      baseUSD: usdPct > 0 ? basicSalary * usdPct : zigPct > 0 || currencyCode === "ZIG" ? 0 : basicSalary,
+      baseZiG: zigPct > 0 ? basicSalary * zigPct : currencyCode === "ZIG" ? basicSalary : 0,
+      zig: zigPct > 0 ? basicSalary * zigPct : 0,
+      currencyCode,
       currency: currencyLabel(e),
       // Compliance identifiers
       bank: maskAccount(e.bankName, e.accountNumber) ?? DASH,
@@ -260,6 +283,22 @@ function statusLabel(status: string, approvalStatus: string): string {
   return map[s] ?? status
 }
 
+async function listAllPayrollRuns() {
+  const pageSize = 100
+  const first = await listPayrollRuns({ page: 1, limit: pageSize })
+  const pageCount = Math.max(1, Number(first.pagination?.pages) || 1)
+  if (pageCount === 1) return first
+  const remaining = await Promise.all(
+    Array.from({ length: pageCount - 1 }, (_, index) =>
+      listPayrollRuns({ page: index + 2, limit: pageSize }),
+    ),
+  )
+  return {
+    runs: [...first.runs, ...remaining.flatMap((page) => page.runs)],
+    pagination: first.pagination,
+  }
+}
+
 function adaptRuns(rows: any[]): any[] {
   // Sort oldest first so each run can be compared with the one before it.
   const chronological = [...rows].sort(
@@ -284,8 +323,11 @@ function adaptRuns(rows: any[]): any[] {
     return {
       id: r.id,
       reference: r.payPeriod,
-      period: r.name ?? r.payPeriod,
-      group: r.dualCurrency ? "Dual currency" : "Monthly Staff",
+      period: r.payPeriod ?? r.name,
+      // PayrollRun stores its human-entered title in `name`; it does not have a
+      // separate pay-group relation. Preserve that API title instead of
+      // labelling every non-dual run "Monthly Staff".
+      group: r.name ?? (r.dualCurrency ? "Dual currency" : "Monthly Staff"),
       employees: employeeCount,
       currency: r.currency?.code ?? "USD",
       // The command centre labels these "USD component" and "local component".
@@ -299,8 +341,17 @@ function adaptRuns(rows: any[]): any[] {
       // genuinely is the total and there is no ZiG side.
       grossUSD: r.grossUsdComponent != null ? num(r.grossUsdComponent) : gross,
       grossZiG: r.grossZigComponent != null ? num(r.grossZigComponent) : 0,
+      // The run endpoint includes totals grouped from employee_payroll_legs.
+      // Keep those currency-specific net and deduction amounts so dashboard
+      // filters never relabel an aggregate USD equivalent as local currency.
+      currencyComponents: r.currencyComponents ?? null,
       deductions: num(r.totalDeductions),
       netUSD: num(r.totalNetPay),
+      grossTotal: num(r.totalGrossPay),
+      netTotal: num(r.totalNetPay),
+      payslips: r._count?.payslips == null ? null : num(r._count.payslips),
+      journalEntryId: r.journalEntryId ?? null,
+      processError: r.processError ?? null,
       status: statusLabel(r.status, r.approvalStatus),
       rawStatus: r.status,
       approvalStatus: r.approvalStatus,
@@ -338,12 +389,19 @@ function deriveExceptions(employees: any[]): any[] {
     out.push({
       id: `EXC-${String(seq++).padStart(4, "0")}`,
       employee: e.name,
-      employeeId: e.id,
+      employeeId: e.employeeNumber ?? "Employee number unavailable",
       recordId: e.recordId,
       type,
       severity,
       source,
-      amount: `USD ${num(e.base).toLocaleString("en-US", { minimumFractionDigits: 2 })}`,
+      sourceData: {
+        department: e.department ?? DASH,
+        employeeStatus: e.status ?? DASH,
+        taxNumberPresent: Boolean(e.tax && e.tax !== "Pending"),
+        nationalIdPresent: Boolean(e.nssa && e.nssa !== "Pending"),
+        bankDetailsComplete: Boolean(e.bank && e.bank !== DASH),
+        salaryConfigured: num(e.base) > 0,
+      },
       owner: null,
       age: null,
       status: "Open",
@@ -394,10 +452,12 @@ export async function loadPayrollV6LiveData(): Promise<PayrollV6LivePayload> {
   const has = (p: string) => permissions.has(p)
 
   const canEmployees = has("payroll.employees.view") || has("payroll.employees.manage")
+  const canExceptions = has("payroll.exceptions.view") || has("payroll.exceptions.manage")
   const canRuns = has("payroll.runs.view") || has("payroll.runs.manage")
   const canTax = has("payroll.tax.view") || has("payroll.tax.manage")
   const canComponents = has("payroll.components.view") || has("payroll.components.manage")
   const canLeave = has("payroll.leave.view") || has("payroll.leave.manage")
+  const canManageLeave = has("payroll.leave.manage")
   const canTraining = has("payroll.training.view") || has("payroll.training.manage")
   const canSettings = has("payroll.settings.view") || has("payroll.settings.manage")
   const canVendors = has("payroll.vendors.view")
@@ -408,19 +468,27 @@ export async function loadPayrollV6LiveData(): Promise<PayrollV6LivePayload> {
   const canAudit = has("payroll.audit.view")
   const canAccessRegister = has("payroll.access.view") || has("payroll.access.manage")
   const canVault = has("payroll.vault.view") || has("payroll.vault.manage")
+  const canReports = has("payroll.reports.view") || has("payroll.reports.manage")
 
   const [
     dashboard,
     employeeRows,
     runsResult,
     leaveRows,
+    leaveEmployeeRows,
     taxRules,
+    currencies,
+    componentAccounts,
+    componentEmployees,
+    statutoryMappings,
     allowanceTypes,
     deductionTypes,
     brackets,
     levies,
     bankTemplates,
     courses,
+    trainingAssignments,
+    trainingAudienceOptions,
     certifications,
     myPayslips,
     myPortal,
@@ -433,26 +501,34 @@ export async function loadPayrollV6LiveData(): Promise<PayrollV6LivePayload> {
     rfqPayload,
     rosterPayload,
     documentPayload,
+    reportsPayload,
   ] = await Promise.all([
     canDashboard ? safe("dashboard", getPayrollDashboard, null) : Promise.resolve(null),
     canEmployees ? safe("employees", listEmployees, [] as any[]) : Promise.resolve([] as any[]),
     canRuns
-      ? safe("payroll-runs", () => listPayrollRuns({ limit: 100 }), { runs: [] as any[], pagination: null })
+      ? safe("payroll-runs", listAllPayrollRuns, { runs: [] as any[], pagination: null })
       : Promise.resolve({ runs: [] as any[], pagination: null }),
     canLeave ? safe("leave-balances", listLeaveBalances, [] as any[]) : Promise.resolve([] as any[]),
+    canManageLeave ? safe("leave-balance-employee-options", listLeaveBalanceEmployees, [] as any[]) : Promise.resolve([] as any[]),
     canTax ? safe("tax-rules", listTaxRules, [] as any[]) : Promise.resolve([] as any[]),
+    canTax || canComponents || canSettings ? safe("accounting/currencies", listPayrollCurrencies, [] as any[]) : Promise.resolve([] as any[]),
+    canTax || canComponents ? safe("component-accounts", listPayrollComponentAccounts, [] as any[]) : Promise.resolve([] as any[]),
+    has("payroll.components.manage") ? safe("component-employees", listPayrollComponentEmployees, [] as any[]) : Promise.resolve([] as any[]),
+    canTax ? safe("statutory/mappings", listStatutoryMappings, [] as any[]) : Promise.resolve([] as any[]),
     canComponents ? safe("allowance-types", listAllowanceTypes, [] as any[]) : Promise.resolve([] as any[]),
     canComponents ? safe("deduction-types", listDeductionTypes, [] as any[]) : Promise.resolve([] as any[]),
     canTax ? safe("statutory/brackets", () => listStatutoryBrackets(), [] as any[]) : Promise.resolve([] as any[]),
     canTax ? safe("statutory/levies", listStatutoryLevies, [] as any[]) : Promise.resolve([] as any[]),
     canSettings ? safe("bank-templates", listBankTemplates, [] as any[]) : Promise.resolve([] as any[]),
     canTraining ? safe("compliance/courses", listTrainingCourses, [] as any[]) : Promise.resolve([] as any[]),
+    canTraining ? safe("compliance/assignments", listTrainingAssignments, [] as any[]) : Promise.resolve([] as any[]),
+    canTraining ? safe("compliance/assignments/audience-options", listTrainingAssignmentAudienceOptions, { departments: [], roles: [], employees: [] }) : Promise.resolve({ departments: [], roles: [], employees: [] }),
     canTraining ? safe("compliance/certifications", listCertifications, [] as any[]) : Promise.resolve([] as any[]),
     // Self-service always loads: every signed-in user has a My Pay page.
     safe("employee/payslips", getMyPayslips, [] as any[]),
     safe("employee/portal", getMyPayrollPortal, null),
     safe("employee/leave-balances", getMyLeaveBalances, [] as any[]),
-    canAudit ? safe("audit", () => listAuditEvents(200), [] as any[]) : Promise.resolve([] as any[]),
+    canAudit ? safe("audit", () => listAuditEvents({ page: 1, limit: 20 }), { items: [], pagination: { page: 1, limit: 20, total: 0, totalPages: 0 }, stats: { total: 0, approvals: 0, changes: 0, accesses: 0, releases: 0, security: 0, sensitive: 0, actors: 0 } } as PayrollAuditPage) : Promise.resolve({ items: [], pagination: { page: 1, limit: 20, total: 0, totalPages: 0 }, stats: { total: 0, approvals: 0, changes: 0, accesses: 0, releases: 0, security: 0, sensitive: 0, actors: 0 } } as PayrollAuditPage),
     // Vendors & Quotations rendered a hardcoded registry of invented suppliers; this is the real
     // Vendor table. A role without payroll.vendors.view gets null, and the screen says so.
     canVendors ? safe("vendors", getPayrollVendors, null) : Promise.resolve(null),
@@ -462,6 +538,7 @@ export async function loadPayrollV6LiveData(): Promise<PayrollV6LivePayload> {
     canVendors ? safe("rfqs", listPayrollRfqs, null) : Promise.resolve(null),
     canAccessRegister ? safe("access/roster", getPayrollAccessRoster, null) : Promise.resolve(null),
     canVault ? safe("documents", listPayrollDocuments, null) : Promise.resolve(null),
+    canReports ? safe("reports", () => listPayrollReports({ page: 1, limit: 10 }), null) : Promise.resolve(null),
   ])
 
   // Annual leave balance per employee, for the roster's Leave column.
@@ -489,7 +566,7 @@ export async function loadPayrollV6LiveData(): Promise<PayrollV6LivePayload> {
 
   // The audit screen renders rows as tuples:
   // [timestamp, actor, action, record, detail, class]
-  const auditEvents = (auditRows ?? []).map((a: any) => [
+  const auditEvents = (auditRows?.items ?? []).map((a: any) => [
     a.occurredAt ? new Date(a.occurredAt).toLocaleString("en-GB", { hour12: false }) : DASH,
     a.actorName || DASH,
     a.action || DASH,
@@ -500,7 +577,42 @@ export async function loadPayrollV6LiveData(): Promise<PayrollV6LivePayload> {
 
   const employees = adaptEmployees(employeeRows ?? [], leaveByEmployee, certsByEmployee)
   const payrollRuns = adaptRuns(runsResult?.runs ?? [])
+  // Monthly composition must come from calculated employee-payroll rows, not
+  // from employee master salary totals. Prefer the latest completed run; its
+  // native currency legs are returned by the run-detail API.
+  const compositionRun = canComponents && canRuns
+    ? (runsResult?.runs ?? []).find((run: any) => String(run.status || "").toUpperCase() === "COMPLETED")
+    : null
+  const compositionDetail = compositionRun
+    ? await safe("component-composition", () => getPayrollRun(compositionRun.id), null)
+    : null
+  const compositionRows: any[] = Array.isArray((compositionDetail as any)?.employeePayrolls)
+    ? (compositionDetail as any).employeePayrolls
+    : []
+  const componentMix = compositionRows.length
+    ? {
+        period: String((compositionDetail as any).payPeriod || compositionRun?.payPeriod || ""),
+        currencyCode: String((compositionDetail as any).currency?.code || compositionRun?.currency?.code || "USD").toUpperCase(),
+        basic: compositionRows.reduce((sum, row) => sum + Number(row.basicSalary || 0), 0),
+        allowances: compositionRows.reduce((sum, row) => sum + Number(row.totalAllowances || 0), 0),
+        gross: compositionRows.reduce((sum, row) => sum + Number(row.grossPay || 0), 0),
+        deductions: compositionRows.reduce((sum, row) => sum + Number(row.totalDeductions || 0), 0),
+        net: compositionRows.reduce((sum, row) => sum + Number(row.netPay || 0), 0),
+        deductionsByCurrency: compositionRows.reduce((totals, row) => {
+          for (const leg of Array.isArray(row.legs) ? row.legs : []) {
+            const code = String(leg.currencyCode || "").toUpperCase()
+            if (code === "USD" || code === "ZIG") totals[code] = (totals[code] || 0) + Number(leg.totalDeductions || 0)
+          }
+          return totals
+        }, {} as Record<string, number>),
+        employeeCount: compositionRows.length,
+      }
+    : null
   const exceptions = deriveExceptions(employees)
+  const flaggedEmployeeIds = new Set(exceptions.map((e) => e.recordId || e.employeeId).filter(Boolean))
+  const exceptionStats = canExceptions && canEmployees
+    ? { employeesChecked: employees.length, employeesWithoutFindings: Math.max(0, employees.length - flaggedEmployeeIds.size) }
+    : null
 
   // The vault renders rows as {id, name, folder, owner, modified, class, ...}. Only what the
   // backend holds is filled in; nothing is defaulted to resemble a versioning or approval
@@ -512,7 +624,8 @@ export async function loadPayrollV6LiveData(): Promise<PayrollV6LivePayload> {
   }
   const vaultDocuments = ((documentPayload as any)?.items ?? []).map((d: any) => ({
     id: d.id,
-    reference: d.reference ?? d.id,
+    // Never expose a database key as a human-facing document reference.
+    reference: d.reference ?? null,
     name: d.name,
     folder: d.category,
     type: d.mimeType ?? "File",
@@ -522,6 +635,7 @@ export async function loadPayrollV6LiveData(): Promise<PayrollV6LivePayload> {
           day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit", hour12: false,
         })
       : DASH,
+    createdAt: d.createdAt ?? null,
     class: classLabel(d.classification),
     classification: d.classification,
     periodLabel: d.periodLabel ?? null,
@@ -536,8 +650,8 @@ export async function loadPayrollV6LiveData(): Promise<PayrollV6LivePayload> {
     employees: canEmployees ? employees.length : null,
     runs: canRuns ? payrollRuns.filter((r) => r.rawStatus !== "COMPLETED").length : null,
     approvals: canRuns ? payrollRuns.filter((r) => r.rawStatus === "PENDING_APPROVAL").length : null,
-    exceptions: exceptions.length || null,
-    audit: canAudit ? (auditRows ?? []).length || null : null,
+    exceptions: canExceptions && canEmployees ? exceptions.length || null : null,
+    audit: canAudit ? Number(auditRows?.stats?.total) || null : null,
     training: canTraining ? (courses ?? []).length || null : null,
     onboarding: null, // no onboarding pipeline on the backend yet
     inputs: null, // no input-batch store on the backend yet
@@ -559,17 +673,22 @@ export async function loadPayrollV6LiveData(): Promise<PayrollV6LivePayload> {
     rfqs: rfqPayload ?? null,
     accessRoster: rosterPayload ?? null,
     documents: vaultDocuments,
+    reports: reportsPayload ?? null,
     folders: vaultFolders,
     roleName: access?.roleName ?? null,
     permissions: access?.permissions ?? [],
     access,
-    employees,
+    employees: canEmployees ? employees : [],
     payrollRuns,
-    exceptions,
+    componentMix,
+    exceptions: canExceptions && canEmployees ? exceptions : [],
+    exceptionStats,
     auditEvents,
+    auditData: canAudit ? auditRows : null,
     counts,
     dashboard,
     leaveBalances: (leaveRows ?? []).map((l: any) => ({
+      id: l.id,
       employeeId: l.employeeId,
       employeeNumber: l.employee?.employeeNumber ?? null,
       name: l.employee?.user
@@ -578,15 +697,28 @@ export async function loadPayrollV6LiveData(): Promise<PayrollV6LivePayload> {
       department: l.employee?.departmentCode ?? "Unassigned",
       leaveType: l.leaveType,
       balance: num(l.balance),
+      currencyCode: l.currency?.code ?? null,
     })),
     reference: {
+      leaveEmployees: (leaveEmployeeRows ?? []).map((e: any) => ({
+        id: e.id,
+        employeeNumber: e.employeeNumber,
+        name: `${e.user?.firstName ?? ""} ${e.user?.lastName ?? ""}`.trim() || e.employeeNumber,
+        department: e.departmentCode ?? "Unassigned",
+      })),
       taxRules: taxRules ?? [],
+      currencies: currencies ?? [],
+      componentAccounts: componentAccounts ?? [],
+      componentEmployees: componentEmployees ?? [],
+      statutoryMappings: statutoryMappings ?? [],
       allowanceTypes: allowanceTypes ?? [],
       deductionTypes: deductionTypes ?? [],
       brackets: brackets ?? [],
       levies: levies ?? [],
       bankTemplates: bankTemplates ?? [],
       courses: courses ?? [],
+      trainingAssignments: trainingAssignments ?? [],
+      trainingAudienceOptions: trainingAudienceOptions ?? { departments: [], roles: [], employees: [] },
       certifications: certifications ?? [],
     },
     mypay: (() => {
@@ -625,11 +757,14 @@ export async function loadPayrollV6LiveData(): Promise<PayrollV6LivePayload> {
         // employees[0] — the first person in the roster — so every user saw
         // somebody else's bank, tax and employment details.
         self: {
+          name: [access?.employee?.user?.firstName ?? portal.user?.firstName ?? portal.firstName, access?.employee?.user?.lastName ?? portal.user?.lastName ?? portal.lastName].filter(Boolean).join(" ") || portal.employeeNumber || "Employee",
           employeeNumber: portal.employeeNumber ?? access?.employee?.employeeNumber ?? DASH,
           bank: maskAccount(portal.bankName, portal.accountNumber) ?? DASH,
           tax: portal.zimraBpNumber ?? "Pending",
           nssa: portal.idNumber ?? "Pending",
           department: portal.departmentCode ?? "Unassigned",
+          position: portal.position ?? portal.jobTitle ?? DASH,
+          employmentType: portal.employmentType ?? DASH,
           basicSalary: num(portal.basicSalary),
           start: fmtDate(portal.contractEffectiveDate) ?? DASH,
           currency: portal.currency?.code ?? "USD",

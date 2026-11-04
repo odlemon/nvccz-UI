@@ -141,8 +141,14 @@ export function mapContactRow(raw: Record<string, any>, orgName?: string, idx = 
 
 export function mapCampaignCard(raw: Record<string, any>) {
   const status = String(raw.status || 'DRAFT').toUpperCase()
+  const suppliedReference = raw.referenceNumber || raw.campaignCode || raw.reference
+  const source = String(raw.id || 'campaign')
+  let hash = 0
+  for (let index = 0; index < source.length; index += 1) hash = (hash * 31 + source.charCodeAt(index)) >>> 0
+  const campaignReference = suppliedReference || `CAM-${new Date(raw.startDate || raw.createdAt || Date.now()).getFullYear()}-${String((hash % 9999) + 1).padStart(4, '0')}`
   return {
     id: String(raw.id),
+    reference: String(campaignReference),
     name: raw.name || 'Campaign',
     type: raw.campaignType || '—',
     status: status === 'ACTIVE' ? 'live' : status === 'DRAFT' || status === 'PENDING' ? 'planned' : status.toLowerCase(),

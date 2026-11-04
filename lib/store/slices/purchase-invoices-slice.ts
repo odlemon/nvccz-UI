@@ -90,6 +90,7 @@ export const deletePurchaseInvoice = createAsyncThunk(
 )
 
 interface PurchaseInvoicesState {
+  currentRequestId?: string
   purchaseInvoices: PurchaseInvoice[]
   selectedPurchaseInvoice: PurchaseInvoice | null
   loading: boolean
@@ -124,6 +125,7 @@ interface PurchaseInvoicesState {
 }
 
 const initialState: PurchaseInvoicesState = {
+  currentRequestId: undefined,
   purchaseInvoices: [],
   selectedPurchaseInvoice: null,
   loading: false,
@@ -169,16 +171,19 @@ const purchaseInvoicesSlice = createSlice({
   extraReducers: (builder) => {
     // Fetch purchase invoices
     builder
-      .addCase(fetchPurchaseInvoices.pending, (state) => {
+      .addCase(fetchPurchaseInvoices.pending, (state, action) => {
         state.loading = true
         state.error = null
+        state.currentRequestId = action.meta.requestId
       })
       .addCase(fetchPurchaseInvoices.fulfilled, (state, action: PayloadAction<PurchaseInvoicesResponse>) => {
+        if (state.currentRequestId !== (action as any).meta.requestId) return
         state.loading = false
+        state.currentRequestId = undefined
         state.purchaseInvoices = action.payload.invoices
         state.pagination = {
           page: action.payload.page,
-          limit: 10,
+          limit: Number((action as any).meta.arg?.limit) || 10,
           totalPages: action.payload.totalPages,
           total: action.payload.total
         }
@@ -199,7 +204,9 @@ const purchaseInvoicesSlice = createSlice({
         }
       })
       .addCase(fetchPurchaseInvoices.rejected, (state, action) => {
+        if (state.currentRequestId !== action.meta.requestId) return
         state.loading = false
+        state.currentRequestId = undefined
         state.error = action.error.message || 'Failed to fetch purchase invoices'
       })
 

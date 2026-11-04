@@ -1,5 +1,18 @@
 # Arcus on 31.220.82.129
 
+## Singapore dev Events release
+
+The current Singapore dev stack lives at `/opt/arcus-dev` on `207.180.234.151`.
+After transferring the changed source files and compose configuration, run
+`/opt/arcus-dev/deploy-dev-events.sh` on that host. The script uses `flock` to
+reject overlapping deployments, builds the API and Events UI sequentially,
+restarts only those two services, and checks their local health endpoints.
+Do not launch a second `docker compose build` while it is running: three
+concurrent builds exhausted the host's 11 GB RAM and 8 GB swap on 22 Oct 2026.
+
+Public checks: `https://dev-api.matanho.com/health` and
+`https://dev.events.matanho.com/`.
+
 Two isolated Docker stacks (separate MySQL, API, UI) behind Traefik TLS on port 443.
 
 | Env | UI | API | Database |

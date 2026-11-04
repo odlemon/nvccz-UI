@@ -12,11 +12,11 @@ import { fundraisingModulePermission } from './fundraising-permissions';
 
 export type RoleCode =
   // Finance Roles
-  | 'FIN_MGR' | 'CFO' | 'FIN_OFF' | 'ACCOUNTANT' | 'FIN_ASST' | 'FIN_MEM'
+  | 'FIN_MGR' | 'CFO' | 'FIN_OFF' | 'ACCOUNTANT' | 'FIN_ASST' | 'PAYROLL_ADMIN' | 'PAYROLL_MGR' | 'FIN_MEM'
   // Sales Roles
   | 'SALES_MGR' | 'SALES_OFF' | 'SALES_REP' | 'SALES_COORD' | 'SALES_MEM'
   // Operations Roles
-  | 'OPS_MGR' | 'OPS_OFF' | 'OPS_COORD' | 'OPS_ANALYST' | 'OPS_MEM'
+  | 'OPS_MGR' | 'MONITORING_EVALUATION' | 'OPS_OFF' | 'OPS_COORD' | 'OPS_ANALYST' | 'OPS_MEM'
   // Procurement Roles
   | 'PROC_MGR' | 'PROC_OFF' | 'BUYER' | 'PROC_COORD' | 'PROC_MEM'
   // HR Roles
@@ -510,32 +510,14 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
           'payroll-payslips': 'read',
         }
       },
-      {
-        moduleId: 'procurement',
-        access: 'write',
-        actions: [
-          PROCUREMENT_ACTIONS.VIEW_DASHBOARD,
-          PROCUREMENT_ACTIONS.CREATE_PURCHASE_REQUISITION,
-          PROCUREMENT_ACTIONS.VIEW_OWN_PURCHASE_REQUISITION,
-          PROCUREMENT_ACTIONS.CREATE_PURCHASE_ORDER,
-          PROCUREMENT_ACTIONS.VIEW_PURCHASE_ORDER,
-          PROCUREMENT_ACTIONS.CREATE_INVOICE,
-          PROCUREMENT_ACTIONS.VIEW_INVOICE,
-          PROCUREMENT_ACTIONS.DELETE_GRN,
-          PROCUREMENT_ACTIONS.VIEW_PAYMENT,
-        ],
-        subModules: {
-          'procurement-dashboard': 'read',
-          'purchase-requisitions': 'write',
-          'purchase-orders': 'write',
-          'procurement-invoices': 'write',
-          'goods-received-notes': 'read',
-          'payments': 'read',
-        }
-      },
-      { moduleId: 'performance-management', access: 'write' },
+      // Finance Officer does not use Performance Management or Procurement.
+      // Keep these out of the role entirely so the app switcher and route guard
+      // apply the same least-privilege decision.
       fpaModulePermission('FIN_OFF')!,
       fundraisingModulePermission('FIN_OFF')!,
+      // The switcher card is portfolio-v11, but the shared permission resolver
+      // canonicalizes that client-design module to portfolio-management.
+      { moduleId: 'portfolio-management', access: 'read' },
       { moduleId: 'investments', access: 'write', subModules: { 'investments-dashboard': 'full', 'investments-portfolios-overview': 'read', 'investments-portfolios-instruments': 'read', 'investments-portfolios-prices': 'read', 'investments-portfolios-positions': 'read', 'investments-portfolios-transactions': 'read', 'investments-portfolios-folder-setup': 'none', 'investments-portfolios-setup': 'none', 'investments-orders-blotter': 'write', 'investments-orders-orderbook': 'write', 'investments-orders-trading': 'write', 'investments-orders-compliance': 'read', 'investments-orders-simulation': 'read', 'investments-orders-models': 'read', 'investments-orders-setup': 'none', 'investments-reconciliation': 'none', 'investments-valuation': 'none', 'investments-reporting': 'none', 'investments-documentation': 'none', 'investments-accounting': 'none', 'investments-setup': 'none' } },
       { moduleId: 'street-rates', access: 'read', subModules: { 'street-rates-dashboard': 'read', 'street-rates-config': 'none' } },
     ]
@@ -613,8 +595,44 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
           'purchase-requisitions': 'write',
         }
       },
+      {
+        // Finance Assistants operate the cash-account workflow and its linked
+        // portfolio controls. The route aliases for cash ledger, reservations,
+        // imports, reconciliation, exceptions and period close all resolve to
+        // this portfolio grant in middleware.
+        moduleId: 'portfolio-management',
+        access: 'write',
+        subModules: {
+          'pv11-cash-accounts': 'write',
+        },
+      },
       { moduleId: 'performance-management', access: 'write' },
       fpaModulePermission('FIN_ASST')!,
+    ]
+  },
+
+  PAYROLL_ADMIN: {
+    roleCode: 'PAYROLL_ADMIN',
+    level: 4,
+    department: 'Finance',
+    modules: [
+      { moduleId: 'homepage', access: 'full' },
+      { moduleId: 'payroll', access: 'full', actions: Object.values(PAYROLL_ACTIONS), subModules: {
+        'payroll-dashboard': 'full', 'payroll-employees': 'full', 'payroll-runs': 'full',
+        'payroll-payslips': 'full', 'payroll-tax-rules': 'full', 'payroll-allowance-types': 'full',
+        'payroll-deduction-types': 'full', 'payroll-bank-templates': 'full',
+      } },
+    ]
+  },
+
+  PAYROLL_MGR: {
+    roleCode: 'PAYROLL_MGR',
+    level: 5,
+    department: 'Human Resources',
+    modules: [
+      { moduleId: 'homepage', access: 'full' },
+      // The Payroll API's effective grants remain authoritative inside /payroll.
+      { moduleId: 'payroll', access: 'full' },
     ]
   },
 
@@ -838,6 +856,41 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
         }
       },
     ]
+  },
+
+  // Monitoring & Evaluation — performance-management only; no unrelated modules.
+  MONITORING_EVALUATION: {
+    roleCode: 'MONITORING_EVALUATION',
+    level: 4,
+    department: 'Operations',
+    modules: [
+      { moduleId: 'homepage', access: 'full' },
+      { moduleId: 'home-v3', access: 'full' },
+      {
+        moduleId: 'performance-management',
+        access: 'write',
+        actions: [
+          PERFORMANCE_ACTIONS.VIEW_KPI,
+          PERFORMANCE_ACTIONS.VIEW_DEPARTMENT_KPIS,
+          PERFORMANCE_ACTIONS.VIEW_DEPARTMENT_GOALS,
+          PERFORMANCE_ACTIONS.VIEW_OWN_DEPARTMENT_GOALS,
+          PERFORMANCE_ACTIONS.UPDATE_OWN_DEPARTMENT_GOAL,
+          PERFORMANCE_ACTIONS.CREATE_TASK,
+          PERFORMANCE_ACTIONS.VIEW_OWN_TASKS,
+          PERFORMANCE_ACTIONS.VIEW_DEPARTMENT_TASKS,
+          PERFORMANCE_ACTIONS.VIEW_DEPARTMENT_SCORECARD,
+          PERFORMANCE_ACTIONS.VIEW_USER_SCORECARDS,
+          PERFORMANCE_ACTIONS.VIEW_PERFORMANCE_REVIEWS,
+        ],
+        subModules: {
+          'kpi-management': 'read',
+          'goals-management': 'write',
+          'task-management': 'write',
+          'department-scorecard': 'read',
+          'user-scorecard': 'read',
+        },
+      },
+    ],
   },
 
   OPS_OFF: {
@@ -1769,6 +1822,7 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
           'accounting-settings': 'full',
         }
       },
+      { moduleId: 'payroll', access: 'full' },
       {
         moduleId: 'procurement',
         access: 'full',
@@ -2396,29 +2450,14 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
         }
       },
       {
-        moduleId: 'application-portal',
-        access: 'write',
-        actions: [
-          APPLICATION_PORTAL_ACTIONS.INITIATE_DUE_DILIGENCE,
-          APPLICATION_PORTAL_ACTIONS.CREATE_DD_TASK,
-          APPLICATION_PORTAL_ACTIONS.UPDATE_DUE_DILIGENCE,
-          APPLICATION_PORTAL_ACTIONS.APPROVE_DD_ACTIVITY,
-          APPLICATION_PORTAL_ACTIONS.CREATE_TERM_SHEET,
-          APPLICATION_PORTAL_ACTIONS.UPDATE_TERM_SHEET,
-          APPLICATION_PORTAL_ACTIONS.DRAFT_INVESTMENT_MEMO,
-          APPLICATION_PORTAL_ACTIONS.SUBMIT_INVESTMENT_MEMO,
-          APPLICATION_PORTAL_ACTIONS.FINALIZE_TERM_SHEET,
-          APPLICATION_PORTAL_ACTIONS.INITIATE_FUND_DISBURSEMENT,
-          APPLICATION_PORTAL_ACTIONS.CREATE_DISBURSEMENT,
-          APPLICATION_PORTAL_ACTIONS.DISBURSE_FUND,
-          APPLICATION_PORTAL_ACTIONS.UPDATE_CHECKLIST,
-        ]
+        moduleId: 'payroll',
+        access: 'read',
       },
       {
         moduleId: 'accounting',
-        access: 'read',
+        access: 'write',
         subModules: {
-          'financial-reports': 'read',
+          'purchase-requisitions': 'write',
         }
       },
       {
@@ -2432,24 +2471,7 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
           'purchase-requisitions': 'write',
         }
       },
-      {
-        moduleId: 'performance-management',
-        access: 'read',
-        actions: [
-          PERFORMANCE_ACTIONS.VIEW_KPI,
-          PERFORMANCE_ACTIONS.VIEW_DEPARTMENT_KPIS,
-          PERFORMANCE_ACTIONS.VIEW_DEPARTMENT_GOALS,
-          PERFORMANCE_ACTIONS.VIEW_DEPARTMENT_SCORECARD,
-          PERFORMANCE_ACTIONS.VIEW_USER_SCORECARDS,
-          PERFORMANCE_ACTIONS.VIEW_OWN_SCORECARD,
-        ],
-        subModules: {
-          'kpi-management': 'read',
-          'goals-management': 'read',
-          'department-scorecard': 'read',
-          'user-scorecard': 'read',
-        }
-      },
+      { moduleId: 'events-management', access: 'read' },
     ]
   },
 
@@ -2460,18 +2482,7 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
     modules: [
       { moduleId: 'homepage', access: 'full' },
       { moduleId: 'portfolio-management', access: 'write' },
-      { moduleId: 'performance-management', access: 'full' },
-      {
-        moduleId: 'application-portal',
-        access: 'write',
-        actions: [
-          APPLICATION_PORTAL_ACTIONS.COMPLETE_DUE_DILIGENCE,
-          APPLICATION_PORTAL_ACTIONS.CREATE_TERM_SHEET,
-          APPLICATION_PORTAL_ACTIONS.UPDATE_TERM_SHEET,
-          APPLICATION_PORTAL_ACTIONS.DRAFT_INVESTMENT_MEMO,
-          APPLICATION_PORTAL_ACTIONS.SUBMIT_INVESTMENT_MEMO,
-        ]
-      },
+      { moduleId: 'payroll', access: 'read' },
       {
         moduleId: 'procurement',
         access: 'write',
@@ -2483,7 +2494,13 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
           'purchase-requisitions': 'write',
         }
       },
-      fpaModulePermission('INV_ANALYST')!,
+      {
+        moduleId: 'accounting',
+        access: 'write',
+        subModules: {
+          'purchase-requisitions': 'write',
+        }
+      },
     ]
   },
 
@@ -2614,6 +2631,12 @@ export const ROLE_PERMISSIONS_MAP: Record<RoleCode, RolePermissions> = {
  * Get role permissions by role code
  */
 export function getRolePermissions(roleCode: RoleCode): RolePermissions | null {
+  // The persisted Super Admin platform role uses a separate code from the
+  // System Administrator persona. Keep the application's full-access surface
+  // consistent when the effective-access endpoint is temporarily unavailable.
+  if (String(roleCode).trim().toUpperCase() === 'SUPER_ADMIN') {
+    return ROLE_PERMISSIONS_MAP.SYSADMIN;
+  }
   return ROLE_PERMISSIONS_MAP[roleCode] || null;
 }
 
@@ -2744,10 +2767,8 @@ export function hasModuleAccess(
   if (moduleId === "employee-hub") return true;
   // Home Version 3 (client Matanho V10 port) — open during comparison/mock phase
   if (moduleId === "home") return true;
-  // Fundraising Investor KYC client design port — open during comparison/mock phase
-  if (moduleId === "fundraising-kyc") return true;
-  // Investee Portal V8 client design port — open during comparison/mock phase
-  if (moduleId === "investee-portal-v8") return true;
+  // Comparison/legacy portal IDs must still resolve through the role grant. A global
+  // bypass here exposed restricted users to modules outside their assigned scope.
   // NOTE: the `performance-v22` bypass that sat here was removed on 8 Sep 2026. It made the
   // whole Performance module readable and writable by every role regardless of grants.
   // Access now resolves through MODULE_ID_ALIASES against the real per-role grants.
@@ -2756,7 +2777,7 @@ export function hasModuleAccess(
   if (!permissions) return false;
 
   const resolved = resolveModuleId(moduleId);
-  const modulePermission = permissions.modules.find(m => m.moduleId === resolved);
+  const modulePermission = permissions.modules.find(m => m != null && m.moduleId === resolved);
   return modulePermission ? modulePermission.access !== 'none' : false;
 }
 
@@ -2770,7 +2791,7 @@ export function getModuleAccessLevel(
   const permissions = getRolePermissions(roleCode);
   if (!permissions) return 'none';
 
-  const modulePermission = permissions.modules.find(m => m.moduleId === resolveModuleId(moduleId));
+  const modulePermission = permissions.modules.find(m => m != null && m.moduleId === resolveModuleId(moduleId));
   return modulePermission?.access || 'none';
 }
 
@@ -2784,15 +2805,13 @@ export function hasSubModuleAccess(
 ): boolean {
   if (moduleId === "employee-hub") return true;
   if (moduleId === "home") return true;
-  if (moduleId === "fundraising-kyc") return true;
-  if (moduleId === "investee-portal-v8") return true;
   // `performance-v22` bypass removed 8 Sep 2026 — see hasModuleAccess above.
 
   const permissions = getRolePermissions(roleCode);
   if (!permissions) return false;
 
   const resolved = resolveModuleId(moduleId);
-  const modulePermission = permissions.modules.find(m => m.moduleId === resolved);
+  const modulePermission = permissions.modules.find(m => m != null && m.moduleId === resolved);
   if (!modulePermission || modulePermission.access === 'none') return false;
 
   // Aliased module (e.g. performance-v22 → performance-management): the superseded module's
@@ -2825,7 +2844,9 @@ export function getAccessibleModules(roleCode: RoleCode): string[] {
   if (!permissions) return [];
 
   return permissions.modules
-    .filter(m => m.access !== 'none')
+    // Some legacy role payloads can contain empty entries; ignore them rather than
+    // crashing the whole application while building the module switcher.
+    .filter((m): m is ModulePermission => m != null && m.access !== 'none')
     .map(m => m.moduleId);
 }
 

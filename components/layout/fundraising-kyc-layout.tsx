@@ -1,24 +1,12 @@
 "use client"
 
 import type React from "react"
-import { Suspense, useEffect, useState } from "react"
-import { usePathname } from "next/navigation"
-import { SharedTopbar } from "./shared-topbar"
-import { ClientDesignAppSwitcher } from "./client-design-app-switcher"
-import { ArcusAppSwitcherProvider } from "./arcus-app-switcher-provider"
+import { Suspense, useEffect } from "react"
 import { FundraisingKycApp } from "@/components/fundraising-kyc-mock/fundraising-kyc-app"
-import { MODULE_CONFIG, getModuleByPath } from "@/lib/config/modules"
 import { useBrandLogoOverride } from "@/lib/client-design-mock/brand-logo-override"
 
 export function FundraisingKycLayout({ children }: { children: React.ReactNode }) {
   useBrandLogoOverride()
-  const [currentModule, setCurrentModule] = useState("fundraising-kyc")
-  const pathname = usePathname()
-
-  useEffect(() => {
-    const module = getModuleByPath(pathname)
-    if (module) setCurrentModule(module.id)
-  }, [pathname])
 
   useEffect(() => {
     const html = document.documentElement
@@ -32,25 +20,14 @@ export function FundraisingKycLayout({ children }: { children: React.ReactNode }
     }
   }, [])
 
-  const handleModuleSelect = (module: string) => {
-    const moduleConfig = MODULE_CONFIG.find((m) => m.id === module)
-    if (moduleConfig) window.location.href = moduleConfig.path
-  }
-
   return (
-    <ArcusAppSwitcherProvider currentModule={currentModule}>
-      <div className="flex h-dvh flex-col overflow-hidden bg-[#f4f7f6]" data-module="fundraising-kyc">
-        <SharedTopbar onModuleSelect={handleModuleSelect} currentModule={currentModule} hideThemeToggle />
-        <div className="min-h-0 flex-1 overflow-hidden">
-          <Suspense fallback={<div className="p-8 text-sm text-[#64748B]">Loading Investor KYC…</div>}>
-            <FundraisingKycApp />
-          </Suspense>
-        </div>
-        <div className="sr-only" aria-hidden>
-          {children}
-        </div>
-        <ClientDesignAppSwitcher currentModule={currentModule} showHeaderButton={false} />
+    <div className="h-dvh overflow-hidden bg-[#f4f7f6]" data-portal="fundraising-kyc">
+      <div className="h-full">
+        <Suspense fallback={<div className="p-8 text-sm text-[#64748B]">Loading Investor KYC…</div>}>
+          <FundraisingKycApp />
+        </Suspense>
       </div>
-    </ArcusAppSwitcherProvider>
+      <div className="sr-only" aria-hidden>{children}</div>
+    </div>
   )
 }

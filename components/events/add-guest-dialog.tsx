@@ -22,6 +22,7 @@ interface AddGuestDialogProps {
 
 interface GuestFormData {
   name: string
+  salutation: string
   email: string
   phone: string
   company: string
@@ -45,6 +46,7 @@ export function AddGuestDialog({ isOpen, onClose, eventId }: AddGuestDialogProps
     mode: "onChange",
     defaultValues: {
       name: "",
+      salutation: "",
       email: "",
       phone: "",
       company: "",
@@ -64,19 +66,35 @@ export function AddGuestDialog({ isOpen, onClose, eventId }: AddGuestDialogProps
 
     setLoading(true)
     try {
-      await dispatch(addEventGuests({ 
-        eventId, 
-        guests: [data] 
+      const result = await dispatch(addEventGuests({
+        eventId,
+        guests: [data]
       })).unwrap()
-      
+
+      if ((result?.skippedExisting ?? 0) > 0) {
+        toast.error("This email is already on the guest list", {
+          description: `${data.email.trim()} has already been added to this event.`,
+        })
+        return
+      }
+
       await dispatch(fetchEventGuests({ eventId }))
-      toast.success("Guest added successfully")
+      const failed = result?.announcementDelivery?.filter((item: any) => item.status === "FAILED") ?? []
+      if (failed.length) {
+        toast.warning("Guest added, but the announcement could not be sent", {
+          description: failed[0].error || "Check the email configuration and retry the announcement.",
+        })
+      } else {
+        toast.success("Guest added; Save the Date announcement is sending")
+      }
       handleClose()
     } catch (error: any) {
       console.error("Failed to add guest:", error)
-      toast.error("Failed to add guest", {
-        description: error.message || "Please try again"
-      })
+      const message = String(error?.message || "")
+      toast.error(
+        /already|duplicate/i.test(message) ? "This email is already on the guest list" : "Failed to add guest",
+        { description: /already|duplicate/i.test(message) ? `${data.email.trim()} has already been added to this event.` : message || "Please try again" }
+      )
     } finally {
       setLoading(false)
     }
@@ -102,7 +120,7 @@ export function AddGuestDialog({ isOpen, onClose, eventId }: AddGuestDialogProps
           {/* Basic Information */}
           <div className="space-y-4">
             <h3 className="text-base font-normal text-gray-900">Basic Information</h3>
-            <Card className="border-l-4 border-l-blue-500 shadow-none p-6">
+            <Card className="border-l-4 border-l-[#00843d] shadow-none p-6">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="name">Name *</Label>
@@ -166,6 +184,25 @@ export function AddGuestDialog({ isOpen, onClose, eventId }: AddGuestDialogProps
                         id="phone"
                         placeholder="+263 123 456 789"
                       />
+                    )}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="salutation">Honorific for invitation *</Label>
+                  <Controller
+                    name="salutation"
+                    control={control}
+                    rules={{ required: "Choose Mr or Mrs for the invitation" }}
+                    render={({ field }) => (
+                      <div>
+                      <select {...field} id="salutation" className="h-10 w-full rounded-md border bg-background px-3 text-sm focus:border-[#00843d]">
+                        <option value="">Choose Mr or Mrs</option>
+                        <option value="Mr">Mr</option>
+                        <option value="Mrs">Mrs</option>
+                      </select>
+                      {errors.salutation && <p className="mt-1 text-sm text-red-500">{errors.salutation.message}</p>}
+                      </div>
                     )}
                   />
                 </div>
@@ -289,7 +326,7 @@ export function AddGuestDialog({ isOpen, onClose, eventId }: AddGuestDialogProps
           <Button
             onClick={handleSubmit(onSubmit)}
             disabled={loading}
-            className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 rounded-full"
+            className="bg-[#00843d] hover:bg-[#006d32] text-white rounded-full"
           >
             {loading ? (
               <>

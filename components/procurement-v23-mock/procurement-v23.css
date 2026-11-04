@@ -1085,3 +1085,6 @@
 @media(max-width:700px){.procurement-v23-root, .procurement-v23-root button, .procurement-v23-root input, .procurement-v23-root select, .procurement-v23-root textarea{line-height:1.5}.procurement-v23-root .page-head p, .procurement-v23-root .card-head p, .procurement-v23-root .kpi-sub, .procurement-v23-root .muted, .procurement-v23-root td{line-height:1.55}}
 
 
+/* Vendor self-registration is not exposed from the staff registry. */
+[data-action="vendor-portal"],
+[data-action="vendor-portal-v6"] { display: none !important; }

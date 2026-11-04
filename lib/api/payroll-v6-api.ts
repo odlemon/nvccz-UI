@@ -172,8 +172,12 @@ export async function createEmployeeWithUser(body: FormData | {
   email: string
   employeeNumber: string
   departmentCode?: string | null
+  position?: string | null
   basicSalary: number | string
   currencyId?: string | null
+  contractEffectiveDate?: string | null
+  salarySplitUsdPct?: number
+  salarySplitZigPct?: number
   bankName?: string | null
   branchCode?: string | null
   accountNumber?: string | null
@@ -330,6 +334,32 @@ export async function getMyPayslips(): Promise<Payslip[]> {
   return unwrapData(res) ?? []
 }
 
+export type MyPayslipPage = {
+  items: Payslip[]
+  page: number
+  limit: number
+  total: number
+  totalPages: number
+}
+
+/** Paginated self-service history. The server derives the employee from the authenticated user. */
+export async function getMyPayslipPage(page = 1, limit = 10): Promise<MyPayslipPage> {
+  const safePage = Math.max(1, Math.floor(page))
+  const safeLimit = Math.min(50, Math.max(1, Math.floor(limit)))
+  const res = await apiClient.get<ApiResponse<Payslip[]>>(
+    `${BASE}/employee/payslips?page=${safePage}&limit=${safeLimit}`,
+  )
+  const response = res as ApiResponse<Payslip[]>
+  const pagination = response?.pagination || {}
+  return {
+    items: unwrapData(response) ?? [],
+    page: Number(pagination.page) || safePage,
+    limit: Number(pagination.limit) || safeLimit,
+    total: Number(pagination.total) || 0,
+    totalPages: Math.max(0, Number(pagination.pages ?? pagination.totalPages) || 0),
+  }
+}
+
 export async function getMyLeaveBalances(): Promise<Record<string, any>[]> {
   const res = await apiClient.get<ApiResponse<any[]>>(`${BASE}/employee/leave-balances`)
   return unwrapData(res) ?? []
@@ -342,6 +372,36 @@ export async function getMyLeaveBalances(): Promise<Record<string, any>[]> {
 export async function listTaxRules(): Promise<Record<string, any>[]> {
   const res = await apiClient.get<ApiResponse<any[]>>(`${BASE}/tax-rules`)
   return unwrapData(res) ?? []
+}
+
+export async function listPayrollCurrencies(): Promise<Record<string, any>[]> {
+  const res = await apiClient.get<ApiResponse<any[]>>("/accounting/currencies")
+  return unwrapData(res) ?? []
+}
+
+export async function listPayrollComponentAccounts(): Promise<Record<string, any>[]> {
+  const res = await apiClient.get<ApiResponse<any[]>>(`${BASE}/component-accounts`)
+  return unwrapData(res) ?? []
+}
+
+export async function listPayrollComponentEmployees(): Promise<Record<string, any>[]> {
+  const res = await apiClient.get<ApiResponse<any[]>>(`${BASE}/component-employees`)
+  return unwrapData(res) ?? []
+}
+
+export async function assignPayrollComponent(body: Record<string, any>) {
+  const res = await apiClient.post<ApiResponse<any>>(`${BASE}/component-assignments`, body)
+  return unwrapData(res)
+}
+
+export async function listStatutoryMappings(): Promise<Record<string, any>[]> {
+  const res = await apiClient.get<ApiResponse<any[]>>(`${BASE}/statutory/mappings`)
+  return unwrapData(res) ?? []
+}
+
+export async function saveStatutoryMapping(body: { deductionTypeId: string; glAccountId: string | null }) {
+  const res = await apiClient.put<ApiResponse<any>>(`${BASE}/statutory/mappings`, body)
+  return unwrapData(res)
 }
 
 export async function listStatutoryBrackets(currencyCode?: string) {
@@ -365,9 +425,59 @@ export async function listDeductionTypes(): Promise<Record<string, any>[]> {
   return unwrapData(res) ?? []
 }
 
+// Payroll setup forms use the same governed CRUD endpoints as the legacy tables.
+export async function saveAllowanceType(body: Record<string, any>, id?: string) {
+  const res = id
+    ? await apiClient.put<ApiResponse<any>>(`${BASE}/allowance-types/${encodeURIComponent(id)}`, body)
+    : await apiClient.post<ApiResponse<any>>(`${BASE}/allowance-types`, body)
+  return unwrapData(res)
+}
+
+export async function saveDeductionType(body: Record<string, any>, id?: string) {
+  const res = id
+    ? await apiClient.put<ApiResponse<any>>(`${BASE}/deduction-types/${encodeURIComponent(id)}`, body)
+    : await apiClient.post<ApiResponse<any>>(`${BASE}/deduction-types`, body)
+  return unwrapData(res)
+}
+
+export async function saveTaxRule(body: Record<string, any>, id?: string) {
+  const res = id
+    ? await apiClient.put<ApiResponse<any>>(`${BASE}/tax-rules/${encodeURIComponent(id)}`, body)
+    : await apiClient.post<ApiResponse<any>>(`${BASE}/tax-rules`, body)
+  return unwrapData(res)
+}
+
+export async function saveStatutoryBrackets(body: Record<string, any>[], id?: string) {
+  if (id) {
+    const res = await apiClient.put<ApiResponse<any>>(`${BASE}/statutory/brackets/${encodeURIComponent(id)}`, body[0])
+    return unwrapData(res)
+  }
+  const results = []
+  for (const item of body) {
+    const res = await apiClient.post<ApiResponse<any>>(`${BASE}/statutory/brackets`, item)
+    results.push(unwrapData(res))
+  }
+  return results
+}
+
+export async function saveStatutoryLevies(body: Record<string, any>[]) {
+  const res = await apiClient.put<ApiResponse<any[]>>(`${BASE}/statutory/levies`, body)
+  return unwrapData(res)
+}
+
 export async function listLeaveBalances(): Promise<Record<string, any>[]> {
   const res = await apiClient.get<ApiResponse<any[]>>(`${BASE}/leave-balances`)
   return unwrapData(res) ?? []
+}
+
+export async function listLeaveBalanceEmployees(): Promise<Record<string, any>[]> {
+  const res = await apiClient.get<ApiResponse<any[]>>(`${BASE}/leave-balances/employee-options`)
+  return unwrapData(res) ?? []
+}
+
+export async function saveLeaveBalance(body: { employeeId: string; leaveType: string; balance: number }) {
+  const res = await apiClient.post<ApiResponse<any>>(`${BASE}/leave-balances`, body)
+  return unwrapData(res)
 }
 
 /**
@@ -394,6 +504,12 @@ export async function createPayrollPayGroup(body: Record<string, any>) {
   return unwrapData(res)
 }
 
+/** Update the fields supported by the pay-group API. Currency legs are read-only here. */
+export async function updatePayrollPayGroup(id: string, body: Record<string, any>) {
+  const res = await apiClient.patch<ApiResponse<any>>(`${BASE}/pay-groups/${encodeURIComponent(id)}`, body)
+  return unwrapData(res)
+}
+
 export async function listPayrollPayGroups(): Promise<Record<string, any> | null> {
   const res = await apiClient.get<ApiResponse<any>>(`${BASE}/pay-groups`)
   return unwrapData(res) ?? null
@@ -416,6 +532,38 @@ export async function upsertPayrollCalendarPeriod(payGroupId: string, body: Reco
 export async function getPayrollAccessRoster(): Promise<Record<string, any> | null> {
   const res = await apiClient.get<ApiResponse<any>>(`${BASE}/access/roster`)
   return unwrapData(res) ?? null
+}
+
+/** Module-scoped, versioned Payroll roles; global platform grants are not changed. */
+export async function listPayrollAccessRoles(): Promise<any[]> {
+  const res = await apiClient.get<ApiResponse<any[]>>(`${BASE}/access/roles`)
+  return unwrapData(res) ?? []
+}
+
+export async function listPayrollAssignableUsers(params: { search?: string; page?: number; limit?: number } = {}): Promise<any> {
+  const qs = new URLSearchParams()
+  for (const [key, value] of Object.entries(params)) if (value !== undefined && String(value).trim()) qs.set(key, String(value))
+  const res = await apiClient.get<ApiResponse<any>>(`${BASE}/access/assignable-users${qs.size ? `?${qs}` : ""}`)
+  return unwrapData(res) ?? { items: [], pagination: { page: 1, limit: 20, total: 0, totalPages: 0 } }
+}
+
+export async function createPayrollAccessRole(input: { name: string; description?: string; permissions: Record<string, boolean> }) {
+  return unwrapData(await apiClient.post<ApiResponse<any>>(`${BASE}/access/roles`, input))
+}
+export async function savePayrollAccessRoleDraft(roleId: string, permissions: Record<string, boolean>, expectedRevision: number, description?: string) {
+  return unwrapData(await apiClient.put<ApiResponse<any>>(`${BASE}/access/roles/${encodeURIComponent(roleId)}/draft`, { permissions, expectedRevision, description }))
+}
+export async function activatePayrollAccessRole(roleId: string, expectedRevision: number) {
+  return unwrapData(await apiClient.post<ApiResponse<any>>(`${BASE}/access/roles/${encodeURIComponent(roleId)}/activate`, { expectedRevision }))
+}
+export async function setPayrollAccessRoleStatus(roleId: string, enabled: boolean, expectedRevision: number) {
+  return unwrapData(await apiClient.post<ApiResponse<any>>(`${BASE}/access/roles/${encodeURIComponent(roleId)}/status`, { enabled, expectedRevision }))
+}
+export async function assignPayrollAccessRole(userId: string, roleId: string) {
+  return unwrapData(await apiClient.put<ApiResponse<any>>(`${BASE}/access/role-assignments/${encodeURIComponent(userId)}`, { roleId }))
+}
+export async function removePayrollAccessRole(userId: string) {
+  return unwrapData(await apiClient.delete<ApiResponse<any>>(`${BASE}/access/role-assignments/${encodeURIComponent(userId)}`))
 }
 
 /** The payroll document register. Carries no storage URLs. Requires payroll.vault.view. */
@@ -467,6 +615,16 @@ export async function listPayrollOnboarding(): Promise<Record<string, any> | nul
   return unwrapData(res) ?? null
 }
 
+export async function createPayrollOnboardingCandidate(body: Record<string, any>): Promise<Record<string, any>> {
+  const res = await apiClient.post<ApiResponse<any>>(`${BASE}/onboarding/candidates`, body)
+  return unwrapData(res)
+}
+
+export async function updatePayrollOnboardingCandidate(id: string, body: Record<string, any>): Promise<Record<string, any>> {
+  const res = await apiClient.patch<ApiResponse<any>>(`${BASE}/onboarding/candidates/${encodeURIComponent(id)}`, body)
+  return unwrapData(res)
+}
+
 export async function listPayrollRfqs(): Promise<Record<string, any> | null> {
   const res = await apiClient.get<ApiResponse<any>>(`${BASE}/rfqs`)
   return unwrapData(res) ?? null
@@ -475,6 +633,28 @@ export async function listPayrollRfqs(): Promise<Record<string, any> | null> {
 export async function listBankTemplates(): Promise<Record<string, any>[]> {
   const res = await apiClient.get<ApiResponse<any[]>>(`${BASE}/bank-templates`)
   return unwrapData(res) ?? []
+}
+
+export type PayrollBankFileTemplateInput = {
+  name: string
+  bankName: string
+  delimiter: string
+  hasHeader: boolean
+  columnOrder: string[]
+}
+
+export async function createBankTemplate(input: PayrollBankFileTemplateInput): Promise<Record<string, any>> {
+  const res = await apiClient.post<ApiResponse<any>>(`${BASE}/bank-templates`, input)
+  return unwrapData(res)
+}
+
+export async function updateBankTemplate(id: string, input: PayrollBankFileTemplateInput): Promise<Record<string, any>> {
+  const res = await apiClient.put<ApiResponse<any>>(`${BASE}/bank-templates/${encodeURIComponent(id)}`, input)
+  return unwrapData(res)
+}
+
+export async function deleteBankTemplate(id: string): Promise<void> {
+  await apiClient.delete(`${BASE}/bank-templates/${encodeURIComponent(id)}`)
 }
 
 // ---------------------------------------------------------------------------
@@ -496,11 +676,38 @@ export type PayrollAuditEvent = {
 }
 
 /** Newest first. Requires payroll.audit.view. */
-export async function listAuditEvents(limit = 100): Promise<PayrollAuditEvent[]> {
-  const res = await apiClient.get<ApiResponse<PayrollAuditEvent[]>>(
-    `${BASE}/audit?limit=${limit}`,
+export type PayrollAuditPage = {
+  items: PayrollAuditEvent[]
+  pagination: { page: number; limit: number; total: number; totalPages: number }
+  stats: { total: number; approvals: number; changes: number; accesses: number; releases: number; security: number; sensitive: number; actors: number }
+}
+
+export async function listAuditEvents(params: { page?: number; limit?: number; search?: string; actor?: string; eventClass?: string; from?: string; to?: string; entityType?: string; entityId?: string; action?: string } = {}): Promise<PayrollAuditPage> {
+  const qs = new URLSearchParams()
+  for (const [key, value] of Object.entries(params)) if (value !== undefined && value !== null && String(value).trim()) qs.set(key, String(value))
+  const res = await apiClient.get<ApiResponse<PayrollAuditPage>>(
+    `${BASE}/audit${qs.size ? `?${qs}` : ""}`,
   )
-  return unwrapData(res) ?? []
+  return unwrapData(res) ?? { items: [], pagination: { page: 1, limit: 20, total: 0, totalPages: 0 }, stats: { total: 0, approvals: 0, changes: 0, accesses: 0, releases: 0, security: 0, sensitive: 0, actors: 0 } }
+}
+
+export async function recordPayrollAuditExport(format: string): Promise<void> {
+  await apiClient.post<ApiResponse<unknown>>(`${BASE}/audit/export`, { format })
+}
+
+export async function listPayrollReports(params: { page?: number; limit?: number; search?: string; type?: string } = {}): Promise<any> {
+  const qs = new URLSearchParams()
+  if (params.page) qs.set("page", String(params.page))
+  if (params.limit) qs.set("limit", String(params.limit))
+  if (params.search) qs.set("search", params.search)
+  if (params.type) qs.set("type", params.type)
+  const res = await apiClient.get<ApiResponse<any>>(`${BASE}/reports${qs.size ? `?${qs}` : ""}`)
+  return unwrapData(res)
+}
+
+export async function generatePayrollReport(input: { reportType: string; periodStart: string; periodEnd: string; currencyCode?: string | null }): Promise<any> {
+  const res = await apiClient.post<ApiResponse<any>>(`${BASE}/reports/generate`, input)
+  return unwrapData(res)
 }
 
 // ---------------------------------------------------------------------------
@@ -515,6 +722,57 @@ export async function listTrainingCourses(): Promise<Record<string, any>[]> {
 export async function listCertifications(): Promise<Record<string, any>[]> {
   const res = await apiClient.get<ApiResponse<any[]>>(`${BASE}/compliance/certifications`)
   return unwrapData(res) ?? []
+}
+
+export async function listTrainingAssignments(): Promise<Record<string, any>[]> {
+  const res = await apiClient.get<ApiResponse<any[]>>(`${BASE}/compliance/assignments`)
+  return unwrapData(res) ?? []
+}
+
+export async function listTrainingAssignmentAudienceOptions(): Promise<{
+  departments: Record<string, any>[]
+  roles: Record<string, any>[]
+  employees: Record<string, any>[]
+}> {
+  const res = await apiClient.get<ApiResponse<any>>(`${BASE}/compliance/assignments/audience-options`)
+  return unwrapData(res) ?? { departments: [], roles: [], employees: [] }
+}
+
+export async function saveTrainingCourse(body: Record<string, any>, id?: string) {
+  const res = id
+    ? await apiClient.put<ApiResponse<any>>(`${BASE}/compliance/courses/${encodeURIComponent(id)}`, body)
+    : await apiClient.post<ApiResponse<any>>(`${BASE}/compliance/courses`, body)
+  return unwrapData(res)
+}
+
+export async function createTrainingAssignment(body: Record<string, any>) {
+  const res = await apiClient.post<ApiResponse<any>>(`${BASE}/compliance/assignments`, body)
+  return unwrapData(res)
+}
+
+export async function createEmployeeCertification(body: FormData) {
+  const res = await apiClient.postFormData<ApiResponse<any>>(`${BASE}/compliance/certifications`, body)
+  return unwrapData(res)
+}
+
+export async function renewEmployeeCertification(id: string, body: FormData) {
+  const res = await apiClient.putFormData<ApiResponse<any>>(`${BASE}/compliance/certifications/${encodeURIComponent(id)}`, body)
+  return unwrapData(res)
+}
+
+export async function revokeEmployeeCertification(id: string) {
+  const res = await apiClient.post<ApiResponse<any>>(`${BASE}/compliance/certifications/${encodeURIComponent(id)}/revoke`)
+  return unwrapData(res)
+}
+
+export async function removeTrainingAssignment(id: string) {
+  const res = await apiClient.delete<ApiResponse<any>>(`${BASE}/compliance/assignments/${encodeURIComponent(id)}`)
+  return unwrapData(res)
+}
+
+export async function deactivateTrainingCourse(id: string) {
+  const res = await apiClient.delete<ApiResponse<any>>(`${BASE}/compliance/courses/${encodeURIComponent(id)}`)
+  return unwrapData(res)
 }
 
 export async function getExpiringCertifications(): Promise<Record<string, any>> {

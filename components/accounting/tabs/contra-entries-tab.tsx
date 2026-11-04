@@ -9,9 +9,10 @@ import { CreateContraEntryModal } from "@/components/accounting/create-contra-en
 import { ContraEntryViewDrawer } from "@/components/accounting/contra-entry-view-drawer"
 import { fetchContraConfigs } from "@/lib/store/slices/cashbookSlice"
 import { format } from "date-fns"
+import { CashbookExportControls } from "@/components/accounting/cashbook-export-controls"
 import type { AppDispatch, RootState } from "@/lib/store"
 
-export function ContraEntriesTab() {
+export function ContraEntriesTab({ enhanced = false }: { enhanced?: boolean }) {
   const dispatch = useDispatch<AppDispatch>()
   const contraConfigs = useSelector((state: RootState) => state.cashbook.contraConfigs)
   const contraConfigsLoading = useSelector((state: RootState) => state.cashbook.contraConfigsLoading)
@@ -103,6 +104,8 @@ export function ContraEntriesTab() {
       </div>
 
       <ProcurementDataTable
+        accuratePagination={enhanced}
+        exportControls={enhanced ? (rows: any[]) => <CashbookExportControls spec={{ title: "Contra Entry Configurations", filename: "cashbook-contra-entries", columns: ["Entry Type", "GL Account", "Contra Type", "Status", "Created By", "Created At"], rows: rows.map(row => [row.entryType || "", row.glAccount ? `${row.glAccount.accountNo} - ${row.glAccount.accountName}` : "", row.contraType || "", row.isEnabled ? "Enabled" : "Disabled", row.createdBy ? `${row.createdBy.firstName} ${row.createdBy.lastName}` : "", row.createdAt ? format(new Date(row.createdAt), "yyyy-MM-dd") : ""]) }} /> : undefined}
         data={contraConfigs}
         columns={columns}
         title="Contra Entry Configurations"

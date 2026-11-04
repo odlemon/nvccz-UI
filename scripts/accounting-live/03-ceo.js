@@ -4,7 +4,11 @@
  * figure opens the page that holds it. Data: /accounting/overview, /accounting/consolidation/summary,
  * /accounting/short-term-investments/dashboard. */
 AL.page('ceo', () => {
-  AL.meLoad();
+  const me = AL.meLoad();
+  // The nav and goPage/setPage gate on AL.pageAllowed('ceo'), but a direct deep-link can render this page before the
+  // role has loaded (the vendored permissive check runs first). Re-check here so a non-CEO never sees the figures.
+  if (me.state === 'loading') return `<div class="v28-page">${AL.head('Control centre', 'CEO View', '')}<div class="al-state" role="status">Loading…</div></div>`;
+  if (!AL.isCeo()) return `<div class="v28-page">${AL.head('Control centre', 'CEO View', '')}<div class="al-state al-denied" role="alert"><strong>You do not have access to this</strong><p>CEO View is limited to the CEO role. Ask an administrator if you need it.</p></div></div>`;
   const ov = AL.res('ov', () => AL.get('/accounting/overview'));
   const sti = AL.res('ceo-sti', () => AL.get(`/accounting/short-term-investments/dashboard?asOfIso=${AL.stiToday()}`).catch(() => null));
   const today = AL.stiToday();

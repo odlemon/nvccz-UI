@@ -29,6 +29,7 @@ import subprocess
 import sys
 import tarfile
 import tempfile
+import time
 from pathlib import Path
 
 import paramiko
@@ -199,8 +200,25 @@ def stage_upload(c):
         log(f"  API {api_sha} {(t/'api.tgz').stat().st_size/1e6:.1f} MB | UI {ui_sha} {(t/'ui.tgz').stat().st_size/1e6:.1f} MB")
         sftp = c.open_sftp()
         for name in ("api.tgz", "ui.tgz"):
-            sftp.put(str(t / name), f"/tmp/arcusdev-{name}")
-            if sftp.stat(f"/tmp/arcusdev-{name}").st_size != (t / name).stat().st_size:
+            total = (t / name).stat().st_size
+            last_report = [0]
+            def progress(done: int, _total: int, label=name, size=total):
+                pct = int(done * 100 / max(size, 1))
+                if pct >= last_report[0] + 10 or done == size:
+                    log(f"  upload {label}: {pct}%")
+                    last_report[0] = pct
+            try:
+                sftp.remove(f"/tmp/arcusdev-{name}")
+            except OSError:
+                pass
+            sftp.put(str(t / name), f"/tmp/arcusdev-{name}", callback=progress, confirm=False)
+            remote_size = 0
+            for _ in range(20):
+                remote_size = sftp.stat(f"/tmp/arcusdev-{name}").st_size
+                if remote_size == total:
+                    break
+                time.sleep(0.25)
+            if remote_size != total:
                 raise SystemExit("upload size mismatch " + name)
 
         def put_lf(local: Path, remote: str) -> None:  # Windows working copies carry CRLF

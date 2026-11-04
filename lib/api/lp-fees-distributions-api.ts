@@ -130,7 +130,7 @@ export interface NoticeDispatch {
 export interface Distribution {
   id: string
   distributionDate: string
-  source: 'DIVIDEND' | 'EXIT_PROCEEDS' | 'INTEREST' | 'OTHER'
+  source: 'DIVIDEND' | 'EXIT_PROCEEDS' | 'REALISATION_PROCEEDS' | 'INTEREST' | 'INCOME' | 'RETURN_OF_CAPITAL' | 'OTHER'
   grossAmount: string
   carryAmount: string
   netToLPs: string
@@ -153,7 +153,7 @@ export interface Distribution {
 
 export interface DeclareDistributionRequest {
   distributionDate: string
-  source: 'DIVIDEND' | 'EXIT_PROCEEDS' | 'INTEREST' | 'OTHER'
+  source: 'DIVIDEND' | 'EXIT_PROCEEDS' | 'REALISATION_PROCEEDS' | 'INTEREST' | 'INCOME' | 'RETURN_OF_CAPITAL' | 'OTHER'
   grossAmount: number
   sourceCompanyId?: string
   sourceDividendId?: string

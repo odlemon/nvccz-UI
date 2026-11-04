@@ -221,16 +221,37 @@ export function FundraisingDueDiligence() {
   useEffect(() => {
     if (!addCaseOpen) return
     setLoadingRefs(true)
-    Promise.allSettled([
-      fundraisingApi.listInvestors({ pageSize: 100 }),
-      fundraisingApi.listCampaigns(),
+    const withTimeout = <T,>(promise: Promise<T>, fallback: T) =>
+      Promise.race([
+        promise,
+        new Promise<T>((resolve) => window.setTimeout(() => resolve(fallback), 8000)),
+      ])
+    const fallbackInvestors = Array.from(
+      new Map(
+        rawCases
+          .map((item) => item.investor)
+          .filter(Boolean)
+          .map((investor) => [String(investor.id), investor]),
+      ).values(),
+    )
+    const fallbackCampaigns = Array.from(
+      new Map(
+        rawCases
+          .map((item) => item.campaign)
+          .filter(Boolean)
+          .map((campaign) => [String(campaign.id), campaign]),
+      ).values(),
+    )
+    Promise.all([
+      withTimeout(fundraisingApi.listInvestors({ pageSize: 100 }), { items: fallbackInvestors }),
+      withTimeout(fundraisingApi.listCampaigns(), fallbackCampaigns),
     ])
       .then(([invRes, campRes]) => {
-        setInvestors(invRes.status === "fulfilled" ? invRes.value.items ?? [] : [])
-        setCampaigns(campRes.status === "fulfilled" ? campRes.value ?? [] : [])
+        setInvestors(invRes.items?.length ? invRes.items : fallbackInvestors)
+        setCampaigns(campRes?.length ? campRes : fallbackCampaigns)
       })
       .finally(() => setLoadingRefs(false))
-  }, [addCaseOpen])
+  }, [addCaseOpen, rawCases])
 
   async function selectCase(id: string) {
     setSelectedId(id)

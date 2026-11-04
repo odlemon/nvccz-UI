@@ -1,6 +1,6 @@
 # Accounting sweep: migration log
 
-Raw SQL / data scripts only (never `prisma migrate` / `db push`). All applied locally only.
+Raw SQL / data scripts only (never `prisma migrate` / `db push`). Apply and verify each database separately before deployment.
 
 | Step | What | Script | Applied locally |
 |---|---|---|---|
@@ -18,3 +18,4 @@ Raw SQL / data scripts only (never `prisma migrate` / `db push`). All applied lo
 | A11 | `expense_claims`, `expense_claim_lines`: employee claims (reference, claimant, status through the approval chain, who approved each step, policy exceptions and the note they were approved with, the accrual and reimbursement journals) and their items (date, category, amount, VAT, receipt, expense account); `accounting_settings` (key/value; the claims policy). Data: account 2260 Staff Claims Payable | `nvccz/scripts/run-accounting-sweep-migration.ts` | yes |
 | A12 | Data/code: 13 posted `VR-PAYROLL-…` reversal journals were themselves unbalanced (they mirrored 13 already-broken payroll test journals from before the payroll posting fix; the void that created them had no balance check on its own reversal). Voided through the normal service path (never deleted, D20); code fixed so `voidJournalEntry` never auto-posts an unbalanced reversal again, and the audit-trail and nightly integrity checks no longer exclude `VR-`/`REV-` journals from the balance check (they previously did, which is exactly how this sat undetected) | `nvccz/scripts/run-accounting-broken-reversal-cleanup.ts --by=<email>` | yes (13 journals voided; trial balance difference 322,209.92 → 0.00) |
 | — | Test users (local only): acct.cfo, acct.accountant, acct.officer, acct.assistant, acct.auditor | `nvccz/scripts/seed-performance-test-users.ts` | yes |
+| A13 | Additive direct-SQL recovery for the current local MySQL database: restored A1/A2/A4/A10/A11 tables, the Home news_articles table and migration ledger row, and the three Payroll access-policy tables with their five foreign keys; ensured account 2260 has CREDIT natural balance. Production already had these tables, constraints, and account; its missing news_articles ledger row was recorded. | nvccz/scripts/sql/accounting-runtime-schema-repair-20261104.sql | Local arcus_dev: applied after backup C:\Users\lysp\Downloads\db-backups\arcus_dev_before_accounting_repair_20261104.sql; production nvccz_prod: applied after backup /home/user/db-backups/nvccz_prod_before_accounting_repair_20261104.sql.gz; production API health verified |

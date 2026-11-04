@@ -34,6 +34,8 @@ export interface PortfolioCompany {
 export interface PortfolioCompaniesResponse {
   success: boolean
   data: PortfolioCompany[]
+  pagination?: { page: number; limit: number; total: number; totalPages: number }
+  filterOptions?: { industries: string[]; funds: Array<{ id: string; name: string }> }
 }
 
 class PortfolioCompaniesApiService {
@@ -43,6 +45,43 @@ class PortfolioCompaniesApiService {
 
   async getAllWithInvestments(): Promise<PortfolioCompaniesResponse> {
     return apiClient.get<PortfolioCompaniesResponse>('/portfolio-companies/with-investments')
+  }
+
+  async getWithInvestmentsPage(params: { page: number; limit: number; search?: string; industry?: string; fundId?: string; status?: string }): Promise<PortfolioCompaniesResponse> {
+    const query = new URLSearchParams()
+    Object.entries(params).forEach(([key, value]) => { if (value !== undefined && value !== '') query.set(key, String(value)) })
+    return apiClient.get<PortfolioCompaniesResponse>(`/portfolio-companies/with-investments?${query.toString()}`)
+  }
+
+  async getDocumentOrganisation(id: string): Promise<{ success: boolean; data: any }> {
+    return apiClient.get(`/portfolio-companies/${encodeURIComponent(id)}/document-organisation`)
+  }
+
+  async getReportingAudit(id: string): Promise<{ success: boolean; data: any }> {
+    return apiClient.get(`/portfolio-companies/${encodeURIComponent(id)}/reporting-audit`)
+  }
+
+  async getFinancialReports(id: string): Promise<{ success: boolean; data: any[] }> {
+    return apiClient.get(`/portfolio-companies/${encodeURIComponent(id)}/financial-reports`)
+  }
+
+  async getCompanyDocuments(id: string): Promise<{ success: boolean; data: { documents: any[]; requests: any[]; folders: string[] } }> {
+    return apiClient.get(`/portfolio-companies/${encodeURIComponent(id)}/company-documents`)
+  }
+
+  async requestCompanyDocument(id: string, data: { title: string; folder: string; dueDate?: string }): Promise<{ success: boolean; data: any }> {
+    return apiClient.post(`/portfolio-companies/${encodeURIComponent(id)}/company-document-requests`, data)
+  }
+
+  async uploadCompanyDocument(id: string, file: File, folder: string): Promise<{ success: boolean; data: any }> {
+    const body = new FormData()
+    body.append('file', file)
+    body.append('folder', folder)
+    return apiClient.post(`/portfolio-companies/${encodeURIComponent(id)}/company-documents`, body)
+  }
+
+  async getCompanyActivity(id: string): Promise<{ success: boolean; data: any[] }> {
+    return apiClient.get(`/portfolio-companies/${encodeURIComponent(id)}/activity`)
   }
 
   async getById(id: string): Promise<{ success: boolean; data: PortfolioCompany }> {

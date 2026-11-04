@@ -790,7 +790,6 @@ export function FundraisingInvestors() {
                 className={frSelectClass}
                 value={form.relationshipOwnerId}
                 onChange={(e) => setForm((f) => ({ ...f, relationshipOwnerId: e.target.value }))}
-                disabled={loadingUsers}
               >
                 <option value="">{loadingUsers ? "Loading users…" : "Select owner"}</option>
                 {users.map((user) => (

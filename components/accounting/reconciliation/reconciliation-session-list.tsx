@@ -5,6 +5,7 @@ import { RootState } from "@/lib/store/store"
 import { ReconciliationSession } from "@/lib/api/reconciliation-api"
 import { ProcurementDataTable, Column } from "../../procurement/procurement-data-table"
 import { Badge } from "@/components/ui/badge"
+import { AccountingExportControls } from "@/components/accounting/accounting-export-controls"
 import { format, parseISO } from "date-fns"
 
 interface ReconciliationSessionListProps {
@@ -89,9 +90,25 @@ export function ReconciliationSessionList({ onOpenSession, onViewSession }: Reco
 
   return (
     <ProcurementDataTable
+      title="Bank Reconciliation Sessions"
       columns={columns}
       data={sessions}
-      isLoading={sessionsLoading}
+      loading={sessionsLoading}
+      accuratePagination
+      exportControls={(rows) => <AccountingExportControls label="reconciliation sessions" spec={{
+        title: "Bank Reconciliation Sessions",
+        subtitle: "Statement balances and reconciliation status",
+        filename: "bank-reconciliation-sessions",
+        columns: ["Statement Date", "Reference", "Status", "Opening Balance", "Statement End Balance", "Created"],
+        rows: rows.map((session) => [
+          formatDate(session.statementDate),
+          session.reference || "",
+          session.status,
+          session.openingBalance ?? "",
+          session.statementEndBalance,
+          formatDate(session.createdAt),
+        ]),
+      }} />}
       emptyMessage="No reconciliation sessions found for this bank."
       searchPlaceholder="Search sessions..."
       onView={handleRowClick}

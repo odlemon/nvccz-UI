@@ -1,8 +1,8 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { useAppDispatch, useAppSelector } from "@/lib/store"
-import { checkInGuest } from "@/lib/store/slices/eventsSlice"
+import { checkInGuest, fetchEventGuests } from "@/lib/store/slices/eventsSlice"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -14,10 +14,13 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible"
-import { ChevronDown, Upload } from "lucide-react"
+import { ChevronDown, ChevronLeft, ChevronRight, LoaderCircle, Upload } from "lucide-react"
 import { format } from "date-fns"
 import { AddGuestDialog } from "../add-guest-dialog"
 import { BulkUploadGuestsDialog } from "../bulk-upload-guests-dialog"
+import { eventsApi } from "@/lib/api/events-api"
+import { toast } from "sonner"
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
 
 interface EventGuestsTabProps {
   eventId: string
@@ -29,17 +32,89 @@ export function EventGuestsTab({ eventId }: EventGuestsTabProps) {
   const [searchTerm, setSearchTerm] = useState("")
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false)
   const [isBulkDialogOpen, setIsBulkDialogOpen] = useState(false)
+  const [resendingGuestId, setResendingGuestId] = useState<string | null>(null)
+  const [retryingAnnouncementGuestId, setRetryingAnnouncementGuestId] = useState<string | null>(null)
+  const [confirmInvitationsOpen, setConfirmInvitationsOpen] = useState(false)
+  const [sendingInvitations, setSendingInvitations] = useState(false)
+  const guestPage = guestsPagination.page || 1
+  const guestPageSize = guestsPagination.limit || 9
+  const refreshGuests = (page = guestPage, search = searchTerm) =>
+    dispatch(fetchEventGuests({ eventId, page, limit: guestPageSize, search }))
 
-  const filteredGuests = currentEventGuests.filter(
-    (guest) =>
-      guest.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      guest.email.toLowerCase().includes(searchTerm.toLowerCase())
-  )
+  // Delivery and open tracking are asynchronous. Keep the guest list fresh
+  // while this tab is mounted without requiring the organiser to refresh.
+  useEffect(() => {
+    const refresh = () => refreshGuests(guestPage, searchTerm)
+    const interval = window.setInterval(refresh, 10000)
+    return () => window.clearInterval(interval)
+  }, [dispatch, eventId, guestPage, guestPageSize, searchTerm])
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => refreshGuests(1, searchTerm), 250)
+    return () => window.clearTimeout(timer)
+  }, [dispatch, eventId, searchTerm, guestPageSize])
+
+  const filteredGuests = currentEventGuests
 
 
 
   const handleCheckIn = async (guestId: string) => {
     await dispatch(checkInGuest({ eventId, guestId }))
+  }
+
+  const handleResend = async (guestId: string, email: string) => {
+    if (resendingGuestId) return
+    setResendingGuestId(guestId)
+    try {
+      const result = await eventsApi.resendInvitations(eventId, { guestIds: [guestId] })
+      const failed = result.delivery?.find((item) => item.status === "FAILED")
+      if (failed) toast.error(`Invitation failed for ${email}`, { description: failed.error })
+      else toast.success(`Invitation resent to ${email}`)
+      await refreshGuests()
+    } catch (error: any) {
+      toast.error("Could not resend invitation", { description: error.message || "Please try again" })
+    } finally {
+      setResendingGuestId(null)
+    }
+  }
+
+  const handleRetryAnnouncement = async (guestId: string, email: string) => {
+    if (retryingAnnouncementGuestId) return
+    setRetryingAnnouncementGuestId(guestId)
+    try {
+      const result = await eventsApi.resendAnnouncements(eventId, { guestIds: [guestId] })
+      const failed = result.announcementDelivery?.find((item) => item.status === "FAILED")
+      if (failed) toast.error(`Announcement failed for ${email}`, { description: failed.error })
+      else toast.success(`Announcement sent to ${email}`)
+      await refreshGuests()
+    } catch (error: any) {
+      toast.error("Could not resend announcement", { description: error.message || "Please try again" })
+    } finally {
+      setRetryingAnnouncementGuestId(null)
+    }
+  }
+
+  const handleSendOfficialInvitations = async () => {
+    if (sendingInvitations) return
+    setSendingInvitations(true)
+    try {
+      const result = await eventsApi.sendOfficialInvitations(eventId)
+      const delivery = result.delivery ?? []
+      const failed = delivery.filter((item) => item.status === "FAILED")
+      if (failed.length) {
+        toast.warning("Some official invitations could not be sent", {
+          description: `${delivery.length - failed.length} sent; ${failed.length} failed. Failed guests remain eligible for another send.`,
+        })
+      } else {
+        toast.success(`Official invitations sent to ${delivery.length} guest${delivery.length === 1 ? "" : "s"}`)
+      }
+      await refreshGuests()
+    } catch (error: any) {
+      toast.error("Could not send official invitations", { description: error.message || "Please try again" })
+    } finally {
+      setSendingInvitations(false)
+      setConfirmInvitationsOpen(false)
+    }
   }
 
   const getInitials = (name: string) => {
@@ -64,12 +139,25 @@ export function EventGuestsTab({ eventId }: EventGuestsTabProps) {
     }
   }
 
+  const getAnnouncementLabel = (guest: any) => {
+    if (guest.announcementDeliveryStatus === "FAILED") return "Failed"
+    if (guest.announcementDeliveryStatus === "SENDING") return "Sending"
+    if (guest.announcementSentAt || guest.announcementDeliveryStatus === "ACCEPTED") return "Sent"
+    return "Not sent"
+  }
+
+  const wasEmailDelivered = (guest: any) =>
+    guest.deliveryStatus === "ACCEPTED" ||
+    guest.deliveryStatus === "DELIVERED" ||
+    guest.deliveryStatus === "SENT" ||
+    (Boolean(guest.invitationSentAt) && guest.deliveryStatus !== "FAILED" && guest.deliveryStatus !== "BOUNCED")
+
   const stats = {
-    total: currentEventGuests.length,
-    accepted: currentEventGuests.filter((g) => g.rsvpStatus === "ACCEPTED").length,
-    declined: currentEventGuests.filter((g) => g.rsvpStatus === "DECLINED").length,
-    pending: currentEventGuests.filter((g) => g.rsvpStatus === "PENDING").length,
-    checkedIn: currentEventGuests.filter((g) => g.checkedIn).length
+    total: guestsPagination.totalGuests,
+    accepted: guestsPagination.acceptedCount,
+    declined: guestsPagination.declinedCount,
+    pending: guestsPagination.pendingCount,
+    checkedIn: guestsPagination.checkedInCount
   }
 
   return (
@@ -86,7 +174,7 @@ export function EventGuestsTab({ eventId }: EventGuestsTabProps) {
           <CardContent>
             <div className="text-5xl font-normal text-white">{stats.total}</div>
             <div className="flex items-center gap-1 mt-1">
-              <p className="text-sm font-medium text-white/80">Total invited</p>
+              <p className="text-sm font-medium text-white/80">On guest list</p>
             </div>
           </CardContent>
         </Card>
@@ -149,11 +237,11 @@ export function EventGuestsTab({ eventId }: EventGuestsTabProps) {
       </div>
 
       {/* Search and Actions */}
-      <div className="flex items-center gap-4">
-        <div className="flex-1 relative">
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="flex-1 min-w-[220px] relative">
           <CiSearch size={20} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground" />
           <Input
-            placeholder="Search guests by name or email..."
+            placeholder="Search all guests by name or email..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="pl-10"
@@ -174,6 +262,14 @@ export function EventGuestsTab({ eventId }: EventGuestsTabProps) {
         >
           <CiCirclePlus size={20} />
           Add Guest
+        </Button>
+        <Button
+          onClick={() => setConfirmInvitationsOpen(true)}
+          disabled={guestsPagination.pendingInvitationCount === 0 || sendingInvitations}
+          className="gap-2 rounded-full h-10 px-5"
+        >
+          {sendingInvitations ? <LoaderCircle size={17} className="animate-spin" /> : <CiMail size={18} />}
+          Send official invitations ({guestsPagination.pendingInvitationCount})
         </Button>
       </div>
 
@@ -220,6 +316,14 @@ export function EventGuestsTab({ eventId }: EventGuestsTabProps) {
                     </div>
                   )}
 
+                  <div className="text-xs text-muted-foreground">
+                    <span className="font-medium">Announcement:</span> {getAnnouncementLabel(guest)}
+                    {guest.announcementSentAt && ` · ${format(new Date(guest.announcementSentAt), "MMM dd, HH:mm")}`}
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    <span className="font-medium">Email delivered:</span> {wasEmailDelivered(guest) ? "Yes" : "No"}
+                  </div>
+
                   {guest.checkedIn ? (
                     <div className="flex items-center gap-2 text-sm text-green-600 bg-green-50 p-2 rounded">
                       <CiCircleCheck size={18} />
@@ -235,6 +339,27 @@ export function EventGuestsTab({ eventId }: EventGuestsTabProps) {
                       <CiCircleCheck size={18} />
                       Check In
                     </Button>
+                  ) : guest.invitationSentAt || guest.deliveryStatus === "FAILED" ? (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="w-full gap-2 rounded-full h-9"
+                      onClick={() => handleResend(guest.id, guest.email)}
+                      disabled={resendingGuestId !== null}
+                      aria-live="polite"
+                    >
+                      {resendingGuestId === guest.id ? (
+                        <>
+                          <LoaderCircle size={16} className="animate-spin" aria-hidden="true" />
+                          Sending invitation...
+                        </>
+                      ) : (
+                        <>
+                          <CiMail size={18} />
+                          {guest.invitationSentAt ? "Resend invitation" : "Retry invitation"}
+                        </>
+                      )}
+                    </Button>
                   ) : null}
                 </div>
 
@@ -248,6 +373,25 @@ export function EventGuestsTab({ eventId }: EventGuestsTabProps) {
 
                 <CollapsibleContent>
                   <div className="p-4 border-t bg-muted/30 space-y-3 text-sm">
+                    <section className="space-y-2 rounded-xl border border-[#cfe3d8] bg-[#f4faf6] p-3">
+                      <h3 className="text-sm font-semibold text-[#00843d]">Uploaded video</h3>
+                      {guest.anniversaryVideoUrl ? <>
+                        <video
+                          key={guest.anniversaryVideoUrl}
+                          src={guest.anniversaryVideoUrl}
+                          controls
+                          playsInline
+                          preload="metadata"
+                          aria-label={`Anniversary video from ${guest.name}`}
+                          className="aspect-video w-full rounded-lg bg-black"
+                          onError={() => toast.error(`Unable to play ${guest.name}'s video. Please try the Open video link.`)}
+                        />
+                        <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-600">
+                          <span>{guest.videoConsentAt ? `Consent recorded ${format(new Date(guest.videoConsentAt), "MMM dd, yyyy")}` : "Guest video submission"}</span>
+                          <a href={guest.anniversaryVideoUrl} target="_blank" rel="noopener noreferrer" className="font-medium text-[#00843d] underline">Open video</a>
+                        </div>
+                      </> : <p className="text-sm text-slate-600">No video uploaded yet.</p>}
+                    </section>
                     {guest.rsvpRespondedAt && (
                       <div>
                         <span className="font-medium text-muted-foreground">RSVP Responded:</span>
@@ -261,6 +405,53 @@ export function EventGuestsTab({ eventId }: EventGuestsTabProps) {
                         <p className="text-foreground">{guest.rsvpNotes}</p>
                       </div>
                     )}
+
+                    <div className="pt-2 border-t space-y-2">
+                      <div className="flex items-center justify-between gap-4">
+                        <span className="font-medium text-muted-foreground">Announcement</span>
+                        <span>{getAnnouncementLabel(guest)}</span>
+                      </div>
+                      {guest.announcementDeliveryError && (
+                        <p className="text-xs text-red-600 break-words">{guest.announcementDeliveryError}</p>
+                      )}
+                      {guest.announcementDeliveryStatus === "FAILED" && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="w-full gap-2 rounded-full h-8"
+                          onClick={() => handleRetryAnnouncement(guest.id, guest.email)}
+                          disabled={retryingAnnouncementGuestId !== null}
+                        >
+                          {retryingAnnouncementGuestId === guest.id ? <LoaderCircle size={14} className="animate-spin" /> : <CiMail size={16} />}
+                          Retry announcement
+                        </Button>
+                      )}
+                      <div className="flex items-center justify-between gap-4">
+                        <span className="font-medium text-muted-foreground">Email delivered</span>
+                        <span>{wasEmailDelivered(guest) ? "Yes" : "No"}</span>
+                      </div>
+                      {guest.deliveryError && (
+                        <p className="text-xs text-red-600 break-words">{guest.deliveryError}</p>
+                      )}
+                      <div className="flex items-center justify-between gap-4">
+                        <span className="font-medium text-muted-foreground">RSVP link clicked</span>
+                        <span>{guest.clickedAt
+                          ? `Yes${guest.clickCount > 1 ? ` (${guest.clickCount} times)` : ""}`
+                          : guest.rsvpRespondedAt ? "Yes — RSVP submitted" : "Not yet"}</span>
+                      </div>
+                      {guest.invitationSentAt && (
+                        <div className="flex items-center justify-between gap-4 text-xs">
+                          <span className="text-muted-foreground">Sent at</span>
+                          <span>{format(new Date(guest.invitationSentAt), "PPP 'at' p")}</span>
+                        </div>
+                      )}
+                      {guest.lastClickedAt && (
+                        <div className="flex items-center justify-between gap-4 text-xs">
+                          <span className="text-muted-foreground">Last link click</span>
+                          <span>{format(new Date(guest.lastClickedAt), "PPP 'at' p")}</span>
+                        </div>
+                      )}
+                    </div>
 
                     {guest.dietaryRequirements && (
                       <div>
@@ -286,12 +477,6 @@ export function EventGuestsTab({ eventId }: EventGuestsTabProps) {
                       </div>
                     )}
 
-                    <div className="pt-2 border-t">
-                      <span className="font-medium text-muted-foreground">Invitation Token:</span>
-                      <p className="text-xs font-mono bg-background p-2 rounded mt-1 break-all">
-                        {guest.invitationToken}
-                      </p>
-                    </div>
                   </div>
                 </CollapsibleContent>
               </CardContent>
@@ -299,6 +484,37 @@ export function EventGuestsTab({ eventId }: EventGuestsTabProps) {
           </Collapsible>
         ))}
       </div>
+
+      {guestsPagination.total > 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-white px-4 py-3">
+          <p className="text-sm text-muted-foreground" aria-live="polite">
+            Showing {Math.min((guestPage - 1) * guestPageSize + 1, guestsPagination.total)}–{Math.min(guestPage * guestPageSize, guestsPagination.total)} of {guestsPagination.total} guests
+          </p>
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => refreshGuests(Math.max(1, guestPage - 1))}
+              disabled={loading || guestPage <= 1}
+              aria-label="Previous guest page"
+            >
+              <ChevronLeft size={16} /> Previous
+            </Button>
+            <span className="min-w-20 text-center text-sm text-muted-foreground">Page {guestPage} of {Math.max(1, guestsPagination.pages)}</span>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => refreshGuests(Math.min(guestsPagination.pages, guestPage + 1))}
+              disabled={loading || guestPage >= guestsPagination.pages}
+              aria-label="Next guest page"
+            >
+              Next <ChevronRight size={16} />
+            </Button>
+          </div>
+        </div>
+      )}
 
       {filteredGuests.length === 0 && (
         <Card className="p-12">
@@ -330,6 +546,26 @@ export function EventGuestsTab({ eventId }: EventGuestsTabProps) {
         onClose={() => setIsBulkDialogOpen(false)}
         eventId={eventId}
       />
+
+      <AlertDialog open={confirmInvitationsOpen} onOpenChange={(open) => !sendingInvitations && setConfirmInvitationsOpen(open)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Send official invitations?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will send personalized RSVP invitations to {guestsPagination.pendingInvitationCount} guest{guestsPagination.pendingInvitationCount === 1 ? "" : "s"} who have not received an official invitation. Guests with a successful invitation are excluded.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={sendingInvitations}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(event) => { event.preventDefault(); void handleSendOfficialInvitations() }}
+              disabled={sendingInvitations}
+            >
+              {sendingInvitations ? <><LoaderCircle size={16} className="mr-2 animate-spin" />Sending...</> : "Send invitations"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

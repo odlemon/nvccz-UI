@@ -8,6 +8,7 @@ interface InvoicesState {
   loading: boolean
   customersLoading: boolean
   error: string | null
+  activeFetchId: string | null
   filters: Record<string, any>
   pagination: {
     total: number
@@ -36,6 +37,7 @@ const initialState: InvoicesState = {
   loading: false,
   customersLoading: false,
   error: null,
+  activeFetchId: null,
   filters: {},
   pagination: {
     total: 0,
@@ -72,7 +74,7 @@ export const fetchInvoices = createAsyncThunk(
 export const fetchCustomers = createAsyncThunk(
   'invoices/fetchCustomers',
   async () => {
-    const response = await accountingApi.getCustomers()
+    const response = await accountingApi.getCustomers({ limit: 10000 })
     if (!response.success) {
       throw new Error(response.message || 'Failed to fetch customers')
     }
@@ -166,12 +168,16 @@ const invoicesSlice = createSlice({
   extraReducers: (builder) => {
     builder
       // Fetch invoices
-      .addCase(fetchInvoices.pending, (state) => {
+      .addCase(fetchInvoices.pending, (state, action) => {
         state.loading = true
         state.error = null
+        state.activeFetchId = action.meta.requestId
       })
-      .addCase(fetchInvoices.fulfilled, (state, action: PayloadAction<InvoicesResponse>) => {
+      .addCase(fetchInvoices.fulfilled, (state, action) => {
+        if (state.activeFetchId !== action.meta.requestId) return
+        if (!action.payload) return
         state.loading = false
+        state.activeFetchId = null
         state.invoices = action.payload.invoices
         state.pagination = {
           total: action.payload.total,
@@ -221,7 +227,9 @@ const invoicesSlice = createSlice({
         state.stats = stats
       })
       .addCase(fetchInvoices.rejected, (state, action) => {
+        if (state.activeFetchId !== action.meta.requestId) return
         state.loading = false
+        state.activeFetchId = null
         state.error = action.error.message || 'Failed to fetch invoices'
       })
       

@@ -18,6 +18,12 @@ export type Pv11Fund = {
   geography: string
   managementFee: string
   carry: string
+  /** True when the register itself returned performance figures (IRR / TVPI / DPI). */
+  perfAvailable?: boolean
+  /** True when a NAV figure came back for this fund. */
+  navAvailable?: boolean
+  /** True when declared distribution records supplied the distributed total. */
+  distributedAvailable?: boolean
 }
 
 export type Pv11Company = {
@@ -35,6 +41,7 @@ export type Pv11Company = {
   boardDate: string
   lastReport: string
   fund: string
+  fundId?: string
   city: string
   revenue: number[]
   ebitda: number[]
@@ -44,6 +51,7 @@ export type Pv11Company = {
   clients: number
   esg: number[]
   color: string
+  source?: Record<string, any>
 }
 
 export type Pv11Deal = {
@@ -68,21 +76,39 @@ export type Pv11Deal = {
 
 export type Pv11CapitalCall = {
   id: string
+  recordId?: string
   fund: string
   fundId?: string
   callDate: string
+  callDateIso?: string
+  transactionDate?: string
   dueDate: string
+  dueDateIso?: string
   purpose: string
   amount: number
   lpCount: number
   collected: number
   status: string
   approval: string
+  bankInstructions?: string
+  currencyCode?: string
+  callPercent?: number
+  allocations?: Array<Record<string, any>>
+  activity?: Array<{ action: string; timestamp: string; actor: string; note?: string | null; summary: string }>
+  createdBy?: { firstName?: string; lastName?: string; email?: string }
+  submittedAt?: string | null
+  approvedAt?: string | null
+  approvedById?: string | null
+  rejectedAt?: string | null
+  rejectionReason?: string | null
+  noticesSentAt?: string | null
+  journalEntry?: Record<string, any> | null
 }
 
 export type Pv11Lp = {
   id: string
   name: string
+  email?: string
   type: string
   geography: string
   commitment: number
@@ -113,7 +139,7 @@ export type Pv11Lp = {
   }>
   portalUserCount: number
   portalRoles: { viewer: number; manager: number }
-  portalUsers: Array<{ name: string; email: string; role: string; isActive: boolean }>
+  portalUsers: Array<{ name: string; email: string; role: string; isActive: boolean; pendingActivation?: boolean }>
   /** Real capital call / distribution transaction ledger, newest first. */
   transactions: Array<{
     date: string
@@ -167,6 +193,7 @@ export type Pv11Document = {
 
 export type Pv11CashAccount = {
   id: string
+  accountName?: string
   fund: string
   vehicle: string
   purpose: string
@@ -191,6 +218,8 @@ export type Pv11CashAccount = {
 
 export type Pv11CashJournal = {
   id: string
+  /** Human-readable journal number/reference; id remains the internal row key. */
+  displayId?: string
   source: string
   event: string
   account: string
@@ -261,6 +290,8 @@ export type Pv11ReconciliationBatch = {
 
 export type Pv11Exception = {
   id: string
+  displayId?: string
+  batch?: string
   code: string
   title?: string
   account?: string
@@ -363,6 +394,7 @@ export type Pv11HydratePayload = {
     companies: Pv11Company[]
     deals: Pv11Deal[]
     capitalCalls: Pv11CapitalCall[]
+    distributions: Array<Record<string, unknown>>
     lps: Pv11Lp[]
     reports: Pv11Report[]
     documents: Pv11Document[]

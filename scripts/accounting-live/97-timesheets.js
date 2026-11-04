@@ -3,7 +3,7 @@
  * everyone with access: projects with the hours approved (billable among them) and still waiting; those who manage
  * projects add and change them. Employees enter their own time in Employee Hub. Data: /accounting/timesheets/*,
  * /accounting/projects. */
-AL.ui.ts = AL.ui.ts || { tab: '', status: '' };
+AL.ui.ts = AL.ui.ts || { tab: '', status: '', page: 1 };
 AL.tsLoad = (canApprove) => ({
   pending: canApprove ? AL.res('ts-pending', () => AL.get('/accounting/timesheets/pending-approval')) : null,
   team: canApprove ? AL.res('ts-team', () => AL.get('/accounting/timesheets/team')) : null,
@@ -17,10 +17,10 @@ AL.TS_STATUS = { DRAFT: ['Draft', 'info'], SUBMITTED: ['Waiting for approval', '
 AL.page('timesheets', () => {
   AL.meLoad();
   const canApprove = AL.can('accounting.timesheets.manage');
-  const L = AL.tsLoad(canApprove), u = { ...AL.ui.ts };
+  const L = AL.tsLoad(canApprove), u = AL.ui.ts;
   // the default tab follows the permissions, which may arrive after the first draw
   if (!u.tab || (!canApprove && u.tab !== 'projects')) u.tab = canApprove ? 'waiting' : 'projects';
-  const head = AL.head('Daily accounting', 'Timesheets & Projects', '', canApprove ? AL.btn('Add project', 'ts-proj-new', 'primary') : '');
+  const head = AL.head('Daily accounting', 'Timesheets & Projects', 'Employee time entries flow from Performance into this approval and project workspace.', [AL.exportBtns('ts-export'), canApprove ? AL.btn('Add project', 'ts-proj-new', 'primary') : ''].join(''));
   const g = AL.gate(L.projects, { key: 'ts-projects', errorTitle: 'Projects could not be loaded' }) || (canApprove && (AL.gate(L.pending, { key: 'ts-pending' }) || AL.gate(L.team, { key: 'ts-team' })));
   if (g) return `<div class="v28-page">${head}${g}</div>`;
   const projects = L.projects.data || [], pending = canApprove ? L.pending.data || [] : [], team = canApprove ? L.team.data || [] : [];
@@ -45,16 +45,23 @@ AL.page('timesheets', () => {
     </tr>`;
   };
   let body = '';
+  let exportRows = [], exportTitle = 'Timesheets';
+  const paginate = (items) => { const size = 10, pages = Math.max(1, Math.ceil(items.length / size)); u.page = Math.min(Math.max(1, Number(u.page) || 1), pages); const offset = (u.page - 1) * size; return { pageItems: items.slice(offset, offset + size), pages, offset, size }; };
+  const pager = (items, p, label) => p.pages > 1 ? `<div class="apq-pagination"><span>Showing ${p.offset + 1}–${Math.min(p.offset + p.size, items.length)} of ${items.length} ${label}</span><div>${AL.btn('Previous', 'ts-page', 'small', `data-dir="-1"${u.page <= 1 ? ' disabled' : ''}`)}<span>Page ${u.page} of ${p.pages}</span>${AL.btn('Next', 'ts-page', 'small', `data-dir="1"${u.page >= p.pages ? ' disabled' : ''}`)}</div></div>` : '';
   if (u.tab === 'waiting') {
     const me = AL.me().id;
-    const rows = pending.map((t) => weekRow(t, [AL.btn('Lines', 'ts-lines', 'small', `data-id="${ae(t.id)}" data-src="ts-pending"`), ...(t.userId !== me ? [AL.btn('Approve', 'ts-approve', 'small primary', `data-id="${ae(t.id)}"`), AL.btn('Return', 'ts-return', 'small danger', `data-id="${ae(t.id)}"`)] : [])].join(''))).join('');
-    body = rows ? AL.table(['Person', 'Week', 'Hours', 'Projects', 'Status', ''], rows, '1040px') : AL.empty('No timesheets are waiting for you.');
+    const list = pending.slice().sort((a, b) => String(a.submittedAt || '').localeCompare(String(b.submittedAt || ''))), p = paginate(list);
+    const rows = p.pageItems.map((t) => weekRow(t, [AL.btn('Lines', 'ts-lines', 'small', `data-id="${ae(t.id)}" data-src="ts-pending"`), ...(t.userId !== me ? [AL.btn('Approve', 'ts-approve', 'small primary', `data-id="${ae(t.id)}"`), AL.btn('Return', 'ts-return', 'small danger', `data-id="${ae(t.id)}"`)] : [])].join(''))).join('');
+    exportTitle = 'Timesheets waiting for approval'; exportRows = list;
+    body = rows ? `${AL.table(['Person', 'Week', 'Hours', 'Projects', 'Status', ''], rows, '1040px')}${pager(list, p, 'timesheets')}` : AL.empty('No timesheets are waiting for you.');
   } else if (u.tab === 'team') {
     const list = team.filter((t) => !u.status || t.status === u.status).sort((a, b) => String(b.weekEnding).localeCompare(String(a.weekEnding)));
-    const rows = list.map((t) => weekRow(t, AL.btn('Lines', 'ts-lines', 'small', `data-id="${ae(t.id)}" data-src="ts-team"`))).join('');
-    body = `<div class="al-filters"><label class="v28-field"><span>Status</span><select class="v28-select" data-ts-f="status"><option value="">All</option>${Object.entries(AL.TS_STATUS).map(([k, v]) => `<option value="${k}"${u.status === k ? ' selected' : ''}>${ae(v[0])}</option>`).join('')}</select></label></div>${rows ? AL.table(['Person', 'Week', 'Hours', 'Projects', 'Status', ''], rows, '1040px') : AL.empty('No timesheets.')}`;
+    const p = paginate(list), rows = p.pageItems.map((t) => weekRow(t, AL.btn('Lines', 'ts-lines', 'small', `data-id="${ae(t.id)}" data-src="ts-team"`))).join('');
+    exportTitle = 'Team timesheets'; exportRows = list;
+    body = `<div class="al-filters"><label class="v28-field"><span>Status</span><select class="v28-select" data-ts-f="status"><option value="">All</option>${Object.entries(AL.TS_STATUS).map(([k, v]) => `<option value="${k}"${u.status === k ? ' selected' : ''}>${ae(v[0])}</option>`).join('')}</select></label></div>${rows ? `${AL.table(['Person', 'Week', 'Hours', 'Projects', 'Status', ''], rows, '1040px')}${pager(list, p, 'timesheets')}` : AL.empty('No timesheets.')}`;
   } else {
-    const rows = projects.map((p) => `<tr class="${p.isActive === false ? 'al-muted' : ''}">
+    const p = paginate(projects); exportTitle = 'Projects'; exportRows = projects;
+    const rows = p.pageItems.map((p) => `<tr class="${p.isActive === false ? 'al-muted' : ''}">
       <td><strong>${ae(p.name)}</strong><span class="v28-sub">${ae([p.clientName, p.projectType].filter(Boolean).join(' · '))}</span></td>
       <td class="num">${p.budget != null ? ae(AL.money(p.budget)) : '—'}</td>
       <td class="num">${ae(((p.hours && p.hours.approved) || 0).toLocaleString('en-US'))} h<span class="v28-sub">${ae(((p.hours && p.hours.billable) || 0).toLocaleString('en-US'))} h billable</span></td>
@@ -62,12 +69,18 @@ AL.page('timesheets', () => {
       <td>${p.isActive === false || p.status === 'CLOSED' ? AL.status('Closed', 'info') : AL.status('Active', 'ok')}</td>
       <td class="al-actions">${canApprove ? AL.btn('Change', 'ts-proj-edit', 'small', `data-id="${ae(p.id)}"`) : ''}</td>
     </tr>`).join('');
-    body = rows ? AL.table(['Project', 'Budget', 'Approved', 'Waiting', 'Status', ''], rows, '900px') : AL.empty('No projects yet.');
+    body = rows ? `${AL.table(['Project', 'Budget', 'Approved', 'Waiting', 'Status', ''], rows, '900px')}${pager(projects, p, 'projects')}` : AL.empty('No projects yet.');
   }
+  AL.tsExportRows = exportRows; AL.tsExportTitle = exportTitle;
   return `<div class="v28-page">${head}${kpis}${AL.panel('Time', '', `${tabs}${body}`)}</div>`;
 });
-AL.wire.timesheets = () => { document.querySelectorAll('[data-ts-f]').forEach((el) => { if (el.dataset.wired) return; el.dataset.wired = '1'; el.addEventListener('change', () => { AL.ui.ts[el.dataset.tsF] = el.value; AL.redraw(); }); }); };
-AL.actions['ts-tab'] = (el) => { AL.ui.ts.tab = el.dataset.t; AL.redraw(); };
+AL.wire.timesheets = () => { document.querySelectorAll('[data-ts-f]').forEach((el) => { if (el.dataset.wired) return; el.dataset.wired = '1'; el.addEventListener('change', () => { AL.ui.ts[el.dataset.tsF] = el.value; AL.ui.ts.page = 1; AL.redraw(); }); }); };
+AL.actions['ts-tab'] = (el) => { AL.ui.ts.tab = el.dataset.t; AL.ui.ts.page = 1; AL.redraw(); };
+AL.actions['ts-page'] = (el) => { AL.ui.ts.page = Math.max(1, (Number(AL.ui.ts.page) || 1) + Number(el.dataset.dir || 0)); AL.redraw(); };
+AL.tsExportSpec = () => AL.ui.ts.tab === 'projects'
+  ? ({ title: 'Projects', subtitle: 'Active and closed project register with approved and waiting time', columns: ['Project', 'Client', 'Type', 'Budget', 'Approved hours', 'Billable hours', 'Waiting hours', 'Status'], rows: (AL.tsExportRows || []).map((p) => [p.name || '', p.clientName || '', p.projectType || '', p.budget == null ? '' : Number(p.budget), Number(p.hours?.approved || 0), Number(p.hours?.billable || 0), Number(p.hours?.waiting || 0), p.isActive === false || p.status === 'CLOSED' ? 'Closed' : 'Active']), filename: 'accounting-projects' })
+  : ({ title: AL.tsExportTitle || 'Timesheets', subtitle: 'Persisted employee time register', columns: ['Employee', 'Department', 'Week ending', 'Hours', 'Billable hours', 'Projects', 'Status', 'Return reason'], rows: (AL.tsExportRows || []).map((t) => [AL.tsName(t.user), (t.user && (t.user.userDepartment?.name || t.user.userDepartment)) || '', AL.date(t.weekEnding), AL.tsHours(t), (t.entries || []).filter((e) => e.billable).reduce((s, e) => s + Number(e.hours || 0), 0), [...new Set((t.entries || []).map((e) => e.project?.name).filter(Boolean))].join(', '), AL.TS_STATUS[t.status]?.[0] || t.status, t.returnReason || '']), filename: 'timesheets' });
+AL.actions['ts-export'] = (el) => { const spec = AL.tsExportSpec(); if (!spec.rows.length) return AL.toast('Nothing to export', 'There are no records in this view.', 'bad'); return AL.exportRun(el, spec, 'timesheets'); };
 AL.tsFind = (src, id) => ((AL.cache[src] && AL.cache[src].data) || []).find((t) => t.id === id);
 AL.actions['ts-lines'] = (el) => {
   const t = AL.tsFind(el.dataset.src, el.dataset.id); if (!t) return;

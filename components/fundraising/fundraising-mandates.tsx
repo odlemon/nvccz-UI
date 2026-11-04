@@ -384,7 +384,7 @@ export function FundraisingMandates() {
   const [createOpen, setCreateOpen] = useState(false)
   const [rfpOpen, setRfpOpen] = useState(false)
   const [rfpSubmitting, setRfpSubmitting] = useState(false)
-  const [rfpForm, setRfpForm] = useState({ institutionName: "", deadline: "" })
+  const [rfpForm, setRfpForm] = useState({ institutionName: "", deadline: "", investorId: "" })
   const [requirements, setRequirements] = useState(emptyRequirementsState)
 
   const [loading, setLoading] = useState(true)
@@ -505,7 +505,9 @@ export function FundraisingMandates() {
     if (!rfpForm.institutionName.trim()) return
     setRfpSubmitting(true)
     try {
+      if (!rfpForm.investorId) return
       await fundraisingApi.createRfp({
+        investorId: rfpForm.investorId,
         institutionName: rfpForm.institutionName.trim(),
         deadline: rfpForm.deadline || undefined,
         status: "DRAFT",
@@ -513,7 +515,7 @@ export function FundraisingMandates() {
       })
       toast.success("RFP created")
       setRfpOpen(false)
-      setRfpForm({ institutionName: "", deadline: "" })
+      setRfpForm({ institutionName: "", deadline: "", investorId: "" })
       await loadData()
     } catch (err) {
       toastFrError(err, "Could not create RFP")
@@ -824,7 +826,7 @@ export function FundraisingMandates() {
         onOpenChange={(open) => {
           if (rfpSubmitting) return
           setRfpOpen(open)
-          if (!open) setRfpForm({ institutionName: "", deadline: "" })
+          if (!open) setRfpForm({ institutionName: "", deadline: "", investorId: "" })
         }}
         title="Add RFP"
         description="Capture the institution and submission deadline."
@@ -838,7 +840,7 @@ export function FundraisingMandates() {
               type="button"
               variant="gradient-info"
               className="h-9 rounded-full px-5 text-xs font-semibold shadow-sm"
-              disabled={!rfpForm.institutionName.trim() || rfpSubmitting}
+              disabled={!rfpForm.institutionName.trim() || !rfpForm.investorId || rfpSubmitting}
               onClick={handleCreateRfp}
             >
               {rfpSubmitting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
@@ -848,6 +850,20 @@ export function FundraisingMandates() {
         }
       >
         <div className="space-y-3">
+          <FrField label="Investor / client">
+            <select
+              className={frInputClass}
+              value={rfpForm.investorId}
+              onChange={(event) => setRfpForm((form) => ({ ...form, investorId: event.target.value }))}
+            >
+              <option value="">Select investor</option>
+              {rawInvestors.map((investor) => (
+                <option key={investor.id} value={investor.id}>
+                  {investor.legalName ?? investor.name ?? investor.id}
+                </option>
+              ))}
+            </select>
+          </FrField>
           <FrField label="Institution name">
             <input
               className={frInputClass}

@@ -336,6 +336,38 @@ export function FpaBudgetCycles() {
     }
   }
 
+  const rebindSelectedCycleToLatestPublishedVersion = async () => {
+    if (!selected || !selectedModelId) return
+    // Refresh versions before rebinding. The model-builder can publish a new
+    // version while this page remains mounted, so the Redux snapshot may be
+    // stale and can point the cycle at an older working copy.
+    const versionsRes = await fpaApi.listModelVersions(selectedModelId)
+    const availableVersions = versionsRes.success && Array.isArray(versionsRes.data)
+      ? versionsRes.data
+      : versions
+    const latestPublished = availableVersions
+      .filter((v) => v.modelId === selectedModelId && ["LOCKED", "PUBLISHED"].includes(String(v.status).toUpperCase()))
+      .sort((a, b) => {
+        const aTime = new Date(a.publishedAt || a.lockedAt || a.updatedAt || 0).getTime()
+        const bTime = new Date(b.publishedAt || b.lockedAt || b.updatedAt || 0).getTime()
+        return bTime - aTime
+      })[0]
+    if (!latestPublished || latestPublished.id === selected.versionId) {
+      toast.message("This cycle already uses the latest published version")
+      return
+    }
+    await runAction(
+      "Cycle updated to the latest published version",
+      async () => {
+        const res = await fpaApi.updateBudgetCycle(selected.id, { versionId: latestPublished.id })
+        if (!res.success || !res.data) throw new Error(res.message || "Could not update cycle version")
+        return res.data
+      },
+      `/v1/fpa/budget-cycles/${selected.id}`,
+      "rebind-version",
+    )
+  }
+
   return (
     <div className="min-h-full bg-[#f8fafc]">
       <FpaPageHeader
@@ -502,6 +534,7 @@ export function FpaBudgetCycles() {
             modelId={selectedModelId || selected?.modelId || ""}
             onAction={runAction}
             onRefresh={refresh}
+            onRebindLatestVersion={rebindSelectedCycleToLatestPublishedVersion}
           />
         </div>
       </div>
@@ -585,6 +618,7 @@ function CycleDetailPanel({
   modelId,
   onAction,
   onRefresh,
+  onRebindLatestVersion,
 }: {
   cycle: FpaBudgetCycle | null
   busyKey: string | null
@@ -613,6 +647,7 @@ function CycleDetailPanel({
     actionKey?: string,
   ) => Promise<void>
   onRefresh: () => Promise<void>
+  onRebindLatestVersion: () => Promise<void>
 }) {
   const [workspace, setWorkspace] = useState<FpaOwnerWorkspace | null>(null)
   const [workspaceLoading, setWorkspaceLoading] = useState(false)
@@ -1146,6 +1181,18 @@ function CycleDetailPanel({
             />
           </>
         )}
+
+        {(canAssignTasks || isAdmin) && ["DRAFT", "OPEN_FOR_INPUT", "RETURNED_FOR_CORRECTION"].includes(st) ? (
+          <button
+            type="button"
+            onClick={() => void onRebindLatestVersion()}
+            disabled={busyKey === "rebind-version"}
+            className={secondaryClass}
+            title="Use the newest published model version for this local cycle"
+          >
+            {busyKey === "rebind-version" ? "Updating version…" : "Use latest published version"}
+          </button>
+        ) : null}
 
         {/* Navigation CTAs — workspace for assignees; workspace + approvals for CFO/admin */}
         {showWorkspaceBtn && (

@@ -37,6 +37,8 @@ const __pr6Live = {
   onboarding: null, // onboarding candidates
   rfqs: null, // sourcing events and vendor bids
   accessRoster: null, // payroll access register: users, role matrix, segregation rule (4a19)
+  reports: null, // persisted report catalogue, saved report snapshots and metrics
+  audit: null, // paginated Payroll audit trail and database-derived aggregate counts
   errors: [],
 };
 
@@ -70,6 +72,7 @@ const __PR6_PERMISSION_MAP = {
   'salary.view': ['payroll.components.view', 'payroll.components.manage'],
   'salary.edit': ['payroll.components.manage'],
   'payroll.prepare': ['payroll.runs.manage'],
+  'runs.view': ['payroll.runs.view'],
   'payroll.approve': ['payroll.runs.approve'],
   'payroll.release': ['payroll.runs.release'],
   'exceptions.resolve': ['payroll.exceptions.manage'],
@@ -1054,6 +1057,13 @@ function __pr6Vendors() {
 
 function __pr6AuditStats() {
   if (!__pr6IsLive()) return null;
+  const stats = __pr6Live.audit && __pr6Live.audit.stats;
+  if (stats) return {
+    total: Number(stats.total) || 0,
+    approvals: Number(stats.approvals) || 0,
+    changes: Number(stats.changes) || 0,
+    actors: Number(stats.actors) || 0,
+  };
   const rows = Array.isArray(auditEvents) ? auditEvents : [];
   const cls = (r) => String((r && r[5]) || '');
   return {
@@ -1208,102 +1218,213 @@ function __pr6PermissionLabel(p) {
 
 // ------------------------------------------------------------------ access
 
+function __pr6AccessExportIcons() {
+  return '<span class="audit-export-icons" role="group" aria-label="Export Payroll access">' +
+    '<button class="icon-btn" type="button" data-pr6-access-export="pdf" title="Export PDF" aria-label="Export Payroll access as PDF">' + icon('file') + '</button>' +
+    '<button class="icon-btn" type="button" data-pr6-access-export="excel" title="Export Excel" aria-label="Export Payroll access as Excel">' + icon('report') + '</button>' +
+    '<button class="icon-btn" type="button" data-pr6-access-export="csv" title="Export CSV" aria-label="Export Payroll access as CSV">' + icon('download') + '</button></span>';
+}
+
 function __pr6AccessPageHtml() {
   const eyebrow = 'Identity, authority and segregation';
   const title = 'Roles and Access Control';
-  const desc = 'Who holds payroll authority, computed from the grants the payroll routes enforce.';
+  const desc = 'Review payroll access, manage payroll-only role policies, and keep maker and checker duties separate.';
   if (!__pr6IsLive()) return __pr6PendingPanel(eyebrow, title, desc, 'Loading the payroll access register…');
-
   const r = __pr6Live.accessRoster;
-  if (!r || !Array.isArray(r.users)) {
-    return __pr6LoadFailed('access/roster')
-      ? __pr6PendingPanel(eyebrow, title, desc, 'The payroll access register could not be loaded.', true)
-      : __pr6PendingPanel(eyebrow, title, desc, 'Your role cannot view the payroll access register.');
-  }
+  if (!r || !Array.isArray(r.users)) return __pr6LoadFailed('access/roster')
+    ? __pr6PendingPanel(eyebrow, title, desc, 'The payroll access register could not be loaded.', true)
+    : __pr6PendingPanel(eyebrow, title, desc, 'Your role cannot view the payroll access register.');
 
   const esc = __pr6Esc;
-  const s = r.summary || {};
-  const users = r.users;
-  const perms = Array.isArray(r.permissions) ? r.permissions : [];
-  const roles = Array.isArray(r.roles) ? r.roles : [];
+  const summary = r.summary || {};
+  const users = Array.isArray(r.users) ? r.users : [];
+  const permissions = Array.isArray(r.permissions) ? r.permissions : [];
+  const globalRoles = Array.isArray(r.roles) ? r.roles : [];
+  const payrollRoles = Array.isArray(r.payrollRoles) ? r.payrollRoles : [];
+  const canManage = __pr6Has('payroll.access.manage');
+  const tab = state.payrollAccessTab || 'users';
+  const search = String(state.payrollAccessSearch || '').trim().toLowerCase();
+  const filteredUsers = users.filter((u) => !search || [u.name, u.email, u.department, u.roleName, u.payrollRoleName, u.status].join(' ').toLowerCase().includes(search));
+  const pageSize = Number(state.payrollAccessPageSize) || 10;
+  const userPages = Math.max(1, Math.ceil(filteredUsers.length / pageSize));
+  const userPage = Math.min(userPages, Math.max(1, Number(state.payrollAccessPage) || 1));
+  const visibleUsers = filteredUsers.slice((userPage - 1) * pageSize, userPage * pageSize);
+  const rolePageSize = Number(state.payrollAccessRolePageSize) || 10;
+  const rolePages = Math.max(1, Math.ceil(payrollRoles.length / rolePageSize));
+  const rolePage = Math.min(rolePages, Math.max(1, Number(state.payrollAccessRolePage) || 1));
+  const visibleRoles = payrollRoles.slice((rolePage - 1) * rolePageSize, rolePage * rolePageSize);
   const dash = '—';
+  const topActions = (canManage ? '<button class="btn primary" type="button" data-pr6-access-action="new-role">' + icon('plus') + 'New Payroll role</button>' : '') + __pr6AccessExportIcons();
+  const header = pageHead(eyebrow, title, desc, topActions);
+  const kpis = '<div class="grid kpis">' +
+    kpi('Users with Payroll access', String(summary.usersWithPayrollAccess ?? users.length), 'Effective permissions from API roles', 'users') +
+    kpi('Payroll-only roles', String(summary.configuredPayrollRoles || 0), 'Versioned and scoped to this module', 'key', 'violet') +
+    kpi('Assigned Payroll roles', String(summary.payrollRoleAssignments || 0), 'Overrides limited to Payroll', 'shield', 'cyan') +
+    kpi('MFA coverage', summary.mfaCoveragePct == null ? dash : summary.mfaCoveragePct + '%', (summary.mfaEnrolled || 0) + ' of ' + users.length + ' enrolled', 'lock', 'cyan') +
+    kpi('Maker-checker exemptions', String(summary.selfApprovalConflicts || 0), 'Users allowed to approve their own submissions', 'alert', summary.selfApprovalConflicts ? 'amber' : '') + '</div>';
 
-  const kpis =
-    kpi('Users with payroll access', String(s.usersWithPayrollAccess != null ? s.usersWithPayrollAccess : users.length), 'Hold at least one payroll grant', 'users') +
-    kpi('Privileged users', String(s.privileged || 0), 'Change access, release pay, or approve own run', 'key', 'violet') +
-    kpi('MFA coverage', s.mfaCoveragePct == null ? dash : s.mfaCoveragePct + '%', (s.mfaEnrolled || 0) + ' of ' + users.length + ' enrolled', 'shield', 'cyan') +
-    kpi('Self-approval exempt', String(s.selfApprovalConflicts || 0), 'Can approve a run they submitted', 'alert', s.selfApprovalConflicts ? 'amber' : '') +
-    kpi('Terminated with access', String(s.terminatedWithAccess || 0), 'Employee terminated, grants still held', 'lock', s.terminatedWithAccess ? 'red' : 'cyan');
+  const tabs = '<div class="payroll-access-tabs" role="tablist">' +
+    ['users', 'roles', 'segregation'].map((key) => '<button type="button" role="tab" aria-selected="' + (tab === key) + '" class="payroll-access-tab ' + (tab === key ? 'active' : '') + '" data-pr6-access-tab="' + key + '">' + ({ users: 'User access', roles: 'Payroll roles', segregation: 'Segregation of duties' }[key]) + '</button>').join('') + '</div>';
 
-  const duties = (u) => [u.canPrepare ? 'Maker' : '', u.canApprove ? 'Checker' : '', u.canRelease ? 'Release' : ''].filter(Boolean);
+  const userRows = visibleUsers.map((u) => {
+    const duties = [u.canPrepare ? 'Maker' : '', u.canApprove ? 'Checker' : '', u.canRelease ? 'Release' : ''].filter(Boolean).join(' · ') || 'View only';
+    const controls = canManage
+      ? '<button type="button" class="btn small" data-pr6-access-action="assign-user" data-user-id="' + esc(u.id) + '">' + (u.payrollRoleId ? 'Change Payroll role' : 'Assign Payroll role') + '</button>' + (u.payrollRoleId ? '<button type="button" class="btn small danger" data-pr6-access-action="remove-user" data-user-id="' + esc(u.id) + '">Remove</button>' : '')
+      : '<span class="muted">Read only</span>';
+    return '<tr><td><div class="access-user"><div class="mini-avatar">' + esc(u.initials) + '</div><div><strong>' + esc(u.name) + '</strong><div class="tiny muted">' + esc(u.email) + (u.department ? ' · ' + esc(u.department) : '') + '</div></div></div></td>' +
+      '<td><strong>' + esc(u.roleName || dash) + '</strong><div class="tiny muted">Platform role</div></td>' +
+      '<td><strong>' + esc(u.payrollRoleName || 'Platform grants') + '</strong><div class="tiny muted">' + esc(u.payrollRoleStatus || 'Inherited') + '</div></td>' +
+      '<td>' + esc(duties) + (u.selfApproval ? '<div class="tiny delta warn">Approval exception</div>' : '') + '</td>' +
+      '<td>' + badge(u.mfaEnrolled ? 'Enrolled' : 'Not enrolled') + '</td><td>' + badge(u.status) + '</td><td class="access-row-actions">' + controls + '</td></tr>';
+  }).join('') || '<tr><td colspan="7"><div class="empty-state"><strong>No matching users</strong><p>Change the search or clear the filter.</p></div></td></tr>';
+  const userTable = '<section class="card access-card"><div class="card-head"><div><h3>User access register</h3><p>Payroll permissions resolved by the Payroll API. Payroll-only assignments do not alter platform roles.</p></div></div>' +
+    '<form class="payroll-access-filter" data-pr6-access-search><label class="sr-only" for="payrollAccessSearch">Search users</label><input id="payrollAccessSearch" type="search" value="' + esc(state.payrollAccessSearch || '') + '" placeholder="Search by name, email, department or role"><button class="btn" type="submit">Search</button><button class="btn" type="button" data-pr6-access-action="clear-search">Clear</button><span class="muted">' + filteredUsers.length + ' matching users</span></form>' +
+    '<div class="table-wrap access-user-table"><table><thead><tr><th>User</th><th>Platform role</th><th>Payroll role</th><th>Duties</th><th>MFA</th><th>Status</th><th>Actions</th></tr></thead><tbody>' + userRows + '</tbody></table></div>' +
+    '<div class="payroll-access-pagination"><span>Showing ' + (filteredUsers.length ? (userPage - 1) * pageSize + 1 : 0) + '–' + Math.min(userPage * pageSize, filteredUsers.length) + ' of ' + filteredUsers.length + '</span><label>Rows <select id="payrollAccessPageSize">' + [10, 20, 50].map((n) => '<option ' + (pageSize === n ? 'selected' : '') + '>' + n + '</option>').join('') + '</select></label><button class="btn small" data-pr6-access-page="users" data-direction="previous" ' + (userPage <= 1 ? 'disabled' : '') + '>Previous</button><span>Page ' + userPage + ' of ' + userPages + '</span><button class="btn small" data-pr6-access-page="users" data-direction="next" ' + (userPage >= userPages ? 'disabled' : '') + '>Next</button></div></section>';
 
-  // Five compact columns. The runtime styles .access-user-table table with min-width:920px,
-  // which inside the two-column access grid pushed Status and Grants out of view and cut the
-  // duty chips mid-word at 1440px. The inline min-width on the table lets it fit its card;
-  // below the runtime's breakpoint the cards take over exactly as before.
-  const userRows = users.map((u) => {
-    const dutyText = duties(u).join(' · ') || '<span class="muted">View only</span>';
-    return '<tr>' +
-      '<td><div class="access-user"><div class="mini-avatar">' + esc(u.initials) + '</div><div><strong>' + esc(u.name) + '</strong><div class="tiny muted">' + esc(u.email) + (u.department ? ' · ' + esc(u.department) : '') + '</div></div></div></td>' +
-      '<td><div>' + esc(u.roleName || dash) + '</div><div class="tiny muted">' + u.permissions.length + ' of ' + perms.length + ' grants</div></td>' +
-      '<td><div>' + dutyText + '</div>' + (u.selfApproval ? '<div class="tiny delta warn">Self-approval exempt</div>' : '') + '</td>' +
-      '<td style="white-space:nowrap">' + badge(u.mfaEnrolled ? 'Enrolled' : 'Not enrolled') + '</td>' +
-      '<td style="white-space:nowrap">' + badge(u.status) + '</td>' +
-      '</tr>';
-  });
+  const roleRows = visibleRoles.map((role) => {
+    const grants = Object.values(role.permissions || {}).filter(Boolean).length;
+    const actionButtons = canManage
+      ? '<div class="access-row-actions"><button class="btn small" type="button" data-pr6-access-action="edit-role" data-role-id="' + esc(role.id) + '">Edit draft</button>' +
+        (role.draftVersion ? '<button class="btn small primary" type="button" data-pr6-access-action="activate-role" data-role-id="' + esc(role.id) + '">Activate draft</button>' : '') +
+        (role.activeVersion ? '<button class="btn small" type="button" data-pr6-access-action="toggle-role" data-role-id="' + esc(role.id) + '" data-enabled="' + (role.status !== 'disabled') + '">' + (role.status === 'disabled' ? 'Enable' : 'Disable') + '</button>' : '') +
+        '<button class="btn small" type="button" data-pr6-access-action="assign-role" data-role-id="' + esc(role.id) + '">Assign</button></div>'
+      : '<span class="muted">Read only</span>';
+    return '<tr><td><strong>' + esc(role.name) + '</strong><div class="tiny muted">' + esc(role.description || 'Payroll-only role policy') + '</div></td><td>' + badge(role.stateLabel || 'Draft') + '</td><td>' + grants + ' of ' + permissions.length + '</td><td>' + role.userCount + '</td><td>' + (role.activeVersion?.version || '—') + (role.draftVersion ? ' · Draft ' + role.draftVersion.version : '') + '</td><td>' + actionButtons + '</td></tr>';
+  }).join('') || '<tr><td colspan="6"><div class="empty-state"><strong>No Payroll roles configured</strong><p>Create a Payroll-only policy to assign distinct access without changing users’ other module roles.</p></div></td></tr>';
+  const customRoles = '<section class="card access-card"><div class="card-head"><div><h3>Payroll role policies</h3><p>Draft changes are versioned; activate them deliberately. Maker and checker permissions cannot be combined.</p></div>' + (canManage ? '<button class="btn primary" type="button" data-pr6-access-action="new-role">' + icon('plus') + 'Create role</button>' : '') + '</div><div class="table-wrap"><table><thead><tr><th>Role</th><th>Status</th><th>Permissions</th><th>Members</th><th>Version</th><th>Actions</th></tr></thead><tbody>' + roleRows + '</tbody></table></div>' +
+    '<div class="payroll-access-pagination"><span>Showing ' + (payrollRoles.length ? (rolePage - 1) * rolePageSize + 1 : 0) + '–' + Math.min(rolePage * rolePageSize, payrollRoles.length) + ' of ' + payrollRoles.length + '</span><label>Rows <select id="payrollAccessRolePageSize">' + [10, 20, 50].map((n) => '<option ' + (rolePageSize === n ? 'selected' : '') + '>' + n + '</option>').join('') + '</select></label><button class="btn small" data-pr6-access-page="roles" data-direction="previous" ' + (rolePage <= 1 ? 'disabled' : '') + '>Previous</button><span>Page ' + rolePage + ' of ' + rolePages + '</span><button class="btn small" data-pr6-access-page="roles" data-direction="next" ' + (rolePage >= rolePages ? 'disabled' : '') + '>Next</button></div></section>';
 
-  const userCards = users.map((u) =>
-    '<article class="access-user-card"><div class="access-user-card-head"><div class="access-user"><div class="mini-avatar">' + esc(u.initials) + '</div><div><strong>' + esc(u.name) + '</strong><div class="tiny muted">' + esc(u.roleName || dash) + '</div></div></div>' + badge(u.status) + '</div>' +
-    '<div class="access-user-card-meta">' +
-    '<div class="fact"><span>Department</span><strong>' + esc(u.department || dash) + '</strong></div>' +
-    '<div class="fact"><span>MFA</span><strong>' + (u.mfaEnrolled ? 'Enrolled' : 'Not enrolled') + '</strong></div>' +
-    '<div class="fact"><span>Duties</span><strong>' + (duties(u).join(', ') || 'View only') + (u.selfApproval ? ' · self-approval exempt' : '') + '</strong></div>' +
-    '<div class="fact"><span>Grants</span><strong>' + u.permissions.length + ' of ' + perms.length + '</strong></div>' +
-    '</div></article>'
-  ).join('');
-
-  const usersCard = users.length
-    ? '<section class="card access-card"><div class="card-head"><div><h3>User access register</h3><p>Everyone holding at least one payroll grant</p></div></div>' +
-      '<div class="table-wrap access-user-table"><table style="min-width:0;width:100%"><thead><tr><th>User</th><th>Role</th><th>Duties</th><th>MFA</th><th>Status</th></tr></thead><tbody>' + userRows.join('') + '</tbody></table></div>' +
-      '<div class="access-user-cards">' + userCards + '</div></section>'
-    : card('User access register', 'Everyone holding at least one payroll grant', '<div class="card-body" style="text-align:center;padding:36px 24px"><strong>No user holds a payroll grant.</strong></div>');
+  const globalMatrixRows = permissions.map((permission) => '<tr><td><strong>' + esc(__pr6PermissionLabel(permission)) + '</strong><div class="tiny muted">' + esc(permission) + '</div></td>' + globalRoles.map((role) => '<td>' + (role.permissions.includes(permission) ? '✓' : '—') + '</td>').join('') + '</tr>').join('');
+  const globalMatrix = globalRoles.length ? '<section class="card role-matrix-card"><div class="card-head"><div><h3>Platform role grants currently used by Payroll</h3><p>Inherited role grants remain view only here and are not modified by Payroll role policies.</p></div></div><div class="role-matrix-scroll"><table><thead><tr><th>Payroll permission</th>' + globalRoles.map((role) => '<th>' + esc(role.name) + '<div class="tiny muted">' + role.userCount + ' users</div></th>').join('') + '</tr></thead><tbody>' + globalMatrixRows + '</tbody></table></div></section>' : '';
 
   const seg = r.segregation || {};
-  const exemptUsers = Array.isArray(seg.exemptUsers) ? seg.exemptUsers : [];
-  const segCard =
-    '<section class="card access-card"><div class="card-head"><div><h3>Segregation of duties</h3><p>The rule the payroll backend enforces</p></div></div><div class="card-body sod-list">' +
-    '<div class="sod-rule"><span class="kpi-icon amber">' + icon('lock') + '</span><div><strong>' + esc(seg.rule || dash) + '</strong><div class="tiny muted">' + esc(seg.exception || '') + '</div></div>' + badge('Enforced') + '</div>' +
-    (exemptUsers.length
-      ? '<div class="callout amber" style="margin-top:12px"><span class="kpi-icon amber">' + icon('alert') + '</span><div><strong>' + exemptUsers.length + (exemptUsers.length === 1 ? ' user is' : ' users are') + ' exempt from this rule</strong><ul style="margin:6px 0 0;padding-left:18px">' +
-        exemptUsers.map((x) => '<li><strong>' + esc(x.name) + '</strong> <span class="muted">' + esc(x.roleName || '') + '</span></li>').join('') +
-        '</ul></div></div>'
-      : '<p class="tiny muted" style="margin:12px 0 0">No user with payroll access is exempt.</p>') +
-    '<p class="tiny muted" style="margin:12px 0 0">No other segregation rule is enforced by the payroll backend. Bank-detail changes, statutory rule changes and report filing have no maker-checker control.</p>' +
-    '</div></section>';
+  const segUsers = Array.isArray(seg.exemptUsers) ? seg.exemptUsers : [];
+  const segregation = '<section class="grid access-primary-grid"><div class="card access-card"><div class="card-head"><div><h3>Payroll maker-checker control</h3><p>Enforced by the Payroll approval API.</p></div>' + badge('Enforced') + '</div><div class="card-body"><div class="sod-rule"><span class="kpi-icon amber">' + icon('lock') + '</span><div><strong>' + esc(seg.rule || 'Payroll run submitters cannot approve their own submissions.') + '</strong><p class="muted">' + esc(seg.exception || '') + '</p></div></div><p class="tiny muted">Custom Payroll roles cannot hold both prepare and approve permissions. Platform administrators retain their protected administrative access.</p></div></div>' +
+    '<div class="card access-card"><div class="card-head"><div><h3>Current policy exceptions</h3><p>Computed from effective API grants.</p></div></div><div class="card-body">' + (segUsers.length ? '<ul>' + segUsers.map((user) => '<li><strong>' + esc(user.name) + '</strong> · ' + esc(user.roleName || 'Platform role') + '</li>').join('') + '</ul>' : '<p>No payroll users are currently exempt from the enforced control.</p>') + '</div></div></section>';
 
-  const matrixRows = perms.map((p) =>
-    '<tr><td><strong>' + esc(__pr6PermissionLabel(p)) + '</strong><div class="tiny muted">' + esc(p) + '</div></td>' +
-    roles.map((role) => '<td style="text-align:center">' + (role.permissions.indexOf(p) >= 0 ? '&#10003;' : '<span class="muted">·</span>') + '</td>').join('') +
-    '</tr>'
-  ).join('');
-
-  const roleCards = roles.map((role) =>
-    '<article class="role-access-card"><header class="role-access-card-head"><div><h4>' + esc(role.name) + '</h4><p>' + role.permissions.length + ' of ' + perms.length + ' grants · ' + role.userCount + (role.userCount === 1 ? ' user' : ' users') + '</p></div></header>' +
-    '<div class="role-permission-list">' + role.permissions.map((p) => '<div class="role-permission-row"><div><strong>' + esc(__pr6PermissionLabel(p)) + '</strong><span>' + esc(p) + '</span></div></div>').join('') + '</div></article>'
-  ).join('');
-
-  const matrix = roles.length
-    ? '<section class="card role-matrix-card"><div class="card-head access-toolbar"><div><h3>Role permission matrix</h3><p>Stored grants per role. Read-only: grants are defined in payrollPermissions.ts and applied by the payroll permissions migration.</p></div></div>' +
-      '<div class="role-matrix-scroll"><table><thead><tr><th>Permission</th>' +
-      roles.map((role) => '<th>' + esc(role.name) + '<div class="tiny muted">' + role.userCount + (role.userCount === 1 ? ' user' : ' users') + '</div></th>').join('') +
-      '</tr></thead><tbody>' + matrixRows + '</tbody></table></div><div class="role-card-grid">' + roleCards + '</div></section>'
-    : '';
-
-  return '<div class="page access-dashboard">' + pageHead(eyebrow, title, desc) +
-    '<div class="grid kpis">' + kpis + '</div>' +
-    '<div class="access-primary-grid">' + usersCard + segCard + '</div>' +
-    matrix + '</div>';
+  const panel = tab === 'roles' ? customRoles + globalMatrix : tab === 'segregation' ? segregation : userTable;
+  return '<div class="page access-dashboard">' + header + kpis + tabs + panel + '</div>';
 }
+
+async function __pr6AccessRefresh() {
+  const refresh = window.__PAYROLL_V6_REFRESH_ACCESS__;
+  if (typeof refresh !== 'function') throw new Error('The Payroll access service is not ready.');
+  __pr6Live.accessRoster = await refresh();
+  render();
+}
+
+function __pr6OpenAccessRoleModal(role) {
+  const permissions = Array.isArray(__pr6Live.accessRoster?.permissions) ? __pr6Live.accessRoster.permissions : [];
+  const values = role?.permissions || {};
+  const checkboxes = permissions.map((permission) => '<label class="access-permission-option"><input type="checkbox" data-access-permission="' + __pr6Esc(permission) + '" ' + (values[permission] ? 'checked' : '') + '><span><strong>' + __pr6Esc(__pr6PermissionLabel(permission)) + '</strong><small>' + __pr6Esc(permission) + '</small></span></label>').join('');
+  const html = '<input type="hidden" id="accessRoleId" value="' + __pr6Esc(role?.id || '') + '"><input type="hidden" id="accessRoleRevision" value="' + Number(role?.revision || 1) + '"><div class="form-grid"><div class="form-field"><label for="accessRoleName">Role name</label><input id="accessRoleName" maxlength="100" value="' + __pr6Esc(role?.name || '') + '" ' + (role ? 'readonly' : 'required') + '></div><div class="form-field"><label for="accessRoleDescription">Description</label><input id="accessRoleDescription" maxlength="500" value="' + __pr6Esc(role?.description || '') + '" placeholder="Describe this Payroll access profile"></div></div><p class="muted">Choose only the access this role needs. A draft takes effect after activation.</p><div class="access-permissions-grid">' + checkboxes + '</div>';
+  openModal(role ? 'Edit Payroll role draft' : 'Create Payroll role', 'Payroll permissions apply only to Payroll and are recorded in the audit trail.', html, '<button class="btn" type="button" data-access-modal-close>Cancel</button><button class="btn primary" type="button" data-access-save-role>Save draft</button>', true);
+}
+
+async function __pr6AccessAssignModal(userId, roleId) {
+  const loader = window.__PAYROLL_V6_ACCESS_USERS__;
+  if (typeof loader !== 'function') { toast('Staff list unavailable', 'The Payroll staff lookup is not ready.', 'warn'); return; }
+  try {
+    const response = await loader({ limit: 100, page: 1, search: state.payrollAccessAssignSearch || '' });
+    const users = response?.items || [];
+    const userOptions = users.map((u) => '<option value="' + __pr6Esc(u.id) + '" ' + (String(u.id) === String(userId || '') ? 'selected' : '') + '>' + __pr6Esc(u.name) + ' · ' + __pr6Esc(u.email) + '</option>').join('');
+    const roles = (__pr6Live.accessRoster?.payrollRoles || []).filter((r) => r.status === 'enabled' && r.activeVersion);
+    const roleOptions = roles.map((r) => '<option value="' + __pr6Esc(r.id) + '" ' + (String(r.id) === String(roleId || '') ? 'selected' : '') + '>' + __pr6Esc(r.name) + '</option>').join('');
+    if (!roles.length) { toast('No active Payroll roles', 'Create and activate a Payroll role before assigning it.', 'warn'); return; }
+    const html = '<div class="form-grid"><div class="form-field"><label for="accessAssignSearch">Find internal staff</label><input id="accessAssignSearch" type="search" placeholder="Name, email or department" value="' + __pr6Esc(state.payrollAccessAssignSearch || '') + '"><label for="accessAssignUser">Internal staff account</label><select id="accessAssignUser">' + userOptions + '</select></div><div class="form-field"><label for="accessAssignRole">Active Payroll role</label><select id="accessAssignRole">' + roleOptions + '</select></div></div><p class="muted">This assignment changes Payroll permissions only. The user’s platform role remains unchanged.</p>';
+    openModal('Assign Payroll role', 'Select an internal user and an active Payroll role.', html, '<button class="btn" type="button" data-access-modal-close>Cancel</button><button class="btn primary" type="button" data-access-assign-save>Save assignment</button>');
+  } catch (error) { toast('Could not load staff', error?.message || String(error), 'warn'); }
+}
+
+async function __pr6ExportAccess(kind) {
+  const exporter = window.__PAYROLL_V6_EXPORT_ACCESS__;
+  if (typeof exporter !== 'function') { toast('Export unavailable', 'The Payroll export service is not ready.', 'warn'); return; }
+  const roster = __pr6Live.accessRoster || {};
+  const tab = state.payrollAccessTab || 'users';
+  let columns, rows, title, filename;
+  if (tab === 'roles') {
+    columns = ['Role', 'Status', 'Permission count', 'Assigned users', 'Active version'];
+    rows = (roster.payrollRoles || []).map((r) => [r.name, r.stateLabel, Object.values(r.permissions || {}).filter(Boolean).length, r.userCount, r.activeVersion?.version || '']);
+    title = 'Payroll Role Policies'; filename = 'payroll-role-policies';
+  } else if (tab === 'segregation') {
+    columns = ['Control', 'Status', 'Exception']; rows = [[roster.segregation?.rule || 'Payroll maker-checker control', 'Enforced', roster.segregation?.exception || '']];
+    title = 'Payroll Segregation of Duties'; filename = 'payroll-segregation-of-duties';
+  } else {
+    columns = ['Name', 'Email', 'Department', 'Platform role', 'Payroll role', 'Duties', 'MFA', 'Status'];
+    const search = String(state.payrollAccessSearch || '').trim().toLowerCase();
+    rows = (roster.users || []).filter((u) => !search || [u.name, u.email, u.department, u.roleName, u.payrollRoleName, u.status].join(' ').toLowerCase().includes(search)).map((u) => [u.name, u.email, u.department || '', u.roleName || '', u.payrollRoleName || 'Platform grants', [u.canPrepare ? 'Maker' : '', u.canApprove ? 'Checker' : '', u.canRelease ? 'Release' : ''].filter(Boolean).join(', ') || 'View only', u.mfaEnrolled ? 'Enrolled' : 'Not enrolled', u.status]);
+    title = 'Payroll User Access Register'; filename = 'payroll-user-access-register';
+  }
+  try { await exporter(kind, { title, subtitle: 'Payroll access and policy data from the Payroll API.', columns, rows, filename, landscape: true, note: 'Confidential Payroll access data. User database identifiers are omitted. Local and development exports use Matanho branding; production exports use NVCCZ branding.' }); }
+  catch (error) { toast('Payroll access export failed', error?.message || String(error), 'warn'); }
+}
+
+document.addEventListener('submit', (event) => {
+  if (!event.target?.matches?.('[data-pr6-access-search]')) return;
+  event.preventDefault(); state.payrollAccessSearch = document.querySelector('#payrollAccessSearch')?.value?.trim() || ''; state.payrollAccessPage = 1; render();
+}, true);
+
+document.addEventListener('change', (event) => {
+  if (event.target?.id === 'payrollAccessPageSize') { state.payrollAccessPageSize = Number(event.target.value) || 10; state.payrollAccessPage = 1; render(); }
+  if (event.target?.id === 'payrollAccessRolePageSize') { state.payrollAccessRolePageSize = Number(event.target.value) || 10; state.payrollAccessRolePage = 1; render(); }
+}, true);
+
+let __pr6AccessAssignSearchTimer = null;
+document.addEventListener('input', (event) => {
+  if (event.target?.id !== 'accessAssignSearch') return;
+  state.payrollAccessAssignSearch = event.target.value;
+  window.clearTimeout(__pr6AccessAssignSearchTimer);
+  __pr6AccessAssignSearchTimer = window.setTimeout(async () => {
+    try {
+      const response = await window.__PAYROLL_V6_ACCESS_USERS__({ limit: 100, page: 1, search: state.payrollAccessAssignSearch });
+      const select = document.querySelector('#accessAssignUser');
+      if (!select) return;
+      const selected = select.value;
+      select.innerHTML = (response?.items || []).map((u) => '<option value="' + __pr6Esc(u.id) + '" ' + (String(u.id) === String(selected) ? 'selected' : '') + '>' + __pr6Esc(u.name) + ' · ' + __pr6Esc(u.email) + '</option>').join('');
+    } catch (error) { toast('Could not search staff', error?.message || String(error), 'warn'); }
+  }, 250);
+}, true);
+
+document.addEventListener('click', async (event) => {
+  const target = event.target?.closest?.('button'); if (!target) return;
+  const tab = target.closest('[data-pr6-access-tab]');
+  if (tab) { event.preventDefault(); state.payrollAccessTab = tab.dataset.pr6AccessTab; render(); return; }
+  const page = target.closest('[data-pr6-access-page]');
+  if (page) { event.preventDefault(); const key = page.dataset.pr6AccessPage === 'roles' ? 'payrollAccessRolePage' : 'payrollAccessPage'; state[key] = Math.max(1, Number(state[key] || 1) + (page.dataset.direction === 'next' ? 1 : -1)); render(); return; }
+  const exporter = target.closest('[data-pr6-access-export]'); if (exporter) { event.preventDefault(); __pr6ExportAccess(exporter.dataset.pr6AccessExport); return; }
+  const actionButton = target.closest('[data-pr6-access-action]');
+  if (actionButton) {
+    event.preventDefault(); const action = actionButton.dataset.pr6AccessAction; const roster = __pr6Live.accessRoster || {};
+    try {
+      if (action === 'clear-search') { state.payrollAccessSearch = ''; state.payrollAccessPage = 1; render(); }
+      else if (action === 'new-role') __pr6OpenAccessRoleModal(null);
+      else if (action === 'edit-role') __pr6OpenAccessRoleModal((roster.payrollRoles || []).find((r) => r.id === actionButton.dataset.roleId));
+      else if (action === 'assign-user') await __pr6AccessAssignModal(actionButton.dataset.userId, roster.users?.find((u) => u.id === actionButton.dataset.userId)?.payrollRoleId);
+      else if (action === 'assign-role') await __pr6AccessAssignModal('', actionButton.dataset.roleId);
+      else if (action === 'activate-role') { const role = roster.payrollRoles?.find((r) => r.id === actionButton.dataset.roleId); if (role && confirm('Activate this Payroll role draft? This changes access for assigned users.')) { await window.__PAYROLL_V6_ACTIVATE_ACCESS_ROLE__(role.id, role.revision); await __pr6AccessRefresh(); toast('Payroll role activated', role.name + ' is now active.'); } }
+      else if (action === 'toggle-role') { const role = roster.payrollRoles?.find((r) => r.id === actionButton.dataset.roleId); if (role) { const enable = role.status === 'disabled'; if (!enable && !confirm('Disable this Payroll role? Assigned users will lose its Payroll permissions.')) return; await window.__PAYROLL_V6_SET_ACCESS_ROLE_STATUS__(role.id, enable, role.revision); await __pr6AccessRefresh(); } }
+      else if (action === 'remove-user') { if (confirm('Remove this Payroll role assignment? The user will return to the permissions from their platform role.')) { await window.__PAYROLL_V6_REMOVE_ACCESS_ROLE__(actionButton.dataset.userId); await __pr6AccessRefresh(); } }
+    } catch (error) { toast('Payroll access change failed', error?.message || String(error), 'warn'); }
+    return;
+  }
+  if (target.closest('[data-access-modal-close]')) { event.preventDefault(); closeModal(); return; }
+  if (target.closest('[data-access-save-role]')) {
+    event.preventDefault(); const roleId = document.querySelector('#accessRoleId')?.value || ''; const permissions = {};
+    document.querySelectorAll('[data-access-permission]').forEach((input) => { permissions[input.dataset.accessPermission] = input.checked; });
+    try {
+      if (roleId) await window.__PAYROLL_V6_SAVE_ACCESS_ROLE__(roleId, permissions, Number(document.querySelector('#accessRoleRevision')?.value), document.querySelector('#accessRoleDescription')?.value?.trim());
+      else await window.__PAYROLL_V6_CREATE_ACCESS_ROLE__({ name: document.querySelector('#accessRoleName')?.value?.trim(), description: document.querySelector('#accessRoleDescription')?.value?.trim(), permissions });
+      closeModal(); await __pr6AccessRefresh(); toast('Draft saved', 'Activate the Payroll role draft when it is ready to take effect.');
+    } catch (error) { toast('Could not save Payroll role', error?.message || String(error), 'warn'); }
+    return;
+  }
+  if (target.closest('[data-access-assign-save]')) {
+    event.preventDefault(); const userId = document.querySelector('#accessAssignUser')?.value; const roleId = document.querySelector('#accessAssignRole')?.value;
+    try { await window.__PAYROLL_V6_ASSIGN_ACCESS_ROLE__(userId, roleId); closeModal(); await __pr6AccessRefresh(); toast('Payroll role assigned', 'The platform role was not changed.'); }
+    catch (error) { toast('Could not assign Payroll role', error?.message || String(error), 'warn'); }
+  }
+}, true);
 
 // ------------------------------------------------------------------- vault
 
@@ -1552,6 +1673,170 @@ function __pr6OpenPeriodModal(groupId, periodLabel) {
 
 /** Must match PERIOD_STATUSES in PayrollOperationsService. */
 const __PR6_PERIOD_STATUSES = ['PLANNED', 'OPEN', 'LOCKED', 'PAID'];
+
+function __pr6AuditEventClassLabel(value) {
+  const text = String(value || 'Change').trim().replace(/[_-]+/g, ' ').toLowerCase();
+  return text.replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function __pr6AuditExportIcons() {
+  return '<span class="audit-export-icons" role="group" aria-label="Export audit trail">' +
+    '<button class="icon-btn" type="button" data-v6-export-audit="pdf" title="Export PDF" aria-label="Export audit trail as PDF">' + icon('file') + '</button>' +
+    '<button class="icon-btn" type="button" data-v6-export-audit="excel" title="Export Excel" aria-label="Export audit trail as Excel">' + icon('report') + '</button>' +
+    '<button class="icon-btn" type="button" data-v6-export-audit="csv" title="Export CSV" aria-label="Export audit trail as CSV">' + icon('download') + '</button></span>';
+}
+
+function __pr6AuditPageHtml() {
+  const eyebrow = 'Payroll governance';
+  const title = 'Payroll Audit Trail';
+  const desc = 'Review Payroll changes, approvals, access and failed actions recorded by the Payroll API.';
+  if (!__pr6IsLive()) return __pr6PendingPanel(eyebrow, title, desc, 'Loading Payroll audit history…');
+
+  const payload = __pr6Live.audit;
+  const items = Array.isArray(payload?.items) ? payload.items : [];
+  const stats = payload?.stats || {};
+  const pagination = payload?.pagination || { page: state.auditPage || 1, limit: state.auditPageSize || 20, total: 0, totalPages: 0 };
+  const filters = state.auditFilters || (state.auditFilters = { search: '', eventClass: '', from: '', to: '', actor: '', action: '', entityType: '', entityId: '' });
+  const loading = state.auditLoading === true;
+  const summary = (label, value, caption, iconName, tone) => kpi(label, value == null ? '—' : Number(value).toLocaleString(), caption, iconName, tone);
+  const kpis = summary('Events recorded', stats.total, 'All Payroll audit events', 'audit') +
+    summary('Approvals', stats.approvals, 'Submitted, approved or rejected', 'shield', 'violet') +
+    summary('Changes', stats.changes, 'Payroll records and configuration', 'edit', 'cyan') +
+    summary('Distinct actors', stats.actors, 'Users recorded in the audit ledger', 'users');
+
+  const filterToolbar = '<section class="card audit-filter-card"><form class="audit-filter-toolbar" data-audit-filter-form>' +
+    '<label class="audit-search"><span>Search events</span><input id="auditSearch" value="' + __pr6Esc(filters.search) + '" placeholder="Actor, action, record, or detail"></label>' +
+    '<label><span>Class</span><select id="auditClass"><option value="">All classes</option>' +
+    ['Change', 'Approval', 'Access', 'Release', 'Security', 'Sensitive'].map((c) => '<option value="' + c + '"' + (filters.eventClass === c ? ' selected' : '') + '>' + c + '</option>').join('') +
+    '</select></label><label><span>From</span><input type="date" id="auditFrom" value="' + __pr6Esc(filters.from) + '"></label>' +
+    '<label><span>To</span><input type="date" id="auditTo" value="' + __pr6Esc(filters.to) + '"></label>' +
+    '<button class="btn small primary" type="submit">Apply</button><button class="btn small" type="button" data-audit-open-filters>Advanced filters</button>' +
+    '<button class="btn small" type="button" data-audit-clear>Clear</button></form></section>';
+
+  const rows = items.map((event, index) => {
+    const stamp = event.occurredAt ? new Date(event.occurredAt).toLocaleString('en-GB', { hour12: false }) : '—';
+    const eventClass = __pr6AuditEventClassLabel(event.eventClass);
+    const entityName = event.entityLabel || String(event.entityType || 'Payroll record').replace(/[_-]+/g, ' ');
+    const action = String(event.action || '—').replace(/_/g, ' ');
+    return '<tr><td class="audit-timestamp">' + __pr6Esc(stamp) + '</td><td><strong>' + __pr6Esc(event.actorName || 'System') + '</strong><div class="tiny muted">' + __pr6Esc(event.actorRole || '—') + '</div></td>' +
+      '<td class="audit-action-cell">' + __pr6Esc(action) + '</td><td>' + __pr6Esc(entityName) + '</td><td class="audit-detail-cell">' + __pr6Esc(event.detail || '—') + '</td>' +
+      '<td><span class="audit-class-badge audit-class-' + eventClass.toLowerCase().replace(/[^a-z]+/g, '-') + '">' + __pr6Esc(eventClass) + '</span></td>' +
+      '<td><button class="btn small" type="button" data-audit-detail="' + index + '">' + icon('eye') + 'Details</button></td></tr>';
+  });
+  const page = Math.max(1, Number(pagination.page) || 1);
+  const totalPages = Math.max(1, Number(pagination.totalPages) || 1);
+  const limit = Number(pagination.limit) || state.auditPageSize || 20;
+  const total = Number(pagination.total) || 0;
+  const first = total ? (page - 1) * limit + 1 : 0;
+  const last = Math.min(page * limit, total);
+  const tableBody = loading
+    ? Array.from({ length: 7 }, () => '<tr class="skeleton-row"><td colspan="7"><span class="skeleton-line"></span></td></tr>').join('')
+    : rows.join('') || '<tr><td colspan="7" class="empty-cell">No Payroll audit events match these filters.</td></tr>';
+  const table = '<section class="card audit-ledger-card"><div class="card-head"><div><h2>Immutable event ledger</h2><p>Events are recorded from Payroll API requests; personal request bodies are not retained.</p></div><div class="audit-ledger-actions"><button class="btn small" type="button" data-audit-refresh>Refresh</button></div></div>' +
+    '<div class="table-wrap"><table class="data-table audit-ledger-table"><thead><tr><th>TIME</th><th>ACTOR / ROLE</th><th>ACTION</th><th>RECORD</th><th>DETAIL</th><th>CLASS</th><th></th></tr></thead><tbody>' + tableBody + '</tbody></table></div>' +
+    '<div class="audit-pagination"><span>Showing ' + first + '–' + last + ' of ' + total + '</span><div><label>Rows <select id="auditPageSize"><option' + (limit === 10 ? ' selected' : '') + '>10</option><option' + (limit === 20 ? ' selected' : '') + '>20</option><option' + (limit === 50 ? ' selected' : '') + '>50</option><option' + (limit === 100 ? ' selected' : '') + '>100</option></select></label>' +
+    '<button class="btn small" type="button" data-audit-page="' + Math.max(1, page - 1) + '"' + (page <= 1 || loading ? ' disabled' : '') + '>Previous</button><span>Page ' + page + ' of ' + totalPages + '</span><button class="btn small" type="button" data-audit-page="' + Math.min(totalPages, page + 1) + '"' + (page >= totalPages || loading ? ' disabled' : '') + '>Next</button></div></div></section>';
+  return '<div class="page">' + pageHead(eyebrow, title, desc, __pr6AuditExportIcons()) +
+    '<div class="grid kpis audit-kpis">' + kpis + '</div>' + filterToolbar + table + '</div>';
+}
+
+// Function declarations are hoisted in the runtime scope; replacing this binding
+// keeps the existing route/menu wiring while removing the fixture-only audit page.
+auditPage = __pr6AuditPageHtml;
+
+async function __pr6LoadAudit(page) {
+  const loader = window.__PAYROLL_V6_LIST_AUDIT__;
+  if (typeof loader !== 'function') { toast('Audit service unavailable', 'The Payroll audit API is not ready.', 'warn'); return; }
+  state.auditPage = Math.max(1, Number(page) || 1);
+  state.auditLoading = true;
+  render();
+  try {
+    const filters = state.auditFilters || {};
+    __pr6Live.audit = await loader({ ...filters, page: state.auditPage, limit: state.auditPageSize || 20 });
+  } catch (error) {
+    toast('Could not load audit events', error?.message || String(error), 'warn');
+  } finally {
+    state.auditLoading = false;
+    render();
+  }
+}
+
+async function __pr6ExportAudit(kind) {
+  const loader = window.__PAYROLL_V6_LIST_AUDIT__;
+  const exporter = window.__PAYROLL_V6_EXPORT_AUDIT__;
+  if (typeof loader !== 'function' || typeof exporter !== 'function') { toast('Export unavailable', 'The Payroll audit export service is not ready.', 'warn'); return; }
+  try {
+    const filters = state.auditFilters || {};
+    const firstPage = await loader({ ...filters, page: 1, limit: 100 });
+    const all = [...(firstPage.items || [])];
+    for (let page = 2; page <= Math.min(firstPage.pagination?.totalPages || 1, 200); page++) {
+      const next = await loader({ ...filters, page, limit: 100 });
+      all.push(...(next.items || []));
+    }
+    const date = (v) => v ? new Date(v).toLocaleString('en-GB', { hour12: false }) : '';
+    const rows = all.map((event) => [date(event.occurredAt), event.actorName || 'System', event.actorRole || '', String(event.action || '').replace(/_/g, ' '), event.entityLabel || String(event.entityType || '').replace(/[_-]+/g, ' '), event.detail || '', __pr6AuditEventClassLabel(event.eventClass)]);
+    await exporter(kind, {
+      title: 'Payroll Audit Trail',
+      subtitle: 'Filtered Payroll API events, newest first.',
+      columns: ['Timestamp', 'Actor', 'Role', 'Action', 'Record', 'Detail', 'Class'],
+      rows,
+      filename: 'payroll-audit-trail',
+      landscape: true,
+      note: 'Confidential Payroll audit evidence. Internal database identifiers are omitted. Local and development exports use Matanho branding; production exports use NVCCZ branding.',
+    });
+  } catch (error) {
+    toast('Audit export failed', error?.message || String(error), 'warn');
+  }
+}
+
+document.addEventListener('submit', (event) => {
+  if (!event.target?.matches?.('[data-audit-filter-form]')) return;
+  event.preventDefault();
+  state.auditFilters = { ...(state.auditFilters || {}), search: document.querySelector('#auditSearch')?.value?.trim() || '', eventClass: document.querySelector('#auditClass')?.value || '', from: document.querySelector('#auditFrom')?.value || '', to: document.querySelector('#auditTo')?.value || '' };
+  __pr6LoadAudit(1);
+}, true);
+
+document.addEventListener('change', (event) => {
+  if (event.target?.id === 'auditPageSize') { state.auditPageSize = Number(event.target.value) || 20; __pr6LoadAudit(1); }
+}, true);
+
+document.addEventListener('click', (event) => {
+  const target = event.target?.closest?.('button,[data-page]');
+  if (!target) return;
+  const nav = target.closest('[data-page="audit"]');
+  if (nav) { event.preventDefault(); event.stopImmediatePropagation(); state.page = 'audit'; render(); __pr6LoadAudit(1); return; }
+  const pageButton = target.closest('[data-audit-page]');
+  if (pageButton) { event.preventDefault(); event.stopImmediatePropagation(); __pr6LoadAudit(pageButton.dataset.auditPage); return; }
+  if (target.closest('[data-audit-refresh]')) { event.preventDefault(); event.stopImmediatePropagation(); __pr6LoadAudit(state.auditPage || 1); return; }
+  const exportButton = target.closest('[data-v6-export-audit]');
+  if (exportButton) { event.preventDefault(); event.stopImmediatePropagation(); __pr6ExportAudit(exportButton.dataset.v6ExportAudit); return; }
+  if (target.closest('[data-audit-clear]')) { event.preventDefault(); event.stopImmediatePropagation(); state.auditFilters = { search: '', eventClass: '', from: '', to: '', actor: '', action: '', entityType: '', entityId: '' }; __pr6LoadAudit(1); return; }
+  if (target.closest('[data-audit-open-filters]')) {
+    event.preventDefault(); event.stopImmediatePropagation(); const f = state.auditFilters || {};
+    openModal('Advanced audit filters', 'Narrow Payroll events by actor, action, record type, or reference.',
+      '<div class="form-grid audit-advanced-form"><div class="form-field"><label for="auditActor">Actor or role</label><input id="auditActor" value="' + __pr6Esc(f.actor || '') + '" placeholder="Name or role"></div>' +
+      '<div class="form-field"><label for="auditAction">Action</label><input id="auditAction" value="' + __pr6Esc(f.action || '') + '" placeholder="Action phrase"></div>' +
+      '<div class="form-field"><label for="auditEntityType">Record type</label><input id="auditEntityType" value="' + __pr6Esc(f.entityType || '') + '" placeholder="e.g. payroll_run"></div>' +
+      '<div class="form-field"><label for="auditEntityId">Record reference</label><input id="auditEntityId" value="' + __pr6Esc(f.entityId || '') + '" placeholder="Known record reference"></div></div>',
+      '<button class="btn" data-audit-close>Cancel</button><button class="btn" data-audit-clear-advanced>Clear</button><button class="btn primary" data-audit-apply-advanced>Apply filters</button>'); return;
+  }
+  if (target.closest('[data-audit-close]')) { event.preventDefault(); event.stopImmediatePropagation(); closeModal(); return; }
+  if (target.closest('[data-audit-clear-advanced]')) { event.preventDefault(); event.stopImmediatePropagation(); state.auditFilters = { search: '', eventClass: '', from: '', to: '', actor: '', action: '', entityType: '', entityId: '' }; closeModal(); __pr6LoadAudit(1); return; }
+  if (target.closest('[data-audit-apply-advanced]')) { event.preventDefault(); event.stopImmediatePropagation(); state.auditFilters = { ...(state.auditFilters || {}), actor: document.querySelector('#auditActor')?.value?.trim() || '', action: document.querySelector('#auditAction')?.value?.trim() || '', entityType: document.querySelector('#auditEntityType')?.value?.trim() || '', entityId: document.querySelector('#auditEntityId')?.value?.trim() || '' }; closeModal(); __pr6LoadAudit(1); return; }
+  const detailButton = target.closest('[data-audit-detail]');
+  if (detailButton) {
+    event.preventDefault(); event.stopImmediatePropagation(); const item = __pr6Live.audit?.items?.[Number(detailButton.dataset.auditDetail)]; if (!item) return;
+    const fact = (label, value) => '<div class="fact"><span>' + __pr6Esc(label) + '</span><strong>' + __pr6Esc(value || '—') + '</strong></div>';
+    const html = '<div class="grid two audit-detail-facts">' + fact('Actor', item.actorName) + fact('Role', item.actorRole) + fact('Action', String(item.action || '').replace(/_/g, ' ')) + fact('Class', __pr6AuditEventClassLabel(item.eventClass)) + fact('Record', item.entityLabel || String(item.entityType || '').replace(/[_-]+/g, ' ')) + fact('Occurred', item.occurredAt ? new Date(item.occurredAt).toLocaleString('en-GB', { hour12: false }) : '') + '</div><section class="card audit-detail-copy"><div class="card-body"><strong>Event detail</strong><p>' + __pr6Esc(item.detail || 'No additional detail was retained.') + '</p></div></section>';
+    openModal('Audit event details', 'Evidence recorded by the Payroll API.', html, '<button class="btn primary" data-audit-close>Close</button>'); return;
+  }
+}, true);
+
+if (!window.__pr6AuditRefreshTimer) {
+  window.__pr6AuditRefreshTimer = window.setInterval(() => {
+    if (state.page === 'audit' && !state.auditLoading) __pr6LoadAudit(state.auditPage || 1);
+  }, 30000);
+}
 
 document.addEventListener('click', (event) => {
   const el = event.target && event.target.closest ? event.target.closest('[data-action="pr6-edit-period"]') : null;

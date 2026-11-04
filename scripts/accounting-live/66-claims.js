@@ -4,7 +4,7 @@
  * finance manager (not the reviewer) approves it — which posts it to the ledger as owed to the employee (with a note
  * when it breaks the policy) — or rejects it, and pays it from a bank account. Each step can return it with what to
  * correct. Roles come from the claims API (staff without Accounting rights use this page too). Data: /accounting/claims. */
-AL.ui.clm = AL.ui.clm || { tab: '', status: '' };
+AL.ui.clm = AL.ui.clm || { tab: '', status: '', page: 1 };
 AL.clmOpts = () => AL.res('clm-opts', () => AL.get('/accounting/claims/options'));
 // the lists; the options (the viewer's roles, categories, banks) stay
 AL.clmReload = () => { Object.keys(AL.cache).filter((k) => k.startsWith('clm-') && k !== 'clm-opts').forEach((k) => delete AL.cache[k]); AL.redraw(); };
@@ -15,17 +15,18 @@ AL.CLM_STATUS = {
 
 AL.page('claims', () => {
   const o = AL.clmOpts();
-  const head = AL.head('Spend', 'Employee Claims', '', [AL.can('view_accounting', 'manage_accounting', 'manage_ledger') ? AL.btn('Expenses', 'clm-expenses') : '', AL.btn('New claim', 'clm-new', 'primary')].join(''));
+  const u = AL.ui.clm;
+  const head = AL.head('Spend', 'Employee Claims', 'Record staff-paid business costs, route each claim for independent review, then approve and reimburse it.', [AL.exportBtns('clm-export'), u.returnToQueue ? AL.btn('Approval Queue', 'clm-queue-back') : '', AL.btn('New claim', 'clm-new', 'primary')].join(''));
   const g = AL.gate(o, { key: 'clm-opts', errorTitle: 'Claims could not be loaded' });
   if (g) return `<div class="v28-page">${head}${g}</div>`;
   const roles = o.data.roles || {}, approver = roles.lineManager || roles.reviewer || roles.approver;
-  const u = AL.ui.clm;
   if (!u.tab || (u.tab === 'waiting' && !approver) || (u.tab === 'all' && !roles.register)) u.tab = approver ? 'waiting' : 'mine';
   const mine = AL.res('clm-mine', () => AL.get('/accounting/claims?scope=mine'));
   const waiting = approver ? AL.res('clm-waiting', () => AL.get('/accounting/claims?scope=waiting')) : null;
   const all = u.tab === 'all' ? AL.res('clm-all', () => AL.get('/accounting/claims?scope=all')) : null;
   const g2 = AL.gate(mine, { key: 'clm-mine' }) || (waiting && AL.gate(waiting, { key: 'clm-waiting' })) || (all && AL.gate(all, { key: 'clm-all' }));
   if (g2) return `<div class="v28-page">${head}${g2}</div>`;
+  if (u.reopen) { const id = u.reopen; u.reopen = ''; setTimeout(() => AL.clmShow(id).catch((e) => AL.toast('Claim could not be opened', AL.msg(e), 'bad')), 0); }
   const my = mine.data || [], wait = waiting ? waiting.data || [] : [];
   const sum = (xs) => xs.reduce((s, c) => s + c.total, 0);
   const cur = (xs) => (xs[0] && xs[0].currency) || 'USD';
@@ -42,7 +43,7 @@ AL.page('claims', () => {
     const st = AL.CLM_STATUS[c.status] || [c.status, 'info'];
     const note = c.status === 'RETURNED' || c.status === 'REJECTED' ? c.returnReason : c.exceptions && c.exceptions.length && !['REIMBURSED', 'WITHDRAWN', 'REJECTED'].includes(c.status) ? `${AL.plural(c.exceptions.length, 'policy exception')}` : '';
     return `<tr>
-      <td><strong>${ae(c.reference)}</strong><span class="v28-sub">${ae(c.title)}</span></td>
+      <td><strong>${ae(c.reference || 'Claim')}</strong><span class="v28-sub">${ae(c.title || 'Employee claim')}</span></td>
       ${showWho ? `<td>${ae(c.claimant || '—')}</td>` : ''}
       <td class="num">${ae(AL.money(c.total, c.currency))}</td>
       <td>${ae(c.submittedAt ? AL.date(c.submittedAt) : '—')}</td>
@@ -50,17 +51,25 @@ AL.page('claims', () => {
       <td class="al-actions">${AL.btn('Open', 'clm-open', 'small primary', `data-id="${ae(c.id)}"`)}</td>
     </tr>`;
   }).join('');
-  let body;
-  if (u.tab === 'waiting') body = wait.length ? AL.table(['Claim', 'Employee', 'Amount', 'Submitted', 'Status', ''], rows(wait, true), '980px') : AL.empty('No claims are waiting for you.');
-  else if (u.tab === 'all') {
-    const list = (all.data || []).filter((c) => !u.status || c.status === u.status);
-    body = `<div class="al-filters"><label class="v28-field"><span>Status</span><select class="v28-select" data-clm-f="status"><option value="">All</option>${Object.entries(AL.CLM_STATUS).filter(([k]) => k !== 'DRAFT').map(([k, v]) => `<option value="${k}"${u.status === k ? ' selected' : ''}>${ae(v[0])}</option>`).join('')}</select></label></div>${list.length ? AL.table(['Claim', 'Employee', 'Amount', 'Submitted', 'Status', ''], rows(list, true), '980px') : AL.empty('No claims.')}`;
-  } else body = my.length ? AL.table(['Claim', 'Amount', 'Submitted', 'Status', ''], rows(my, false), '860px') : AL.empty('You have no claims yet.');
+  let list = u.tab === 'waiting' ? wait : u.tab === 'all' ? (all.data || []).filter((c) => !u.status || c.status === u.status) : my;
+  const showWho = u.tab !== 'mine';
+  const pageSize = 10, totalPages = Math.max(1, Math.ceil(list.length / pageSize));
+  u.page = Math.min(Math.max(1, Number(u.page) || 1), totalPages);
+  const start = (u.page - 1) * pageSize, pageList = list.slice(start, start + pageSize);
+  const columns = showWho ? ['Claim', 'Employee', 'Amount', 'Submitted', 'Status', ''] : ['Claim', 'Amount', 'Submitted', 'Status', ''];
+  const pager = totalPages > 1 ? `<div class="apq-pagination"><span>Showing ${start + 1}–${Math.min(start + pageSize, list.length)} of ${list.length} claims</span><div>${AL.btn('Previous', 'clm-page', 'small', `data-dir="-1"${u.page <= 1 ? ' disabled' : ''}`)}<span>Page ${u.page} of ${totalPages}</span>${AL.btn('Next', 'clm-page', 'small', `data-dir="1"${u.page >= totalPages ? ' disabled' : ''}`)}</div></div>` : '';
+  const table = list.length ? `${AL.table(columns, rows(pageList, showWho), showWho ? '980px' : '860px')}${pager}` : AL.empty(u.tab === 'waiting' ? 'No claims are waiting for you.' : u.tab === 'mine' ? 'You have no claims yet.' : 'No claims match this filter.');
+  const filter = u.tab === 'all' ? `<div class="al-filters"><label class="v28-field"><span>Status</span><select class="v28-select" data-clm-f="status"><option value="">All</option>${Object.entries(AL.CLM_STATUS).filter(([k]) => k !== 'DRAFT').map(([k, v]) => `<option value="${k}"${u.status === k ? ' selected' : ''}>${ae(v[0])}</option>`).join('')}</select></label></div>` : '';
+  const body = `${filter}${table}`;
   return `<div class="v28-page">${head}${kpis}${AL.panel('Claims', '', `${tabs}${body}`)}</div>`;
 });
-AL.wire.claims = () => { document.querySelectorAll('[data-clm-f]').forEach((el) => { if (el.dataset.wired) return; el.dataset.wired = '1'; el.addEventListener('change', () => { AL.ui.clm[el.dataset.clmF] = el.value; AL.redraw(); }); }); };
-AL.actions['clm-tab'] = (el) => { AL.ui.clm.tab = el.dataset.t; AL.redraw(); };
-AL.actions['clm-expenses'] = () => AL.go('expenses');
+AL.wire.claims = () => { document.querySelectorAll('[data-clm-f]').forEach((el) => { if (el.dataset.wired) return; el.dataset.wired = '1'; el.addEventListener('change', () => { AL.ui.clm[el.dataset.clmF] = el.value; AL.ui.clm.page = 1; AL.redraw(); }); }); };
+AL.actions['clm-tab'] = (el) => { AL.ui.clm.tab = el.dataset.t; AL.ui.clm.page = 1; AL.redraw(); };
+AL.actions['clm-page'] = (el) => { AL.ui.clm.page = Math.max(1, (Number(AL.ui.clm.page) || 1) + Number(el.dataset.dir || 0)); AL.redraw(); };
+AL.clmVisibleRows = () => { const u = AL.ui.clm, mine = AL.cache['clm-mine']?.data || [], wait = AL.cache['clm-waiting']?.data || [], all = AL.cache['clm-all']?.data || []; return u.tab === 'waiting' ? wait : u.tab === 'all' ? all.filter((c) => !u.status || c.status === u.status) : mine; };
+AL.clmExportSpec = () => ({ title: 'Employee Claims', subtitle: 'Claim register and approval workflow', columns: ['Claim reference', 'Employee', 'Title', 'Business purpose', 'Amount', 'Currency', 'Submitted', 'Status', 'Workflow step', 'Return reason'], rows: AL.clmVisibleRows().map((c) => [c.reference || 'Claim', c.claimant || '', c.title || '', c.purpose || '', Number(c.total), c.currency || '', c.submittedAt ? AL.date(c.submittedAt) : '', AL.CLM_STATUS[c.status]?.[0] || c.status, ({ SUBMITTED: 'Line manager', MANAGER_APPROVED: 'Finance review', REVIEWED: 'Finance approval', APPROVED: 'Reimbursement', REIMBURSED: 'Paid' })[c.status] || '', c.returnReason || '']), filename: 'employee-claims' });
+AL.actions['clm-export'] = (el) => { const spec = AL.clmExportSpec(); if (!spec.rows.length) return AL.toast('Nothing to export', 'There are no claims in this view.', 'bad'); return AL.exportRun(el, spec, 'claims'); };
+AL.actions['clm-queue-back'] = () => { AL.ui.clm.returnToQueue = false; delete AL.cache.apq; AL.go('approvals'); };
 AL.clmData = () => (AL.cache['clm-opts'] && AL.cache['clm-opts'].data) || { categories: [], currencies: [], projects: [], accounts: [], banks: [], roles: {}, policy: {} };
 AL.clmFields = () => {
   const d = AL.clmData();
@@ -69,7 +78,7 @@ AL.clmFields = () => {
     { k: 'purpose', label: 'Business purpose', type: 'textarea', wide: true },
     { k: 'tripFrom', label: 'From', type: 'date' }, { k: 'tripTo', label: 'To', type: 'date' },
     { k: 'currency', label: 'Currency', type: 'select', blank: false, options: (d.currencies || []).map((c) => ({ value: c.code, label: `${c.code} · ${c.name}` })) },
-    { k: 'projectId', label: 'Project', type: 'select', options: (d.projects || []).map((p) => ({ value: p.id, label: p.name })) },
+    { k: 'projectId', label: 'Project', type: 'select', blankLabel: 'No project selected', options: (d.projects || []).map((p) => ({ value: p.id, label: p.name })) },
   ];
 };
 AL.clmBody = (v) => ({ title: v.title, purpose: v.purpose || null, tripFrom: v.tripFrom || null, tripTo: v.tripTo || null, currency: v.currency, projectId: v.projectId || null });
@@ -84,7 +93,7 @@ AL.clmShow = async (id) => {
   const d = AL.clmData(), roles = d.roles || {}, me = d.me || '';
   const mineEditable = c.claimantId === me && ['DRAFT', 'RETURNED'].includes(c.status);
   const reviewing = c.status === 'MANAGER_APPROVED' && roles.reviewer && c.claimantId !== me;
-  const accOpts = (sel) => `<option value="">Category's account</option>${(d.accounts || []).map((a) => `<option value="${ae(a.id)}"${sel === a.id ? ' selected' : ''}>${ae(`${a.accountNo} ${a.accountName}`)}</option>`).join('')}`;
+  const accOpts = (sel) => `<option value="">Use category account</option>${(d.accounts || []).map((a) => `<option value="${ae(a.id)}"${sel === a.id ? ' selected' : ''}>${ae(`${a.accountNo} ${a.accountName}`)}</option>`).join('')}`;
   const lineRows = c.lines.map((l) => `<tr>
     <td>${ae(AL.date(l.date))}</td>
     <td><strong>${ae(l.description)}</strong><span class="v28-sub">${ae(l.category || 'No category')}</span></td>
@@ -110,6 +119,7 @@ AL.clmShow = async (id) => {
     if (c.status === 'REVIEWED' && roles.approver) acts.push(b('Approve for payment', 'clm-approve', 'primary'), b('Return', 'clm-return', 'danger'), b('Reject', 'clm-reject', 'danger'));
     if (c.status === 'APPROVED' && roles.approver) acts.push(b('Pay', 'clm-pay', 'primary'));
   }
+  if (AL.ui.clm.returnToQueue) acts.unshift(AL.btn('Back to Approval Queue', 'clm-queue-back'));
   const st = AL.CLM_STATUS[c.status] || [c.status, 'info'];
   const exc = c.exceptions && c.exceptions.length ? `<div class="al-wide"><p><strong>Policy exceptions</strong></p><ul class="al-list">${c.exceptions.map((x) => `<li>${ae(x)}</li>`).join('')}</ul>${c.exceptionNote ? `<p class="v28-sub">Approved with the note: ${ae(c.exceptionNote)}</p>` : ''}</div>` : '';
   AL.clmOpen = c;
@@ -171,4 +181,5 @@ AL.actions['clm-pay'] = (el) => {
     onSubmit: async (v) => { const r = await AL.post(`/accounting/claims/${encodeURIComponent(c.id)}/reimburse`, v); return r.reimbursementJournal ? `Journal ${r.reimbursementJournal.referenceNumber} posted; the payment is in the cashbook.` : ''; },
     after: () => AL.clmReload() });
 };
-AL.navAdd('Daily accounting', ['claims', 'Employee Claims', 'expense'], 'expenses');
+// Claims remain a distinct workflow from Expenses, but are discoverable beside the Approval Queue.
+AL.navAdd('Control centre', ['claims', 'Employee Claims', 'people'], 'approvals');

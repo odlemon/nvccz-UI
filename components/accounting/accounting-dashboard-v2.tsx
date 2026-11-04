@@ -5,6 +5,8 @@ import { useSelector, useDispatch } from "react-redux"
 import { AppDispatch, RootState } from "@/lib/store/store"
 import { fetchAccountingDashboard, fetchCurrencies } from "@/lib/store/slices/accountingSlice"
 import { AccountingDashboardSkeleton } from "./accounting-dashboard-skeleton"
+import { AccountingExportControls } from "./accounting-export-controls"
+import type { Ac52ExportSpec } from "@/lib/accounting-v52/export"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -19,7 +21,6 @@ import {
     ArrowUpRight,
     ArrowDownRight,
     Target,
-    IndianRupee,
 } from "lucide-react"
 import {
     BarChart,
@@ -181,6 +182,77 @@ export function AccountingDashboardV2() {
     // Calculate total expenses from API
     const totalExpenses = expensesChartData.reduce((sum: number, expense: any) => sum + (expense.amount || 0), 0)
     const totalExpensesLabel = formatCurrency(totalExpenses)
+    const formatPercent = (value: unknown, digits = 1) => {
+        const numeric = typeof value === "number" ? value : Number(value)
+        return Number.isFinite(numeric) ? numeric.toFixed(digits) : (0).toFixed(digits)
+    }
+    const exportCurrency = currencies.find((currency: any) => currency.id === selectedCurrency)?.code || currencies[0]?.code || "USD"
+    const buildExportSpec = async (): Promise<Ac52ExportSpec> => {
+        const rows: (string | number)[][] = []
+        const add = (section: string, item: string, amount: number, details = "") => {
+            rows.push([section, item, "", exportCurrency, Number.isFinite(amount) ? amount : 0, details])
+        }
+        const comparison = benchmark === "LAST_YEAR" ? "last year" : "last month"
+        add("Summary", "Revenue", stats.revenue, `${stats.revenueChange >= 0 ? "+" : ""}${formatPercent(stats.revenueChange)}% vs ${comparison}`)
+        add("Summary", "Cost of goods sold", stats.cogs, `${stats.cogsChange >= 0 ? "+" : ""}${formatPercent(stats.cogsChange)}% vs ${comparison}`)
+        add("Summary", "Gross profit", stats.gross, `${stats.grossChange >= 0 ? "+" : ""}${formatPercent(stats.grossChange)}% vs ${comparison}`)
+        add("Summary", "Net profit", stats.net, `${stats.netChange >= 0 ? "+" : ""}${formatPercent(stats.netChange)}% vs ${comparison}`)
+        add("Summary", "Total assets", Number(totalAssets) || 0)
+        add("Summary", "Total liabilities and equity", Number(totalLiabilitiesEquity) || 0)
+        add("Summary", "Total expenses", Number(totalExpenses) || 0)
+
+        const filterNote = [
+            `Period: ${dateWindow ? `${dateWindow.startDate} to ${dateWindow.endDate}` : period}`,
+            `Benchmark: ${comparison}`,
+            `Currency: ${exportCurrency}`,
+            `Year: ${financialYear === "all" ? "All years" : financialYear}`,
+            `Month filter: ${selectedMonths === "all" ? "All months" : selectedMonths.toUpperCase()}`,
+        ].join(" | ")
+
+        return {
+            title: "Accounting Command Centre",
+            subtitle: "Current financial position and activity",
+            filename: "accounting-command-centre",
+            landscape: true,
+            note: filterNote,
+            meta: [["As of", new Date().toLocaleDateString("en-GB")], ["Organization", "National Venture Capital Company of Zimbabwe"]],
+            columns: ["Section", "Item", "Date / period", "Currency", "Amount", "Details"],
+            rows,
+            moneyColumns: [4],
+            extra: [
+                {
+                    title: "Monthly results",
+                    columns: ["Month", "Revenue", "COGS", "Gross profit", "Net profit"],
+                    rows: chartData.map((row: any) => [String(row.month || ""), Number(row.revenue) || 0, Number(row.cogs) || 0, Number(row.grossProfit) || 0, Number(row.netProfit) || 0]),
+                    moneyColumns: [1, 2, 3, 4],
+                },
+                {
+                    title: "Asset distribution",
+                    columns: ["Category", "Amount", "Share of total (%)"],
+                    rows: assetsSummaryData.map((item: any) => [String(item.category || "Uncategorised"), Number(item.amount) || 0, Number(item.percent) || 0]),
+                    moneyColumns: [1],
+                },
+                {
+                    title: "Assets",
+                    columns: ["Category", "Amount", "Share of total (%)"],
+                    rows: assetsDetailedData.map((item: any) => [String(item.category || "Uncategorised"), Number(item.amount) || 0, Number(item.percent) || 0]),
+                    moneyColumns: [1],
+                },
+                {
+                    title: "Liabilities and equity",
+                    columns: ["Category", "Amount"],
+                    rows: liabilitiesEquityData.map((item: any) => [String(item.category || item.name || "Uncategorised"), Number(item.amount) || 0]),
+                    moneyColumns: [1],
+                },
+                {
+                    title: "Expenses by category",
+                    columns: ["Category", "Amount"],
+                    rows: expensesChartData.map((item: any) => [String(item.category || "Uncategorised"), Number(item.amount) || 0]),
+                    moneyColumns: [1],
+                },
+            ],
+        }
+    }
 
     // Show skeleton while loading - AFTER all hooks
     if (dashboardLoading) {
@@ -200,7 +272,7 @@ export function AccountingDashboardV2() {
                                 <Button
                                     variant="ghost"
                                     size="sm"
-                                    className={`rounded-full h-8 px-4 text-xs font-semibold ${period === "MTD" ? "bg-[#1a3a4a] text-white hover:bg-[#1a3a4a]/90" : "text-muted-foreground hover:bg-gray-50"}`}
+                                    className={`rounded-full h-8 px-4 text-xs font-semibold ${period === "MTD" ? "bg-[#1a3a4a] text-white! hover:bg-[#1a3a4a]/90" : "text-muted-foreground! hover:bg-gray-50"}`}
                                     onClick={() => setPeriod("MTD")}
                                 >
                                     MTD
@@ -208,7 +280,7 @@ export function AccountingDashboardV2() {
                                 <Button
                                     variant="ghost"
                                     size="sm"
-                                    className={`rounded-full h-8 px-4 text-xs font-semibold ${period === "YTD" ? "bg-[#1a3a4a] text-white hover:bg-[#1a3a4a]/90" : "text-muted-foreground hover:bg-gray-50"}`}
+                                    className={`rounded-full h-8 px-4 text-xs font-semibold ${period === "YTD" ? "bg-[#1a3a4a] text-white! hover:bg-[#1a3a4a]/90" : "text-muted-foreground! hover:bg-gray-50"}`}
                                     onClick={() => setPeriod("YTD")}
                                 >
                                     YTD
@@ -222,7 +294,7 @@ export function AccountingDashboardV2() {
                                 <Button
                                     variant="ghost"
                                     size="sm"
-                                    className={`rounded-full h-8 px-4 text-xs font-semibold ${benchmark === "LAST_YEAR" ? "bg-[#1a3a4a] text-white hover:bg-[#1a3a4a]/90" : "text-muted-foreground hover:bg-gray-50"}`}
+                                    className={`rounded-full h-8 px-4 text-xs font-semibold ${benchmark === "LAST_YEAR" ? "bg-[#1a3a4a] text-white! hover:bg-[#1a3a4a]/90" : "text-muted-foreground! hover:bg-gray-50"}`}
                                     onClick={() => setBenchmark("LAST_YEAR")}
                                 >
                                     Last Year
@@ -230,7 +302,7 @@ export function AccountingDashboardV2() {
                                 <Button
                                     variant="ghost"
                                     size="sm"
-                                    className={`rounded-full h-8 px-4 text-xs font-semibold ${benchmark === "LAST_MONTH" ? "bg-[#1a3a4a] text-white hover:bg-[#1a3a4a]/90" : "text-muted-foreground hover:bg-gray-50"}`}
+                                    className={`rounded-full h-8 px-4 text-xs font-semibold ${benchmark === "LAST_MONTH" ? "bg-[#1a3a4a] text-white! hover:bg-[#1a3a4a]/90" : "text-muted-foreground! hover:bg-gray-50"}`}
                                     onClick={() => setBenchmark("LAST_MONTH")}
                                 >
                                     Last Month
@@ -239,7 +311,8 @@ export function AccountingDashboardV2() {
                         </div>
                     </div>
 
-                    <div className="flex flex-wrap items-center gap-6">
+                    <div className="flex flex-wrap items-end justify-end gap-4">
+                      <div className="flex flex-wrap items-center gap-6">
                         <div className="flex flex-col gap-1.5">
                             <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Currency</span>
                             <Select value={selectedCurrency} onValueChange={setSelectedCurrency}>
@@ -286,6 +359,8 @@ export function AccountingDashboardV2() {
                                 </SelectContent>
                             </Select>
                         </div>
+                      </div>
+                      <AccountingExportControls spec={buildExportSpec} label="the Command Centre" showLabels />
                     </div>
                 </div>
 
@@ -310,7 +385,7 @@ export function AccountingDashboardV2() {
                                     {stats.revenueChange !== 0 && (
                                         <span className={`flex items-center gap-1 font-medium px-2 py-0.5 rounded-full ${stats.revenueChange > 0 ? 'text-emerald-600 bg-emerald-50' : 'text-rose-600 bg-rose-50'}`}>
                                             {stats.revenueChange > 0 ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
-                                            {stats.revenueChange > 0 ? '+' : ''}{stats.revenueChange.toFixed(1)}%
+                                            {stats.revenueChange > 0 ? '+' : ''}{formatPercent(stats.revenueChange)}%
                                         </span>
                                     )}
                                     <span className="text-muted-foreground">vs {benchmark === "LAST_YEAR" ? "last year" : "last month"}</span>
@@ -338,7 +413,7 @@ export function AccountingDashboardV2() {
                                     {stats.cogsChange !== 0 && (
                                         <span className={`flex items-center gap-1 font-medium px-2 py-0.5 rounded-full ${stats.cogsChange > 0 ? 'text-emerald-600 bg-emerald-50' : 'text-rose-600 bg-rose-50'}`}>
                                             {stats.cogsChange > 0 ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
-                                            {stats.cogsChange > 0 ? '+' : ''}{stats.cogsChange.toFixed(1)}%
+                                            {stats.cogsChange > 0 ? '+' : ''}{formatPercent(stats.cogsChange)}%
                                         </span>
                                     )}
                                     <span className="text-muted-foreground">vs {benchmark === "LAST_YEAR" ? "last year" : "last month"}</span>
@@ -366,7 +441,7 @@ export function AccountingDashboardV2() {
                                     {stats.grossChange !== 0 && (
                                         <span className={`flex items-center gap-1 font-medium px-2 py-0.5 rounded-full ${stats.grossChange > 0 ? 'text-emerald-600 bg-emerald-50' : 'text-rose-600 bg-rose-50'}`}>
                                             {stats.grossChange > 0 ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
-                                            {stats.grossChange > 0 ? '+' : ''}{stats.grossChange.toFixed(1)}%
+                                            {stats.grossChange > 0 ? '+' : ''}{formatPercent(stats.grossChange)}%
                                         </span>
                                     )}
                                     <span className="text-muted-foreground">vs {benchmark === "LAST_YEAR" ? "last year" : "last month"}</span>
@@ -381,7 +456,7 @@ export function AccountingDashboardV2() {
                             <div className="flex flex-col gap-4">
                                 <div className="flex items-center gap-3">
                                     <div className="w-10 h-10 rounded-2xl bg-emerald-50 flex items-center justify-center">
-                                        <IndianRupee className="w-6 h-6 text-emerald-600" />
+                                        <TrendingUp className="w-6 h-6 text-emerald-600" />
                                     </div>
                                     <div>
                                         <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Net Profit</p>
@@ -394,7 +469,7 @@ export function AccountingDashboardV2() {
                                     {stats.netChange !== 0 && (
                                         <span className={`flex items-center gap-1 font-medium px-2 py-0.5 rounded-full ${stats.netChange > 0 ? 'text-emerald-600 bg-emerald-50' : 'text-rose-600 bg-rose-50'}`}>
                                             {stats.netChange > 0 ? <ArrowUpRight className="w-3 h-3" /> : <ArrowDownRight className="w-3 h-3" />}
-                                            {stats.netChange > 0 ? '+' : ''}{stats.netChange.toFixed(1)}%
+                                            {stats.netChange > 0 ? '+' : ''}{formatPercent(stats.netChange)}%
                                         </span>
                                     )}
                                     <span className="text-muted-foreground">vs {benchmark === "LAST_YEAR" ? "last year" : "last month"}</span>
@@ -630,7 +705,7 @@ export function AccountingDashboardV2() {
                                                         <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">{asset.category}</p>
                                                         <p className="text-xl font-normal text-foreground mt-1 tracking-tight">{currencySymbol}{(asset.amount ?? 0).toLocaleString()}</p>
                                                         {typeof asset.percent === 'number' && (
-                                                            <p className="text-[11px] font-medium text-muted-foreground/70 mt-0.5">{asset.percent.toFixed(1)}% of total</p>
+                                                            <p className="text-[11px] font-medium text-muted-foreground/70 mt-0.5">{formatPercent(asset.percent)}% of total</p>
                                                         )}
                                                     </div>
                                                 </div>
@@ -725,7 +800,7 @@ export function AccountingDashboardV2() {
                                                                 </span>
                                                                 {typeof item.percent === 'number' && (
                                                                     <span className="text-[10px] font-medium text-white/80 mt-0.5">
-                                                                        {item.percent.toFixed(1)}%
+                                                                        {formatPercent(item.percent)}%
                                                                     </span>
                                                                 )}
                                                             </div>

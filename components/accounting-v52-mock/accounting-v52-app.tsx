@@ -1,7 +1,8 @@
 "use client"
 
-import { useEffect, useRef } from "react"
-import { usePathname, useRouter } from "next/navigation"
+import { Suspense, useEffect, useRef, useState } from "react"
+import { createPortal } from "react-dom"
+import { usePathname } from "next/navigation"
 import {
   pathToAc52Page,
   AC52_PAGE_TO_PATH,
@@ -10,12 +11,21 @@ import { startAccountingV52Runtime } from "@/components/accounting-v52-mock/mata
 import { ACCOUNTING_V52_SHELL_HTML } from "@/components/accounting-v52-mock/shell"
 import { loadAc52Scopes, scopesForAc52Page, type Ac52DataScope } from "@/lib/accounting-v52/live-loaders"
 import { handleAccountingV52Action } from "@/lib/accounting-v52/actions"
+import { downloadAc52Export } from "@/lib/accounting-v52/export"
 import { toast } from "sonner"
 import type { Ac52Account } from "@/lib/accounting-v52/types"
 import "@/components/accounting-v52-mock/accounting-v52.css"
 import "@/components/accounting-v52-mock/accounting-v52-live.css"
 import { apiClient } from "@/lib/api/api-client"
 import { getAuthUser, getUserProfile } from "@/lib/utils/cookies"
+import { AccountingDashboardV2 } from "@/components/accounting/accounting-dashboard-v2"
+import { GeneralLedger } from "@/components/accounting/general-ledger"
+import { FinancialReports } from "@/components/accounting/financial-reports"
+import { CashbookLegacyContent } from "@/components/accounting/cashbook-legacy-content"
+import { PayablesLegacyContent } from "@/components/accounting/payables-legacy-content"
+import { ReceivablesLegacyContent } from "@/components/accounting/receivables-legacy-content"
+import { BankReconciliationLegacyContent } from "@/components/accounting/bank-reconciliation-legacy-content"
+import { LegacyMountHost } from "@/components/accounting-v52-mock/legacy-mount-host"
 
 type RuntimeApi = {
   setPage: (page: string) => void
@@ -28,11 +38,39 @@ type RuntimeApi = {
   commitError?: (err: unknown) => void
 }
 
+/** Keep route observation isolated so a pathname transition cannot suspend and replace the
+ * Accounting shell/runtime with the module-wide loading fallback. */
+function AccountingV52PathnameBridge({ onPathnameChange }: { onPathnameChange: (pathname: string) => void }) {
+  const pathname = usePathname()
+  useEffect(() => onPathnameChange(pathname), [onPathnameChange, pathname])
+  return null
+}
+
 export function AccountingV52App() {
   const rootRef = useRef<HTMLDivElement>(null)
+  // The portal container has to be a node whose identity survives the runtime's render passes. The live layer
+  // re-emits its page HTML on every render, so #ac52LegacyDashboardSlot / #ac52LegacyLedgerSlot are replaced a
+  // few times while a page comes up; portalling straight into the slot remounted the legacy screen on each
+  // replacement (measured: three mounts on the General Ledger, so three register fetches racing the
+  // currency-filtered one, a visible skeleton flash, and the register able to settle on the un-filtered
+  // response). These persistent host divs are re-homed into whatever the current slot element is, so the
+  // portalled tree mounts exactly once per visit, the same as it does on the standalone legacy route.
+  const legacyDashboardHostRef = useRef<HTMLElement | null>(null)
+  const legacyLedgerHostRef = useRef<HTMLElement | null>(null)
+  const legacyReportsHostRef = useRef<HTMLElement | null>(null)
+  const legacyCashHostRef = useRef<HTMLElement | null>(null)
+  const legacyPayablesHostRef = useRef<HTMLElement | null>(null)
+  const legacyReceivablesHostRef = useRef<HTMLElement | null>(null)
+  const legacyReconciliationHostRef = useRef<HTMLElement | null>(null)
+  const [legacyDashboardHost, setLegacyDashboardHost] = useState<HTMLElement | null>(null)
+  const [legacyLedgerHost, setLegacyLedgerHost] = useState<HTMLElement | null>(null)
+  const [legacyReportsHost, setLegacyReportsHost] = useState<HTMLElement | null>(null)
+  const [legacyCashHost, setLegacyCashHost] = useState<HTMLElement | null>(null)
+  const [legacyPayablesHost, setLegacyPayablesHost] = useState<HTMLElement | null>(null)
+  const [legacyReceivablesHost, setLegacyReceivablesHost] = useState<HTMLElement | null>(null)
+  const [legacyReconciliationHost, setLegacyReconciliationHost] = useState<HTMLElement | null>(null)
   const apiRef = useRef<RuntimeApi | null>(null)
-  const pathname = usePathname()
-  const router = useRouter()
+  const [pathname, setPathname] = useState(() => typeof window === "undefined" ? "/accounting" : window.location.pathname)
   const pathnameRef = useRef(pathname)
   pathnameRef.current = pathname
   const loadedScopesRef = useRef<Set<Ac52DataScope>>(new Set())
@@ -62,9 +100,11 @@ export function AccountingV52App() {
     let starting = true
     // Pages patched for live data (scripts/patch-accounting-v52-runtime.mjs) render the records instead of samples.
     ;(window as any).__AC52_LIVE__ = true
+    ;(window as any).__AC52_LEGACY_DASHBOARD__ = pathnameRef.current === "/accounting"
     // The live layer (scripts/accounting-live, synced into the runtime) reads and writes through these: every call carries
     // the signed-in user's token, and the server decides what that user may do.
     ;(window as any).__AC52_HTTP__ = {
+      apiBaseUrl: process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:3009/api",
       get: (p: string) => apiClient.get<any>(p),
       post: (p: string, b?: unknown) => apiClient.post<any>(p, b ?? {}),
       put: (p: string, b?: unknown) => apiClient.put<any>(p, b ?? {}),
@@ -73,6 +113,9 @@ export function AccountingV52App() {
       text: (p: string) => apiClient.get<string>(p, { responseType: "text" }),
       form: (p: string, fd: FormData) => apiClient.postFormData<any>(p, fd),
     }
+    // Page exports (PDF / Excel / CSV): the live layer builds a plain spec of what the page shows and this writes the
+    // file using the client-supplied NVCCZ branding in every environment.
+    ;(window as any).__AC52_EXPORT__ = downloadAc52Export
     ;(window as any).__AC52_ME__ = () => {
       const u: any = getUserProfile() ?? getAuthUser() ?? {}
       return { id: u.id ?? null, name: [u.firstName, u.lastName].filter(Boolean).join(" ") || u.email || "", email: u.email ?? "", role: u.role?.name ?? u.roleName ?? "" }
@@ -91,13 +134,59 @@ export function AccountingV52App() {
         // page's URL (e.g. '/accounting/close') — the runtime re-renders in place without
         // changing the Next.js route, so there's nothing to push here.
         const path = AC52_PAGE_TO_PATH[page]
-        if (path && pathnameRef.current !== path) router.push(path)
+        if (path && `${window.location.pathname}${window.location.search}` !== path) {
+          // Accounting pages share this persistent client shell. Use the App Router's
+          // native-history integration so the URL and back button stay in sync without
+          // suspending/remounting the whole module during a sidebar click.
+          window.history.pushState(window.history.state, "", path)
+          setPathname(path.split("?")[0])
+        }
         void ensurePageDataRef.current?.(page)
       },
     })
     apiRef.current = runtime
     starting = false
     runtime.setPage(initialPage)
+
+    // Keep the current V52 shell and navigation, but render the established legacy
+    // dashboard React screen inside the overview content slot on /accounting only.
+    // The General Ledger is restored the same way: the live layer's ledger page emits an
+    // empty mount point (#ac52LegacyLedgerSlot) and the legacy React <GeneralLedger/> is
+    // portalled into it, so the old UI and its accountingApi integration come back intact
+    // while the V52 nav rail, topbar and app switcher stay in place around them.
+    const hostFor = (slotSelector: string, ref: { current: HTMLElement | null }) => {
+      const slot = el.querySelector<HTMLElement>(slotSelector)
+      // Absent means the runtime is mid-render of another pass; keep the current host and let the next
+      // mutation tick re-home it. Unmounting is driven by the route effect below, never by this.
+      if (!slot) return null
+      let host = ref.current
+      if (!host) {
+        host = document.createElement("div")
+        host.dataset.ac52LegacyHost = slotSelector.slice(1)
+        ref.current = host
+      }
+      if (host.parentElement !== slot) slot.appendChild(host)
+      return host
+    }
+    const syncLegacySlots = () => {
+      const dash = hostFor("#ac52LegacyDashboardSlot", legacyDashboardHostRef)
+      if (dash) setLegacyDashboardHost((current) => (current === dash ? current : dash))
+      const ledger = hostFor("#ac52LegacyLedgerSlot", legacyLedgerHostRef)
+      if (ledger) setLegacyLedgerHost((current) => (current === ledger ? current : ledger))
+      const reports = hostFor("#ac52LegacyReportsSlot", legacyReportsHostRef)
+      if (reports) setLegacyReportsHost((current) => (current === reports ? current : reports))
+      const cash = hostFor("#ac52LegacyCashSlot", legacyCashHostRef)
+      if (cash) setLegacyCashHost((current) => (current === cash ? current : cash))
+      const payables = hostFor("#ac52LegacyPayablesSlot", legacyPayablesHostRef)
+      if (payables) setLegacyPayablesHost((current) => (current === payables ? current : payables))
+      const receivables = hostFor("#ac52LegacyReceivablesSlot", legacyReceivablesHostRef)
+      if (receivables) setLegacyReceivablesHost((current) => (current === receivables ? current : receivables))
+      const reconciliation = hostFor("#ac52LegacyReconciliationSlot", legacyReconciliationHostRef)
+      if (reconciliation) setLegacyReconciliationHost((current) => (current === reconciliation ? current : reconciliation))
+    }
+    const dashboardSlotObserver = new MutationObserver(syncLegacySlots)
+    dashboardSlotObserver.observe(el, { childList: true, subtree: true })
+    syncLegacySlots()
 
     // Every Accounting style is scoped to .accounting-v52-root, but the runtime appends its drawers, focus and deep
     // views, toolbar and menus to <body>, where they rendered unstyled below the page (and the sidebar covered
@@ -274,7 +363,10 @@ export function AccountingV52App() {
     return () => {
       window.removeEventListener("matanho:before-action", onBeforeAction)
       delete (window as any).__AC52_HTTP__
+      delete (window as any).__AC52_EXPORT__
       delete (window as any).__AC52_ME__
+      delete (window as any).__AC52_LEGACY_DASHBOARD__
+      dashboardSlotObserver.disconnect()
       apiRef.current?.destroy()
       apiRef.current = null
     }
@@ -283,9 +375,33 @@ export function AccountingV52App() {
 
   useEffect(() => {
     const page = pathToAc52Page(pathname)
+    ;(window as any).__AC52_LEGACY_DASHBOARD__ = pathname === "/accounting"
     apiRef.current?.setPage(page)
     void ensurePageDataRef.current?.(page)
+    // Leaving the screen that hosts a portalled legacy module is the only thing that tears it down; the
+    // slot churning underneath it during a render pass must not (see hostFor above).
+    if (pathname !== "/accounting") setLegacyDashboardHost(null)
+    if (pathname !== "/accounting/general-ledger") setLegacyLedgerHost(null)
+    if (pathname !== "/accounting/reports" && pathname !== "/accounting/consolidation") setLegacyReportsHost(null)
+    if (pathname !== "/accounting/cash-book") setLegacyCashHost(null)
+    if (pathname !== "/accounting/payables") setLegacyPayablesHost(null)
+    if (pathname !== "/accounting/receivables") setLegacyReceivablesHost(null)
+    if (pathname !== "/accounting/bank-reconciliation") setLegacyReconciliationHost(null)
   }, [pathname])
 
-  return <div ref={rootRef} className="accounting-v52-root h-full" />
+  return (
+    <>
+      <Suspense fallback={null}>
+        <AccountingV52PathnameBridge onPathnameChange={setPathname} />
+      </Suspense>
+      <div ref={rootRef} className="accounting-v52-root h-full" />
+      {legacyDashboardHost && createPortal(<LegacyMountHost><AccountingDashboardV2 /></LegacyMountHost>, legacyDashboardHost)}
+      {legacyLedgerHost && createPortal(<LegacyMountHost><GeneralLedger /></LegacyMountHost>, legacyLedgerHost)}
+      {legacyReportsHost && createPortal(<LegacyMountHost><FinancialReports /></LegacyMountHost>, legacyReportsHost)}
+      {legacyCashHost && createPortal(<LegacyMountHost><CashbookLegacyContent enhanced /></LegacyMountHost>, legacyCashHost)}
+      {legacyPayablesHost && createPortal(<LegacyMountHost><PayablesLegacyContent enhanced /></LegacyMountHost>, legacyPayablesHost)}
+      {legacyReceivablesHost && createPortal(<LegacyMountHost><ReceivablesLegacyContent enhanced /></LegacyMountHost>, legacyReceivablesHost)}
+      {legacyReconciliationHost && createPortal(<LegacyMountHost><BankReconciliationLegacyContent /></LegacyMountHost>, legacyReconciliationHost)}
+    </>
+  )
 }

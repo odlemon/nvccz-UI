@@ -13,7 +13,7 @@ import { FileText, Loader2, CalendarIcon, Plus, Trash2 } from "lucide-react"
 import { format } from "date-fns"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
-import { AccountingCurrency, CreateInvoiceRequest, Invoice, InvoiceItem, VatRate, accountingApi } from "@/lib/api/accounting-api"
+import { AccountingCurrency, CreateInvoiceRequest, Invoice, InvoiceItem, InventoryItem, VatRate, accountingApi } from "@/lib/api/accounting-api"
 import { CreateCustomerModal } from "./create-customer-modal"
 import { Switch } from "@/components/ui/switch"
 
@@ -65,6 +65,35 @@ export function CreateInvoiceModal({
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [activeVatRate, setActiveVatRate] = useState<VatRate | null>(null)
   const [isVatLoading, setIsVatLoading] = useState(false)
+  const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([])
+  const [isInventoryLoading, setIsInventoryLoading] = useState(false)
+
+  useEffect(() => {
+    if (!isOpen) return
+    let cancelled = false
+    const loadInventory = async () => {
+      setIsInventoryLoading(true)
+      try {
+        const items: InventoryItem[] = []
+        let page = 1
+        let totalPages = 1
+        do {
+          const response = await accountingApi.getInventoryItems({ page, limit: 100 })
+          const result = response.data
+          items.push(...(result?.items || []))
+          totalPages = Number(result?.totalPages) || 1
+          page += 1
+        } while (page <= totalPages)
+        if (!cancelled) setInventoryItems(items.filter(item => item.isActive !== false))
+      } catch (error: any) {
+        if (!cancelled) toast.error("Could not load Inventory items", { description: error?.message || "Try again before adding stock to this invoice." })
+      } finally {
+        if (!cancelled) setIsInventoryLoading(false)
+      }
+    }
+    void loadInventory()
+    return () => { cancelled = true }
+  }, [isOpen, isEditing])
 
   // Get default currency
   useEffect(() => {
@@ -87,6 +116,7 @@ export function CreateInvoiceModal({
           invoiceDate: invoice.transactionDate.split('T')[0],
           isTaxable: invoice.isTaxable ?? false,
           items: invoice.items.length > 0 ? invoice.items.map(i => ({
+            itemId: i.itemId,
             description: i.description || "",
             amount: i.amount || 0,
             category: i.category || "",
@@ -428,7 +458,10 @@ export function CreateInvoiceModal({
           {/* Invoice Items */}
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <Label>Invoice Items *</Label>
+              <div>
+                <Label>Invoice Items *</Label>
+                <p className="text-xs text-gray-500 mt-1">Choose a stock item to post its cost and reduce Inventory when the invoice is sent. Leave non-stock lines unlinked.</p>
+              </div>
               <Button
                 type="button"
                 size="sm"
@@ -446,6 +479,28 @@ export function CreateInvoiceModal({
               {formData.items.map((item, index) => (
                 <div key={index} className="grid grid-cols-12 gap-2 p-4 border rounded-lg">
                   <div className="col-span-4">
+                    <Select
+                      value={item.itemId || "non-stock"}
+                      onValueChange={(value) => {
+                        const selected = inventoryItems.find(option => option.id === value)
+                        const next = [...formData.items]
+                        next[index] = { ...next[index], itemId: value === "non-stock" ? undefined : value, description: selected ? `${selected.skuNumber || ""} ${selected.itemName}`.trim() : next[index].description }
+                        setFormData(prev => ({ ...prev, items: next }))
+                      }}
+                      disabled={isLoading || isInventoryLoading}
+                    >
+                      <SelectTrigger className="mb-2">
+                        <SelectValue placeholder={isInventoryLoading ? "Loading Inventory…" : "Service / non-stock item"} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="non-stock">Service / non-stock item</SelectItem>
+                        {inventoryItems.map(option => (
+                          <SelectItem key={option.id} value={option.id}>
+                            {option.skuNumber ? `${option.skuNumber} · ` : ""}{option.itemName} ({Number(option.quantityOnHand)} on hand)
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                     <Input
                       placeholder="Item description"
                       value={item.description}
@@ -464,11 +519,12 @@ export function CreateInvoiceModal({
                   <div className="col-span-1">
                     <Input
                       type="number"
-                      min="1"
+                        min="0.01"
+                        step="0.01"
                       placeholder="Qty"
                       value={item.quantity || 1}
                       onChange={(e) => {
-                        const qty = parseInt(e.target.value) || 1
+                        const qty = parseFloat(e.target.value) || 0
                         const newItems = [...formData.items]
                         newItems[index] = { ...newItems[index], quantity: qty, amount: qty * (item.unitPrice || 0) }
                         setFormData(prev => ({ ...prev, items: newItems }))

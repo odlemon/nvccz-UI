@@ -133,7 +133,9 @@ export function FpaRollingForecast() {
     versions,
     scenarios,
     loading: loadingSelection,
+    error: bootstrapError,
     selectModel,
+    retryBootstrap,
     setVersionId,
     setScenarioId,
   } = useFpaBootstrap()
@@ -177,6 +179,10 @@ export function FpaRollingForecast() {
       if (requestId === loadRequestRef.current) setLoading(false)
     }
   }, [cycleId, effectiveScenarioId, effectiveVersionId, selectedModelId])
+
+  useEffect(() => {
+    if (bootstrapError) setLoadError(bootstrapError)
+  }, [bootstrapError])
 
   useEffect(() => {
     if (loadingSelection) {
@@ -434,7 +440,10 @@ export function FpaRollingForecast() {
             <button
               type="button"
               disabled={loading}
-              onClick={() => void loadForecast()}
+              onClick={() => {
+                if (!selectedModelId) void retryBootstrap()
+                else void loadForecast()
+              }}
               className="h-8 shrink-0 rounded-full border border-[#fda29b] px-3 font-semibold hover:bg-[#fee4e2] disabled:opacity-50"
             >
               Retry

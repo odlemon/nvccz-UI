@@ -1,0 +1,34 @@
+source_row,asset_pool,acquisition_date,description,cost_per_unit_zig,quantity,total_cost_zig,rate,total_cost_usd,supplier,useful_life_months
+01,Office Equipment,2024-08-26,HP Colour LaserJet Pro MFP 4303W Printer,14782.76,1,14782.76,14.38,1028.01,FuserTech,48
+02,Office Equipment,2024-09-11,HP Spectre 14 X360,37200.00,1,37200.00,14.30,2601.84,Laptop World,24
+03,Office Equipment,2024-09-11,HP Spectre 14 X360,37200.00,1,37200.00,14.30,2601.84,Laptop World,24
+04,Office Equipment,2024-09-11,HP Spectre 14 X360,37200.00,1,37200.00,14.30,2601.84,Laptop World,24
+05,Office Equipment,2024-09-11,HP Spectre 14 X360,37200.00,1,37200.00,14.30,2601.84,Laptop World,24
+06,Office Equipment,2024-10-01,HP Envy 16X360,64800.00,1,64800.00,25.76,2515.65,Laptop World,24
+07,Office Equipment,2024-10-02,IPHONE 15 Pro Max 512GB,67392.00,1,67392.00,25.91,2600.55,Laptop World,24
+08,Office Equipment,2024-10-02,IPHONE 15 Pro Max 512GB,67392.00,1,67392.00,25.91,2600.55,Laptop World,24
+09,Office Equipment,2024-10-02,Samsung Galaxy S24+ 256GB,49504.00,1,49504.00,25.91,1910.28,Laptop World,24
+10,Office Equipment,2024-10-02,Samsung Galaxy S24+ 256GB,49504.00,1,49504.00,25.91,1910.28,Laptop World,24
+11,Office Equipment,2024-10-02,Printer,17888.00,1,17888.00,25.91,690.27,Laptop World,48
+12,Office Equipment,2024-11-06,Epson Video Projector,15794.48,1,15794.48,26.66,592.34,FuserTech,48
+13,Office Equipment,2024-11-14,350L Fridge,12900.00,1,12900.00,25.92,497.75,Capri,48
+14,Office Equipment,2024-11-14,350L Fridge,12900.00,1,12900.00,25.92,497.75,Capri,48
+15,Office Equipment,2024-11-14,350L Fridge,12900.00,1,12900.00,25.92,497.75,Capri,48
+16,Office Equipment,2024-12-06,IPHONE 16 Pro Max 256GB,65287.80,1,65287.80,26.25,2486.82,Spellbound Electronics,24
+17,Office Equipment,2024-12-06,IPHONE 16 Pro Max 256GB,65287.80,1,65287.80,26.25,2486.82,Spellbound Electronics,24
+18,Office Equipment,2024-12-06,IPHONE 16 Pro Max 256GB,65287.80,1,65287.80,26.25,2486.82,Spellbound Electronics,24
+19,Office Equipment,2024-12-06,Samsung S23FE 256GB,20451.60,1,20451.60,26.25,779.00,Spellbound Electronics,24
+20,Office Equipment,2024-12-06,HP Spectre 14 CORE i7 11TH GEN 16/1TB,47196.00,1,47196.00,26.25,1797.70,Spellbound Electronics,24
+21,Office Equipment,2024-12-06,HP Envy 16X360,77280.00,1,77280.00,26.25,2943.61,Laptop World,24
+22,Motor Vehicle,2025-07-17,TOYOTA PRADO CHS5001807 - DARK GREY,4460400.00,1,4460400.00,30.00,151045.00,Faramatsi Motors,60
+23,Motor Vehicle,2025-07-17,TOYOTA FORTUNER CHS372552 - SILVER METALLIC,2444400.00,1,2444400.00,30.00,83845.00,Faramatsi Motors,60
+24,Motor Vehicle,2025-07-17,TOYOTA FORTUNER CHS372410 - SUPER WHITE,2444400.00,1,2444400.00,30.00,83845.00,Faramatsi Motors,60
+25,Motor Vehicle,2025-07-17,TOYOTA FORTUNER CHS372477 - SUPER WHITE,2444400.00,1,2444400.00,30.00,83845.00,Faramatsi Motors,60
+26,Motor Vehicle,2025-07-31,TOYOTA URBAN CRUISER CHS986719 - BROWN/BLACK,1242000.00,1,1242000.00,30.00,41400.00,Faramatsi Motors,60
+27,Office Furniture,2025-10-07,1 in 1 Workstation Desk,86400.00,1,86400.00,30.00,2880.00,Lifestyle Urban,48
+28,Office Furniture,2025-10-07,2 in 1 Workstation Desk,43960.00,2,87920.00,30.00,2930.67,Lifestyle Urban,48
+29,Office Furniture,2025-10-07,Black Office Chairs,11520.00,8,92160.00,30.00,3072.00,Lifestyle Urban,48
+30,Office Equipment,2025-10-15,HP Pavilion 14 Core i7 1365U 16gb 1TB SSD x graphic,34960.00,1,34960.00,30.00,1165.33,Spellbound Electronics,24
+31,Office Equipment,2025-10-15,HP Pavilion 14 Core i7 1365U 16gb 1TB SSD x graphic,34960.00,1,34960.00,30.00,1165.33,Spellbound Electronics,24
+32,Office Equipment,2025-10-15,HP Pavilion 14 Core i7 1365U 16gb 1TB SSD x graphic,34960.00,1,34960.00,30.00,1165.33,Spellbound Electronics,24
+33,Office Equipment,2025-11-03,PRINTER-CANON IMAGE RUNNER C3326i MFP,133559.00,1,133559.00,30.00,4451.97,FuserTech,48

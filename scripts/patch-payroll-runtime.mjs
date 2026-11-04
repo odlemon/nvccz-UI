@@ -105,6 +105,16 @@ must(
 
 console.log(`Patching ${path.relative(ROOT, RUNTIME)}${CHECK_ONLY ? " (check only)" : ""}\n`)
 
+// A view-only Payroll role must be able to open the runs register. Creation stays
+// guarded by the separate payroll.prepare -> payroll.runs.manage mapping.
+s = replaceOnce(
+  s,
+  "const pagePermission={employees:'employee.view',onboarding:'employee.edit',runs:'payroll.prepare'",
+  "const pagePermission={employees:'employee.view',onboarding:'employee.edit',runs:'runs.view'",
+  "payroll runs register uses the read grant",
+  "runs:'runs.view'",
+)
+
 // ---------------------------------------------------------------------------
 // 1. Live bridge injection
 // ---------------------------------------------------------------------------
@@ -1114,7 +1124,7 @@ s = replaceEvery(
   "__pr6TrendV3()||payrollTrendDataV3_fixture",
 )
 s = s.replace(
-  "const (__pr6TrendV3()||payrollTrendDataV3_fixture) = [",
+  "const (__pr6TrendV3()||payrollTrendDataV3_fixture)_fixture = [",
   "const payrollTrendDataV3_fixture = [",
 )
 
@@ -1532,6 +1542,8 @@ const HYDRATE_IMPL = `  api = {
         if (Array.isArray(payload.payrollRuns)) payrollRuns = payload.payrollRuns;
         if (Array.isArray(payload.exceptions)) exceptions = payload.exceptions;
         if (Array.isArray(payload.documents)) documents = payload.documents;
+        if (payload.reports !== undefined) __pr6Live.reports = payload.reports;
+        if (payload.auditData !== undefined) __pr6Live.audit = payload.auditData;
         if (Array.isArray(payload.folders)) folders = payload.folders;
         if (Array.isArray(payload.reportTemplates)) reportTemplates = payload.reportTemplates;
         if (Array.isArray(payload.auditEvents)) auditEvents = payload.auditEvents;
@@ -1618,6 +1630,13 @@ if (s.includes("__pr6Live.vendors = payload.vendors")) {
 }
 
 s = replaceOnce(s, API_ANCHOR, HYDRATE_IMPL, "api.hydrate()", "hydrate(payload) {")
+s = replaceOnce(
+  s,
+  "if (payload.reports !== undefined) __pr6Live.reports = payload.reports;",
+  "if (payload.reports !== undefined) __pr6Live.reports = payload.reports;\n        if (payload.auditData !== undefined) __pr6Live.audit = payload.auditData;",
+  "hydrate: carry paginated audit data",
+  "payload.auditData !== undefined",
+)
 
 // ---------------------------------------------------------------------------
 // 6. Expose hydrate on window.MatanhoUI so the host can call it either way

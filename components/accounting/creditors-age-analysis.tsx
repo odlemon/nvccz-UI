@@ -9,11 +9,14 @@ import { CalendarIcon, RefreshCw, Loader2, ChevronDown, ChevronRight } from "luc
 import { format } from "date-fns"
 import { toast } from "sonner"
 import { accountingApi } from "@/lib/api/accounting-api"
+import { AccountingExportControls } from "./accounting-export-controls"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 export function CreditorsAgeAnalysis() {
   const [asOfDate, setAsOfDate] = useState<Date>(new Date())
   const [loading, setLoading] = useState(false)
   const [data, setData] = useState<any>(null)
+  const [currency, setCurrency] = useState('all')
   const [expandedVendors, setExpandedVendors] = useState<Set<string>>(new Set())
 
   const handleGenerate = async () => {
@@ -22,6 +25,7 @@ export function CreditorsAgeAnalysis() {
       const response = await accountingApi.getCreditorsAgeAnalysis(format(asOfDate, "yyyy-MM-dd"))
       if (response.success && response.data) {
         setData(response.data)
+        setCurrency('all')
         setExpandedVendors(new Set())
       } else {
         throw new Error(response.error || "Failed to load report")
@@ -47,11 +51,16 @@ export function CreditorsAgeAnalysis() {
     })
   }
 
-  const vendors: any[] = data?.vendors || []
-  const grandTotal = data?.grandTotal
-  const grandTotalMixedCurrency: boolean = Boolean(data?.grandTotalMixedCurrency)
+  const vendors: any[] = (data?.vendors || []).flatMap((v: any) => {
+    if (currency === 'all') return [v]
+    const bills = (v.bills || []).filter((b: any) => b.currencyCode === currency)
+    if (!bills.length) return []
+    return [{ ...v, ...(v.multiCurrencyVendor ? v.perCurrencyVendorTotals?.[currency] : {}), bills, multiCurrencyVendor: false }]
+  })
+  const grandTotal = currency === 'all' ? data?.grandTotal : null
+  const grandTotalMixedCurrency: boolean = currency === 'all' && Boolean(data?.grandTotalMixedCurrency)
   const grandTotalNote: string | undefined = data?.grandTotalNote
-  const totalsByCurrency: Record<string, any> = data?.totalsByCurrency || {}
+  const totalsByCurrency: Record<string, any> = Object.fromEntries(Object.entries(data?.totalsByCurrency || {}).filter(([code]) => currency === 'all' || code === currency))
   const bucketLabels = data?.bucketShortColumnTitles || {
     current: "Current",
     days1To30: "30 Days",
@@ -78,6 +87,11 @@ export function CreditorsAgeAnalysis() {
             <Calendar mode="single" selected={asOfDate} onSelect={(d) => d && setAsOfDate(d)} initialFocus />
           </PopoverContent>
         </Popover>
+        <Select value={currency} onValueChange={setCurrency}>
+          <SelectTrigger className="w-44 rounded-full" aria-label="Currency"><SelectValue /></SelectTrigger>
+          <SelectContent><SelectItem value="all">All currencies</SelectItem>{Object.keys(data?.totalsByCurrency || {}).sort().map(code => <SelectItem key={code} value={code}>{code}</SelectItem>)}</SelectContent>
+        </Select>
+        {data && !loading && <AccountingExportControls label="creditors age analysis" spec={{ title: 'Creditors Age Analysis', subtitle: `As of ${data.asOfDate} · ${currency === 'all' ? 'All currencies' : currency}`, columns: ['Supplier', 'Invoice', 'Invoice date', 'Due date', 'Currency', 'Outstanding', 'VAT', 'Age bucket'], moneyColumns: [5, 6], rows: vendors.flatMap(v => (v.bills || []).map((b: any) => [v.vendorName || '', b.invoiceNumber || '', b.invoiceDate || '', b.dueDate || '', b.currencyCode || '', Number(b.outstandingAmount || 0), Number(b.vatAmount || 0), b.reportColumnTitle || b.bucket || ''])), filename: 'creditors-age-analysis' }} />}
         <Button onClick={handleGenerate} disabled={loading} className="rounded-full">
           {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-2" />}
           Generate

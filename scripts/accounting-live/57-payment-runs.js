@@ -3,7 +3,7 @@
  * else approves it; the bank file goes to the bank; once paid, the run is settled with the bank's confirmation and each
  * bill is paid (journal, cashbook line, procurement shows it paid). A bill that fails keeps its reason and can be tried
  * again. Data: /accounting/payment-runs. */
-AL.ui.pr = AL.ui.pr || { open: '' };
+AL.ui.pr = AL.ui.pr || { open: '', page: 1, pageSize: 10 };
 AL.prLoad = () => AL.res('pr', () => AL.get('/accounting/payment-runs'));
 AL.prReload = () => { Object.keys(AL.cache).filter((k) => k === 'pr' || k.startsWith('pr:')).forEach((k) => delete AL.cache[k]); AL.redraw(); };
 AL.PR_STATUS = { DRAFT: ['Draft', 'info'], SUBMITTED: ['Waiting for approval', 'warn'], APPROVED: ['Approved: pay at the bank', 'warn'], SETTLING: ['Settling', 'warn'], SETTLED: ['Paid', 'ok'], PARTLY_SETTLED: ['Partly paid', 'bad'], CANCELLED: ['Cancelled', 'info'] };
@@ -12,17 +12,22 @@ AL.page('paymentruns', () => {
   AL.meLoad();
   const canPrep = AL.can('manage_accounting'), canApprove = AL.can('manage_ledger');
   const e = AL.prLoad();
-  const head = AL.head('Daily accounting', 'Payment Runs', '', [AL.btn('Payables', 'pr-payables'), canPrep ? AL.btn('New payment run', 'pr-new', 'primary') : ''].join(''));
+  const exportActions = `<div class="al-export al-export-labeled" role="group" aria-label="Export payment runs">${[['pdf','PDF'],['xlsx','Excel'],['csv','CSV']].map(([format,label]) => `<button type="button" class="v28-btn al-export-btn" data-al="pr-export" data-fmt="${format}" title="Export as ${label}" aria-label="Export as ${label}">${label}</button>`).join('')}</div>`;
+  const head = AL.head('Payables', 'Payment Runs', 'Group approved supplier bills into a run, route it for independent approval, then record settlement after the bank pays.', [exportActions, AL.btn('Payables', 'pr-payables'), canPrep ? AL.btn('New payment run', 'pr-new', 'primary') : ''].join(''));
   const g = AL.gate(e, { key: 'pr', errorTitle: 'Payment runs could not be loaded' });
   if (g) return `<div class="v28-page">${head}${g}</div>`;
-  const runs = e.data || [], me = AL.me().id;
+  const runs = Array.isArray(e.data) ? e.data.filter((run) => run && typeof run === 'object') : [], me = AL.me().id;
+  const totalAmount = (rows) => rows.reduce((sum, run) => sum + (Number.isFinite(Number(run.total)) ? Number(run.total) : 0), 0);
   const kpis = AL.kpis([
-    ['Waiting for approval', String(runs.filter((r) => r.status === 'SUBMITTED').length), AL.money(runs.filter((r) => r.status === 'SUBMITTED').reduce((s, r) => s + r.total, 0)), runs.some((r) => r.status === 'SUBMITTED') ? '#f79009' : undefined],
-    ['Approved, to pay at the bank', String(runs.filter((r) => r.status === 'APPROVED').length), AL.money(runs.filter((r) => r.status === 'APPROVED').reduce((s, r) => s + r.total, 0))],
+    ['Waiting for approval', String(runs.filter((r) => r.status === 'SUBMITTED').length), AL.money(totalAmount(runs.filter((r) => r.status === 'SUBMITTED'))), runs.some((r) => r.status === 'SUBMITTED') ? '#f79009' : undefined],
+    ['Approved, to pay at the bank', String(runs.filter((r) => r.status === 'APPROVED').length), AL.money(totalAmount(runs.filter((r) => r.status === 'APPROVED')))],
     ['With failed bills', String(runs.filter((r) => r.status === 'PARTLY_SETTLED').length), 'Settle again once corrected', runs.some((r) => r.status === 'PARTLY_SETTLED') ? '#d92d20' : undefined],
-    ['Paid this month', AL.money(runs.filter((r) => r.status === 'SETTLED' && String(r.settledAt || '').slice(0, 7) === AL.stiToday().slice(0, 7)).reduce((s, r) => s + r.total, 0)), `${AL.plural(runs.filter((r) => r.status === 'SETTLED').length, 'run')} paid in all`],
+    ['Paid this month', AL.money(totalAmount(runs.filter((r) => r.status === 'SETTLED' && String(r.settledAt || '').slice(0, 7) === AL.stiToday().slice(0, 7)))), `${AL.plural(runs.filter((r) => r.status === 'SETTLED').length, 'run')} paid in all`],
   ]);
-  const rows = runs.map((r) => {
+  const pageSize = AL.ui.pr.pageSize || 10, pageCount = Math.max(1, Math.ceil(runs.length / pageSize));
+  AL.ui.pr.page = Math.max(1, Math.min(AL.ui.pr.page || 1, pageCount));
+  const start = (AL.ui.pr.page - 1) * pageSize, shown = runs.slice(start, start + pageSize);
+  const rows = shown.map((r) => {
     const st = AL.PR_STATUS[r.status] || [r.status, 'info'];
     const acts = [AL.btn('Bills', 'pr-open', 'small', `data-id="${ae(r.id)}"`)];
     if (canPrep && r.status === 'DRAFT' && r.preparedById === me) acts.push(AL.btn('Submit', 'pr-submit', 'small primary', `data-id="${ae(r.id)}"`));
@@ -38,9 +43,17 @@ AL.page('paymentruns', () => {
       <td class="al-actions">${acts.join('')}</td>
     </tr>`;
   }).join('');
-  return `<div class="v28-page">${head}${kpis}${AL.panel('Runs', '', rows ? AL.table(['Run', 'Amount', 'Prepared by', 'Status', ''], rows, '1060px') : AL.empty('No payment runs yet.'))}</div>`;
+  const pager = `<nav class="al-set-pager" aria-label="Payment run pages"><span>Showing ${runs.length ? start + 1 : 0}–${Math.min(start + pageSize, runs.length)} of ${runs.length}</span><div class="al-set-pager-tools"><label class="al-set-page-size"><span>Rows</span><select class="v28-select" data-pr-page-size aria-label="Payment runs per page">${[10, 25, 50].map((n) => `<option value="${n}"${n === pageSize ? ' selected' : ''}>${n}</option>`).join('')}</select></label><div class="al-actions"><button type="button" class="v28-btn small" data-al="pr-page" data-page="${AL.ui.pr.page - 1}" ${AL.ui.pr.page <= 1 ? 'disabled' : ''}>Previous</button><span>Page ${AL.ui.pr.page} of ${pageCount}</span><button type="button" class="v28-btn small" data-al="pr-page" data-page="${AL.ui.pr.page + 1}" ${AL.ui.pr.page >= pageCount ? 'disabled' : ''}>Next</button></div></div></nav>`;
+  return `<div class="v28-page">${head}${kpis}${AL.panel('Runs', '', rows ? `${AL.table(['Run', 'Amount', 'Prepared by', 'Status', ''], rows, '1060px')}${pager}` : AL.empty('No payment runs yet.'))}</div>`;
 });
 AL.actions['pr-payables'] = () => AL.go('payables');
+AL.actions['pr-page'] = (el) => { AL.ui.pr.page = Number(el.dataset.page) || 1; AL.redraw(); };
+AL.actions['pr-export'] = (el) => {
+  const runs = AL.prLoad().data || [];
+  const spec = { title: 'Supplier Payment Runs', subtitle: 'Accounting payables', filename: 'supplier-payment-runs', landscape: true, meta: [['Runs', runs.length]], columns: ['Run reference', 'Bank account', 'Payment date', 'Currency', 'Amount', 'Bills', 'Paid', 'Prepared by', 'Approved by', 'Status', 'Bank reference'], rows: runs.map((r) => [r.reference, r.bank, AL.date(r.paymentDate), r.currency, r.total, r.bills, r.paid, r.preparedBy || '', r.approvedBy || '', (AL.PR_STATUS[r.status] || [r.status])[0], r.bankReference || '']) };
+  if (!spec.rows.length) return AL.toast('Nothing to export', 'There are no payment runs to export.', 'bad');
+  return AL.exportRun(el, spec, 'payment runs');
+};
 AL.prFind = (id) => ((AL.cache.pr && AL.cache.pr.data) || []).find((r) => r.id === id);
 AL.actions['pr-new'] = (el) => AL.busy(el, async () => {
   const banks = (await AL.get('/cashbook/banks').catch(() => [])).filter((b) => b.isActive !== false);
@@ -88,3 +101,6 @@ AL.actions['pr-settle'] = (el) => {
 };
 // the Payables page (scripts/accounting-v52-payables-live.inc.js) links here
 AL.actions['pr-runs'] = () => AL.go('paymentruns');
+// Keep payment runs directly discoverable from Accounting navigation as well as from Payables.
+AL.navAdd('Payables', ['paymentruns', 'Payment Runs', 'payable'], 'payables');
+document.addEventListener('change', (ev) => { if (ev.target?.matches?.('[data-pr-page-size]')) { AL.ui.pr.pageSize = Number(ev.target.value) || 10; AL.ui.pr.page = 1; AL.redraw(); } });

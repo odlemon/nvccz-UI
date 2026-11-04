@@ -281,6 +281,8 @@ export function FundraisingOnboarding() {
   const [rawMandates, setRawMandates] = useState<Record<string, any>[]>([])
   const [rawInvestors, setRawInvestors] = useState<Record<string, any>[]>([])
   const [rawCampaigns, setRawCampaigns] = useState<Record<string, any>[]>([])
+  const [selectedKycDetail, setSelectedKycDetail] = useState<Record<string, any> | null>(null)
+  const [loadingKycDetail, setLoadingKycDetail] = useState(false)
 
   const [requestingDocs, setRequestingDocs] = useState(false)
   const [updatingKyc, setUpdatingKyc] = useState(false)
@@ -389,6 +391,21 @@ export function FundraisingOnboarding() {
       setSelectedId(cases[0].id)
     }
   }, [loading, cases, selectedId])
+
+  useEffect(() => {
+    if (!selected || selected.kind !== "KYC") {
+      setSelectedKycDetail(null)
+      return
+    }
+    let active = true
+    setLoadingKycDetail(true)
+    fundraisingApi
+      .getKycCase(String(selected.raw.id))
+      .then((detail) => { if (active) setSelectedKycDetail(detail) })
+      .catch((err) => { if (active) { setSelectedKycDetail(null); toastFrError(err, "Could not load KYC evidence") } })
+      .finally(() => { if (active) setLoadingKycDetail(false) })
+    return () => { active = false }
+  }, [selected])
 
   const holdBanner = selected?.complianceHold
 
@@ -691,6 +708,49 @@ export function FundraisingOnboarding() {
         ) : null}
       </div>
 
+      {selected?.kind === "KYC" ? (
+        <section className={cn(CARD, "mt-4 p-4")} aria-label="KYC evidence and audit detail">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h2 className="text-[13px] font-semibold text-[#000000]">Evidence and review history</h2>
+              <p className="mt-1 text-[11px] text-[#111111]">Live linked records for the selected KYC case.</p>
+            </div>
+            {loadingKycDetail ? <Loader2 className="h-4 w-4 animate-spin text-[#141414]" /> : null}
+          </div>
+          {!loadingKycDetail && selectedKycDetail ? (
+            <div className="mt-4 grid gap-4 lg:grid-cols-3">
+              <div className="rounded-[6px] border border-[#e2e8f0] p-3">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-[#141414]">Documents</p>
+                <p className="mt-1 text-xl font-bold text-[#000000]">{selectedKycDetail.documents?.length ?? 0}</p>
+                <div className="mt-2 space-y-1.5">
+                  {(selectedKycDetail.documents ?? []).slice(0, 4).map((doc: any) => (
+                    <div key={doc.id} className="flex items-center justify-between gap-2 text-[11px]"><span className="truncate text-[#111111]">{doc.name}</span><span className="shrink-0 text-[#141414]">{String(doc.category).replace(/_/g, " ")}</span></div>
+                  ))}
+                </div>
+              </div>
+              <div className="rounded-[6px] border border-[#e2e8f0] p-3">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-[#141414]">Assisted liveness</p>
+                <p className="mt-1 text-xl font-bold text-[#000000]">{selectedKycDetail.livenessSessions?.length ?? 0}</p>
+                <div className="mt-2 space-y-1.5">
+                  {(selectedKycDetail.livenessSessions ?? []).slice(0, 3).map((session: any) => (
+                    <div key={session.id} className="flex items-center justify-between gap-2 text-[11px]"><span className="text-[#111111]">{session.status}</span><span className="text-[#141414]">{session.resultMetadata?.automatedVerification === false ? "Manual review" : "—"}</span></div>
+                  ))}
+                </div>
+              </div>
+              <div className="rounded-[6px] border border-[#e2e8f0] p-3">
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-[#141414]">Audit history</p>
+                <p className="mt-1 text-xl font-bold text-[#000000]">{selectedKycDetail.externalAuditLogs?.length ?? 0}</p>
+                <div className="mt-2 space-y-1.5">
+                  {(selectedKycDetail.externalAuditLogs ?? []).slice(0, 4).map((event: any) => (
+                    <div key={event.id} className="flex items-center justify-between gap-2 text-[11px]"><span className="truncate text-[#111111]">{event.action}</span><span className="shrink-0 text-[#141414]">{new Date(event.createdAt).toLocaleDateString()}</span></div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          ) : !loadingKycDetail ? <p className="mt-4 text-[11px] text-[#141414]">No linked evidence or audit records were returned.</p> : null}
+        </section>
+      ) : null}
+
       <FrSimpleWizard
         open={createOpen}
         onOpenChange={setCreateOpen}
@@ -710,7 +770,6 @@ export function FundraisingOnboarding() {
               <select
                 className={cn(frSelectClass, "rounded-full")}
                 value={form.investorId}
-                disabled={wizardLoadingInvestors}
                 onChange={(e) => setForm((f) => ({ ...f, investorId: e.target.value }))}
               >
                 <option value="">{wizardLoadingInvestors ? "Loading investors…" : "Select investor"}</option>

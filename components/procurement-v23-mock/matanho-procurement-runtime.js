@@ -6,6 +6,8 @@ import {
   onClientDesignSessionUser,
 } from "@/components/client-design-mock/runtime-auth";
 import * as XLSX from "xlsx";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 import { generatePDF } from "@/lib/utils/pdf-generator";
 export function startProcurementV23Runtime(rootEl, runtimeOptions = {}) {
   const initialPage = runtimeOptions.initialPage || 'dashboard';
@@ -588,7 +590,15 @@ function __pr23RequisitionEntityField() {
 function __pr23RequisitionDepartmentField() {
   const live = __pr23Live() || {};
   const dept = live.access && live.access.department;
-  if (dept) return formField('Department / cost centre', `<select name="cost" disabled><option>${__pr23Esc(dept)}</option></select>`);
+  const departments = Array.isArray(live.departments) ? live.departments : [];
+  if (dept && departments.includes(dept)) return formField('Department / cost centre', `<select name="cost" disabled><option>${__pr23Esc(dept)}</option></select>`);
+  // Some local synthetic identities carry a legacy department label that the
+  // live API no longer accepts (for example, “Investments”). Keep the field
+  // actionable and submit one of the API's current department values.
+  if (dept && departments.length) {
+    const options = departments.map(d => `<option>${__pr23Esc(d)}</option>`).join('');
+    return formField('Department / cost centre', `<select name="cost" required><option value="">Choose a department</option>${options}</select><p class="muted" style="margin:4px 0 0">Your saved department label needs confirmation for this request.</p>`);
+  }
   // An administrator has no department of their own but can still raise a requisition, against
   // whichever department they choose here (an ordinary account with none is blocked below).
   if (live.access && live.access.isPrivileged) {
@@ -2195,7 +2205,7 @@ function __pr23PlanModal(planId) {
   const live = __pr23Live() || {};
   const year = new Date().getFullYear();
   const years = [`FY ${year}`, `FY ${year + 1}`];
-  const lines = plan ? '' : `<div class="field full"><label>Plan lines (optional; add more later with Add plan item)</label>${__pr23LinesTable(['Requirement', 'Category', 'Quarter', 'Method', 'Estimated value'], [__pr23PlanLineRows(4)])}</div>`;
+  const lines = plan ? '' : `<div class="field full"><label>Plan lines (optional; add as many as needed)</label><div id="planLinesCreateV23">${__pr23LinesTable(['Requirement', 'Category', 'Quarter', 'Method', 'Estimated value'], [__pr23PlanLineRows(4)])}</div><button type="button" class="btn small" style="margin-top:8px" data-action="add-plan-line-row-v23">Add another line</button></div>`;
   openModal(
     plan ? `Edit ${plan.id}` : 'Create annual procurement plan',
     plan ? 'Change the plan header. Lines are added with Add plan item.' : 'Create the plan with its budget and first requirements. It stays a draft until you submit it for budget approval.',
@@ -2222,6 +2232,15 @@ function __pr23PlanItemModal() {
     btn('Cancel', 'close-overlay') + btn('Save item', 'save-plan-item', 'primary'),
   );
 }
+
+__pr23On(document, 'click', event => {
+  const control = event.target && event.target.closest && event.target.closest('[data-action="add-plan-line-row-v23"]');
+  if (!control) return;
+  event.preventDefault();
+  event.stopImmediatePropagation();
+  const body = document.querySelector('#planLinesCreateV23 tbody');
+  if (body) body.insertAdjacentHTML('beforeend', __pr23PlanLineRows(1));
+}, true);
 
 /**
  * Edit an existing plan line. The vendored Edit button on this row (Plan requirement register,
@@ -2396,7 +2415,7 @@ function __pr23RefreshPosition() {
     const line = rows.find(b => b.costCentre && b.costCentre === cc) || rows.find(b => !b.costCentre);
     if (!line) lines.push(`No active budget for ${code}${cc ? ` and ${cc}` : ''} this year.`);
     else lines.push(`Budget ${code}${line.costCentre ? ` · ${line.costCentre}` : ''}: ${__pr23Cents(line.available)} available of ${__pr23Cents(line.amount)}.${total > line.available + 0.005 ? ` This requisition, at ${__pr23Cents(total)}, is above it${mode === 'ENFORCE' ? ' and will not submit' : ''}.` : ''}`);
-  } else if (mode === 'ENFORCE') lines.push('A budget code is needed before this can be submitted.');
+  } else lines.push('No budget code selected. The requisition can still be submitted for review.');
   const planId = field('planItem');
   const pl = planId ? (state.planLinesV23 || []).find(l => l.id === planId) : null;
   if (pl) lines.push(`Plan line ${pl.planNumber}: ${__pr23Cents(pl.remaining)} left of ${__pr23Cents(pl.estimatedValue)}.${total > pl.remaining + 0.005 ? ' This requisition is above what remains.' : ''}`);
@@ -2641,6 +2660,7 @@ function __pr23ExportRows(title) {
   if (pick(/evaluation|bid|quotation|comparison/i)) return [['Quotation', 'RFQ', 'Vendor', 'Amount', 'Currency', 'Status', 'Technical score', 'Submitted'], ...(state.quotationsLive || []).map(q => [q.id, n(q.rfq), q.vendor, q.amount, n(q.currency), q.status, n(q.evaluationScore), n(q.submitted)])];
   if (pick(/approval/i)) return [['Approval', 'Type', 'Record', 'Title', 'Amount', 'Role', 'Status'], ...(state.approvalPromptsV6 || []).map(a => [a.id, a.type, a.record, a.title, n(a.amount), a.role, a.status])];
   if (pick(/vendor|supplier/i)) return [['Vendor', 'Category', 'BP number', 'VAT number', 'Status', 'Tax clearance', 'Email', 'Spend'], ...(state.vendors || []).map(v => [v.name, v.category, v.bp, v.vat, v.status, v.itf, n(v.email), v.spend])];
+  if (pick(/document|vault/i)) return [['UID', 'Document', 'Type', 'Folder', 'Version', 'Owner', 'Updated', 'Status', 'Related record'], ...(state.documents || []).map(d => [d.id, d.name, d.type, d.folder, d.version, d.owner, d.uploadedAt || d.date, d.status, n(d.relatedRecord)])];
   if (pick(/contract/i)) return [['Contract', 'Title', 'Vendor', 'Value', 'Start', 'End', 'Status'], ...(state.contractsV6 || []).map(c => [c.id, c.title, c.vendor, c.value, n(c.start), n(c.end), c.status])];
   if (pick(/plan|budget/i)) return [['Line', 'Plan', 'Requirement', 'Department', 'Category', 'Quarter', 'Method', 'Estimated value', 'Status'], ...(state.planItems || []).map(i => [i.id, i.plan, i.description, i.entity, i.category, i.quarter, i.method, i.budget, i.status])];
   if (pick(/spend|commitment|department spend|category spend/i)) return [['Purchase order', 'Vendor', 'Department', 'Category', 'Amount', 'Currency', 'Status'], ...(state.orders || []).map(o => [o.id, o.vendor, o.entity, n(o.spendCategory), o.amount, n(o.currency), o.status])];
@@ -2689,7 +2709,13 @@ function __pr23ExportFile(format, title) {
   const name = String(title || 'Matanho Procurement Export');
   const base = name.replace(/[^a-z0-9]+/gi, '_').replace(/^_|_$/g, '') || 'export';
   const rows = __pr23ExportRows(name);
-  if (format === 'pdf') return downloadBlob(__pr23PdfBlob(name, rows), base + '.pdf');
+  if (format === 'pdf') {
+    const pdf = new jsPDF({ orientation: 'landscape' });
+    pdf.setFontSize(14);
+    pdf.text(name, 14, 16);
+    autoTable(pdf, { head: [rows[0]], body: rows.slice(1), startY: 23, styles: { fontSize: 8, overflow: 'linebreak' }, margin: { left: 14, right: 14 } });
+    return downloadBlob(pdf.output('blob'), base + '.pdf');
+  }
   if (format === 'json') {
     const [head, ...body] = rows;
     return downloadBlob(new Blob([JSON.stringify(body.map(r => Object.fromEntries(head.map((h, i) => [h, r[i]]))), null, 2)], { type: 'application/json' }), base + '.json');
@@ -2705,6 +2731,14 @@ function __pr23ExportFile(format, title) {
   const wbArray = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
   return downloadBlob(new Blob([wbArray], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), base + '.xlsx');
 }
+
+__pr23On(document, 'click', event => {
+  const control = event.target && event.target.closest && event.target.closest('[data-action="export-documents-v23"]');
+  if (!control || !__pr23Live()) return;
+  event.preventDefault();
+  event.stopImmediatePropagation();
+  __pr23ExportFile(control.dataset.id || 'csv', 'Document Vault Register');
+}, true);
 
 // ---------------------------------------------------------------- accounts payable tab
 
@@ -2799,7 +2833,12 @@ __pr23On(document, 'input', event => {
     }
     if (input.value.trim() !== q) return;
     if (!items.length) {
-      box.innerHTML = '<div class="muted" style="padding:8px 10px;font-size:12px">Not bought before. Enter your own estimate.</div>';
+      // Custom items are valid requisition lines. Render the fallback as a real
+      // option so keyboard/mouse selection follows the same commit path as a
+      // historical suggestion instead of leaving the line in an unselected
+      // state.
+      window.__pr23SuggestItems = [{ itemName: q, unit: null, lastPrice: null, standardCost: null, vendors: [] }];
+      box.innerHTML = '<button type="button" data-pr-suggest="0" aria-label="Use custom item" style="display:block;width:100%;text-align:left;padding:8px 10px;border:0;background:none;border-radius:8px;cursor:pointer"><strong>Not bought before. Enter your own estimate.</strong><br><span class="muted" style="font-size:12px">Use “' + __pr23Esc(q) + '” as a custom item.</span></button>';
       box.style.display = 'block';
       return;
     }
@@ -3991,8 +4030,9 @@ function __pr23VendorRegistryLive() {
   const head = pageHead('Supplier master', 'Vendor Registry',
     'The central vendor master: identity, classification, status, compliance and banking. Only an Approved, compliant vendor can be invited to an RFQ, awarded, issued a purchase order or paid.',
     __pr23ActionButton('Register vendor', 'register-vendor', '', 'primary', 'plus')
+      + __pr23ActionButton('Bulk upload', 'bulk-register-vendors-open-v23', '', '', 'upload')
       + (canRun ? __pr23ActionButton('Run compliance check', 'run-compliance-reminders-v6', '', '', 'mail') : '')
-      + __pr23ActionButton('Vendor portal', 'vendor-portal', '', '', 'vendor'));
+      );
   const kpis = `<div class="grid kpis">`
     + kpi('Registered vendors', vs.length, `${n(v => v.vendorStatusCode === 'APPROVED')} approved`, 'vendor')
     + kpi('Can transact', n(v => v.transactable), 'Approved, fully approved and compliant', 'approve')
@@ -4023,6 +4063,27 @@ function __pr23VendorRegistryLive() {
   const regs = __pr23VendorRegistrationsCard();
   return `<div class="page">${head}${regs}${kpis}${card('Vendors', 'Filter by status or compliance; open a vendor for its full record.', `${toolbar}<div class="table-wrap"><table id="vendorRegistryTableV23"><thead><tr>${['Vendor', 'Contact', 'Classification', 'Vendor status', 'Compliance', 'Banking', ''].map(h => `<th>${h}</th>`).join('')}</tr></thead><tbody>${rows.join('')}</tbody></table></div>${empty}`)}</div>`;
 }
+
+function __pr23VendorBulkModal() {
+  openModal(
+    'Bulk register vendors',
+    'Upload the first sheet of a CSV or Excel file. Every valid row is registered as a Draft for review.',
+    `<form id="vendorBulkFormV23" class="form-grid">
+      <div class="field full"><label>Vendor file</label><input type="file" name="file" required accept=".csv,.xlsx,.xls"></div>
+      <div class="field full"><label>Required column</label><p class="muted">Legal name (Vendor name or Name are also accepted).</p></div>
+      <div class="field full"><label>Optional columns</label><p class="muted">Trading name, Category, Registration number, Tax number/TIN, VAT number, BP number, Contact person, Email, Phone, Address, Country, Payment terms, Currency and Commodity categories.</p></div>
+    </form>`,
+    btn('Cancel', 'close-overlay') + btn('Import vendors', 'bulk-register-vendors-v23', 'primary', 'upload'),
+  );
+}
+
+__pr23On(document, 'click', event => {
+  const control = event.target && event.target.closest && event.target.closest('[data-action="bulk-register-vendors-open-v23"]');
+  if (!control || !__pr23Live()) return;
+  event.preventDefault();
+  event.stopImmediatePropagation();
+  __pr23VendorBulkModal();
+}, true);
 
 /** Applied straight to the rows on input/change, and remembered, so a redraw keeps the filter. */
 function __pr23VApplyFilters() {
@@ -4063,7 +4124,7 @@ function __pr23VendorDetailLive(v) {
   const moveButtons = moves.map(m => `<button class="btn${m.to === 'APPROVED' ? ' primary' : (['BLOCKED', 'SUSPENDED', 'INACTIVE'].includes(m.to) ? ' danger' : '')}" data-action="vendor-status-move-v23" data-id="${__pr23Esc(v.id)}" data-to="${__pr23Esc(m.to)}">${__pr23Esc(m.to === 'APPROVED' && v.vendorStatusCode !== 'PENDING_APPROVAL' ? 'Reinstate as Approved' : (m.to === 'PENDING_REVIEW' ? 'Submit for review' : (m.to === 'PENDING_APPROVAL' ? 'Send for approval' : `Move to ${m.label}`)))}</button>`).join('');
   const head = pageHead('Vendor profile', v.name,
     [v.vendorCode, v.category, v.country].filter(x => x && x !== '—').join(' | '),
-    (canManage ? __pr23ActionButton('Edit profile', 'edit-vendor-v6', v.id, '', 'edit') : '') + moveButtons + __pr23ActionButton('Open vendor portal', 'vendor-portal-v6', v.id, '', 'vendor') + (canManage ? __pr23ActionButton('Delete vendor', 'delete-vendor-v23', v.id, 'danger') : ''));
+    (canManage ? __pr23ActionButton('Edit profile', 'edit-vendor-v6', v.id, '', 'edit') : '') + moveButtons + (canManage ? __pr23ActionButton('Delete vendor', 'delete-vendor-v23', v.id, 'danger') : ''));
   const docCounts = { VALID: 0, EXPIRING: 0, EXPIRED: 0 };
   for (const d of docs) if (docCounts[d.expiryState] != null) docCounts[d.expiryState] += 1;
   const kpis = `<div class="grid kpis">`
@@ -5875,8 +5936,8 @@ function accountsPage(){
  return `<div class="page">${pageHead('Accounting hand-off','Accounts & Asset Transfers','Post approved P2P journals to the accounting API, manage AP batches, WHT/VAT logic and maintain the fixed asset registry. Reconciliation screens have been removed.',btn('Export bank file','export-bank','','download')+btn('Sync accounting API','sync-accounting','primary','transfer'))}${filterBar()}<div class="grid kpis">${kpi('Journal queue','4','2 ready to post','account')}${kpi('AP liability',money(1248000),'Approved vendor invoices','invoice')}${kpi('WHT payable',money(26460),'Non-compliant vendor deduction','account')}${kpi('VAT input',money(286400),'Current tax period','account')}${kpi('Asset transfer queue','2','From accepted GRNs','transfer')}${kpi('Accounting API','Online','Last sync 4 minutes ago','approve')}</div><section class="card">${tabs}<div class="card-body" style="padding-top:15px">${content}</div></section></div>`
 }
 function documentsPage(){
- const rows=state.documents.map(d=>`<tr data-record="document" data-id="${d.id}"><td><strong class="link">${d.id}</strong></td><td>${d.name}</td><td>${d.type}</td><td>${d.version}</td><td>${d.owner}</td><td>${d.date}</td><td>${status(d.status)}</td><td><div class="actions"><button class="btn small" data-action="preview-document" data-id="${d.id}">${icon('eye')}Preview</button><button class="btn small" data-action="download-document" data-id="${d.id}">${icon('download')}PDF</button></div></td></tr>`);
- return `<div class="page">${pageHead('Controlled records','Document Vault','Secure, version-controlled records for plans, requisitions, tenders, bids, evaluations, contracts, POs, GRNs, invoices and audit evidence.',btn('Upload documents','upload-document','primary','plus')+btn('New folder','new-folder'))}
+ const rows=state.documents.map(d=>`<tr data-record="document" data-id="${d.id}"><td><strong class="link">${d.id}</strong></td><td>${d.name}</td><td>${d.type}</td><td>${d.version}</td><td>${d.owner}</td><td>${d.date}</td><td>${status(d.status)}</td><td><div class="actions"><button class="btn small" data-action="preview-document" data-id="${d.id}">${icon('eye')}Preview</button><button class="btn small" data-action="download-document" data-id="${d.id}">${icon('download')}PDF</button><button class="btn small" data-action="download-document-xls" data-id="${d.id}">Excel</button><button class="btn small" data-action="download-document-csv" data-id="${d.id}">CSV</button></div></td></tr>`);
+ return `<div class="page">${pageHead('Controlled records','Document Vault','Secure, version-controlled records for plans, requisitions, tenders, bids, evaluations, contracts, POs, GRNs, invoices and audit evidence.',btn('Upload documents','upload-document','primary','plus')+btn('New folder','new-folder')+btn('Download Excel','download-documents-xls','','download')+btn('Download CSV','download-documents-csv','','download')+btn('Download PDF','download-documents-pdf','','download'))}
  <div class="folder-grid" style="margin-bottom:14px">${(__pr23Live()?__pr23VaultFolders().slice(0,6):[['Annual Plans','184'],['Tenders & Bids','2,410'],['Contracts & Awards','1,286'],['Orders & GRNs','3,928'],['Invoices & AP','4,102'],['Audit Evidence','576']]).map(x=>`<button class="folder" data-action="open-folder" data-id="${x[0]}"><span class="folder-icon">${icon('document')}</span><span><strong>${x[0]}</strong><span>${x[1]} controlled files</span></span></button>`).join('')}</div>
  ${card('Recent controlled documents','Preview in the browser or download PDF, Excel-compatible and CSV representations',`<div class="table-tools"><input placeholder="Search file name, UID or owner"><select><option>All document types</option><option>Plan</option><option>Tender</option><option>Contract</option><option>Invoice</option></select></div>${table(['UID','Document','Type','Version','Owner','Updated','Status',''],rows)}`)}</div>`
 }
@@ -5987,9 +6048,21 @@ function exportFile(format,title='Matanho Procurement Report'){if(__pr23Live())r
  const html=`<html><body><table>${data.map(r=>`<tr>${r.map(v=>`<td>${v}</td>`).join('')}</tr>`).join('')}</table>
 </body></html>`;downloadBlob(new Blob([html],{type:'application/vnd.ms-excel'}),base+'.xls')
 }
+function exportDocuments(format){
+ const title='Procurement Document Register';
+ if(__pr23Live())return __pr23ExportFile(format,title);
+ const data=[['UID','Document','Type','Version','Owner','Updated','Status'],...state.documents.map(d=>[d.id,d.name,d.type,d.version,d.owner,d.date,d.status])];
+ const base=title.replace(/[^a-z0-9]+/gi,'_').replace(/^_|_$/g,'');
+ if(format==='pdf')return downloadBlob(pdfBlob(title),base+'.pdf');
+ if(format==='csv')return downloadBlob(new Blob([data.map(r=>r.map(v=>`"${String(v??'').replaceAll('"','""')}"`).join(',')).join('\n')],{type:'text/csv'}),base+'.csv');
+ const html=`<html><body><table>${data.map(r=>`<tr>${r.map(v=>`<td>${String(v??'')}</td>`).join('')}</tr>`).join('')}</table></body></html>`;
+ return downloadBlob(new Blob([html],{type:'application/vnd.ms-excel'}),base+'.xls');
+}
 function submitPlan(){state.plans.unshift({id:'PLAN-27-'+Math.random().toString(36).slice(2,6).toUpperCase(),name:'FY 2027 Procurement Plan',entity:'Group Consolidated',budget:1000000,committed:0,status:'Draft',version:'v1.0',owner:'Group Procurement'});closeOverlay();toast('Plan created','The plan header was created and is ready for line items.');render()}
 function savePlanItem(){const f=$('#planItemForm');if(!f?.reportValidity())return;const d=new FormData(f);state.planItems.unshift({id:'PPI-'+String(state.planItems.length+1).padStart(4,'0'),description:d.get('description'),entity:d.get('entity'),category:d.get('category'),quarter:d.get('quarter'),method:d.get('method'),budget:Number(d.get('budget')),status:'Draft'});closeOverlay();toast('Plan item saved','Budget validation and plan totals were refreshed.');render()}
-function submitPR(){const f=$('#prForm');if(!f?.reportValidity())return;const d=new FormData(f);state.requisitions.unshift({id:'PR-'+Math.random().toString(36).slice(2,6).toUpperCase()+'-'+String(Date.now()).slice(-4),title:d.get('title'),entity:d.get('entity'),type:d.get('type'),category:d.get('category'),amount:Number(d.get('qty'))*Number(d.get('price')),status:'Pending Department Head Approval',budget:'Within budget',owner:'Current user'});closeOverlay();toast('Requisition submitted','Approval routing was created and the department head was notified.');render()}
+function __pr23ReadForm(){const f=$('#prForm');if(!f||!f.reportValidity())return null;const d=new FormData(f);const items=[...f.querySelectorAll('#prLinesV23 tr')].map(row=>({itemName:row.querySelector('[name="item"]')?.value?.trim()||'',quantity:Number(row.querySelector('[name="qty"]')?.value||0),unitPrice:Number(row.querySelector('[name="price"]')?.value||0),unit:row.querySelector('[name="uom"]')?.value||'Each'})).filter(item=>item.itemName);return {form:f,data:d,items};}
+function savePRDraft(){const payload=__pr23ReadForm();if(!payload)return;const {data:d,items}=payload;const id='PR-DRAFT-'+Math.random().toString(36).slice(2,7).toUpperCase()+'-'+String(Date.now()).slice(-4);state.requisitions.unshift({id,recordId:id,title:String(d.get('title')||''),entity:String(d.get('entity')||'Matanho'),type:String(d.get('type')||'Internal'),category:String(d.get('category')||''),department:String(d.get('cost')||''),amount:items.reduce((sum,item)=>sum+(item.quantity*item.unitPrice),0),currency:String(d.get('currencyId')||'USD'),status:'Draft',rawStatus:'DRAFT',budget:'Not assessed',owner:'Current user',requestedById:__pr23Live()?.access?.userId||'',items,justification:String(d.get('motivation')||'')});closeOverlay();toast('Draft saved',`${id} remains editable in your requisition register.`);render()}
+function submitPR(){const payload=__pr23ReadForm();if(!payload)return;const {data:d,items}=payload;const id='PR-'+Math.random().toString(36).slice(2,6).toUpperCase()+'-'+String(Date.now()).slice(-4);state.requisitions.unshift({id,recordId:id,title:d.get('title'),entity:d.get('entity'),type:d.get('type'),category:d.get('category'),department:d.get('cost'),amount:items.reduce((sum,item)=>sum+(item.quantity*item.unitPrice),0),currency:d.get('currencyId')||'USD',status:'Pending Department Head Approval',rawStatus:'PENDING_APPROVAL',budget:'Within budget',owner:'Current user',requestedById:__pr23Live()?.access?.userId||'',items,justification:d.get('motivation')||''});closeOverlay();toast('Requisition submitted','Approval routing was created and the department head was notified.');render()}
 function registerVendor(){const f=$('#vendorForm');if(!f?.reportValidity())return;const d=new FormData(f);if(state.vendors.some(v=>v.bp===d.get('bp')||v.vat===d.get('vat'))){toast('Vendor already exists','A vendor with this BP or VAT number is already registered.');return}state.vendors.unshift({id:'VEN-'+String(483+state.vendors.length).padStart(5,'0'),name:d.get('name'),category:d.get('category'),country:'Zimbabwe',bp:d.get('bp'),vat:d.get('vat'),currency:d.get('currency'),status:'Due diligence',rating:0,itf:d.get('itf')?'Uploaded':'Missing',spend:0});closeOverlay();toast('Vendor registered','The vendor is in due diligence and cannot be invited until approved.');render()}
 __pr23On(document, 'click',e=>{
  const page=e.target.closest('[data-page]');if(page){navigate(page.dataset.page);return}
@@ -6016,7 +6089,7 @@ __pr23On(document, 'click',e=>{
   case 'submit-plan':{const draft=state.plans.find(x=>/Draft/i.test(x.status))||state.plans[0];draft.status='Under review';draft.version='v'+(Number(draft.version.slice(1))+0.1).toFixed(1);render();toast('Plan and budget submitted','The entity approver, Group Procurement and CFO/Budget Committee workflow was created.');break}
   case 'import-plan':toast('Prior-year plan imported','A draft FY 2027 plan was populated from approved FY 2026 items.');break;
   case 'create-requisition':requisitionModal();break;
-  case 'save-pr':toast('Draft saved','The requisition remains editable and has not entered approval.');closeOverlay();break;
+  case 'save-pr':savePRDraft();break;
   case 'submit-pr':submitPR();break;
   case 'import-pr':openModal('Import requisition line items','Upload the controlled CSV template. UOM values are validated before import.',`<div class="field"><label>CSV file</label><input type="file" accept=".csv"></div><div class="notice" style="margin-top:12px"><div><strong>Supported units</strong><p>Each, Box, Lot, Month, Hour, Kilogram and Litre. Invalid units are rejected.</p></div></div>`,btn('Download template','download-current-csv')+btn('Validate import','validate-pr-import','primary'));break;
   case 'register-vendor':vendorModal();break;
@@ -6065,6 +6138,11 @@ __pr23On(document, 'click',e=>{
   case 'send-esign':toast('Signature envelope sent','Signers received secure links and the audit certificate is active.');closeOverlay();break;
   case 'preview-document':previewDocument(id||'DOC-00184',id?'Document '+id:'Procurement document');break;
   case 'download-document':exportFile('pdf',id||'Procurement Document');break;
+  case 'download-document-xls':exportFile('xls',id||'Procurement Document');break;
+  case 'download-document-csv':exportFile('csv',id||'Procurement Document');break;
+  case 'download-documents-xls':exportDocuments('xls');break;
+  case 'download-documents-csv':exportDocuments('csv');break;
+  case 'download-documents-pdf':exportDocuments('pdf');break;
   case 'preview-report':previewReport(id);break;
   case 'download-report':exportFile(a.dataset.format||'pdf',state.reports.find(x=>x.id===id)?.name||'Procurement Report');break;
   case 'download-current-pdf':exportFile('pdf',$('#modalTitle')?.textContent||'Matanho Document');break;
@@ -8068,10 +8146,10 @@ window.MatanhoProcurement=Object.freeze({version:'8.0.0',navigate,render,getStat
     if (folder) {
       docs = isTemplates ? (state.documentTemplates || []).filter(t => folder === 'Report Templates' ? t.folder === 'Report Templates' : t.folder !== 'Report Templates') : (state.documents || []).filter(d => d.folder === folder);
       if (!docs.length && folder !== 'Templates' && folder !== 'Report Templates') docs = state.documents || [];
-      return `<div class="page"><div class="breadcrumbs"><button data-action="back-document-vault-v5">Document Vault</button><i>›</i><strong>${escV11(folder)}</strong></div>${pageHead('Controlled folder',folder,'Filter, preview, edit, upload, send and download controlled documents without exposing every action in the table.',actionV11(isTemplates?'Create template':'Upload document',isTemplates?'create-template-v5':'upload-document-v5',folder,'primary','plus')+actionV11('Edit default letterhead','edit-doc-v11','TPL-PLAN-01','','document'))}${documentFiltersV11(docs)}${card(`${folder} records`,'',table(['UID','Document','Type','Version','Owner','Updated','Status',''],[documentRowsV11(docs)]))}</div>`;
+      return `<div class="page"><div class="breadcrumbs"><button data-action="back-document-vault-v5">Document Vault</button><i>›</i><strong>${escV11(folder)}</strong></div>${pageHead('Controlled folder',folder,'Filter, preview, edit, upload, send and download controlled documents without exposing every action in the table.',actionV11(isTemplates?'Create template':'Upload document',isTemplates?'create-template-v5':'upload-document-v5',folder,'primary','plus')+actionV11('CSV','export-documents-v23','csv','','download')+actionV11('Excel','export-documents-v23','xlsx','','download')+actionV11('PDF','export-documents-v23','pdf','','download'))}${documentFiltersV11(docs)}${card(`${folder} records`,'',table(['UID','Document','Type','Version','Owner','Updated','Status',''],[documentRowsV11(docs)]))}</div>`;
     }
     docs = [...(state.documents || []), ...(state.documentTemplates || []).slice(0,4)];
-    return `<div class="page">${pageHead('Controlled records','Document Vault','Version-controlled procurement records and templates with functional filters, actual document previews and secure sending.',actionV11('Upload document','upload-document-v5','','primary','plus')+actionV11('Create template','create-template-v5','','','document'))}<div class="vault-hero"><section class="vault-summary"><h2>Procurement document control</h2><p>Every plan, request, tender, bid, evaluation, contract, purchase order, GRN, invoice and audit file is retained with a UID, version, access policy and audit history.</p><div class="actions">${actionV11('Browse templates','open-document-folder-v5','Templates','','document')}${actionV11('Upload files','upload-document-v5','','','plus')}</div></section>${card('Vault health','Current controls and retrieval',`<div class="card-body list"><div class="list-row"><div class="list-main"><strong>Actual previews</strong><span>Controlled content and letterhead rendered from each record</span></div>${status('Healthy')}</div><div class="list-row"><div class="list-main"><strong>Pending versions</strong><span>${__pr23Live()?__pr23PendingReviewText():'7 files require review'}</span></div>${status('Review')}</div><div class="list-row"><div class="list-main"><strong>External shares</strong><span>${__pr23Live()?'External sharing is not tracked for vault files':'12 active secure links'}</span></div>${__pr23Live()?status('Not tracked'):status('Active')}</div></div>`)}</div>${folderCardsV11()}<div style="height:14px"></div>${documentFiltersV11(docs)}${card('Recent controlled documents','',table(['UID','Document','Type','Version','Owner','Updated','Status',''],[documentRowsV11(docs)]))}</div>`;
+    return `<div class="page">${pageHead('Controlled records','Document Vault','Version-controlled procurement records and templates with functional filters, actual document previews and secure sending.',actionV11('Upload document','upload-document-v5','','primary','plus')+actionV11('CSV','export-documents-v23','csv','','download')+actionV11('Excel','export-documents-v23','xlsx','','download')+actionV11('PDF','export-documents-v23','pdf','','download'))}<div class="vault-hero"><section class="vault-summary"><h2>Procurement document control</h2><p>Every plan, request, tender, bid, evaluation, contract, purchase order, GRN, invoice and audit file is retained with a UID, version, access policy and audit history.</p><div class="actions">${actionV11('Browse templates','open-document-folder-v5','Templates','','document')}${actionV11('Upload files','upload-document-v5','','','plus')}</div></section>${card('Vault health','Current controls and retrieval',`<div class="card-body list"><div class="list-row"><div class="list-main"><strong>Actual previews</strong><span>Controlled content and letterhead rendered from each record</span></div>${status('Healthy')}</div><div class="list-row"><div class="list-main"><strong>Pending versions</strong><span>${__pr23Live()?__pr23PendingReviewText():'7 files require review'}</span></div>${status('Review')}</div><div class="list-row"><div class="list-main"><strong>External shares</strong><span>${__pr23Live()?'External sharing is not tracked for vault files':'12 active secure links'}</span></div>${__pr23Live()?status('Not tracked'):status('Active')}</div></div>`)}</div>${folderCardsV11()}<div style="height:14px"></div>${documentFiltersV11(docs)}${card('Recent controlled documents','',table(['UID','Document','Type','Version','Owner','Updated','Status',''],[documentRowsV11(docs)]))}</div>`;
   }
   pages.documents = documentsPageV11;
 

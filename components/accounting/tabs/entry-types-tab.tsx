@@ -9,9 +9,10 @@ import { CreateEntryTypeModal } from "@/components/accounting/create-entry-type-
 import { EntryTypeViewDrawer } from "@/components/accounting/entry-type-view-drawer"
 import { fetchEntryTypes } from "@/lib/store/slices/cashbookSlice"
 import { format } from "date-fns"
+import { CashbookExportControls } from "@/components/accounting/cashbook-export-controls"
 import type { AppDispatch, RootState } from "@/lib/store"
 
-export function EntryTypesTab() {
+export function EntryTypesTab({ enhanced = false }: { enhanced?: boolean }) {
   const dispatch = useDispatch<AppDispatch>()
   const entryTypes = useSelector((state: RootState) => state.cashbook.entryTypes)
   const entryTypesLoading = useSelector((state: RootState) => state.cashbook.entryTypesLoading)
@@ -102,6 +103,8 @@ export function EntryTypesTab() {
       </div>
 
       <ProcurementDataTable
+        accuratePagination={enhanced}
+        exportControls={enhanced ? (rows: any[]) => <CashbookExportControls spec={{ title: "Entry Types", filename: "cashbook-entry-types", columns: ["Name", "Transaction Type", "Counterparty Type", "Default GL Account", "Status", "Created At"], rows: rows.map(row => [row.name || "", row.transactionType || "", row.counterpartyType || "", row.glAccount ? `${row.glAccount.accountNo} - ${row.glAccount.accountName}` : "", row.isActive ? "Active" : "Inactive", row.createdAt ? format(new Date(row.createdAt), "yyyy-MM-dd") : ""]) }} /> : undefined}
         data={entryTypes}
         columns={columns}
         title="Entry Types"

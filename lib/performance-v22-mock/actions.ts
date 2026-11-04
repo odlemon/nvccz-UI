@@ -30,6 +30,7 @@
 import { apiClient } from "@/lib/api/api-client"
 import { publishPerformanceLiveData } from "./bridge"
 import type { PerfLiveGlobal } from "./types"
+import { adaptTimesheet } from "./adapters"
 
 /**
  * Actions the host intercepts and routes to the real API.
@@ -48,6 +49,76 @@ export const API_ACTIONS = new Set<string>([
   "submit-goal-quick",
 ])
 
+/** Persist the same week/entry records read by the Accounting approval queue. */
+export async function savePerformanceTimesheet(payload: any, submit = false): Promise<ActionResult> {
+  try {
+    const ending = String(payload?.weekEnding || "").slice(0, 10)
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(ending)) return { ok: false, error: "Choose a valid week ending date." }
+    const entries = Array.isArray(payload?.entries) ? payload.entries : []
+    if (submit && !entries.some((entry: any) => Number(entry.hours) > 0)) return { ok: false, error: "Add at least one time entry before submitting." }
+    const initial: any = await apiClient.get("/accounting/timesheets/mine")
+    const norm = (v: any) => String(v || "").slice(0, 10)
+    const existing = (initial?.data || []).find((t: any) => norm(t.weekEnding) === ending)
+    const keep = new Set<string>(), deleted = new Set<string>()
+    for (const e of entries) {
+      const hours = Number(e.hours) || 0
+      if (hours <= 0) {
+        if (e.entryId) { await apiClient.delete(`/accounting/timesheets/entries/${encodeURIComponent(e.entryId)}`); deleted.add(String(e.entryId)) }
+        continue
+      }
+      if (!e.projectId || !e.date) throw new Error("Each time entry needs a project and date.")
+      const body = {
+        projectId: e.projectId, taskId: e.taskId || null, date: e.date, hours,
+        billable: !!e.billable, notes: e.notes || null, source: e.source === "TIMER" ? "TIMER" : "MANUAL",
+      }
+      const res: any = e.entryId
+        ? await apiClient.put(`/accounting/timesheets/entries/${encodeURIComponent(e.entryId)}`, body)
+        : await apiClient.post(`/accounting/timesheets/${ending}/entries`, body)
+      const savedId = res?.data?.entry?.id ?? res?.data?.id
+      if (savedId) keep.add(String(savedId))
+    }
+    if (payload?.replaceAll && existing?.entries?.length) {
+      for (const e of existing.entries) if (!keep.has(String(e.id)) && !deleted.has(String(e.id))) {
+        await apiClient.delete(`/accounting/timesheets/entries/${encodeURIComponent(e.id)}`)
+      }
+    }
+    if (!submit && !entries.some((entry: any) => Number(entry.hours) > 0)) {
+      await apiClient.post(`/accounting/timesheets/${ending}/draft`, {})
+    }
+    if (submit) {
+      const refreshed: any = await apiClient.get("/accounting/timesheets/mine")
+      const saved = (refreshed?.data || []).find((t: any) => norm(t.weekEnding) === ending)
+      if (!saved?.id) throw new Error("The saved timesheet could not be found for submission.")
+      await apiClient.post(`/accounting/timesheets/${encodeURIComponent(saved.id)}/submit`, {})
+    }
+    await publishPerformanceLiveData()
+    if (typeof window !== "undefined") {
+      try { (window as any).__PERF_TIMESHEET_WEEK__ = await fetchPerformanceTimesheetWeek(ending) } catch { /* page renders its explicit unavailable state */ }
+    }
+    toast(submit ? "Timesheet submitted" : "Timesheet saved", submit ? "Your week is now waiting for manager approval." : "Your changes were saved to your timesheet.")
+    return { ok: true }
+  } catch (err: any) {
+    const message = errorText(err, "Could not save the timesheet")
+    toast("Could not save", message)
+    return { ok: false, error: message }
+  }
+}
+
+export async function fetchPerformanceTimesheetPolicy(): Promise<any> {
+  const response: any = await apiClient.get("/accounting/timesheets/policy")
+  return response?.data ?? null
+}
+
+export async function fetchPerformanceTimesheetWeek(weekEnding: string): Promise<any> {
+  const response: any = await apiClient.get(`/accounting/timesheets/week/${encodeURIComponent(weekEnding)}`)
+  return response?.data ? adaptTimesheet(response.data) : null
+}
+
+export async function fetchPerformanceTimesheetAudit(timesheetId: string): Promise<any[]> {
+  const response: any = await apiClient.get(`/accounting/timesheets/${encodeURIComponent(timesheetId)}/audit`)
+  return Array.isArray(response?.data) ? response.data : []
+}
+
 export interface BeforeActionDetail {
   action: string
   id?: string
@@ -57,6 +128,118 @@ export interface BeforeActionDetail {
 }
 
 export type ActionResult = { ok: true; message?: string } | { ok: false; error: string }
+
+export interface CompanyStrategyPayload {
+  title: string
+  periodStart: string
+  periodEnd: string
+  visionStatement: string
+  pillarWeights: Record<string, number>
+  metadata: Record<string, unknown>
+}
+
+/** Persist strategy cycles through the governed config API, then re-read the live registers. */
+export async function saveCompanyStrategy(payload: CompanyStrategyPayload, strategyId?: string): Promise<ActionResult> {
+  try {
+    const path = strategyId
+      ? `/performance/config/strategies/${encodeURIComponent(strategyId)}`
+      : "/performance/config/strategies"
+    const res: any = strategyId ? await apiClient.put(path, payload) : await apiClient.post(path, payload)
+    await publishPerformanceLiveData()
+    return { ok: true, message: String(res?.data?.id || strategyId || "") }
+  } catch (err: any) {
+    const message = errorText(err, "Could not save the company strategy")
+    toast("Could not save strategy", message)
+    return { ok: false, error: message }
+  }
+}
+
+export async function createCompanyStrategyTheme(payload: { name: string; description?: string; perspective?: string }): Promise<ActionResult> {
+  try {
+    await apiClient.post("/performance/config/themes", payload)
+    await publishPerformanceLiveData()
+    return { ok: true }
+  } catch (err: any) {
+    const message = errorText(err, "Could not create the strategic theme")
+    toast("Could not create theme", message)
+    return { ok: false, error: message }
+  }
+}
+
+export async function updateCompanyStrategyTheme(themeId: string, payload: { name?: string; description?: string; perspective?: string; status?: string }): Promise<ActionResult> {
+  try {
+    await apiClient.put(`/performance/config/themes/${encodeURIComponent(themeId)}`, payload)
+    await publishPerformanceLiveData()
+    return { ok: true }
+  } catch (err: any) {
+    const message = errorText(err, "Could not update the strategic theme")
+    toast("Could not update theme", message)
+    return { ok: false, error: message }
+  }
+}
+
+export async function archiveCompanyStrategy(strategyId: string): Promise<ActionResult> {
+  try {
+    await apiClient.post(`/performance/config/strategies/${encodeURIComponent(strategyId)}/archive`, {})
+    await publishPerformanceLiveData()
+    return { ok: true }
+  } catch (err: any) {
+    const message = errorText(err, "Could not archive the company strategy")
+    toast("Could not archive strategy", message)
+    return { ok: false, error: message }
+  }
+}
+
+export async function createCompanyStrategyObjective(payload: Record<string, unknown>): Promise<ActionResult> {
+  let createdGoalId = ""
+  try {
+    const pillarIds: Record<string, string> = {
+      Financial: "bsc_financial",
+      "Customer & Market": "bsc_customer_market",
+      "Internal Operations": "bsc_internal_operations",
+      "Learning, Growth & HR": "bsc_learning_growth_hr",
+    }
+    const pillarId = pillarIds[String(payload.scorecardPillar || "")]
+    const requestedWeights = { ...((payload.goalWeights as Record<string, number>) || {}) }
+    if (!pillarId || Object.values(requestedWeights).reduce((sum, weight) => sum + Number(weight || 0), 0) + Number(payload.scorecardWeight || 0) !== 100) {
+      throw new Error("Set all objective weights in this pillar so they total exactly 100%.")
+    }
+    const createPayload = { ...payload }
+    delete createPayload.scorecardWeight
+    delete createPayload.strategicThemeId
+    const res: any = await apiClient.post("/performance/goals", createPayload)
+    const goalId = String(res?.goal?.id || res?.data?.goal?.id || "")
+    if (!goalId) throw new Error("The API did not return the saved objective.")
+    createdGoalId = goalId
+    const themeId = String(payload.strategicThemeId || "")
+    await apiClient.put(`/performance/config/goals/${encodeURIComponent(goalId)}`, {
+      strategyId: payload.strategyId,
+      scorecardPillar: payload.scorecardPillar,
+      ...(themeId ? { strategicThemeId: themeId } : {}),
+    })
+    const goalWeights = { ...requestedWeights, [goalId]: Number(payload.scorecardWeight) }
+    await apiClient.put(`/performance/scorecard-pillars/${pillarId}/company-goal-weights`, { goalWeights })
+    await publishPerformanceLiveData()
+    return { ok: true, message: goalId }
+  } catch (err: any) {
+    if (createdGoalId) await apiClient.delete(`/performance/goals/${encodeURIComponent(createdGoalId)}`).catch(() => undefined)
+    const message = errorText(err, "Could not create the strategic objective")
+    toast("Could not create objective", message)
+    return { ok: false, error: message }
+  }
+}
+
+export async function deleteCompanyStrategyObjective(goalId: string): Promise<ActionResult> {
+  try {
+    await apiClient.delete(`/performance/goals/${encodeURIComponent(goalId)}`)
+    await publishPerformanceLiveData()
+    return { ok: true }
+  } catch (err: any) {
+    const message = errorText(err, "Could not remove the strategic objective")
+    toast("Could not remove objective", message)
+    return { ok: false, error: message }
+  }
+}
 
 /* --------------------------------------------------------------------------------------
  * Helpers shared by handlers
@@ -321,6 +504,17 @@ export interface KpiPayload {
   unit?: string
   isReverseKpi?: boolean
   perspective?: string
+  pillarId?: string
+  targetValue?: number
+  amberThreshold?: number
+  redThreshold?: number
+  sourceSystem?: string
+  updateMethod?: "manual" | "workflow" | "integrated"
+  frequency?: "daily" | "weekly" | "monthly" | "quarterly" | "annually"
+  evidenceRule?: string
+  ownerId?: string
+  department?: string
+  performanceMetadata?: Record<string, unknown>
 }
 
 /**
@@ -375,6 +569,93 @@ export async function submitKpi(payload: KpiPayload, existingId?: string | null)
   }
 }
 
+/** Save the complete set of fields supported by the governed KPI registry, optionally submitting for approval. */
+export async function submitGovernedKpi(payload: KpiPayload, submitForApproval: boolean, existingId?: string | null): Promise<ActionResult> {
+  try {
+    let pillarId = payload.pillarId
+    if (!pillarId && payload.perspective) {
+      const pillarRes: any = await apiClient.get("/performance/scorecard-pillars")
+      const pillars = Array.isArray(pillarRes?.data) ? pillarRes.data : Array.isArray(pillarRes?.pillars) ? pillarRes.pillars : []
+      pillarId = pillars.find((p: any) => [p?.name, p?.displayName, p?.canonicalName].some((v) => String(v || "").toLowerCase() === String(payload.perspective).toLowerCase()))?.id
+    }
+    if (!pillarId) throw new Error("Choose a configured BSC perspective before saving this KPI.")
+    const body = {
+      name: payload.name, description: payload.description, code: payload.code, pillarId,
+      unitKind: payload.unit || "number", isReverseKpi: !!payload.isReverseKpi,
+      targetValue: payload.targetValue, amberThreshold: payload.amberThreshold, redThreshold: payload.redThreshold,
+      sourceSystem: payload.sourceSystem, updateMethod: payload.updateMethod, frequency: payload.frequency,
+      evidenceRule: payload.evidenceRule, ownerId: payload.ownerId, catalogDepartmentName: payload.department,
+      performanceMetadata: payload.performanceMetadata,
+    }
+    const created: any = existingId
+      ? await apiClient.put(`/performance/kpi-registry/${encodeURIComponent(existingId)}`, body)
+      : await apiClient.post("/performance/kpi-registry", body)
+    const id = created?.data?.id || created?.id
+    if (!id) throw new Error("The KPI was saved without an identifier; it cannot enter the approval workflow.")
+    if (submitForApproval) await apiClient.post(`/performance/kpi-registry/${encodeURIComponent(id)}/submit`, {})
+    await publishPerformanceLiveData()
+    toast(submitForApproval ? "KPI submitted" : "KPI draft saved", submitForApproval ? `${payload.code} is waiting for an authorized approver.` : `${payload.code} was saved to the governed KPI registry.`)
+    return { ok: true, message: id }
+  } catch (err: any) {
+    const message = errorText(err, "Could not save the KPI")
+    toast("Could not save", message)
+    return { ok: false, error: message }
+  }
+}
+
+export async function submitObjectiveCheckIn(goalId: string, payload: { value: number; confidence?: "high" | "medium" | "low"; note?: string }): Promise<ActionResult> {
+  try {
+    await apiClient.post(`/performance/goals/${encodeURIComponent(goalId)}/check-in`, payload)
+    await publishPerformanceLiveData()
+    toast("Check-in recorded", "The objective progress and check-in history were saved.")
+    return { ok: true }
+  } catch (err: any) {
+    const message = errorText(err, "Could not record the objective check-in")
+    toast("Check-in failed", message)
+    return { ok: false, error: message }
+  }
+}
+
+export async function fetchObjectiveCheckIns(goalId: string): Promise<any[]> {
+  const res: any = await apiClient.get(`/performance/goals/${encodeURIComponent(goalId)}/check-ins`)
+  return Array.isArray(res?.data) ? res.data : []
+}
+
+export async function uploadObjectiveEvidence(goalId: string, fileName: string, contentBase64: string, mimeType?: string): Promise<ActionResult> {
+  try {
+    await apiClient.post(`/performance/goals/${encodeURIComponent(goalId)}/attachments/base64`, { fileName, contentBase64, mimeType })
+    await publishPerformanceLiveData()
+    toast("Evidence uploaded", `${fileName} was attached to the objective.`)
+    return { ok: true }
+  } catch (err: any) {
+    const message = errorText(err, "Could not upload objective evidence")
+    toast("Evidence upload failed", message)
+    return { ok: false, error: message }
+  }
+}
+
+export async function fetchKpiRegistryAnalytics(filters: { period?: string; department?: string; pillar?: string } = {}): Promise<any> {
+  const query = new URLSearchParams()
+  if (filters.period) query.set("period", filters.period)
+  if (filters.department) query.set("department", filters.department)
+  if (filters.pillar) query.set("pillar", filters.pillar)
+  const res: any = await apiClient.get(`/performance/kpi-registry/analytics${query.size ? `?${query.toString()}` : ""}`)
+  return res?.data ?? null
+}
+
+export async function transitionGovernedKpi(id: string, action: "submit" | "approve" | "reject" | "retire" | "reinstate", note?: string): Promise<ActionResult> {
+  try {
+    await apiClient.post(`/performance/kpi-registry/${encodeURIComponent(id)}/${action}`, note ? { note } : {})
+    await publishPerformanceLiveData()
+    toast("KPI workflow updated", `The KPI was ${action === "submit" ? "submitted for approval" : action === "reinstate" ? "reinstated" : `${action}d`}.`)
+    return { ok: true }
+  } catch (err: any) {
+    const message = errorText(err, "Could not update the KPI workflow")
+    toast("KPI workflow failed", message)
+    return { ok: false, error: message }
+  }
+}
+
 export interface GoalPayload {
   title: string
   description?: string
@@ -390,6 +671,7 @@ export interface GoalPayload {
   departmentName?: string
   performanceContractId?: string
   kpiId?: string
+  parentGoalId?: string
 }
 
 /**
@@ -420,6 +702,10 @@ export interface ContractPayload {
   subjectUserId?: string
   departmentName?: string
   periodYear?: number
+  title?: string
+  reviewerUserId?: string
+  approverUserId?: string
+  metadata?: Record<string, unknown>
 }
 
 /**
@@ -436,6 +722,10 @@ export async function submitContract(payload: ContractPayload): Promise<ActionRe
       subjectUserId: payload.subjectUserId,
       departmentName: payload.departmentName,
       periodYear: payload.periodYear,
+      title: payload.title,
+      reviewerUserId: payload.reviewerUserId,
+      approverUserId: payload.approverUserId,
+      metadata: payload.metadata,
     })
     await publishPerformanceLiveData()
     const created = res?.contract
@@ -447,6 +737,234 @@ export async function submitContract(payload: ContractPayload): Promise<ActionRe
     return { ok: false, error: message }
   }
 }
+
+export interface ContractObjectivePayload {
+  id?: string
+  title: string
+  description?: string
+  scorecardPillar: string
+  scorecardSection?: string
+  scorecardWeight: number
+  targetValue: number
+  targetUnit: string
+  measureName?: string
+  evidenceRequirement?: string
+  kpiId?: string
+  formulaType?: "TASK_COMPLETION" | null
+}
+
+export async function fetchPerformanceContractDetail(contractId: string): Promise<any> {
+  const res: any = await apiClient.get(`/performance/contracts/${encodeURIComponent(contractId)}/detail`)
+  return res?.data ?? null
+}
+
+export async function savePerformanceContractObjectives(contractId: string, objectives: ContractObjectivePayload[]): Promise<ActionResult> {
+  try {
+    await apiClient.put(`/performance/contracts/${encodeURIComponent(contractId)}/objectives`, { objectives })
+    await publishPerformanceLiveData()
+    toast("Objectives saved", "Contract objectives and their 100% weight allocation were saved.")
+    return { ok: true }
+  } catch (err: any) {
+    const message = errorText(err, "Could not save contract objectives")
+    toast("Could not save objectives", message)
+    return { ok: false, error: message }
+  }
+}
+
+export async function convertPerformanceGoalToTask(goalId: string): Promise<ActionResult> {
+  try {
+    await apiClient.post(`/performance/individual-goals/${encodeURIComponent(goalId)}/convert-to-tasks`, {})
+    await publishPerformanceLiveData()
+    return { ok: true }
+  } catch (err: any) {
+    const message = errorText(err, "Could not create the linked task")
+    toast("Task was not created", message)
+    return { ok: false, error: message }
+  }
+}
+
+export async function updatePerformanceTaskStage(taskId: string, stage: string, options: { silent?: boolean } = {}): Promise<ActionResult> {
+  try {
+    await apiClient.put(`/tasks/${encodeURIComponent(taskId)}/stage`, { stage })
+    await publishPerformanceLiveData()
+    return { ok: true }
+  } catch (err: any) {
+    const message = errorText(err, "Could not update the task")
+    if (!options.silent) toast("Task was not updated", message)
+    return { ok: false, error: message }
+  }
+}
+
+export async function fetchPerformanceTaskWorkspace(taskId: string): Promise<any> {
+  const [taskRes, commentsRes, subtasksRes, dependenciesRes] = await Promise.all([
+    apiClient.get(`/tasks/${encodeURIComponent(taskId)}`),
+    apiClient.get(`/tasks/${encodeURIComponent(taskId)}/comments`),
+    apiClient.get(`/tasks/${encodeURIComponent(taskId)}/subtasks`),
+    apiClient.get(`/tasks/${encodeURIComponent(taskId)}/dependencies`),
+  ])
+  return {
+    task: (taskRes as any)?.task ?? (taskRes as any)?.data ?? null,
+    comments: Array.isArray((commentsRes as any)?.comments) ? (commentsRes as any).comments : [],
+    subtasks: Array.isArray((subtasksRes as any)?.data) ? (subtasksRes as any).data : [],
+    dependencies: Array.isArray((dependenciesRes as any)?.data) ? (dependenciesRes as any).data : [],
+  }
+}
+
+export async function updatePerformanceTask(taskId: string, payload: Record<string, unknown>): Promise<any> {
+  const res: any = await apiClient.put(`/tasks/${encodeURIComponent(taskId)}`, payload)
+  await publishPerformanceLiveData()
+  return res?.task ?? res?.data ?? null
+}
+
+export async function changePerformanceTaskStage(taskId: string, stage: string): Promise<any> {
+  const res: any = await apiClient.put(`/tasks/${encodeURIComponent(taskId)}/stage`, { stage })
+  await publishPerformanceLiveData()
+  return res?.task ?? res?.data ?? null
+}
+
+export async function addPerformanceTaskSubtask(taskId: string, title: string): Promise<any> {
+  const res: any = await apiClient.post(`/tasks/${encodeURIComponent(taskId)}/subtasks`, { title })
+  return res?.data
+}
+
+export async function updatePerformanceTaskSubtask(taskId: string, subtaskId: string, completed: boolean): Promise<any> {
+  const res: any = await apiClient.put(`/tasks/${encodeURIComponent(taskId)}/subtasks/${encodeURIComponent(subtaskId)}`, { completed })
+  return res?.data
+}
+
+export async function deletePerformanceTaskSubtask(taskId: string, subtaskId: string): Promise<any> {
+  const res: any = await apiClient.delete(`/tasks/${encodeURIComponent(taskId)}/subtasks/${encodeURIComponent(subtaskId)}`)
+  return res?.data
+}
+
+export async function addPerformanceTaskDependency(taskId: string, dependencyId: string): Promise<any[]> {
+  const res: any = await apiClient.post(`/tasks/${encodeURIComponent(taskId)}/dependencies`, { dependencyId })
+  return Array.isArray(res?.data) ? res.data : []
+}
+
+export async function removePerformanceTaskDependency(taskId: string, dependencyId: string): Promise<any[]> {
+  const res: any = await apiClient.delete(`/tasks/${encodeURIComponent(taskId)}/dependencies/${encodeURIComponent(dependencyId)}`)
+  return Array.isArray(res?.data) ? res.data : []
+}
+
+export async function uploadPerformanceTaskAttachments(taskId: string, files: File[]): Promise<any[]> {
+  const form = new FormData()
+  files.forEach((file) => form.append("attachments", file))
+  const res: any = await apiClient.postFormData(`/tasks/${encodeURIComponent(taskId)}/attachments`, form)
+  return Array.isArray(res?.result?.attachments) ? res.result.attachments : []
+}
+
+export async function postPerformanceTaskComment(taskId: string, content: string): Promise<any> {
+  const form = new FormData()
+  form.append("content", content)
+  const res: any = await apiClient.postFormData(`/tasks/${encodeURIComponent(taskId)}/comments`, form)
+  return res?.comment ?? res?.data ?? res
+}
+
+export async function duplicatePerformanceTask(taskId: string): Promise<any> {
+  const res: any = await apiClient.post(`/tasks/${encodeURIComponent(taskId)}/duplicate`, {})
+  await publishPerformanceLiveData()
+  return res?.data ?? null
+}
+
+export async function archivePerformanceTask(taskId: string): Promise<void> {
+  await apiClient.post(`/tasks/${encodeURIComponent(taskId)}/archive`, {})
+  await publishPerformanceLiveData()
+}
+
+export async function sharePerformanceTask(taskId: string, userIds: string[]): Promise<any> {
+  const res: any = await apiClient.put(`/tasks/${encodeURIComponent(taskId)}/share`, { userIds })
+  await publishPerformanceLiveData()
+  return res?.data ?? null
+}
+
+export async function sendPerformanceTimesheetMessage(timesheetId: string, recipientId: string, message: string): Promise<ActionResult> {
+  try {
+    await apiClient.post(`/accounting/timesheets/${encodeURIComponent(timesheetId)}/message`, { recipientId, message })
+    toast("Message sent", "Your message was added to the approver's notifications.")
+    return { ok: true }
+  } catch (err: any) {
+    const messageText = errorText(err, "Could not send the message")
+    toast("Could not send message", messageText)
+    return { ok: false, error: messageText }
+  }
+}
+
+export async function fetchPerformanceTaskPriorities(): Promise<string[]> {
+  const res: any = await apiClient.get("/tasks/filter-options/priorities")
+  return Array.isArray(res?.data) ? res.data.map((value: unknown) => String(value)) : []
+}
+
+export async function fetchArchivedPerformanceTasks(): Promise<any[]> {
+  const res: any = await apiClient.get("/tasks?stage=archived&includeArchived=true")
+  return Array.isArray(res?.tasks) ? res.tasks : Array.isArray(res?.data) ? res.data : []
+}
+
+export async function createPerformanceProject(payload: Record<string, unknown>): Promise<ActionResult> {
+  try {
+    await apiClient.post("/performance/projects", payload)
+    await publishPerformanceLiveData()
+    return { ok: true }
+  } catch (err: any) { return { ok: false, error: errorText(err, "Could not create the project") } }
+}
+
+export async function updatePerformanceProjectStatus(id: string, status: string, note?: string): Promise<ActionResult> {
+  try {
+    await apiClient.post(`/performance/projects/${encodeURIComponent(id)}/status`, { status, note })
+    await publishPerformanceLiveData()
+    return { ok: true }
+  } catch (err: any) { return { ok: false, error: errorText(err, "Could not update the project status") } }
+}
+
+export async function assignPerformanceProjectTasks(id: string, taskIds: string[]): Promise<ActionResult> {
+  try {
+    const response: any = await apiClient.post(`/performance/projects/${encodeURIComponent(id)}/tasks`, { taskIds })
+    if (Number(response?.data?.assigned) !== taskIds.length) throw new Error("One or more tasks were not added to this project.")
+    await publishPerformanceLiveData()
+    return { ok: true }
+  } catch (err: any) { return { ok: false, error: errorText(err, "Could not add tasks to the project") } }
+}
+
+export async function unassignPerformanceProjectTasks(id: string, taskIds: string[]): Promise<ActionResult> {
+  try {
+    const response: any = await apiClient.delete(`/performance/projects/${encodeURIComponent(id)}/tasks`, { body: JSON.stringify({ taskIds }) })
+    if (Number(response?.data?.removed) !== taskIds.length) throw new Error("One or more tasks were not removed from this project.")
+    await publishPerformanceLiveData()
+    return { ok: true }
+  } catch (err: any) { return { ok: false, error: errorText(err, "Could not remove tasks from the project") } }
+}
+
+export async function amendPerformanceContract(contractId: string, payload: Record<string, unknown>): Promise<ActionResult> {
+  try {
+    await apiClient.put(`/performance/contracts/${encodeURIComponent(contractId)}/amend`, payload)
+    await publishPerformanceLiveData()
+    toast("Contract amended", "A new contract version was created and sign-offs were reset.")
+    return { ok: true }
+  } catch (err: any) {
+    const message = errorText(err, "Could not amend the contract")
+    toast("Could not amend contract", message)
+    return { ok: false, error: message }
+  }
+}
+
+async function contractLifecycleAction(contractId: string, action: "request-signatures" | "sign" | "close" | "reopen", body: Record<string, unknown> = {}): Promise<ActionResult> {
+  try {
+    await apiClient.post(`/performance/contracts/${encodeURIComponent(contractId)}/${action}`, body)
+    await publishPerformanceLiveData()
+    const labels = { "request-signatures": "Contract sent for signatures", sign: "Contract signed", close: "Contract closed", reopen: "Contract reopened" }
+    toast(labels[action], "The updated contract state has been saved.")
+    return { ok: true }
+  } catch (err: any) {
+    const message = errorText(err, `Could not ${action.replaceAll("-", " ")}`)
+    toast("Contract action failed", message)
+    return { ok: false, error: message }
+  }
+}
+
+export const requestPerformanceContractSignatures = (id: string) => contractLifecycleAction(id, "request-signatures")
+export const signPerformanceContract = (id: string, note?: string) => contractLifecycleAction(id, "sign", { note })
+export const closePerformanceContract = (id: string, note: string) => contractLifecycleAction(id, "close", { note })
+export const reopenPerformanceContract = (id: string, note: string) => contractLifecycleAction(id, "reopen", { note })
 
 /**
  * Update a goal's current/actual value from the Employee Scorecard's "Record update" /

@@ -1,4 +1,4 @@
-/** Client design faithful port — Bank Reconciliation */
+﻿/** V52 shell mounts the shared Bank Reconciliation component into its legacy slot. */
 export default function Page() {
-  return <span>Bank Reconciliation</span>
+  return null
 }

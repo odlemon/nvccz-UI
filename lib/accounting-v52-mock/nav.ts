@@ -10,6 +10,7 @@ export const AC52_PAGE_TO_PATH: Record<string, string> = {
   'reconciliation': '/accounting/bank-reconciliation',
   'payables': '/accounting/payables',
   'receivables': '/accounting/receivables',
+  'receivables-workflows': '/accounting/receivables/workflows',
   'expenses': '/accounting/expenses',
   'timesheets': '/accounting/timesheets',
   'recurring': '/accounting/recurring',
@@ -20,7 +21,8 @@ export const AC52_PAGE_TO_PATH: Record<string, string> = {
   'trialbalance': '/accounting/trial-balance',
   'compliance': '/accounting/tax',
   'fx': '/accounting/fx-revaluation',
-  'consolidation': '/accounting/consolidation',
+  // Legacy Consolidation links now open the Financial Reports tab instead of a separate page.
+  'consolidation': '/accounting/reports?tab=group-consolidation',
   'coa': '/accounting/chart-governance',
   'vault': '/accounting/vault',
   'audit': '/accounting/audit',
@@ -37,6 +39,7 @@ export const AC52_PATH_TO_PAGE: Record<string, string> = Object.fromEntries(
 )
 
 export function pathToAc52Page(pathname: string): string {
+  if (pathname === '/accounting/consolidation') return 'reports'
   if (pathname in AC52_PATH_TO_PAGE) return AC52_PATH_TO_PAGE[pathname]
   if (pathname.startsWith('/accounting/')) {
     const seg = pathname.replace('/accounting/', '').split('/')[0]
@@ -52,7 +55,6 @@ export const AC52_NAV_PAGES = [
   { id: 'ac52-approvals', page: 'approvals', path: '/accounting/approvals', name: 'Approval Queue' },
   { id: 'ac52-close', page: 'close', path: '/accounting/close', name: 'Period Close' },
   { id: 'ac52-ledger', page: 'ledger', path: '/accounting/general-ledger', name: 'General Ledger' },
-  { id: 'ac52-journals', page: 'journals', path: '/accounting/journals', name: 'Journal Entries' },
   { id: 'ac52-cash', page: 'cash', path: '/accounting/cash-book', name: 'Cash & Liquidity' },
   { id: 'ac52-reconciliation', page: 'reconciliation', path: '/accounting/bank-reconciliation', name: 'Bank Reconciliation' },
   { id: 'ac52-payables', page: 'payables', path: '/accounting/payables', name: 'Payables & Payments' },
@@ -67,7 +69,6 @@ export const AC52_NAV_PAGES = [
   { id: 'ac52-trialbalance', page: 'trialbalance', path: '/accounting/trial-balance', name: 'Trial Balance' },
   { id: 'ac52-compliance', page: 'compliance', path: '/accounting/tax', name: 'Compliance & Tax' },
   { id: 'ac52-fx', page: 'fx', path: '/accounting/fx-revaluation', name: 'FX Revaluation' },
-  { id: 'ac52-consolidation', page: 'consolidation', path: '/accounting/consolidation', name: 'Group Consolidation' },
   { id: 'ac52-coa', page: 'coa', path: '/accounting/chart-governance', name: 'Chart of Accounts' },
   { id: 'ac52-vault', page: 'vault', path: '/accounting/vault', name: 'Document Vault' },
   { id: 'ac52-audit', page: 'audit', path: '/accounting/audit', name: 'Audit Trail' },

@@ -803,6 +803,8 @@ interface AccountingState {
 
   // Credit Notes
   creditNotes: CreditNote[]
+  creditNotesPagination: { total: number; page: number; limit: number; totalPages: number }
+  creditNotesFetchId: string | null
   creditNotesLoading: boolean
   creditNotesError: string | null
   selectedCreditNote: CreditNote | null
@@ -978,6 +980,8 @@ const initialState: AccountingState = {
 
   // Credit Notes
   creditNotes: [],
+  creditNotesPagination: { total: 0, page: 1, limit: 10, totalPages: 0 },
+  creditNotesFetchId: null,
   creditNotesLoading: false,
   creditNotesError: null,
   selectedCreditNote: null,
@@ -1422,16 +1426,23 @@ const accountingSlice = createSlice({
       })
 
       // Fetch credit notes
-      .addCase(fetchCreditNotes.pending, (state) => {
+      .addCase(fetchCreditNotes.pending, (state, action) => {
         state.creditNotesLoading = true
         state.creditNotesError = null
+        state.creditNotesFetchId = action.meta.requestId
       })
       .addCase(fetchCreditNotes.fulfilled, (state, action) => {
+        if (state.creditNotesFetchId !== action.meta.requestId) return
+        if (!action.payload) return
         state.creditNotesLoading = false
+        state.creditNotesFetchId = null
         state.creditNotes = action.payload.creditNotes
+        state.creditNotesPagination = { total: action.payload.total, page: action.payload.page, limit: action.meta.arg?.limit || 10, totalPages: action.payload.totalPages }
       })
       .addCase(fetchCreditNotes.rejected, (state, action) => {
+        if (state.creditNotesFetchId !== action.meta.requestId) return
         state.creditNotesLoading = false
+        state.creditNotesFetchId = null
         state.creditNotesError = action.error.message || 'Failed to fetch credit notes'
       })
 

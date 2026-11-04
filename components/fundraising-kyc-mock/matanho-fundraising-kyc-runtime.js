@@ -298,8 +298,14 @@ function clearLocalDraft() {
 
 
 const apiModuleConfig = window.MATANHO_CONFIG || {};
-const apiBaseUrl = String(apiModuleConfig.apiBaseUrl || '').replace(/\/$/, '');
+// Accept either the API origin (`http://127.0.0.1:3009`) or the conventional
+// client base (`http://127.0.0.1:3009/api`) without producing `/api/api/...`.
+const apiBaseUrl = String(apiModuleConfig.apiBaseUrl || '')
+  .replace(/\/$/, '')
+  .replace(/\/api$/, '');
 const useMockApi = apiModuleConfig.useMockApi !== false;
+const invitationToken = new URLSearchParams(window.location.search).get('token') || window.sessionStorage?.getItem('fundraisingKycInvitationToken') || '';
+if (invitationToken) window.sessionStorage?.setItem('fundraisingKycInvitationToken', invitationToken);
 
 async function request(path, options = {}) {
   const response = await fetch(`${apiBaseUrl}${path}`, {
@@ -308,17 +314,19 @@ async function request(path, options = {}) {
     headers: {
       'Content-Type': 'application/json',
       'X-Client-Application': 'matanho-onboard-web',
+      ...(invitationToken ? { Authorization: `Bearer ${invitationToken}` } : {}),
       ...(options.headers || {}),
     },
   });
 
   if (!response.ok) {
+    const raw = await response.text();
     let detail = '';
     try {
-      const problem = await response.json();
-      detail = problem.detail || problem.title || '';
+      const problem = JSON.parse(raw);
+      detail = problem.detail || problem.title || problem.message || '';
     } catch {
-      detail = await response.text();
+      detail = raw;
     }
     throw new Error(detail || `Request failed with status ${response.status}.`);
   }
@@ -341,37 +349,45 @@ function mockApplication(status = 'draft', existingId = '') {
 const api = {
   async createDraft(data) {
     if (useMockApi) return mockApplication('draft');
-    return request('/api/v1/onboarding/applications', { method: 'POST', body: JSON.stringify(data) });
+    return request('/api/public/fundraising-kyc/session', { method: 'GET' });
   },
 
   async saveDraft(applicationId, data) {
     if (useMockApi) return { ...mockApplication('draft', applicationId), reference: data.reference || mockApplication().reference };
-    return request(`/api/v1/onboarding/applications/${applicationId}`, {
+    return request('/api/public/fundraising-kyc/session', {
       method: 'PATCH',
-      headers: { 'Idempotency-Key': crypto.randomUUID() },
-      body: JSON.stringify(data),
+      body: JSON.stringify({ details: data }),
     });
   },
 
   async createLivenessSession(applicationId) {
     if (useMockApi) return { sessionId: `live_${crypto.randomUUID()}` };
-    return request(`/api/v1/onboarding/applications/${applicationId}/liveness/session`, { method: 'POST', body: '{}' });
+    const response = await request('/api/public/fundraising-kyc/session/liveness', { method: 'POST', body: '{}' });
+    return { sessionId: response.data.id, challenge: response.data.challenge, expiresAt: response.data.expiresAt };
   },
 
   async completeLivenessSession(applicationId, payload) {
     if (useMockApi) return { status: 'passed', score: 96 };
-    return request(`/api/v1/onboarding/applications/${applicationId}/liveness/complete`, {
+    const response = await request(`/api/public/fundraising-kyc/session/liveness/${payload.sessionId}/complete`, {
       method: 'POST',
-      body: JSON.stringify(payload),
+      body: JSON.stringify({ evidenceRef: payload.evidenceRef, challengeResponse: payload.challengeResponse }),
     });
+    return response.data;
   },
 
   async requestDocumentUpload(applicationId, metadata) {
     if (useMockApi) return { documentId: `doc_${crypto.randomUUID()}`, uploadUrl: 'mock://upload' };
-    return request(`/api/v1/onboarding/applications/${applicationId}/documents/presign`, {
-      method: 'POST',
-      body: JSON.stringify(metadata),
-    });
+    return { documentId: '', uploadUrl: `${apiBaseUrl}/api/public/fundraising-kyc/session/documents`, headers: { Authorization: `Bearer ${invitationToken}` }, metadata };
+  },
+
+  async listDocumentCategories() {
+    if (useMockApi) return { data: [{ code: 'supporting_document', label: 'Other supporting document', required: false }] };
+    return request('/api/public/fundraising-kyc/session/document-categories', { method: 'GET' });
+  },
+
+  async listDocuments() {
+    if (useMockApi) return { data: [] };
+    return request('/api/public/fundraising-kyc/session/documents', { method: 'GET' });
   },
 
   async uploadDocument(upload, file) {
@@ -379,24 +395,35 @@ const api = {
       await new Promise((resolve) => setTimeout(resolve, 450));
       return;
     }
+    if (String(upload.uploadUrl).includes('/api/public/fundraising-kyc/session/documents')) {
+      const form = new FormData();
+      form.append('file', file);
+      form.append('category', upload.metadata?.category || 'supporting_document');
+      const response = await fetch(upload.uploadUrl, {
+        method: 'POST',
+        headers: { 'X-Client-Application': 'matanho-onboard-web', ...(upload.headers || {}) },
+        body: form,
+      });
+      if (!response.ok) throw new Error('Document upload failed.');
+      return response.json();
+    }
     const response = await fetch(upload.uploadUrl, { method: 'PUT', headers: upload.headers || {}, body: file });
     if (!response.ok) throw new Error('Document upload failed.');
   },
 
   async registerDocument(applicationId, documentId) {
-    if (useMockApi) return;
-    await request(`/api/v1/onboarding/applications/${applicationId}/documents`, {
-      method: 'POST',
-      body: JSON.stringify({ documentId }),
-    });
+    // The live public KYC upload endpoint creates and links the document in one
+    // operation. The old onboarding registration endpoint is unrelated to the
+    // token-scoped KYC contract and must not be called after a public upload.
+    void applicationId;
+    void documentId;
   },
 
   async submit(applicationId) {
     if (useMockApi) return mockApplication('submitted', applicationId);
-    return request(`/api/v1/onboarding/applications/${applicationId}/submit`, {
+    return request('/api/public/fundraising-kyc/submit', {
       method: 'POST',
-      headers: { 'Idempotency-Key': crypto.randomUUID() },
-      body: '{}',
+      body: JSON.stringify({ details: application }),
     });
   },
 };
@@ -418,6 +445,7 @@ const appRoot = rootEl.querySelector('#app') || rootEl;
 
 const preview = options.preview || new URLSearchParams(window.location.search).get('preview');
 let application = preview ? createPreviewApplication() : loadLocalDraft() || createDefaultApplication();
+let documentCategoryCatalog = [];
 let currentStep = typeof options.initialStep === 'number' ? options.initialStep : (preview === 'liveness' ? 2 : preview === 'review' ? 7 : 0);
 let busy = false;
 let receipt = null;
@@ -637,7 +665,7 @@ function renderLiveness() {
   const image = liveness.selfieDataUrl
     ? `<img src="${liveness.selfieDataUrl}" alt="Captured applicant selfie" class="h-full w-full object-cover">`
     : '<video id="camera-video" muted playsinline class="h-full w-full -scale-x-100 object-cover"></video>';
-  return `<div class="space-y-5"><div class="grid gap-4 sm:grid-cols-2">${field('Person completing this check', 'liveness.subjectName', { required: true, placeholder: 'Full legal name' })}${field('Capacity or role', 'liveness.subjectRole', { required: true, placeholder: 'Applicant, director, trustee, authorised representative', hint: 'For an entity, use the authorised representative or signatory.' })}</div>${checkRow('biometric-consent', 'liveness.consent', 'I consent to biometric identity verification', 'The selfie and liveness result may be used for identity verification, fraud prevention, KYC/AML compliance and legally required record-keeping.')}<div class="grid gap-5 xl:grid-cols-[minmax(0,1.15fr)_minmax(300px,.85fr)]"><div class="overflow-hidden rounded-2xl border border-ink-100 bg-ink-950"><div class="relative aspect-[4/3] min-h-[280px] bg-ink-900">${image}<div class="pointer-events-none absolute inset-0 grid place-items-center"><div class="face-mask h-[72%] w-[58%] rounded-[48%] border-2 border-dashed border-white/70"></div></div><div class="absolute left-4 top-4 flex gap-2"><span id="camera-badge" class="status-pill ${completed ? 'status-success' : 'status-neutral'}">${completed ? 'Captured' : 'Camera off'}</span>${liveness.score ? statusPill(`${liveness.score}% quality`, 'success') : ''}</div>${!liveness.selfieDataUrl ? '<div id="camera-help" class="absolute inset-x-8 bottom-8 rounded-2xl border border-white/10 bg-black/35 p-4 text-center backdrop-blur"><p class="text-sm font-semibold text-white">Your camera starts only after you choose Start camera.</p><p class="mt-1 text-xs leading-5 text-white/60">Use a bright, glare-free setting and keep your full face visible.</p></div>' : ''}</div><div class="flex flex-col gap-3 border-t border-white/10 bg-ink-950 px-4 py-4 text-white sm:flex-row sm:items-center sm:justify-between"><p id="challenge-text" class="text-xs leading-5 text-white/70">${completed ? 'Selfie and liveness completed.' : assisted ? 'Selfie captured and queued for assisted verification.' : 'Start the camera when you are ready.'}</p><div class="flex shrink-0 flex-wrap gap-2">${liveness.selfieDataUrl ? '<button type="button" data-action="retake-selfie" class="rounded-xl border border-white/15 px-3 py-2 text-xs font-semibold transition hover:bg-white/10">Retake</button>' : '<button type="button" data-action="start-camera" class="rounded-xl border border-white/15 px-3 py-2 text-xs font-semibold transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40">Start camera</button><button id="run-liveness" type="button" data-action="run-liveness" disabled class="rounded-xl border border-white/15 px-3 py-2 text-xs font-semibold transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40">Run liveness</button><button id="capture-selfie" type="button" data-action="capture-selfie" disabled class="rounded-xl bg-matanho-500 px-3 py-2 text-xs font-semibold text-white transition hover:bg-matanho-600 disabled:cursor-not-allowed disabled:opacity-40">Take selfie</button>'}</div></div><canvas id="selfie-canvas" class="hidden"></canvas></div><div class="space-y-3"><div class="rounded-2xl border border-ink-100 bg-white p-5 shadow-card"><div class="flex items-start justify-between gap-3"><div><p class="text-xs font-semibold uppercase tracking-[0.14em] text-ink-500">Verification status</p><h3 class="mt-1 text-lg font-semibold text-ink-950">${completed ? 'Face verification ready' : assisted ? 'Assisted review requested' : 'Complete the live check'}</h3></div><span class="grid h-10 w-10 place-items-center rounded-xl ${completed ? 'bg-matanho-50 text-matanho-800' : 'bg-ink-50 text-ink-500'}">${completed ? '✓' : '◎'}</span></div><div class="mt-5 space-y-3">${livenessStatusRow('Biometric consent', liveness.consent)}${livenessStatusRow('Live camera session', ['camera_ready', 'challenge_passed', 'captured'].includes(liveness.status))}${livenessStatusRow('Motion challenge', ['challenge_passed', 'captured'].includes(liveness.status))}${livenessStatusRow('Selfie captured', Boolean(liveness.selfieDataUrl))}</div></div>${callout('Camera unavailable?', '<p>Use a recent mobile selfie below. The application remains paperless, but activation is held for assisted identity review.</p><label class="mt-3 inline-flex cursor-pointer rounded-xl border border-amber-300 bg-white px-3 py-2 text-xs font-semibold text-amber-900 hover:bg-amber-50">Upload mobile selfie<input id="selfie-upload" type="file" accept="image/*" capture="user" class="hidden"></label><button type="button" data-action="request-assisted" class="ml-2 mt-3 rounded-xl border border-amber-300 bg-white px-3 py-2 text-xs font-semibold text-amber-900 hover:bg-amber-50">Request assisted check</button>', 'warning')}${callout('Production integration note', config.livenessProvider === 'mock' ? 'This package uses a mock result for demonstration. Change config.js to vendor mode and connect the documented session endpoints before production.' : 'Liveness sessions are created and completed through the backend API. The browser should never receive private vendor credentials.')}</div></div></div>`;
+  return `<div class="space-y-5"><div class="grid gap-4 sm:grid-cols-2">${field('Person completing this check', 'liveness.subjectName', { required: true, placeholder: 'Full legal name' })}${field('Capacity or role', 'liveness.subjectRole', { required: true, placeholder: 'Applicant, director, trustee, authorised representative', hint: 'For an entity, use the authorised representative or signatory.' })}</div>${checkRow('biometric-consent', 'liveness.consent', 'I consent to assisted identity review', 'Your capture and challenge response may be reviewed by an authorised KYC staff member. This local flow does not perform automated biometric verification.')}<div class="grid gap-5 xl:grid-cols-[minmax(0,1.15fr)_minmax(300px,.85fr)]"><div class="overflow-hidden rounded-2xl border border-ink-100 bg-ink-950"><div class="relative aspect-[4/3] min-h-[280px] bg-ink-900">${image}<div class="pointer-events-none absolute inset-0 grid place-items-center"><div class="face-mask h-[72%] w-[58%] rounded-[48%] border-2 border-dashed border-white/70"></div></div><div class="absolute left-4 top-4 flex gap-2"><span id="camera-badge" class="status-pill ${completed ? 'status-success' : 'status-neutral'}">${completed ? 'Capture recorded' : 'Camera off'}</span></div>${!liveness.selfieDataUrl ? '<div id="camera-help" class="absolute inset-x-8 bottom-8 rounded-2xl border border-white/10 bg-black/35 p-4 text-center backdrop-blur"><p class="text-sm font-semibold text-white">Your camera starts only after you choose Start camera.</p><p class="mt-1 text-xs leading-5 text-white/60">The local browser captures a reference for assisted staff review only.</p></div>' : ''}</div><div class="flex flex-col gap-3 border-t border-white/10 bg-ink-950 px-4 py-4 text-white sm:flex-row sm:items-center sm:justify-between"><p id="challenge-text" class="text-xs leading-5 text-white/70">${completed ? 'Capture recorded for assisted review.' : assisted ? 'Capture queued for assisted review.' : 'Start the camera when you are ready.'}</p><div class="flex shrink-0 flex-wrap gap-2">${liveness.selfieDataUrl ? '<button type="button" data-action="retake-selfie" class="rounded-xl border border-white/15 px-3 py-2 text-xs font-semibold transition hover:bg-white/10">Retake</button>' : '<button type="button" data-action="start-camera" class="rounded-xl border border-white/15 px-3 py-2 text-xs font-semibold transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40">Start camera</button><button id="run-liveness" type="button" data-action="run-liveness" disabled class="rounded-xl border border-white/15 px-3 py-2 text-xs font-semibold transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-40">Run motion prompts</button><button id="capture-selfie" type="button" data-action="capture-selfie" disabled class="rounded-xl bg-matanho-500 px-3 py-2 text-xs font-semibold text-white transition hover:bg-matanho-600 disabled:cursor-not-allowed disabled:opacity-40">Record capture</button>'}</div></div><canvas id="selfie-canvas" class="hidden"></canvas></div><div class="space-y-3"><div class="rounded-2xl border border-ink-100 bg-white p-5 shadow-card"><div class="flex items-start justify-between gap-3"><div><p class="text-xs font-semibold uppercase tracking-[0.14em] text-ink-500">Assisted review status</p><h3 class="mt-1 text-lg font-semibold text-ink-950">${completed || assisted ? 'Queued for staff review' : 'Complete the assisted check'}</h3></div><span class="grid h-10 w-10 place-items-center rounded-xl ${completed || assisted ? 'bg-matanho-50 text-matanho-800' : 'bg-ink-50 text-ink-500'}">${completed || assisted ? '✓' : '◎'}</span></div><div class="mt-5 space-y-3">${livenessStatusRow('Assisted-review consent', liveness.consent)}${livenessStatusRow('Camera session', ['camera_ready', 'challenge_passed', 'captured'].includes(liveness.status))}${livenessStatusRow('Motion prompts completed', ['challenge_passed', 'captured'].includes(liveness.status))}${livenessStatusRow('Capture recorded', Boolean(liveness.selfieDataUrl))}</div></div>${callout('Camera unavailable?', '<p>Continue without camera and request authorised staff review. You may optionally attach a recent mobile selfie; no automated verification result is produced.</p><label class="mt-3 inline-flex cursor-pointer rounded-xl border border-amber-300 bg-white px-3 py-2 text-xs font-semibold text-amber-900 hover:bg-amber-50">Attach mobile selfie<input id="selfie-upload" type="file" accept="image/*" capture="user" class="hidden"></label><button type="button" data-action="request-assisted" class="ml-2 mt-3 rounded-xl border border-amber-300 bg-white px-3 py-2 text-xs font-semibold text-amber-900 hover:bg-amber-50">Request assisted review</button>', 'warning')}${callout('Local development boundary', 'This flow records a local evidence reference and queues staff review. It does not verify a face, issue a biometric score or produce a VERIFIED result.', 'info')}</div></div></div>`;
 }
 
 function renderOwnership() {
@@ -779,10 +807,7 @@ appRoot.addEventListener('click', (event) => {
     render();
   }
   if (action === 'request-assisted') {
-    application.liveness.status = 'assisted_review';
-    scheduleAutosave();
-    render();
-    showToast('Assisted identity verification has been requested.');
+    void completeAssistedReview('local://fundraising-kyc/camera-unavailable');
   }
   if (action === 'restart') {
     clearLocalDraft();
@@ -867,11 +892,16 @@ async function handleDocumentFiles(fileList) {
   setBusy(true);
   try {
     const applicationId = await ensureApplication();
+    const categoryResponse = await api.listDocumentCategories();
+    documentCategoryCatalog = Array.isArray(categoryResponse?.data) ? categoryResponse.data : [];
+    const defaultCategory = documentCategoryCatalog.find((category) => category.code === 'identity_document' && category.required)?.code
+      || documentCategoryCatalog.find((category) => category.required)?.code
+      || 'supporting_document';
     const queued = files.map((file) => ({
       file,
       record: {
         id: crypto.randomUUID(),
-        category: 'supporting_document',
+        category: defaultCategory,
         fileName: file.name,
         size: file.size,
         mimeType: file.type,
@@ -894,9 +924,13 @@ async function handleDocumentFiles(fileList) {
         await api.registerDocument(applicationId, upload.documentId);
         const record = application.documents.find((document) => document.id === item.record.id);
         if (record) Object.assign(record, { status: 'uploaded', documentId: upload.documentId });
-      } catch {
+      } catch (error) {
         const record = application.documents.find((document) => document.id === item.record.id);
-        if (record) record.status = 'failed';
+        if (record) {
+          record.status = 'failed';
+          record.error = error instanceof Error ? error.message : 'Document upload failed.';
+        }
+        showToast(record?.error || 'Document upload failed.');
       }
       render();
     }
@@ -952,13 +986,35 @@ function bindLivenessStep() {
       const reader = new FileReader();
       reader.onload = () => {
         application.liveness.selfieDataUrl = String(reader.result || '');
-        application.liveness.status = 'assisted_review';
-        scheduleAutosave();
-        render();
-        showToast('Mobile selfie received for assisted verification.');
+        void completeAssistedReview('local://fundraising-kyc/mobile-selfie');
       };
       reader.readAsDataURL(file);
     });
+  }
+}
+
+async function completeAssistedReview(evidenceRef) {
+  setBusy(true);
+  try {
+    const applicationId = await ensureApplication();
+    const session = await api.createLivenessSession(applicationId);
+    const result = await api.completeLivenessSession(applicationId, {
+      sessionId: session.sessionId,
+      evidenceRef,
+      challengeResponse: session.challenge,
+    });
+    Object.assign(application.liveness, {
+      status: result.status === 'ASSISTED_REVIEW' ? 'assisted_review' : 'captured',
+      providerSessionId: session.sessionId,
+      score: null,
+    });
+    scheduleAutosave();
+    render();
+    showToast('Assisted review requested. An authorised staff member must complete the review.');
+  } catch (error) {
+    showToast(error instanceof Error ? error.message : 'Assisted review request failed.');
+  } finally {
+    setBusy(false);
   }
 }
 
@@ -1066,19 +1122,19 @@ async function captureSelfie() {
     const session = await api.createLivenessSession(applicationId);
     const result = await api.completeLivenessSession(applicationId, {
       sessionId: session.sessionId,
-      selfieDataUrl,
-      challengeCompleted: true,
+      evidenceRef: `local://fundraising-kyc/${session.sessionId}/camera-capture`,
+      challengeResponse: session.challenge,
     });
     Object.assign(application.liveness, {
       selfieDataUrl,
-      status: result.status === 'passed' ? 'captured' : 'assisted_review',
+      status: result.status === 'ASSISTED_REVIEW' ? 'assisted_review' : 'captured',
       providerSessionId: session.sessionId,
-      score: result.score || null,
+      score: null,
     });
     stopCamera();
     scheduleAutosave();
     render();
-    showToast(result.status === 'passed' ? 'Selfie and liveness completed.' : 'Selfie captured for assisted verification.');
+    showToast('Capture recorded and queued for authorised staff review.');
   } catch (error) {
     showToast(error instanceof Error ? error.message : 'Liveness completion failed.');
   } finally {
@@ -1087,6 +1143,24 @@ async function captureSelfie() {
 }
 
 render();
+
+if (!preview && !useMockApi && invitationToken) {
+  void api.listDocuments().then((response) => {
+    const persisted = Array.isArray(response?.data) ? response.data : [];
+    if (!persisted.length) return;
+    application.documents = persisted.map((document) => ({
+      id: document.id,
+      category: document.category || 'supporting_document',
+      fileName: document.fileName || document.name || 'KYC document',
+      size: 0,
+      mimeType: document.mimeType || '',
+      status: 'uploaded',
+      documentId: document.id,
+    }));
+    saveLocalDraft(application);
+    render();
+  }).catch(() => {});
+}
 
 
   // Bridge step changes → Next paths (only when step index changes)

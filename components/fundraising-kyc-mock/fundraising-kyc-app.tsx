@@ -16,6 +16,16 @@ type RuntimeApi = {
   destroy: () => void
 }
 
+declare global {
+  interface Window {
+    MATANHO_CONFIG?: {
+      apiBaseUrl?: string
+      useMockApi?: boolean
+      [key: string]: unknown
+    }
+  }
+}
+
 export function FundraisingKycApp() {
   const rootRef = useRef<HTMLDivElement>(null)
   const apiRef = useRef<RuntimeApi | null>(null)
@@ -27,6 +37,16 @@ export function FundraisingKycApp() {
   useEffect(() => {
     const el = rootRef.current
     if (!el) return
+
+    // Live transport is opt-in until the local backend migration and endpoint
+    // tests are complete. The standalone portal remains usable with its
+    // existing local draft/mock flow by default.
+    window.MATANHO_CONFIG = {
+      ...(window.MATANHO_CONFIG || {}),
+      apiBaseUrl: process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:3009",
+      useMockApi: process.env.NEXT_PUBLIC_FUNDRAISING_KYC_USE_LIVE_API !== "1",
+      livenessProvider: "local_assisted",
+    }
 
     const initialStep = pathToFrKycStep(pathnameRef.current)
     apiRef.current = startFundraisingKycRuntime(el, {

@@ -24,6 +24,8 @@ Usage:
 from __future__ import annotations
 
 import hashlib
+import os
+import subprocess
 import sys
 import tarfile
 import tempfile
@@ -41,12 +43,14 @@ if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
-HOST = "31.220.82.129"
-USER = "root"
+HOST = os.environ.get("NVCCZ_UI_DEPLOY_HOST", "31.220.82.129")
+PORT = int(os.environ.get("NVCCZ_UI_DEPLOY_PORT", "22"))
+USER = os.environ.get("NVCCZ_UI_DEPLOY_USER", "root")
+DEPLOY_PASSWORD = os.environ.get("NVCCZ_CLIENT_SSH_PASSWORD") or SSH_PASSWORD
 REMOTE_ROOT = "/var/www/projects/nvccz"
 UI_ROOT = Path(r"C:\Users\lysp\Downloads\nvccz-new")
 
-UI_SERVICES = ["ui-staff", "ui-lp", "ui-investee", "ui-apply", "ui-vendor", "ui-events"]
+UI_SERVICES = os.environ.get("NVCCZ_UI_SERVICES", "ui-staff").split()
 
 # Mirrors deploy-nvccz-nts-prod.py so the two stay comparable.
 EXCLUDE_DIRS = {
@@ -81,15 +85,18 @@ def skip(rel: str) -> bool:
 
 
 def make_tarball(root: Path, prefix: str, out: Path) -> str:
+    tracked = subprocess.check_output(
+        ["git", "ls-files", "-z"], cwd=root
+    ).split(b"\0")
     with tarfile.open(out, mode="w:gz") as tar:
-        for dirpath, dirs, files in __import__("os").walk(root):
-            dirs[:] = [d for d in dirs if d not in EXCLUDE_DIRS and not is_build_output_dir(d)]
-            for f in files:
-                full = Path(dirpath) / f
-                rel = str(full.relative_to(root))
-                if skip(rel):
-                    continue
-                tar.add(full, arcname=f"{prefix}/{rel.replace(chr(92), '/')}")
+        for encoded_rel in tracked:
+            if not encoded_rel:
+                continue
+            rel = os.fsdecode(encoded_rel)
+            full = root / rel
+            if skip(rel) or not full.is_file():
+                continue
+            tar.add(full, arcname=f"{prefix}/{rel.replace(chr(92), '/')}")
     h = hashlib.sha256()
     with open(out, "rb") as fh:
         for chunk in iter(lambda: fh.read(1 << 20), b""):
@@ -121,7 +128,9 @@ if [ -f src/ui/deploy/nvccz/docker-compose.prod.yml ]; then
 fi
 echo '=== rebuild UI services only ==='
 docker compose --env-file secrets/prod.env -f compose/docker-compose.prod.yml \
-  up -d --build __SERVICES__
+  build __SERVICES__
+docker compose --env-file secrets/prod.env -f compose/docker-compose.prod.yml \
+  up -d --no-build --no-deps __SERVICES__
 echo '=== status ==='
 docker compose --env-file secrets/prod.env -f compose/docker-compose.prod.yml ps
 echo NVCCZ_PROD_UI_ONLY_DONE
@@ -136,24 +145,39 @@ def main() -> int:
         size_mb = ui_tgz.stat().st_size / 1e6
         print(f"  {size_mb:.1f} MB  sha256={sha[:16]}...")
 
-        cli = paramiko.SSHClient()
-        cli.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        try:
-            cli.connect(HOST, username=USER, key_filename=SSH_KEY,
-                        timeout=60, banner_timeout=60)
-            print("  connected (key auth)")
-        except Exception:
-            cli.connect(HOST, username=USER, password=SSH_PASSWORD,
-                        timeout=60, banner_timeout=60,
-                        look_for_keys=False, allow_agent=False)
-            print("  connected (password auth)")
+        def connect() -> paramiko.SSHClient:
+            client = paramiko.SSHClient()
+            client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+            try:
+                client.connect(HOST, port=PORT, username=USER, key_filename=SSH_KEY,
+                               timeout=60, banner_timeout=60)
+                return client
+            except Exception:
+                client.close()
+                client = paramiko.SSHClient()
+                client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+                client.connect(HOST, port=PORT, username=USER, password=DEPLOY_PASSWORD,
+                               timeout=60, banner_timeout=60,
+                               look_for_keys=False, allow_agent=False)
+                return client
+
+        cli = connect()
+        print("  connected")
 
         print("Uploading ...")
+        remote_part = f"/tmp/nvccz-ui-only.{sha[:16]}.part"
         for attempt in (1, 2, 3):
             try:
                 sftp = cli.open_sftp()
-                sftp.put(str(ui_tgz), "/tmp/nvccz-ui-only.tgz")
+                sftp.put(str(ui_tgz), remote_part)
                 sftp.close()
+                _, verify_out, _ = cli.exec_command(f"sha256sum {remote_part} | awk '{{print $1}}'")
+                remote_sha = verify_out.read().decode().strip()
+                if remote_sha != sha:
+                    raise RuntimeError(f"remote checksum mismatch: {remote_sha[:16]}...")
+                cli.exec_command(
+                    f"mv -f {remote_part} /tmp/nvccz-ui-only.tgz"
+                )[1].channel.recv_exit_status()
                 print(f"  upload ok (attempt {attempt})")
                 break
             except Exception as exc:  # the transport drops mid-transfer sometimes
@@ -162,10 +186,7 @@ def main() -> int:
                     cli.close()
                     return 1
                 cli.close()
-                cli = paramiko.SSHClient()
-                cli.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-                cli.connect(HOST, username=USER, key_filename=SSH_KEY,
-                            timeout=60, banner_timeout=60)
+                cli = connect()
 
         script = (REMOTE_SH
                   .replace("__UI_SHA__", sha)
@@ -178,19 +199,21 @@ def main() -> int:
         # UnicodeEncodeError, each leaving a half-finished deploy behind).
         import base64 as _b64, time as _time
         blob = _b64.b64encode(script.encode()).decode()
-        cli.exec_command("rm -f /root/.uionly.b64 /root/.uionly.log")[1].channel.recv_exit_status()
+        remote_state = "/home/user/.uionly"
+        cli.exec_command(f"rm -f {remote_state}.b64 {remote_state}.log {remote_state}.pid")[1].channel.recv_exit_status()
         for i in range(0, len(blob), 3000):
-            cli.exec_command(f"printf %s {blob[i:i+3000]} >> /root/.uionly.b64")[1].channel.recv_exit_status()
+            cli.exec_command(f"printf %s {blob[i:i+3000]} >> {remote_state}.b64")[1].channel.recv_exit_status()
         cli.exec_command(
-            "base64 -d /root/.uionly.b64 > /root/.uionly.sh && "
-            "setsid nohup bash /root/.uionly.sh > /root/.uionly.log 2>&1 < /dev/null & disown"
+            f"base64 -d {remote_state}.b64 > {remote_state}.sh && "
+            f"setsid nohup bash {remote_state}.sh > {remote_state}.log 2>&1 < /dev/null & "
+            f"echo $! > {remote_state}.pid"
         )[1].channel.recv_exit_status()
 
         print("Rebuilding UI services on the server (detached; polling) ...")
         seen = 0
         deadline = _time.time() + 3600
         while _time.time() < deadline:
-            _, out, _ = cli.exec_command("cat /root/.uionly.log 2>/dev/null")
+            _, out, _ = cli.exec_command(f"cat {remote_state}.log 2>/dev/null")
             log = out.read().decode(errors="replace")
             if len(log) > seen:
                 sys.stdout.write(log[seen:])
@@ -200,7 +223,10 @@ def main() -> int:
                 cli.close()
                 print("exit=0")
                 return 0
-            _, out, _ = cli.exec_command("pgrep -f '/root/.uionly.sh' >/dev/null && echo RUNNING || echo GONE")
+            _, out, _ = cli.exec_command(
+                f"test -s {remote_state}.pid && "
+                f"kill -0 $(cat {remote_state}.pid) 2>/dev/null && echo RUNNING || echo GONE"
+            )
             if out.read().decode().strip() == "GONE" and "NVCCZ_PROD_UI_ONLY_DONE" not in log:
                 cli.close()
                 print("exit=1 (remote script ended without the completion marker)")

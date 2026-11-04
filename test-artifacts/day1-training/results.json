@@ -1,0 +1,14 @@
+{
+  "environment": "http://localhost:3001",
+  "testedAt": "2026-10-15T14:01:24.261Z",
+  "results": [
+    {
+      "name": "admin-login",
+      "passed": false,
+      "error": "page.waitForResponse: Timeout 60000ms exceeded while waiting for event \"response\"",
+      "observed": "",
+      "url": "http://localhost:3001/login",
+      "durationMs": 63036
+    }
+  ]
+}

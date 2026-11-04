@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { useDispatch, useSelector } from "react-redux"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -49,13 +49,15 @@ import { CreateInvoiceModal } from "./create-invoice-modal"
 import { accountingApi } from "@/lib/api/accounting-api"
 import { ConfirmationDialog } from "@/components/ui/confirmation-dialog"
 import { useInvoices } from "@/lib/hooks/use-invoices"
-import { fetchCurrencies, fetchCreditNotes } from "@/lib/store/slices/accountingSlice"
+import { fetchCurrencies } from "@/lib/store/slices/accountingSlice"
 import type { RootState, AppDispatch } from "@/lib/store"
-import { Invoice } from "@/lib/api/accounting-api"
+import { Invoice, type MarkAsPaidRequest } from "@/lib/api/accounting-api"
 import { CreditNotesManagement } from "./credit-notes-management"
 import { CustomersManagement } from "./customers-management"
 import { useAccountingPermissions } from "@/lib/hooks/useAccountingPermissions"
 import { CurrencyFilter } from "./CurrencyFilter"
+import { AccountingExportControls } from "./accounting-export-controls"
+import { BulkReceivablesUploadModal } from "./bulk-receivables-upload-modal"
 
 interface MockInvoice {
   id: string
@@ -184,7 +186,7 @@ const tabs = [
   }
 ]
 
-export function InvoicesManagement() {
+export function InvoicesManagement({ enhanced = false }: { enhanced?: boolean }) {
   const dispatch = useDispatch<AppDispatch>()
   const { permissions } = useAccountingPermissions()
   
@@ -240,45 +242,26 @@ export function InvoicesManagement() {
   const [invoiceToEdit, setInvoiceToEdit] = useState<Invoice | null>(null)
   const [currentFilters, setCurrentFilters] = useState<any>({})
   const [isCreateCreditNoteModalOpen, setIsCreateCreditNoteModalOpen] = useState(false)
+  const [bulkOpen, setBulkOpen] = useState(false)
+  const [invoiceToDelete, setInvoiceToDelete] = useState<Invoice | null>(null)
+  const [deletingInvoice, setDeletingInvoice] = useState(false)
+  const initialLoadRef = useRef(false)
+  const previousCurrencyRef = useRef(selectedCurrencyId)
 
   useEffect(() => {
-    const loadData = async () => {
-      try {
-        // Load currencies from Redux if not already loaded
-        if (currencies.length === 0) {
-          dispatch(fetchCurrencies())
-        }
+    if (initialLoadRef.current) return
+    initialLoadRef.current = true
+    if (!currencies.length) void dispatch(fetchCurrencies())
+    void loadCustomers()
+    void loadInvoices({ currencyId: selectedCurrencyId || undefined, page: 1, limit: 10 })
+  }, [dispatch, currencies.length, loadCustomers, loadInvoices, selectedCurrencyId])
 
-        // Load customers
-        await loadCustomers()
-
-        // Load invoices with pagination
-        const statusFilter = activeTab !== 'all' ? tabs.find(t => t.id === activeTab)?.status : undefined
-        await loadInvoices({ 
-          status: statusFilter,
-          currencyId: selectedCurrencyId || undefined,
-          page: 1,
-          limit: 10
-        })
-
-        // Load credit notes when on credit notes tab
-        if (activeMainTab === 'credit-notes') {
-          dispatch(fetchCreditNotes({ currencyId: selectedCurrencyId || undefined }))
-        }
-      } catch (error) {
-        console.error('Failed to load data:', error)
-      }
-    }
-
-    loadData()
-  }, [dispatch, currencies.length, activeTab, activeMainTab, loadCustomers, loadInvoices, selectedCurrencyId])
-
-  // Load credit notes when switching to credit notes tab
   useEffect(() => {
-    if (activeMainTab === 'credit-notes') {
-      dispatch(fetchCreditNotes({ currencyId: selectedCurrencyId || undefined }))
-    }
-  }, [activeMainTab, dispatch, selectedCurrencyId])
+    if (previousCurrencyRef.current === selectedCurrencyId) return
+    previousCurrencyRef.current = selectedCurrencyId
+    void loadInvoices({ ...currentFilters, status: activeTab === 'all' ? undefined : tabs.find(t => t.id === activeTab)?.status,
+      currencyId: selectedCurrencyId || undefined, page: 1, limit: pagination.limit })
+  }, [selectedCurrencyId])
 
   // Handle tab change and filter by status
   const handleTabChange = (tabId: string) => {
@@ -288,7 +271,10 @@ export function InvoicesManagement() {
     
     loadInvoices({ 
       status: statusFilter,
-      page: 1 // Reset to first page on tab change
+      ...currentFilters,
+      currencyId: selectedCurrencyId || undefined,
+      page: 1,
+      limit: pagination.limit
     })
   }
 
@@ -307,7 +293,9 @@ export function InvoicesManagement() {
     updateFilters(updatedFilters)
     loadInvoices({ 
       ...updatedFilters,
-      page: 1 // Reset to first page on filter change
+      currencyId: updatedFilters.currencyId || selectedCurrencyId || undefined,
+      page: 1,
+      limit: pagination.limit
     })
   }
 
@@ -322,7 +310,9 @@ export function InvoicesManagement() {
     updateFilters(updatedFilters)
     loadInvoices({ 
       ...updatedFilters,
-      page: 1 // Reset to first page on search
+      currencyId: updatedFilters.currencyId || selectedCurrencyId || undefined,
+      page: 1,
+      limit: pagination.limit
     })
   }
 
@@ -334,7 +324,9 @@ export function InvoicesManagement() {
     loadInvoices({ 
       ...currentFilters,
       status: statusFilter,
-      page
+      currencyId: currentFilters.currencyId || selectedCurrencyId || undefined,
+      page,
+      limit: pagination.limit
     })
   }
 
@@ -346,6 +338,7 @@ export function InvoicesManagement() {
     loadInvoices({ 
       ...currentFilters,
       status: statusFilter,
+      currencyId: currentFilters.currencyId || selectedCurrencyId || undefined,
       limit: pageSize,
       page: 1
     })
@@ -381,8 +374,21 @@ export function InvoicesManagement() {
   }
 
   const handleDeleteInvoice = (invoice: Invoice) => {
-    // TODO: Implement delete functionality
-    console.log('Delete invoice:', invoice.id)
+    setInvoiceToDelete(invoice)
+  }
+
+  const confirmDeleteInvoice = async () => {
+    if (!invoiceToDelete) return
+    setDeletingInvoice(true)
+    try {
+      const response = await accountingApi.deleteInvoice(invoiceToDelete.id)
+      if (!response.success) throw new Error(response.error || response.message || 'Delete failed')
+      toast.success(`Invoice ${invoiceToDelete.invoiceNumber} deleted`)
+      setInvoiceToDelete(null)
+      await loadInvoices({ ...currentFilters, status: activeTab === 'all' ? undefined : tabs.find(t => t.id === activeTab)?.status,
+        currencyId: selectedCurrencyId || undefined, page: Math.max(1, pagination.page), limit: pagination.limit })
+    } catch (error) { toast.error(error instanceof Error ? error.message : 'Could not delete invoice') }
+    finally { setDeletingInvoice(false) }
   }
 
   // Wrapper functions for drawer actions
@@ -391,7 +397,9 @@ export function InvoicesManagement() {
   }
 
   const handleMarkAsPaidFromDrawer = async (invoice: Invoice, data: { paymentMethod: string; paymentCurrencyId: string }): Promise<Invoice> => {
-    return await handleMarkAsPaid(invoice, data)
+    const method = data.paymentMethod.toUpperCase()
+    if (!['CASH', 'BANK', 'CARD', 'CHEQUE'].includes(method)) throw new Error('Choose a valid payment method.')
+    return await handleMarkAsPaid(invoice, { ...data, paymentMethod: method as MarkAsPaidRequest['paymentMethod'] })
   }
 
   const handleVoidInvoiceFromDrawer = async (invoice: Invoice, data: { reason: string }): Promise<Invoice> => {
@@ -744,12 +752,17 @@ export function InvoicesManagement() {
   ]
 
   const handleBulkAction = async (selectedInvoices: Invoice[], action: string) => {
-    try {
-      // TODO: Implement bulk actions for invoices
-      console.log(`Bulk ${action} for`, selectedInvoices.length, 'invoices')
-    } catch (error: any) {
-      console.error(`Failed to ${action} invoices`, error)
+    if (action === 'mark-paid') {
+      toast.error('Record and allocate receipts under Receipts & ageing to settle invoices.')
+      return
     }
+    if (action !== 'send') return
+    let sent = 0
+    for (const invoice of selectedInvoices.filter(x => x.status === 'DRAFT')) {
+      try { await handleSendInvoice(invoice); sent++ } catch { /* the hook displays the API error */ }
+    }
+    toast.info(`${sent} of ${selectedInvoices.length} selected invoices sent`)
+    await loadInvoices({ ...currentFilters, page: pagination.page, limit: pagination.limit })
   }
 
   const handleExport = (data: Invoice[]) => {
@@ -775,6 +788,21 @@ export function InvoicesManagement() {
     window.URL.revokeObjectURL(url)
 
     console.log(`Exported ${data.length} invoices`)
+  }
+
+  const loadInvoiceExport = async () => {
+    const rows: Invoice[] = []
+    const status = activeTab === 'all' ? undefined : tabs.find(t => t.id === activeTab)?.status as 'DRAFT' | 'SENT' | 'PAID' | 'VOID' | undefined
+    for (let page = 1; ; page++) {
+      const response = await accountingApi.getInvoices({ ...currentFilters, status, currencyId: currentFilters.currencyId || selectedCurrencyId || undefined, page, limit: 100 })
+      if (!response.success || !response.data) throw new Error(response.error || 'Could not export invoices')
+      rows.push(...response.data.invoices)
+      if (page >= response.data.totalPages || response.data.invoices.length < 100) break
+    }
+    return { title: `Sales Invoices — ${tabs.find(t => t.id === activeTab)?.label || 'All Invoices'}`,
+      filename: `sales-invoices-${activeTab}`, landscape: true,
+      columns: ['Invoice', 'Customer', 'Date', 'Currency', 'Subtotal', 'VAT', 'Total', 'Paid', 'Outstanding', 'Status'],
+      rows: rows.map(x => [x.invoiceNumber || '', x.customer?.name || '', x.transactionDate?.slice(0, 10) || '', x.currency?.code || '', Number(x.amount || 0), Number(x.vatAmount || 0), Number(x.totalAmount || 0), Number(x.paidAmount || 0), Number(x.outstandingAmount || 0), x.status || '']) }
   }
 
   return (
@@ -812,8 +840,8 @@ export function InvoicesManagement() {
 
       {/* Header with Create Button */}
       <div className="flex items-center justify-between">
-        <div>
-          {/* Tab-specific content */}
+        <div className="flex items-center gap-3">
+          {enhanced && activeMainTab === 'invoices' && canCreateInvoice && <Button variant="outline" className="rounded-full h-10" onClick={() => setBulkOpen(true)}>Bulk Upload</Button>}
         </div>
         <div className="flex items-center gap-3">
           <CurrencyFilter />
@@ -1084,7 +1112,7 @@ export function InvoicesManagement() {
                               setSelectedEndDate(undefined)
                               const statusFilter = activeTab !== 'all' ?
                                 tabs.find(t => t.id === activeTab)?.status : undefined
-                              loadInvoices({ status: statusFilter as 'DRAFT' | 'SENT' | 'PAID' | 'VOID' | undefined })
+                              loadInvoices({ status: statusFilter as 'DRAFT' | 'SENT' | 'PAID' | 'VOID' | undefined, currencyId: selectedCurrencyId || undefined, page: 1, limit: pagination.limit })
                             }}
                             className="rounded-full text-xs"
                           >
@@ -1098,16 +1126,17 @@ export function InvoicesManagement() {
 
                 <ProcurementDataTable
                   data={invoices}
+                  exportControls={enhanced ? () => <AccountingExportControls label="sales invoices" spec={loadInvoiceExport} /> : undefined}
                   columns={columns}
                   title="Sales Invoices"
                   filterOptions={filterOptions}
                   onView={handleViewInvoice}
-                  onEdit={handleEditInvoice}
-                  onDelete={handleDeleteInvoice}
+                  onEdit={canEditInvoice ? handleEditInvoice : undefined}
+                  onDelete={canDeleteInvoice ? handleDeleteInvoice : undefined}
                   onBulkAction={handleBulkAction}
                   bulkActions={bulkActions}
                   loading={invoicesLoading}
-                  onExport={handleExport}
+                  onExport={enhanced ? undefined : handleExport}
                   showSearch={false}
                   showFilters={false}
                   emptyMessage="No invoices found. Create your first invoice to get started."
@@ -1123,17 +1152,21 @@ export function InvoicesManagement() {
 
         {activeMainTab === "credit-notes" && (
           <CreditNotesManagement
+            enhanced={enhanced}
             isCreateModalOpen={isCreateCreditNoteModalOpen}
             onCreateModalClose={() => setIsCreateCreditNoteModalOpen(false)}
           />
         )}
 
         {activeMainTab === "customers" && (
-          <CustomersManagement />
+          <CustomersManagement enhanced={enhanced} />
         )}
       </div>
 
       {/* Invoice View Drawer */}
+      <ConfirmationDialog isOpen={!!invoiceToDelete} onClose={() => setInvoiceToDelete(null)} onConfirm={confirmDeleteInvoice}
+        title={`Delete ${invoiceToDelete?.invoiceNumber || 'invoice'}?`} description="The invoice will be removed from active records. A posted invoice is reversed by the Accounting service." confirmText="Delete invoice" variant="destructive" isLoading={deletingInvoice} />
+      {enhanced && <BulkReceivablesUploadModal kind="invoices" isOpen={bulkOpen} onClose={() => setBulkOpen(false)} onSuccess={async () => { await loadInvoices({ ...currentFilters, page: 1, limit: pagination.limit }) }} customers={customers} currencies={currencies} />}
       <InvoiceViewDrawer
         isOpen={isViewDrawerOpen}
         onClose={() => {

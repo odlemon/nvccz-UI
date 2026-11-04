@@ -13,6 +13,7 @@ interface ReconciliationState {
     sessions: ReconciliationSession[]
     sessionsLoading: boolean
     sessionsError: string | null
+    sessionsRequestId: string | null
 
     // Active session (being worked on)
     activeSession: ReconciliationSession | null
@@ -48,6 +49,7 @@ const initialState: ReconciliationState = {
     sessions: [],
     sessionsLoading: false,
     sessionsError: null,
+    sessionsRequestId: null,
 
     activeSession: null,
     activeSessionLoading: false,
@@ -228,17 +230,22 @@ const reconciliationSlice = createSlice({
         })
 
         // Fetch sessions
-        builder.addCase(fetchReconciliationSessions.pending, (state) => {
+        builder.addCase(fetchReconciliationSessions.pending, (state, action) => {
             state.sessionsLoading = true
             state.sessionsError = null
+            state.sessionsRequestId = action.meta.requestId
         })
         builder.addCase(fetchReconciliationSessions.fulfilled, (state, action) => {
+            if (state.sessionsRequestId !== action.meta.requestId) return
             state.sessionsLoading = false
             state.sessions = action.payload || []
+            state.sessionsRequestId = null
         })
         builder.addCase(fetchReconciliationSessions.rejected, (state, action) => {
+            if (state.sessionsRequestId !== action.meta.requestId) return
             state.sessionsLoading = false
             state.sessionsError = action.error.message || 'Failed to load sessions'
+            state.sessionsRequestId = null
         })
 
         // Create draft

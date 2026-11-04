@@ -92,7 +92,9 @@ const SCOPE: Record<PerfTier, PerfScopeLevel> = {
 /** roleCodes that carry organisation-wide performance authority regardless of grant level. */
 const EXECUTIVE_ROLES = new Set(["CEO", "CIO", "CFO", "BOARD_CHAIR"])
 const HR_ROLES = new Set(["HR_MGR", "HR_OFF", "HR_COORD"])
-const ADMIN_ROLES = new Set(["SYSADMIN", "IT_MGR"])
+// Monitoring & Evaluation owns the full performance-management workspace, including
+// configuration and access screens. This is scoped to this module's runtime only.
+const ADMIN_ROLES = new Set(["SYSADMIN", "SYS_ADMIN", "SUPER_ADMIN", "PLATFORM_ADMIN", "IT_MGR", "MONITORING_EVALUATION"])
 
 export interface PerfUserLike {
   roleCode?: string | null
@@ -125,13 +127,19 @@ export function resolvePerfAccess(user: PerfUserLike | null | undefined): PerfAc
   const department = user?.userDepartment ? String(user.userDepartment) : null
   const userId = user?.id ? String(user.id) : null
 
-  if (!user || !roleCode) {
+  if (!user) {
     return { label, tier: "none", scope: "none", permissions: [], department, isDepartmentHead, userId }
   }
 
   // `admin` is a real roleCode on this system (admin@nts.com) alongside SYSADMIN.
-  if (ADMIN_ROLES.has(roleCode) || roleCode.toLowerCase() === "admin") {
+  // Some authenticated profile payloads expose only the role name, not roleCode; keep
+  // that explicit system role from being mistaken for a user with no Performance grant.
+  if (ADMIN_ROLES.has(roleCode) || roleCode.toLowerCase() === "admin" || ["admin", "super admin", "superadmin", "administrator"].includes(label.toLowerCase())) {
     return { label, tier: "admin", scope: SCOPE.admin, permissions: PERMISSIONS.admin, department, isDepartmentHead, userId }
+  }
+
+  if (!roleCode) {
+    return { label, tier: "none", scope: "none", permissions: [], department, isDepartmentHead, userId }
   }
 
   let level: ReturnType<typeof getModuleAccessLevel> = "none"

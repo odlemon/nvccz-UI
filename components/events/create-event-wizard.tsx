@@ -136,6 +136,11 @@ export function CreateEventWizard({ isOpen, onClose, initialDate, editMode = fal
       return
     }
 
+    if (!data.description.trim()) {
+      toast.error("Please enter an event description")
+      return
+    }
+
     if (!data.location.trim()) {
       toast.error("Please enter a location")
       return
@@ -225,10 +230,10 @@ export function CreateEventWizard({ isOpen, onClose, initialDate, editMode = fal
           {/* Basic Information */}
           <div className="space-y-4">
             <h3 className="text-base font-normal text-gray-900">Basic Information</h3>
-            <Card className="border-l-4 border-l-blue-500 shadow-none">
+            <Card className="border-l-4 border-l-[#00843d] shadow-none">
               <CardHeader className="pb-3">
                 <CardTitle className="text-base font-normal flex items-center gap-2">
-                  <CiCalendar className="w-5 h-5 text-blue-500" />
+                  <CiCalendar className="w-5 h-5 text-[#00843d]" />
                   Event Details
                 </CardTitle>
               </CardHeader>
@@ -266,7 +271,7 @@ export function CreateEventWizard({ isOpen, onClose, initialDate, editMode = fal
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="description">Description</Label>
+                  <Label htmlFor="description">Description *</Label>
                   <Controller
                     name="description"
                     control={control}

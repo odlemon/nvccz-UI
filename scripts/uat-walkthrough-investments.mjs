@@ -2,9 +2,9 @@
 /**
  * Walkthrough UAT — Reconciliation, Client Statements, Trading (API smoke).
  * Usage: node scripts/uat-walkthrough-investments.mjs
- * Env: API_BASE (default http://localhost:3009/api), UAT_EMAIL, UAT_PASSWORD
+ * Env: API_BASE (default http://127.0.0.1:3009/api), UAT_EMAIL, UAT_PASSWORD
  */
-const API = process.env.API_BASE || 'http://localhost:3009/api'
+const API = process.env.API_BASE || 'http://127.0.0.1:3009/api'
 const EMAIL = process.env.UAT_EMAIL || 'admin@nts.com'
 const PASSWORD = process.env.UAT_PASSWORD || 'admin123'
 

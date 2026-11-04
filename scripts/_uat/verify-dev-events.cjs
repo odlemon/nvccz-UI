@@ -1,0 +1,28 @@
+const {chromium}=require('playwright');
+const fs=require('fs');
+(async()=>{
+ const sample=JSON.parse(fs.readFileSync('.acc-dumps/dev-event-sample.json','utf8'));
+ if(!sample)throw new Error('No development guest available for read-only check');
+ const b=await chromium.launch();const p=await b.newPage({viewport:{width:1440,height:1000}});
+ const response=await p.goto('https://dev.events.matanho.com/events/rsvp/'+sample.invitationToken,{waitUntil:'domcontentloaded',timeout:60000});
+ await p.getByRole('heading',{name:'Confirm your attendance'}).waitFor({timeout:30000});
+ await p.locator('img[src*=inspiration]').last().scrollIntoViewIfNeeded();
+ await p.waitForFunction(()=>[...document.querySelectorAll('img[src*=inspiration]')].every(e=>e.complete&&e.naturalWidth>0),{timeout:20000});
+ const text=await p.locator('body').innerText();
+ console.log('Events portal',response.status(),'form',text.includes('Registration details'),'closed',text.includes('Registration has closed'));
+ console.log('HD images',await p.locator('img[src*=inspiration]').evaluateAll(es=>es.map(e=>({loaded:e.complete&&e.naturalWidth>0,width:e.naturalWidth}))));
+ await p.screenshot({path:'.acc-dumps/dev-rsvp-deployed.png',fullPage:true});
+ const video=await p.evaluate(async()=>{const r=await fetch('https://dev-api.matanho.com/api/public-media/event-anniversary-videos/1792674150884-333827719.mp4',{headers:{Range:'bytes=0-1023'}});return {status:r.status}});
+ console.log('Deployed video streaming',video.status);
+ await p.goto('https://dev.matanho.com/login',{waitUntil:'domcontentloaded',timeout:60000});
+ await p.waitForLoadState('networkidle',{timeout:15000}).catch(()=>{});await p.waitForTimeout(1000);
+ await p.locator('input[type=email]').fill('admin@nts.com');await p.locator('input[type=password]').fill('admin123');
+ await p.getByRole('button',{name:'Sign in',exact:true}).click();
+ await p.waitForURL('**/home',{waitUntil:'domcontentloaded',timeout:30000});
+ await p.goto('https://dev.matanho.com/events/'+sample.eventId,{waitUntil:'domcontentloaded',timeout:60000});
+ await p.getByRole('button',{name:'Guests',exact:true}).click();
+ await p.getByRole('button',{name:/Send official invitations/}).waitFor({timeout:20000});
+ console.log('Staff Events guest management accessible; official-invitation action present');
+ await p.screenshot({path:'.acc-dumps/dev-guests-deployed.png',fullPage:true});
+ await b.close();
+})().catch(e=>{console.error(e.message);process.exit(1)});

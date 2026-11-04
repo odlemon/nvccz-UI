@@ -40,6 +40,7 @@ import { fetchCreditNotes } from "@/lib/store/slices/accountingSlice"
 import type { RootState, AppDispatch } from "@/lib/store/store"
 import { useCreditNotes } from "@/lib/hooks/use-credit-notes"
 import { useAccountingPermissions } from "@/lib/hooks/useAccountingPermissions"
+import { AccountingExportControls } from "./accounting-export-controls"
 
 const creditNoteTabs = [
   {
@@ -77,11 +78,13 @@ const creditNoteTabs = [
 ]
 
 interface CreditNotesManagementProps {
+  enhanced?: boolean
   isCreateModalOpen?: boolean
   onCreateModalClose?: () => void
 }
 
 export function CreditNotesManagement({ 
+  enhanced = false,
   isCreateModalOpen: externalCreateModalOpen, 
   onCreateModalClose 
 }: CreditNotesManagementProps = {}) {
@@ -98,11 +101,14 @@ export function CreditNotesManagement({
     loading: creditNotesLoading,
     error: creditNotesError,
     loadCreditNotes,
+    handleSendCreditNote,
     handleDeleteCreditNote,
     selectCreditNote
   } = useCreditNotes()
   
   const [activeTab, setActiveTab] = useState("all")
+  const pagination = useSelector((state: RootState) => state.accounting.creditNotesPagination)
+  const selectedCurrencyId = useSelector((state: RootState) => state.accounting.selectedCurrencyId)
   const [selectedCreditNote, setSelectedCreditNote] = useState<CreditNote | null>(null)
   const [isViewDrawerOpen, setIsViewDrawerOpen] = useState(false)
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
@@ -113,14 +119,14 @@ export function CreditNotesManagement({
 
   useEffect(() => {
     // Load credit notes using the hook
-    loadCreditNotes()
-  }, [loadCreditNotes])
+    loadCreditNotes({ page: 1, limit: pagination.limit, currencyId: selectedCurrencyId || undefined })
+  }, [loadCreditNotes, selectedCurrencyId])
 
   const handleTabChange = (tabId: string) => {
     setActiveTab(tabId)
     // Load credit notes with status filter if needed
     const statusFilter = creditNoteTabs.find(t => t.id === tabId)?.status
-    loadCreditNotes(statusFilter ? { status: statusFilter } : undefined)
+    loadCreditNotes({ status: statusFilter, currencyId: selectedCurrencyId || undefined, page: 1, limit: pagination.limit })
   }
 
   // Filter credit notes based on active tab
@@ -409,11 +415,13 @@ export function CreditNotesManagement({
   ]
 
   const handleBulkAction = async (selectedCreditNotes: CreditNote[], action: string) => {
-    try {
-      console.log(`Bulk ${action} for`, selectedCreditNotes.length, 'credit notes')
-    } catch (error: any) {
-      console.error(`Failed to ${action} credit notes`, error)
+    if (action !== 'send') return
+    let sent = 0
+    for (const note of selectedCreditNotes.filter(x => x.status === 'DRAFT')) {
+      try { await handleSendCreditNote(note); sent++ } catch { /* the hook displays the API error */ }
     }
+    toast.info(`${sent} of ${selectedCreditNotes.length} selected credit notes issued`)
+    await loadCreditNotes({ status: creditNoteTabs.find(t => t.id === activeTab)?.status, currencyId: selectedCurrencyId || undefined, page: pagination.page, limit: pagination.limit })
   }
 
   const handleExport = (data: CreditNote[]) => {
@@ -439,6 +447,20 @@ export function CreditNotesManagement({
     window.URL.revokeObjectURL(url)
 
     console.log(`Exported ${data.length} credit notes`)
+  }
+
+  const loadExport = async () => {
+    const status = creditNoteTabs.find(t => t.id === activeTab)?.status
+    const rows: CreditNote[] = []
+    for (let page = 1; ; page++) {
+      const response = await accountingApi.getCreditNotes({ status, currencyId: selectedCurrencyId || undefined, page, limit: 100 })
+      if (!response.success || !response.data) throw new Error(response.error || 'Could not export credit notes')
+      rows.push(...response.data.creditNotes)
+      if (page >= response.data.totalPages || response.data.creditNotes.length < 100) break
+    }
+    return { title: `Credit Notes — ${creditNoteTabs.find(t => t.id === activeTab)?.label || 'All'}`, filename: `credit-notes-${activeTab}`,
+      columns: ['Credit Note', 'Customer', 'Currency', 'Subtotal', 'VAT', 'Total', 'Remaining', 'Reason', 'Status', 'Created'],
+      rows: rows.map(x => [x.creditNoteNumber || '', x.customer?.name || '', x.currency?.code || '', Number(x.amount || 0), Number(x.vatAmount || 0), Number(x.totalAmount || 0), Number(x.remainingAmount || 0), x.reason || '', x.status || '', x.createdAt?.slice(0, 10) || '']), landscape: true }
   }
 
   return (
@@ -480,6 +502,7 @@ export function CreditNotesManagement({
         <CardContent className="pt-6">
           <ProcurementDataTable
             data={filteredCreditNotes}
+            exportControls={enhanced ? () => <AccountingExportControls label="credit notes" spec={loadExport} /> : undefined}
             columns={columns}
             title="Credit Notes"
             filterOptions={filterOptions}
@@ -489,7 +512,11 @@ export function CreditNotesManagement({
             onBulkAction={handleBulkAction}
             bulkActions={bulkActions}
             loading={creditNotesLoading}
-            onExport={handleExport}
+            onExport={enhanced ? undefined : handleExport}
+            usePagination={enhanced ? "backend" : "frontend"}
+            paginationData={enhanced ? pagination : undefined}
+            onPageChange={enhanced ? page => loadCreditNotes({ status: creditNoteTabs.find(t => t.id === activeTab)?.status, currencyId: selectedCurrencyId || undefined, page, limit: pagination.limit }) : undefined}
+            onPageSizeChange={enhanced ? limit => loadCreditNotes({ status: creditNoteTabs.find(t => t.id === activeTab)?.status, currencyId: selectedCurrencyId || undefined, page: 1, limit }) : undefined}
             emptyMessage="No credit notes found. Create your first credit note to get started."
           />
         </CardContent>

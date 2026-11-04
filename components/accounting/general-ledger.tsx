@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
+import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from "@/components/ui/pagination"
 import { Calendar as CalendarComponent } from "@/components/ui/calendar"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { 
@@ -28,16 +29,21 @@ import {
   BarChart3,
   TrendingUp,
   RefreshCw,
-  Download
+  Download,
+  FileSpreadsheet,
+  Upload
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { toast } from "sonner"
 import { format } from "date-fns"
 import { CreateJournalEntryModal } from "./create-journal-entry-modal"
+import { BulkJournalUploadModal } from "./bulk-journal-upload-modal"
 import { JournalEntryViewDrawer } from "./journal-entry-view-drawer"
 import { CurrencyFilter } from "./CurrencyFilter"
 import { TrialBalanceView } from "./trial-balance-view"
+import { AccountingExportButtonGroup } from "./accounting-export-controls"
 import { accountingApi, JournalEntryFilters } from "@/lib/api/accounting-api"
+import { downloadAc52Export, type Ac52ExportSpec } from "@/lib/accounting-v52/export"
 import { useAccountingPermissions } from "@/lib/hooks/useAccountingPermissions"
 import { useSelector } from "react-redux"
 import { RootState } from "@/lib/store/store"
@@ -64,72 +70,40 @@ const currentCurrencyCode = (currencies: any[], id: string | null) => {
   return currencies.find(c => c.id === id)?.code || 'USD'
 }
 
-// CSV Export utility function
-const exportToCSV = (journalEntries: JournalEntry[]) => {
-  // Prepare CSV headers
-  const headers = [
-    "Transaction Date",
-    "Reference Number",
-    "Journal Entry Description",
-    "Account Number",
-    "Account Name",
-    "Account Type",
-    "Line Description",
-    "Debit Amount",
-    "Credit Amount",
-    "Status",
-    "Created By",
-    "Total Amount"
-  ]
+// The columns the General Ledger export writes, shared by the on-screen CSV and the branded PDF / Excel documents so
+// every format carries the same figures. One row per journal line; the entry-level fields print on the first line only.
+const JOURNAL_EXPORT_COLUMNS = [
+  "Transaction Date",
+  "Reference Number",
+  "Journal Entry Description",
+  "Account Number",
+  "Account Name",
+  "Account Type",
+  "Line Description",
+  "Debit Amount",
+  "Credit Amount",
+  "Status",
+  "Created By",
+  "Total Amount",
+]
 
-  // Prepare CSV rows
-  const rows = journalEntries.flatMap(entry => 
-    entry.journalEntryLines.map((line, index) => [
-      format(new Date(entry.transactionDate), 'yyyy-MM-dd'),
+const journalExportRows = (entries: JournalEntry[]): (string | number)[][] =>
+  entries.flatMap((entry) =>
+    (entry.journalEntryLines || []).map((line, index) => [
+      format(new Date(entry.transactionDate), "yyyy-MM-dd"),
       cleanString(entry.referenceNumber),
-      index === 0 ? cleanString(entry.description) : "", // Only show on first line
-      cleanString(line.chartOfAccount.accountNo),
-      cleanString(line.chartOfAccount.accountName),
-      cleanString(line.chartOfAccount.accountType),
+      index === 0 ? cleanString(entry.description) : "",
+      cleanString(line.chartOfAccount?.accountNo),
+      cleanString(line.chartOfAccount?.accountName),
+      cleanString(line.chartOfAccount?.accountType),
       cleanString(line.description),
       cleanNumber(line.debitAmount).toFixed(2),
       cleanNumber(line.creditAmount).toFixed(2),
-      index === 0 ? entry.status : "", // Only show on first line
-      index === 0 ? `${entry.createdBy.firstName} ${entry.createdBy.lastName}` : "", // Only show on first line
-      index === 0 ? cleanNumber(entry.totalAmount).toFixed(2) : "" // Only show on first line
-    ])
+      index === 0 ? entry.status : "",
+      index === 0 ? `${cleanString(entry.createdBy?.firstName)} ${cleanString(entry.createdBy?.lastName)}`.trim() : "",
+      index === 0 ? cleanNumber(entry.totalAmount).toFixed(2) : "",
+    ]),
   )
-
-  // Combine headers and rows
-  const csvContent = [
-    headers.join(","),
-    ...rows.map(row => 
-      row.map(cell => {
-        // Escape quotes and wrap in quotes if contains comma, quote, or newline
-        const cellStr = String(cell)
-        if (cellStr.includes(",") || cellStr.includes('"') || cellStr.includes("\n")) {
-          return `"${cellStr.replace(/"/g, '""')}"`
-        }
-        return cellStr
-      }).join(",")
-    )
-  ].join("\n")
-
-  // Create blob and download
-  const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" })
-  const link = document.createElement("a")
-  const url = URL.createObjectURL(blob)
-  
-  link.setAttribute("href", url)
-  link.setAttribute("download", `journal_entries_${format(new Date(), 'yyyy-MM-dd_HHmmss')}.csv`)
-  link.style.visibility = "hidden"
-  
-  document.body.appendChild(link)
-  link.click()
-  document.body.removeChild(link)
-  
-  toast.success(`Exported ${journalEntries.length} journal entries to CSV`)
-}
 
 interface JournalEntry {
   id: string
@@ -203,6 +177,7 @@ export function GeneralLedger() {
   const [journalEntries, setJournalEntries] = useState<JournalEntry[]>([])
   const [loading, setLoading] = useState(false)
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
+  const [isBulkOpen, setIsBulkOpen] = useState(false)
   const [isViewDrawerOpen, setIsViewDrawerOpen] = useState(false)
   const [selectedEntry, setSelectedEntry] = useState<JournalEntry | null>(null)
   
@@ -216,6 +191,10 @@ export function GeneralLedger() {
   // Debounced search
   const [debouncedSearch, setDebouncedSearch] = useState("")
 
+  // Pagination over date groups (mirrors the Trial Balance tab's pager convention)
+  const [currentPage, setCurrentPage] = useState(1)
+  const groupsPerPage = 10
+
   // Debounce search query
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -224,6 +203,11 @@ export function GeneralLedger() {
 
     return () => clearTimeout(timer)
   }, [searchQuery])
+
+  // Back to page 1 whenever the register is refiltered
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [debouncedSearch, statusFilter, startDate, endDate, selectedCurrencyId])
 
   // Load entries when filters change
   useEffect(() => {
@@ -314,6 +298,12 @@ export function GeneralLedger() {
     return groups
   }, [])
 
+  // Clamp the page on render so shrinking result sets can never leave the pager on an empty page
+  const totalPages = Math.max(1, Math.ceil(groupedEntries.length / groupsPerPage))
+  const clampedPage = Math.min(currentPage, totalPages)
+  const pageStart = (clampedPage - 1) * groupsPerPage
+  const paginatedGroups = groupedEntries.slice(pageStart, pageStart + groupsPerPage)
+
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'POSTED':
@@ -355,6 +345,16 @@ export function GeneralLedger() {
     setIsViewDrawerOpen(true)
   }
 
+  // A trial-balance drill hands over an account and a date range; the legacy register has no account filter, so apply
+  // the range it carries (the account itself can then be searched from the reference box).
+  useEffect(() => {
+    const drill = (window as any).__AC52_GL_DRILL__
+    if (!drill) return
+    if (drill.from) setStartDate(new Date(drill.from))
+    if (drill.to) setEndDate(new Date(drill.to))
+    delete (window as any).__AC52_GL_DRILL__
+  }, [])
+
   const handleClearFilters = () => {
     setSearchQuery("")
     setStatusFilter("all")
@@ -386,12 +386,36 @@ export function GeneralLedger() {
   // Check if filters are active
   const hasActiveFilters = debouncedSearch !== "" || statusFilter !== "all" || !!startDate || !!endDate
 
-  const handleExportCSV = () => {
+  const buildExportSpec = (): Ac52ExportSpec => {
+    const code = currentCurrencyCode(currencies, selectedCurrencyId)
+    return {
+      title: "General Ledger — Journal Entries",
+      subtitle: hasActiveFilters ? "Filtered view of the journal register" : "Full journal register",
+      meta: [
+        ["Journal entries", String(stats.totalEntries)],
+        ["Posted", String(stats.postedEntries)],
+        ["Pending", String(stats.pendingEntries)],
+        ["Total value", formatWithCurrencyCode(stats.totalValue, code)],
+      ],
+      columns: JOURNAL_EXPORT_COLUMNS,
+      rows: journalExportRows(journalEntries),
+      align: ["left", "left", "left", "left", "left", "left", "left", "right", "right", "left", "left", "right"],
+      filename: "general-ledger-journals",
+      landscape: true,
+      note: hasActiveFilters ? "Exported with the filters currently applied to the register." : undefined,
+    }
+  }
+
+  // PDF / Excel / CSV all go through the shared Accounting export engine, so the documents carry the deployment's
+  // branding (Matanho locally and on dev, NVCCZ in production) and the same figures the register shows on screen.
+  const handleExport = (kind: "pdf" | "excel" | "csv") => {
     if (journalEntries.length === 0) {
       toast.error("No journal entries to export")
       return
     }
-    exportToCSV(journalEntries)
+    downloadAc52Export(kind, buildExportSpec())
+      .then((name) => toast.success(`Exported ${journalEntries.length} journal entries`, { description: name }))
+      .catch((e: any) => toast.error("Export failed", { description: e?.message || String(e) }))
   }
 
   return (
@@ -412,14 +436,17 @@ export function GeneralLedger() {
             <RefreshCw className={cn("w-4 h-4 mr-2", loading && "animate-spin")} />
             Refresh
           </Button>
-          <Button 
-            variant="outline" 
-            onClick={handleExportCSV}
+          <AccountingExportButtonGroup
+            label="journal entries"
+            onExport={handleExport}
             disabled={loading || journalEntries.length === 0}
-          >
-            <Download className="w-4 h-4 mr-2" />
-            Export CSV
-          </Button>
+          />
+          {canCreateJournal && (
+            <Button variant="outline" onClick={() => setIsBulkOpen(true)}>
+              <Upload className="w-4 h-4 mr-2" />
+              Bulk Upload
+            </Button>
+          )}
           {canCreateJournal && (
             <Button 
               className="bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-full shadow-md hover:shadow-lg transition-all"
@@ -668,11 +695,11 @@ export function GeneralLedger() {
                     {/* Results count */}
                     <div className="flex items-center justify-between mb-4">
                       <p className="text-sm text-gray-600">
-                        Showing {groupedEntries.length} date group{groupedEntries.length !== 1 ? 's' : ''} with {journalEntries.length} entr{journalEntries.length !== 1 ? 'ies' : 'y'}
+                        Showing {groupedEntries.length === 0 ? 0 : pageStart + 1}–{Math.min(pageStart + groupsPerPage, groupedEntries.length)} of {groupedEntries.length} date group{groupedEntries.length !== 1 ? 's' : ''} with {journalEntries.length} entr{journalEntries.length !== 1 ? 'ies' : 'y'}
                       </p>
                     </div>
                     
-                    {groupedEntries.map((group) => (
+                    {paginatedGroups.map((group) => (
                       <GroupedJournalEntries
                         key={group.date}
                         group={group}
@@ -682,6 +709,54 @@ export function GeneralLedger() {
                         getStatusColor={getStatusColor}
                       />
                     ))}
+
+                    {/* Pagination */}
+                    {totalPages > 1 && (
+                      <div className="flex justify-center mt-6">
+                        <Pagination>
+                          <PaginationContent>
+                            <PaginationItem>
+                              <PaginationPrevious
+                                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                                className={clampedPage === 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                              />
+                            </PaginationItem>
+
+                            {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                              let pageNum
+                              if (totalPages <= 5) {
+                                pageNum = i + 1
+                              } else if (clampedPage <= 3) {
+                                pageNum = i + 1
+                              } else if (clampedPage >= totalPages - 2) {
+                                pageNum = totalPages - 4 + i
+                              } else {
+                                pageNum = clampedPage - 2 + i
+                              }
+
+                              return (
+                                <PaginationItem key={pageNum}>
+                                  <PaginationLink
+                                    onClick={() => setCurrentPage(pageNum)}
+                                    isActive={clampedPage === pageNum}
+                                    className="cursor-pointer"
+                                  >
+                                    {pageNum}
+                                  </PaginationLink>
+                                </PaginationItem>
+                              )
+                            })}
+
+                            <PaginationItem>
+                              <PaginationNext
+                                onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                                className={clampedPage === totalPages ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                              />
+                            </PaginationItem>
+                          </PaginationContent>
+                        </Pagination>
+                      </div>
+                    )}
                   </>
                 )}
               </div>
@@ -700,6 +775,17 @@ export function GeneralLedger() {
         onClose={() => setIsCreateModalOpen(false)}
         onSuccess={() => {
           setIsCreateModalOpen(false)
+          loadJournalEntries()
+        }}
+      />
+
+      {/* Bulk Upload Modal */}
+      <BulkJournalUploadModal
+        isOpen={isBulkOpen}
+        onClose={() => setIsBulkOpen(false)}
+        onSuccess={() => {
+          // Refresh the register behind the modal but leave the dialog open so the operator can read the
+          // per-journal Import results (including any that failed) and close it themselves with "Done".
           loadJournalEntries()
         }}
       />

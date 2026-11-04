@@ -55,3 +55,15 @@ Focused ESLint on the changed frontend files completed without reported findings
 4. Implement an explicitly scoped accounting requisition creation workflow/API, if intended, then test allowed creation and denied approve/process/read-confidential actions without leaving persistent UAT data.
 5. Complete fresh post-fix menu and per-user browser matrices, and test valid Procurement create in isolated disposable data or with cleanup.
 6. Run relevant focused backend tests, then retest locally. Only separately authorized work may push/deploy; production remains read-only.
+
+## Local-first browser follow-up — 2026-10-15
+
+- Confirmed local frontend `http://localhost:3001` returns HTTP 200, but no local API process is listening on `127.0.0.1:3009`; Docker CLI is unavailable in this workspace. This makes authenticated API and persistent create/retrieve checks unavailable.
+- Local Home initially showed an unhandled runtime error because role module permission processing dereferenced a null entry (`access`, then `moduleId`). Added defensive null filtering to the role module lookup/access helpers in `lib/config/role-permissions.ts`. Browser reload then rendered Home and `/portfolio/funds` without the runtime overlay; focused unit/build validation remains outstanding.
+- Home → People showed an empty 0-colleague/0-department state without a top-right Unauthorized toast, but direct `/people` navigation redirected to Reset Password. No password was entered or changed. Do not treat this as proof that the backend directory guard works for staff.
+- The local fund form opened; no record was submitted because API was unavailable. The earlier live dev pending/unknown fund create remains unresolved; never retry without a read-only persistence check.
+
+### Local fund role fix and real browser retest — 2026-10-15
+
+The local API recovered. The synthetic `INV_ANALYST` received 403 from `POST /api/funds` and, after the frontend fix, the Funds browser page showed no Create fund action. The browser then signed in as synthetic `PORTFOLIO_MGR`; Create fund appeared. A $3.5M synthetic fund was created through the three-step wizard, visible as the thirteenth fund, and remained present after reload. No error toast appeared. API readback confirmed name, vintage, currency, and geography. The backend controller now forwards the latter three fields to the service. This closes the local fund creation and button-visibility defect only; it does not verify the earlier development-server attempt or the broader Day 1 access matrix.
+- Backend source still contains the local-only `GET /users` guard change to `requireInternalStaffUser()`. A local ESLint attempt could not start because ESLint 9 finds no flat config; full backend typecheck was stopped after making no progress. No test pass is claimed. No push, commit, deployment, migration, seed, or production access occurred in this follow-up.

@@ -417,13 +417,22 @@ export function FundraisingPipeline() {
     setLoading(true)
     try {
       const campaignType = CAMPAIGN_TYPE_BY_FILTER[filter]
-      const [dash, opps, funnel, meetings, commitments, audit] = await Promise.all([
+      const requests = Promise.all([
         fundraisingApi.getDashboard(campaignType ? { campaignType } : undefined),
         fundraisingApi.listOpportunities(campaignType ? { campaignType } : undefined),
         fundraisingApi.getAnalyticsFunnel(),
         fundraisingApi.listMeetings({ pageSize: 100 }),
         fundraisingApi.listCommitments(),
         fundraisingApi.listAuditLogs({ limit: 100 }),
+      ])
+      const [dash, opps, funnel, meetings, commitments, audit] = await Promise.race([
+        requests,
+        new Promise<never>((_, reject) =>
+          window.setTimeout(
+            () => reject(new Error("Pipeline data request timed out; showing a safe empty state.")),
+            12000,
+          ),
+        ),
       ])
       setDashboard(dash)
       setRawOpportunities(opps ?? [])

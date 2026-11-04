@@ -73,7 +73,13 @@
   dependencies:
     tslib "^2.0.0"
 
-"@emnapi/core@^1.4.5", "@emnapi/core@^1.7.1 || ^2.0.0-alpha.4", "@emnapi/core@1.10.0":
+"@emnapi/core@^1.4.3", "@emnapi/core@^1.4.5":
+  version "1.4.5"
+  dependencies:
+    "@emnapi/wasi-threads" "1.0.4"
+    tslib "^2.4.0"
+
+"@emnapi/core@^1.7.1 || ^2.0.0-alpha.4", "@emnapi/core@1.10.0":
   version "1.10.0"
   resolved "https://registry.npmjs.org/@emnapi/core/-/core-1.10.0.tgz"
   integrity sha512-yq6OkJ4p82CAfPl0u9mQebQHKPJkY7WrIuk205cTYnYe+k2Z8YBh11FrbRG/H6ihirqcacOgl2BIO8oyMQLeXw==
@@ -81,14 +87,24 @@
     "@emnapi/wasi-threads" "1.2.1"
     tslib "^2.4.0"
 
-"@emnapi/runtime@^1.4.5", "@emnapi/runtime@^1.7.1 || ^2.0.0-alpha.4", "@emnapi/runtime@1.10.0":
+"@emnapi/runtime@^1.4.3", "@emnapi/runtime@^1.4.5":
+  version "1.4.5"
+  dependencies:
+    tslib "^2.4.0"
+
+"@emnapi/runtime@^1.7.1 || ^2.0.0-alpha.4", "@emnapi/runtime@1.10.0":
   version "1.10.0"
   resolved "https://registry.npmjs.org/@emnapi/runtime/-/runtime-1.10.0.tgz"
   integrity sha512-ewvYlk86xUoGI0zQRNq/mC+16R1QeDlKQy21Ki3oSYXNgLb45GV1P6A0M+/s6nyCuNDqe5VpaY84BzXGwVbwFA==
   dependencies:
     tslib "^2.4.0"
 
-"@emnapi/wasi-threads@^1.0.4", "@emnapi/wasi-threads@1.2.1":
+"@emnapi/wasi-threads@^1.0.4", "@emnapi/wasi-threads@1.0.4":
+  version "1.0.4"
+  dependencies:
+    tslib "^2.4.0"
+
+"@emnapi/wasi-threads@1.2.1":
   version "1.2.1"
   resolved "https://registry.npmjs.org/@emnapi/wasi-threads/-/wasi-threads-1.2.1.tgz"
   integrity sha512-uTII7OYF+/Mes/MrcIOYp5yOtSMLBWSIoLPpcgwipoiKbli6k322tcoFsxoIIxPDqW01SQGAgko4EzZi2BNv2w==
@@ -435,7 +451,14 @@
     "@napi-rs/canvas-win32-arm64-msvc" "0.1.100"
     "@napi-rs/canvas-win32-x64-msvc" "0.1.100"
 
-"@napi-rs/wasm-runtime@^0.2.12", "@napi-rs/wasm-runtime@^1.1.4":
+"@napi-rs/wasm-runtime@^0.2.12":
+  version "0.2.12"
+  dependencies:
+    "@emnapi/core" "^1.4.3"
+    "@emnapi/runtime" "^1.4.3"
+    "@tybys/wasm-util" "^0.10.0"
+
+"@napi-rs/wasm-runtime@^1.1.4":
   version "1.2.5"
   resolved "https://registry.npmjs.org/@napi-rs/wasm-runtime/-/wasm-runtime-1.2.5.tgz"
   integrity sha512-HshSvXzmBxNzqejd3k/KemgQ3hdREUYFRRrgxOZ+gPljDIsO2SDZrVZMd4Z/HsxudQbE62OVyVFE8z9BCurfjA==
@@ -1990,7 +2013,12 @@
   resolved "https://registry.npmjs.org/@tiptap/suggestion/-/suggestion-3.22.5.tgz"
   integrity sha512-Uv79Ht/o4mx1GWIT65jeQTE67LMrA+K7d8p51XOe9PJw0H0fS3iCdeMJ8tAo3h6QrMJFejdsB7z8jJL9UbAnhA==
 
-"@tybys/wasm-util@^0.10.0", "@tybys/wasm-util@^0.10.3":
+"@tybys/wasm-util@^0.10.0":
+  version "0.10.0"
+  dependencies:
+    tslib "^2.4.0"
+
+"@tybys/wasm-util@^0.10.3":
   version "0.10.4"
   resolved "https://registry.npmjs.org/@tybys/wasm-util/-/wasm-util-0.10.4.tgz"
   integrity sha512-W3c4gRigFS0T/Ma4qIYF3GDAc5AQdHb1yL5znJT1Zv1YaD9Kitx656wBjvr19qbiosmZT8lWDM5BEMynUqX65A==
@@ -3921,11 +3949,7 @@ fdir@^6.5.0:
   resolved "https://registry.npmjs.org/fdir/-/fdir-6.5.0.tgz"
   integrity sha512-tIbYtZbucOs0BRGqPJkshJUYdL+SDH7dVM8gjy+ERp3WAUjLEFJE+02kanyHtwjWOnwrKYBiwAmM0p4kLJAnXg==
 
-fflate@^0.8.1:
-  version "0.8.2"
-  resolved "https://registry.npmjs.org/fflate/-/fflate-0.8.2.tgz"
-  integrity sha512-cPJU47OaAoCbg0pBvzsgpTPhmhqI5eJjh/JIu8tPj5q+T7iLvW/JAYUqmE7KOB4R1ZyEhzBaIQpQpardBF5z8A==
-
+fflate@^0.8.1, fflate@^0.8.2, fflate@^0.8.3:`r`n  version "0.8.3"`r`n  resolved "https://registry.npmjs.org/fflate/-/fflate-0.8.3.tgz"`r`n  integrity sha512-tbZNuJrLwGUp3zshBtdy4W+ORxZuIh8a5ilyIEQDC5rY1f3U20JMry0Ll3WBzU58EZKsEuJFXhb5gwv8CsPvgA==`r`n
 file-entry-cache@^6.0.1:
   version "6.0.1"
   resolved "https://registry.npmjs.org/file-entry-cache/-/file-entry-cache-6.0.1.tgz"

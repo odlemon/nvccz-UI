@@ -28,7 +28,7 @@ export function useCreditNotes() {
   } = useSelector((state: RootState) => state.accounting)
 
   // Load credit notes with optional filters
-  const loadCreditNotes = useCallback(async (filters?: { status?: string }) => {
+  const loadCreditNotes = useCallback(async (filters?: { status?: string; currencyId?: string; page?: number; limit?: number }) => {
     try {
       await dispatch(fetchCreditNotes(filters)).unwrap()
     } catch (error: any) {

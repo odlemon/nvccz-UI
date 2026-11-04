@@ -1,32 +1,34 @@
-# Start local dev stack: MySQL + backend API + frontend (staff portal).
+# Start the local staff stack on the ports used by .env.local.
 # Usage: powershell -ExecutionPolicy Bypass -File scripts/start-dev-servers.ps1
-# Or:    npm run start:servers   (from nvccz-new)
 
 $ErrorActionPreference = "Stop"
-$BE = "C:\Users\lysp\Downloads\nvccz"
-$FE = $PSScriptRoot + "\.."
-$FE = (Resolve-Path $FE).Path
+$backend = "C:\Users\lysp\Downloads\nvccz"
+$frontend = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 
-Write-Host "=== 1/3 MySQL ===" -ForegroundColor Cyan
-& "$BE\scripts\start-local-mysql.bat"
-Start-Sleep -Seconds 2
+function Test-ListeningPort([int]$port) {
+  return [bool](Get-NetTCPConnection -State Listen -LocalPort $port -ErrorAction SilentlyContinue)
+}
 
-Write-Host "=== 2/3 Backend (port 3009) ===" -ForegroundColor Cyan
-Start-Process powershell -ArgumentList @(
-  "-NoExit", "-Command",
-  "cd '$BE'; Write-Host 'Backend API :3009' -ForegroundColor Green; npm run dev"
-)
+& (Join-Path $backend "scripts\start-local-mysql.bat")
 
-Write-Host "=== 3/3 Frontend staff portal (port 3000) ===" -ForegroundColor Cyan
-Start-Process powershell -ArgumentList @(
-  "-NoExit", "-Command",
-  "cd '$FE'; Write-Host 'Frontend :3000' -ForegroundColor Green; npm run dev"
-)
+if (-not (Test-ListeningPort 3019)) {
+  $env:PORT = "3019"
+  Start-Process npm.cmd -ArgumentList @("run", "dev") -WorkingDirectory $backend -WindowStyle Hidden `
+    -RedirectStandardOutput (Join-Path $env:TEMP "nvccz-local-api-3019.out.log") `
+    -RedirectStandardError (Join-Path $env:TEMP "nvccz-local-api-3019.err.log") | Out-Null
+  Write-Host "Started staff API on port 3019."
+} else {
+  Write-Host "Staff API already listening on port 3019."
+}
 
-Write-Host ""
-Write-Host "Started MySQL + backend + frontend in separate windows." -ForegroundColor Green
-Write-Host "  API:  http://127.0.0.1:3009/health"
-Write-Host "  UI:   http://localhost:3000"
-Write-Host "  Login: admin@nts.com / admin123"
-Write-Host ""
-Write-Host "Other portals: npm run dev:lp | dev:investee | dev:apply (separate terminals)"
+if (-not (Test-ListeningPort 3001)) {
+  Start-Process npm.cmd -ArgumentList @("run", "dev") -WorkingDirectory $frontend -WindowStyle Hidden `
+    -RedirectStandardOutput (Join-Path $env:TEMP "nvccz-local-fe-3001.out.log") `
+    -RedirectStandardError (Join-Path $env:TEMP "nvccz-local-fe-3001.err.log") | Out-Null
+  Write-Host "Started staff frontend on port 3001."
+} else {
+  Write-Host "Staff frontend already listening on port 3001."
+}
+
+Write-Host "Frontend: http://localhost:3001"
+Write-Host "API: http://127.0.0.1:3019/health"

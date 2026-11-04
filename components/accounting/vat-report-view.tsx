@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { useSelector } from "react-redux"
 import { RootState } from "@/lib/store/store"
 import { Button } from "@/components/ui/button"
@@ -14,6 +14,7 @@ import { format, startOfMonth, endOfMonth } from "date-fns"
 import { toast } from "sonner"
 import { vatApi } from "@/lib/api/vat-api"
 import { ProcurementDataTable, Column } from "../procurement/procurement-data-table"
+import { AccountingExportControls } from "./accounting-export-controls"
 
 export function VatReportView() {
   const currencies = useSelector((state: RootState) => state.accounting.currencies)
@@ -23,17 +24,24 @@ export function VatReportView() {
   const [currencyId, setCurrencyId] = useState("")
   const [loading, setLoading] = useState(false)
   const [data, setData] = useState<any>(null)
+  const [generatedCurrency, setGeneratedCurrency] = useState("")
+
+  useEffect(() => {
+    if (!currencyId && currencies.length) setCurrencyId((currencies.find(c => c.isDefault) || currencies[0]).id)
+  }, [currencies, currencyId])
 
   const handleGenerate = async () => {
+    if (!currencyId) { toast.error('Select a currency first.'); return }
     setLoading(true)
     try {
       const response = await vatApi.getOutputTaxAuditReport({
         startDate: format(startDate, "yyyy-MM-dd"),
         endDate: format(endDate, "yyyy-MM-dd"),
-        currencyId: currencyId && currencyId !== "all" ? currencyId : undefined,
+        currencyId,
       })
       if (response.success && response.data) {
         setData(response.data)
+        setGeneratedCurrency(currencyId)
       } else {
         throw new Error(response.error || "Failed to load VAT report")
       }
@@ -153,12 +161,11 @@ export function VatReportView() {
             <Calendar mode="single" selected={endDate} onSelect={(d) => d && setEndDate(d)} initialFocus />
           </PopoverContent>
         </Popover>
-        <Select value={currencyId} onValueChange={setCurrencyId}>
+        <Select value={currencyId} onValueChange={(value) => { setCurrencyId(value); setData(null) }}>
           <SelectTrigger className="w-40 rounded-full">
-            <SelectValue placeholder="All Currencies" />
+            <SelectValue placeholder="Select currency" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Currencies</SelectItem>
             {currencies.map((c) => (
               <SelectItem key={c.id} value={c.id}>{c.code} - {c.name}</SelectItem>
             ))}
@@ -168,6 +175,7 @@ export function VatReportView() {
           {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-2" />}
           Generate
         </Button>
+        {data && !loading && <AccountingExportControls label="VAT report" spec={{ title: "VAT Output Tax Audit", subtitle: `${period?.startDate || ''} to ${period?.endDate || ''} · ${currencies.find(c => c.id === generatedCurrency)?.code || 'Currency unavailable'}`, columns: ['Date', 'Reference', 'Invoice', 'Customer', 'Description', 'Type', 'Amount', 'VAT amount'], moneyColumns: [6, 7], rows: lines.map(r => [r.date || '', r.reference || '', r.invoiceNumber || '', r.customerName || '', r.description || '', r.type || '', Number(r.amount || 0), Number(r.vatAmount || 0)]), filename: 'vat-output-tax-audit' }} />}
       </div>
 
       {/* Period & Total Summary */}
@@ -194,8 +202,8 @@ export function VatReportView() {
         title="VAT Output Tax Audit"
         searchPlaceholder="Search by invoice, customer, reference..."
         loading={loading}
+        exportable={false}
         emptyMessage="Select a date range and click Generate to view the VAT output tax audit."
-        onExport={handleExport}
       />
     </div>
   )

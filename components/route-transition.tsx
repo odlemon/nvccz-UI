@@ -3,6 +3,7 @@
 import { motion, AnimatePresence } from "framer-motion"
 import { usePathname } from "next/navigation"
 import { ReactNode, useEffect, useState } from "react"
+import { AppLoadingSpinner } from "@/components/layout/app-loading-spinner"
 
 interface RouteTransitionProps {
   children: ReactNode
@@ -99,10 +100,10 @@ export function RouteTransition({ children }: RouteTransitionProps) {
         transition={transition}
         className={viewportLocked ? "h-dvh overflow-hidden" : "min-h-screen"}
       >
-        {/* Top loading bar */}
+        {/* Shared loader keeps module changes visually consistent. */}
         {isNavigating && (
-          <div className="fixed top-0 left-0 right-0 h-1 z-[60]">
-            <div className="h-full w-full bg-gradient-to-r from-blue-500 via-indigo-500 to-cyan-400 animate-pulse" />
+          <div className="fixed inset-0 z-[60] bg-[#F4F7FC]/80 backdrop-blur-[1px]">
+            <AppLoadingSpinner className="h-full min-h-0 w-full" />
           </div>
         )}
         {children}

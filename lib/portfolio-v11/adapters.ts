@@ -27,6 +27,13 @@ function num(v: unknown, fallback = 0): number {
   return Number.isFinite(n) ? n : fallback
 }
 
+/** Like num(), but keeps "nothing was supplied" as null instead of collapsing it to 0. */
+function optionalNum(v: unknown): number | null {
+  if (v == null || v === '') return null
+  const n = typeof v === 'number' ? v : Number(String(v).replace(/,/g, ''))
+  return Number.isFinite(n) ? n : null
+}
+
 function fmtDate(v: unknown): string {
   if (!v) return '—'
   const d = new Date(String(v))
@@ -80,58 +87,73 @@ const STAGE_MAP: Record<string, string> = {
   WITHDRAWN: 'Rejected',
 }
 
+const FUND_STATUS_LABELS: Record<string, string> = {
+  OPEN: 'Open',
+  CLOSED: 'Closed',
+  PAUSED: 'Paused',
+}
+
+/** "PRIVATE_EQUITY" -> "Private Equity"; an already-readable value is kept as is. */
+function fundPurposeLabel(value: unknown): string {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .split('_')
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ')
+}
+
 export function adaptFunds(raw: any[]): Pv11Fund[] {
   return (raw || []).map((f, i) => {
     const commitment = num(f.totalAmount ?? f.commitment)
-    const remaining = num(f.remainingAmount, commitment)
-    const called = Math.max(0, commitment - remaining)
-    const fee = num(f.managementFeeRate)
-    const carry = num(f.carryRate)
-    const hurdle = num(f.hurdleRate)
-    // Prefer live performance fields only — do not invent IRR/DPI (T2.6 backend ask).
-    const hasPerf =
-      f.grossIrr != null ||
-      f.grossIRR != null ||
-      f.irr != null ||
-      f.netIrr != null ||
-      f.netIRR != null ||
-      f.tvpi != null ||
-      f.dpi != null ||
-      f.performance?.grossIrr != null ||
-      f.performance?.netIrr != null ||
-      f.performance?.tvpi != null ||
-      f.performance?.dpi != null
-    const grossIrr = hasPerf
-      ? num(f.grossIrr ?? f.grossIRR ?? f.irr ?? f.performance?.grossIrr, 0)
-      : 0
-    const netIrr = hasPerf
-      ? num(f.netIrr ?? f.netIRR ?? f.performance?.netIrr, Math.max(0, grossIrr - 2.4))
-      : 0
-    const tvpi = hasPerf ? num(f.tvpi ?? f.performance?.tvpi, 0) : 0
-    const dpi = hasPerf ? num(f.dpi ?? f.performance?.dpi, 0) : 0
-    const distributed = num(f.distributed ?? f.totalDistributed, dpi > 0 ? commitment * dpi * 0.45 : 0)
+    const remaining = optionalNum(f.remainingAmount)
+    const called = remaining == null ? 0 : Math.max(0, commitment - remaining)
+    const fee = optionalNum(f.managementFeeRate)
+    const carry = optionalNum(f.carryRate)
+    const hurdle = optionalNum(f.hurdleRate)
+    // Only figures this endpoint actually returns are shown. The fund register has no
+    // performance columns, so the page renders a dash instead of an invented value:
+    // the previous fallbacks produced netIrr = grossIrr - 2.4, distributed =
+    // commitment x dpi x 0.45 and a NAV derived from tvpi/dpi, none of which was data.
+    const grossIrr = optionalNum(f.grossIrr ?? f.grossIRR ?? f.irr ?? f.performance?.grossIrr)
+    const netIrr = optionalNum(f.netIrr ?? f.netIRR ?? f.performance?.netIrr)
+    const tvpi = optionalNum(f.tvpi ?? f.performance?.tvpi)
+    const dpi = optionalNum(f.dpi ?? f.performance?.dpi)
+    const nav = optionalNum(f.nav ?? f.netAssetValue ?? f.currentNav)
+    const distributed = optionalNum(f.distributed ?? f.totalDistributed)
+    // vintageYear is the stored field; createdAt only dates the record.
+    const vintageYear =
+      optionalNum(f.vintageYear) ?? (f.createdAt ? new Date(f.createdAt).getFullYear() : null)
+    const strategy =
+      Array.isArray(f.focusIndustries) && f.focusIndustries.length
+        ? String(f.focusIndustries[0])
+        : String(f.strategy || fundPurposeLabel(f.fundPurpose) || '')
+    const statusKey = String(f.status || 'OPEN').toUpperCase()
     return {
       id: String(f.id),
       name: String(f.name || 'Fund'),
-      vintage: f.createdAt ? new Date(f.createdAt).getFullYear() : new Date().getFullYear(),
-      strategy: Array.isArray(f.focusIndustries) && f.focusIndustries.length
-        ? String(f.focusIndustries[0])
-        : String(f.fundPurpose || f.strategy || 'Private Equity'),
+      vintage: vintageYear ?? 0,
+      strategy,
       currency: String(f.currencyCode || f.currency || 'USD'),
       commitment,
       called,
-      nav: remaining || (tvpi > 0 ? commitment * Math.max(0.35, tvpi - dpi) : remaining),
-      distributed,
-      grossIrr,
-      netIrr,
-      tvpi,
-      dpi,
-      status: String(f.status || 'OPEN') === 'OPEN' ? 'Investing' : String(f.status || 'Investing'),
+      nav: nav ?? 0,
+      navAvailable: nav != null,
+      distributed: distributed ?? 0,
+      distributedAvailable: distributed != null,
+      grossIrr: grossIrr ?? 0,
+      netIrr: netIrr ?? 0,
+      tvpi: tvpi ?? 0,
+      dpi: dpi ?? 0,
+      perfAvailable: grossIrr != null || netIrr != null || tvpi != null || dpi != null,
+      status: FUND_STATUS_LABELS[statusKey] || String(f.status || 'Open'),
       geography: String(f.geography || f.region || '—'),
-      managementFee: fee ? `${(fee * (fee < 1 ? 100 : 1)).toFixed(1)}%` : '—',
-      carry: carry
-        ? `${(carry * (carry < 1 ? 100 : 1)).toFixed(0)}%${hurdle ? ` above ${(hurdle * (hurdle < 1 ? 100 : 1)).toFixed(0)}% hurdle` : ''}`
-        : '—',
+      managementFee: fee != null ? `${(fee * (fee < 1 ? 100 : 1)).toFixed(1)}%` : '—',
+      carry:
+        carry != null
+          ? `${(carry * (carry < 1 ? 100 : 1)).toFixed(0)}%${hurdle != null ? ` above ${(hurdle * (hurdle < 1 ? 100 : 1)).toFixed(0)}% hurdle` : ''}`
+          : '—',
       _colorIndex: i,
     } as Pv11Fund
   })
@@ -141,7 +163,7 @@ export function adaptCompanies(raw: any[], dashboardSummary: any[] = []): Pv11Co
   if (raw?.length) {
     return raw.map((c, i) => {
       const invested = num(c.totalInvested ?? c.totalInvestmentCost ?? c.invested)
-      const fair = num(c.fairMarketValue ?? c.fairValue ?? c.currentValue, invested)
+      const fair = c.fairMarketValue != null || c.fairValue != null || c.currentValue != null ? num(c.fairMarketValue ?? c.fairValue ?? c.currentValue) : null
       return {
         id: String(c.id),
         name: String(c.name || 'Company'),
@@ -149,14 +171,15 @@ export function adaptCompanies(raw: any[], dashboardSummary: any[] = []): Pv11Co
         stage: String(c.status || 'ACTIVE'),
         entry: fmtDate(c.startDate || c.createdAt),
         invested,
-        fairValue: fair,
+        fairValue: fair as any,
         ownership: num(c.currentOwnership ?? c.ownership),
         revenueGrowth: num(c.revenueGrowth),
         runway: num(c.runway, 12),
-        health: Math.min(100, Math.max(40, Math.round(60 + (fair - invested) / Math.max(invested, 1) * 10))),
+        health: fair == null ? 60 : Math.min(100, Math.max(40, Math.round(60 + (fair - invested) / Math.max(invested, 1) * 10))),
         boardDate: '—',
         lastReport: fmtDate(c.updatedAt),
         fund: String(c.fund?.name || c.fundName || '—'),
+        fundId: String(c.fund?.id || c.fundId || ''),
         city: String(c.address || '—'),
         revenue: [],
         ebitda: [],
@@ -166,6 +189,7 @@ export function adaptCompanies(raw: any[], dashboardSummary: any[] = []): Pv11Co
         clients: 0,
         esg: [70, 70, 70],
         color: COLORS[i % COLORS.length],
+        source: c,
       }
     })
   }
@@ -239,46 +263,15 @@ function optionalProgress(v: unknown): number | undefined {
   return Number.isFinite(n) ? n : undefined
 }
 
-export function adaptCapitalCalls(
-  rows: Array<{ fundId: string; fundName: string; call: any }>,
-): Pv11CapitalCall[] {
-  const STATUS_MAP: Record<string, string> = {
-    DRAFT: 'Draft',
-    PENDING_APPROVAL: 'Draft',
-    APPROVED: 'Approved',
-    NOTICES_SENT: 'Issued',
-    PARTIALLY_COLLECTED: 'Partially Collected',
-    COLLECTED: 'Closed',
-    CLOSED: 'Closed',
-    CANCELLED: 'Draft',
-  }
+export function adaptCapitalCalls(rows: Array<{ fundId: string; fundName: string; call: any }>): Pv11CapitalCall[] {
+  const statusMap: Record<string, string> = { DRAFT: 'Draft', PENDING_APPROVAL: 'Pending approval', REJECTED: 'Rejected', INITIATED: 'Initiated', NOTICES_SENT: 'Issued', PARTIALLY_PAID: 'Partially Collected', FULLY_PAID: 'Closed' }
   return rows.map(({ fundId, fundName, call }) => {
-    const allocations = call.allocations || []
-    const amount = allocations.length
-      ? allocations.reduce((s: number, a: any) => s + num(a.currentCallAmount), 0)
-      : num(call.totalCallAmount ?? call.amount)
-    const collected = allocations.reduce((s: number, a: any) => s + num(a.amountPaid), 0)
-    const rawStatus = String(call.statusLabel || call.status || 'Draft')
-    const status = STATUS_MAP[rawStatus.toUpperCase()] || rawStatus
-    // When percent-only payload (no allocation amounts), use illustrative call size from percent × $100M
-    const resolvedAmount =
-      amount ||
-      (num(call.callPercent) > 0 && num(call.callPercent) <= 100
-        ? num(call.callPercent) * 1_000_000
-        : num(call.callPercent))
-    return {
-      id: String(call.reference || call.callNumber || call.id),
-      fundId,
-      fund: fundName,
-      callDate: fmtDate(call.transactionDate || call.createdAt),
-      dueDate: fmtDate(call.paymentDueDate),
-      purpose: String(call.purpose || call.notes || 'Capital call'),
-      amount: resolvedAmount,
-      lpCount: num(call._count?.allocations, allocations.length || num(call.lpCount)),
-      collected: collected || (status === 'Closed' ? resolvedAmount : collected),
-      status,
-      approval: call.noticesSentAt ? 'Issued' : status,
-    }
+    const allocations = Array.isArray(call.allocations) ? call.allocations : []
+    const amount = num(call.totalAmount ?? call.totalCallAmount ?? call.amount, allocations.reduce((s: number,a: any)=>s+num(a.currentCallAmount),0))
+    const collected = num(call.totalCollected, allocations.reduce((s: number,a: any)=>s+num(a.amountPaid),0))
+    const raw = String(call.status || call.statusLabel || 'DRAFT').toUpperCase()
+    const status = statusMap[raw] || raw.replaceAll('_',' ')
+    return { id: String(call.referenceNumber || call.callNumber || call.id), recordId: String(call.id), fundId, fund: fundName, callDate: fmtDate(call.transactionDate || call.createdAt), callDateIso: String(call.transactionDate || call.createdAt || '').slice(0,10), transactionDate: String(call.transactionDate || call.createdAt || '').slice(0,10), dueDate: fmtDate(call.paymentDueDate), dueDateIso: String(call.paymentDueDate || '').slice(0,10), purpose: String(call.purpose || ''), amount, lpCount: num(call._count?.allocations, allocations.length), collected, status, workflowStatus: String(call.status || '').toUpperCase(), approval: status, callPercent: num(call.callPercent), bankInstructions: String(call.bankInstructions || ''), currencyCode: call.currency?.code || '', allocations, activity: call.activity || [], createdBy: call.createdBy || undefined, submittedAt: call.submittedAt || null, approvedAt: call.approvedAt || null, approvedById: call.approvedById || null, rejectedAt: call.rejectedAt || null, rejectionReason: call.rejectionReason || null, noticesSentAt: call.noticesSentAt || null, journalEntry: call.journalEntry || null }
   })
 }
 
@@ -307,9 +300,10 @@ export function adaptLps(raw: any[]): Pv11Lp[] {
           }
         })
       : []
-    const commitmentFromApi = fundBreakdown.reduce((sum, f) => sum + f.commitment, 0)
-    const calledFromApi = fundBreakdown.reduce((sum, f) => sum + f.called, 0)
-    const distributedFromApi = fundBreakdown.reduce((sum, f) => sum + f.distributed, 0)
+    const fundBreakdownTotals = fundBreakdown as Array<{ commitment: number; called: number; distributed: number }>
+    const commitmentFromApi = fundBreakdownTotals.reduce((sum: number, f) => sum + f.commitment, 0)
+    const calledFromApi = fundBreakdownTotals.reduce((sum: number, f) => sum + f.called, 0)
+    const distributedFromApi = fundBreakdownTotals.reduce((sum: number, f) => sum + f.distributed, 0)
     const commitment = num(c.totalCommitment ?? c.commitment ?? c.commitments?.[0]?.amount, commitmentFromApi)
     const called = num(c.cumulativeCalled ?? c.called, calledFromApi)
     const allRelations = Array.isArray(c.lpUserRelations) ? c.lpUserRelations : []
@@ -319,6 +313,7 @@ export function adaptLps(raw: any[]): Pv11Lp[] {
       email: String(r.user?.email || ''),
       role: String(r.lpRole || 'VIEWER'),
       isActive: Boolean(r.isActive),
+      pendingActivation: Boolean(r.user?.mustChangePassword),
     }))
     const commitments = Array.isArray(c.investmentCommitments) ? c.investmentCommitments : []
     const transactions: Pv11Lp['transactions'] = []
@@ -359,6 +354,7 @@ export function adaptLps(raw: any[]): Pv11Lp[] {
     return {
       id: String(c.id),
       name: String(c.legalName || c.name || 'LP'),
+      email: String(c.email || ''),
       type: String(c.type || c.investorType || 'Institutional'),
       geography: String(c.country || c.geography || '—'),
       commitment,
@@ -367,8 +363,10 @@ export function adaptLps(raw: any[]): Pv11Lp[] {
       netIrr: num(c.netIrr),
       owner: String(c.relationshipManager || '—'),
       lastInteraction: fmtDate(c.updatedAt || c.createdAt),
-      kyc: String(c.kycStatus || c.kyc || 'In Review'),
-      portal: c.userId || c.linkedUserId ? 'Active' : 'Inactive',
+      kyc: String(c.kycStatus || c.kyc || 'Not reviewed'),
+      portal: relations.length
+        ? relations.some((r: any) => !r.user?.mustChangePassword) ? 'Active' : 'Invited'
+        : c.userId || c.linkedUserId ? 'Active' : 'Inactive',
       unfunded: Math.max(0, commitment - called),
       tvpi: num(c.tvpi, commitment > 0 ? called / commitment : 0),
       dpi: num(c.dpi),
@@ -453,13 +451,22 @@ export function adaptCashAccounts(raw: any[]): Pv11CashAccount[] {
     const settled = num(a.postedSettledCash ?? a.settledBalance ?? a.balance ?? a.settled)
     const reserved = num(a.activeReservations ?? a.reserved)
     const held = num(a.held)
-    const acct = String(a.accountNumber || a.id || '')
+    const acct = String(a.accountNumber || a.accountNumberMasked || '')
+    const providerCode = String(a.providerName || a.provider || a.providerId || '').trim()
+    const providerLabels: Record<string, string> = {
+      provider_cbz: 'CBZ Bank Zimbabwe',
+      provider_stanbic: 'Stanbic Zimbabwe',
+      provider_ecobank: 'Ecobank Zimbabwe',
+      provider_fbc: 'FBC Custody',
+      provider_nmb: 'NMB Bank',
+    }
     return {
       id: String(a.id),
+      accountName: String(a.accountName || a.accountLabel || a.name || ''),
       fund: String(a.fundName || a.clientName || a.portfolioName || '—'),
       vehicle: String(a.vehicleName || a.clientName || a.accountName || 'Main'),
       purpose: String(a.accountPurpose || a.accountType || a.purpose || 'FUND_OPERATING_BANK'),
-      provider: String(a.providerName || a.provider || '—'),
+      provider: providerLabels[providerCode] || (providerCode && !providerCode.startsWith('cmt') ? providerCode : '') || 'Provider mapping pending',
       masked: acct ? `••••${acct.slice(-4)}` : '••••',
       currency: String(a.baseCurrency || a.currency || 'USD'),
       ownership: String(a.ownership || 'SEGREGATED'),
@@ -487,7 +494,19 @@ export function adaptCashJournals(raw: any[]): Pv11CashJournal[] {
     const signed = num(j.signedCashAmount ?? j.signed, credit - debit)
     return {
       id: String(j.id || j.lineId),
-      source: String(j.tradeId || j.sourceRef || j.journalId || '—'),
+      displayId: String(
+        j.journalNumber ||
+          j.journalNo ||
+          j.journalEntryNumber ||
+          j.journalEntryNo ||
+          j.journalCode ||
+          j.reference ||
+          j.journalId ||
+          j.id ||
+          j.lineId ||
+          '—',
+      ),
+      source: String(j.tradeId || j.sourceRef || j.source || '—'),
       event: String(j.type || j.description || j.event || 'Cash movement'),
       account: String(j.cashAccountId || j.accountId || '—'),
       fund: String(j.portfolioId || j.fundId || '—'),
@@ -570,9 +589,11 @@ export function adaptReconciliationBatches(raw: any[]): Pv11ReconciliationBatch[
 export function adaptExceptions(raw: any[]): Pv11Exception[] {
   return (raw || []).map((e) => ({
     id: String(e.id),
+    displayId: String(e.caseNumber || e.exceptionNumber || e.reference || e.code || 'Exception'),
+    batch: String(e.batchNumber || e.batchReference || e.batchName || '—'),
     code: String(e.code || e.exceptionCode || e.type || 'EXC'),
     title: String(e.title || e.description || e.code || 'Exception'),
-    account: String(e.cashAccountId || '—'),
+    account: String(e.accountName || e.accountLabel || e.accountNumberMasked || e.accountReference || e.cashAccountName || 'Not mapped'),
     amount: num(e.amount ?? e.varianceAmount),
     owner: String(e.ownerName || e.assigneeName || '—'),
     age: daysBetween(e.createdAt),

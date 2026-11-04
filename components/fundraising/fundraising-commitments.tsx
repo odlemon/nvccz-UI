@@ -241,6 +241,7 @@ function KpiCard({ kpi }: { kpi: CommitmentKpi }) {
 
 function ChecklistPanel({
   investorName,
+  commitmentId,
   items,
   loading,
   complianceBlocked,
@@ -249,6 +250,7 @@ function ChecklistPanel({
   togglingId,
 }: {
   investorName: string
+  commitmentId?: string
   items: ChecklistRow[]
   loading?: boolean
   complianceBlocked?: boolean
@@ -266,6 +268,11 @@ function ChecklistPanel({
           <div>
             <h2 className="text-[13px] font-semibold text-[#000000]">Closing Checklist</h2>
             <p className="mt-0.5 text-[11px] text-[#111111]">{investorName}</p>
+            {commitmentId ? (
+              <p className="mt-0.5 font-mono text-[10px] text-[#64748b]" title="Commitment record ID">
+                ID: {commitmentId}
+              </p>
+            ) : null}
           </div>
           <p className="shrink-0 text-[11px] font-medium tabular-nums text-[#111111]">
             {completed}/{items.length} completed
@@ -1260,6 +1267,7 @@ export function FundraisingCommitments() {
           {selected ? (
             <ChecklistPanel
               investorName={selected.name}
+              commitmentId={selected.id}
               items={checklist}
               loading={checklistLoading}
               complianceBlocked={selected.complianceBlocked}

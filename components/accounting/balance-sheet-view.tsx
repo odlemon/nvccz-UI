@@ -17,6 +17,8 @@ import { toast } from "sonner"
 import type { RootState, AppDispatch } from "@/lib/store/store"
 import { generateBalanceSheet } from "@/lib/store/slices/accountingSlice"
 import { accountingApi } from "@/lib/api/accounting-api"
+import { AccountingExportControls } from "./accounting-export-controls"
+import { reportAmount } from "@/lib/accounting-v52/report-amount"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Badge } from "@/components/ui/badge"
 import { Switch } from "@/components/ui/switch"
@@ -712,24 +714,22 @@ export function BalanceSheetView() {
             <RefreshCw className={cn("w-4 h-4 mr-2", (balanceSheetLoading || isConsolidating) && "animate-spin")} />
             Generate
           </Button>
-          <Button
-            onClick={handleExportPDF}
-            variant="outline"
-            className="rounded-full"
-            disabled={generatingPDF || (reportMode === "single" ? !balanceSheet : !consolidatedBalance)}
-          >
-            {generatingPDF ? (
-              <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Generating PDF...
-              </>
-            ) : (
-              <>
-                <FileText className="w-4 h-4 mr-2" />
-                Export PDF
-              </>
-            )}
-          </Button>
+          {!balanceSheetLoading && !isConsolidating && ((reportMode === 'single' && balanceSheet) || (reportMode === 'consolidated' && consolidatedBalance)) && <AccountingExportControls label="balance sheet" spec={async () => {
+            if (reportMode === 'consolidated' && consolidatedBalance) {
+              const rows: (string | number)[][] = consolidatedBalance.rows.map(r => [r.section, r.group, r.accountNo, r.accountName, r.sourceCurrencyCode, reportAmount(r.sourceAmount), r.spotRate, reportAmount(r.consolidatedAmount)])
+              rows.push(['Totals', '', '', 'Assets', '', '', '', reportAmount(consolidatedBalance.totals.assets)], ['Totals', '', '', 'Liabilities', '', '', '', reportAmount(consolidatedBalance.totals.liabilities)], ['Totals', '', '', 'Equity', '', '', '', reportAmount(consolidatedBalance.totals.equity)], ['Totals', '', '', 'Liabilities and equity', '', '', '', reportAmount(consolidatedBalance.totals.liabilitiesAndEquity)])
+              return { title: 'Consolidated Balance Sheet', subtitle: `As of ${consolidatedBalance.asOfDate} · ${consolidatedBalance.reportingCurrencyCode}`, columns: ['Section', 'Group', 'Account code', 'Account', 'Source currency', 'Source amount', 'Rate', 'Amount'], moneyColumns: [5, 7], rows, filename: 'consolidated-balance-sheet', note: consolidatedBalance.missingRates.length ? `${consolidatedBalance.missingRates.length} missing rates; affected rows were excluded.` : undefined }
+            }
+            if (!balanceSheet) throw new Error('Generate the balance sheet first.')
+            const rows: (string | number)[][] = []
+            for (const [label, section] of [['Current assets', balanceSheet.assets.currentAssets], ['Fixed assets', balanceSheet.assets.fixedAssets], ['Other assets', balanceSheet.assets.otherAssets], ['Current liabilities', balanceSheet.liabilities.currentLiabilities], ['Long-term liabilities', balanceSheet.liabilities.longTermLiabilities]] as const) {
+              for (const a of section.accounts || []) rows.push([label, a.accountNo || '', a.accountName || '', reportAmount(a.balance)])
+              rows.push([label, '', 'Total', reportAmount(section.total)])
+            }
+            for (const a of balanceSheet.equity.accounts || []) rows.push(['Equity', a.accountNo || '', a.accountName || '', reportAmount(a.balance)])
+            rows.push(['Equity', '', 'Retained earnings', reportAmount(balanceSheet.equity.retainedEarnings)], ['Totals', '', 'Assets', reportAmount(balanceSheet.assets.totalAssets)], ['Totals', '', 'Liabilities', reportAmount(balanceSheet.liabilities.totalLiabilities)], ['Totals', '', 'Equity', reportAmount(balanceSheet.equity.total)], ['Totals', '', 'Liabilities and equity', reportAmount(balanceSheet.totalLiabilitiesAndEquity)])
+            return { title: 'Balance Sheet', subtitle: `As of ${balanceSheet.asOfDate} · ${currencies.find(c => c.id === balanceSheet.currency || c.code === balanceSheet.currency)?.code || currencies.find(c => c.id === currencyId)?.code || ''}`, columns: ['Section', 'Account code', 'Account', 'Amount'], moneyColumns: [3], rows, filename: 'balance-sheet' }
+          }} />}
         </div>
       </div>
 

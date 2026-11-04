@@ -5,7 +5,7 @@
 AL.page('overview', () => {
   AL.meLoad();
   const e = AL.res('ov', () => AL.get('/accounting/overview'));
-  const head = AL.head('Control centre', 'Command Centre', '', [AL.btn('New journal', 'ov-go', '', 'data-page="journals"'), AL.btn('Cash book', 'ov-go', '', 'data-page="cash"'), AL.btn('Financial statements', 'ov-go', 'primary', 'data-page="reports"')].join(''));
+  const head = AL.head('Control centre', 'Command Centre', '', [AL.exportBtns('ov-export'), AL.btn('New journal', 'ov-go', '', 'data-page="journals"'), AL.btn('Cash book', 'ov-go', '', 'data-page="cash"'), AL.btn('Financial statements', 'ov-go', 'primary', 'data-page="reports"')].join(''));
   const g = AL.gate(e, { key: 'ov', errorTitle: 'The overview could not be loaded' });
   if (g) return `<div class="v28-page">${head}${g}</div>`;
   const d = e.data, c = d.baseCurrency;
@@ -45,3 +45,23 @@ AL.page('overview', () => {
   </div>`;
 });
 AL.actions['ov-go'] = (el) => AL.go(el.dataset.page);
+AL.overviewExportSpec = () => {
+  const e = AL.cache.ov, d = e && e.data;
+  if (!d) return { title: 'Accounting Command Centre', subtitle: 'Current financial position', filename: 'accounting-command-centre', landscape: true, columns: ['Section', 'Item', 'Date', 'Currency', 'Amount', 'Details'], rows: [] };
+  const rows = [], c = d.baseCurrency || {}, currency = c.code || '';
+  const add = (section, item, date, cur, amount, details) => rows.push([section, item, date || '', cur || '', amount == null ? '' : amount, details || '']);
+  const ar = d.receivables?.control || null, ytd = d.results.ytd || {}, ly = d.results.lastYear || {}, w = d.waiting || {};
+  add('Position', 'Cash and bank', '', '', '', Object.entries(d.cash?.byCurrency || {}).map(([code, value]) => AL.money(value, code)).join('; ') || 'No bank balances');
+  add('Position', 'Receivables', '', currency, ar?.debitBalance, `${d.receivables?.openInvoices || 0} open invoices; ${d.receivables?.overdue || 0} overdue`);
+  add('Position', 'Payables', '', currency, d.payables?.control ? -d.payables.control.debitBalance : 0, `${d.payables?.openBills || 0} approved unpaid bills; ${d.payables?.dueWithin7Days || 0} due within 7 days`);
+  add('Results', 'Revenue year to date', '', currency, ytd.revenue, `Last year: ${ly.revenue ?? 0}`);
+  add('Results', 'Net income year to date', '', currency, ytd.netIncome, `Last year: ${ly.netIncome ?? 0}`);
+  [['Journals waiting to be posted', w.draftJournals, 'Approvals'], ['Approval requests', w.approvalRequests, 'Approvals'], ['Bank lines not reconciled', w.unreconciledBankLines, 'Reconciliation'], ['Invoices overdue', w.overdueInvoices, 'Receivables'], ['Supplier bills due within 7 days', w.billsDue, 'Payables']].forEach(([name, count, area]) => add('Waiting', name, '', '', count, area));
+  (d.results?.months || []).forEach((m) => add('Monthly results', m.month, m.month, currency, m.netIncome, `Revenue ${AL.money(m.revenue, currency)}; expenses ${AL.money(m.expenses, currency)}`));
+  (d.cash?.banks || []).forEach((b) => add('Cash by bank', b.bank, '', b.currency, b.balance, `${b.unreconciled || 0} unreconciled lines`));
+  (d.recent || []).forEach((j) => add('Latest postings', j.reference, AL.date(j.date), j.currency, j.amount, `${j.description || ''}${j.by ? `; recorded by ${j.by}` : ''}`));
+  if (d.close) add('Close and control', 'Month being closed', '', '', '', `${d.close.period}; ${d.close.locked ? 'locked' : 'open'}; ${d.close.complete || 0} of ${d.close.tasks || 0} tasks done`);
+  if (d.integrity) add('Close and control', 'Ledger integrity', AL.dateTime(d.integrity.at), '', '', d.integrity.status);
+  return { title: 'Accounting Command Centre', subtitle: 'Current financial position and activity', filename: 'accounting-command-centre', landscape: true, meta: [['As of', AL.date(AL.stiToday())], ['Organization', AL.brand?.name || '']], columns: ['Section', 'Item', 'Date', 'Currency', 'Amount', 'Details'], rows };
+};
+AL.actions['ov-export'] = (el) => { const spec = AL.overviewExportSpec(); if (!spec.rows.length) return AL.toast('Nothing to export', 'There is no Command Centre data to export.', 'bad'); return AL.exportRun(el, spec, 'Command Centre records'); };

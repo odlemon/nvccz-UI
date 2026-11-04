@@ -75,6 +75,7 @@ interface SharedTopbarProps {
   moduleActions?: React.ReactNode
   /** When true, hide the built-in theme toggle (for modules that provide their own). */
   hideThemeToggle?: boolean
+  hideHomeButton?: boolean
 }
 
 export function SharedTopbar(props: SharedTopbarProps) {
@@ -87,7 +88,7 @@ export function SharedTopbar(props: SharedTopbarProps) {
   )
 }
 
-function SharedTopbarInner({ currentModule, moduleActions, hideThemeToggle = false }: SharedTopbarProps) {
+function SharedTopbarInner({ currentModule, moduleActions, hideThemeToggle = false, hideHomeButton = false }: SharedTopbarProps) {
   const [isLoggingOut, setIsLoggingOut] = useState(false)
   const [isDark, setIsDark] = useState(false)
   const appSwitcher = useArcusAppSwitcher()
@@ -158,7 +159,7 @@ function SharedTopbarInner({ currentModule, moduleActions, hideThemeToggle = fal
               sibling, not an ancestor, of the rail. */}
           <div className="flex items-center gap-4" style={{ minWidth: "var(--reserved-sidebar-w, 0px)" }}>
           </div>
-          {!(["home", "home-v3", "homepage"].includes(currentModule)) && (
+          {!hideHomeButton && !(["home", "home-v3", "homepage"].includes(currentModule)) && (
             <Button
               asChild
               variant="outline"
@@ -254,13 +255,17 @@ function SharedTopbarInner({ currentModule, moduleActions, hideThemeToggle = fal
             {/* Profile Dropdown */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <div className="p-2 h-auto cursor-pointer flex items-center justify-center rounded-md hover:bg-accent hover:text-accent-foreground transition-colors">
+                <button
+                  type="button"
+                  aria-label="Open profile menu"
+                  className="p-2 h-auto cursor-pointer flex items-center justify-center rounded-md hover:bg-accent hover:text-accent-foreground transition-colors"
+                >
                   <Avatar className="w-10 h-10">
                     <AvatarFallback className="bg-primary text-primary-foreground text-base">
                       {getUserInitials()}
                     </AvatarFallback>
                   </Avatar>
-                </div>
+                </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56">
                 <div className="flex items-center gap-2 p-2">

@@ -3,10 +3,12 @@ import { boardReviewApi } from '@/lib/api/board-review-api'
 import { dueDiligenceApi } from '@/lib/api/due-diligence-api'
 import { termSheetApi } from '@/lib/api/term-sheet-api'
 import { investmentOpsApi } from '@/lib/api/investment-ops-api'
-import { usersApi } from '@/lib/api/users-api'
 import { stockPickerCashApi } from '@/lib/api/stock-picker-cash-api'
 import { portfolioCompaniesApi } from '@/lib/api/portfolio-companies-api'
 import { investmentImplementationApi } from '@/lib/api/investment-implementation-api'
+import { rolesApi } from '@/lib/api/roles-api'
+import { getAuthUser, getUserProfile } from '@/lib/utils/cookies'
+import { legacyPortfolioGrants } from '@/lib/portfolio-v11/legacy-access'
 import { asArray } from './adapters'
 
 function num(v: unknown, fallback = 0): number {
@@ -210,28 +212,119 @@ function matchPersonaId(roleName: string, roleCode?: string | null): string | nu
   return null
 }
 
+export type PortfolioSessionRbac = {
+  canManagePolicies: boolean
+  effectiveSource: string
+  effectivePermissions: string[]
+}
+
+/**
+ * Last resolved policy for the signed-in user. The embedded runtime needs it
+ * before the first paint so the sidebar and the current page are correct from
+ * frame one. The permissions hook resolves the same endpoint, so priming it
+ * from there costs no extra request.
+ */
+let cachedSessionRbac: PortfolioSessionRbac | null = null
+
+export function peekPortfolioSessionRbac(): PortfolioSessionRbac | null {
+  return cachedSessionRbac
+}
+
+/** Publish a policy resolved elsewhere (for example the permissions hook). */
+export function primePortfolioSessionRbac(policy: PortfolioSessionRbac | null) {
+  cachedSessionRbac = policy
+}
+
+/** Drop the cached policy on sign-out or a user switch. */
+export function clearPortfolioSessionRbac() {
+  cachedSessionRbac = null
+}
+
+export async function loadPortfolioSessionRbac(): Promise<PortfolioSessionRbac> {
+  let policy: PortfolioSessionRbac
+  if (process.env.NEXT_PUBLIC_PORTFOLIO_RBAC_MODE === 'legacy') {
+    const user = getAuthUser()
+    const grants = legacyPortfolioGrants(user?.roleCode || user?.roleName || user?.role)
+    policy = {
+      canManagePolicies: false,
+      effectiveSource: 'legacy',
+      effectivePermissions: Object.keys(grants),
+    }
+  } else {
+    const response = await rolesApi.getPortfolioEffective()
+    if (!response || response.success === false || response.data == null) {
+      // Never keep priming with a policy that could not be confirmed.
+      cachedSessionRbac = null
+      throw new Error(response?.message || 'The Portfolio access policy could not be loaded.')
+    }
+    const effective = response.data
+    policy = {
+      canManagePolicies: effective.canManagePolicies === true,
+      effectiveSource: effective.source || 'legacy',
+      effectivePermissions: Object.entries(effective.permissions || {})
+        .filter(([, value]) => value === true).map(([key]) => key),
+    }
+  }
+  cachedSessionRbac = policy
+  return policy
+}
+
 export async function loadSettingsRbac() {
-  const res = await usersApi.getAll().catch(() => null)
-  const users = asArray(res)
+  const [rolesRes, catalogueRes, effectiveRes] = await Promise.all([
+    rolesApi.getPortfolioRoles(),
+    rolesApi.getPortfolioCatalogue(),
+    rolesApi.getPortfolioEffective(),
+  ])
+  const requireData = (response: any, label: string) => {
+    if (!response || response.success === false || response.data == null) {
+      throw new Error(response?.message || `The Portfolio ${label} could not be loaded.`)
+    }
+    return response.data
+  }
+  const portfolioRoles = asArray(requireData(rolesRes, 'role directory'))
+  const catalogue = requireData(catalogueRes, 'permission catalogue')
+  const effective = requireData(effectiveRes, 'effective access')
+  const users = portfolioRoles.flatMap((role: any) => (role.members || []).map((user: any) => ({
+    id: user.id,
+    name: `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email,
+    email: user.email,
+    role: role.id,
+    department: user.departmentRole || '-',
+    title: user.departmentRole || role.name,
+    scope: user.departmentRole || 'Portfolio access role',
+    status: 'Active',
+    lastActive: user.updatedAt ? new Date(user.updatedAt).toLocaleDateString() : '—',
+  })))
   return {
-    // Intentionally empty: never inject/overwrite persona identity from live data (see above).
-    roles: [] as Array<{ id: string }>,
-    users: users
-      .map((u: any) => ({
-        id: u.id,
-        name: `${u.firstName || ''} ${u.lastName || ''}`.trim() || u.email,
-        email: u.email,
-        role: matchPersonaId(u.role?.name, u.roleCode),
-        department: typeof u.department === 'string' ? u.department : u.department?.name || '-',
-        title: u.departmentRole || u.role?.name || 'Staff',
-        scope: typeof u.department === 'string' ? u.department : u.department?.name || 'Organisation',
-        status: 'Active',
-        lastActive: u.updatedAt ? new Date(u.updatedAt).toLocaleDateString() : '—',
+    canManagePolicies: effective?.canManagePolicies === true,
+    effectiveSource: effective?.source || 'legacy',
+    effectivePermissions: Object.entries(effective?.permissions || {})
+      .filter(([, value]) => value === true).map(([key]) => key),
+    roles: portfolioRoles.map((role: any) => ({
+      id: role.id,
+      name: role.name,
+      description: role.description,
+      users: role.memberCount ?? role._count?.assignments ?? 0,
+      globalRoleId: role.globalRoleId || null,
+      permissions: Object.entries(role.draftVersion?.permissions || role.activeVersion?.permissions || {})
+        .filter(([, value]) => value === true).map(([key]) => key),
+      activePermissions: Object.entries(role.activeVersion?.permissions || {})
+        .filter(([, value]) => value === true).map(([key]) => key),
+      legacyPermissions: Array.isArray(role.legacyPermissions) ? role.legacyPermissions : [],
+      modules: ['portfolio'],
+      protected: false,
+      status: role.status,
+      revision: role.revision,
+      activeVersion: role.activeVersion?.version || null,
+      draftVersion: role.draftVersion?.version || null,
+    })),
+    catalogue: Array.isArray(catalogue?.resources)
+      ? catalogue.resources.map((resource: any) => ({
+        module: 'portfolio', resource: resource.key, label: resource.label,
+        actions: (catalogue.actions || []).filter((action: string) => resource.permissions?.includes(`portfolio.${resource.key}.${action}`)),
       }))
-      .filter((u) => u.role) as Array<{
-        id: string; name: string; email: string; role: string; department: string
-        title: string; scope: string; status: string; lastActive: string
-      }>,
+      : [],
+    users,
   }
 }
 

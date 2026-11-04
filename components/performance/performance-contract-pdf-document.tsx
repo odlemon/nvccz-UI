@@ -6,8 +6,11 @@ const COLORS = {
   slate900: "#0f172a",
   slate700: "#334155",
   slate500: "#64748b",
+  slate400: "#94a3b8",
   slate300: "#cbd5e1",
+  slate200: "#e2e8f0",
   slate100: "#f1f5f9",
+  slate50: "#f8fafc",
   emerald: "#059669",
   amber: "#d97706",
   red: "#dc2626",
@@ -192,14 +195,17 @@ export default function PerformanceContractPDF({
   contract: c,
   activeAddress,
 }: PerformanceContractPDFProps) {
-  const subjectName = fullName(c.subjectUser) || c.departmentName || "Official Subject"
-  const subjectRole = c.contractType === 'CEO' ? 'Chief Executive Officer' : 
-                   c.contractType === 'BOARD' ? 'Member of the Board' : 
-                   c.contractType === 'DEPARTMENT' ? 'Department Head' : 'Employee'
-  
-  const reviewerName = fullName(c.reviewer) || "Official Reviewer"
-  const approverName = fullName(c.approver) || "Approving Authority"
-  const goals = c.contractKpis?.goals || []
+  const metadata = c.metadata && typeof c.metadata === "object" ? c.metadata : {}
+  const subjectName = fullName(c.subjectUser) || c.subjectName || c.departmentName || "Official Subject"
+  const subjectRole = c.subjectUser?.jobTitle || c.subjectUser?.role?.name || (c.contractType === "CEO" ? "Chief Executive Officer" :
+                   c.contractType === "BOARD" ? "Member of the Board" :
+                   c.contractType === "DEPARTMENT" ? "Department Head" : "Employee")
+
+  const reviewerName = fullName(c.reviewer) || c.reviewerName || "Official Reviewer"
+  const approverName = fullName(c.approver) || c.approverName || "Approving Authority"
+  const goals = c.contractKpis?.goals || c.goals || []
+  const objectiveEvidence = metadata.objectiveEvidence && typeof metadata.objectiveEvidence === "object" ? metadata.objectiveEvidence : {}
+  const reference = c.documentReference || `PC-${String(c.contractType || "EMPLOYEE").replace(/[^A-Z0-9]/gi, "-")}-${c.periodLabel || new Date(c.periodStart || Date.now()).getUTCFullYear()}-V${c.versionNo || 1}`
 
   return (
     <Document>
@@ -208,7 +214,7 @@ export default function PerformanceContractPDF({
           title="Official Performance Agreement"
           subtitle={c.periodLabel ? `Reporting Cycle: ${c.periodLabel}` : "Executive Agreement"}
           periodLabel={c.periodLabel}
-          activeAddress={activeAddress}
+          activeAddress={activeAddress ? { ...activeAddress, logoUrl: "/nvccz-logo.png" } : null}
         />
 
         <View style={styles.contractTitleContainer}>
@@ -216,14 +222,14 @@ export default function PerformanceContractPDF({
             {c.contractType} PERFORMANCE CONTRACT
           </Text>
           <Text style={styles.contractSubtitle}>
-            CONTRACT REF: PC-{c.id?.slice(0, 8).toUpperCase() || "NEW"}
+            CONTRACT REF: {reference}
           </Text>
         </View>
 
         <Text style={styles.recital}>
-          THIS AGREEMENT is entered into for the performance cycle of {c.periodLabel}, 
-          outlining the strategic objectives, key performance indicators (KPIs), and budget 
-          allocations agreed upon between the Management and the Subject Participant.
+          THIS AGREEMENT is entered into for the performance cycle of {c.periodLabel}, setting out the agreed
+          performance objectives, measures, evidence requirements and review expectations between the organisation
+          and the Subject Participant.
         </Text>
 
         {/* 1.0 PARTIES */}
@@ -243,7 +249,7 @@ export default function PerformanceContractPDF({
             <View style={[styles.tableRow, { borderBottomWidth: 0 }]}>
               <View style={styles.tableCell}>
                 <Text style={styles.tableCellLabel}>Department / Unit</Text>
-                <Text style={styles.tableCellText}>{c.departmentName || "Corporate Executive"}</Text>
+                <Text style={styles.tableCellText}>{c.departmentName || c.subjectUser?.userDepartment || "Corporate Executive"}</Text>
               </View>
               <View style={styles.tableCell}>
                 <Text style={styles.tableCellLabel}>Agreement Status</Text>
@@ -255,11 +261,18 @@ export default function PerformanceContractPDF({
           </View>
         </View>
 
-        {/* 2.0 SCOPE OF WORK */}
+        {metadata.bodyText ? (
+          <View style={styles.section}>
+            <Text style={styles.sectionHeading}>2.0 Agreement Details</Text>
+            <Text>{metadata.bodyText}</Text>
+          </View>
+        ) : null}
+
+        {/* 3.0 OBJECTIVES */}
         <View style={styles.section} wrap={false}>
-          <Text style={styles.sectionHeading}>2.0 Strategic Deliverables & Performance Metrics</Text>
+          <Text style={styles.sectionHeading}>{metadata.bodyText ? "3.0" : "2.0"} Objectives and Measures</Text>
           <Text style={{ fontSize: 8, marginBottom: 8, color: COLORS.slate500 }}>
-            The following Key Performance Indicators have been established and agreed upon for this period.
+            The following objectives, measures and targets have been agreed for this period. Review cadence: {metadata.reviewCadence || "As agreed by the signatories"}.
           </Text>
           
           <View style={{ borderTopWidth: 1, borderTopColor: COLORS.slate900, marginBottom: 5 }} />
@@ -275,13 +288,14 @@ export default function PerformanceContractPDF({
               <View key={goal.id} style={styles.kpiRow} wrap={false}>
                 <View style={styles.kpiColMain}>
                   <Text style={styles.kpiTitle}>{idx + 1}. {goal.title}</Text>
-                  <Text style={styles.kpiSubtitle}>Pillar: {goal.scorecardPillar || "Strategic"} | Stage: {goal.stage?.replace(/_/g, ' ') || 'Active'}</Text>
+                  <Text style={styles.kpiSubtitle}>{goal.scorecardPillar || "Strategic"}{goal.measureName || goal.kpiName ? ` | Measure: ${goal.measureName || goal.kpiName}` : ""}{objectiveEvidence[goal.id] ? ` | Evidence: ${objectiveEvidence[goal.id]}` : ""}</Text>
                 </View>
                 <View style={styles.kpiColValue}>
                   <Text style={styles.tableCellText}>{goal.targetValue || "0"}</Text>
                 </View>
                 <View style={styles.kpiColUnit}>
                   <Text style={[styles.tableCellText, { fontSize: 8, color: COLORS.slate500 }]}>{goal.targetUnit || "Units"}</Text>
+                  {goal.scorecardWeight != null ? <Text style={styles.kpiSubtitle}>{Number(goal.scorecardWeight).toFixed(2).replace(/\.00$/, "")}% weight</Text> : null}
                 </View>
               </View>
             ))
@@ -292,28 +306,17 @@ export default function PerformanceContractPDF({
           )}
         </View>
 
-        {/* 3.0 FINANCIAL ALLOCATION */}
-        <View style={styles.section} wrap={false}>
-          <Text style={styles.sectionHeading}>3.0 Financial Budget Allocation</Text>
-          <View style={styles.table}>
-            <View style={[styles.tableRow, { borderBottomWidth: 0 }]}>
-              <View style={styles.tableCell}>
-                <Text style={styles.tableCellLabel}>Total Allocated Budget (USD)</Text>
-                <Text style={[styles.tableCellText, { fontSize: 12, color: COLORS.primary }]}>
-                  ${Number(c.allocatedBudget || 0).toLocaleString()}
-                </Text>
-              </View>
-              <View style={styles.tableCell}>
-                <Text style={styles.tableCellLabel}>Allocated Date</Text>
-                <Text style={styles.tableCellText}>{new Date(c.createdAt || Date.now()).toLocaleDateString()}</Text>
-              </View>
-            </View>
+        {metadata.development || metadata.notes ? (
+          <View style={styles.section}>
+            <Text style={styles.sectionHeading}>{metadata.bodyText ? "4.0" : "3.0"} Commitments and Notes</Text>
+            {metadata.development ? <Text><Text style={styles.clauseTitle}>Development commitments: </Text>{metadata.development}</Text> : null}
+            {metadata.notes ? <Text style={{ marginTop: 8 }}><Text style={styles.clauseTitle}>Notes: </Text>{metadata.notes}</Text> : null}
           </View>
-        </View>
+        ) : null}
 
         {/* 4.0 SIGNATORIES */}
         <View style={styles.section} wrap={false}>
-          <Text style={styles.sectionHeading}>4.0 Agreement Signatories</Text>
+          <Text style={styles.sectionHeading}>{metadata.bodyText ? "5.0" : "4.0"} Agreement Signatories</Text>
           <Text style={{ fontSize: 8, color: COLORS.slate500, marginBottom: 10 }}>
             By signing below, the parties agree to strictly adhere to the performance metrics and financial 
             provisions outlined in this document.
@@ -339,7 +342,7 @@ export default function PerformanceContractPDF({
         </View>
 
         <View style={styles.footer} fixed>
-          <Text>Performance Contract Ref: {c.id || "N/A"}</Text>
+          <Text>Performance Contract Ref: {reference}</Text>
           <Text render={({ pageNumber, totalPages }) => `Page ${pageNumber} of ${totalPages}`} />
         </View>
       </Page>

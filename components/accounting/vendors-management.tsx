@@ -13,7 +13,8 @@ import {
   Phone,
   FileText,
   RefreshCcw,
-  ShieldCheck
+  ShieldCheck,
+  Upload
 } from "lucide-react"
 import { toast } from "sonner"
 import { CreateVendorModal } from "./create-vendor-modal"
@@ -22,11 +23,13 @@ import { ConfirmationDialog } from "../ui/confirmation-drawer"
 import { accountingApi, Vendor } from "@/lib/api/accounting-api"
 import { useAccountingPermissions } from "@/lib/hooks/useAccountingPermissions"
 import { cn } from "@/lib/utils"
+import { AccountingExportControls } from "@/components/accounting/accounting-export-controls"
+import { BulkPayablesUploadModal } from "@/components/accounting/bulk-payables-upload-modal"
 
 // Export the type for use in other components
 export type { Vendor }
 
-export function VendorsManagement() {
+export function VendorsManagement({ enhanced = false }: { enhanced?: boolean }) {
   const { permissions } = useAccountingPermissions()
 
   // Permission checks
@@ -38,6 +41,7 @@ export function VendorsManagement() {
   const [vendorsLoading, setVendorsLoading] = useState(false)
 
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
+  const [isBulkUploadOpen, setIsBulkUploadOpen] = useState(false)
   const [isViewModalOpen, setIsViewModalOpen] = useState(false)
   const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false)
   const [selectedVendorForEdit, setSelectedVendorForEdit] = useState<Vendor | null>(null)
@@ -286,6 +290,9 @@ export function VendorsManagement() {
     <div className="space-y-6">
       <ProcurementDataTable
         data={vendors}
+        accuratePagination={enhanced}
+        exportControls={enhanced ? (rows) => <AccountingExportControls label="vendors" spec={{ title: "Vendors", filename: "vendors", columns: ["Name", "Tax Number", "Contact Person", "Email", "Phone", "Address", "Payment Terms", "Status", "Created"], rows: rows.map(vendor => [vendor.name || "", vendor.taxNumber || "", vendor.contactPerson || "", vendor.email || "", vendor.phone || "", vendor.address || "", vendor.paymentTerms || "", vendor.isActive ? "Active" : "Inactive", vendor.createdAt?.slice(0, 10) || ""]) }} /> : undefined}
+        extraControls={enhanced && canCreateVendor ? <Button type="button" data-payables-new="bulk-vendors" variant="outline" onClick={() => setIsBulkUploadOpen(true)} className="rounded-full h-10"><Upload className="w-4 h-4 mr-2" />Bulk Upload</Button> : undefined}
         columns={columns}
         title="Vendors"
         searchPlaceholder="Search vendors..."
@@ -342,6 +349,8 @@ export function VendorsManagement() {
         cancelText="Cancel"
         variant="danger"
       />
+
+      {enhanced && <BulkPayablesUploadModal kind="vendors" isOpen={isBulkUploadOpen} onClose={() => setIsBulkUploadOpen(false)} onSuccess={loadVendors} vendors={vendors} />}
 
     </div>
   )

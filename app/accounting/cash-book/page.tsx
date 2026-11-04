@@ -1,4 +1,4 @@
-/** Client design faithful port — Cash Book */
+/** The V52 layout mounts the shared legacy Cash Book screen in its content slot. */
 export default function Page() {
-  return <span>Cash Book</span>
+  return null
 }

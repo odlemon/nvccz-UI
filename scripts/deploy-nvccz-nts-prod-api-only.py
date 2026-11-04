@@ -46,8 +46,10 @@ from _ssh_creds import SSH_PASSWORD, SSH_KEY
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
-HOST = "31.220.82.129"
-USER = "root"
+HOST = os.environ.get("NVCCZ_API_DEPLOY_HOST", "31.220.82.129")
+PORT = int(os.environ.get("NVCCZ_API_DEPLOY_PORT", "22"))
+USER = os.environ.get("NVCCZ_API_DEPLOY_USER", "root")
+DEPLOY_PASSWORD = os.environ.get("NVCCZ_CLIENT_SSH_PASSWORD") or SSH_PASSWORD
 REMOTE_ROOT = "/var/www/projects/nvccz"
 API_ROOT = Path(r"C:\Users\lysp\Downloads\nvccz")
 
@@ -129,8 +131,7 @@ NET=$(docker inspect nvccz-prod-mysql-1 --format '{{range $k,$v := .NetworkSetti
 DBURL=$($COMPOSE config 2>/dev/null | grep -m1 -oE 'DATABASE_URL: [^ ]+' | cut -d' ' -f2-)
 echo "  network=$NET"
 echo "  db=$(echo "$DBURL" | sed -E 's|://([^:]+):[^@]+@|://\1:<pw>@|')"
-IMG=$($COMPOSE images -q api 2>/dev/null | head -1)
-[ -z "$IMG" ] && IMG=nvccz-prod-api
+IMG=nvccz-prod-api:latest
 echo "  image=$IMG"
 
 # secrets/prod.env is passed in full, not just DATABASE_URL. Some migrations
@@ -171,9 +172,9 @@ def connect() -> paramiko.SSHClient:
     cli = paramiko.SSHClient()
     cli.set_missing_host_key_policy(paramiko.AutoAddPolicy())
     try:
-        cli.connect(HOST, username=USER, key_filename=SSH_KEY, timeout=60, banner_timeout=60)
+        cli.connect(HOST, port=PORT, username=USER, key_filename=SSH_KEY, timeout=60, banner_timeout=60)
     except Exception:
-        cli.connect(HOST, username=USER, password=SSH_PASSWORD, timeout=60,
+        cli.connect(HOST, port=PORT, username=USER, password=DEPLOY_PASSWORD, timeout=60,
                     banner_timeout=60, look_for_keys=False, allow_agent=False)
     return cli
 
@@ -211,19 +212,20 @@ def main() -> int:
 
     # Detached + polled: a dropped connection must not kill a migration midway.
     blob = base64.b64encode(script.encode()).decode()
-    cli.exec_command("rm -f /root/.apionly.b64 /root/.apionly.log")[1].channel.recv_exit_status()
+    remote_state = f"/home/{USER}/.apionly"
+    cli.exec_command(f"rm -f {remote_state}.b64 {remote_state}.log")[1].channel.recv_exit_status()
     for i in range(0, len(blob), 3000):
-        cli.exec_command(f"printf %s {blob[i:i+3000]} >> /root/.apionly.b64")[1].channel.recv_exit_status()
+        cli.exec_command(f"printf %s {blob[i:i+3000]} >> {remote_state}.b64")[1].channel.recv_exit_status()
     cli.exec_command(
-        "base64 -d /root/.apionly.b64 > /root/.apionly.sh && "
-        "setsid nohup bash /root/.apionly.sh > /root/.apionly.log 2>&1 < /dev/null & disown"
+        f"base64 -d {remote_state}.b64 > {remote_state}.sh && "
+        f"setsid nohup bash {remote_state}.sh > {remote_state}.log 2>&1 < /dev/null & disown"
     )[1].channel.recv_exit_status()
 
     print("Running on server (detached; polling) ...")
     seen = 0
     deadline = time.time() + 5400
     while time.time() < deadline:
-        _, out, _ = cli.exec_command("cat /root/.apionly.log 2>/dev/null")
+        _, out, _ = cli.exec_command(f"cat {remote_state}.log 2>/dev/null")
         log = out.read().decode(errors="replace")
         if len(log) > seen:
             sys.stdout.write(log[seen:])
@@ -232,7 +234,7 @@ def main() -> int:
         if "NVCCZ_PROD_API_ONLY_DONE" in log:
             cli.close()
             return 0 if "MIGRATE_EXIT=0" in log and "MIGRATIONS_FAILED" not in log else 1
-        _, out, _ = cli.exec_command("pgrep -f '/root/.apionly.sh' >/dev/null && echo RUNNING || echo GONE")
+        _, out, _ = cli.exec_command(f"pgrep -f '{remote_state}.sh' >/dev/null && echo RUNNING || echo GONE")
         if out.read().decode().strip() == "GONE":
             cli.close()
             print("remote script ended without the completion marker")

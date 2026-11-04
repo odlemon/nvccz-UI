@@ -222,6 +222,10 @@ export const FPA_ROLE_PERMISSIONS: Record<
   // Investment analysts in the restricted ERP access policy must not enter FP&A.
 
   // Department Head / Budget Owner (+ junior finance input)
+  // Local/test Finance Owner follows the department-owner input boundary:
+  // it can edit and submit its assigned department, but cannot review, approve,
+  // lock, or administer the cycle.
+  FIN_OWNER: { access: 'write', subModules: { ...FPA_SUBMODULES_DEPT_OWNER }, actions: DEPT_OWNER_ACTIONS },
   FIN_ASST: { access: 'write', subModules: { ...FPA_SUBMODULES_DEPT_OWNER }, actions: DEPT_OWNER_ACTIONS },
   OPS_MGR: { access: 'write', subModules: { ...FPA_SUBMODULES_DEPT_OWNER }, actions: DEPT_OWNER_ACTIONS },
   HR_MGR: { access: 'write', subModules: { ...FPA_SUBMODULES_DEPT_OWNER }, actions: DEPT_OWNER_ACTIONS },

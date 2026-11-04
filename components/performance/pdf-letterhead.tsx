@@ -21,31 +21,13 @@ interface PerformancePdfLetterheadProps {
 const styles = StyleSheet.create({
   wrap: {
     marginBottom: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: "#cbd5e1",
     paddingBottom: 8,
   },
-  top: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    gap: 8,
-  },
   logo: {
-    width: 46,
-    height: 46,
+    width: "100%",
+    height: 89,
     objectFit: "contain",
-  },
-  companyName: {
-    fontSize: 10,
-    fontWeight: "bold",
-    color: "#0f172a",
-    marginBottom: 2,
-  },
-  companyLine: {
-    fontSize: 8,
-    color: "#475569",
-    marginBottom: 1,
+    objectPosition: "left top",
   },
   title: {
     fontSize: 16,
@@ -65,46 +47,16 @@ const styles = StyleSheet.create({
   },
 })
 
-const fallbackAddress = {
-  label: "National Venture Capital Company of Zimbabwe",
-  line1: "4th Floor Blue Bridge",
-  line2: "Eastgate Mall",
-  city: "Harare",
-  country: "Zimbabwe",
-}
-
-const DEFAULT_LOGO_URL = "/logo.png"
-
-const buildAddressLines = (address: LetterheadAddress) => {
-  const cityLine = [address.city, address.state, address.postalCode].filter(Boolean).join(", ")
-  return [address.line1, address.line2, cityLine, address.country].filter(Boolean) as string[]
-}
+const NVCCZ_LETTERHEAD_URL = "/nvccz-letterhead-header-2026.png"
 
 export function PerformancePdfLetterhead({
   title,
   subtitle,
   periodLabel,
-  activeAddress,
 }: PerformancePdfLetterheadProps) {
-  const address = activeAddress || fallbackAddress
-  const lines = buildAddressLines(address)
-  const logoUrl = address.logoUrl || DEFAULT_LOGO_URL
-
   return (
     <View style={styles.wrap}>
-      <View style={styles.top}>
-        <View>
-          <Image src={logoUrl} style={styles.logo} />
-        </View>
-        <View>
-          <Text style={styles.companyName}>{address.label || fallbackAddress.label}</Text>
-          {lines.map((line, idx) => (
-            <Text key={`${line}-${idx}`} style={styles.companyLine}>
-              {line}
-            </Text>
-          ))}
-        </View>
-      </View>
+      <Image src={NVCCZ_LETTERHEAD_URL} style={styles.logo} />
 
       <Text style={styles.title}>{title}</Text>
       {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}

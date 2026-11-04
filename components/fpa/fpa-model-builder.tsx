@@ -666,6 +666,59 @@ export function FpaModelBuilder({ modelId }: { modelId?: string }) {
     }
   }
 
+  const createWorkspaceVersion = async () => {
+    if (!id || !canConfigureBuilder) return
+    const name = `${model?.name || "Model"} Working Version`
+    setBusyKey("create-version")
+    try {
+      const res = await fpaApi.createVersion({ modelId: id, name })
+      if (!res.success || !res.data?.id) {
+        toast.error(res.error || "Could not create the working version")
+        return
+      }
+      toast.success("Working version created")
+      dispatch(setSelectedVersionId(res.data.id))
+      await load()
+      syncUrl(id, res.data.id, viewMode)
+    } catch (error) {
+      toast.error(errorMessage(error, "Could not create the working version"))
+    } finally {
+      setBusyKey(null)
+    }
+  }
+
+  const seedLocalDefaults = async () => {
+    if (!id || !canConfigureBuilder) return
+    setBusyKey("seed-defaults")
+    try {
+      const res = await fpaApi.seedModelDefaults(id)
+      if (!res.success) {
+        toast.error(res.error || "Could not prepare local FP&A defaults")
+        return
+      }
+      // Newly added input lines are part of the model immediately, but their
+      // period cells are not created by the model-level defaults endpoint.
+      // Seed the selected working version as well so owner validation can see
+      // every planning category in the local UAT cycle.
+      if (versionId) {
+        const cells = await fpaApi.seedVersionCells(versionId, {
+          scenarioId: selectedScenarioId || undefined,
+          fillMissing: true,
+        })
+        if (!cells.success) {
+          toast.error(cells.error || "Model defaults prepared, but period cells could not be seeded")
+          return
+        }
+      }
+      toast.success("Local FP&A defaults prepared")
+      await load()
+    } catch (error) {
+      toast.error(errorMessage(error, "Could not prepare local FP&A defaults"))
+    } finally {
+      setBusyKey(null)
+    }
+  }
+
   const runTestCalc = async () => {
     if (!id || !versionId) {
       toast.error("Select a workspace/version first")
@@ -1725,6 +1778,8 @@ export function FpaModelBuilder({ modelId }: { modelId?: string }) {
               onChangeHistory={() => setHistoryOpen(true)}
               onOpenModelSettings={() => setModelSettingsOpen(true)}
               onPublish={() => void runPublish()}
+              onCreateVersion={() => void createWorkspaceVersion()}
+              onSeedDefaults={() => void seedLocalDefaults()}
             />
           ) : null}
 

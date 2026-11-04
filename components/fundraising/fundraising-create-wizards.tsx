@@ -219,7 +219,6 @@ export function FrOpportunityWizard({
             <select
               className={frSelectClass}
               value={investorId}
-              disabled={loadingRefs}
               onChange={(e) => setInvestorId(e.target.value)}
             >
               <option value="">{loadingRefs ? "Loading investors…" : "Select investor"}</option>
@@ -276,7 +275,15 @@ export function FrOpportunityWizard({
             </select>
           </FrField>
           <FrField label="Expected close date">
-            <input type="date" className={frInputClass} value={expectedCloseDate} onChange={(e) => setExpectedCloseDate(e.target.value)} />
+            <input
+              type="text"
+              inputMode="numeric"
+              className={frInputClass}
+              value={expectedCloseDate}
+              onChange={(e) => setExpectedCloseDate(e.target.value)}
+              placeholder="YYYY-MM-DD"
+              aria-label="Expected close date (YYYY-MM-DD)"
+            />
           </FrField>
           <FrField label="Notes" className="sm:col-span-2">
             <textarea className={frInputClass + " h-20 py-2"} value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Optional context" />
@@ -383,6 +390,8 @@ export function FrCampaignWizard({
     const e: string[] = []
     if (wiz.stepId === "identity" && !name.trim()) e.push("Campaign name is required")
     if (wiz.stepId === "target" && !targetCapital.trim()) e.push("Target capital is required")
+    if (wiz.stepId === "target" && !startDate) e.push("Start date is required")
+    if (wiz.stepId === "target" && !closeDate) e.push("Target close date is required")
     if (wiz.stepId === "fund" && fundRequired && !fundId.trim()) e.push("Fund is required for this campaign type")
     return e
   }
@@ -781,8 +790,10 @@ export function FrCommitmentWizard({
   useEffect(() => {
     if (!open) return
     setLoadingRefs(true)
-    fundraisingApi
-      .listInvestors({ pageSize: 100 })
+    const timeout = new Promise<{ items: Record<string, any>[] }>((resolve) => {
+      window.setTimeout(() => resolve({ items: [] }), 8000)
+    })
+    Promise.race([fundraisingApi.listInvestors({ pageSize: 100 }), timeout])
       .then((res) => setInvestors(res.items ?? []))
       .catch(() => setInvestors([]))
       .finally(() => setLoadingRefs(false))

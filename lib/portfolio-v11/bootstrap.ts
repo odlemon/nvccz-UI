@@ -1,5 +1,5 @@
 import { applicationsApi } from '@/lib/api/applications-api'
-import { capitalCallsApi, clientsApi } from '@/lib/api/capital-calls-api'
+import { capitalCallsApi, clientsApi, distributionsApi } from '@/lib/api/capital-calls-api'
 import { fundsApi } from '@/lib/api/funds-api'
 import { fundraisingApi } from '@/lib/api/fundraising-api'
 import { fundPerformanceReportingApi } from '@/lib/api/fund-performance-reporting-api'
@@ -48,6 +48,7 @@ export type PortfolioDataScope =
   | 'dashboard'
   | 'companies'
   | 'capitalCalls'
+  | 'distributions'
   | 'lps'
   | 'cashAccounts'
   | 'cashLedger'
@@ -112,7 +113,10 @@ export function scopesForPage(page: string): PageScopePlan {
   switch (page) {
     case 'deals':
     case 'deal-detail':
-      return { primary: ['applications'], secondary: ['funds'] }
+      // Deal intake requires a fund selector. Load funds in the primary plan so
+      // the Add Deal action cannot open with a false "No funds available" state
+      // while the secondary hydration request is still pending.
+      return { primary: ['applications', 'funds'], secondary: [] }
 
     case 'dashboard':
       // Metrics/charts first; companies + funds + deal activity follow.
@@ -125,9 +129,24 @@ export function scopesForPage(page: string): PageScopePlan {
       }
 
     case 'funds':
+      // Funds table first; deadlines + capital activity cards need reporting/calls,
+      // and the "Distributed" column is only real once the declared records are in.
+      return {
+        primary: ['funds'],
+        secondary: ['dashboard', 'reporting', 'capitalCalls', 'distributions'],
+      }
+
     case 'fund-detail':
-      // Funds table first; deadlines + capital activity cards need reporting/calls.
-      return { primary: ['funds'], secondary: ['dashboard', 'reporting', 'capitalCalls'] }
+      // Every tab of the fund profile has its own register: holdings, investors, call
+      // notices and reporting schedules. Any scope missing here leaves that tab showing
+      // the runtime's embedded demonstration fixtures, which look exactly like live data
+      // on screen. The dashboard is not rendered here, and the fund's declared distributions
+      // arrive from a single per-fund request (see the host's matanho:load-fund-detail
+      // handler) rather than the whole-register scan the list page pays for.
+      return {
+        primary: ['funds'],
+        secondary: ['companies', 'lps', 'capitalCalls', 'reporting'],
+      }
 
     case 'fund-performance':
       return { primary: ['funds'], secondary: ['dashboard'] }
@@ -136,6 +155,9 @@ export function scopesForPage(page: string): PageScopePlan {
     case 'capital-call-detail':
       // Calls are the register; LPs feed allocation + payment confirmation cards.
       return { primary: ['capitalCalls'], secondary: ['lps'] }
+
+    case 'distributions':
+      return { primary: ['distributions'], secondary: ['funds'] }
 
     case 'companies':
     case 'company-detail':
@@ -185,7 +207,10 @@ export function scopesForPage(page: string): PageScopePlan {
       return { primary: ['mailer'], secondary: [] }
 
     case 'settings':
-      return { primary: ['settings'], secondary: [] }
+      // Settings is a local control surface whose static policy/configuration
+      // must remain usable even if the optional user-directory/RBAC request is
+      // unavailable. Do not block first paint on that request.
+      return { primary: [], secondary: [] }
 
     case 'analytics-detail':
       return { primary: ['dashboard'], secondary: ['funds'] }
@@ -348,14 +373,14 @@ async function loadCapitalCallsScope(ctx: ScopeLoadContext, funds: ReturnType<ty
   const fundsForCalls =
     ctx.filters.fundName && ctx.filters.fundName !== 'All Funds'
       ? funds.filter((f) => f.name === ctx.filters.fundName)
-      : funds.slice(0, 20)
+      : funds
   await Promise.all(
     fundsForCalls.map(async (f) => {
       const res = await settle(capitalCallsApi.list(f.id), `capitalCalls:${f.id}`, ctx.errors)
       const listed = asArray(res)
       // List payload omits allocation amounts — hydrate details for accurate totals/collected.
       const detailed = await Promise.all(
-        listed.slice(0, 12).map(async (call: any) => {
+        listed.map(async (call: any) => {
           const id = call?.id
           if (!id) return call
           const full = await settle(
@@ -414,7 +439,8 @@ export async function loadPortfolioV11Scopes(
   const wanted = uniqScopes(scopes)
   const errors: string[] = []
   const loadedAt = new Date().toISOString()
-  const needsCurrency = wanted.some((s) => s === 'dashboard')
+  const needsCurrency = wanted.includes('dashboard') &&
+    Boolean(filters.currencyCode && filters.currencyCode.toUpperCase() !== 'REPORTING CURRENCY' && !filters.currencyId)
   const currencyMap = needsCurrency ? await loadCurrencyMap() : {}
 
   const ctx: ScopeLoadContext = { filters, errors, currencyMap }
@@ -427,7 +453,7 @@ export async function loadPortfolioV11Scopes(
   const needsFunds =
     wanted.includes('funds') ||
     wanted.includes('capitalCalls') ||
-    wanted.includes('dashboard') ||
+    (wanted.includes('dashboard') && Boolean(filters.fundName && filters.fundName !== 'All Funds')) ||
     wanted.includes('reporting') ||
     wanted.includes('mailer') ||
     wanted.includes('companies') ||
@@ -469,10 +495,27 @@ export async function loadPortfolioV11Scopes(
   if (wanted.includes('companies')) {
     // Prefer with-investments (includes disbursement totals); fall back to the full
     // company list when demo companies have no FundDisbursement rows yet.
-    let companiesRes = await settle(portfolioCompaniesApi.getAllWithInvestments(), 'companies', errors)
-    if (!asArray(companiesRes).length) {
-      companiesRes = await settle(portfolioCompaniesApi.getAll(), 'companies:fallback', errors)
+    const companiesWithInvestments = await settle(
+      portfolioCompaniesApi.getAllWithInvestments(),
+      'companies',
+      errors,
+    )
+    const companiesBase = await settle(portfolioCompaniesApi.getAll(), 'companies:base', errors)
+    const enrichedRows = asArray(companiesWithInvestments)
+    const baseRows = asArray(companiesBase)
+    // The enriched endpoint can omit companies that do not have investment or
+    // disbursement rows yet. Keep those newly-created profiles visible by
+    // merging the complete base list and letting enriched values win.
+    const mergedById = new Map<string, any>()
+    for (const company of baseRows) {
+      if (company?.id) mergedById.set(String(company.id), company)
     }
+    for (const company of enrichedRows) {
+      if (!company?.id) continue
+      const id = String(company.id)
+      mergedById.set(id, { ...(mergedById.get(id) || {}), ...company })
+    }
+    const companiesRes = Array.from(mergedById.values())
     const summary = Array.isArray(dashboardData?.portfolioSummary) ? dashboardData.portfolioSummary : []
     let companies = adaptCompanies(asArray(companiesRes), summary)
     if (filters.geography) {
@@ -503,6 +546,23 @@ export async function loadPortfolioV11Scopes(
     tasks.push(
       loadCapitalCallsScope(ctx, funds).then((calls) => {
         data.capitalCalls = calls
+      }),
+    )
+  }
+
+  if (wanted.includes('distributions')) {
+    tasks.push(
+      Promise.all(
+        funds.map(async (fund) => {
+          const res = await settle(distributionsApi.list(fund.id), `distributions:${fund.id}`, errors)
+          return asArray((res as any)?.data ?? res).map((row: any) => ({
+            ...row,
+            fundId: fund.id,
+            fundName: fund.name,
+          }))
+        }),
+      ).then((groups) => {
+        data.distributions = groups.flat()
       }),
     )
   }
@@ -675,7 +735,17 @@ export async function loadPortfolioV11Scopes(
 
   if (wanted.includes('settings')) {
     tasks.push(
-      settle(loadSettingsRbac(), 'settingsRbac', errors).then((rbac) => {
+      // Settings must remain usable even when the optional user directory is slow
+      // or unavailable. RBAC data is additive; it must not hold the whole page
+      // behind the global portfolio loading state.
+      settle(
+        Promise.race([
+          loadSettingsRbac(),
+          new Promise<null>((resolve) => setTimeout(() => resolve(null), 5000)),
+        ]),
+        'settingsRbac',
+        errors,
+      ).then((rbac) => {
         data.rbac = rbac || { roles: [], users: [] }
         state.rbac = rbac || { roles: [], users: [] }
       }),
@@ -683,6 +753,24 @@ export async function loadPortfolioV11Scopes(
   }
 
   await Promise.all(tasks)
+
+  // The fund register stores no distribution totals, so they are summed from the
+  // declared records the funds page now loads alongside it. Funds with no declared
+  // distribution show $0; a missing source leaves the page showing a dash.
+  if (Array.isArray((data as any).distributions) && Array.isArray((data as any).funds)) {
+    const distributedByFund = new Map<string, number>()
+    for (const row of (data as any).distributions) {
+      const fundId = String(row?.fundId || '')
+      if (!fundId) continue
+      const amount = Number(row?.grossAmount ?? row?.amount ?? 0)
+      distributedByFund.set(fundId, (distributedByFund.get(fundId) || 0) + (Number.isFinite(amount) ? amount : 0))
+    }
+    ;(data as any).funds = (data as any).funds.map((fund: any) => ({
+      ...fund,
+      distributed: distributedByFund.get(String(fund.id)) || 0,
+      distributedAvailable: true,
+    }))
+  }
 
   return {
     data: data as any,

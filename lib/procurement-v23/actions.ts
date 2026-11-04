@@ -104,6 +104,7 @@ import {
   enqueueRpaJob,
 } from "@/lib/api/procurement-v23-api"
 import type { ProcurementV23LivePayload } from "@/lib/procurement-v23/live-loaders"
+import * as XLSX from "xlsx"
 
 /** The API's error code (for example MATCH_EXCEPTIONS), when the failure carried one. */
 function errorCode(e: unknown): string {
@@ -235,6 +236,7 @@ export const LIVE_ACTIONS = [
   "confirm-reject-approval-v6",
   "register-vendor-confirm",
   "register-vendor-confirm-v6",
+  "bulk-register-vendors-v23",
   "save-vendor-profile-v23",
   "delete-vendor-v23",
   "extend-rfq-closing-v23",
@@ -563,7 +565,13 @@ export async function handleProcurementV23Action(
         if (form && !form.reportValidity()) return { handled: true }
         // An admin has no department of their own but can still raise a requisition, against
         // whichever department they choose on the form (__pr23RequisitionDepartmentField).
-        const department = live.access?.department || (live.access?.isPrivileged ? val('#prForm [name="cost"]') : "")
+        const rawDepartment = live.access?.department || (live.access?.isPrivileged ? val('#prForm [name="cost"]') : "")
+        // Local synthetic identities can retain the retired "Investments" label,
+        // while the live requisition API accepts the current department set only.
+        // Prefer the form's explicit choice; keep a safe local fallback so a
+        // valid line item is not rejected solely because of stale identity data.
+        const allowedDepartments = new Set(["Finance", "Operations", "Procurement", "Human Resources", "Marketing", "Legal", "IT"])
+        const department = allowedDepartments.has(rawDepartment) ? rawDepartment : (val('#prForm [name="cost"]') || "Finance")
         if (!department) {
           return {
             handled: true,
@@ -950,6 +958,66 @@ export async function handleProcurementV23Action(
           handled: true,
           reload: true,
           message: `${created?.vendorCode ? `${created.vendorCode} ` : ""}${created?.name ?? name} registered as a Draft${cleared ? " with a valid tax clearance" : ""}. Submit it for review, then have someone else approve it, before it can be used.${bankTyped ? " Bank details were not saved here; Finance records them." : ""}`,
+        }
+      }
+
+      case "bulk-register-vendors-v23": {
+        if (!has("vendors.manage")) return refuse("registering vendors")
+        const form = document.querySelector<HTMLFormElement>("#vendorBulkFormV23")
+        if (form && !form.reportValidity()) return { handled: true }
+        const file = document.querySelector<HTMLInputElement>('#vendorBulkFormV23 [name="file"]')?.files?.[0]
+        if (!file) return { handled: true, error: "Choose a CSV or Excel workbook to import." }
+        const workbook = XLSX.read(await file.arrayBuffer(), { type: "array", cellDates: true })
+        const sheet = workbook.Sheets[workbook.SheetNames[0]]
+        const source = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: "" })
+        const key = (row: Record<string, unknown>, ...names: string[]) => {
+          const entries = Object.entries(row)
+          for (const name of names) {
+            const hit = entries.find(([k]) => k.trim().toLowerCase().replace(/[^a-z0-9]/g, "") === name)
+            if (hit && String(hit[1]).trim()) return String(hit[1]).trim()
+          }
+          return ""
+        }
+        const rowsToCreate = source.map((row, index) => ({
+          row: index + 2,
+          body: {
+            name: key(row, "legalname", "vendorname", "name"),
+            tradingName: key(row, "tradingname") || undefined,
+            category: key(row, "category", "vendorcategory") || undefined,
+            registrationNumber: key(row, "registrationnumber", "companyregistrationnumber") || undefined,
+            taxNumber: key(row, "taxnumber", "tin") || undefined,
+            vatNumber: key(row, "vatnumber", "vat") || undefined,
+            bpNumber: key(row, "bpnumber", "businesspartnernumber") || undefined,
+            contactPerson: key(row, "contactperson", "contact") || undefined,
+            email: key(row, "email", "emailaddress") || undefined,
+            phone: key(row, "phone", "phonenumber") || undefined,
+            address: key(row, "address") || undefined,
+            country: key(row, "country") || undefined,
+            paymentTerms: key(row, "paymentterms") || undefined,
+            settlementCurrencyCode: key(row, "currency", "settlementcurrency") || undefined,
+            commodityCategories: key(row, "commodities", "commoditycategories").split(/[;,]/).map((x) => x.trim()).filter(Boolean),
+          },
+        }))
+        const invalid = rowsToCreate.filter((x) => !x.body.name)
+        if (!rowsToCreate.length) return { handled: true, error: "The selected file has no vendor rows." }
+        if (invalid.length) return { handled: true, error: `Legal name is missing on row${invalid.length === 1 ? "" : "s"} ${invalid.map((x) => x.row).join(", ")}. Nothing was imported.` }
+        const failures: string[] = []
+        let created = 0
+        for (const item of rowsToCreate) {
+          try {
+            await createVendor(item.body)
+            created += 1
+          } catch (error) {
+            const detail = readProcurementError(error)
+            failures.push(`row ${item.row}: ${detail.message || detail.error || "registration failed"}`)
+          }
+        }
+        if (!created) return { handled: true, error: `No vendors were registered. ${failures.slice(0, 3).join("; ")}` }
+        closeRuntimeOverlay()
+        return {
+          handled: true,
+          reload: true,
+          message: `${created} vendor${created === 1 ? "" : "s"} registered as Draft${failures.length ? `; ${failures.length} row${failures.length === 1 ? "" : "s"} failed (${failures.slice(0, 2).join("; ")})` : "."}`,
         }
       }
 

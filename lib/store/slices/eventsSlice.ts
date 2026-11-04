@@ -39,7 +39,13 @@ export interface EventsState {
     page: number
     limit: number
     total: number
+    totalGuests: number
     pages: number
+    pendingInvitationCount: number
+    acceptedCount: number
+    declinedCount: number
+    pendingCount: number
+    checkedInCount: number
   }
 }
 
@@ -64,9 +70,15 @@ const initialState: EventsState = {
   error: null,
   guestsPagination: {
     page: 1,
-    limit: 10,
+    limit: 9,
     total: 0,
-    pages: 0
+    totalGuests: 0,
+    pages: 0,
+    pendingInvitationCount: 0,
+    acceptedCount: 0,
+    declinedCount: 0,
+    pendingCount: 0,
+    checkedInCount: 0,
   }
 }
 
@@ -175,11 +187,11 @@ export const deleteEvent = createAsyncThunk(
 // Guest Management
 export const fetchEventGuests = createAsyncThunk(
   'events/fetchEventGuests',
-  async ({ eventId, page = 1, limit = 10 }: { eventId: string; page?: number; limit?: number }, { rejectWithValue }) => {
+  async ({ eventId, page = 1, limit = 9, search = '' }: { eventId: string; page?: number; limit?: number; search?: string }, { rejectWithValue }) => {
     try {
-      const response = await eventsApi.getGuests(eventId, page, limit)
+      const response = await eventsApi.getGuests(eventId, page, limit, search)
       if (response.success) {
-        return { guests: response.data, pagination: response.pagination }
+        return { guests: response.data, pagination: { ...response.pagination, pendingInvitationCount: response.pendingInvitationCount ?? response.pagination?.pendingInvitationCount ?? 0 } }
       }
       throw new Error('Failed to fetch guests')
     } catch (error: any) {
@@ -194,7 +206,7 @@ export const addEventGuests = createAsyncThunk(
     try {
       const response = await eventsApi.addGuests(eventId, guests)
       if (response.success) {
-        return response.data
+        return { guests: response.data, announcementDelivery: response.announcementDelivery ?? [], skippedExisting: response.skippedExisting ?? 0 }
       }
       throw new Error('Failed to add guests')
     } catch (error: any) {
@@ -521,7 +533,7 @@ const eventsSlice = createSlice({
     // Add Guests
     builder
       .addCase(addEventGuests.fulfilled, (state, action) => {
-        state.currentEventGuests = [...state.currentEventGuests, ...action.payload]
+        state.currentEventGuests = [...state.currentEventGuests, ...action.payload.guests]
       })
 
     // Check In Guest

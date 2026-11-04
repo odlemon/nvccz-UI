@@ -44,7 +44,20 @@
     ".next-procurement-preview/types/**/*.ts",
     ".next-vendor-preview/types/**/*.ts",
     ".next-vendor-review/types/**/*.ts",
-    ".next-staff-home-page/types/**/*.ts"
+    ".next-staff-home-page/types/**/*.ts",
+    ".next-staff-staff3011/types/**/*.ts",
+    ".next-staff-expenses-detail-fix/types/**/*.ts",
+    ".next-staff-approval-verify/types/**/*.ts",
+    ".next-staff-visible-verify/types/**/*.ts",
+    ".next-staff-.next-staff-board/types/**/*.ts",
+    ".next-staff-fix/types/**/*.ts",
+    ".next-events/types/**/*.ts",
+    ".next-events-events-local-3019/types/**/*.ts",
+    ".next-staff-events-local-3019/types/**/*.ts",
+    ".next-vendor/types/**/*.ts",
+    ".next-staff-payroll-isolated-20261028/types/**/*.ts",
+    ".next-staff-payroll-settings-isolated/types/**/*.ts",
+    ".next-staff-performance-approval-hide/types/**/*.ts"
   ],
   "exclude": [
     "node_modules"

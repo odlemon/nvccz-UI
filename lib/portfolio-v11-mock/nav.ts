@@ -4,6 +4,7 @@ export const PV11_PAGE_TO_PATH: Record<string, string> = {
   deals: '/portfolio/deals',
   funds: '/portfolio/funds',
   'capital-calls': '/portfolio/capital-calls',
+  distributions: '/portfolio/distributions',
   companies: '/portfolio/companies',
   'cash-accounts': '/portfolio/cash-accounts',
   'cash-overview': '/portfolio/cash-overview',
@@ -23,7 +24,7 @@ export const PV11_PAGE_TO_PATH: Record<string, string> = {
   settings: '/portfolio/settings',
   // details
   'deal-detail': '/portfolio/deals/detail',
-  'company-detail': '/portfolio/companies/detail',
+  'company-detail': '/portfolio/companies',
   'fund-detail': '/portfolio/funds/detail',
   'lp-detail': '/portfolio/lps/detail',
   'capital-call-detail': '/portfolio/capital-calls/detail',
@@ -38,13 +39,21 @@ export const PV11_PATH_TO_PAGE: Record<string, string> = Object.fromEntries(
 )
 
 export function pathToPv11Page(pathname: string): string {
-  const clean = String(pathname || '').replace(/\/+$/, '') || '/portfolio'
+  // Callers sometimes hold an absolute URL; reduce it to a path so the
+  // '/portfolio/...' prefixes below can still match.
+  const withoutOrigin = String(pathname || '').replace(/^[a-z][a-z0-9+.-]*:\/\/[^/]+/i, '')
+  const clean = (withoutOrigin.split(/[?#]/)[0] || '').replace(/\/+$/, '') || '/portfolio'
+  // Keep the explicit module-menu alias backed by the existing reporting runtime.
+  // This route was present in the module configuration but was otherwise treated
+  // as the dashboard, leaving the page blank after a successful 200 response.
+  if (clean === '/portfolio/reporting-schedules') return 'reporting'
   if (clean in PV11_PATH_TO_PAGE) return PV11_PATH_TO_PAGE[clean]
   if (clean.startsWith('/portfolio/deals/detail')) return 'deal-detail'
   if (clean.startsWith('/portfolio/deals')) return 'deals'
   if (clean.startsWith('/portfolio/funds/detail')) return 'fund-detail'
   if (clean.startsWith('/portfolio/funds')) return 'funds'
   if (clean.startsWith('/portfolio/companies/detail')) return 'company-detail'
+  if (/^\/portfolio\/companies\/[^/]+$/.test(clean)) return 'company-detail'
   if (clean.startsWith('/portfolio/companies')) return 'companies'
   if (clean.startsWith('/portfolio/lps/detail')) return 'lp-detail'
   if (clean.startsWith('/portfolio/lps')) return 'lps'
@@ -62,6 +71,7 @@ export const PV11_NAV_PAGES = [
   { id: 'pv11-deals', page: 'deals', path: '/portfolio/deals', name: 'Deal Flow' },
   { id: 'pv11-funds', page: 'funds', path: '/portfolio/funds', name: 'Funds' },
   { id: 'pv11-capital-calls', page: 'capital-calls', path: '/portfolio/capital-calls', name: 'Capital Calls' },
+  { id: 'pv11-distributions', page: 'distributions', path: '/portfolio/distributions', name: 'Distributions' },
   { id: 'pv11-companies', page: 'companies', path: '/portfolio/companies', name: 'Portfolio Companies' },
   { id: 'pv11-cash-accounts', page: 'cash-accounts', path: '/portfolio/cash-accounts', name: 'Client / Fund Accounts' },
   { id: 'pv11-cash-overview', page: 'cash-overview', path: '/portfolio/cash-overview', name: 'Cash Overview' },

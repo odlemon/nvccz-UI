@@ -99,6 +99,20 @@ const HEAD =
   "    const days=(function(){const n=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];const m=/^(\\d{4})-(\\d{2})-(\\d{2})/.exec(String(__tsCur&&__tsCur.periodStart||''));if(!m)return n;const base=Date.UTC(+m[1],+m[2]-1,+m[3]);return n.map((x,i)=>x+' '+new Date(base+i*86400000).getUTCDate())})();\n" +
   "    const tot=totalHours(),daily=dailyTotals();"
 
+const EDITOR_STATE_FIND = "const __tsCur=(__tsRows||[]).slice().sort((a,b)=>String(b&&b.periodStart||'').localeCompare(String(a&&a.periodStart||'')))[0]||null;"
+const EDITOR_CURRENT_WEEK_FIND = EDITOR_STATE_FIND
+const EDITOR_CURRENT_WEEK = "const __tsCurrentWeek=(function(){const n=new Date(),add=(7-n.getUTCDay())%7;return new Date(Date.UTC(n.getUTCFullYear(),n.getUTCMonth(),n.getUTCDate()+add)).toISOString().slice(0,10)})();\n" +
+  "    const __tsCur=(__tsRows||[]).find(t=>String(t&&t.weekEnding||'').slice(0,10)===__tsCurrentWeek)||(__tsRows||[]).filter(t=>['DRAFT','RETURNED'].includes(t&&t.status)).sort((a,b)=>String(b&&b.periodStart||'').localeCompare(String(a&&a.periodStart||'')))[0]||null;\n" +
+  "    /* patched:timesheets-current-week */"
+const EDITOR_CURRENT_WEEK_ONLY_FIND = "const __tsCur=(__tsRows||[]).find(t=>String(t&&t.weekEnding||'').slice(0,10)===__tsCurrentWeek)||(__tsRows||[]).filter(t=>['DRAFT','RETURNED'].includes(t&&t.status)).sort((a,b)=>String(b&&b.periodStart||'').localeCompare(String(a&&a.periodStart||'')))[0]||null;"
+const EDITOR_CURRENT_WEEK_ONLY = "const __tsCur=(__tsRows||[]).find(t=>String(t&&t.weekEnding||'').slice(0,10)===__tsCurrentWeek)||null;\n" +
+  "    /* patched:timesheets-current-week-only */"
+const EDITOR_STATE = EDITOR_STATE_FIND + "\n" +
+  "    /* patched:timesheets-editor-state */\n" +
+  "    const __tsEntries=(__tsCur&&Array.isArray(__tsCur.entries))?__tsCur.entries:[];\n" +
+  "    const __tsSig=__tsCur?JSON.stringify([__tsCur.id,__tsCur.status,__tsEntries]):'';\n" +
+  "    if(V.timesheet._liveSignature!==__tsSig){const groups=new Map();const base=__tsCur&&__tsCur.periodStart?new Date(String(__tsCur.periodStart).slice(0,10)+'T00:00:00Z'):null;for(const e of __tsEntries){const d=new Date(String(e.date||'').slice(0,10)+'T00:00:00Z');const di=base&&!Number.isNaN(d.getTime())?Math.max(0,Math.min(6,Math.round((d-base)/86400000))):0;const key=String(e.projectId)+'|'+String(e.taskId||'');let r=groups.get(key);if(!r){r={project:e.projectName||'Project',task:e.notes||'Time entry',projectId:e.projectId,taskId:e.taskId||null,billable:!!e.billable,hours:[0,0,0,0,0,0,0],entryIds:{}};groups.set(key,r)}r.hours[di]+=Number(e.hours)||0;r.entryIds[di]=e.id}V.timesheet.rows=Array.from(groups.values());V.timesheet.weekEnding=__tsCur&&__tsCur.weekEnding||'';V.timesheet.status=__tsCur&&__tsCur.status||'';V.timesheet._sourceId=__tsCur&&__tsCur.id||'';V.timesheet._liveSignature=__tsSig;V.timesheet.entries=__tsEntries.map(e=>({when:__perfDate(e.date),project:e.projectName,task:e.notes||'Time entry',hours:e.hours,source:'Saved'}))}"
+
 const TITLE_ANCHOR = "'Weekly Timesheet — '+ts.week"
 // The week is only named when a real period backs it.
 const TITLE = "/* patched:timesheets-title */'Weekly Timesheet'+(__tsWeek?' \\u2014 '+__tsWeek:'')"
@@ -274,6 +288,9 @@ const APPR_AUDIT =
 export default [
   { label: "timesheets-fixture", find: FIXTURE_ANCHOR, repl: FIXTURE },
   { label: "timesheets-head", find: HEAD_ANCHOR, repl: HEAD },
+  { label: "timesheets-editor-state", find: EDITOR_STATE_FIND, repl: EDITOR_STATE },
+  { label: "timesheets-current-week", find: EDITOR_CURRENT_WEEK_FIND, repl: EDITOR_CURRENT_WEEK },
+  { label: "timesheets-current-week-only", find: EDITOR_CURRENT_WEEK_ONLY_FIND, repl: EDITOR_CURRENT_WEEK_ONLY },
   { label: "timesheets-title", find: TITLE_ANCHOR, repl: TITLE },
   { label: "timesheets-kpis", find: KPIS_ANCHOR, repl: KPIS },
   { label: "timesheets-timer-state", find: TIMER_STATE_ANCHOR, repl: TIMER_STATE },

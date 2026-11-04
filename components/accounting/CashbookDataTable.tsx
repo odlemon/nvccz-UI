@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Plus, Eye, Copy, ChevronUp, ChevronDown, ChevronLeft, ChevronRight } from "lucide-react"
@@ -11,6 +11,7 @@ import { toast } from "sonner"
 interface CashbookEntry {
   id: string
   transactionDate: string
+  date?: string
   description: string
   reference: string
   type: "RECEIPT" | "PAYMENT"
@@ -26,7 +27,28 @@ interface CashbookDataTableProps {
   onAddPayment: () => void
   onViewEntry: (entry: CashbookEntry) => void
   onExport: () => void
+  exportControls?: (entries: CashbookEntry[]) => React.ReactNode
+  accuratePagination?: boolean
   readOnly?: boolean // New prop to enable read-only mode
+}
+
+const asFiniteNumber = (value: unknown): number => {
+  if (typeof value === "number") return Number.isFinite(value) ? value : 0
+  if (typeof value === "string" && value.trim()) {
+    const parsed = Number(value.replace(/,/g, ""))
+    return Number.isFinite(parsed) ? parsed : 0
+  }
+  if (value && typeof value === "object" && "toString" in value) {
+    const parsed = Number(String(value))
+    return Number.isFinite(parsed) ? parsed : 0
+  }
+  return 0
+}
+
+const displayDate = (value: unknown): string => {
+  if (typeof value !== "string" && !(value instanceof Date)) return "—"
+  const date = value instanceof Date ? value : new Date(value)
+  return Number.isNaN(date.getTime()) ? "—" : format(date, "yyyy-MM-dd")
 }
 
 export function CashbookDataTable({
@@ -36,6 +58,8 @@ export function CashbookDataTable({
   onAddPayment,
   onViewEntry,
   onExport,
+  exportControls,
+  accuratePagination = false,
   readOnly = true, // Default to false for backward compatibility
 }: CashbookDataTableProps) {
   const [sortColumn, setSortColumn] = useState<string | null>(null)
@@ -44,11 +68,17 @@ export function CashbookDataTable({
   const itemsPerPage = 10
 
   const sortedEntries = useMemo(() => {
-    if (!sortColumn) return Array.isArray(entries) ? entries : []
-    const safeEntries = Array.isArray(entries) ? entries : []
+    const safeEntries = Array.isArray(entries)
+      ? entries.filter((entry): entry is CashbookEntry => Boolean(entry && typeof entry === "object"))
+      : []
+    if (!sortColumn) return safeEntries
     return [...safeEntries].sort((a, b) => {
       const aValue = a[sortColumn as keyof CashbookEntry]
       const bValue = b[sortColumn as keyof CashbookEntry]
+      if (aValue == null || bValue == null) {
+        if (aValue == null && bValue == null) return 0
+        return aValue == null ? 1 : -1
+      }
       if (aValue < bValue) return sortDirection === "asc" ? -1 : 1
       if (aValue > bValue) return sortDirection === "asc" ? 1 : -1
       return 0
@@ -61,6 +91,9 @@ export function CashbookDataTable({
   }, [sortedEntries, currentPage])
 
   const totalPages = Math.ceil((Array.isArray(sortedEntries) ? sortedEntries.length : 0) / itemsPerPage)
+  useEffect(() => {
+    if (accuratePagination && currentPage > Math.max(1, totalPages)) setCurrentPage(Math.max(1, totalPages))
+  }, [currentPage, totalPages, accuratePagination])
 
   const handleSort = (column: string) => {
     if (sortColumn === column) {
@@ -118,9 +151,9 @@ export function CashbookDataTable({
     <div className="mt-6 border rounded-xl bg-white overflow-x-auto">
       <div className="p-4 flex justify-between items-center">
         <h2 className="text-lg font-semibold">Cashbook Entries</h2>
-        <Button onClick={onExport} variant="outline">
+        {exportControls ? exportControls(sortedEntries) : <Button onClick={onExport} variant="outline">
           Export to Excel
-        </Button>
+        </Button>}
       </div>
       <table className="min-w-full">
         <thead>
@@ -183,31 +216,31 @@ export function CashbookDataTable({
                 className={cn("border-b hover:bg-gray-50 cursor-pointer", index % 2 === 0 ? "bg-gray-50" : "")}
                 onClick={() => onViewEntry(entry)}
               >
-                <td className="p-3 font-mono">{format(new Date(entry.transactionDate || entry.date), "yyyy-MM-dd")}</td>
-                <td className="p-3">{entry.description}</td>
+                <td className="p-3 font-mono">{displayDate(entry.transactionDate || entry.date)}</td>
+                <td className="p-3">{entry.description || "—"}</td>
                 <td className="p-3 font-mono flex items-center gap-2">
-                  {entry.reference}
+                  {entry.reference || "—"}
                   <Button
                     size="sm"
                     variant="ghost"
                     onClick={(e) => {
                       e.stopPropagation()
-                      copyToClipboard(entry.reference)
+                      copyToClipboard(entry.reference || "")
                     }}
                   >
                     <Copy className="w-4 h-4" />
                   </Button>
                 </td>
                 <td className="p-3 text-right text-green-700 font-mono text-lg" style={{ fontFamily: "monospace" }}>
-                  {entry.type === "RECEIPT" ? Number(entry.amount).toLocaleString() : ""}
+                  {entry.type === "RECEIPT" ? asFiniteNumber(entry.amount).toLocaleString() : ""}
                 </td>
                 <td className="p-3 text-right text-red-700 font-mono text-lg" style={{ fontFamily: "monospace" }}>
-                  {entry.type === "PAYMENT" ? Number(entry.amount).toLocaleString() : ""}
+                  {entry.type === "PAYMENT" ? asFiniteNumber(entry.amount).toLocaleString() : ""}
                 </td>
-                <td className="p-3 text-right font-mono text-lg">{entry.balance.toLocaleString()}</td>
+                <td className="p-3 text-right font-mono text-lg">{asFiniteNumber(entry.balance).toLocaleString()}</td>
                 <td className="p-3">
                   <Badge className={entry.status === "POSTED" ? "bg-green-100 text-green-800" : "bg-yellow-100 text-yellow-800"}>
-                    {entry.status}
+                    {entry.status || "Unknown"}
                   </Badge>
                 </td>
               </tr>

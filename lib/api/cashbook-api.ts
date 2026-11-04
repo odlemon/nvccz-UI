@@ -386,7 +386,7 @@ class CashbookApiService {
         maxAmount?: number
         page?: number
         limit?: number
-    }): Promise<AccountingResponse<CashbookEntry[]>> {
+    }): Promise<AccountingResponse<{ entries: CashbookEntry[]; pagination: { page: number; limit: number; total: number; pages: number } }>> {
         const queryParams = new URLSearchParams()
         Object.entries(params).forEach(([k, v]) => {
             if (v !== undefined && v !== null && v !== '') {
@@ -394,7 +394,7 @@ class CashbookApiService {
             }
         })
         const queryString = queryParams.toString() ? `?${queryParams.toString()}` : ''
-        return apiClient.get<AccountingResponse<CashbookEntry[]>>(`/cashbook/entries${queryString}`)
+        return apiClient.get<AccountingResponse<{ entries: CashbookEntry[]; pagination: { page: number; limit: number; total: number; pages: number } }>>(`/cashbook/entries${queryString}`)
     }
 
     // Create Receipt
@@ -424,8 +424,12 @@ class CashbookApiService {
     }
 
     // Cashbook Batches
-    async getCashbookBatches(params?: { currencyId?: string }): Promise<AccountingResponse<any[]>> {
-        const query = params?.currencyId ? `?currencyId=${params.currencyId}` : ''
+    async getCashbookBatches(params?: { currencyId?: string; limit?: number; offset?: number }): Promise<AccountingResponse<any[]>> {
+        const queryParams = new URLSearchParams()
+        if (params?.currencyId) queryParams.set('currencyId', params.currencyId)
+        if (params?.limit !== undefined) queryParams.set('limit', String(params.limit))
+        if (params?.offset !== undefined) queryParams.set('offset', String(params.offset))
+        const query = queryParams.size ? `?${queryParams.toString()}` : ''
         return apiClient.get<AccountingResponse<any[]>>(`/cashbook/batches${query}`)
     }
 

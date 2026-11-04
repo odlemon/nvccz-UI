@@ -491,6 +491,29 @@ export const PERFORMANCE_ROLE_PERMISSIONS = {
     ]
   },
 
+  // Monitoring & Evaluation Officer — department-scoped performance reporting.
+  MONITORING_EVALUATION: {
+    dashboard: 'read',
+    kpiManagement: 'read',
+    goalsManagement: 'write',
+    taskManagement: 'write',
+    departmentScorecard: 'read',
+    userScorecard: 'read',
+    actions: [
+      PERFORMANCE_ACTIONS.VIEW_KPI,
+      PERFORMANCE_ACTIONS.VIEW_DEPARTMENT_KPIS,
+      PERFORMANCE_ACTIONS.VIEW_DEPARTMENT_GOALS,
+      PERFORMANCE_ACTIONS.VIEW_OWN_DEPARTMENT_GOALS,
+      PERFORMANCE_ACTIONS.UPDATE_OWN_DEPARTMENT_GOAL,
+      PERFORMANCE_ACTIONS.CREATE_TASK,
+      PERFORMANCE_ACTIONS.VIEW_OWN_TASKS,
+      PERFORMANCE_ACTIONS.VIEW_DEPARTMENT_TASKS,
+      PERFORMANCE_ACTIONS.VIEW_DEPARTMENT_SCORECARD,
+      PERFORMANCE_ACTIONS.VIEW_USER_SCORECARDS,
+      PERFORMANCE_ACTIONS.VIEW_PERFORMANCE_REVIEWS,
+    ],
+  },
+
   // Procurement Manager - Department Head
   PROC_MGR: {
     dashboard: 'read',

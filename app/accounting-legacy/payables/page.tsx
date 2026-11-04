@@ -1,6 +1,6 @@
 "use client"
 
-import { PayablesManagement } from "@/components/accounting/payables-management"
+import { PayablesLegacyContent } from "@/components/accounting/payables-legacy-content"
 import { ModuleGuard } from "@/lib/permissions"
 import { AccountingLayout } from "@/components/layout/accounting-layout"
 
@@ -10,10 +10,7 @@ export default function PayablesPage() {
 
     <ModuleGuard moduleId="accounting" subModuleId="payables">
       <AccountingLayout>
-        <div className="p-6">
-          <PayablesManagement />
-
-        </div>
+        <PayablesLegacyContent />
       </AccountingLayout>
     </ModuleGuard>
   )

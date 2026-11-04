@@ -1,0 +1,23 @@
+const { chromium }=require('playwright');
+(async()=>{
+ const b=await chromium.launch(); const p=await b.newPage({viewport:{width:1440,height:1000}});
+ await p.goto('http://localhost:3001/login',{waitUntil:'networkidle'});
+ await p.waitForTimeout(500);
+ await p.locator('input[type=email]').fill('perf.sysadmin@nts.local');
+ await p.locator('input[type=password]').fill('admin123');
+ await p.getByRole('button',{name:'Sign in',exact:true}).click();
+ await p.waitForURL('**/home',{timeout:20000});
+ await p.goto('http://localhost:3001/events/cmvjgh857000hunusrwgyxu88',{waitUntil:'networkidle'});
+ await p.getByRole('button',{name:'Guests',exact:true}).click();
+ const player=p.getByLabel('Anniversary video from Local Bulk Test Recipient');
+ if(await player.isVisible())throw new Error('Video should be inside collapsed View Details');
+ const card=p.locator('[data-slot="collapsible"]').filter({has:p.getByRole('heading',{name:'Local Bulk Test Recipient',exact:true})});
+ await card.getByRole('button',{name:'View Details',exact:true}).click();
+ await player.waitFor({timeout:20000});
+ await player.evaluate(v=>{v.src=v.src.replace('http://localhost:3009','https://dev-api.matanho.com');v.muted=true;v.load()});
+ await p.waitForFunction(()=>[...document.querySelectorAll('video')].some(v=>v.readyState>=2),{timeout:30000});
+ await player.evaluate(v=>v.play());
+ console.log('Staff guest player',await player.evaluate(v=>({duration:v.duration,paused:v.paused,width:v.videoWidth})));
+ await p.screenshot({path:'.acc-dumps/staff-video-player.png',fullPage:true});
+ await b.close();
+})().catch(e=>{console.error(e.message);process.exit(1)});

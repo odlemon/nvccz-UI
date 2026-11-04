@@ -43,6 +43,7 @@ import { refreshUserDetails, logoutUser } from "@/lib/store/slices/authSlice"
 import { getSwitcherModules } from "@/lib/config/modules"
 import { useRolePermissions } from "@/lib/hooks/useRolePermissions"
 import { toast } from "sonner"
+import { AppLoadingSpinner } from "@/components/layout/app-loading-spinner"
 import "@/components/home-v3-mock/home-v3.css"
 import "@/components/home-v3-mock/home-v3-overrides.css"
 
@@ -363,7 +364,12 @@ export function HomeV3App() {
     if (live?.teamRows.error) toast.error("Couldn't load team workload", { description: live.teamRows.error })
     if (live?.posts.error) toast.error("Couldn't load posts", { description: live.posts.error })
     if (live?.newsletters.error) toast.error("Couldn't load newsletters", { description: live.newsletters.error })
-    if (live?.directory.error) toast.error("Couldn't load the people directory", { description: live.directory.error })
+    // A denied directory request is an expected RBAC outcome for most roles, not a
+    // page failure. Keep genuine service errors visible, but do not show users a
+    // misleading toast when the API correctly enforces directory access.
+    if (live?.directory.error && !/only the (ceo|chief executive officer) or an administrator|forbidden|not authorized|not permitted/i.test(live.directory.error)) {
+      toast.error("Couldn't load the people directory", { description: live.directory.error })
+    }
 
     const onPriorityToggled = (event: Event) => {
       const detail = (event as CustomEvent).detail || {}
@@ -626,11 +632,7 @@ export function HomeV3App() {
   }, [pathname])
 
   if (isLoading || !liveDataReady) {
-    return (
-      <div className="flex h-full min-h-[320px] items-center justify-center text-sm text-[#64748B]">
-        Loading your workspace…
-      </div>
-    )
+    return <AppLoadingSpinner label="Loading your workspace" />
   }
 
   return (

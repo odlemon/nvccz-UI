@@ -1,4 +1,6 @@
-/** Client design faithful port — Consolidation */
+import { redirect } from "next/navigation"
+
+/** Group Consolidation lives under the Financial Reports tabs. Preserve old links. */
 export default function Page() {
-  return <span>Consolidation</span>
+  redirect("/accounting/reports?tab=group-consolidation")
 }

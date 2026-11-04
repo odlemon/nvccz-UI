@@ -27,7 +27,7 @@ import {
   Check
 } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { format, subDays } from "date-fns"
+import { format, subDays, subYears, parseISO } from "date-fns"
 import { toast } from "sonner"
 import type { RootState, AppDispatch } from "@/lib/store/store"
 import { fetchIncomeStatement } from "@/lib/store/slices/accountingSlice"
@@ -38,6 +38,8 @@ import { companyProfileApi } from "@/lib/api/company-profile-api"
 import jsPDF from "jspdf"
 import autoTable from "jspdf-autotable"
 import { TransactionsDataTable } from "./transactions-data-table"
+import { AccountingExportControls } from "./accounting-export-controls"
+import { profitLossTemplateRows } from "@/lib/accounting-v52/profit-loss-template"
 import { TransactionViewDrawer } from "./transaction-view-drawer"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { ConsolidatedIncomeStatement, ConsolidatedIncomeRow } from "@/lib/utils/consolidation/income-statement"
@@ -390,7 +392,7 @@ export function IncomeStatementView() {
         let startY = await addLetterhead(doc, "Income Statement", undefined, activeAddress)
         startY = addReportInfo(doc, startY, [
           `Consolidated (${consolidatedIncome.reportingCurrencyCode})`,
-          `For the period ${format(new Date(consolidatedIncome.period.startDate), "MMMM d, yyyy")} to ${format(new Date(consolidatedIncome.period.endDate), "MMMM d, yyyy")}`,
+          `For the period ${format(parseISO(String(consolidatedIncome.period.startDate).slice(0, 10)), "MMMM d, yyyy")} to ${format(parseISO(String(consolidatedIncome.period.endDate).slice(0, 10)), "MMMM d, yyyy")}`,
         ])
 
         const sectionOrder: Array<"revenue" | "operatingExpenses" | "incomeTax" | "belowTheLine"> = [
@@ -442,7 +444,7 @@ export function IncomeStatementView() {
           columnStyles: { 2: { halign: "right" }, 3: { halign: "right" } },
         })
 
-        doc.save(`IncomeStatement_Consolidated_${format(new Date(consolidatedIncome.period.startDate), "yyyyMMdd")}_${format(new Date(consolidatedIncome.period.endDate), "yyyyMMdd")}.pdf`)
+        doc.save(`IncomeStatement_Consolidated_${format(parseISO(String(consolidatedIncome.period.startDate).slice(0, 10)), "yyyyMMdd")}_${format(parseISO(String(consolidatedIncome.period.endDate).slice(0, 10)), "yyyyMMdd")}.pdf`)
         toast.success("Consolidated income statement PDF generated successfully")
       } catch {
         toast.error("Failed to generate consolidated income statement PDF")
@@ -461,7 +463,7 @@ export function IncomeStatementView() {
       const doc = new jsPDF()
       let startY = await addLetterhead(doc, "Income Statement", undefined, activeAddress)
       startY = addReportInfo(doc, startY, [
-        `For the period ${format(new Date(incomeStatement.period.startDate), "MMMM d, yyyy")} to ${format(new Date(incomeStatement.period.endDate), "MMMM d, yyyy")}`,
+        `For the period ${format(parseISO(String(incomeStatement.period.startDate).slice(0, 10)), "MMMM d, yyyy")} to ${format(parseISO(String(incomeStatement.period.endDate).slice(0, 10)), "MMMM d, yyyy")}`,
         `Currency: ${incomeStatement.currency.name || incomeStatement.currency.code}`,
       ])
 
@@ -522,7 +524,7 @@ export function IncomeStatementView() {
         columnStyles: { 1: { halign: 'right' } }
       })
 
-      doc.save(`IncomeStatement_${format(new Date(incomeStatement.period.startDate), "yyyyMMdd")}_${format(new Date(incomeStatement.period.endDate), "yyyyMMdd")}.pdf`)
+      doc.save(`IncomeStatement_${format(parseISO(String(incomeStatement.period.startDate).slice(0, 10)), "yyyyMMdd")}_${format(parseISO(String(incomeStatement.period.endDate).slice(0, 10)), "yyyyMMdd")}.pdf`)
       toast.success("Income statement PDF generated successfully")
     } catch (error) {
       toast.error("Failed to generate income statement PDF")
@@ -579,7 +581,7 @@ export function IncomeStatementView() {
           <h1 className="text-2xl font-bold text-gray-900 mb-1">{activeAddress?.label || "National venture capital company of Zimbabwe"}</h1>
           <h2 className="text-xl font-semibold text-gray-700 mb-2">Income Statement (Consolidated)</h2>
           <p className="text-gray-600">
-            For the Period from {format(new Date(consolidatedIncome.period.startDate), 'MMMM d, yyyy')} to {format(new Date(consolidatedIncome.period.endDate), 'MMMM d, yyyy')}
+            For the Period from {format(parseISO(String(consolidatedIncome.period.startDate).slice(0, 10)), 'MMMM d, yyyy')} to {format(parseISO(String(consolidatedIncome.period.endDate).slice(0, 10)), 'MMMM d, yyyy')}
           </p>
           <p className="text-sm text-gray-500 mt-1">Reporting Currency: {consolidatedIncome.reportingCurrencyCode}</p>
           {consolidatedIncome.missingRates.length > 0 && (
@@ -782,25 +784,24 @@ export function IncomeStatementView() {
             {reportMode === "single" ? currencyDropdown : consolidationCurrencyDropdown}
           </div>
 
-          {/* Export PDF Button */}
-          <Button
-            onClick={handleExportPDF}
-            variant="outline"
-            className="rounded-full"
-            disabled={(reportMode === "single" && !incomeStatement) || (reportMode === "consolidated" && !consolidatedIncome) || generatingPDF}
-          >
-            {generatingPDF ? (
-              <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Generating PDF...
-              </>
-            ) : (
-              <>
-                <FileText className="w-4 h-4 mr-2" />
-                Export PDF
-              </>
-            )}
-          </Button>
+          {!incomeStatementLoading && !isConsolidating && ((reportMode === "single" && incomeStatement) || (reportMode === "consolidated" && consolidatedIncome)) && <AccountingExportControls label="income statement" spec={async () => {
+            if (reportMode === "consolidated" && consolidatedIncome) {
+              const rows: (string | number)[][] = consolidatedIncome.rows.map(r => [r.sectionLabel, r.accountName, r.sourceCurrencyCode, r.sourceAmount, r.conversionRate, r.consolidatedAmount])
+              rows.push(['Totals', 'Net income before tax', '', '', '', consolidatedIncome.totals.netIncomeBeforeTaxes], ['Totals', 'Net income', '', '', '', consolidatedIncome.totals.netIncome])
+              return { title: 'Consolidated Income Statement', subtitle: `${String(consolidatedIncome.period.startDate).slice(0, 10)} to ${String(consolidatedIncome.period.endDate).slice(0, 10)} · ${consolidatedIncome.reportingCurrencyCode}`, columns: ['Section', 'Account', 'Source currency', 'Source amount', 'Rate', 'Amount'], moneyColumns: [3, 5], rows, filename: 'consolidated-income-statement', note: consolidatedIncome.missingRates.length ? `${consolidatedIncome.missingRates.length} missing rates; affected rows were excluded.` : undefined }
+            }
+            if (!incomeStatement) throw new Error('Generate the income statement first.')
+            const currentStart = parseISO(String(incomeStatement.period.startDate).slice(0, 10))
+            const currentEnd = parseISO(String(incomeStatement.period.endDate).slice(0, 10))
+            const previousStart = format(subYears(currentStart, 1), 'yyyy-MM-dd')
+            const previousEnd = format(subYears(currentEnd, 1), 'yyyy-MM-dd')
+            const prior = await accountingApi.getIncomeStatementV2({ startDate: previousStart, endDate: previousEnd, currencyId })
+            if (!prior.success || !prior.data) throw new Error(prior.error || 'The comparative period could not be loaded.')
+            const rows = profitLossTemplateRows(incomeStatement, prior.data)
+            const total = rows[rows.length - 1]
+            if (Math.abs(Number(total[3]) - Number(incomeStatement.totals.netIncome)) > 0.01 || Math.abs(Number(total[4]) - Number(prior.data.totals.netIncome)) > 0.01) throw new Error('The template totals do not reconcile to the income statement. Review account mappings before exporting.')
+            return { title: 'Statement of Profit or Loss', subtitle: `${format(currentStart, 'yyyy-MM-dd')} to ${format(currentEnd, 'yyyy-MM-dd')} · ${incomeStatement.currency.code}; comparative ${previousStart} to ${previousEnd}`, columns: ['IFRS category / account description', 'NVCCZ COA code', 'Notes', `Current (${incomeStatement.currency.code})`, `Comparative (${incomeStatement.currency.code})`], moneyColumns: [3, 4], rows, filename: 'statement-of-profit-or-loss' }
+          }} />}
 
           <Button
             onClick={reportMode === "single" ? loadIncomeStatement : loadConsolidatedIncomeStatement}
@@ -846,21 +847,6 @@ export function IncomeStatementView() {
                 </Badge>
               )}
 
-              {/* Quick Export Button in Table Header */}
-              <Button
-                size="sm"
-                variant="ghost"
-                onClick={handleExportPDF}
-                disabled={(reportMode === "single" && !incomeStatement) || (reportMode === "consolidated" && !consolidatedIncome) || generatingPDF}
-                className="text-xs"
-              >
-                {generatingPDF ? (
-                  <Loader2 className="w-3 h-3 mr-1 animate-spin" />
-                ) : (
-                  <FileText className="w-3 h-3 mr-1" />
-                )}
-                PDF
-              </Button>
             </div>
           </div>
         </CardHeader>
@@ -884,7 +870,7 @@ export function IncomeStatementView() {
                 <h1 className="text-2xl font-bold text-gray-900 mb-1">{activeAddress?.label || "National venture capital company of Zimbabwe"}</h1>
                 <h2 className="text-xl font-semibold text-gray-700 mb-2">Income Statement</h2>
                 <p className="text-gray-600">
-                  For the Period from {format(new Date(incomeStatement.period.startDate), 'MMMM d, yyyy')} to {format(new Date(incomeStatement.period.endDate), 'MMMM d, yyyy')}
+                  For the Period from {format(parseISO(String(incomeStatement.period.startDate).slice(0, 10)), 'MMMM d, yyyy')} to {format(parseISO(String(incomeStatement.period.endDate).slice(0, 10)), 'MMMM d, yyyy')}
                 </p>
               </div>
 

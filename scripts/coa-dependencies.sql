@@ -1,0 +1,13 @@
+SHOW CREATE TABLE chart_of_accounts;
+SHOW CREATE TABLE journal_entry_lines;
+SHOW CREATE TABLE assets;
+SHOW CREATE TABLE entity_chart_of_accounts;
+SELECT COUNT(*) AS live_foreign_keys FROM information_schema.KEY_COLUMN_USAGE WHERE TABLE_SCHEMA=DATABASE() AND REFERENCED_TABLE_NAME IS NOT NULL;
+SELECT 'assets' AS table_name,COUNT(*) AS row_count FROM assets UNION ALL SELECT 'banks',COUNT(*) FROM banks UNION ALL SELECT 'cashbook_entries',COUNT(*) FROM cashbook_entries UNION ALL SELECT 'entity_chart_of_accounts',COUNT(*) FROM entity_chart_of_accounts UNION ALL SELECT 'budget_items',COUNT(*) FROM budget_items UNION ALL SELECT 'cap_table_gl_mappings',COUNT(*) FROM cap_table_gl_mappings UNION ALL SELECT 'financial_reports',COUNT(*) FROM financial_reports UNION ALL SELECT 'accounting_settings',COUNT(*) FROM accounting_settings UNION ALL SELECT 'audit_logs',COUNT(*) FROM audit_logs UNION ALL SELECT 'recurring_journal_templates',COUNT(*) FROM recurring_journal_templates UNION ALL SELECT 'planning_actuals_snapshots',COUNT(*) FROM planning_actuals_snapshots UNION ALL SELECT 'planning_model_accounts',COUNT(*) FROM planning_model_accounts;
+SELECT assetAccountId,accumulatedDepreciationAccountId,depreciationExpenseAccountId,COUNT(*) AS asset_count FROM assets GROUP BY assetAccountId,accumulatedDepreciationAccountId,depreciationExpenseAccountId;
+SELECT * FROM entity_chart_of_accounts LIMIT 4;
+SELECT * FROM accounting_settings LIMIT 15;
+SELECT TABLE_NAME,COLUMN_NAME,COLUMN_TYPE FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND (LOWER(COLUMN_NAME) REGEXP 'account|ledger|gl.*(id|code)' OR TABLE_NAME IN ('planning_accounts','gl_kpi_mappings','gl_kpi_catalog','financial_reports','asset_categories')) ORDER BY TABLE_NAME,ORDINAL_POSITION;
+SELECT SUM(debitAmount) AS debit,SUM(creditAmount) AS credit,COUNT(*) AS line_count FROM journal_entry_lines;
+SELECT COUNT(*) AS orphan_account_lines FROM journal_entry_lines l LEFT JOIN chart_of_accounts a ON a.id=l.chartOfAccountId WHERE a.id IS NULL;
+SELECT COUNT(*) AS orphan_journal_lines FROM journal_entry_lines l LEFT JOIN journal_entries j ON j.id=l.journalEntryId WHERE j.id IS NULL;

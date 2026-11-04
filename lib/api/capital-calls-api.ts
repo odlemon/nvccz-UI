@@ -49,6 +49,20 @@ export interface CapitalCall {
   fundId: string
   currencyId: string
   callPercent: string
+  purpose?: string | null
+  totalAmount?: string
+  totalCollected?: string
+  totalOutstanding?: string
+  submittedAt?: string | null
+  submittedById?: string | null
+  approvedAt?: string | null
+  approvedById?: string | null
+  rejectedAt?: string | null
+  rejectedById?: string | null
+  rejectionReason?: string | null
+  createdBy?: { firstName?: string; lastName?: string; email?: string }
+  activity?: Array<{ action: string; timestamp: string; actor: string; note?: string | null; summary: string }>
+  totalCallAmount?: string
   paymentDueDate: string
   bankInstructions: string
   transactionDate: string
@@ -148,14 +162,23 @@ export const capitalCallsApi = {
   initiate: async (
     fundId: string,
     data: {
-      callPercent: number
+      callPercent?: number
+      targetAmount?: number
       paymentDueDate: string
       transactionDate: string
       bankInstructions: string
+      purpose: string
     }
   ): Promise<{ success: boolean; message: string; data: CapitalCall }> => {
     return apiClient.post(`/funds/${fundId}/capital-calls`, data)
   },
+
+  preview: async (fundId: string, data: { callPercent?: number; targetAmount?: number }) => apiClient.post(`/funds/${fundId}/capital-calls/preview`, data),
+  updateDraft: async (fundId: string, callId: string, data: { callPercent: number; paymentDueDate: string; transactionDate: string; bankInstructions: string; purpose: string }) => apiClient.put(`/funds/${fundId}/capital-calls/${callId}`, data),
+  submitForApproval: async (fundId: string, callId: string) => apiClient.post(`/funds/${fundId}/capital-calls/${callId}/submit-for-approval`),
+  approve: async (fundId: string, callId: string) => apiClient.post(`/funds/${fundId}/capital-calls/${callId}/approve`),
+  reject: async (fundId: string, callId: string, reason: string) => apiClient.post(`/funds/${fundId}/capital-calls/${callId}/reject`, { reason }),
+  addActivity: async (fundId: string, callId: string, note: string) => apiClient.post(`/funds/${fundId}/capital-calls/${callId}/activity`, { note }),
 
   /** 3. LP summary */
   lpSummary: async (
@@ -217,6 +240,41 @@ export const capitalCallsApi = {
       `/funds/${fundId}/capital-calls/${capitalCallId}/allocations/${allocationId}/payments`
     )
   },
+}
+
+export interface DistributionAllocationRow {
+  id: string
+  lpLegalNameSnapshot: string
+  shareAmount: string
+  amountPaid: string
+  status: string
+  client?: { legalName?: string; email?: string }
+}
+
+export interface FundDistribution {
+  id: string
+  fundId: string
+  distributionDate: string
+  source: string
+  grossAmount: string
+  carryAmount: string
+  netToLPs: string
+  status: string
+  noticesSentAt: string | null
+  currency: { code: string; symbol: string }
+  allocations: DistributionAllocationRow[]
+}
+
+export const distributionsApi = {
+  list: async (fundId: string): Promise<{ success: boolean; data: FundDistribution[] }> =>
+    apiClient.get(`/funds/${encodeURIComponent(fundId)}/distributions`),
+  detail: async (
+    fundId: string,
+    distributionId: string,
+  ): Promise<{ success: boolean; data: FundDistribution }> =>
+    apiClient.get(
+      `/funds/${encodeURIComponent(fundId)}/distributions/${encodeURIComponent(distributionId)}`,
+    ),
 }
 
 // ── LPs (Clients) ──────────────────────────────────────────────────────

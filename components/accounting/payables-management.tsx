@@ -48,6 +48,10 @@ import { PendingVendorsList } from "./vendor-approval/pending-vendors-list"
 import { CreditCard, Building } from "lucide-react"
 import type { RootState, AppDispatch } from "@/lib/store"
 import { PurchaseInvoice } from "@/lib/api/accounting-api"
+import { accountingApi } from "@/lib/api/accounting-api"
+import { AccountingExportControls } from "@/components/accounting/accounting-export-controls"
+import { BulkPayablesUploadModal } from "@/components/accounting/bulk-payables-upload-modal"
+import { Upload } from "lucide-react"
 
 const tabs = [
   {
@@ -97,7 +101,7 @@ const tabs = [
   }
 ]
 
-export function PayablesManagement() {
+export function PayablesManagement({ enhanced = false }: { enhanced?: boolean }) {
   const dispatch = useDispatch<AppDispatch>()
   const { permissions } = useAccountingPermissions()
   
@@ -126,7 +130,9 @@ export function PayablesManagement() {
   const [activeMainTab, setActiveMainTab] = useState<"invoices" | "vendors">("invoices")
   const [activeVendorTab, setActiveVendorTab] = useState<"all" | "pending">("all")
   const [activeTab, setActiveTab] = useState("all")
+  const [pageSize, setPageSize] = useState(10)
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
+  const [isBulkInvoiceModalOpen, setIsBulkInvoiceModalOpen] = useState(false)
   const [isViewDrawerOpen, setIsViewDrawerOpen] = useState(false)
   const [isBatchPayModalOpen, setIsBatchPayModalOpen] = useState(false)
   const [selectedForBatchPay, setSelectedForBatchPay] = useState<any[]>([])
@@ -136,24 +142,24 @@ export function PayablesManagement() {
   const [currentFilters, setCurrentFilters] = useState<any>({})
 
   useEffect(() => {
+    if (currencies.length === 0) dispatch(fetchCurrencies())
+    if (vendors.length === 0) dispatch(fetchVendors())
+  }, [dispatch])
+
+  useEffect(() => {
     const loadData = async () => {
       try {
-        if (currencies.length === 0) {
-          dispatch(fetchCurrencies())
-        }
-        if (vendors.length === 0) {
-          dispatch(fetchVendors())
-        }
-
         const statusFilter = activeTab !== 'all' ? tabs.find(t => t.id === activeTab)?.status : undefined
         const paymentStatusFilter = activeTab !== 'all' ? tabs.find(t => t.id === activeTab)?.paymentStatus : undefined
         
-        await loadPurchaseInvoices({ 
+        if (enhanced && activeMainTab !== "invoices") return
+        await loadPurchaseInvoices({
+          ...(enhanced ? currentFilters : {}),
           status: statusFilter,
           paymentStatus: paymentStatusFilter,
           currencyId: selectedCurrencyId || undefined,
           page: 1,
-          limit: 10
+          limit: pageSize
         })
       } catch (error) {
         console.error('Failed to load data:', error)
@@ -161,16 +167,18 @@ export function PayablesManagement() {
     }
 
     loadData()
-  }, [dispatch, currencies.length, vendors.length, activeTab, loadPurchaseInvoices, selectedCurrencyId])
+  }, [activeTab, activeMainTab, loadPurchaseInvoices, selectedCurrencyId, enhanced, pageSize, currentFilters])
 
   const handleTabChange = (tabId: string) => {
     setActiveTab(tabId)
+    if (enhanced) return
     const tab = tabs.find(t => t.id === tabId)
     
     loadPurchaseInvoices({ 
       status: tab?.status,
       paymentStatus: tab?.paymentStatus,
-      page: 1
+      page: 1,
+      limit: pageSize
     })
   }
 
@@ -186,9 +194,11 @@ export function PayablesManagement() {
     
     setCurrentFilters(updatedFilters)
     updateFilters(updatedFilters)
+    if (enhanced) return
     loadPurchaseInvoices({ 
       ...updatedFilters,
-      page: 1
+      page: 1,
+      limit: pageSize
     })
   }
 
@@ -200,9 +210,11 @@ export function PayablesManagement() {
     
     setCurrentFilters(updatedFilters)
     updateFilters(updatedFilters)
+    if (enhanced) return
     loadPurchaseInvoices({ 
       ...updatedFilters,
-      page: 1
+      page: 1,
+      limit: pageSize
     })
   }
 
@@ -213,11 +225,14 @@ export function PayablesManagement() {
       ...currentFilters,
       status: tab?.status,
       paymentStatus: tab?.paymentStatus,
-      page
+      page,
+      limit: pageSize
     })
   }
 
   const handlePageSizeChange = (pageSize: number) => {
+    setPageSize(pageSize)
+    if (enhanced) return
     const tab = tabs.find(t => t.id === activeTab)
     
     loadPurchaseInvoices({ 
@@ -240,9 +255,37 @@ export function PayablesManagement() {
   const handleCreateModalSuccess = async () => {
     closeCreateModal()
     await loadPurchaseInvoices({ 
+      ...currentFilters,
+      status: tabs.find(t => t.id === activeTab)?.status,
+      paymentStatus: tabs.find(t => t.id === activeTab)?.paymentStatus,
+      currencyId: selectedCurrencyId || undefined,
       page: 1,
-      limit: 10
+      limit: pageSize
     })
+  }
+
+  const loadInvoiceExport = async () => {
+    const selectedTab = tabs.find(t => t.id === activeTab)
+    const rows: PurchaseInvoice[] = []
+    for (let page = 1; ; page++) {
+      const response = await accountingApi.getPurchaseInvoices({
+        ...currentFilters,
+        status: selectedTab?.status as "DRAFT" | "POSTED" | undefined,
+        paymentStatus: selectedTab?.paymentStatus as "PENDING" | "PAID" | undefined,
+        currencyId: selectedCurrencyId || undefined,
+        page, limit: 100,
+      })
+      if (!response.success || !response.data) throw new Error(response.error || "Could not export purchase invoices")
+      rows.push(...response.data.invoices)
+      if (page >= response.data.totalPages || response.data.invoices.length < 100) break
+    }
+    return {
+      title: `Purchase Invoices — ${selectedTab?.label || "All Invoices"}`,
+      filename: `purchase-invoices-${activeTab}`,
+      columns: ["Invoice", "Vendor", "Invoice Date", "Due Date", "Currency", "Subtotal", "VAT", "Total", "Status", "Payment Status"],
+      rows: rows.map(invoice => [invoice.invoiceNumber || "", invoice.vendor?.name || "", invoice.invoiceDate?.slice(0, 10) || "", invoice.dueDate?.slice(0, 10) || "", invoice.currency?.code || "", Number(invoice.subtotal || 0), Number(invoice.vatAmount || 0), Number(invoice.totalAmount || 0), invoice.status || "", invoice.paymentStatus || ""]),
+      landscape: true,
+    }
   }
 
   const handleViewInvoice = (invoice: PurchaseInvoice) => {
@@ -614,6 +657,16 @@ export function PayablesManagement() {
               </button>
             )
           })}
+          <button
+            type="button"
+            onClick={() => { window.location.href = "/accounting/payment-runs" }}
+            className="flex items-center gap-3 px-6 py-4 text-lg font-medium rounded-t-lg border-b-2 border-transparent text-gray-600 transition-all hover:text-gray-900 hover:border-gray-300"
+          >
+            <div className="w-7 h-7 rounded-full flex items-center justify-center bg-gradient-to-br from-gray-300 to-gray-400">
+              <CreditCard className="w-4 h-4 text-white" />
+            </div>
+            <span>Payment Runs</span>
+          </button>
         </div>
       </div>
 
@@ -649,9 +702,9 @@ export function PayablesManagement() {
 
           {/* Vendor Content */}
           {activeVendorTab === "all" ? (
-            <VendorsManagement />
+            <VendorsManagement enhanced={enhanced} />
           ) : (
-            <PendingVendorsList />
+            <PendingVendorsList enhanced={enhanced} />
           )}
         </div>
       ) : (
@@ -664,6 +717,7 @@ export function PayablesManagement() {
         </div>
         <div className="flex items-center gap-3">
           <CurrencyFilter />
+          {enhanced && permissions.canCreatePayable && <Button type="button" data-payables-new="bulk-invoices" variant="outline" className="rounded-full h-10" onClick={() => setIsBulkInvoiceModalOpen(true)}><Upload className="w-4 h-4 mr-2" />Bulk Upload</Button>}
           {permissions.canCreatePayable && (
             <Button
               onClick={handleCreateInvoiceClick}
@@ -796,7 +850,7 @@ export function PayablesManagement() {
                       onClick={() => {
                         setCurrentFilters({})
                         resetFilters()
-                        loadPurchaseInvoices({ page: 1 })
+                        if (!enhanced) loadPurchaseInvoices({ page: 1 })
                       }}
                     >
                       Clear Filters
@@ -810,6 +864,7 @@ export function PayablesManagement() {
           {/* Data Table */}
           <ProcurementDataTable
             data={purchaseInvoices}
+            exportControls={enhanced ? () => <AccountingExportControls label="purchase invoices" spec={loadInvoiceExport} /> : undefined}
             columns={columns}
             loading={loading}
             searchPlaceholder="Search by invoice number, vendor..."
@@ -847,6 +902,7 @@ export function PayablesManagement() {
         currencies={currencies}
         vendors={vendors}
       />
+      {enhanced && <BulkPayablesUploadModal kind="invoices" isOpen={isBulkInvoiceModalOpen} onClose={() => setIsBulkInvoiceModalOpen(false)} onSuccess={() => void loadPurchaseInvoices({ ...currentFilters, status: tabs.find(t => t.id === activeTab)?.status, paymentStatus: tabs.find(t => t.id === activeTab)?.paymentStatus, currencyId: selectedCurrencyId || undefined, page: 1, limit: pageSize })} vendors={vendors} currencies={currencies} />}
 
       <PurchaseInvoiceViewDrawer
         isOpen={isViewDrawerOpen}

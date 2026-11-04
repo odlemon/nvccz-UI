@@ -232,14 +232,26 @@ export function AccountingDataTable<T extends { id: string }>({
             filteredData.map((item) => (
               <div
                 key={item.id}
-                className="grid gap-4 p-4 border-b hover:bg-gray-50 transition-colors"
+                className={`grid gap-4 p-4 border-b transition-colors ${onView ? "cursor-pointer hover:bg-gray-50 focus:bg-gray-50" : "hover:bg-gray-50"}`}
                 style={{ gridTemplateColumns: `auto repeat(${columns.length}, 1fr) auto` }}
+                onClick={() => onView?.(item)}
+                onKeyDown={(event) => {
+                  if (!onView) return
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault()
+                    onView(item)
+                  }
+                }}
+                tabIndex={onView ? 0 : undefined}
+                role={onView ? "button" : undefined}
               >
                 <div className="flex items-center">
                   <input
                     type="checkbox"
                     checked={selectedItems.includes(item.id)}
                     onChange={(e) => handleSelectItem(item.id, e.target.checked)}
+                    onClick={(e) => e.stopPropagation()}
+                    onKeyDown={(e) => e.stopPropagation()}
                     className="rounded border-gray-300"
                   />
                 </div>
@@ -254,11 +266,16 @@ export function AccountingDataTable<T extends { id: string }>({
                 <div className="flex items-center justify-end">
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="sm">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={(e) => e.stopPropagation()}
+                        onMouseDown={(e) => e.stopPropagation()}
+                      >
                         <MoreHorizontal className="w-4 h-4" />
                       </Button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
+                    <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
                       {onView && (
                         <DropdownMenuItem onClick={() => onView(item)}>
                           <Eye className="w-4 h-4 mr-2" />

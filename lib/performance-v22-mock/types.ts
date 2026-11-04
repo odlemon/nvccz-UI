@@ -78,6 +78,29 @@ export interface PerfTask {
   isOverdue: boolean
   isPerformanceTask: boolean
   goalId: string | null
+  projectId: string | null
+  teamMemberIds: string[]
+}
+
+/** Goal-aligned Performance project returned by GET /api/performance/projects. */
+export interface PerfProject {
+  id: string
+  name: string
+  description: string | null
+  status: string
+  ownerId: string | null
+  ownerName: string | null
+  goalId: string | null
+  goalTitle: string | null
+  departmentName: string | null
+  startDate: string | null
+  endDate: string | null
+  budget: number | null
+  taskCount: number
+  doneCount: number
+  overdueCount: number
+  progress: number | null
+  hoursLogged: number
 }
 
 export interface PerfNamed {
@@ -88,12 +111,86 @@ export interface PerfNamed {
   status: string | null
 }
 
+/** Company strategy cycle as persisted by PerformanceConfigService. */
+export interface PerfStrategy extends PerfNamed {
+  title: string
+  periodStart: string | null
+  periodEnd: string | null
+  visionStatement: string | null
+  pillarWeights: Record<string, number> | null
+  metadata: Record<string, unknown> | null
+  archivedAt: string | null
+  cycle: string
+  owner: string
+  sponsor: string
+  approval: string
+  intent: string
+  vision: string
+  mission: string
+  themes: string
+  framework: string
+  cadence: string
+  risk: string
+  effective: string
+  end: string
+  objectives: any[]
+}
+
+/** Measurable goal fields used by Company Strategy and scorecard alignment. */
+export interface PerfGoal extends PerfNamed {
+  performanceContractId?: string | null
+  title: string
+  strategyId: string | null
+  strategicThemeId: string | null
+  scorecardPillar: string | null
+  scorecardWeight: number | null
+  targetValue: number | null
+  targetUnit: string | null
+  goalType: string | null
+  owner: string | null
+  ownerId: string | null
+  departmentName: string | null
+  currentValue: number | null
+  progressPercentage: number | null
+  confidence: string | null
+  startDate: string | null
+  endDate: string | null
+  lastCheckDate: string | null
+  nextCheckDate: string | null
+  priority: string | null
+  trackingFrequency: string | null
+  isReverseKpi: boolean
+  parentGoalId: string | null
+  keyResultCount: number
+  attachments: Array<{ fileName: string; fileUrl?: string | null; fileSizeBytes?: number | null; createdAt?: string | null }>
+}
+
+export interface PerfTheme extends PerfNamed {
+  perspective: string | null
+}
+
 export interface PerfKpi extends PerfNamed {
   code: string | null
+  unit: string | null
   department: string | null
   owner: string | null
   frequency: string | null
   target: string | null
+  targetValue: number | null
+  amberThreshold: number | null
+  redThreshold: number | null
+  perspective: string | null
+  sourceSystem: string | null
+  updateMethod: string | null
+  evidenceRule: string | null
+  approvalStatus: string | null
+  isReverseKpi: boolean
+  isActive: boolean
+  ownerId: string | null
+  linkedGoals: number | null
+  averageProgress: number | null
+  performanceMetadata: Record<string, unknown> | null
+  updatedAt: string | null
 }
 
 /**
@@ -137,6 +234,15 @@ export interface PerfContract extends PerfNamed {
   approver: string | null
   allocatedBudget: number | null
   actualSpend: number | null
+  state: string | null
+  versionNo: number | null
+  goalCount: number | null
+  weightTotal: number | null
+  evidenceCoverage: number | null
+  signaturesNeeded: number | null
+  signaturesGiven: number | null
+  overdue: boolean | null
+  metadata: Record<string, unknown> | null
 }
 
 /** `GET /api/users` — used for owner pickers and for department headcount joins. */
@@ -148,6 +254,9 @@ export interface PerfUser {
   departmentRole: string | null
   roleCode: string | null
   role: string | null
+  jobTitle?: string | null
+  reportingManagerId?: string | null
+  status?: string | null
 }
 
 /** `GET /api/performance/corrective-actions`. */
@@ -216,14 +325,29 @@ export interface PerfReview extends PerfNamed {
   score: number | null
   submittedAt: string | null
   completedAt: string | null
+  reviewType: string | null
+  reviewPeriod: string | null
+  stage: string | null
+  isLocked: boolean
+  selfFeedback: string | null
+  managerFeedback: string | null
+  strengths: string | null
+  developmentPlan: string | null
+  ratingValue: number | null
+  quantitativeSnapshot: Record<string, unknown> | null
 }
 
 /** `GET /api/accounting/timesheets/mine`. */
 export interface PerfTimesheet extends PerfNamed {
+  weekEnding: string | null
   periodStart: string | null
   periodEnd: string | null
   totalHours: number | null
   billableHours: number | null
+  expectedHours?: number | null
+  overtimeHours?: number | null
+  utilizationPercent?: number | null
+  entries: Array<{ id: string; projectId: string; projectName: string; taskId: string | null; date: string; hours: number; billable: boolean; notes: string | null; source?: string | null }>
   submittedAt: string | null
   approvedAt: string | null
   approver: string | null
@@ -468,9 +592,9 @@ export interface PerfLivePayload {
   tasks: ScopeResult<PerfTask[]>
   kpis: ScopeResult<PerfKpi[]>
   pillars: ScopeResult<PerfNamed[]>
-  themes: ScopeResult<PerfNamed[]>
-  strategies: ScopeResult<PerfNamed[]>
-  goals: ScopeResult<PerfNamed[]>
+  themes: ScopeResult<PerfTheme[]>
+  strategies: ScopeResult<PerfStrategy[]>
+  goals: ScopeResult<PerfGoal[]>
   contracts: ScopeResult<PerfContract[]>
   risks: ScopeResult<PerfRisk[]>
   users: ScopeResult<PerfUser[]>
@@ -484,10 +608,13 @@ export interface PerfLivePayload {
   reviewCycles: ScopeResult<PerfNamed[]>
   timesheets: ScopeResult<PerfTimesheet[]>
   teamTimesheets: ScopeResult<PerfTeamTimesheet[]>
+  accountingProjects: ScopeResult<Array<PerfNamed & { isActive?: boolean; clientName?: string | null; projectType?: string | null }>>
+  performanceProjects: ScopeResult<PerfProject[]>
   pillarConfig: ScopeResult<PerfPillar[]>
   vision: ScopeResult<PerfVision | null>
   archivedStrategies: ScopeResult<PerfNamed[]>
   analyticsKpi: ScopeResult<PerfAnalyticsKpi | null>
+  kpiRegistryAnalytics: ScopeResult<any | null>
   analyticsDashboard: ScopeResult<PerfAnalyticsDashboard | null>
   analyticsReports: ScopeResult<PerfAnalyticsReports | null>
   deptComparison: ScopeResult<PerfDeptComparison[]>

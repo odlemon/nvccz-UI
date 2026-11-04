@@ -1,0 +1,143 @@
+accountNo	accountName	accountType	financialStatement	naturalBalance	parentId	isActive
+1000	Land and Buildings	Asset	Balance sheet	DEBIT	NULL	1
+1010	Property, Plant and Equipment	Asset	Balance sheet	DEBIT	NULL	1
+1101	VAT Input Recoverable	Current Asset	Balance Sheet	DEBIT	cmtqwcdv80005t67jed3x3c6e	1
+1200	Other Assets	Asset	Balance sheet	DEBIT	NULL	1
+1300	Prepaid Expenses	Asset	Balance sheet	DEBIT	NULL	1
+1310	Inventory	Asset	Balance sheet	DEBIT	NULL	1
+1320	Debtors/Other Receivables	Asset	Balance sheet	DEBIT	NULL	1
+1321	Accounts Receivable — LP Commitments	Asset	Balance Sheet	DEBIT	cmtqwcdv80005t67jed3x3c6e	1
+1322	Capital Contributions Receivable	Current Asset	Balance Sheet	DEBIT	cmtqwcdv80005t67jed3x3c6e	1
+1323	Management Fee Receivable	Current Asset	Balance Sheet	DEBIT	cmtqwcdv80005t67jed3x3c6e	1
+1330	Gold Coins Instruments	Asset	Balance sheet	DEBIT	NULL	1
+1340	Money-market Instruments	Asset	Balance sheet	DEBIT	NULL	1
+1350	Cash and Cash Equivalents	Asset	Balance sheet	DEBIT	NULL	1
+1351	Petty Cash	Current Asset	Balance Sheet	DEBIT	cmtqwcdtk0000t67jkw0vms5o	1
+1352	Petty Cash / Cash Clearing	Current Asset	Balance Sheet	DEBIT	cmtqwcdtk0000t67jkw0vms5o	1
+1353	Bank - Operating Account	Current Asset	Balance Sheet	DEBIT	cmtqwcdtk0000t67jkw0vms5o	1
+1360	NVF Instruments	Asset	Balance sheet	DEBIT	NULL	1
+1370	IDF Instruments	Asset	Balance sheet	DEBIT	NULL	1
+1502	Investment Asset — Portfolio	Asset	Balance Sheet	DEBIT	NULL	1
+1550	Accumulated Depreciation	Contra-Asset	Balance Sheet	CREDIT	cmtqwcdvz0008t67j55rjidhi	1
+2000	Accounts payable	Liability	Balance sheet	CREDIT	NULL	1
+2100	Accrued Expenses	Liability	Balance sheet	CREDIT	NULL	1
+2101	VAT Output Payable	Current Liability	Balance Sheet	CREDIT	NULL	1
+2110	VAT Input (clearing) / VAT Payable	Current Liability	Balance Sheet	CREDIT	NULL	1
+2150	PAYE Payable	Current Liability	Balance Sheet	CREDIT	NULL	1
+2160	NSSA / Pension Payable	Current Liability	Balance Sheet	CREDIT	NULL	1
+2170	Statutory Payments	Current Liability	Balance Sheet	CREDIT	NULL	1
+2171	ZIMDEF Payable	Current Liability	Balance Sheet	CREDIT	cmvgtmf53000fl9nl8rpfsma9	1
+2172	Standard Development Levy Payable	Current Liability	Balance Sheet	CREDIT	cmvgtmf53000fl9nl8rpfsma9	1
+2173	ZIMRA Payable	Current Liability	Balance Sheet	CREDIT	cmvgtmf53000fl9nl8rpfsma9	1
+2174	PAYE Payable	Current Liability	Balance Sheet	CREDIT	cmvgtmf53000fl9nl8rpfsma9	1
+2200	IDF Fund	Liability	Balance sheet	CREDIT	NULL	1
+2210	Corporate Tax Liabilities — ZIMRA	Liability	Balance Sheet	CREDIT	NULL	1
+2250	Net Wages Payable	Current Liability	Balance Sheet	CREDIT	NULL	1
+2260	Staff Claims Payable	Current Liability	Balance Sheet	CREDIT	NULL	1
+2400	Distributions Payable to LPs	Current Liability	Balance Sheet	CREDIT	NULL	1
+3000	Share Capital	Equity	Balance sheet	CREDIT	NULL	1
+3010	Partners Capital - Uncalled	Equity	Balance Sheet	CREDIT	NULL	1
+3050	Share Premium — Capital in Excess of Par	Equity	Balance Sheet	CREDIT	NULL	1
+3100	Retained earnings	Equity	Balance sheet	CREDIT	NULL	1
+3900	Opening Balance Equity	Equity	Balance Sheet	CREDIT	NULL	1
+4000	Grant Income	Revenue	Income Statement	CREDIT	NULL	1
+4001	Sales Revenue	Revenue	Income Statement	CREDIT	NULL	1
+4020	Performance Fee Revenue	Revenue	Income Statement	CREDIT	NULL	1
+4100	Interest Income	Revenue	Income Statement	CREDIT	NULL	1
+4200	Management Fees	Revenue	Income Statement	CREDIT	NULL	1
+4300	Dividend Income	Revenue	Income Statement	CREDIT	NULL	1
+4400	Fair Value Gains	Revenue	Income Statement	CREDIT	NULL	1
+5000	Other OPEX	Expense	Income Statement	DEBIT	NULL	1
+5005	Cost of Sales	Expense	Income Statement	DEBIT	NULL	1
+5010	Board Retainer Fees	Expense	Income Statement	DEBIT	cmtqwce0e000pt67j0xjtuxq4	1
+5020	Board Sitting Fees	Expense	Income Statement	DEBIT	cmtqwce0e000pt67j0xjtuxq4	1
+5030	Board Meetings Expenses	Expense	Income Statement	DEBIT	cmtqwce0e000pt67j0xjtuxq4	1
+5040	Board Members Accomodation	Expense	Income Statement	DEBIT	cmtqwce0e000pt67j0xjtuxq4	1
+5050	Rentals	Expense	Income Statement	DEBIT	cmtqwce0e000pt67j0xjtuxq4	1
+5060	Staff Fuel	Expense	Income Statement	DEBIT	cmtqwce0e000pt67j0xjtuxq4	1
+5070	Operational Fuel	Expense	Income Statement	DEBIT	cmtqwce0e000pt67j0xjtuxq4	1
+5080	Electricity	Expense	Income Statement	DEBIT	cmtqwce0e000pt67j0xjtuxq4	1
+5090	Security	Expense	Income Statement	DEBIT	cmtqwce0e000pt67j0xjtuxq4	1
+5095	Inventory Count Variance	Expense	Income Statement	DEBIT	cmtqwce0e000pt67j0xjtuxq4	1
+5100	Canteen	Expense	Income Statement	DEBIT	cmtqwce0e000pt67j0xjtuxq4	1
+5110	Server Subs	Expense	Income Statement	DEBIT	cmtqwce0e000pt67j0xjtuxq4	1
+5120	Office Supplies	Expense	Income Statement	DEBIT	cmtqwce0e000pt67j0xjtuxq4	1
+5130	Computer Supplies	Expense	Income Statement	DEBIT	cmtqwce0e000pt67j0xjtuxq4	1
+5140	Consultancy	Expense	Income Statement	DEBIT	cmtqwce0e000pt67j0xjtuxq4	1
+5150	Stationery	Expense	Income Statement	DEBIT	cmtqwce0e000pt67j0xjtuxq4	1
+5160	Staff Welfare	Expense	Income Statement	DEBIT	cmtqwce0e000pt67j0xjtuxq4	1
+5170	Cleaning Services	Expense	Income Statement	DEBIT	cmtqwce0e000pt67j0xjtuxq4	1
+5180	Payroll Services	Expense	Income Statement	DEBIT	cmtqwce0e000pt67j0xjtuxq4	1
+5190	Exchange Gains/Losses	Expense	Income Statement	DEBIT	cmtqwce0e000pt67j0xjtuxq4	1
+5191	Unrealized Foreign Exchange Gain/Loss	Revenue	Income Statement	CREDIT	cmtqwce12000st67jdt87q9vu	1
+5192	Foreign Exchange Loss	Expense	Income Statement	DEBIT	cmtqwce12000st67jdt87q9vu	1
+5200	Airtime and Data	Expense	Income Statement	DEBIT	cmtqwce0e000pt67j0xjtuxq4	1
+5210	Internet	Expense	Income Statement	DEBIT	cmtqwce0e000pt67j0xjtuxq4	1
+5220	Car hire	Expense	Income Statement	DEBIT	cmtqwce0e000pt67j0xjtuxq4	1
+5230	Other Expenses	Expense	Income Statement	DEBIT	cmtqwce0e000pt67j0xjtuxq4	1
+5240	Funeral Assistance	Expense	Income Statement	DEBIT	cmtqwce0e000pt67j0xjtuxq4	1
+5250	Repairs and maintenance-MV	Expense	Income Statement	DEBIT	cmtqwce0e000pt67j0xjtuxq4	1
+5260	Repairs and maintenance-Other	Expense	Income Statement	DEBIT	cmtqwce0e000pt67j0xjtuxq4	1
+5270	Depreciation	Expense	Income Statement	DEBIT	cmtqwce0e000pt67j0xjtuxq4	1
+5280	Newspapers	Expense	Income Statement	DEBIT	cmtqwce0e000pt67j0xjtuxq4	1
+5290	Canteen	Expense	Income Statement	DEBIT	cmtqwce0e000pt67j0xjtuxq4	1
+5300	Hospitality and Entertainment	Expense	Income Statement	DEBIT	cmtqwce0e000pt67j0xjtuxq4	1
+5310	CleanUp Campaign	Expense	Income Statement	DEBIT	cmtqwce0e000pt67j0xjtuxq4	1
+5320	Board Member Tools of Trade	Expense	Income Statement	DEBIT	cmtqwce0e000pt67j0xjtuxq4	1
+5330	IDF Expenses	Expense	Income Statement	DEBIT	cmtqwce0e000pt67j0xjtuxq4	1
+5340	Dividend Payment	Expense	Income Statement	DEBIT	cmtqwce0e000pt67j0xjtuxq4	1
+5350	Reimbursements	Expense	Income Statement	DEBIT	cmtqwce0e000pt67j0xjtuxq4	1
+5360	Bank Charges & IMTT	Expense	Income Statement	DEBIT	cmtqwce0e000pt67j0xjtuxq4	1
+5500	Corporate Tax Expense	Expense	Income Statement	DEBIT	NULL	1
+6000	Salaries and Wages	Expense	Income Statement	DEBIT	NULL	1
+6010	Gross Salaries	Expense	Income Statement	DEBIT	cmtqwcdzp000mt67jwvdhx6y3	1
+6020	Other Employee Benefits	Expense	Income Statement	DEBIT	cmtqwcdzp000mt67jwvdhx6y3	1
+6030	NSSA	Expense	Income Statement	DEBIT	cmtqwcdzp000mt67jwvdhx6y3	1
+6040	PAYE	Expense	Income Statement	DEBIT	cmtqwcdzp000mt67jwvdhx6y3	1
+6050	ZIMDEF	Expense	Income Statement	DEBIT	cmtqwcdzp000mt67jwvdhx6y3	1
+6060	Standards Development Levy	Expense	Income Statement	DEBIT	cmtqwcdzp000mt67jwvdhx6y3	1
+6095	Rounding Variance	Expense	Income Statement	DEBIT	cmtqwce0e000pt67j0xjtuxq4	1
+7000	Travel Expenses - Travel and Accomodation	Expense	Income Statement	DEBIT	NULL	1
+7010	Legal	Expenses	Income Statement	DEBIT	cmtqwce07000ot67ji0ldproz	1
+7020	Investments	Expenses	Income Statement	DEBIT	cmtqwce07000ot67ji0ldproz	1
+7030	Finance	Expenses	Income Statement	DEBIT	cmtqwce07000ot67ji0ldproz	1
+7040	Administration	Expenses	Income Statement	DEBIT	cmtqwce07000ot67ji0ldproz	1
+7050	Board Members	Expenses	Income Statement	DEBIT	cmtqwce07000ot67ji0ldproz	1
+7060	CEO's Office	Expenses	Income Statement	DEBIT	cmtqwce07000ot67ji0ldproz	1
+8000	Training and Development	Expense	Income Statement	DEBIT	NULL	1
+8010	Legal	Expenses	Income Statement	DEBIT	coa_wb_9aebfeae1e7f6d688d7ac89e	1
+8020	Investments	Expenses	Income Statement	DEBIT	coa_wb_9aebfeae1e7f6d688d7ac89e	1
+8030	Finance	Expenses	Income Statement	DEBIT	coa_wb_9aebfeae1e7f6d688d7ac89e	1
+8040	Administration	Expenses	Income Statement	DEBIT	coa_wb_9aebfeae1e7f6d688d7ac89e	1
+8050	Board Members	Expenses	Income Statement	DEBIT	coa_wb_9aebfeae1e7f6d688d7ac89e	1
+8060	CEO's Office	Expenses	Income Statement	DEBIT	coa_wb_9aebfeae1e7f6d688d7ac89e	1
+9000	Branding and Marketing	Expense	Income Statement	DEBIT	NULL	1
+9010	Branding and Designing	Expenses	Income Statement	DEBIT	cmtqwce00000nt67jbj5s660l	1
+9020	ZITF	Expenses	Income Statement	DEBIT	cmtqwce00000nt67jbj5s660l	1
+9030	Newspapers	Expenses	Income Statement	DEBIT	cmtqwce00000nt67jbj5s660l	1
+9040	Promotional Material & Advertising	Expenses	Income Statement	DEBIT	cmtqwce00000nt67jbj5s660l	1
+9050	Website services	Expenses	Income Statement	DEBIT	cmtqwce00000nt67jbj5s660l	1
+9060	Social Media Management	Expenses	Income Statement	DEBIT	cmtqwce00000nt67jbj5s660l	1
+9070	Sponsorship	Expenses	Income Statement	DEBIT	cmtqwce00000nt67jbj5s660l	1
+9080	NVCCZ Launch	Expenses	Income Statement	DEBIT	cmtqwce00000nt67jbj5s660l	1
+accountNo	accountName	accountType	financialStatement	naturalBalance	parentId	isActive
+1010	Property, Plant and Equipment	Asset	Balance sheet	DEBIT	NULL	1
+1350	Cash and Cash Equivalents	Asset	Balance sheet	DEBIT	NULL	1
+1550	Accumulated Depreciation	Contra-Asset	Balance Sheet	CREDIT	cmtqwcdvz0008t67j55rjidhi	1
+2000	Accounts payable	Liability	Balance sheet	CREDIT	NULL	1
+2100	Accrued Expenses	Liability	Balance sheet	CREDIT	NULL	1
+2200	IDF Fund	Liability	Balance sheet	CREDIT	NULL	1
+3000	Share Capital	Equity	Balance sheet	CREDIT	NULL	1
+3100	Retained earnings	Equity	Balance sheet	CREDIT	NULL	1
+6000	Salaries and Wages	Expense	Income Statement	DEBIT	NULL	1
+6010	Gross Salaries	Expense	Income Statement	DEBIT	cmtqwcdzp000mt67jwvdhx6y3	1
+6020	Other Employee Benefits	Expense	Income Statement	DEBIT	cmtqwcdzp000mt67jwvdhx6y3	1
+6030	NSSA	Expense	Income Statement	DEBIT	cmtqwcdzp000mt67jwvdhx6y3	1
+6040	PAYE	Expense	Income Statement	DEBIT	cmtqwcdzp000mt67jwvdhx6y3	1
+6050	ZIMDEF	Expense	Income Statement	DEBIT	cmtqwcdzp000mt67jwvdhx6y3	1
+6060	Standards Development Levy	Expense	Income Statement	DEBIT	cmtqwcdzp000mt67jwvdhx6y3	1
+status	currencyId	lineCount	debit	credit
+POSTED	cur_usd_seed_20260907000000	1292	1632795.820	1632795.820
+VOID	cur_usd_seed_20260907000000	646	1574104.080	1574104.080
+orphanJournalLines
+0

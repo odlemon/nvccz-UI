@@ -8,14 +8,142 @@
 .accounting-v52-root .al-wrap { white-space: normal; max-width: 360px; }
 .accounting-v52-root .al-actions { white-space: nowrap; }
 .accounting-v52-root .al-actions .v28-btn + .v28-btn { margin-left: 6px; }
+.accounting-v52-root .v28-table td.al-actions {
+  min-width: 180px;
+  white-space: nowrap;
+}
+/* Keep the approval affordance visible while the wide queue scrolls horizontally. */
+.accounting-v52-root .apq-table .v28-table th:first-child,
+.accounting-v52-root .apq-table .v28-table td:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 3;
+  background: #fff;
+  box-shadow: 1px 0 0 #d6e2ee;
+}
+.accounting-v52-root .apq-table .v28-table th:first-child { z-index: 4; background: #f4f8fc; }
+.accounting-v52-root .apq-table .v28-table tr:hover td:first-child { background: #f7fbff; }
+/* The queue is paginated to 10 rows/page, so it no longer needs the shared 410px scroll cap on .v28-tablewrap. That cap,
+ * combined with the kebab fix's overflow:visible, let the taller table paint past its box and cover the pager bar below,
+ * hijacking Next clicks into the row-detail drawer. Let the wrapper grow to its rows so the pager sits clear underneath. */
+.accounting-v52-root .apq-table .v28-tablewrap { max-height: none !important; }
+/* The row now carries a single 'View' button (its actions moved onto the detail modal), so the sticky action column no
+ * longer needs the wide min-width the old multi-button rows required — trim it and give the detail column the room. */
+.accounting-v52-root .apq-table .v28-table td.al-actions { min-width: 84px; }
+/* The whole row opens the record detail; show that it is clickable and keep it keyboard-focusable. */
+.accounting-v52-root .apq-table tbody tr[data-apq-row] { cursor: pointer; }
+.accounting-v52-root .apq-table tbody tr[data-apq-row]:focus-visible { outline: 2px solid #2e75cc; outline-offset: -2px; }
 .accounting-v52-root .v28-table td .v28-sub { display: block; margin-top: 2px; }
+/* Approval Queue pager — same appearance as the Fixed Assets register pager (label left, Prev / Page n of m / Next right). */
+.accounting-v52-root .apq-pagination { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; padding: 12px 4px 2px; margin-top: 4px; border-top: 1px solid #e7eef6; }
+.accounting-v52-root .apq-pagination > div { display: flex; align-items: center; gap: 10px; }
+.accounting-v52-root .apq-pagination button:disabled { opacity: .48; cursor: not-allowed; transform: none !important; }
+/* Approval-queue / period-close record detail: read-only fact tiles (they look like clickable list rows by default, so neutralise that)
+ * above the action buttons that used to hide behind the row's 3-dots kebab. */
+.accounting-v52-root .apq-detail-facts .v28-list-item { cursor: default; }
+.accounting-v52-root .apq-detail-facts .v28-list-item:hover { border-color: #e0e9f3; background: #fff; }
+.accounting-v52-root .apq-detail-actions, .accounting-v52-root .al-detail-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; padding-top: 14px; border-top: 1px solid #e7eef6; }
 .accounting-v52-root .al-wide { grid-column: 1 / -1; }
 .accounting-v52-root .al-check { display: flex; align-items: center; gap: 8px; }
+.accounting-v52-root .al-expense-modal { width: min(980px, 94vw); max-width: 980px; }
+.accounting-v52-root .al-expense-modal .v28-modal-body { padding: 22px 24px; }
+.accounting-v52-root .al-expense-form { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px 18px; }
+.accounting-v52-root .al-expense-form .v28-field { min-width: 0; gap: 7px; }
+.accounting-v52-root .al-expense-form .v28-field > span { font-size: 12px; line-height: 1.35; }
+.accounting-v52-root .al-expense-form .v28-input,
+.accounting-v52-root .al-expense-form .v28-select { box-sizing: border-box; width: 100%; min-width: 0; height: 42px; padding: 0 12px; font-size: 13px; }
+.accounting-v52-root .al-expense-form .al-check { align-self: end; min-height: 42px; margin-top: 18px; padding: 0 11px; border: 1px solid #c8d5e4; border-radius: 9px; background: #fff; font-size: 12px; line-height: 1.35; }
+.accounting-v52-root .al-expense-form .al-check input { flex: 0 0 auto; margin: 0; }
+.accounting-v52-root .al-expense-detail { display: grid; gap: 14px; min-width: 0; }
+.accounting-v52-root .al-expense-detail .v28-grid.equal { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.accounting-v52-root .al-expense-detail .v28-panel { min-width: 0; }
+.accounting-v52-root .al-expense-detail .al-actions { display: flex; flex-wrap: wrap; gap: 8px; margin: 14px 0 2px !important; white-space: normal; }
+.accounting-v52-root .al-expense-amounts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; padding: 14px 16px; border: 1px solid #d8e5f2; border-radius: 12px; background: #f7faff; }
+.accounting-v52-root .al-expense-amounts > div { display: grid; gap: 5px; min-width: 0; }
+.accounting-v52-root .al-expense-amounts span { color: #52677f; font-size: 11px; }
+.accounting-v52-root .al-expense-amounts strong { color: #17304f; font-size: 16px; line-height: 1.3; overflow-wrap: anywhere; }
+.accounting-v52-root .al-expense-amounts .total { padding-left: 14px; border-left: 1px solid #d8e5f2; }
+.accounting-v52-root .al-expense-amounts .total strong { color: #075fc7; font-size: 19px; }
+@media (max-width: 700px) {
+  .accounting-v52-root .al-expense-form,
+  .accounting-v52-root .al-expense-detail .v28-grid.equal { grid-template-columns: minmax(0, 1fr); }
+  .accounting-v52-root .al-expense-form .al-check { margin-top: 0; }
+  .accounting-v52-root .al-expense-amounts { grid-template-columns: 1fr; }
+  .accounting-v52-root .al-expense-amounts .total { padding: 10px 0 0; border-left: 0; border-top: 1px solid #d8e5f2; }
+}
 .accounting-v52-root .al-form-error { margin: 12px 0 0; padding: 10px 12px; border-radius: 10px; border: 1px solid #fda29b; background: #fef3f2; color: #b42318; font-size: 13px; }
 .accounting-v52-root .al-modal-wide { width: min(980px, 94vw); max-width: 980px; }
+.accounting-v52-root .al-dep-modal { width: min(540px, 94vw); }
+.accounting-v52-root .al-dep-form { grid-template-columns: minmax(0, 1fr); gap: 16px; }
+.accounting-v52-root .al-dep-form [hidden] { display: none !important; }
+.accounting-v52-root .al-dep-summary { display: grid; gap: 5px; padding: 12px 14px; border-radius: 12px; background: #f5f8fc; }
+.accounting-v52-root .al-dep-summary span { color: #667085; font-size: 11px; }
+.accounting-v52-root .al-dep-modes { display: flex; padding: 4px; gap: 4px; border: 1px solid #dce5ef; border-radius: 999px; background: #f7f9fc; }
+.accounting-v52-root .al-dep-modes button { flex: 1; padding: 9px 12px; border: 0; border-radius: 999px; color: #667085; background: transparent; cursor: pointer; }
+.accounting-v52-root .al-dep-modes button.active { color: #175cd3; background: #fff; box-shadow: 0 1px 4px #10182820; font-weight: 700; }
+.accounting-v52-root .al-dep-form .v28-input { min-height: 40px; border-radius: 20px; }
+.accounting-v52-root .cash-legacy-modal { width: min(672px, 94vw); max-width: 672px; }
+.accounting-v52-root .cash-legacy-modal .v28-modal-body { padding: 20px 22px; }
+.accounting-v52-root .cash-legacy-modal .v28-modal-foot { justify-content: flex-end; }
+.accounting-v52-root .cash-legacy-form { display: grid; grid-template-columns: minmax(0, 1fr); gap: 18px; }
+.accounting-v52-root .cash-legacy-form.cash-legacy-transfer { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.accounting-v52-root .cash-legacy-form .v28-field { min-width: 0; }
+.accounting-v52-root .cash-legacy-form .v28-field > span { display: block; margin-bottom: 5px; font-size: 12px; color: #344054; }
+.accounting-v52-root .cash-legacy-form .v28-input, .accounting-v52-root .cash-legacy-form .v28-select { width: 100%; min-height: 42px; border-radius: 22px; }
+.accounting-v52-root .cash-legacy-form textarea.v28-input { min-height: 78px; border-radius: 14px; padding-top: 10px; }
+.accounting-v52-root .cash-legacy-form [hidden] { display: none !important; }
+@media (max-width: 600px) { .accounting-v52-root .cash-legacy-form.cash-legacy-transfer { grid-template-columns: minmax(0, 1fr); } }
+.accounting-v52-root .cash-detail-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px 12px; }
+.accounting-v52-root .cash-detail-item { min-width: 0; padding: 12px 14px; border: 1px solid #e4eaf2; border-radius: 10px; background: #fbfcfe; }
+.accounting-v52-root .cash-detail-item > span { display: block; margin-bottom: 5px; color: #667085; font-size: 11px; }
+.accounting-v52-root .cash-detail-item > strong { display: block; color: #101828; font-size: 13px; line-height: 1.45; overflow-wrap: anywhere; }
+.accounting-v52-root .cash-detail-item.is-amount { border-color: #b2ddff; background: #eff8ff; }
+.accounting-v52-root .cash-detail-item.is-amount > strong { color: #175cd3; font-size: 17px; }
+.accounting-v52-root .cash-detail-item.is-status.is-good > strong { color: #067647; }
+.accounting-v52-root .cash-detail-item.is-status.is-bad > strong { color: #b42318; }
+@media (max-width: 600px) { .accounting-v52-root .cash-detail-grid { grid-template-columns: 1fr; } }
+.accounting-v52-root .cash-bank-actions { width: 54px; min-width: 54px; text-align: right; white-space: nowrap; }
+.accounting-v52-root .cash-bank-outstanding { white-space: nowrap; }
+.accounting-v52-root tr[data-cash-bank-row] { cursor: pointer; }
+.accounting-v52-root tr[data-cash-bank-row]:focus-visible { outline: 2px solid #2e75cc; outline-offset: -2px; }
+.accounting-v52-root .cash-reconcile-link { display: inline-flex; align-items: center; margin-left: 8px; min-height: 28px; padding: 0 9px; border: 1px solid #b8c8da; border-radius: 8px; color: #17304f; background: #fff; font-size: 10px; font-weight: 700; text-decoration: none; }
+.accounting-v52-root .cash-reconcile-link:hover { border-color: #6aaaf2; background: #f7fbff; color: #0564d8; }
+.accounting-v52-root tr[data-cash-entry-row] { cursor: pointer; }
+.accounting-v52-root tr[data-cash-entry-row]:focus-visible { outline: 2px solid #2e75cc; outline-offset: -2px; }
+.accounting-v52-root .cash-entry-action-cell { min-width: 120px !important; }
+.accounting-v52-root .cash-entry-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; white-space: nowrap; }
+.accounting-v52-root .cash-void-link { display: inline-flex; align-items: center; justify-content: center; min-height: 30px; padding: 0 10px; border: 1px solid #f3b4bd; border-radius: 8px; color: #b42318; background: #fff; font-size: 10px; font-weight: 700; text-decoration: none; }
+.accounting-v52-root .cash-void-link:hover { border-color: #e88996; background: #fff5f5; }
+.accounting-v52-root .cash-view-btn { width: 34px; height: 34px; min-height: 34px; padding: 0; color: #31577e; }
+.accounting-v52-root .cash-view-btn svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.accounting-v52-root .cash-view-btn:hover { color: #0564d8; }
+.accounting-v52-root .cash-view-label { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+.accounting-v52-root .al-assets-tablewrap tr[data-asset-row] { cursor: pointer; }
+.accounting-v52-root .al-assets-tablewrap tr[data-asset-row]:focus-visible { outline: 2px solid #2e75cc; outline-offset: -2px; }
 .accounting-v52-root .al-busy { position: relative; opacity: 0.6; pointer-events: none; }
 .accounting-v52-root .al-busy::after { content: ""; position: absolute; top: 50%; left: 50%; width: 14px; height: 14px; margin: -7px 0 0 -7px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: al-spin 0.7s linear infinite; }
 @keyframes al-spin { to { transform: rotate(360deg); } }
+.accounting-v52-root .al-inv-import-progress { display: grid; grid-template-columns: 22px 1fr; align-items: center; gap: 8px 11px; margin: 14px 0 2px; padding: 12px 14px; border: 1px solid #bfdbfe; border-radius: 10px; background: #eff6ff; color: #194185; }
+.accounting-v52-root .al-inv-import-progress[hidden] { display: none; }
+.accounting-v52-root .al-inv-import-progress strong, .accounting-v52-root .al-inv-import-progress small { display: block; }
+.accounting-v52-root .al-inv-import-progress strong { font-size: 13px; }
+.accounting-v52-root .al-inv-import-progress small { margin-top: 3px; color: #475467; font-size: 11px; }
+.accounting-v52-root .al-inv-import-spinner { width: 18px; height: 18px; border: 2px solid #93c5fd; border-top-color: #1769e0; border-radius: 50%; animation: al-spin 0.75s linear infinite; }
+.accounting-v52-root .al-inv-progress-track { grid-column: 1 / -1; height: 5px; overflow: hidden; border-radius: 99px; background: #dbeafe; }
+.accounting-v52-root .al-inv-progress-track i { display: block; width: 38%; height: 100%; border-radius: inherit; background: #1671e8; animation: al-inv-progress 1.2s ease-in-out infinite alternate; }
+@keyframes al-inv-progress { from { transform: translateX(-12%); } to { transform: translateX(180%); } }
+.accounting-v52-root .al-inv-import-progress.is-error { border-color: #fda29b; background: #fff5f5; color: #b42318; }
+.accounting-v52-root .al-inv-import-progress.is-error .al-inv-progress-track { display: none; }
+.accounting-v52-root .al-inv-import-progress.is-ready { border-color: #abefc6; background: #ecfdf3; color: #067647; }
+.accounting-v52-root .al-inv-import-results { margin-top: 12px; max-height: 300px; overflow: auto; }
+.accounting-v52-root .al-inv-import-errors { margin: 8px 0 0; padding: 10px 12px 10px 30px; border: 1px solid #fda29b; border-radius: 8px; background: #fff5f5; color: #b42318; font-size: 12px; }
+.accounting-v52-root .al-inv-tab-help { margin: 10px 0 14px; color: #475467; }
+.accounting-v52-root #alOverlay [data-al="form-submit"]:disabled { opacity: .5; cursor: not-allowed; }
+/* Keep approval-row actions reachable after the shared action-menu normalizer runs. */
+.accounting-v52-root tr[data-v23-actions="1"] .v23-action-cell > .v23-kebab { display: inline-flex !important; }
+.accounting-v52-root tr[data-v23-actions="1"] .v23-action-cell.open > .v23-menu { display: grid !important; gap: 3px; }
+.accounting-v52-root .table-wrap.v23-actions-overflow { overflow: visible !important; }
+.accounting-v52-root .v28-tablewrap.v23-actions-overflow { overflow: visible !important; }
 /* a small per-day bar chart (Short-Term Investments: interest earned this month) */
 .accounting-v52-root .al-bars { display: flex; align-items: flex-end; gap: 3px; height: 160px; padding: 8px 4px 0; border-bottom: 1px solid #e4e7ec; }
 .accounting-v52-root .al-bar { flex: 1 1 0; min-width: 3px; height: var(--h); background: #0878f6; border-radius: 3px 3px 0 0; opacity: 0.85; }
@@ -28,16 +156,140 @@
 .accounting-v52-root .al-filters .v28-field { min-width: 160px; }
 .accounting-v52-root .al-filters .al-grow { flex: 1 1 240px; }
 .accounting-v52-root .al-pager { display: flex; gap: 8px; align-items: center; justify-content: flex-end; margin-top: 10px; }
+.accounting-v52-root .al-recurring-page .al-pager { justify-content: space-between; }
+.accounting-v52-root .al-recurring-page .al-pager > div { display: flex; align-items: center; gap: 8px; }
 .accounting-v52-root .al-total td { border-top: 2px solid #d0d5dd; }
 .accounting-v52-root .al-je-lines td { vertical-align: middle; }
 .accounting-v52-root .al-je-lines .v28-select, .accounting-v52-root .al-je-lines .v28-input { width: 100%; min-width: 0; }
 .accounting-v52-root .al-je-foot { display: flex; gap: 14px; align-items: center; margin-top: 10px; }
 .accounting-v52-root .al-ok { color: #067647; font-weight: 600; }
 .accounting-v52-root .al-bad { color: #b42318; font-weight: 600; }
+/* Page-header exports (PDF / Excel / CSV). The shared button rule pins every `.v28-btn` at 34px tall with 11px side padding
+ * using !important, so the group's three icon buttons state their own geometry the same way: 32px squares inside a 2px
+ * frame. That reads as one quiet control in the header's top-right corner instead of three loose buttons competing with
+ * the page's own action (Lock month), and it fixes the 36px height the month picker beside it uses. */
+.accounting-v52-root .al-export { display: inline-flex; align-items: center; gap: 2px; height: 36px; padding: 2px; border: 1px solid #cdd9e7; border-radius: 11px; background: #fff; }
+.accounting-v52-root .al-export .v28-btn.al-export-btn { width: 32px !important; height: 32px !important; min-height: 32px !important; padding: 0 !important; border: 0 !important; border-radius: 9px !important; background: transparent !important; color: #47617f !important; box-shadow: none !important; }
+.accounting-v52-root .al-export .v28-btn.al-export-btn svg { width: 15px; height: 15px; display: block; }
+.accounting-v52-root .al-export .v28-btn.al-export-btn:hover { background: #eaf2fd !important; color: var(--v28-blue) !important; transform: none !important; }
+.accounting-v52-root .al-export .v28-btn.al-export-btn:focus-visible { outline: 2px solid var(--v28-blue); outline-offset: 1px; }
+.accounting-v52-root .al-export .v28-btn.al-export-btn.al-busy { opacity: 0.5; }
+.accounting-v52-root .al-export.al-export-labeled { height: 40px; gap: 6px; padding: 0; border: 0; background: transparent; }
+.accounting-v52-root .al-export.al-export-labeled .v28-btn.al-export-btn { width: auto !important; min-width: 70px !important; height: 38px !important; min-height: 38px !important; padding: 0 10px !important; display: inline-flex; align-items: center; justify-content: center; gap: 6px; border: 1px solid #cdd9e7 !important; border-radius: 9px !important; background: #fff !important; color: #344054 !important; font-size: 12px; font-weight: 600; }
+.accounting-v52-root .al-export.al-export-labeled .v28-btn.al-export-btn svg { width: 14px; height: 14px; }
+.accounting-v52-root .al-export.al-export-labeled .v28-btn.al-export-btn:hover { background: #eaf2fd !important; color: var(--v28-blue) !important; }
 /* period close */
 .accounting-v52-root .al-inline { display: inline-flex; flex-direction: column; min-width: 180px; margin-right: 8px; vertical-align: bottom; }
+/* The month picker is a column (caption over a 36px control) and so is taller than the button beside it; centring the
+ * row leaves that button in mid-air against it. The refinement layer wins the container though:
+ * `.accounting-v52-root #main.v50-refined .v50-actions { align-items: center !important }` is specificity (1,3,0) plus
+ * !important, so no rule on the container can beat it without repeating that ID. Align the *items* instead — align-self
+ * belongs to the child, which no other rule claims — so the picker and the button sit on one bottom line regardless of
+ * what the container is told to do. The hero also carries `v50-actions`, which is why the plain rule never applied. */
+.accounting-v52-root .v28-hero-actions:has(> .al-inline) > * { align-self: flex-end; }
+/* A 34px button against a 36px select still steps by 2px at the top edge, so match the control heights. The shared
+ * button rule pins every button at `height:34px !important` (specificity (0,2,0)), so this needs !important too — and
+ * at (0,4,0) it then outranks it. 36px is the design system's own control height (`.v28-btn{min-height:36px}`). */
+.accounting-v52-root .v28-hero-actions:has(> .al-inline) > .v28-btn { height: 36px !important; min-height: 36px !important; }
+.accounting-v52-root .v28-hero-actions .al-inline { margin-right: 0; }
 .accounting-v52-root .al-group td { background: #f9fafb; }
 .accounting-v52-root .al-listcol { display: grid; gap: 8px; }
+/* `.v28-page` is a plain block with no gap, and its children each carry their own bottom margin (hero 14px, the KPI
+ * strip 12px) except the panels, which carry none — so the checklist panel and the two panels below it shared one edge
+ * at exactly 0px (same on Cash Book and FX Revaluation, where a grid or a panel followed one). Any panel, or any grid
+ * of panels, that follows another block on the page gets the 12px rhythm the rest of the page already uses; adjacent
+ * block margins collapse, so this can only ever raise a gap to 12px, never stack it into 24px. */
+.accounting-v52-root .v28-page > * + :is(.v28-panel, .v28-grid) { margin-top: 12px; }
+/* Lock history, stacked: the column is 382px, so the feed scrolls vertically inside it rather than horizontally across
+ * a clipped table. `overflow: hidden auto` also stops a wide reason ever reviving the sideways scroll. The window is
+ * sized to the four lock tiles beside it (which set the row height) so the shorter panel is not left with a dead band. */
+.accounting-v52-root .al-close-hist { display: grid; gap: 8px; max-height: 240px; overflow: hidden auto; overscroll-behavior: contain; padding-right: 2px; }
+.accounting-v52-root .al-close-hist-row { border: 1px solid #e0e9f3; border-radius: 11px; background: #fff; padding: 9px 10px; min-width: 0; }
+.accounting-v52-root .al-close-hist-row strong { display: block; font-size: 10.5px; line-height: 1.35; }
+.accounting-v52-root .al-close-hist-row span { display: block; margin-top: 3px; font-size: 9.5px; color: var(--v28-muted); line-height: 1.35; overflow-wrap: anywhere; }
+/* The checklist is paginated to 10 tasks a page, so it must not inherit the shared 410px scroll cap on .v28-tablewrap:
+ * with the kebab fix's overflow:visible, a table taller than the cap paints past its box and hijacks the pager bar's
+ * clicks (the same defect the Approval Queue pager had). Let the wrapper grow to its rows instead. */
+.accounting-v52-root .al-close-table .v28-tablewrap { max-height: none !important; }
+/* The refinement layer gives every `.v28-tablewrap` `scrollbar-gutter: stable both-edges`, which reserves a 10px
+ * scrollbar channel on BOTH inline edges — and this wrapper can never scroll, its height cap is lifted just above and
+ * the table fits. So the checklist was drawn 10px inside the card while its filter chips, the panel title and the
+ * action buttons above it all sit on the card's edge. The gutter is only worth reserving where a scrollbar can appear.
+ * Qualified with #main because that is what makes the source rule outrank a plain class chain. */
+.accounting-v52-root #main .al-close-table .v28-tablewrap { scrollbar-gutter: auto !important; }
+/* Every card in the module had its heading 3px inside its own content: the refinement layer gives the head
+ * `padding:13px 15px !important` (`.accounting-v52-root #main.v50-refined :is(.panel, … .v28-panel, …) > header`,
+ * specificity (1,5,1)) while the body keeps `11px 12px !important`, so the panel title and its Add buttons sat off the
+ * left edge of the table and chips beneath them. The head is brought to the body's 12px — the content edge is what the
+ * grid is built on. Naming `section`/`header` is what clears (1,5,1): the tie would otherwise fall to source order
+ * between two separately bundled stylesheets. */
+.accounting-v52-root #main.v50-refined .v28-page section.v28-panel > header.v28-panel-head { padding-left: 12px !important; padding-right: 12px !important; }
+/* A whole checklist row opens the task, so it must look and focus like one. Group headings are not rows to open. */
+.accounting-v52-root .al-close-table tbody tr[data-al="close-task-detail"] { cursor: pointer; }
+.accounting-v52-root .al-close-table tbody tr[data-al="close-task-detail"]:focus-visible { outline: 2px solid #2e75cc; outline-offset: -2px; }
+/* A row now carries one Open button, so it needs none of the wide multi-button action column. */
+.accounting-v52-root .al-close-table .v28-table td.al-actions { min-width: 74px; }
+
+/* Scheduled Jobs keeps the full viewport scrollable and shows five rows per page so the page controls stay visible. */
+.accounting-v52-root .content:has(.al-jobs-page) { height: calc(100dvh - var(--topbar)) !important; min-height: 0 !important; overflow-x: hidden !important; overflow-y: auto !important; overscroll-behavior-y: contain; }
+.accounting-v52-root #main:has(.al-jobs-page) { min-height: max-content !important; overflow: visible !important; }
+.accounting-v52-root .al-jobs-page .al-jobs-table .v28-tablewrap { max-height: none !important; overflow-x: auto !important; overflow-y: visible !important; }
+.accounting-v52-root .al-jobs-page .v28-table th:last-child { pointer-events: none; }
+.accounting-v52-root .al-jobs-pager { display: flex; align-items: center; justify-content: space-between; gap: 12px; border-top: 1px solid #e0e7ef; padding: 10px 12px; color: #667085; font-size: 11px; }
+.accounting-v52-root .al-jobs-pager > div { display: flex; align-items: center; gap: 10px; }
+
+/* Keep STI row action triggers inside the scrollable register so they cannot cover its pager. */
+.accounting-v52-root .al-sti-page .v28-tablewrap.v23-actions-overflow { position: relative; isolation: isolate; max-height: 410px !important; overflow-x: auto !important; overflow-y: auto !important; }
+.accounting-v52-root .al-sti-page .al-jobs-pager { position: relative; z-index: 5; }
+.accounting-v52-root .al-fx-page .v28-tablewrap.v23-actions-overflow { position: relative; isolation: isolate; max-height: 410px !important; overflow-x: auto !important; overflow-y: auto !important; }
+.accounting-v52-root .al-fx-page .al-pager { position: relative; z-index: 5; }
+.accounting-v52-root .al-fx-row-action { display: inline-flex; align-items: center; min-height: 30px; margin-right: 6px; padding: 0 9px; border: 1px solid #cbd9e7; border-radius: 8px; background: #fff; color: #24415f; font-size: 11px; font-weight: 750; text-decoration: none; white-space: nowrap; }
+.accounting-v52-root .al-fx-row-action:hover { border-color: #7faee0; background: #f5faff; color: #005ed8; }
+.accounting-v52-root .nav-item[data-page="investments"] .nav-count { display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto; white-space: nowrap; line-height: 1; }
+.accounting-v52-root .al-jobs-pager .v28-btn:disabled { cursor: not-allowed; opacity: .45; }
+.accounting-v52-root .al-job-description { margin: 0 0 10px; color: #344054; line-height: 1.5; }
+.accounting-v52-root .al-job-posting { margin: 0 0 14px; color: #667085; font-size: 11px; }
+.accounting-v52-root .al-job-controls { display: flex; flex-wrap: wrap; gap: 8px; }
+@media (max-width: 760px) {
+  .accounting-v52-root .al-jobs-pager { align-items: flex-start; flex-direction: column; }
+  .accounting-v52-root .al-jobs-pager > div { width: 100%; justify-content: space-between; }
+}
+/* The Due cell carries the day and how far off or how late it is; keep the day on one line so the sub never wraps under
+ * it and the rows stay an even height. */
+.accounting-v52-root .al-close-table .v28-table td:nth-child(3) { white-space: nowrap; }
+/* The lock tiles are read-only; they must not invite a click the panel cannot answer. */
+.accounting-v52-root .al-close-locks .v28-list-item { cursor: default; }
+.accounting-v52-root .al-close-locks .v28-list-item:hover { border-color: #e0e9f3; background: #fff; }
+/* The app shell pins every form control with `.accounting-v52-root input:not([type="checkbox"]):not([type="radio"])` at
+ * 10.5px !important — specificity (0,3,1), so an attribute-only selector loses even when it is also !important and comes
+ * later. For a native date field that renders the day, month and year segments as unreadable specks, the one field a
+ * period manager has to read and set precisely. The element type is therefore repeated in each selector to out-specify
+ * it. The owner picker carries "name · email", so it needs the same lift to stay legible. */
+/* A field is its own grid of label / control / hint rows, and the form grid stretches every field in a row to the
+ * tallest one. `align-content: normal` behaves as stretch there, so that extra height is shared out between the rows
+ * and a field with no hint ends up with its control pushed ~18px below the labelled box beside it — labels aligned, the
+ * controls not. Packing the rows at the top puts every control in a row on one line. */
+.accounting-v52-root .v28-form-grid .v28-field { align-content: start; }
+/* 36px, the same as the select and text inputs beside it: the shared control height is 36px and a taller date box
+ * steps out of the row even once the fields are top-packed. */
+.accounting-v52-root .v28-form-grid input.v28-input[name="dueAt"] { height: 36px; padding: 0 12px; font-size: 13px !important; }
+.accounting-v52-root .v28-form-grid select.v28-select[name="ownerId"] { font-size: 12.5px !important; }
+/* The owner dropdown is one long list in alphabet sections; the browser renders an <optgroup> heading in italic, which
+ * reads as a disabled option rather than a section, so it is set upright and dimmer than the names under it. */
+.accounting-v52-root .v28-form-grid select.v28-select[name="ownerId"] optgroup { font-style: normal; font-weight: 700; color: #7b8ca0; }
+/* The read-only facts under the fields ran on their own 229/516/172 split, so none of their columns matched the form
+ * above: values started 76px left of the form's second column and notes 135px right of the third, with a 516px column
+ * holding the word "None". Repeating the form's own tracks (three equal columns, 10px gap) drops the notes directly
+ * under "Due date". Scoped to this dialog because .al-status-rows is shared with the Expenses panels, and kept out of
+ * the narrow case so the vendored 820px collapse still applies. */
+@media (min-width: 821px) {
+  .accounting-v52-root .al-plan-extra .al-status-row { grid-template-columns: repeat(3, minmax(0, 1fr)); column-gap: 10px; }
+}
+/* The status pill is 21.5px against a 14.8px text row, so the line below it gaped 7px further than the others. One
+ * shared row height (24px, just over the pill's 23.5px) with everything centred gives the four facts an even rhythm;
+ * the vendored -2px pill nudge would otherwise knock it off centre. */
+.accounting-v52-root .al-plan-extra .al-status-row { min-height: 24px; align-items: center; }
+.accounting-v52-root .al-plan-extra .al-status-row .v28-status { margin-top: 0; }
 /* bank reconciliation: statement beside the cashbook */
 .accounting-v52-root .al-split { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 16px; align-items: start; }
 @media (max-width: 1100px) { .accounting-v52-root .al-split { grid-template-columns: 1fr; } }
@@ -57,3 +309,99 @@
 .accounting-v52-root tr.al-muted td { color: #98a2b3; }
 .accounting-v52-root .al-list { margin: 0; padding-left: 18px; display: grid; gap: 6px; }
 .accounting-v52-root .al-center { text-align: center; }
+/* loading skeleton — shimmer blocks that mirror the real KPI cards / filter chips / queue rows while data is in flight */
+.accounting-v52-root .al-skel { display: inline-block; vertical-align: middle; background: linear-gradient(90deg, #eef2f7 0%, #e2eaf3 40%, #eef2f7 80%); background-size: 200% 100%; animation: al-shimmer 1.3s ease-in-out infinite; }
+.accounting-v52-root .al-skel-card { display: flex; flex-direction: column; }
+.accounting-v52-root .al-skel-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.accounting-v52-root .al-skel-chips .al-skel { flex: 0 0 auto; }
+@keyframes al-shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+@media (prefers-reduced-motion: reduce) { .accounting-v52-root .al-skel { animation: none; } }
+.al-assets-search { display: flex; flex-direction: column; gap: 6px; margin: 12px 0; max-width: 420px; }
+.al-assets-search label { font-size: 12px; font-weight: 600; color: #40516b; }
+.al-assets-search input { width: 100%; min-height: 38px; padding: 8px 12px; border: 1px solid #d0d9e6; border-radius: 8px; background: #fff; color: #17243b; }
+/* Restored legacy screens portalled into the V52 shell (#ac52LegacyLedgerSlot on the General Ledger, and the Command
+ * Centre dashboard slot). The mount holds the original React/shadcn/Tailwind component, which must render exactly as it
+ * does on its standalone legacy route. The refinement layers used to pin every element type inside the module
+ * (td/th/button/input/select/textarea/p/li/h1-h4/label/small/a/strong/span: micro font sizes, 9-10px radii, 34px
+ * boxes, sticky uppercase headers, its own font stack) and those unlayered `!important` pins outrank Tailwind's
+ * layered utilities, so no override could rebuild the native look — they can only be switched off. Every such
+ * bare-element pin now carries `:not(.ac52-legacy-mount *)`, which lets the portalled UI fall back to its own
+ * utility-driven styling. What is left here is only what the legacy page inherits from <body> (Tailwind preflight,
+ * which the mount cannot inherit because the shell root sits in between) plus the design tokens the shell redefines
+ * under the same names Tailwind utilities read (--radius, --muted, --sidebar). Every value below is the value the
+ * standalone legacy route measures: app/globals.css --font-sans (--font-montserrat), body text-base
+ * (--text-base: 1.0625rem = 17px, line-height 1.5), --radius 0.75rem, --muted oklch(0.97 0 0), --sidebar oklch(1 0 0).
+ * The token names --font-sans/--text-base cannot be referenced here: they are declared in `@theme inline`, so Tailwind
+ * consumes them at build time and never emits them as custom properties. */
+.accounting-v52-root .ac52-legacy-mount {
+  max-width: 1700px; margin: 0 auto;
+  font-family: var(--font-montserrat);
+  font-size: 1.0625rem;
+  line-height: 1.5;
+  letter-spacing: normal;
+  word-spacing: normal;
+  font-weight: 400;
+  color: var(--foreground);
+  text-align: start;   /* the legacy route inherits the initial value; the shell chrome sets an explicit one */
+  /* The shell root also turns on text-rendering:optimizeLegibility and font-feature-settings:"kern" 1,"liga" 1, both
+   * inherited, and both change glyph kerning/ligature advances inside the portalled module (measurable as a text
+   * rendering delta against the legacy route, which inherits the UA defaults). Re-declare the defaults. */
+  text-rendering: auto;
+  font-feature-settings: normal;
+  --radius: 0.75rem;
+  --muted: oklch(0.97 0 0);
+  --sidebar: oklch(1 0 0);
+}
+
+/* The standalone Payables content sits on white; the V52 work area behind its transparent wrapper is tinted. */
+.accounting-v52-root #ac52LegacyPayablesSlot { background: #fff; }
+.accounting-v52-root #ac52LegacyReceivablesSlot { background: #fff; width: calc(100% + 22px); transform: translateX(9px); }
+.accounting-v52-root #ac52LegacyReconciliationSlot { background: #fff; }
+
+/* Text-free sort arrows avoid mojibake in sortable table headers. */
+.accounting-v52-root .v28-table th[title="Sort this column"] { padding-right: 24px; }
+.accounting-v52-root .v28-table th[title="Sort this column"]::before, .accounting-v52-root .v28-table th[title="Sort this column"]::after { content: ""; position: absolute; right: 9px; width: 0; height: 0; border-left: 4px solid transparent; border-right: 4px solid transparent; opacity: .58; }
+.accounting-v52-root .v28-table th[title="Sort this column"]::before { top: calc(50% - 6px); border-bottom: 4px solid #63768d; }
+.accounting-v52-root .v28-table th[title="Sort this column"]::after { top: calc(50% + 2px); border-top: 4px solid #63768d; }
+
+/* Document Vault layout and upload feedback. */
+.accounting-v52-root .al-vault-pager { display:flex; justify-content:space-between; align-items:center; gap:12px; padding:12px 4px 2px; color:#63758e; font-size:13px; }
+.accounting-v52-root .al-vault-pager .al-actions { display:flex; align-items:center; gap:10px; }
+.accounting-v52-root .al-vault-pager .al-actions .v28-btn + .v28-btn { margin-left:0; }
+.accounting-v52-root .v28-form-grid > .al-vault-detail { grid-column:1 / -1; width:100%; }
+.accounting-v52-root .al-vault-detail { display:grid; gap:0; min-width:0; width:100%; }
+.accounting-v52-root .al-vault-detail-row { display:grid; grid-template-columns:minmax(140px, 220px) minmax(0, 1fr); gap:16px; align-items:start; padding:13px 4px; border-bottom:1px solid #e7eef6; }
+.accounting-v52-root .al-vault-detail-row:last-of-type { border-bottom:0; }
+.accounting-v52-root .al-vault-detail-row span { color:#63758e; }
+.accounting-v52-root .al-vault-detail-row strong { min-width:0; overflow-wrap:anywhere; font-weight:600; }
+.accounting-v52-root .al-vault-detail-actions { display:flex; flex-wrap:wrap; gap:8px; margin-top:14px; padding-top:14px; border-top:1px solid #e7eef6; }
+.accounting-v52-root .al-vault-selection { padding:10px 12px; border:1px solid #dbe4ef; border-radius:8px; color:#63758e; overflow-wrap:anywhere; }
+.accounting-v52-root .al-vault-selection.is-invalid { border-color:#dc3545; color:#b42318; }
+.accounting-v52-root .al-vault-progress { display:flex; flex-wrap:wrap; align-items:center; gap:10px; color:#63758e; }
+.accounting-v52-root .al-vault-progress progress { width:min(320px, 100%); height:12px; accent-color:#1677e8; }
+@media (max-width:700px) {
+  .accounting-v52-root .al-vault-pager { align-items:flex-start; flex-direction:column; }
+  .accounting-v52-root .al-vault-detail-row { grid-template-columns:minmax(0, 1fr); gap:5px; }
+}
+
+/* Accounting Settings search, pagers, and aligned record details. */
+.accounting-v52-root .al-set-pager { display:flex; justify-content:space-between; align-items:center; gap:12px; padding:12px 4px 2px; color:#63758e; font-size:13px; }
+.accounting-v52-root .al-set-pager-tools { display:flex; align-items:center; flex-wrap:wrap; gap:12px; }
+.accounting-v52-root .al-set-page-size { display:flex; align-items:center; gap:7px; white-space:nowrap; }
+.accounting-v52-root .al-set-page-size .v28-select { min-width:68px; width:68px; padding:5px 24px 5px 8px; }
+.accounting-v52-root .al-set-pager .al-actions { display:flex; align-items:center; gap:10px; }
+.accounting-v52-root .al-set-pager .al-actions .v28-btn + .v28-btn { margin-left:0; }
+.accounting-v52-root .al-set-content { min-width:0; }
+.accounting-v52-root .v28-form-grid > .al-set-detail { grid-column:1 / -1; width:100%; }
+.accounting-v52-root .al-set-detail { display:grid; gap:0; min-width:0; width:100%; }
+.accounting-v52-root .al-set-detail-row { display:grid; grid-template-columns:minmax(160px, 240px) minmax(0, 1fr); gap:16px; align-items:start; padding:13px 4px; border-bottom:1px solid #e7eef6; }
+.accounting-v52-root .al-set-detail-row:last-of-type { border-bottom:0; }
+.accounting-v52-root .al-set-detail-row > span { color:#63758e; }
+.accounting-v52-root .al-set-detail-row > strong { min-width:0; overflow-wrap:anywhere; font-weight:600; }
+.accounting-v52-root .al-set-detail-actions { display:flex; flex-wrap:wrap; gap:8px; margin-top:14px; padding-top:14px; border-top:1px solid #e7eef6; }
+.accounting-v52-root .al-set-detail-actions .v28-btn + .v28-btn { margin-left:0; }
+@media (max-width:700px) {
+  .accounting-v52-root .al-set-pager { align-items:flex-start; flex-direction:column; }
+  .accounting-v52-root .al-set-pager-tools { width:100%; justify-content:space-between; }
+  .accounting-v52-root .al-set-detail-row { grid-template-columns:minmax(0, 1fr); gap:5px; }
+}

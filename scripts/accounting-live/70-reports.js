@@ -38,38 +38,20 @@ AL.page('trialbalance', () => {
   return `<div class="v28-page">${head}${filters}${kpis}${AL.panel('Balances', '', table)}</div>`;
 });
 AL.actions['tb-csv'] = () => AL.csv(`trial-balance-${AL.ui.tb.asOf || AL.stiToday()}.csv`, [['Account', 'Name', 'Type', 'Debit', 'Credit'], ...(AL.tbRows || [])]);
-AL.actions['tb-drill'] = (el) => { AL.ui.gl.acct = el.dataset.no; AL.ui.gl.from = AL.yearStart(); AL.ui.gl.to = AL.ui.tb.asOf || AL.stiToday(); AL.go('ledger'); };
+// Drilling a trial-balance account opens the restored legacy General Ledger; hand it the account and range so the
+// React screen can prefill its filters (window.__AC52_GL_DRILL__ is read by components/accounting/general-ledger.tsx).
+AL.actions['tb-drill'] = (el) => { AL.ui.gl.acct = el.dataset.no; AL.ui.gl.from = AL.yearStart(); AL.ui.gl.to = AL.ui.tb.asOf || AL.stiToday(); window.__AC52_GL_DRILL__ = { accountNo: AL.ui.gl.acct, from: AL.ui.gl.from, to: AL.ui.gl.to }; AL.go('ledger'); };
 
 // ------------------------------------------------------------------------------------------------ general ledger
-AL.page('ledger', () => {
-  AL.meLoad();
-  const lk = AL.jeLookups();
-  const u = AL.ui.gl;
-  const from = u.from || `${AL.stiToday().slice(0, 7)}-01`, to = u.to || AL.stiToday();
-  const accts = (lk.data && lk.data.accounts) || [];
-  const acct = u.acct || (accts.find((a) => a.accountNo === '1100') || accts[0] || {}).accountNo || '';
-  const head = AL.head('Daily accounting', 'General Ledger', 'Every posted line on an account, with its running balance.', AL.btn('Export CSV', 'gl-csv'));
-  const filters = `<div class="al-filters"><label class="v28-field al-grow"><span>Account</span><select class="v28-select" data-rep-f="gl-acct">${accts.map((a) => `<option value="${ae(a.accountNo)}"${a.accountNo === acct ? ' selected' : ''}>${ae(`${a.accountNo} ${a.accountName}`)}</option>`).join('')}</select></label><label class="v28-field"><span>From</span><input class="v28-input" type="date" data-rep-f="gl-from" value="${ae(from)}"></label><label class="v28-field"><span>To</span><input class="v28-input" type="date" data-rep-f="gl-to" value="${ae(to)}"></label></div>`;
-  if (lk.state !== 'ok') return `<div class="v28-page">${head}${AL.gate(lk, { key: 'je-lookups' }) || ''}</div>`;
-  if (!acct) return `<div class="v28-page">${head}${AL.empty('No accounts are set up.')}</div>`;
-  const e = AL.res(`gl:${acct}:${from}:${to}`, () => AL.get(`/accounting/gl-ledger-detail?accountNo=${encodeURIComponent(acct)}&startDate=${from}&endDate=${to}`));
-  const g = AL.gate(e, { errorTitle: 'The ledger could not be read' });
-  if (g) return `<div class="v28-page">${head}${filters}${g}</div>`;
-  const d = e.data; const a = d.account || {};
-  const txs = d.transactions || [];
-  AL.glRows = txs.map((t) => [String(t.date).slice(0, 10), t.reference, t.description, t.debitAmount || '', t.creditAmount || '', t.runningBalance]);
-  const kpis = AL.kpis([
-    ['Opening balance', AL.money(a.openingBalance), AL.date(from)],
-    ['Debits', AL.money(txs.reduce((s, t) => s + Number(t.debitAmount || 0), 0)), AL.plural(txs.filter((t) => Number(t.debitAmount) > 0).length, 'line')],
-    ['Credits', AL.money(txs.reduce((s, t) => s + Number(t.creditAmount || 0), 0)), AL.plural(txs.filter((t) => Number(t.creditAmount) > 0).length, 'line')],
-    ['Closing balance', AL.money(a.closingBalance), AL.date(to), '#0878f6'],
-  ]);
-  const tr = txs.map((t) => `<tr><td>${ae(AL.date(t.date))}</td><td><strong>${ae(t.reference || '')}</strong></td><td class="al-wrap">${ae(t.description || '')}</td><td>${Number(t.debitAmount) ? ae(AL.money(t.debitAmount)) : ''}</td><td>${Number(t.creditAmount) ? ae(AL.money(t.creditAmount)) : ''}</td><td>${ae(AL.money(t.runningBalance))}</td><td>${t.transactionCurrency && t.transactionCurrency !== 'USD' ? ae(t.transactionCurrency) : ''}</td></tr>`).join('');
-  return `<div class="v28-page">${head}${filters}${kpis}${AL.panel(`${a.accountNo || acct} ${a.accountName || ''}`, a.accountType || '', tr ? AL.table(['Date', 'Reference', 'Description', 'Debit', 'Credit', 'Balance', ''], tr, '1000px') : AL.empty('No posted lines in this period.'))}</div>`;
-});
-AL.actions['gl-csv'] = () => AL.csv(`ledger-${AL.ui.gl.acct || 'account'}.csv`, [['Date', 'Reference', 'Description', 'Debit', 'Credit', 'Balance'], ...(AL.glRows || [])]);
+// The General Ledger is the established legacy React screen (components/accounting/general-ledger.tsx), restored in
+// full — grouped journal register, advanced filters, create/view drawers, trial-balance tab — talking to accountingApi
+// as it did before. The V52 shell stays (nav rail, topbar, app switcher); this page is only a mount point that
+// accounting-v52-app.tsx portals the React component into, the same way the Command Centre portals its legacy dashboard.
+AL.page('ledger', () => `<div class="v28-page"><div id="ac52LegacyLedgerSlot" class="ac52-legacy-mount"></div></div>`);
 
 // ------------------------------------------------------------------------------------------------ financial statements
+AL.page('reports', () => '<div class="v28-page"><div id="ac52LegacyReportsSlot" class="ac52-legacy-mount"></div></div>');
+/* Previous live statements implementation retained below for reference.
 AL.page('reports', () => {
   AL.meLoad();
   const cur = AL.repCur();
@@ -108,6 +90,7 @@ AL.page('reports', () => {
   const tr = out.map((r) => `<tr class="al-lvl${r[2]}"><td>${r[2] === 2 ? '<span class="al-indent"></span>' : ''}${r[2] < 2 ? `<strong>${ae(r[0])}</strong>` : ae(r[0])}</td><td>${r[1] == null ? '' : r[2] < 2 ? `<strong>${ae(AL.money(r[1], code))}</strong>` : ae(AL.money(r[1], code))}</td></tr>`).join('');
   return `<div class="v28-page">${head}${AL.panel(t === 'is' ? `Income statement ${AL.date(from)} – ${AL.date(to)}` : t === 'bs' ? `Balance sheet at ${AL.date(asOf)}` : `Cash flow ${AL.date(from)} – ${AL.date(to)}`, '', `${tabs}${filters}${check}${AL.table(['', code], tr, '640px')}`)}</div>`;
 });
+*/
 AL.actions['rep-tab'] = (el) => { AL.ui.rep.tab = el.dataset.tab; AL.redraw(); };
 AL.actions['rep-csv'] = () => AL.csv(`${{ is: 'income-statement', bs: 'balance-sheet', cf: 'cash-flow' }[AL.ui.rep.tab]}.csv`, [['Line', 'Amount'], ...(AL.repRows || [])]);
 AL.wire.reports = AL.wire.trialbalance = AL.wire.ledger = () => {

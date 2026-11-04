@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/popover"
 import { CalendarIcon, RefreshCw, FileText, Loader2, AlertCircle, Check, ChevronDown, ChevronUp } from "lucide-react"
 import { cn } from "@/lib/utils"
-import { format, subDays } from "date-fns"
+import { format, subDays, parseISO } from "date-fns"
 import { toast } from "sonner"
 import type { RootState, AppDispatch } from "@/lib/store/store"
 import { fetchCashFlow } from "@/lib/store/slices/accountingSlice"
@@ -25,6 +25,8 @@ import { addLetterhead, addReportInfo, type LetterheadAddress } from "@/lib/util
 import { companyProfileApi } from "@/lib/api/company-profile-api"
 import { TransactionsDataTable } from "./transactions-data-table"
 import { TransactionViewDrawer } from "./transaction-view-drawer"
+import { AccountingExportControls } from "./accounting-export-controls"
+import { reportAmount } from "@/lib/accounting-v52/report-amount"
 
 function formatMoney(v: number | string) {
   return (
@@ -250,7 +252,7 @@ export function CashFlowView() {
       const doc = new jsPDF()
       let startY = await addLetterhead(doc, "Cash Flow Statement", undefined, activeAddress)
       startY = addReportInfo(doc, startY, [
-        `For the period ${format(new Date(cashFlow.period.startDate), "MMMM d, yyyy")} to ${format(new Date(cashFlow.period.endDate), "MMMM d, yyyy")}`,
+        `For the period ${format(parseISO(String(cashFlow.period.startDate).slice(0, 10)), "MMMM d, yyyy")} to ${format(parseISO(String(cashFlow.period.endDate).slice(0, 10)), "MMMM d, yyyy")}`,
         `Currency: ${cashFlow.currency.name}`,
       ])
 
@@ -336,7 +338,7 @@ export function CashFlowView() {
           )}
           <h2 className="text-xl font-semibold text-gray-700 mb-2">Cash Flow Statement</h2>
           <p className="text-gray-600">
-            For the period {format(new Date(cashFlow.period.startDate), "MMMM d, yyyy")} to {format(new Date(cashFlow.period.endDate), "MMMM d, yyyy")}
+            For the period {format(parseISO(String(cashFlow.period.startDate).slice(0, 10)), "MMMM d, yyyy")} to {format(parseISO(String(cashFlow.period.endDate).slice(0, 10)), "MMMM d, yyyy")}
           </p>
           <p className="text-sm text-gray-500 mt-1">Currency: {cashFlow.currency.name} ({cashFlow.currency.code})</p>
         </div>
@@ -690,24 +692,16 @@ export function CashFlowView() {
             <RefreshCw className={cn("w-4 h-4 mr-2", cashFlowLoading && "animate-spin")} />
             Generate
           </Button>
-          <Button
-            onClick={handleExportPDF}
-            variant="outline"
-            className="rounded-full"
-            disabled={generatingPDF || !cashFlow}
-          >
-            {generatingPDF ? (
-              <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Generating PDF...
-              </>
-            ) : (
-              <>
-                <FileText className="w-4 h-4 mr-2" />
-                Export PDF
-              </>
-            )}
-          </Button>
+          {cashFlow && !cashFlowLoading && <AccountingExportControls label="cash flow statement" spec={() => {
+            const rows: (string | number)[][] = []
+            for (const [label, section] of [["Operating activities", cashFlow.operatingActivities], ["Investing activities", cashFlow.investingActivities], ["Financing activities", cashFlow.financingActivities]] as const) {
+              rows.push([label, ""])
+              for (const account of section.accounts || []) rows.push([`${account.accountNo} - ${account.accountName}`, reportAmount(account.netAmount)])
+              rows.push([`Total ${label.toLowerCase()}`, reportAmount(section.total)])
+            }
+            rows.push(["Net change in cash", reportAmount(cashFlow.netCashFlow)], ["Beginning cash balance", reportAmount(cashFlow.beginningCashBalance)], ["Ending cash balance", reportAmount(cashFlow.endingCashBalance)])
+            return Promise.resolve({ title: "Cash Flow Statement", subtitle: `${String(cashFlow.period.startDate).slice(0, 10)} to ${String(cashFlow.period.endDate).slice(0, 10)} · ${cashFlow.currency.code}`, columns: ["Description", `Amount (${cashFlow.currency.code})`], moneyColumns: [1], rows, filename: "cash-flow-statement" })
+          }} />}
         </div>
       </div>
 

@@ -53,6 +53,7 @@ AL.page('audit', () => {
     <td>${AL.status(AL.audActionLabel(x.action), /VOID|DELETE|REJECT/.test(x.action) ? 'bad' : /POST|APPROVE|LOCK/.test(x.action) ? 'ok' : 'info')}</td>
     <td>${ae(x.user || 'System')}<span class="v28-sub">${ae(x.role || '')}</span></td>
     <td class="al-wrap">${ae(AL.audDetail(x))}${x.reason ? `<span class="v28-sub">Reason: ${ae(String(x.reason).slice(0, 160))}</span>` : ''}</td>
+    <td class="al-actions">${AL.btn('Open', 'aud-open', 'small', `data-id="${ae(x.id)}"`)}</td>
   </tr>`).join('');
   const pages = Math.max(1, Math.ceil((d.total || 0) / 50));
   const pager = pages > 1 ? `<div class="al-pager">${AL.btn('Newer', 'aud-page', 'small', `data-d="-1"${u.page <= 1 ? ' disabled' : ''}`)}<span class="v28-sub">Page ${u.page} of ${pages}</span>${AL.btn('Older', 'aud-page', 'small', `data-d="1"${u.page >= pages ? ' disabled' : ''}`)}</div>` : '';
@@ -63,7 +64,7 @@ AL.page('audit', () => {
     iv.counterBehind ? '<li>The numbering counter is behind the highest number issued.</li>' : '',
     iv.unbalancedPosted.length ? `<li>Posted journals whose debits and credits differ: ${ae(iv.unbalancedPosted.slice(0, 10).join(', '))}.</li>` : '',
   ].join('')}</ul>`) : '';
-  return `<div class="v28-page">${head}${kpis}${integPanel}${AL.panel('Events', '', `${filters}${rows ? AL.table(['When', 'Record', 'Action', 'Who', 'What changed'], rows, '1080px') : AL.empty('No events match.')}${pager}`)}</div>`;
+  return `<div class="v28-page">${head}${kpis}${integPanel}${AL.panel('Events', '', `${filters}${rows ? AL.table(['When', 'Record', 'Action', 'Who', 'What changed', ''], rows, '1160px') : AL.empty('No events match.')}${pager}`)}</div>`;
 });
 AL.wire.audit = () => {
   document.querySelectorAll('[data-aud-f]').forEach((el) => {
@@ -76,6 +77,11 @@ AL.wire.audit = () => {
   });
 };
 AL.actions['aud-page'] = (el) => { AL.ui.aud.page = Math.max(1, AL.ui.aud.page + Number(el.dataset.d)); AL.redraw(); };
+AL.actions['aud-open'] = (el) => {
+  const d = AL.cache[AL.audKey()] && AL.cache[AL.audKey()].data, x = (d && d.items || []).find((item) => item.id === el.dataset.id); if (!x) return;
+  const detail = [['When', AL.dateTime(x.at)], ['Record', AL.audTypeLabel[x.entityType] || x.entityType], ['Action', AL.audActionLabel(x.action)], ['Who', x.user || 'System'], ['Role', x.role || '—'], ['Reference', x.reference || '—'], ['Change', AL.audDetail(x) || 'No field-level detail recorded'], ['Reason', x.reason || '—']].map(([k, v]) => `<div><span class="v28-sub">${ae(k)}</span><strong>${ae(String(v == null ? '—' : v))}</strong></div>`).join('');
+  AL.form({ title: `${AL.audTypeLabel[x.entityType] || x.entityType} · ${AL.audActionLabel(x.action)}`, sub: 'Audit event detail', wide: true, viewOnly: true, submitLabel: 'Close', fields: [], extra: `<div class="al-wide"><div class="v28-grid equal">${detail}</div></div>`, onSubmit: async () => false });
+};
 AL.actions['aud-check'] = (el) => AL.busy(el, async () => { const r = await AL.get('/accounting/audit/integrity'); AL.cache['aud-int'] = { data: r }; AL.redraw(); return r; },
   ['Integrity checked', (r) => (r && r.ok ? `All ${r.journals.toLocaleString('en-US')} journals are numbered in sequence and every posted journal balances.` : 'Exceptions found; they are listed on the page.')]);
 AL.actions['aud-export'] = (el) => AL.busy(el, async () => { const text = await AL.getText(`/accounting/audit/export?${AL.audQuery()}`); AL.saveText(`﻿${text}`, `accounting-audit-${AL.stiToday()}.csv`); return text; },

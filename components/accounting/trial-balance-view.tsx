@@ -27,9 +27,6 @@ import {
   BarChart3,
   AlertCircle,
   Scale,
-  Download,
-  FileText,
-  Loader2,
   Eye,
   Check
 } from "lucide-react"
@@ -45,12 +42,14 @@ import type { RootState, AppDispatch } from "@/lib/store/store"
 import { fetchTrialBalance, fetchTrialBalanceSummary } from "@/lib/store/slices/accountingSlice"
 import { accountingApi } from "@/lib/api/accounting-api"
 import { exportTrialBalanceToCSV, exportTrialBalanceToPDF } from "@/lib/utils/export"
+import { downloadAc52Export, type Ac52ExportSpec } from "@/lib/accounting-v52/export"
 import { buildConsolidatedTrialBalance, ConsolidatedTrialBalance } from "@/lib/utils/consolidation/trial-balance"
 import { withUsdZwlFallbackRates } from "@/lib/utils/consolidation/fallback-rates"
 import jsPDF from "jspdf"
 import autoTable from "jspdf-autotable"
 import { addLetterhead, addReportInfo, type LetterheadAddress } from "@/lib/utils/pdf-letterhead"
 import { companyProfileApi } from "@/lib/api/company-profile-api"
+import { AccountingExportButtonGroup } from "./accounting-export-controls"
 
 function TrialBalanceSkeleton() {
   return (
@@ -546,6 +545,80 @@ export function TrialBalanceView() {
     }
   }
 
+  // Excel is the third tier of the export group. It runs through the shared Accounting export engine (the same one the
+  // Journal Entries register uses) so the workbook is branded for the deployment; the existing letterheaded PDF and the
+  // CSV keep their own long-standing paths. The single view exports the accounts as currently filtered; the consolidated
+  // view carries the source figures, rate and reporting-currency totals.
+  const handleExportExcel = () => {
+    const periodLabel = getPeriodOptions().find((opt) => opt.value === periodValue)?.label || periodValue
+    if (reportMode === "consolidated") {
+      if (!consolidatedTrialBalance) {
+        toast.error("No trial balance data to export")
+        return
+      }
+      const code = consolidatedTrialBalance.reportingCurrencyCode
+      const spec: Ac52ExportSpec = {
+        title: "Trial Balance — Consolidated",
+        subtitle: `Consolidated to ${code} · ${periodLabel}`,
+        meta: [
+          ["As of", consolidatedTrialBalance.date],
+          ["Total debits", consolidatedTrialBalance.totals.totalDebits.toFixed(2)],
+          ["Total credits", consolidatedTrialBalance.totals.totalCredits.toFixed(2)],
+          ["Status", consolidatedTrialBalance.totals.isBalanced ? "Balanced" : "Unbalanced"],
+        ],
+        columns: ["Account No.", "Account Name", "Account Type", "Source Currency", "Source Debit", "Source Credit", "Rate", `Consolidated Debit (${code})`, `Consolidated Credit (${code})`],
+        rows: filteredAccounts.map((row: any) => [
+          row.accountNo,
+          row.accountName,
+          row.accountType,
+          row.sourceCurrencyCode,
+          Number(row.sourceDebit || 0).toFixed(2),
+          Number(row.sourceCredit || 0).toFixed(2),
+          Number(row.conversionRate || 0).toFixed(6),
+          Number(row.consolidatedDebit || 0).toFixed(2),
+          Number(row.consolidatedCredit || 0).toFixed(2),
+        ]),
+        align: ["left", "left", "left", "left", "right", "right", "right", "right", "right"],
+        filename: `trial-balance-consolidated-${consolidatedTrialBalance.date}`,
+        landscape: true,
+      }
+      downloadAc52Export("excel", spec)
+        .then((name) => toast.success("Consolidated trial balance exported to Excel", { description: name }))
+        .catch((e: any) => toast.error("Failed to export to Excel", { description: e?.message || String(e) }))
+      return
+    }
+
+    if (!trialBalance) {
+      toast.error("No trial balance data to export")
+      return
+    }
+    const code = currencies.find((c) => c.id === selectedCurrencyId)?.code || "USD"
+    const spec: Ac52ExportSpec = {
+      title: "Trial Balance",
+      subtitle: `${periodLabel} · Currency: ${code}`,
+      meta: [
+        ["Accounts", String(filteredAccounts.length)],
+        ["Total debits", formatCurrency(trialBalance.totals?.totalDebits || 0)],
+        ["Total credits", formatCurrency(trialBalance.totals?.totalCredits || 0)],
+        ["Status", trialBalanceSummary?.isBalanced ? "Balanced" : "Unbalanced"],
+      ],
+      columns: ["Account No.", "Account Name", "Account Type", "Debit Balance", "Credit Balance"],
+      rows: filteredAccounts.map((a: any) => [
+        a.accountNo,
+        a.accountName,
+        a.accountType,
+        Number(a.debitBalance || 0).toFixed(2),
+        Number(a.creditBalance || 0).toFixed(2),
+      ]),
+      align: ["left", "left", "left", "right", "right"],
+      filename: `trial-balance-${periodValue}`,
+      note: searchTerm || filterAccountType !== "all" ? "Exported with the filters currently applied to the register." : undefined,
+    }
+    downloadAc52Export("excel", spec)
+      .then((name) => toast.success("Trial balance exported to Excel", { description: name }))
+      .catch((e: any) => toast.error("Failed to export to Excel", { description: e?.message || String(e) }))
+  }
+
   if (reportMode === "single" && (trialBalanceError || trialBalanceSummaryError)) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -689,34 +762,19 @@ export function TrialBalanceView() {
             </>
           )}
           {/* Export Buttons */}
-          <Button 
-            onClick={handleExportCSV}
-            variant="outline" 
-            className="rounded-full h-10 px-6"
-            disabled={reportMode === "single" ? !trialBalance : !consolidatedTrialBalance}
-          >
-            <Download className="w-4 h-4 mr-2" />
-            Export CSV
-          </Button>
-          
-          <Button 
-            onClick={handleExportPDF}
-            variant="outline" 
-            className="rounded-full h-10 px-6"
-            disabled={(reportMode === "single" ? !trialBalance : !consolidatedTrialBalance) || generatingPDF}
-          >
-            {generatingPDF ? (
-              <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Generating PDF...
-              </>
-            ) : (
-              <>
-                <FileText className="w-4 h-4 mr-2" />
-                Export PDF
-              </>
-            )}
-          </Button>
+          <AccountingExportButtonGroup
+            label="trial balance"
+            onExport={(kind) => {
+              if (kind === "pdf") return handleExportPDF()
+              if (kind === "excel") return handleExportExcel()
+              return handleExportCSV()
+            }}
+            disabled={(kind) =>
+              (reportMode === "single" ? !trialBalance : !consolidatedTrialBalance) ||
+              (kind === "pdf" && generatingPDF)
+            }
+            busy={generatingPDF ? "pdf" : null}
+          />
           
           <Button 
             onClick={reportMode === "single" ? loadTrialBalanceData : loadConsolidatedTrialBalance} 

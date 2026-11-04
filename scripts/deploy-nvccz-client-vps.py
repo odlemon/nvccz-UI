@@ -219,7 +219,7 @@ def stage_migrate(c):
 def stage_up(c):
     return sh(c, f"""
 cd {ROOT}
-{COMPOSE} up -d
+{COMPOSE} up -d --force-recreate
 for i in $(seq 1 60); do curl -fsS http://127.0.0.1:3209/health >/dev/null 2>&1 && break; sleep 5; done
 curl -sS http://127.0.0.1:3209/health; echo
 {COMPOSE} ps --format '{{{{.Name}}}}  {{{{.Status}}}}'

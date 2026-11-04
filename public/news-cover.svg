@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900" fill="none">
+  <defs>
+    <linearGradient id="sky" x1="120" y1="40" x2="1450" y2="870" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#102B4C"/><stop offset=".56" stop-color="#17638A"/><stop offset="1" stop-color="#64A9B5"/>
+    </linearGradient>
+    <linearGradient id="sun" x1="1060" y1="188" x2="1380" y2="552" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#F5D49A" stop-opacity=".94"/><stop offset="1" stop-color="#E6A663" stop-opacity=".04"/>
+    </linearGradient>
+    <linearGradient id="glass" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#B9E4E7" stop-opacity=".65"/><stop offset="1" stop-color="#70B8C4" stop-opacity=".12"/>
+    </linearGradient>
+    <pattern id="windows" width="46" height="54" patternUnits="userSpaceOnUse">
+      <path d="M10 10h19v28H10z" fill="#C8E8E7" fill-opacity=".18"/>
+    </pattern>
+    <filter id="blur"><feGaussianBlur stdDeviation="42"/></filter>
+  </defs>
+  <path fill="url(#sky)" d="M0 0h1600v900H0z"/>
+  <circle cx="1195" cy="286" r="170" fill="url(#sun)" filter="url(#blur)"/>
+  <circle cx="1194" cy="282" r="98" fill="#F4D59E" fill-opacity=".8"/>
+  <path d="M0 601 173 499l147 92 172-183 133 121 148-202 155 200 138-151 142 147 120-99 272 171v305H0z" fill="#173C59" fill-opacity=".65"/>
+  <path d="M0 707 164 624l137 62 186-128 148 96 141-104 189 118 168-101 160 87 129-72 178 95v223H0z" fill="#102D49"/>
+  <path d="M153 900V490l139-91 141 91v410z" fill="url(#glass)"/>
+  <path d="M153 490h280v410H153z" fill="url(#windows)"/>
+  <path d="M490 900V359l176-114 176 114v541z" fill="url(#glass)"/>
+  <path d="M490 359h352v541H490z" fill="url(#windows)"/>
+  <path d="M890 900V463l126-84 126 84v437z" fill="url(#glass)"/>
+  <path d="M890 463h252v437H890z" fill="url(#windows)"/>
+  <path d="M1174 900V550l130-92 130 92v350z" fill="url(#glass)"/>
+  <path d="M1174 550h260v350h-260z" fill="url(#windows)"/>
+  <path d="M0 770c268-70 450-80 675-20s434 49 925-96v246H0z" fill="#0B233D" fill-opacity=".7"/>
+  <path d="M95 711c232-76 383-86 558-36s337 54 554-17 283-104 394-81" stroke="#A7E3DB" stroke-opacity=".78" stroke-width="4"/>
+  <path d="m1535 564 66 10-41 54" stroke="#A7E3DB" stroke-opacity=".8" stroke-width="4"/>
+  <path d="M0 840h1600" stroke="#D6E8E8" stroke-opacity=".14" stroke-width="2"/>
+</svg>

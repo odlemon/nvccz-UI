@@ -11,11 +11,15 @@ import { format } from "date-fns"
 import { toast } from "sonner"
 import { accountingApi } from "@/lib/api/accounting-api"
 import { ProcurementDataTable, Column } from "../procurement/procurement-data-table"
+import { AccountingExportControls } from "./accounting-export-controls"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
 export function UnrealizedFxGainsView() {
   const [asOfDate, setAsOfDate] = useState<Date>(new Date())
   const [loading, setLoading] = useState(false)
   const [data, setData] = useState<any>(null)
+  const [currency, setCurrency] = useState("all")
+  const [generatedDate, setGeneratedDate] = useState<Date | null>(null)
 
   const handleGenerate = async () => {
     setLoading(true)
@@ -23,6 +27,8 @@ export function UnrealizedFxGainsView() {
       const response = await accountingApi.getUnrealizedFxGainsReport(format(asOfDate, "yyyy-MM-dd"))
       if (response.success && response.data) {
         setData(response.data)
+        setCurrency('all')
+        setGeneratedDate(asOfDate)
       } else {
         throw new Error(response.error || "Failed to load FX report")
       }
@@ -73,8 +79,9 @@ export function UnrealizedFxGainsView() {
     toast.success(`Exported ${rows.length} records`)
   }
 
-  const lines: any[] = data?.lines || []
-  const totals = data?.totals
+  const allLines: any[] = data?.lines || []
+  const lines = currency === "all" ? allLines : allLines.filter((line) => line.invoiceCurrencyCode === currency)
+  const totals = currency === "all" ? data?.totals : { unrealizedGain: lines.reduce((s, x) => s + (x.gainLossType === 'GAIN' ? Number(x.unrealizedGainLoss) || 0 : 0), 0), unrealizedLoss: lines.reduce((s, x) => s + (x.gainLossType === 'LOSS' ? Number(x.unrealizedGainLoss) || 0 : 0), 0), netUnrealized: lines.reduce((s, x) => s + (x.gainLossType === 'GAIN' ? 1 : x.gainLossType === 'LOSS' ? -1 : 0) * (Number(x.unrealizedGainLoss) || 0), 0) }
   const functionalCurrency = data?.functionalCurrencyCode || ""
   const valuationCurrency = data?.valuationCurrencyCode || ""
   const excludedItems: any[] = data?.excludedOpenItems || []
@@ -160,10 +167,15 @@ export function UnrealizedFxGainsView() {
             <Calendar mode="single" selected={asOfDate} onSelect={(d) => d && setAsOfDate(d)} initialFocus />
           </PopoverContent>
         </Popover>
+        <Select value={currency} onValueChange={setCurrency}>
+          <SelectTrigger className="w-44 rounded-full" aria-label="Invoice currency"><SelectValue /></SelectTrigger>
+          <SelectContent><SelectItem value="all">All currencies</SelectItem>{Array.from(new Set(allLines.map(x => x.invoiceCurrencyCode).filter(Boolean))).sort().map(code => <SelectItem key={code as string} value={code as string}>{code as string}</SelectItem>)}</SelectContent>
+        </Select>
         <Button onClick={handleGenerate} disabled={loading} variant="gradient-create" className="rounded-full h-10 px-6">
           {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <RefreshCw className="w-4 h-4 mr-2" />}
           Generate
         </Button>
+        {data && generatedDate && !loading && <AccountingExportControls label="unrealized FX report" spec={{ title: 'Unrealized FX Gains and Losses', subtitle: `As of ${format(generatedDate, 'yyyy-MM-dd')} · Invoice currency: ${currency === 'all' ? 'All' : currency} · Valuation: ${valuationCurrency}`, columns: ['Invoice', 'Customer', 'Status', 'Currency', 'Outstanding', `Original (${valuationCurrency})`, `Current (${valuationCurrency})`, 'Gain/loss', 'Type'], moneyColumns: [4, 5, 6, 7], rows: lines.map(r => [r.invoiceNumber || '', r.customerName || '', r.status || '', r.invoiceCurrencyCode || '', Number(r.outstandingAmount || 0), Number(r.originalFunctionalValue || 0), Number(r.currentFunctionalValue || 0), Number(r.unrealizedGainLoss || 0), r.gainLossType || '']), filename: 'unrealized-fx-gains' }} />}
       </div>
 
       {/* Summary Cards */}
@@ -208,8 +220,8 @@ export function UnrealizedFxGainsView() {
         title="Unrealized FX Gains/Losses"
         searchPlaceholder="Search by invoice, customer..."
         loading={loading}
+        exportable={false}
         emptyMessage="Select a date and click Generate to view unrealized FX gains/losses."
-        onExport={handleExport}
       />
 
       {/* Excluded Items */}

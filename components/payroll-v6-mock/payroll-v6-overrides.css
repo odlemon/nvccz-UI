@@ -117,3 +117,372 @@
   min-width: 0;
   overflow-wrap: anywhere;
 }
+.payroll-v6-root .export-icon-group,
+.payroll-v6-root .employee-export-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+}
+.payroll-v6-root .export-icon-group .icon-btn,
+.payroll-v6-root .employee-export-group .employee-export-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 31px;
+  height: 31px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  color: var(--ink);
+  background: transparent;
+  box-shadow: none;
+}
+.payroll-v6-root .export-icon-group .icon-btn:hover,
+.payroll-v6-root .employee-export-group .employee-export-icon:hover {
+  color: var(--blue);
+  background: var(--blue-soft);
+}
+.payroll-v6-root .export-icon-group .icon-btn svg,
+.payroll-v6-root .employee-export-group .employee-export-icon svg {
+  width: 15px;
+  height: 15px;
+}
+
+/* Compliance Report Studio spacing and compact, consistent export controls. */
+.payroll-v6-root .report-grid + .report-runs-card {
+  margin-top: 16px;
+}
+.payroll-v6-root .report-table-toolbar,
+.payroll-v6-root .report-row-actions {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+.payroll-v6-root .report-table-toolbar {
+  flex: 0 0 auto;
+  margin-left: auto;
+  justify-content: flex-end;
+}
+.payroll-v6-root .report-export-icons {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 3px;
+  padding: 3px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+}
+.payroll-v6-root .report-export-icon {
+  display: inline-grid;
+  flex: 0 0 30px;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--ink);
+  box-shadow: none;
+}
+.payroll-v6-root .report-export-icon:hover {
+  background: var(--blue-soft);
+  color: var(--blue);
+}
+.payroll-v6-root .report-export-icon svg {
+  width: 15px;
+  height: 15px;
+}
+.payroll-v6-root .report-row-actions {
+  gap: 8px;
+  white-space: nowrap;
+}
+.payroll-v6-root .report-pagination {
+  display: flex;
+  justify-content: flex-end;
+  gap: 18px;
+  margin-top: 4px;
+  padding: 14px 16px;
+  border-top: 1px solid var(--line);
+}
+.payroll-v6-root .report-pagination > div > span {
+  white-space: nowrap;
+}
+.payroll-v6-root .report-pagination > div {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.payroll-v6-root .report-generate-form {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: end;
+  gap: 16px;
+}
+.payroll-v6-root .report-generate-form .form-field {
+  min-width: 0;
+  gap: 7px;
+}
+.payroll-v6-root .report-generate-form .form-field label {
+  display: block;
+  margin: 0;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+.payroll-v6-root .report-generate-form .form-field input,
+.payroll-v6-root .report-generate-form .form-field select {
+  box-sizing: border-box;
+  min-width: 0;
+  min-height: 40px;
+  padding: 9px 11px;
+  color: var(--ink);
+  font: inherit;
+  font-size: 12px;
+  line-height: 1.4;
+}
+@media (max-width: 760px) {
+  .payroll-v6-root .report-generate-form {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .payroll-v6-root .report-table-toolbar {
+    flex-wrap: wrap;
+    justify-content: flex-start;
+  }
+  .payroll-v6-root .report-pagination {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .payroll-v6-root .report-pagination > div {
+    align-self: flex-end;
+  }
+}
+
+.payroll-v6-root .audit-kpis { margin-bottom: 14px; }
+.payroll-v6-root .audit-filter-card,
+.payroll-v6-root .audit-ledger-card { margin-top: 14px; }
+.payroll-v6-root .audit-filter-toolbar {
+  display: grid;
+  grid-template-columns: minmax(220px, 1.7fr) repeat(3, minmax(120px, .8fr)) auto auto auto;
+  align-items: end;
+  gap: 10px;
+  padding: 14px;
+}
+.payroll-v6-root .audit-filter-toolbar label,
+.payroll-v6-root .audit-pagination label {
+  display: grid;
+  min-width: 0;
+  gap: 5px;
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 600;
+}
+.payroll-v6-root .audit-filter-toolbar label > span { line-height: 1.3; }
+.payroll-v6-root .audit-filter-toolbar input,
+.payroll-v6-root .audit-filter-toolbar select,
+.payroll-v6-root .audit-pagination select {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  height: 38px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-size: 11px;
+}
+.payroll-v6-root .audit-ledger-card { overflow: hidden; }
+.payroll-v6-root .audit-ledger-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
+}
+.payroll-v6-root .audit-export-icons {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 3px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+}
+.payroll-v6-root .audit-export-icons .icon-btn {
+  display: inline-grid;
+  flex: 0 0 30px;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--ink);
+}
+.payroll-v6-root .audit-export-icons .icon-btn:hover { background: var(--blue-soft); color: var(--blue); }
+.payroll-v6-root .audit-export-icons svg { width: 15px; height: 15px; }
+.payroll-v6-root .audit-ledger-table { min-width: 1120px; }
+.payroll-v6-root .audit-ledger-table th,
+.payroll-v6-root .audit-ledger-table td { padding: 11px 12px; vertical-align: middle; }
+.payroll-v6-root .audit-ledger-table th { white-space: nowrap; }
+.payroll-v6-root .audit-timestamp { min-width: 150px; white-space: nowrap; color: var(--muted); font-variant-numeric: tabular-nums; }
+.payroll-v6-root .audit-action-cell { min-width: 185px; font-weight: 600; }
+.payroll-v6-root .audit-detail-cell { min-width: 240px; max-width: 360px; color: var(--muted); line-height: 1.45; overflow-wrap: anywhere; }
+
+/* Keep every Payroll export surface aligned with the Accounting command-center controls. */
+.payroll-v6-root .export-icon-group,
+.payroll-v6-root .employee-export-group,
+.payroll-v6-root .audit-export-icons,
+.payroll-v6-root .report-export-icons {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+.payroll-v6-root .export-icon-group > button.icon-btn,
+.payroll-v6-root .employee-export-group > button.employee-export-icon,
+.payroll-v6-root .audit-export-icons > button.icon-btn,
+.payroll-v6-root .report-export-icons > button.report-export-icon {
+  display: inline-flex;
+  flex: 0 0 auto;
+  width: auto;
+  min-width: 70px;
+  height: 36px;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: none;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
+}
+.payroll-v6-root .export-icon-group > button.icon-btn:hover,
+.payroll-v6-root .employee-export-group > button.employee-export-icon:hover,
+.payroll-v6-root .audit-export-icons > button.icon-btn:hover,
+.payroll-v6-root .report-export-icons > button.report-export-icon:hover {
+  border-color: var(--line-strong, #cbd5e1);
+  background: var(--surface-2, #f8fafc);
+  color: var(--ink);
+}
+.payroll-v6-root .export-icon-group > button.icon-btn svg,
+.payroll-v6-root .employee-export-group > button.employee-export-icon svg,
+.payroll-v6-root .audit-export-icons > button.icon-btn svg,
+.payroll-v6-root .report-export-icons > button.report-export-icon svg {
+  width: 14px;
+  height: 14px;
+  flex: 0 0 14px;
+}
+.payroll-v6-root .export-icon-group > button.icon-btn::after,
+.payroll-v6-root .employee-export-group > button.employee-export-icon::after,
+.payroll-v6-root .audit-export-icons > button.icon-btn::after,
+.payroll-v6-root .report-export-icons > button.report-export-icon::after {
+  content: "";
+}
+.payroll-v6-root .export-icon-group > button.icon-btn[title*="PDF"]::after,
+.payroll-v6-root .employee-export-group > button.employee-export-icon[title*="PDF"]::after,
+.payroll-v6-root .audit-export-icons > button.icon-btn[title*="PDF"]::after,
+.payroll-v6-root .report-export-icons > button.report-export-icon[title*="PDF"]::after { content: "PDF"; }
+.payroll-v6-root .export-icon-group > button.icon-btn[title*="Excel"]::after,
+.payroll-v6-root .employee-export-group > button.employee-export-icon[title*="Excel"]::after,
+.payroll-v6-root .audit-export-icons > button.icon-btn[title*="Excel"]::after,
+.payroll-v6-root .report-export-icons > button.report-export-icon[title*="Excel"]::after { content: "Excel"; }
+.payroll-v6-root .export-icon-group > button.icon-btn[title*="CSV"]::after,
+.payroll-v6-root .employee-export-group > button.employee-export-icon[title*="CSV"]::after,
+.payroll-v6-root .audit-export-icons > button.icon-btn[title*="CSV"]::after,
+.payroll-v6-root .report-export-icons > button.report-export-icon[title*="CSV"]::after { content: "CSV"; }
+.payroll-v6-root .audit-class-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 23px;
+  padding: 3px 8px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 650;
+  white-space: nowrap;
+}
+.payroll-v6-root .audit-class-change { color: #1c5c9d; background: #e7f0ff; border-color: #d5e5ff; }
+.payroll-v6-root .audit-class-approval { color: #5b43a6; background: #f0ebff; border-color: #e4dcff; }
+.payroll-v6-root .audit-class-access,
+.payroll-v6-root .audit-class-sensitive { color: #087b73; background: #e3f8f4; border-color: #ccefe9; }
+.payroll-v6-root .audit-class-release { color: #176b3b; background: #e7f7ed; border-color: #d4f0df; }
+.payroll-v6-root .audit-class-security { color: #a1243b; background: #fff0f2; border-color: #ffd9df; }
+.payroll-v6-root .audit-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 13px 16px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 11px;
+}
+.payroll-v6-root .audit-pagination > div { display: flex; align-items: center; gap: 10px; }
+.payroll-v6-root .audit-pagination label { display: flex; align-items: center; gap: 7px; white-space: nowrap; }
+.payroll-v6-root .audit-pagination select { width: 72px; height: 34px; }
+.payroll-v6-root .audit-advanced-form { gap: 14px; }
+.payroll-v6-root .audit-detail-copy { margin-top: 14px; }
+.payroll-v6-root .audit-detail-copy p { margin: 7px 0 0; color: var(--muted); line-height: 1.55; overflow-wrap: anywhere; }
+@media (max-width: 1200px) {
+  .payroll-v6-root .audit-filter-toolbar { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .payroll-v6-root .audit-search { grid-column: 1 / -1; }
+}
+@media (max-width: 700px) {
+  .payroll-v6-root .audit-filter-toolbar { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .payroll-v6-root .audit-search { grid-column: 1 / -1; }
+  .payroll-v6-root .audit-ledger-card .card-head { align-items: flex-start; flex-direction: column; gap: 12px; }
+  .payroll-v6-root .audit-ledger-actions { margin-left: 0; }
+  .payroll-v6-root .audit-pagination { align-items: flex-start; flex-direction: column; }
+  .payroll-v6-root .audit-pagination > div { align-self: flex-end; flex-wrap: wrap; }
+}
+
+.payroll-v6-root .tax-kpis { margin-bottom: 14px; }
+/* Settings & Integrations: API-backed bank payment template register. */
+.payroll-v6-root .settings-summary { margin-bottom: 14px; }
+.payroll-v6-root .settings-register,
+.payroll-v6-root .settings-currencies { margin-bottom: 14px; overflow: hidden; }
+.payroll-v6-root .settings-register .card-head,
+.payroll-v6-root .settings-currencies .card-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.payroll-v6-root .settings-register .card-head p,
+.payroll-v6-root .settings-currencies .card-head p { margin: 4px 0 0; }
+.payroll-v6-root .settings-toolbar { display: flex; align-items: end; gap: 10px; padding: 14px 16px; border-bottom: 1px solid var(--line, #d7e2f1); }
+.payroll-v6-root .settings-toolbar label { display: grid; gap: 5px; color: var(--muted, #53647c); font-size: 12px; }
+.payroll-v6-root .settings-toolbar input { min-width: min(340px, 48vw); }
+.payroll-v6-root .settings-result-count { margin-left: auto; padding-bottom: 8px; color: var(--muted, #53647c); font-size: 12px; }
+.payroll-v6-root .settings-template-columns { min-width: 260px; max-width: 440px; white-space: normal; }
+.payroll-v6-root .settings-pagination { display: flex; justify-content: space-between; align-items: center; gap: 14px; padding: 12px 16px; color: var(--muted, #53647c); font-size: 12px; }
+.payroll-v6-root .settings-pagination > div { display: flex; align-items: center; gap: 8px; }
+.payroll-v6-root .settings-pagination label { display: flex; align-items: center; gap: 6px; }
+.payroll-v6-root .settings-pagination select { min-width: 64px; }
+.payroll-v6-root .settings-currency-list { display: flex; flex-wrap: wrap; gap: 8px; }
+.payroll-v6-root .settings-currency-chip { display: inline-flex; align-items: center; padding: 6px 10px; border: 1px solid var(--line, #d7e2f1); border-radius: 999px; background: var(--surface, #fff); font-weight: 600; }
+.payroll-v6-root .settings-check-label { display: flex; align-items: center; gap: 8px; min-height: 42px; }
+.payroll-v6-root #bankTemplateColumns { min-height: 150px; }
+@media (max-width: 720px) {
+  .payroll-v6-root .settings-toolbar, .payroll-v6-root .settings-pagination { align-items: stretch; flex-direction: column; }
+  .payroll-v6-root .settings-toolbar input { min-width: 0; width: 100%; }
+  .payroll-v6-root .settings-result-count { margin-left: 0; }
+  .payroll-v6-root .settings-pagination > div { justify-content: space-between; flex-wrap: wrap; }
+}
+.pr6-mypay-card{cursor:pointer;transition:box-shadow .16s ease,transform .16s ease}.pr6-mypay-card:hover{box-shadow:0 8px 24px rgba(15,39,76,.1);transform:translateY(-1px)}.pr6-mypay-card:focus-visible{outline:2px solid #2563eb;outline-offset:2px}
+.mypay-slip-preview{max-width:760px;margin:0 auto;background:#fff;border:1px solid #d6deeb;border-radius:12px;overflow:hidden;color:#152743}.mypay-slip-letterhead{padding:18px 22px;background:#fff;border-bottom:1px solid #d6deeb}.mypay-slip-letterhead img{display:block;width:100%;max-height:100px;object-fit:contain;object-position:left center}.mypay-slip-letterhead div{display:flex;justify-content:space-between;align-items:center;margin-top:18px;color:#243070}.mypay-slip-letterhead strong{font-size:17px;letter-spacing:.08em}.mypay-slip-letterhead span{font-size:13px}.mypay-slip-employee{display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:20px 22px}.mypay-slip-employee h3{grid-column:1/-1;margin:0 0 2px;font-size:15px}.mypay-slip-employee div,.mypay-slip-summary>div{display:flex;flex-direction:column;gap:5px;padding:12px;border:1px solid #dbe3ef;border-radius:8px;background:#f6f8fc}.mypay-slip-employee span,.mypay-slip-summary span{font-size:12px;color:#5b6b82}.mypay-slip-employee strong,.mypay-slip-summary strong{font-size:14px;color:#152743}.mypay-slip-summary{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:0 22px 22px}.mypay-slip-summary .net{grid-column:1/-1;flex-direction:row;align-items:center;justify-content:space-between;background:#102f5d;border-color:#102f5d}.mypay-slip-summary .net span,.mypay-slip-summary .net strong{color:#fff}.mypay-slip-summary .net strong{font-size:18px}.mypay-slip-footer{padding:12px 22px;border-top:2px solid #243070;color:#5b6b82;font-size:11px}@media(max-width:560px){.mypay-slip-employee,.mypay-slip-summary{grid-template-columns:1fr}.mypay-slip-employee h3,.mypay-slip-summary .net{grid-column:auto}}
+.payroll-v6-root .mypay-slip-summary .net span,.payroll-v6-root .mypay-slip-summary .net strong{color:#fff!important}

@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { ProcurementDataTable, Column } from "../procurement/procurement-data-table"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
@@ -20,12 +20,16 @@ import { ViewCustomerModal } from "./view-customer-modal"
 import { ConfirmationDialog } from "../ui/confirmation-drawer"
 import { accountingApi, Customer, CreateCustomerRequest } from "@/lib/api/accounting-api"
 import { CustomerViewDrawer } from "./customer-view-drawer"
+import { AccountingExportControls } from "./accounting-export-controls"
+import { BulkReceivablesUploadModal } from "./bulk-receivables-upload-modal"
+import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import { useAccountingPermissions } from "@/lib/hooks/useAccountingPermissions"
 
 // Export the type for use in other components
 export type { Customer }
 
-export function CustomersManagement() {
+export function CustomersManagement({ enhanced = false }: { enhanced?: boolean }) {
   const { permissions } = useAccountingPermissions()
   
   // Permission checks
@@ -34,6 +38,11 @@ export function CustomersManagement() {
   const canDeleteCustomer = permissions.canDeleteCustomer
   
   const [customers, setCustomers] = useState<Customer[]>([])
+  const [pagination, setPagination] = useState({ total: 0, page: 1, limit: 10, totalPages: 0 })
+  const [search, setSearch] = useState("")
+  const [bulkOpen, setBulkOpen] = useState(false)
+  const [allCustomers, setAllCustomers] = useState<Customer[]>([])
+  const requestSeq = useRef(0)
   const [customersLoading, setCustomersLoading] = useState(false)
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
   const [isViewModalOpen, setIsViewModalOpen] = useState(false)
@@ -48,19 +57,22 @@ export function CustomersManagement() {
     loadCustomers()
   }, [])
 
-  const loadCustomers = async () => {
+  const loadCustomers = async (page = pagination.page, limit = pagination.limit, query = search) => {
+    const seq = ++requestSeq.current
     try {
       setCustomersLoading(true)
-      const response = await accountingApi.getCustomers()
+      const response = await accountingApi.getCustomers(enhanced ? { page, limit, search: query || undefined } : { limit: 10000 })
+      if (seq !== requestSeq.current) return
       if (response.success && response.data) {
         setCustomers(response.data.customers)
+        if (enhanced) setPagination({ total: response.data.total, page: response.data.page, limit: response.data.limit, totalPages: response.data.totalPages })
       } else {
         toast.error("Failed to load customers")
       }
     } catch (error: any) {
       toast.error("Error loading customers", { description: error.message })
     } finally {
-      setCustomersLoading(false)
+      if (seq === requestSeq.current) setCustomersLoading(false)
     }
   }
 
@@ -280,11 +292,26 @@ export function CustomersManagement() {
     toast.success(`Exported ${data.length} customers`)
   }
 
+  const loadExport = async () => {
+    const rows: Customer[] = []
+    for (let page = 1; ; page++) {
+      const response = await accountingApi.getCustomers({ page, limit: 100, search: search || undefined })
+      if (!response.success || !response.data) throw new Error(response.error || 'Could not export customers')
+      rows.push(...response.data.customers)
+      if (page >= response.data.totalPages || response.data.customers.length < 100) break
+    }
+    return { title: 'Customers', filename: 'customers', columns: ['Name', 'Tax Number', 'Contact', 'Email', 'Phone', 'Address', 'Payment Terms', 'Status', 'Created'],
+      rows: rows.map(x => [x.name, x.taxNumber || '', x.contactPerson || '', x.email || '', x.phone || '', x.address || '', x.paymentTerms || '', x.isActive ? 'Active' : 'Inactive', x.createdAt?.slice(0, 10) || '']), landscape: true }
+  }
+
   return (
     <div className="space-y-6">
+      {enhanced && <BulkReceivablesUploadModal kind="customers" isOpen={bulkOpen} onClose={() => setBulkOpen(false)} onSuccess={() => loadCustomers(1, pagination.limit, search)} customers={allCustomers} />}
       {/* Data Table */}
       <ProcurementDataTable
         data={customers}
+        exportControls={enhanced ? () => <AccountingExportControls label="customers" spec={loadExport} /> : undefined}
+        extraControls={enhanced ? <div className="flex items-center gap-2"><Input aria-label="Search customers" placeholder="Search customers..." value={search} onChange={e => { setSearch(e.target.value); void loadCustomers(1, pagination.limit, e.target.value) }} className="w-52" />{canCreateCustomer && <Button variant="outline" className="rounded-full" onClick={async () => { const response = await accountingApi.getCustomers({ limit: 10000 }); setAllCustomers(response.data?.customers || []); setBulkOpen(true) }}>Bulk Upload</Button>}</div> : undefined}
         columns={columns}
         title="Customers"
         searchPlaceholder="Search customers..."
@@ -296,7 +323,13 @@ export function CustomersManagement() {
         onBulkAction={handleBulkAction}
         bulkActions={bulkActions}
         loading={customersLoading}
-        onExport={handleExport}
+        onExport={enhanced ? undefined : handleExport}
+        showSearch={!enhanced}
+        showFilters={!enhanced}
+        usePagination={enhanced ? 'backend' : 'frontend'}
+        paginationData={enhanced ? pagination : undefined}
+        onPageChange={enhanced ? page => void loadCustomers(page, pagination.limit, search) : undefined}
+        onPageSizeChange={enhanced ? limit => void loadCustomers(1, limit, search) : undefined}
         emptyMessage="No customers found. Create your first customer to get started."
       />
 

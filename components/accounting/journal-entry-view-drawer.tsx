@@ -57,8 +57,8 @@ interface JournalEntry {
     firstName: string
     lastName: string
   }
-  createdAt: string
-  updatedAt: string
+  createdAt?: string
+  updatedAt?: string
 }
 
 interface JournalEntryLine {

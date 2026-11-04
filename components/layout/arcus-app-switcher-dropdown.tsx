@@ -2,6 +2,7 @@
 
 import { useRef, useEffect, useMemo } from "react"
 import { createPortal } from "react-dom"
+import { CiWallet } from "react-icons/ci"
 import { getSwitcherModules } from "@/lib/config/modules"
 import { useRolePermissions } from "@/lib/hooks/useRolePermissions"
 import "./arcus-app-switcher.css"
@@ -22,6 +23,7 @@ export function AppSwitcherDropdown({
 }: AppSwitcherDropdownProps) {
   const dropdownRef = useRef<HTMLDivElement>(null)
   const { hasModuleAccess, isLoading, isAuthenticated } = useRolePermissions()
+  const showMyPayShortcut = isAuthenticated && !isLoading && !hasModuleAccess("payroll-v6")
 
   const modulesToDisplay = useMemo(() => {
     if (!isAuthenticated || isLoading) return []
@@ -144,10 +146,36 @@ export function AppSwitcherDropdown({
                   </button>
                 )
               })}
+              {showMyPayShortcut && (
+                <button
+                  type="button"
+                  data-arcus-app-switcher-card
+                  data-active="false"
+                  onClick={() => {
+                    onClose()
+                    window.location.href = "/payroll/mypay"
+                  }}
+                  className="group relative p-3 sm:p-4 cursor-pointer transition-all duration-200"
+                >
+                  <div
+                    data-arcus-app-switcher-icon
+                    className="w-12 h-12 sm:w-14 sm:h-14 mx-auto mb-2.5 sm:mb-3 flex items-center justify-center shadow-sm group-hover:shadow-md transition-all duration-200"
+                    style={{ borderColor: "oklch(0.52 0.14 255)" }}
+                  >
+                    <CiWallet className="h-6 w-6 sm:h-7 sm:w-7" style={{ color: "oklch(0.52 0.14 255)" }} />
+                  </div>
+                  <div className="text-center">
+                    <span data-arcus-app-switcher-name className="block leading-tight">Payroll</span>
+                    <div data-arcus-app-switcher-desc className="mt-1 line-clamp-2">
+                      Your payslips and leave balances
+                    </div>
+                  </div>
+                </button>
+              )}
             </div>
           )}
 
-          {!isLoading && modulesToDisplay.length === 0 && (
+          {!isLoading && modulesToDisplay.length === 0 && !showMyPayShortcut && (
             <div className="text-center py-12 text-gray-500">
               <p>No modules available</p>
             </div>

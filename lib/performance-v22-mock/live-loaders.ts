@@ -41,6 +41,7 @@ import {
   adaptNamed,
   adaptOrgBsc,
   adaptPillar,
+  adaptPerformanceProject,
   adaptReview,
   adaptRisk,
   adaptTask,
@@ -64,11 +65,15 @@ import type {
   PerfContract,
   PerfDocumentFolders,
   PerfKpi,
+  PerfProject,
   PerfDeptScorecard,
   PerfGovScorecard,
   PerfMyScorecard,
   PerfLivePayload,
   PerfNamed,
+  PerfGoal,
+  PerfTheme,
+  PerfStrategy,
   PerfOrgBsc,
   PerfPillar,
   PerfReview,
@@ -149,10 +154,22 @@ export async function loadKpis(): Promise<ScopeResult<PerfKpi[]>> {
   return safe<PerfKpi[]>(
     "kpis",
     async () => {
-      const res: any = await apiClient.get("/kpis")
-      return pickArray(res, "kpis", "data").map(adaptKpi)
+      const res: any = await apiClient.get("/performance/kpi-registry")
+      const registry = res?.data
+      return (Array.isArray(registry?.kpis) ? registry.kpis : []).map(adaptKpi)
     },
     [],
+  )
+}
+
+export async function loadKpiRegistryAnalytics(): Promise<ScopeResult<any | null>> {
+  return safe<any | null>(
+    "KPI registry analytics",
+    async () => {
+      const res: any = await apiClient.get("/performance/kpi-registry/analytics")
+      return res?.data ?? null
+    },
+    null,
   )
 }
 
@@ -181,9 +198,86 @@ function namedLoader(label: string, path: string, ...keys: string[]) {
 }
 
 export const loadPillars = namedLoader("pillars", "/performance/scorecard-pillars", "data")
-export const loadThemes = namedLoader("themes", "/performance/config/themes", "data")
-export const loadStrategies = namedLoader("strategies", "/performance/config/strategies", "data")
-export const loadGoals = namedLoader("goals", "/performance/goals", "goals", "data")
+export async function loadThemes(): Promise<ScopeResult<PerfTheme[]>> {
+  return safe<PerfTheme[]>("themes", async () => {
+    const res: any = await apiClient.get("/performance/config/themes")
+    return pickArray(res, "data").map((raw: any) => ({
+      ...adaptNamed(raw),
+      perspective: raw?.perspective == null ? null : String(raw.perspective),
+    }))
+  }, [])
+}
+export async function loadStrategies(): Promise<ScopeResult<PerfStrategy[]>> {
+  return safe<PerfStrategy[]>("strategies", async () => {
+    const res: any = await apiClient.get("/performance/config/strategies?includeArchived=false")
+    return pickArray(res, "data").map((raw: any) => {
+      const metadata = raw?.metadata && typeof raw.metadata === "object" ? raw.metadata : null
+      return {
+        ...adaptNamed(raw),
+        performanceContractId: raw?.performanceContractId == null ? null : String(raw.performanceContractId),
+        parentGoalId: raw?.parentGoalId == null ? null : String(raw.parentGoalId),
+        name: String(metadata?.cycle || raw?.title || raw?.name || ""),
+        title: String(raw?.title ?? raw?.name ?? ""),
+        periodStart: raw?.periodStart ? String(raw.periodStart) : null,
+        periodEnd: raw?.periodEnd ? String(raw.periodEnd) : null,
+        visionStatement: raw?.visionStatement == null ? null : String(raw.visionStatement),
+        pillarWeights: raw?.pillarWeights && typeof raw.pillarWeights === "object" ? raw.pillarWeights : null,
+        metadata,
+        archivedAt: raw?.archivedAt ? String(raw.archivedAt) : null,
+        cycle: metadata?.cycle || "",
+        owner: metadata?.owner || "",
+        sponsor: metadata?.sponsor || "",
+        approval: metadata?.approval || "",
+        intent: metadata?.intent || "",
+        vision: raw?.visionStatement || metadata?.vision || "",
+        mission: metadata?.mission || "",
+        themes: metadata?.themes || "",
+        framework: metadata?.framework || "Balanced Scorecard",
+        cadence: metadata?.cadence || "",
+        risk: metadata?.risk || "",
+        effective: raw?.periodStart ? String(raw.periodStart).slice(0, 10) : "",
+        end: raw?.periodEnd ? String(raw.periodEnd).slice(0, 10) : "",
+        objectives: [],
+      }
+    })
+  }, [])
+}
+export async function loadGoals(): Promise<ScopeResult<PerfGoal[]>> {
+  return safe<PerfGoal[]>("goals", async () => {
+    const res: any = await apiClient.get("/performance/goals")
+    return pickArray(res, "goals", "data").map((raw: any) => {
+      const assigned = raw?.assignedTo
+      const owner = assigned?.name || [assigned?.firstName, assigned?.lastName].filter(Boolean).join(" ") || null
+      return {
+        ...adaptNamed(raw),
+        title: String(raw?.title ?? raw?.name ?? ""),
+        strategyId: raw?.strategyId == null ? null : String(raw.strategyId),
+        strategicThemeId: raw?.strategicThemeId == null ? null : String(raw.strategicThemeId),
+        scorecardPillar: raw?.scorecardPillar == null ? null : String(raw.scorecardPillar),
+        scorecardWeight: raw?.scorecardWeight == null ? null : Number(raw.scorecardWeight),
+        targetValue: raw?.targetValue == null ? null : Number(raw.targetValue),
+        targetUnit: raw?.targetUnit == null ? null : String(raw.targetUnit),
+        goalType: raw?.type == null ? null : String(raw.type),
+        owner,
+        ownerId: raw?.assignedToId == null ? null : String(raw.assignedToId),
+        departmentName: raw?.departmentName == null ? null : String(raw.departmentName),
+        currentValue: raw?.currentValue == null ? null : Number(raw.currentValue),
+        progressPercentage: raw?.progressPercentage == null ? null : Number(raw.progressPercentage),
+        confidence: raw?.confidence == null ? null : String(raw.confidence),
+        startDate: raw?.startDate == null ? null : String(raw.startDate),
+        endDate: raw?.endDate == null ? null : String(raw.endDate),
+        lastCheckDate: raw?.lastCheckDate == null ? null : String(raw.lastCheckDate),
+        nextCheckDate: raw?.nextCheckDate == null ? null : String(raw.nextCheckDate),
+        priority: raw?.priority == null ? null : String(raw.priority),
+        trackingFrequency: raw?.trackingFrequency == null ? null : String(raw.trackingFrequency),
+        isReverseKpi: Boolean(raw?.isReverseKpi ?? raw?.kpi?.isReverseKpi),
+        parentGoalId: raw?.parentGoalId == null ? null : String(raw.parentGoalId),
+        keyResultCount: Number(raw?._count?.subGoals ?? raw?.subGoals?.length ?? 0),
+        attachments: Array.isArray(raw?.activities?.attachments) ? raw.activities.attachments.map((a: any) => ({ fileName: String(a?.fileName || "Evidence attachment"), fileUrl: a?.fileUrl == null ? null : String(a.fileUrl), fileSizeBytes: a?.fileSize == null ? null : Number(a.fileSize), createdAt: a?.uploadedAt == null ? null : String(a.uploadedAt) })) : [],
+      }
+    })
+  }, [])
+}
 export const loadArchivedStrategies = namedLoader(
   "archivedStrategies",
   "/performance/config/strategies/archives",
@@ -322,7 +416,8 @@ export async function loadCeoScorecard(): Promise<ScopeResult<PerfGovScorecard |
 }
 
 /**
- * `/api/performance/contracts` -> { success, count, total, skip, take, data } (verified 8 Sep).
+ * `/api/performance/contracts/registry` -> governed contract rows with real signatory,
+ * objective-weight, evidence-coverage and readiness fields.
  *
  * Not `namedLoader`: that reduces every row to {id,name,description,status} and the contract
  * endpoint returns period, subject, department, reviewer, approver and budget as well. The
@@ -332,7 +427,7 @@ export async function loadContracts(): Promise<ScopeResult<PerfContract[]>> {
   return safe<PerfContract[]>(
     "contracts",
     async () => {
-      const res: any = await apiClient.get("/performance/contracts")
+      const res: any = await apiClient.get("/performance/contracts/registry")
       return pickArray(res, "data").map(adaptContract)
     },
     [],
@@ -436,7 +531,7 @@ export async function loadReviews(): Promise<ScopeResult<PerfReview[]>> {
   return safe<PerfReview[]>(
     "reviews",
     async () => {
-      const res: any = await apiClient.get("/performance-reviews")
+      const res: any = await apiClient.get("/performance-reviews?page=1&limit=100")
       return pickArray(res?.data, "reviews").map(adaptReview)
     },
     [],
@@ -448,7 +543,7 @@ export async function loadReviewCycles(): Promise<ScopeResult<PerfNamed[]>> {
   return safe<PerfNamed[]>(
     "reviewCycles",
     async () => {
-      const res: any = await apiClient.get("/performance/review-cycles")
+      const res: any = await apiClient.get("/performance/review-cycles?page=1&limit=100")
       return pickArray(res?.data, "cycles").map(adaptNamed)
     },
     [],
@@ -475,6 +570,22 @@ export async function loadTimesheets(): Promise<ScopeResult<PerfTimesheet[]>> {
     },
     [],
   )
+}
+
+/** Project catalog shared with Accounting Timesheets; employees use it when logging time. */
+export async function loadAccountingProjects(): Promise<ScopeResult<any[]>> {
+  return safe<any[]>("accountingProjects", async () => {
+    const res: any = await apiClient.get("/accounting/projects")
+    return pickArray(res, "data").filter((p: any) => p?.isActive !== false).map((p: any) => ({ id: String(p.id), name: String(p.name || ""), isActive: p.isActive !== false, clientName: p.clientName ?? null, projectType: p.projectType ?? null }))
+  }, [])
+}
+
+/** Performance project workspaces, including task completion and timesheet rollups. */
+export async function loadPerformanceProjects(): Promise<ScopeResult<PerfProject[]>> {
+  return safe<PerfProject[]>("performanceProjects", async () => {
+    const res: any = await apiClient.get("/performance/projects")
+    return pickArray(res, "data").map(adaptPerformanceProject)
+  }, [])
 }
 
 /**
@@ -609,10 +720,13 @@ export async function loadPerformanceLiveData(): Promise<PerfLivePayload> {
     reviewCycles,
     timesheets,
     teamTimesheets,
+    accountingProjects,
+    performanceProjects,
     pillarConfig,
     vision,
     archivedStrategies,
     analyticsKpi,
+    kpiRegistryAnalytics,
     analyticsDashboard,
     analyticsReports,
     deptComparison,
@@ -643,10 +757,13 @@ export async function loadPerformanceLiveData(): Promise<PerfLivePayload> {
     loadReviewCycles(),
     loadTimesheets(),
     loadTeamTimesheets(),
+    loadAccountingProjects(),
+    loadPerformanceProjects(),
     loadPillarConfig(),
     loadVision(),
     loadArchivedStrategies(),
     loadAnalyticsKpi(),
+    loadKpiRegistryAnalytics(),
     loadAnalyticsDashboard(),
     loadAnalyticsReports(),
     loadDeptComparison(),
@@ -679,10 +796,13 @@ export async function loadPerformanceLiveData(): Promise<PerfLivePayload> {
     reviewCycles,
     timesheets,
     teamTimesheets,
+    accountingProjects,
+    performanceProjects,
     pillarConfig,
     vision,
     archivedStrategies,
     analyticsKpi,
+    kpiRegistryAnalytics,
     analyticsDashboard,
     analyticsReports,
     deptComparison,

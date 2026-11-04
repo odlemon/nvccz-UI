@@ -1351,10 +1351,24 @@ type CreateProps = {
   defaultCategory: string
 }
 
+const INPUT_CATEGORIES = [
+  "REVENUE",
+  "COST_OF_SALES",
+  "PAYROLL",
+  "OPERATING_EXPENSES",
+  "DEPARTMENTAL",
+  "PROJECT",
+  "CAPEX",
+  "TAX",
+  "CASH_MOVEMENT",
+  "FUNDING",
+]
+
 export function CreateLineItemDialog({ open, onClose, onCreate, defaultCategory }: CreateProps) {
   const [name, setName] = useState("")
   const [code, setCode] = useState("")
   const [kind, setKind] = useState<"INPUT" | "CALCULATED">("INPUT")
+  const [category, setCategory] = useState(defaultCategory || "REVENUE")
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
 
@@ -1400,6 +1414,20 @@ export function CreateLineItemDialog({ open, onClose, onCreate, defaultCategory 
             <option value="CALCULATED">CALCULATED</option>
           </select>
         </label>
+        <label className="block text-xs text-[#111111]">
+          Planning category
+          <select
+            className="mt-1 w-full h-9 rounded-full border border-[#e2e8f0] px-3 text-sm"
+            value={category}
+            onChange={(e) => setCategory(e.target.value)}
+          >
+            {INPUT_CATEGORIES.map((value) => (
+              <option key={value} value={value}>
+                {value}
+              </option>
+            ))}
+          </select>
+        </label>
         {err && <p className="text-[11px] text-[#b91c1c]">{err}</p>}
         <div className="flex justify-end gap-2 pt-1">
           <button
@@ -1421,7 +1449,7 @@ export function CreateLineItemDialog({ open, onClose, onCreate, defaultCategory 
                   name: name.trim(),
                   code: code.trim(),
                   lineItemType: kind === "CALCULATED" ? "CALC" : "REVENUE",
-                  category: defaultCategory || "General",
+                  category,
                   dataType: "CURRENCY",
                   summaryMethod: "SUM",
                   isEditable: kind === "INPUT",
